@@ -1706,7 +1706,7 @@ async function submitOrderTicket(){
     });
     const result = await r.json();
     if(!r.ok || result.status !== 'placed'){
-      alert('Order failed: ' + (result.error || r.statusText));
+      alert('Order failed: ' + (result.error || result.reason || r.statusText));
       return;
     }
     closeOrderTicket();

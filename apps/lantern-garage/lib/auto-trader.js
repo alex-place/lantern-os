@@ -119,6 +119,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     const record = { symbol: sym, direction: s.direction, p_win: s.convergence.p_win, news: s.news || null };
 
     if (price < c.minPrice) { out.skipped.push({ ...record, why: 'price too low' }); continue; }
+    // Crypto pairs can't trade through this IBKR path (Paxos needs a US crypto acct
+    // + cash-qty orders) — skip so the autopilot doesn't churn on un-tradable names.
+    if (/^[A-Z]{2,5}USD$/.test(sym)) { out.skipped.push({ ...record, why: 'crypto not tradable on this account' }); continue; }
 
     // BEARISH + we hold a long → SELL to close (signal-based exit).
     if (!bullish && held > 0) {

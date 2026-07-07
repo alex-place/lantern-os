@@ -104,6 +104,14 @@ class TradingAPIBridge {
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
     if (!status.connected) return null;
+    // Crypto pairs (BTCUSD/ETHUSD/SOLUSD…) don't trade through this path: IBKR's
+    // hosted crypto (Paxos) requires cash-quantity orders on a US crypto-enabled
+    // account, and the share-quantity order path here doesn't support it. Fail with
+    // a clear reason instead of an opaque "could not resolve conid" / Bad Request.
+    if (/^[A-Z]{2,5}USD$/.test(String(ticker || '').toUpperCase())) {
+      const reason = `Crypto (${ticker}) can't be traded through this IBKR connection. IBKR crypto needs a US crypto-enabled account and cash-quantity orders — not supported on ${status.accountId || 'this account'} (paper, stocks/options).`;
+      return { status: 'error', order_id: null, ticker, side, qty, type: type || 'market', dry: false, reason, error: reason, mode: status.mode, source: 'ibkr-cpapi' };
+    }
     const t = String(type || 'market').toLowerCase();
     const orderType = t === 'limit' ? 'LMT' : t === 'stop' ? 'STP' : 'MKT';
     // A protective stop must survive the session → GTC by default; entries default DAY.
@@ -116,12 +124,14 @@ class TradingAPIBridge {
       price: orderType === 'STP' ? stopPrice : limitPrice,
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
     });
+    const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
     return {
       status: r.status === 'submitted' ? 'placed' : r.status, // placed | dry_run | error
       order_id: r.orderId || null,
       ticker, side, qty, type: type || 'market',
       dry: !!r.dry,
-      reason: r.note || r.error || (r.gate && r.gate.reason) || null,
+      reason,
+      error: r.status === 'error' ? reason : undefined, // surfaced by the UI (result.error)
       mode: r.gate && r.gate.mode,
       stop_loss: stopLoss || null,
       take_profit: takeProfit || null,
