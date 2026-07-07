@@ -415,8 +415,10 @@ class IbkrCpapi {
     };
     if (orderType === 'LMT' && order.price != null) ticket.price = order.price;
 
-    // Body is a JSON ARRAY of tickets (IBKR Web API "New Order Example").
-    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, [ticket]);
+    // Body must be { orders: [ticket, …] }. IBKR's Web API rejects a bare array
+    // with 400 "Missing order parameters" — verified live against a paper account
+    // (a bare [ticket] → 400, { orders:[ticket] } → 200 PreSubmitted).
+    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [ticket] });
     // Order reply messages [{id, message, messageIds}] must be confirmed to proceed.
     let confirms = 0;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
