@@ -2445,14 +2445,19 @@ async function sendMessage(opts = {}) {
       // it only when the debug toggle is set (localStorage `lantern_chat_debug` = "1",
       // or ?debug=1 on the URL). The visible label + swap chip (the cockpit "which model"
       // signal) always show; only the route internals are gated.
-      if (pm && debugChromeOn()) {
-        // Wrap provider/model + route reason in a disclosure so it's accessible but
-        // not noisy; the visible label carries the reason as a hover tooltip (#1554).
+      if (pm) {
+        // #2126: always expose which model actually answered — a collapsed ▸ debug
+        // disclosure carrying the provider/model, so the receipt is never missing.
+        // The verbose route internals (swap chain + route reason, #1554) stay
+        // operator-only behind the debug toggle (#1926) to keep the default clean.
+        const showRouteInternals = debugChromeOn();
+        const summaryLabel = showRouteInternals ? '▸ route' : '▸ debug';
+        const extras = showRouteInternals ? `${swapDebug}${routeDebug}` : '';
         sig.innerHTML =
           `<span${routeTitle}>${visibleText}${swapChip}</span>` +
           `<details class="sig-debug" style="display:inline-block;margin-left:6px">` +
-          `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Route and model details">▸ route</summary>` +
-          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}${swapDebug}${routeDebug}</span>` +
+          `<summary style="display:inline;cursor:pointer;font-size:10px;opacity:0.45;list-style:none" aria-label="Model and route details">${summaryLabel}</summary>` +
+          `<span class="sig-debug-body" style="font-size:10px;opacity:0.55;margin-left:4px">${pm}${extras}</span>` +
           `</details>`;
         sig.setAttribute('aria-label', `Unisona replied${time ? ' at ' + time : ''}; model: ${pm}` + (routeReasonText ? `; routed: ${routeReasonText}` : '') + (swapTitle ? `; ${swapTitle}` : ''));
       } else {

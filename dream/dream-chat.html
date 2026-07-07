@@ -499,6 +499,28 @@
     label.textContent = opt ? opt.textContent.trim() : 'Auto';
   }
 
+  // #2127: a switch used to give no acknowledgement. Flash a brief confirmation so
+  // the user knows the pin took (the next reply's PCSF receipt then shows the model).
+  let _toastTimer = null;
+  function flashPicked(name) {
+    let t = document.getElementById('mp-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'mp-toast';
+      t.setAttribute('role', 'status');
+      t.style.cssText = 'position:absolute;top:100%;left:0;z-index:60;margin-top:6px;padding:6px 10px;'
+        + 'border-radius:8px;font-size:12px;font-weight:600;background:var(--accent,#06b6d4);color:#fff;'
+        + 'box-shadow:0 6px 18px rgba(0,0,0,.2);opacity:0;transition:opacity .15s;pointer-events:none;white-space:nowrap';
+      picker.appendChild(t);
+    }
+    t.textContent = 'Switched to ' + name + ' — your next message will use it';
+    // Show immediately (rAF fade-in can be throttled in a background tab); the
+    // opacity transition still animates the fade-out.
+    t.style.opacity = '1';
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2400);
+  }
+
   function buildMenu() {
     menu.innerHTML = '';
     [...select.options].forEach((opt) => {
@@ -517,6 +539,7 @@
           select.value = opt.value;
           select.dispatchEvent(new Event('change', { bubbles: true }));
           syncLabel(); buildMenu(); close();
+          flashPicked(opt.textContent.trim());
         });
       }
       menu.appendChild(item);
