@@ -345,6 +345,50 @@ const REGISTRY = {
     },
   },
 
+  // ── Coding control plane (#2185): propose → verify → HOLD for approval ──────
+  // The idiomatic seam onto the coding backend (routes/coding.js is the HTTP twin).
+  // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
+  // never applies a repo change itself. Operator-only (policy: mutating).
+  propose_coding_change: {
+    policy: "mutating",
+    desc:
+      "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
+    schema: {
+      type: "object",
+      properties: {
+        task: { type: "string", description: "What the change should do." },
+        repo_path: { type: "string", description: "Repo to change (default: this repo)." },
+        backend: { type: "string", description: "Force a backend (mock|ollama|aider|openhands); default routes by measured per-repo outcome." },
+      },
+      required: ["task"],
+    },
+    async run(i) {
+      const task = String(i.task || "").trim();
+      if (!task) return "[error: task is required]";
+      const cb = require("./coding-backend");
+      const repoPath = i.repo_path || REPO;
+      let r;
+      try {
+        r = i.backend
+          ? await cb.runCodingTask({ task, repoPath, backend: String(i.backend), why: "chat tool" })
+          : await cb.routeCodingTask({ task, repoPath, candidates: cb.listBackends(), defaultBackend: "aider", why: "chat tool" });
+      } catch (e) {
+        return `[propose_coding_change error: ${e.message}]`;
+      }
+      if (!r || !r.ok) return `[propose_coding_change failed: ${(r && r.error) || "no proposal"}${r && r.hint ? " — " + r.hint : ""}]`;
+      const v = r.verification || {};
+      const files = (r.proposal && r.proposal.filesChanged) || [];
+      const verdict = v.decisive ? (v.passed === false ? "FAILED" : "passed") : "not decisive (guard-only)";
+      return [
+        `Proposed ${files.length} file change(s) via backend '${r.backend}' — HELD for approval (NOT applied).`,
+        files.length ? `Files: ${files.join(", ")}` : null,
+        `Verification: ${verdict}${v.enforce ? " [enforced]" : ""}${r.blocked ? " — BLOCKED from apply until overridden" : ""}`,
+        r.routing ? `Routing: ${r.routing.backend} (${r.routing.hasSignal ? "measured outcome" : "cold-start"})` : null,
+        `Pending id: ${r.pendingId} — approve via POST /api/coding/approve (operator).`,
+      ].filter(Boolean).join("\n");
+    },
+  },
+
   // #1344: a first-class issue/PR lookup. Before this, "find issue #1342" had no tool —
   // the model fell back to Grep on repo files (issues don't live in the repo), found
   // nothing, and gave up, even though the live-context block already injects the top-8
