@@ -105,6 +105,14 @@ Decision tree: **B wins** → "dreaming" = replay+verification, RLVR waits; **A 
 recipe needs work; **none win** → stop updating weights, improve retrieval/tools instead. This is the
 cheapest test of whether weight updates earn their keep at all.
 
+> **Harness spec (2026-07-07):** the concrete cloud-L4 runbook is
+> [docs/SIGMA-THETA-ABC-HARNESS-SPEC.md](../SIGMA-THETA-ABC-HARNESS-SPEC.md). The Σ_θ release gate
+> (§8.1.2, 7 conditions) and the A/B/C decision tree are **implemented and self-tested with no GPU**
+> in `experiments/sigma_theta_abc/harness.py --self-test` (CI: `tests/test_sigma_theta_gate.py`) —
+> a planted reward-hack, forgetting regression, instability, and over-budget drift are each rejected.
+> The only remaining new training code is a narrow GRPO trainer for arm C; arms A/B reuse
+> `train-qlora-ouro.py`. Training runs L4-only (`KEYSTONE_L4=1`); the local box is refused.
+
 ## Consequences
 
 - **Positive:** turns 0010's abstract "verify-gated last resort" into a concrete, safe mechanism; the
