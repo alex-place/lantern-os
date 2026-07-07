@@ -91,7 +91,7 @@ def test_decide_reports_winner_and_gates():
     assert set(rep["gates"]) == {"A", "B", "C"}
 
 
-def test_decide_stops_updates_when_none_beat_retrieval():
+def test_decide_stops_updates_when_no_arm_wins():
     g = _good()
     res = {"retrieval": dict(g, fresh_pass1=0.86), "A": dict(g, fresh_pass1=0.865),
            "B": dict(g, fresh_pass1=0.865), "C": dict(g, fresh_pass1=0.865)}
