@@ -1,17 +1,17 @@
 ---
 adr: 0025
 title: RLVR + generative-replay ("dreaming") continual weight updates, double-gated by exec-holdout + stability cert
-status: Proposed
+status: Accepted
 date: 2026-07-07
 deciders: Alex Place
-approved-by: pending
+approved-by: Alex Place (operator directive, 2026-07-07)
 supersedes: none
 superseded-by: none
 ---
 
 # ADR-0025: RLVR + "dreaming" continual weight updates, double-gated
 
-- Status: **Proposed** (requires Alex's explicit acceptance; agents may not flip this — see [adr-approval-gate])
+- Status: **Accepted** — approved by Alex Place, 2026-07-07 (explicit operator directive in-session: "approve ADR-0025"). Drafted Proposed per the ADR approval gate; flipped only on that directive.
 - Loop stage: **Verify** (the update gate) + **Reason** (the updated policy) + **Remember** (verified-memory replay buffer)
 - Relates to: [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) (continual-learning rules — this ADR is the *mechanism* for 0010's verify-gated last-resort path), [ADR-0015](0015-qwen-teacher-verified-distillation.md) (verified distillation — extended, not replaced), [ADR-0024](0024-sigma0-frontier-training-program.md) (frontier program — this is the *continual-update* half 0024 explicitly excludes), [ADR-0017](0017-surprise-gated-decoding.md) (surprise canary), [ADR-0021](0021-serving-substrate-retain-ouro-custom-loop.md)
 - Research backing: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md)
@@ -53,7 +53,7 @@ Small-scale feasibility is real but requires the efficiency literature, not naiv
 reward estimation (arXiv:2603.18444), adaptive rollout skipping zero-advantage groups (arXiv:2602.14338),
 inference-for-training trades (arXiv:2606.08854), and Hybrid-LoRA for RLVR post-training (arXiv:2605.18822).
 
-## Decision (proposed)
+## Decision (accepted 2026-07-07)
 
 Adopt a **double-gated continual-update mechanism** for the serving adapter, ordered cheapest/safest first:
 
