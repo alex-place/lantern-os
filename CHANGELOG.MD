@@ -1,3 +1,6 @@
+## [1.8.112] - 2026-07-07
+- research(sigma0): incremental-validity experiment (cert §8.6-5) — deployed Σ₀ decode canary vs external exec gate on planted bad checkpoints; CPU self-test + CI tests; L4 launcher.
+
 ## [1.8.111] - 2026-07-07
 - research(sigma0): Σ_θ §8.4 third road measured — Thresholdout arm + pool ablation on the holdout-staleness harness (mechanism buys validity, burned pool buys extraction; compounding design law in cert §8.4); §8.1.2/§8.6 reconciled with #2228/#2230; 15/15 tests.
 
