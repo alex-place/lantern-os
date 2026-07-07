@@ -37,6 +37,7 @@ async function _probe(userId) {
   if (!out.authenticated && client._lstError) {
     out.reason = client._lstError.code;
     const R = {
+      invalid_consumer: 'IBKR rejects your consumer key as unknown (error 164, "invalid consumer"). This is NOT an activation delay — waiting won\'t help. Register the consumer in IBKR\'s Self-Service OAuth portal and enter the EXACT consumer key IBKR accepts.',
       not_activated_or_unauthorized: 'IBKR rejected the OAuth handshake — your consumer is most likely not active yet (activation can take up to ~24h). Nothing to fix; retry later.',
       lst_signature_mismatch: 'Handshake signature mismatch — the keys/DH prime in unisona don\'t match what was uploaded to IBKR. Regenerate keys, re-upload all 3 files to IBKR, and reconnect.',
       bad_key: 'One of the private keys couldn\'t be read. Regenerate your keys and reconnect.',
