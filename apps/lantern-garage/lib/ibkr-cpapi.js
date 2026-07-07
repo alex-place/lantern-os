@@ -477,6 +477,17 @@ class IbkrCpapi {
     return r.ok ? r.json : null;
   }
 
+  /** DELETE /iserver/account/{acct}/order/{id} — cancel a working order. Returns
+   *  { ok, status }. Used to cancel a protective stop when the position it guards
+   *  is closed, so the stop can't later fire on a flat position and open a short. */
+  async cancelOrder(orderId) {
+    if (!orderId) return { ok: false, error: 'no_order_id' };
+    const acct = await this.resolveAccountId();
+    if (!acct) return { ok: false, error: 'no_account' };
+    const r = await this._request('DELETE', `/iserver/account/${encodeURIComponent(acct)}/order/${encodeURIComponent(orderId)}`);
+    return { ok: r.ok, status: r.status, json: r.json };
+  }
+
   /**
    * Composite, honest, cached status. Always resolves; carries [claim, evidence,
    * source] provenance so the UI badge reflects reality instead of a hardcoded true.
