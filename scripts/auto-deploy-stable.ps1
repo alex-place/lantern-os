@@ -164,7 +164,11 @@ function StartServer {
 function HealthOk {
   for ($i = 0; $i -lt 25; $i++) {
     try {
-      $r = Invoke-WebRequest "http://127.0.0.1:$PORT/api/convergence/health" -UseBasicParsing -TimeoutSec 4
+      # Liveness probe hits the fast, dependency-free /api/health (#2067) — a plain
+      # JSON { ok, uptime, pid } that never touches the convergence kernel. The old
+      # /api/convergence/health does cold kernel work on first hit after a deploy,
+      # which could time out the probe and trigger a needless rollback.
+      $r = Invoke-WebRequest "http://127.0.0.1:$PORT/api/health" -UseBasicParsing -TimeoutSec 4
       if ($r.StatusCode -eq 200) { return $true }
     } catch { }
     Start-Sleep -Seconds 1
