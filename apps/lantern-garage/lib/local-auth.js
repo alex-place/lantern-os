@@ -19,23 +19,42 @@ const {
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationEmail, smtpConfigured } = require("./mailer");
+const { isLoopback } = require("./request-auth");
+
+/** Build a fresh email-confirmation link (mints a verify_email token). */
+function verifyLinkFor(req, profile) {
+  const host = (req.headers && req.headers.host) || "127.0.0.1";
+  const proto =
+    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
+    (req.socket && req.socket.encrypted ? "https" : "http");
+  const token = createToken("verify_email", profile.id, null);
+  return `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+}
 
 // Fire-and-forget: email the new account a confirmation link (dev fallback logs
-// it). Never blocks or fails registration. Returns "sent" when SMTP is configured
-// or "logged" when the link only went to the server log/outbox (no SMTP).
+// it). Never blocks or fails registration. Returns { delivery, link } where
+// delivery is "sent" (SMTP configured) or "logged" (link only went to the server
+// log/outbox). The link is returned so a loopback dev caller can complete the
+// flow without a mail server (see devVerifyLink below).
 function sendSignupVerification(req, profile) {
   try {
-    const host = (req.headers && req.headers.host) || "127.0.0.1";
-    const proto =
-      (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-      (req.socket && req.socket.encrypted ? "https" : "http");
-    const token = createToken("verify_email", profile.id, null);
-    const link = `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const link = verifyLinkFor(req, profile);
     sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
-    return smtpConfigured() ? "sent" : "logged";
+    return { delivery: smtpConfigured() ? "sent" : "logged", link };
   } catch (_) {
-    return "logged"; // best-effort
+    return { delivery: "logged", link: null }; // best-effort
   }
+}
+
+// Dev-only self-service: when NO mail server is configured AND the request is a
+// direct, un-proxied loopback hit (the operator's own machine), it is safe to
+// hand the confirmation link straight back so local testing can complete the
+// email-gate flow. Proxied/public traffic and any SMTP-configured deployment
+// NEVER receive it — the link only ever surfaces where it already goes to the
+// local server log.
+function devVerifyLink(req, profile) {
+  if (smtpConfigured() || !isLoopback(req)) return null;
+  return verifyLinkFor(req, profile);
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -132,10 +151,13 @@ async function handleLocalRegister(req, res) {
   const result = createLocalAccount(email, password, name);
   if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
-  const delivery = sendSignupVerification(req, result.profile); // confirmation email
+  const { delivery } = sendSignupVerification(req, result.profile); // confirmation email
   // Hard email gate: the account is created but NOT signed in. It cannot log in
   // until the confirmation link is clicked (see handleLocalLogin).
-  return _json(res, 202, { ok: true, pendingVerification: true, email, emailDelivery: delivery });
+  const body = { ok: true, pendingVerification: true, email, emailDelivery: delivery };
+  const devLink = devVerifyLink(req, result.profile);
+  if (devLink) body.devVerifyLink = devLink; // loopback + no-SMTP only
+  return _json(res, 202, body);
 }
 
 /** POST /api/auth/local/login { email, password } */
@@ -155,7 +177,10 @@ async function handleLocalLogin(req, res) {
   clearFailures(req, email);
   // Hard email gate: a local account with an unconfirmed email cannot sign in.
   if (profile.emailVerified !== true) {
-    return _json(res, 403, { error: "email_unverified", email });
+    const body = { error: "email_unverified", email };
+    const devLink = devVerifyLink(req, profile);
+    if (devLink) body.devVerifyLink = devLink; // loopback + no-SMTP only
+    return _json(res, 403, body);
   }
   return _establish(req, res, profile, 200);
 }
