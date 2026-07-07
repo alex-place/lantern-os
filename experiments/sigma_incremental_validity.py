@@ -237,17 +237,26 @@ def sft_adapter(base_model, tok_encode, corpus, *, lr, steps, lora_r=8, device="
     return m
 
 
-def generate_with_canary(model, tok, prompt, *, max_new=96, device="cpu"):
-    """One greedy generation with the DEPLOYED canary attached; returns (text, telemetry)."""
+def generate_with_canary(model, tok, prompt, *, max_new=96, device="cpu", seed=0):
+    """One generation with the DEPLOYED canary attached; returns (text, telemetry).
+
+    PROTOCOL NOTE (run-2 correction, recorded): run 1 decoded GREEDY, under which the frozen
+    base itself degenerates on bare code prompts (docstring repetition) — the canary rightly
+    fired and the grader rightly failed 0/18 on ALL checkpoints, so run 1 measured a decode
+    artifact, not checkpoint quality (kept as
+    data/sigma0/incremental_validity_run1_INVALID_greedy_degeneration.json). Run 2 evaluates
+    each checkpoint under DEPLOYMENT-MATCHED sampling — the same T=1.0/top_p=0.95 the working
+    GRPO path uses — with a fixed per-(checkpoint,task) seed for reproducibility."""
     import torch
     from sigma0.decode_canary import CanaryLogitsProcessor
     from transformers import LogitsProcessorList
     enc = tok(prompt, return_tensors="pt").to(device)
     plen = enc["input_ids"].shape[1]
     lp = CanaryLogitsProcessor(prompt_len=plen, max_new_tokens=max_new, eos_id=tok.eos_token_id)
+    torch.manual_seed(seed)
     with torch.no_grad():
-        out = model.generate(**enc, max_new_tokens=max_new, do_sample=False,
-                             logits_processor=LogitsProcessorList([lp]),
+        out = model.generate(**enc, max_new_tokens=max_new, do_sample=True, temperature=1.0,
+                             top_p=0.95, logits_processor=LogitsProcessorList([lp]),
                              pad_token_id=tok.eos_token_id)
     text = tok.decode(out[0][plen:], skip_special_tokens=True)
     return text, lp.telemetry()
@@ -261,14 +270,16 @@ def eval_checkpoint(model, tok, *, base_retention=None, device="cpu", max_new=96
     for i in range(6):
         stream += [("visible", VISIBLE[i]), ("hidden", HIDDEN[i]), ("retention", RETENTION[i])]
     raw = []
-    for split, task in stream:
-        text, tel = generate_with_canary(model, tok, task["prompt"], max_new=max_new, device=device)
+    for i, (split, task) in enumerate(stream):
+        text, tel = generate_with_canary(model, tok, task["prompt"], max_new=max_new,
+                                         device=device, seed=1000 + i)
         passed = exec_reward(text, task["prompt"], task["entry_point"], task["test"]) > 0.5
         eg.observe(split, passed)
         sg.observe(tel)
         raw.append({"split": split, "task": task["entry_point"], "passed": passed,
                     "proximity": tel.get("canary_max_proximity"),
-                    "spooks": tel.get("canary_spooks"), "collapse_events": tel.get("collapse_events")})
+                    "spooks": tel.get("canary_spooks"), "collapse_events": tel.get("collapse_events"),
+                    "completion_head": text[:110]})
     return eg.verdict(), sg.verdict(), raw
 
 
@@ -311,16 +322,16 @@ def run(args):
     print("== eval good-base (frozen base; also sets base_retention) ==")
     base = fresh_base()
     base.train(False)
-    ev, sv, _ = eval_checkpoint(base, tok, base_retention=None, device=device, max_new=args.max_new)
+    ev, sv, raw = eval_checkpoint(base, tok, base_retention=None, device=device, max_new=args.max_new)
     base_ret = ev["rates"]["retention"]
-    rows.append({"name": "good-base", "klass": "good", "external": ev, "sigma": sv})
+    rows.append({"name": "good-base", "klass": "good", "external": ev, "sigma": sv, "raw": raw})
     print(json.dumps(rows[-1]["external"]["rates"]), "| sigma mean_prox:", sv["mean_proximity"])
     del base; torch.cuda.empty_cache()
     for name, klass, ckey, lr, steps, seed in plants:
         print(f"== plant + eval {name} (lr={lr}, steps={steps}) ==")
         m = sft_adapter(fresh_base(), enc, corp[ckey], lr=lr, steps=steps, device=device, seed=seed)
-        ev, sv, _ = eval_checkpoint(m, tok, base_retention=base_ret, device=device, max_new=args.max_new)
-        rows.append({"name": name, "klass": klass, "external": ev, "sigma": sv})
+        ev, sv, raw = eval_checkpoint(m, tok, base_retention=base_ret, device=device, max_new=args.max_new)
+        rows.append({"name": name, "klass": klass, "external": ev, "sigma": sv, "raw": raw})
         print(" external:", json.dumps(ev), "\n sigma   :", json.dumps(sv))
         del m; torch.cuda.empty_cache()
     report = score(rows)
