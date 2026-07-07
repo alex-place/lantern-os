@@ -32,6 +32,13 @@ async function _probe(userId) {
   const client = new IbkrCpapi({ oauth1: signer });
   const p = await client.probe();
   const out = { connected: !!(p && p.connected), authenticated: !!(p && p.authenticated), competing: !!(p && p.competing) };
+  // Resolve the account id live so the UI never shows "account (unknown)" when the
+  // handshake succeeded but the user left the Account ID field blank — IBKR reports
+  // it via /portfolio/accounts. Fail-soft: leave it off if it can't be resolved.
+  if (out.authenticated) {
+    const acctId = await client.resolveAccountId().catch(() => null);
+    if (acctId) { out.accountId = acctId; out.mode = IbkrCpapi.inferMode(acctId); }
+  }
   // Surface WHY the OAuth handshake failed so the UI can distinguish "not
   // activated yet" (normal for a new consumer) from a real key/config error.
   if (!out.authenticated && client._lstError) {

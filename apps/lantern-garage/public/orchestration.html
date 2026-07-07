@@ -1547,7 +1547,7 @@ openssl dhparam -out dhparam.pem 2048</pre>
     const waiting=has&&!connected&&live&&live.reason==='not_activated_or_unauthorized';
     $('bdot').className='bdot '+(connected?'on':waiting?'wait':has?'off':'');
     $('bstatusText').textContent=connected
-      ? `Connected · ${s.accountId||(live&&live.accountId)||'account'} (${s.mode||'?'})`
+      ? `Connected · ${s.accountId||(live&&live.accountId)||'account'} (${(live&&live.mode)||s.mode||'?'})`
       : waiting ? 'Saved · waiting for IBKR to activate — retry later'
       : has ? 'Saved · not connected — see the message below'
       : 'Not connected';
