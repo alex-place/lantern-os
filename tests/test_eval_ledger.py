@@ -100,6 +100,27 @@ def test_signal_less_row_keeps_env_fallback(monkeypatch):
     assert row["served_checkpoint"] == "ByteDance/Ouro-1.4B"
 
 
+def test_checkpoint_id_shapes():
+    assert eval_ledger.checkpoint_id("m", None) == "m"
+    assert eval_ledger.checkpoint_id("m", "/x/checkpoint-600/") == "m@checkpoint-600"
+    assert eval_ledger.checkpoint_id(None, "/adapters/final") == "ouro@final"
+    assert eval_ledger.checkpoint_id(None, None) is None
+
+
+def test_writer_stamp_beats_env_for_ouro_engine(monkeypatch):
+    """An in-process harness can load a --base-model/--adapter that diverges from the
+    box's OURO_* env (ledger row ouro-coding-v3-he20: engine ouro-fast-cached but
+    base_model Qwen/Qwen2.5-Coder-3B-Instruct). Writers stamp checkpoint_id(args)
+    themselves and stamp_provenance must keep it over the env."""
+    monkeypatch.setenv("OURO_MODEL", "ByteDance/Ouro-1.4B")
+    monkeypatch.setenv("OURO_ADAPTER", "/models/ck/checkpoint-600")
+    row = {"benchmark": "humaneval", "engine": "ouro-fast-cached",
+           "base_model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+           "served_checkpoint": eval_ledger.checkpoint_id("Qwen/Qwen2.5-Coder-3B-Instruct", None)}
+    eval_ledger.stamp_provenance(row)
+    assert row["served_checkpoint"] == "Qwen/Qwen2.5-Coder-3B-Instruct"
+
+
 def test_caller_set_served_checkpoint_not_clobbered(monkeypatch):
     monkeypatch.setenv("OURO_MODEL", "ouro")
     row = {"engine": "loop", "served_checkpoint": "replayed@ck123"}

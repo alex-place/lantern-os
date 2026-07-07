@@ -60,27 +60,40 @@ def git_sha(short: bool = True) -> Optional[str]:
         return None
 
 
+def checkpoint_id(model: Optional[str], adapter: Optional[str]) -> Optional[str]:
+    """Canonical ``"<model>@<adapter-basename>"`` id (just the model when no adapter).
+
+    Writers that KNOW what they loaded should stamp ``served_checkpoint`` themselves
+    with this (``stamp_provenance`` never clobbers a caller-set value) rather than
+    rely on env inference: an in-process harness can be pointed at any
+    ``--base-model``/``--adapter`` regardless of the box's ``OURO_*`` env — the
+    ledger's ``ouro-coding-v3-he20`` row is an ``ouro-fast-cached`` run that
+    actually measured ``Qwen/Qwen2.5-Coder-3B-Instruct``.
+    """
+    if not model and not adapter:
+        return None
+    if adapter:
+        base = os.path.basename(str(adapter).rstrip("/\\")) or adapter
+        return f"{model or 'ouro'}@{base}"
+    return model
+
+
 def served_checkpoint() -> Optional[str]:
     """Best-effort id of the local model+adapter this box is CONFIGURED to serve.
 
     Reads the ``OURO_*`` env the serving path already honours rather than probing a
     running server, so this works whether or not ``ouro_serve.py`` is up and —
     importantly — without importing the serving module (which would drag this into
-    the ``eval-leaderboard-gate`` CI check). Shape: ``"<model>@<adapter-basename>"``
-    when an adapter is set, else just the model. None when nothing is configured.
+    the ``eval-leaderboard-gate`` CI check). None when nothing is configured.
 
     NB: this is the box's serving config, NOT necessarily the engine a given run
     measured — stamping goes through ``served_checkpoint_for(row)``, which only
-    trusts this env for rows an Ouro engine actually produced.
+    trusts this env for rows an Ouro engine actually produced, and writers that
+    resolve their own model/adapter args should stamp via ``checkpoint_id`` instead.
     """
     model = os.environ.get("OURO_MODEL") or os.environ.get("KEYSTONE_SERVE_OURO_MODEL")
     adapter = os.environ.get("OURO_ADAPTER")
-    if not model and not adapter:
-        return None
-    if adapter:
-        base = os.path.basename(adapter.rstrip("/\\")) or adapter
-        return f"{model or 'ouro'}@{base}"
-    return model
+    return checkpoint_id(model, adapter)
 
 
 def served_checkpoint_for(row: dict) -> Optional[str]:

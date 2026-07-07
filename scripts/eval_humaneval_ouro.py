@@ -32,7 +32,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Phase 3 (issue #1292): the reranker is stdlib-only and GPU-free, safe to import here.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from humaneval_rerank import rerank as rerank_candidates  # noqa: E402
-from eval_ledger import append_leaderboard  # noqa: E402  (#2108)
+from eval_ledger import append_leaderboard, checkpoint_id  # noqa: E402  (#2108)
 os.environ.setdefault("HF_HOME", "D:/hf-cache")
 # canonical HumanEval completion stops: ONLY true top-level boundaries (column 0).
 # NB: do NOT stop on "\n#" or "\nprint(" — the model writes comments/prints INSIDE the
@@ -347,6 +347,11 @@ def main():
         "n_samples": a.samples,
         "temperature": (a.temperature if a.samples > 1 else None),
         "base_model": a.base_model, "adapter": bool(a.adapter),
+        # Stamp what this process ACTUALLY loaded — the --base-model/--adapter args
+        # can diverge from the box's OURO_* env, which the ledger would otherwise
+        # fall back to (see ouro-coding-v3-he20: an "ouro-fast-cached" row that
+        # really measured Qwen/Qwen2.5-Coder-3B-Instruct).
+        "served_checkpoint": checkpoint_id(a.base_model, a.adapter),
         "n": n_eval, "subset": (not a.full), "pass@1": round(n_ok / n_eval, 3) if n_eval else 0.0,
         "accuracy": round(n_ok / n_eval, 3) if n_eval else 0.0,  # alias for cross-benchmark summary
         "passed": n_ok, "wall_s": round(dt, 1), "sec_per_problem": round(dt / n_eval, 1) if n_eval else 0.0,
