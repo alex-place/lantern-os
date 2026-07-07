@@ -9,6 +9,11 @@ const https = require('https');
 const IbkrCpapi = require('./ibkr-cpapi');
 const ibkrCreds = require('./ibkr-credentials');
 
+// Module-level so the short-lived cache is SHARED across bridge instances — the
+// trading routes build a fresh TradingAPIBridge per request, so an instance-level
+// cache would never survive between polls. key -> { val, exp }.
+const _RESP_CACHE = new Map();
+
 class TradingAPIBridge {
   constructor() {
     // IBKR — real Client Portal Web API (CPAPI) via the local gateway.
@@ -27,6 +32,27 @@ class TradingAPIBridge {
     this.marketCache = {};
     this.adviceCache = {};
     this.cacheExpiry = 30000; // 30 seconds
+    // Short-lived response cache so the polling trader UI (account/positions every
+    // few seconds) and the symbol-search box don't re-hit IBKR's remote API on
+    // every call. Account/positions: 4s (fresh enough for a live view); symbol
+    // search: 60s (a symbol's listings barely change). Invalidated on order place.
+  }
+
+  /** Memoize an async result for ttlMs in the shared cache. Caches null too (e.g.
+   *  "not connected"), which is fine for a few seconds and avoids hammering a down
+   *  gateway. */
+  async _cached(key, ttlMs, fn) {
+    const hit = _RESP_CACHE.get(key);
+    if (hit && hit.exp > Date.now()) return hit.val;
+    const val = await fn();
+    _RESP_CACHE.set(key, { val, exp: Date.now() + ttlMs });
+    return val;
+  }
+
+  /** Drop a user's cached account/positions (call right after an order changes them). */
+  _invalidateUser(userId) {
+    _RESP_CACHE.delete('acct:' + userId);
+    _RESP_CACHE.delete('pos:' + userId);
   }
 
   /** Lazily build the CPAPI client (reads IBKR_GATEWAY_URL / IBKR_ACCOUNT_ID). */
@@ -70,8 +96,12 @@ class TradingAPIBridge {
   /**
    * Account summary from the IBKR Client Portal gateway (CPAPI). Returns null
    * when the gateway is absent or unauthenticated — it never fabricates a value.
+   * Cached 4s so the polling UI doesn't re-hit IBKR on every refresh.
    */
   async getIBKRAccount(userId) {
+    return this._cached('acct:' + userId, 4000, () => this._getIBKRAccountRaw(userId));
+  }
+  async _getIBKRAccountRaw(userId) {
     const client = this._clientFor(userId);
     if (!client) return null;                 // user context, not connected
     const status = await client.getStatus();
@@ -125,6 +155,7 @@ class TradingAPIBridge {
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
     });
     const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
+    if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read
     return {
       status: r.status === 'submitted' ? 'placed' : r.status, // placed | dry_run | error
       order_id: r.orderId || null,
@@ -146,6 +177,9 @@ class TradingAPIBridge {
    * no IBKR account is connected (caller falls back to the Yahoo probe).
    */
   async searchIBKRSymbols(userId, q) {
+    return this._cached('search:' + userId + ':' + String(q || '').trim().toLowerCase(), 60000, () => this._searchIBKRSymbolsRaw(userId, q));
+  }
+  async _searchIBKRSymbolsRaw(userId, q) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;
     const status = await client.getStatus();
@@ -198,6 +232,9 @@ class TradingAPIBridge {
    * Open positions from the IBKR gateway (CPAPI). Returns [] when disconnected.
    */
   async getIBKRPositions(userId) {
+    return this._cached('pos:' + userId, 4000, () => this._getIBKRPositionsRaw(userId));
+  }
+  async _getIBKRPositionsRaw(userId) {
     const client = this._clientFor(userId);
     if (!client) return [];                   // user context, not connected
     const status = await client.getStatus();
