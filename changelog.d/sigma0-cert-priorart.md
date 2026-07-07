@@ -1,0 +1,1 @@
+docs(sigma0): add verified inference-time nearest-prior to the Σ certificate — Huang et al. ICLR 2024 (2310.01798, self-correction degrades without external feedback) and Semantic Entropy Probes (2406.15927); records the external-novelty audit honestly (no novel mechanism claimed; contribution is the machine-checked formalization + honest negative results).
