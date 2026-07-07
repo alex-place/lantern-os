@@ -304,9 +304,13 @@
     width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
     box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
   @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
-  /* The order ticket floats OVER the right edge as a drawer — it does NOT reflow
-     the chart grid (opening buy/sell used to shove every chart to the side). The
-     panel is translucent-backed + slides in, so the charts behind stay put. */
+  /* When the ticket is open, REFLOW the deck (and footer) to the left so the cards
+     sit BESIDE the panel instead of hidden under it. Gated on body.ot-open, which
+     the guest/read-only view never gets (openOrderPanel is !GUEST) — so the guest
+     layout never shifts (the old bug: it shifted while the panel stayed invisible). */
+  body.ot-open .main{ padding-right: 356px; }
+  body.ot-open .footer{ padding-right: 356px; }
+  @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
@@ -1293,10 +1297,10 @@ function buildCard(ticker, d){
   const dir   = d.direction  || sig.direction  || 'NEUTRAL';
 
   const dirClass = dir==='BULLISH'?'bull':dir==='BEARISH'?'bear':'neut';
-  const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT':'--- ';
-  const confHtml = conf
-    ? `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`
-    : '';
+  const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT ':'· FLAT ';
+  // Always render the conviction row so every card is the SAME height and shows a
+  // long/short % (a missing badge made the BREAKOUT/quiet cards shorter + blank).
+  const confHtml = `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`;
 
   let pnlHtml = '';
   if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
@@ -1345,7 +1349,7 @@ function updateCardMeta(ticker, d){
   const conf = d.confidence || sig.confidence || 0;
   const dir  = d.direction  || sig.direction  || 'NEUTRAL';
   const dirClass = dir==='BULLISH'?'bull':dir==='BEARISH'?'bear':'neut';
-  const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT':'--- ';
+  const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT ':'· FLAT ';
 
   const pnlEl = document.getElementById('pnl-'+ticker);
   if(pnlEl){
@@ -1363,9 +1367,7 @@ function updateCardMeta(ticker, d){
 
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
-    const confHtml = conf
-      ? `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`
-      : '';
+    const confHtml = `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`;
     let watchHtml = '';
     if(state==='watching'){
       const near = (d.zones||[])[0];
