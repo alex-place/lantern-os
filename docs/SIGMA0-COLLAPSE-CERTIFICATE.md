@@ -40,7 +40,11 @@ and the operator review recorded in §8.7 and Appendix M — useful, but not pee
 [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md)) concluded the components are
 standard (TRPO, Gao, Dwork — ~97% confidence not novel), the framing has close prior art (ADOWIP,
 EvalStop, sealed-audit gating — ~90%), and what remains is a system-specific integration. The one
-open research question is §8.6 item 5 (incremental validity), which is unmeasured.
+open research question — §8.6 item 5 (incremental validity) — was **measured on 2026-07-07** (two
+pre-registered experiments, PR #2240): the internal signal adds detection power **only for gross
+degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2, decaying to +0.019 at
+n=5), and it **cannot substitute for fresh verified data at all** in the selection role (§8.4.1).
+The still-open cell is *subtle, training-induced* badness, which needs the real A/B/C artifacts.
 
 **"Machine-checked" here means:** closed-form algebra + numerical sweeps + `pytest` — **not** a
 Lean/Mathlib formal proof. Every use of the phrase in this document carries that meaning and no
@@ -66,6 +70,8 @@ against this revision on 2026-07-07 (68 tests, all passing, plus the gate self-t
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
+| Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
+| Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
 | §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
 
 If a command above fails on a fresh clone, the document has drifted from the code and should not
@@ -131,6 +137,13 @@ diverge, no third fate. The anti-collapse *freeze* claim is likewise proven for 
 pytest, **not** a Lean/Mathlib formal proof; and every theorem here certifies the
 **local linear Jacobian**, not a global guarantee — grounding remains the safety
 mechanism.)
+
+**Part II in one line.** For the *slow* timescale — deciding whether a retrained model may replace
+the current one — the measured version of the same principle is: **a system's self-checks can spot
+disasters, but only fresh outside tests can pick winners.** Reusing one test set lets lucky models
+win (measured, §8.4); self-measurements cannot substitute because their errors stick to the
+checkpoint the same way (measured, §8.4.1); a cheap self-check still earns its keep as an early
+alarm for gross breakage exactly when outside tests are scarce (measured on one real model, §8.6).
 
 > **For the precise version, read on.** Each section carries its own status line.
 > The summary above is the honest gist, not a substitute for the math.
@@ -1314,6 +1327,33 @@ remains lower than the fresh-arm comparison through the measured range. Fresh so
 rate-limits genuinely hidden promotion tasks; the result suggests that previously used verified
 tasks can remain useful after retirement, rather than becoming worthless.
 
+### 8.4.1 Why the anchor must be *re-drawn*, not merely external — intrinsic signals cannot substitute
+
+**[MEASURED 2026-07-07 — pre-registered N1, `experiments/sigma_update_internal_signal_value.py`,
+32 seeds, PR #2240.]** A tempting escape from the freshness requirement is a **free internal
+signal** — perplexity, an entropy statistic, the Part I canary — combined with the fixed holdout to
+stretch its budget. The pre-registered hypothesis (H1: such a signal extends the fixed-holdout
+budget) was **falsified**, and the falsification sharpens the law:
+
+- Combining the fixed holdout with an intrinsic signal of noise `s_i ∈ {2.0, 1.0, 0.5, 0.25}`
+  extracts **no more true quality** than the holdout alone (verification-equivalent value
+  ~1.0–1.2× across `n = 50–200`).
+- **Robustness:** the null is not a combiner artifact — a direct weight sweep shows extraction is
+  flat then strictly *worse* as weight shifts toward the internal signal (`n=50, s_i=0.5`:
+  0.64 → 0.10 as `w_i`: 0 → 0.9).
+- Even a **near-oracle** intrinsic signal (`s_i = 0.1`) reaches only 4.10 — far below a fresh
+  holdout of the same size (12.68).
+
+**Mechanism (why):** an intrinsic signal is a deterministic property of the checkpoint — measuring
+the same checkpoint twice returns the same number — so **its error sticks with the champion exactly
+like a fixed holdout's lucky draw**. It cannot re-anchor the selection ratchet; only a *re-drawn*
+measurement can. **The refined law: freshness (re-drawability), not externality, is the active
+ingredient of grounding.** This closes the tempting "cheap internal substitute" road and leaves
+exactly the two §8.4 escapes standing: fresh verified flow, or formally managed (Thresholdout-class)
+reuse. What intrinsic signals *are* measurably good for is **detection**, not selection — see the
+§8.6 item 5 result. One sentence: **internal signals detect; only fresh truth selects.**
+[MEASURED-by-simulation; shape, not a closed-form constant.]
+
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
 is never one it has already leaked into:
@@ -1337,13 +1377,17 @@ the compounding effect is MEASURED-by-simulation.]**
 ### 8.5 What is and isn't claimed
 
 **Claimed:** a computable three-leg gate anchored to an external holdout; a proven
-monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao); and
-evidence that naïve fixed-holdout reuse degrades under adaptive selection. **NOT claimed:** an
-in-repo theorem for the full gate; real-model validation of its training behavior; that "two fates"
-is exhaustive (§8.2); that scalar-query reusable-holdout guarantees automatically govern model-level
-promotion (§8.4); or that a single potential is proven monotone (§8.3). **The trap:** treating
-"passed the holdout" as unconditional evidence — without the §8.4 freshness-or-controlled-reuse
-discipline, Σ_θ is holdout theater, the same collapse it exists to prevent, one level up.
+monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao);
+evidence that naïve fixed-holdout reuse degrades under adaptive selection; that intrinsic signals
+cannot substitute for fresh verified data in the *selection* role (§8.4.1, MEASURED-by-simulation);
+and that an internal-signal bundle adds *detection* power for gross degradation exactly when the
+external gate is smallest (§8.6 item 5, MEASURED on one model). **NOT claimed:** an in-repo theorem
+for the full gate; real-model validation of its training behavior; that "two fates" is exhaustive
+(§8.2); that scalar-query reusable-holdout guarantees automatically govern model-level promotion
+(§8.4); that a single potential is proven monotone (§8.3); or that internal signals detect *subtle,
+training-induced* badness — that cell is untested (§8.6 item 5). **The trap:** treating "passed the
+holdout" as unconditional evidence — without the §8.4 freshness-or-controlled-reuse discipline, Σ_θ
+is holdout theater, the same collapse it exists to prevent, one level up.
 
 ### 8.6 Minimal falsification path (before trusting any of this)
 
@@ -1373,12 +1417,24 @@ discipline, Σ_θ is holdout theater, the same collapse it exists to prevent, on
    third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
    remaining empirical gap.)*
-5. **Incremental-validity teeth (the strongest genuine research question here):** does the Part I
-   fast-state signal **add detection power** for bad checkpoints over the external gate alone —
-   catching more, earlier, at acceptable false-positive cost? (`external gate` vs `external + Σ₀`
-   on planted hacks/regressions.) No prior art surfaced for internal-state monitors as an
-   *incremental* checkpoint-gate signal (bounded search, 2026-07-07). If Σ₀ adds nothing, Gate B is
-   honestly decorative; if it adds early detection, that is a measurable systems contribution.
+5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
+   signal **add detection power** for bad checkpoints over the external gate alone? No prior art
+   surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,
+   2026-07-07). **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
+   `experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B, PR #2240):** a 9-checkpoint
+   corruption-ladder generator (int8 / Gaussian noise 3–15% / partial+full naive ternary / int4)
+   with exec pass rate as truth. Adding an internal bundle {perplexity, predictive entropy,
+   distinct-2-gram} to a small-`n` exec gate: **ΔAUC +0.121 at n=2 → +0.068 at n=3 → +0.019 at
+   n=5** (internal-alone AUC 0.944). So incremental validity is **real, gross-only, and
+   scarcity-gated** — Gate B is *not* decorative, but its value decays quickly as the external gate
+   grows, and it detects only gross degradation (all corruption-induced bads had ppl ratios
+   ×629–×93,444). **The subtle cell came back empty by construction:** weight-space corruption is
+   binary on this model — free (mild noise even *raised* weak-base greedy pass 0.25 → 0.62 with ppl
+   flat, plausibly by breaking repetitive greedy loops; n=8 tasks, treat gently) or cliff-collapsed —
+   matching the measured quantization cliff. So the **still-open half is subtle, training-induced
+   badness** (reward hacks, forgetting): only the real A/B/C artifacts (teeth 2–3) can produce it.
+   Caveats: one model, 8-task truth, coarse AUC granularity. Joint law with §8.4.1: **internal
+   signals detect; only fresh truth selects.**
 
 ### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
 
@@ -1826,5 +1882,23 @@ for produced results and Appendix A for the original design sketch.*
 
 **Resolved (landed 2026-06-17):**
 - [#661] — **§2 / Appendix A defect.** `_collapse_state`'s "log-barrier" was a misnamed multiplicative shrink that flipped sign for `strength > 0.217`. **Fixed:** the term is dropped; collapse is now the clean orthogonal projection `x* = P x` (non-expansive, smooth). The `log_barrier_strength` parameter was removed. Regression: `test_collapse_is_nonexpansive_projection`. *Flagged in external review 2026-06-16.*
+
+> **Maintenance log — 2026-07-07 (publication pass + §8.6-5 measured).** Reconcile pass folding in
+> the two pre-registered incremental-validity experiments (PR #2240) that answered the document's
+> one open research question at corruption level: **N1** (`experiments/sigma_update_internal_signal_value.py`,
+> 32-seed sim) *falsified* the hypothesis that a free intrinsic signal can extend the fixed-holdout
+> budget (~1.0–1.2× equivalent value; weight-sweep strictly worse; near-oracle 4.10 ≪ fresh 12.68)
+> → new §8.4.1 records the refined law (*freshness, not externality, is the active ingredient* —
+> an intrinsic signal's error sticks with the champion like fixed-holdout luck). **N2**
+> (`experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B corruption ladder) measured
+> incremental validity as **real, gross-only, scarcity-gated** (ΔAUC +0.121/+0.068/+0.019 at
+> n=2/3/5; internal-alone 0.944; subtle cell empty by construction — weight corruption is binary,
+> matching the measured quantization cliff) → §8.6 item 5 updated from "unmeasured" to half-closed;
+> the open half is *subtle training-induced* badness, which requires the real A/B/C artifacts.
+> Front-matter novelty paragraph, audit table (+2 rows), §8.5 claimed/not-claimed, and a Part II
+> plain-language line updated to match. Joint law recorded: **internal signals detect; only fresh
+> truth selects.** Also fixed in the same pass: `tests/test_sigma0_jsrr_gate.py` imported torch
+> unguarded, breaking collection on torch-free CI — the audit table's "tests pass on a fresh clone"
+> contract; now `pytest.importorskip`-guarded per repo convention.
 
 ---
