@@ -211,6 +211,86 @@ function fixtureRepo(checkBody) {
     assert(s && s.successes === 1, "approved → success outcome (unchanged)");
   });
 
+  // ── hardening: sandbox containment (review-confirmed) ────────────────────
+  await check("tests-run REFUSES a proposal path that escapes the repo — no outside write", async () => {
+    const parent = tmp();
+    const repo = path.join(parent, "repo");
+    fs.mkdirSync(repo);
+    fs.writeFileSync(path.join(repo, "check.js"), "process.exit(0);");
+    const outside = path.join(parent, "SECRET.txt");
+    fs.writeFileSync(outside, "ORIGINAL");
+    const r = await testsRun.runTests(
+      { repoPath: repo, files: [{ path: "../SECRET.txt", content: "PWNED" }] },
+      { testCommand: "node check.js" }
+    );
+    assert.strictEqual(r.skipped, true, "escaping path → whole run refused");
+    assert(/escapes repo/.test(r.reason));
+    assert.strictEqual(fs.readFileSync(outside, "utf8"), "ORIGINAL", "outside file never touched");
+  });
+
+  await check("approveCodingPatch REFUSES an escaping proposal path", async () => {
+    const parent = tmp();
+    const repo = path.join(parent, "repo");
+    fs.mkdirSync(repo);
+    const data = tmp();
+    const outside = path.join(parent, "OUT.txt");
+    fs.writeFileSync(outside, "SAFE");
+    // craft a held pending with an escaping file directly via a mock run, then swap input
+    const r = await cb.runCodingTask({ task: "note", repoPath: repo, backend: "mock" }, { dataDir: data });
+    // append a pending update whose input carries an escaping file (simulating a hostile proposal)
+    fs.appendFileSync(
+      path.join(data, "coding-pending.jsonl"),
+      JSON.stringify({ id: r.pendingId, input: { repoPath: repo, files: [{ path: "../OUT.txt", content: "PWNED" }], receiptId: r.receiptId } }) + "\n"
+    );
+    const res = await cb.approveCodingPatch(r.pendingId, { dataDir: data });
+    assert.strictEqual(res.ok, false, "apply refused");
+    assert.strictEqual(fs.readFileSync(outside, "utf8"), "SAFE", "outside file untouched");
+  });
+
+  await check("tests-run cleans up directories it created (tree left as found)", async () => {
+    const repo = fixtureRepo("process.exit(0);");
+    const r = await testsRun.runTests(
+      { repoPath: repo, files: [{ path: "brand/new/dir/file.txt", content: "x" }] },
+      { testCommand: "node check.js" }
+    );
+    assert.strictEqual(r.passed, true);
+    assert(!fs.existsSync(path.join(repo, "brand")), "created directories removed on restore");
+  });
+
+  await check("tests-run treats a maxBuffer overflow as UNDECIDABLE (skipped), not a false failure", async () => {
+    const repo = tmp();
+    fs.writeFileSync(path.join(repo, "big.js"), "require('fs').writeSync(1,'x'.repeat(9*1024*1024));process.exit(0);");
+    const r = await testsRun.runTests({ repoPath: repo, files: [{ path: "noop.txt", content: "1" }] }, { testCommand: "node big.js" });
+    assert.strictEqual(r.skipped, true, "huge output → cannot decide");
+    assert(/buffer/i.test(r.reason));
+  });
+
+  // ── hardening: router precedence (review-confirmed inversion) ─────────────
+  await check("PRECEDENCE: a user REJECT beats a decisive verifier PASS (rejected ≠ success)", async () => {
+    const repo = fixtureRepo("process.exit(0);"); // tests pass
+    const data = tmp();
+    const repoName = path.basename(repo);
+    const r = await cb.runCodingTask({ task: "note", repoPath: repo, backend: "mock" }, { dataDir: data });
+    await cb.verifyPending(r.pendingId, { dataDir: data, verify: { runTests: true, testCommand: "node check.js" } }); // decisive PASS
+    await cb.rejectCodingPatch(r.pendingId, { dataDir: data });
+    const s = router.outcomeStats({ dataDir: data }).find((x) => x.repo === repoName && x.backend === "mock");
+    assert(s && s.attempts === 1 && s.successes === 0, "rejected patch is a FAILURE outcome despite the passing verdict");
+  });
+
+  await check("PRECEDENCE: a decisive verifier FAILURE beats a force-apply (applied ≠ success)", async () => {
+    const repo = fixtureRepo("process.exit(1);"); // tests fail
+    const data = tmp();
+    const repoName = path.basename(repo);
+    const r = await cb.runCodingTask(
+      { task: "note", repoPath: repo, backend: "mock" },
+      { dataDir: data, verify: { enforce: true, runTests: true, testCommand: "node check.js" } }
+    );
+    assert.strictEqual(r.blocked, true);
+    await cb.approveCodingPatch(r.pendingId, { dataDir: data, overrideVerification: true }); // force-applied
+    const s = router.outcomeStats({ dataDir: data }).find((x) => x.repo === repoName && x.backend === "mock");
+    assert(s && s.attempts === 1 && s.successes === 0, "force-applied failing patch is a FAILURE outcome");
+  });
+
   console.log(failures ? `\n${failures} FAILED` : "\nall coding-verifier (#2174) tests passed");
   process.exit(failures ? 1 : 0);
 })();
