@@ -559,7 +559,13 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
         return true;
       }
-      const result = await traderAgent.placeOrder({ ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit });
+      // Prefer the user's connected IBKR account (per-user OAuth) so BUY/SELL on the
+      // trader page trades the account shown in the header. Falls back to the legacy
+      // agent when no IBKR account is linked. Order is HARD-GATED inside placeOrder.
+      const uid = getEffectiveUserId(req);
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
+        || await traderAgent.placeOrder(orderReq);
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,

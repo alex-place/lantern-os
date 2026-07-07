@@ -92,6 +92,40 @@ class TradingAPIBridge {
   }
 
   /**
+   * Place an order on a user's OWN IBKR account (per-user OAuth, ADR-0022).
+   * Returns null when the user hasn't connected an IBKR account — the caller then
+   * falls back to its default order path. The order is still HARD-GATED inside
+   * IbkrCpapi.placeOrder (DRY unless TRADER_LIVE=1; a live U… account additionally
+   * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
+   * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
+   */
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit }) {
+    const client = this.ibkrForUser(userId);
+    if (!client) return null;                 // not connected → caller falls back
+    const status = await client.getStatus();
+    if (!status.connected) return null;
+    const r = await client.placeOrder({
+      symbol: ticker,
+      side,
+      qty,
+      orderType: String(type || 'market').toLowerCase() === 'limit' ? 'LMT' : 'MKT',
+      price: limitPrice,
+      tif: String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
+    });
+    return {
+      status: r.status === 'submitted' ? 'placed' : r.status, // placed | dry_run | error
+      order_id: r.orderId || null,
+      ticker, side, qty, type: type || 'market',
+      dry: !!r.dry,
+      reason: r.note || r.error || (r.gate && r.gate.reason) || null,
+      mode: r.gate && r.gate.mode,
+      stop_loss: stopLoss || null,   // brackets not sent to IBKR yet (parity w/ agent)
+      take_profit: takeProfit || null,
+      source: 'ibkr-cpapi',
+    };
+  }
+
+  /**
    * Open positions from the IBKR gateway (CPAPI). Returns [] when disconnected.
    */
   async getIBKRPositions(userId) {
