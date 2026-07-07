@@ -408,12 +408,14 @@ class IbkrCpapi {
 
     const ticket = {
       conid: Number(cid),
-      orderType, // 'MKT' | 'LMT'
+      orderType, // 'MKT' | 'LMT' | 'STP'
       side: order.side, // 'BUY' | 'SELL'
       quantity: order.qty,
       tif,
     };
-    if (orderType === 'LMT' && order.price != null) ticket.price = order.price;
+    // LMT needs a limit price; STP (protective stop) needs a trigger price — both
+    // ride the `price` field in IBKR's ticket. MKT carries none.
+    if ((orderType === 'LMT' || orderType === 'STP') && order.price != null) ticket.price = order.price;
 
     // Body must be { orders: [ticket, …] }. IBKR's Web API rejects a bare array
     // with 400 "Missing order parameters" — verified live against a paper account

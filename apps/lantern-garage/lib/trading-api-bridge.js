@@ -99,18 +99,22 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
     if (!status.connected) return null;
+    const t = String(type || 'market').toLowerCase();
+    const orderType = t === 'limit' ? 'LMT' : t === 'stop' ? 'STP' : 'MKT';
+    // A protective stop must survive the session → GTC by default; entries default DAY.
+    const defaultTif = orderType === 'STP' ? 'gtc' : 'day';
     const r = await client.placeOrder({
       symbol: ticker,
       side,
       qty,
-      orderType: String(type || 'market').toLowerCase() === 'limit' ? 'LMT' : 'MKT',
-      price: limitPrice,
-      tif: String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
+      orderType,
+      price: orderType === 'STP' ? stopPrice : limitPrice,
+      tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
     });
     return {
       status: r.status === 'submitted' ? 'placed' : r.status, // placed | dry_run | error
@@ -119,10 +123,24 @@ class TradingAPIBridge {
       dry: !!r.dry,
       reason: r.note || r.error || (r.gate && r.gate.reason) || null,
       mode: r.gate && r.gate.mode,
-      stop_loss: stopLoss || null,   // brackets not sent to IBKR yet (parity w/ agent)
+      stop_loss: stopLoss || null,
       take_profit: takeProfit || null,
       source: 'ibkr-cpapi',
     };
+  }
+
+  /** Broker-authoritative day P&L for a user's account (IBKR `dpl`), or null.
+   *  The daily-loss circuit breaker reads this before opening new positions. */
+  async getIBKRDayPnl(userId) {
+    const client = this.ibkrForUser(userId);
+    if (!client) return null;
+    const status = await client.getStatus();
+    if (!status.connected) return null;
+    const pnl = await client.getPnl(status.accountId).catch(() => null);
+    if (pnl && typeof pnl.dailyPnl === 'number') return pnl.dailyPnl;
+    // Fall back to the account summary's day figure when partitioned P&L is absent.
+    const acct = await this.getIBKRAccount(userId).catch(() => null);
+    return acct && typeof acct.pnl_today === 'number' ? acct.pnl_today : null;
   }
 
   /**

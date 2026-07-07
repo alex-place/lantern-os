@@ -27,6 +27,8 @@ const DEFAULTS = {
   maxNewPerScan: 3,        // cap new entries opened in a single scan tick
   cooldownMs: 30 * 60000,  // don't re-order the same symbol within 30 min
   minPrice: 1,             // skip sub-$1 names
+  stopPct: 2,              // protective stop % below entry (broker-side STP)
+  maxDailyLossPct: 2,      // halt NEW entries once day P&L ≤ -this% of equity
 };
 
 function cfg() {
@@ -38,9 +40,18 @@ function cfg() {
     positionPct: n('TRADER_POSITION_PCT', DEFAULTS.positionPct),
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
+    stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
+    maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
     allowShorts: process.env.TRADER_ALLOW_SHORTS === '1',
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
   };
+}
+
+/** Protective stop trigger price for a long entry: `stopPct` below entry. */
+function stopPriceFor(entry, stopPct) {
+  const e = Number(entry);
+  if (!(e > 0)) return null;
+  return Math.round(e * (1 - Math.max(0.1, stopPct) / 100) * 100) / 100;
 }
 
 /**
@@ -89,6 +100,13 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   const heldQty = {};
   for (const p of (positions || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
 
+  // Daily-loss circuit breaker: once the account's day P&L is at/below the limit,
+  // stop opening NEW positions (exits still run — closing losers is allowed).
+  const dailyLimit = account.equity * (c.maxDailyLossPct / 100);
+  const dayPnl = await bridge.getIBKRDayPnl(userId).catch(() => null);
+  const haltEntries = typeof dayPnl === 'number' && dayPnl <= -dailyLimit;
+  if (haltEntries) out.circuit_breaker = { dayPnl, limit: -Math.round(dailyLimit) };
+
   const maxNotional = Number(caps.maxNotional) || parseFloat(process.env.MAX_ORDER_NOTIONAL) || 2000;
   const maxQty = Number(caps.maxQty) || parseFloat(process.env.MAX_ORDER_QTY) || 100;
   let opened = 0;
@@ -113,6 +131,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     if (!bullish && !(held < 0) && !c.allowShorts) { out.skipped.push({ ...record, why: 'bearish, no long to exit; shorts disabled' }); continue; }
     // Already hold this symbol on the signal's side → no pyramiding.
     if (bullish && held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // Daily-loss circuit breaker halts NEW entries (exits above already ran).
+    if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
     // Cooldown.
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
@@ -125,7 +145,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
 
     const side = bullish ? 'buy' : 'sell';
     const r = await bridge.placeIBKROrder(userId, { ticker: sym, side, qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-    out.executed.push({ ...record, action: bullish ? 'open_long' : 'open_short', qty, notional: Math.round(qty * price), result: r });
+    const exec = { ...record, action: bullish ? 'open_long' : 'open_short', qty, notional: Math.round(qty * price), result: r };
+    // Attach a broker-side protective stop on a filled/placed long — the hard
+    // stop-loss the position keeps even if the scan loop dies. SELL STP below entry.
+    if (bullish && r && r.status === 'placed') {
+      const stop = stopPriceFor(price, c.stopPct);
+      if (stop) {
+        const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc' }).catch((e) => ({ status: 'error', reason: e.message }));
+        exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
+      }
+    }
+    out.executed.push(exec);
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') opened += 1; }
   }
   return out;
