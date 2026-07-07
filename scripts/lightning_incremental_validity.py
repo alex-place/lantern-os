@@ -43,9 +43,23 @@ def main():
     studio = _get_studio()
     print(f"studio status: {studio.status}")
     try:
-        if str(studio.status).lower() not in ("running",):
-            print("starting L4 ...")
-            studio.start(Machine.L4)
+        # state machine: running → go; stopped → start; Pending/stopping/etc → wait it out.
+        started = False
+        t0 = time.time()
+        while True:
+            st = str(studio.status).lower()
+            if st == "running":
+                print("studio running.")
+                break
+            if st == "stopped" and not started:
+                print("starting L4 ...")
+                studio.start(Machine.L4)
+                started = True
+            elif time.time() - t0 > 900:
+                raise RuntimeError(f"studio stuck in state {st!r} after 15 min")
+            else:
+                print(f"  waiting (studio {st}) ...")
+            time.sleep(20)
         payload = PAYLOAD.replace("{branch}", args.branch)
         with open("siv_payload.py", "w") as f:
             f.write(payload)
