@@ -120,9 +120,15 @@ $targets = @(
         Root  = $StableRoot
         # server.js binds 0.0.0.0 when PORT is set (Cloudflare tunnel).
         Port  = '4177'
-        # Stable must be serving master. A different branch on :4177 means a stale/wrong
-        # checkout is squatting the port — treat it as unhealthy and relaunch stable.
-        ExpectBranch = 'master'
+        # Stable is served from the permanent `stable-server` worktree branch (see
+        # Start-DualServers.ps1: `git worktree add $StableRoot stable-server`);
+        # auto-deploy-stable.ps1 keeps that branch's CONTENT reset to origin/master.
+        # /api/health reports the branch NAME (rev-parse --abbrev-ref HEAD), which is
+        # 'stable-server', never 'master' — so asserting 'master' here false-positived a
+        # healthy server into an endless kill/relaunch loop. Assert the real branch name:
+        # a genuinely wrong checkout squatting :4177 (e.g. dev-server / a feature branch)
+        # still reports a different name and is still caught.
+        ExpectBranch = 'stable-server'
         OutLog = Join-Path $LogDir 'stable-4177.out.log'
         ErrLog = Join-Path $LogDir 'stable-4177.err.log'
         Fails = 0
