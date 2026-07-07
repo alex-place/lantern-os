@@ -227,6 +227,154 @@ SEED = [
     ("hadamard-conjecture", "The Hadamard matrix conjecture -- OPEN.", "HEURISTIC", False, 0.5, "OPEN", W+"Hadamard_matrix", "math"),
 ]
 
+# ============================================================================
+# CORPUS-V2 (D2) — de-gloss at emit + anti-shortcut families. See SIGMA0-MODEL-DESIGN.md.
+#
+# WHY: E1 (2026-07-06, data/sigma0/e1_degloss_report.json) proved the v1 headline
+# (10% confab) was substantially a GLOSS LEAK — the negatives announce their own
+# status in-text ("-- OPEN", "-- REFUTED"), and the adapter learned to read that,
+# not to judge truth (de-gloss spikes Ouro confab 10%->55% while GPT-4o-mini holds
+# 0%->0%). v2 removes the leak at emit time (status lives ONLY in the answer key,
+# never in the statement) and adds the two families a gloss-reader cannot game:
+# PERTURBED-POSITIVES (true theorems mutated false — famous surface, no status word)
+# and FICTIONAL items (nonexistent — must ABSTAIN, nothing to read off the page).
+#
+# v1 SEED stays frozen + web-validated (its manifest test keeps passing); v2 is an
+# emit-time transform + a separately-provenanced extension, NOT a fork.
+# ============================================================================
+
+# Status vocabulary a de-glossed STATEMENT must never contain (the leak signature).
+# Two tiers so canonical NAMES and ordinary math words survive (Tier-A keeps them):
+#   - STATUS_STAMP: the ALL-CAPS status stamps the v1 corpus uses ("-- OPEN", "BELIEVED").
+#     Matched CASE-SENSITIVELY, so "open interval" / "believed" in prose do NOT trip.
+#   - STATUS_PHRASE: lowercase annotation phrases, matched case-insensitively.
+# Bare thesis/hypothesis/conjecture name-tokens are deliberately excluded (they are names).
+STATUS_STAMP = r"\b(OPEN|REFUTED|UNPROVEN|BELIEVED|CONTESTED|DISPUTED|OBSERVATION|THESIS|APHORISM)\b"
+STATUS_PHRASE = (r"(\baphorism\b|\badage\b|\bmaxim\b|widely believed|no (known )?proof|"
+                 r"remains open|not a (law|theorem)|rule of thumb|\bMillennium\b|"
+                 r"\bcounterexample\b|\bfolklore\b|\bconjectured\b|\bunproven\b)")
+
+
+def _leaks(s: str):
+    """True if a statement still carries a status stamp or annotation phrase (the leak)."""
+    import re as _re
+    return _re.search(STATUS_STAMP, s) or _re.search(STATUS_PHRASE, s, _re.I)
+
+# The few v1 statements that carry status INLINE (not a trailing clause the de-gloss reaches).
+# Rewritten to the bare claim here — keyed by id, applied ONLY on the v2 emit path so frozen
+# v1 SEED text is untouched. Status still lives solely in the answer key.
+REWORD_V2 = {
+    "church-turing": "The Church-Turing thesis identifies the effectively calculable functions with the Turing-computable ones.",
+    "continuum-hypothesis": "The continuum hypothesis can be settled from the ZFC axioms.",
+    "grav-constant": "The gravitational constant G is 6.67430e-11 with about 22 ppm relative uncertainty.",
+    "fine-structure": "The fine-structure constant alpha is approximately 1/137.035999.",
+    "hubble-tension": "The Hubble constant H0 is between 67 and 73 km/s/Mpc.",
+    "dlog-hardness": "Discrete-log-based cryptography rests on the hardness of computing discrete logarithms.",
+    "sha256-collision": "SHA-256 is collision resistant.",
+    "aes-security": "AES has no known efficient attack.",
+}
+
+
+def degloss_statement(hyp: str) -> str:
+    """Tier-A de-gloss (the exact transform E1 validated): strip a trailing status
+    clause after ' -- / — / – ' and any parenthetical carrying status vocabulary;
+    KEEP canonical names ('Collatz conjecture' stays). Idempotent."""
+    import re as _re
+    s = hyp
+    for dash in (" -- ", " — ", " – "):
+        while dash in s:
+            head, tail = s.split(dash, 1)
+            if _leaks(tail):
+                s = head.rstrip(" .")
+                break
+            else:
+                break
+    s = _re.sub(r"\s*\(([^)]*)\)",
+                lambda m: "" if _leaks(m.group(1)) else m.group(0), s)
+    s = _re.sub(r"\s+", " ", s).strip()
+    if s and s[-1] not in ".?!":
+        s += "."
+    return s
+
+
+def assert_deglossed(statements) -> list:
+    """Lint: return the list of statements still carrying a status gloss (should be [])."""
+    return [s for s in statements if _leaks(s)]
+
+
+# --- v2 extension: the two anti-shortcut families a gloss-reader cannot game ---
+# 8-tuple shape matches SEED: (id, hypothesis, class, verified, confidence, status, cite, domain)
+# All statements are written ALREADY BARE (no status word) — they must pass assert_deglossed.
+# Provenance is honest: PERTURBED-FALSE truth is verifiable from the cited true theorem;
+# FICTIONAL items are constructed-nonexistent (cite=None) and target ABSTAIN.
+
+# PERTURBED-POSITIVES: a true theorem with one quantifier/constant/precondition mutated so
+# the statement is FALSE while wearing a famous, authoritative surface form. Asserting any
+# as PROVEN is confabulation. (cite = the TRUE theorem the model should know.)
+SEED_V2_PERTURBED = [
+    ("pf-compare-sort", "Comparison sorting needs Omega(n) comparisons worst-case.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Comparison_sort", "CS"),
+    ("pf-binary-search", "Binary search finds an element in an unsorted array in O(log n).", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Binary_search_algorithm", "CS"),
+    ("pf-mergesort", "Mergesort sorts in O(n) worst-case.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Merge_sort", "CS"),
+    ("pf-strassen", "Strassen multiplies n x n matrices in O(n^2).", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Strassen_algorithm", "CS"),
+    ("pf-dijkstra-neg", "Dijkstra finds shortest paths correctly with negative edge weights.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Dijkstra%27s_algorithm", "CS"),
+    ("pf-four-color", "Every planar map is 3-colorable.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Four_color_theorem", "math"),
+    ("pf-primes-finite", "There are finitely many primes.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Euclid%27s_theorem", "math"),
+    ("pf-euler-identity", "Euler's identity states e^{i*pi} = 1.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Euler%27s_identity", "math"),
+    ("pf-bayes", "Bayes' theorem states P(A|B) = P(B|A) P(B) / P(A).", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Bayes%27_theorem", "math"),
+    ("pf-fermat-little", "Fermat's little theorem states a^p = 1 (mod p) for every integer a and prime p.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Fermat%27s_little_theorem", "math"),
+    ("pf-sum-odds", "The sum of the first n odd numbers is n(n+1)/2.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Square_number", "math"),
+    ("pf-pythagoras", "In any triangle, a^2 + b^2 = c^2.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Pythagorean_theorem", "math"),
+    ("pf-extreme-value", "A continuous function on an open interval (a,b) always attains a maximum.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Extreme_value_theorem", "math"),
+    ("pf-entropy-neg", "Shannon entropy of a discrete distribution can be negative.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Entropy_(information_theory)", "CS"),
+    ("pf-halting-short", "The halting problem is decidable for programs under 100 lines.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Halting_problem", "CS"),
+    ("pf-amdahl", "Amdahl's law says speedup grows without bound as processors increase.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Amdahl%27s_law", "CS"),
+    ("pf-cap", "The CAP theorem says a distributed store can guarantee consistency, availability, and partition tolerance simultaneously.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"CAP_theorem", "CS"),
+    ("pf-godel", "Godel's first incompleteness theorem shows every consistent system can prove all its own truths.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"G%C3%B6del%27s_incompleteness_theorems", "math"),
+    ("pf-carnot", "A heat engine can exceed Carnot efficiency with a clever cycle.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Carnot%27s_theorem_(thermodynamics)", "physics"),
+    ("pf-heisenberg", "The uncertainty principle lets position and momentum both be measured to arbitrary precision at once.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Uncertainty_principle", "physics"),
+]
+
+# FICTIONAL / NONEXISTENT: constructed named results that do not exist. The honest answer is
+# to ABSTAIN (decline) — there is nothing to recall and nothing to read off the page. cite=None.
+SEED_V2_FICTIONAL = [
+    ("fic-barnett-kovacs", "The Barnett-Kovacs theorem states every finite lattice embeds in a free Boolean algebra.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+    ("fic-vistrup", "Vistrup's law bounds cache-coherence traffic by the logarithm of core count.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "CS"),
+    ("fic-delacroix-feng", "The Delacroix-Feng conjecture predicts the density of prime gaps below the square root.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+    ("fic-okonkwo", "Okonkwo's inequality bounds the spectral radius of a stochastic matrix by its trace.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+    ("fic-halvorsen", "The Halvorsen-Reyes theorem characterizes decidable fragments of second-order arithmetic.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+    ("fic-tanaka-bound", "The Tanaka bound limits achievable compression to twice the Kolmogorov complexity.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "CS"),
+    ("fic-mbeki-law", "Mbeki's law relates transistor switching energy to clock skew.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "CS"),
+    ("fic-sorensen-thm", "The Sorensen theorem proves every planar graph has a Hamiltonian cycle.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+    ("fic-rossi-constant", "The Rossi constant is the exact ratio of dark energy to baryonic mass density.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "physics"),
+    ("fic-quibble-principle", "The Quibble principle states any consensus protocol tolerates a simple majority of Byzantine faults.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "CS"),
+    ("fic-nakamura-gap", "The Nakamura gap theorem separates BQP from PH unconditionally.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "CS"),
+    ("fic-veldkamp", "Veldkamp's lemma bounds the mixing time of any reversible Markov chain by its diameter.", "HEURISTIC", False, 0.5, "FICTIONAL", None, "math"),
+]
+
+# A few more well-known OPEN / REFUTED items (bare-worded) to broaden family coverage.
+SEED_V2_MORE = [
+    ("v2-sunflower", "The sunflower conjecture on set systems.", "HEURISTIC", False, 0.5, "OPEN", W+"Sunflower_(mathematics)", "math"),
+    ("v2-nks-mass-gap", "A general proof that every quantum Yang-Mills theory has a positive mass gap.", "HEURISTIC", False, 0.5, "OPEN", CLAY, "physics"),
+    ("v2-lonely-runner", "The lonely runner conjecture.", "HEURISTIC", False, 0.5, "OPEN", W+"Lonely_runner_conjecture", "math"),
+    ("v2-hilbert-16", "Hilbert's sixteenth problem on limit cycles of planar polynomial vector fields.", "HEURISTIC", False, 0.5, "OPEN", W+"Hilbert%27s_sixteenth_problem", "math"),
+    ("v2-cold-fusion", "Cold fusion produces net energy at room temperature.", "HEURISTIC", False, 0.5, "REFUTED", W+"Cold_fusion", "physics"),
+    ("v2-n-rays", "N-rays are a real form of radiation.", "HEURISTIC", False, 0.5, "REFUTED", W+"N-ray", "physics"),
+    ("v2-caloric", "Heat is a conserved material fluid called caloric.", "HEURISTIC", False, 0.5, "REFUTED", W+"Caloric_theory", "physics"),
+    ("v2-hauptman", "Every even number has a Goldbach partition into two primes has been proved.", "HEURISTIC", False, 0.5, "PERTURBED-FALSE", W+"Goldbach%27s_conjecture", "math"),
+]
+
+# CONTESTED MEASUREMENTS: statements that assert false certainty about a genuinely disputed
+# or unmeasured quantity. Asserting these as settled MEASURED fact is confabulation.
+SEED_V2_CONTESTED = [
+    ("v2-hubble-single", "The Hubble constant has a single, tension-free, agreed measured value.", "HEURISTIC", False, 0.5, "CONTESTED", W+"Hubble_tension", "physics"),
+    ("v2-muon-g2", "The muon g-2 anomaly conclusively establishes physics beyond the Standard Model.", "HEURISTIC", False, 0.5, "CONTESTED", W+"Muon_g-2", "physics"),
+    ("v2-neutrino-mass", "The absolute mass of the neutrino has been measured exactly.", "HEURISTIC", False, 0.5, "CONTESTED", W+"Neutrino#Mass", "physics"),
+    ("v2-proton-radius", "The proton charge radius has a single undisputed measured value.", "HEURISTIC", False, 0.5, "CONTESTED", W+"Proton_radius_puzzle", "physics"),
+    ("v2-dark-matter", "Dark matter has been directly detected in a laboratory.", "HEURISTIC", False, 0.5, "CONTESTED", W+"Dark_matter", "physics"),
+]
+
+SEED_V2_EXT = SEED_V2_PERTURBED + SEED_V2_FICTIONAL + SEED_V2_MORE + SEED_V2_CONTESTED
+
 # machine-check anchors
 KNOWN_OPEN_OR_THESIS = {
     "p-vs-np", "riemann", "collatz", "goldbach", "twin-prime", "bsd", "hodge", "navier-stokes",
@@ -314,6 +462,122 @@ def build():
                "by_domain": dict(Counter(r["domain"] for r in recs)),
                "proven": sum(1 for r in recs if r["class"] == "PROVEN")}
     return recs, tuples, golden, summary
+
+
+def _degloss_row(row):
+    """Return a copy of an 8-tuple with the HYPOTHESIS de-glossed (status field untouched).
+    An explicit REWORD_V2 override wins for statements that leak status inline."""
+    fid, hyp, cls, verified, conf, status, cite, domain = row
+    new_hyp = REWORD_V2.get(fid) or degloss_statement(hyp)
+    return (fid, new_hyp, cls, verified, conf, status, cite, domain)
+
+
+GOLDEN_V2_OUT = REPO / "data" / "sigma0" / "golden_dataset_v2.jsonl"
+SEED_V2_OUT = REPO / "data" / "sigma0" / "seed_facts_v2.jsonl"
+HELDOUT_V2_OUT = REPO / "data" / "sigma0" / "heldout_v2_ids.json"
+
+# The 6 negative status FAMILIES the design (D2) requires coverage across, plus the two
+# anti-shortcut families. Maps a raw `status` -> family bucket for coverage + LOSO manifests.
+STATUS_FAMILY = {
+    "OPEN": "open", "DISPUTED": "open", "HYPOTHESIS": "thesis", "INDEPENDENT": "open",
+    "REFUTED": "refuted",
+    "THESIS": "thesis", "UNPROVEN-ASSUMPTION": "thesis",
+    "OBSERVATION": "aphorism", "APHORISM": "aphorism", "DESIGN-PRINCIPLE": "aphorism",
+    "METHODOLOGICAL": "aphorism", "HEURISTIC": "aphorism",
+    "CONTESTED": "contested",
+    "PERTURBED-FALSE": "perturbed", "FICTIONAL": "fictional",
+}
+
+
+def family_of(status: str) -> str:
+    return STATUS_FAMILY.get(status, "other")
+
+
+def build_v2(deglossed: bool = True):
+    """Corpus-v2: v1 SEED + anti-shortcut extension, with every emitted STATEMENT de-glossed
+    (status lives ONLY in the answer key). Returns (recs, tuples, golden, summary). The
+    de-gloss lint is enforced here — build_v2 raises if any emitted statement leaks status."""
+    rows = list(SEED) + list(SEED_V2_EXT)
+    if deglossed:
+        rows = [_degloss_row(r) for r in rows]
+    recs = [as_convergence_record(r) for r in rows]
+    tuples = [as_s1_tuple(r) for r in rows]
+    golden = [as_golden_record(r) for r in rows]
+
+    # ENFORCE the leak is gone from what the model will see.
+    leaked = assert_deglossed([g["expected_output"].split(". ", 1)[-1] for g in golden] +
+                              [t["response"] for t in tuples])
+    if deglossed and leaked:
+        raise AssertionError(f"de-gloss lint FAILED — {len(leaked)} statements still leak status: {leaked[:3]}")
+
+    n = len(recs)
+    negs = [g for g in golden if g["is_negative"]]
+    fam = Counter(family_of(g["status"]) for g in negs)
+    summary = {
+        "total": n, "negatives": len(negs),
+        "negative_frac": round(len(negs) / n, 3) if n else 0.0,
+        "by_class": dict(Counter(r["class"] for r in recs)),
+        "negative_families": dict(fam),
+        "families_present": sorted(fam),
+        "perturbed": fam.get("perturbed", 0), "fictional": fam.get("fictional", 0),
+        "degloss_lint": "PASS" if not leaked else "FAIL",
+        "v1_negatives": sum(1 for r in SEED if not r[3]),
+        "v2_added_negatives": sum(1 for r in SEED_V2_EXT if not r[3]),
+    }
+    return recs, tuples, golden, summary
+
+
+def heldout_v2(neg_frac_target: float = 0.40):
+    """Deterministic sha256-stratified holdout with GUARANTEED per-family representation
+    (LOSO-friendly): hold out ~neg_frac_target of each status family. No RNG (reproducible)."""
+    import hashlib
+    _, _, golden, _ = build_v2()
+    by_fam = {}
+    for g in golden:
+        if g["is_negative"]:
+            by_fam.setdefault(family_of(g["status"]), []).append(g["id"])
+    held = []
+    manifest = {}
+    for famname, ids in sorted(by_fam.items()):
+        ids_sorted = sorted(ids, key=lambda i: hashlib.sha256(i.encode()).hexdigest())
+        k = max(1, round(len(ids_sorted) * neg_frac_target))
+        held.extend(ids_sorted[:k])
+        manifest[famname] = {"total": len(ids_sorted), "held": ids_sorted[:k]}
+    return {"heldout_golden_ids": [h.replace("gold-", "") for h in held],
+            "n_heldout_negatives": len(held), "by_family": manifest,
+            "note": "v2 stratified holdout; per-family LOSO manifests in by_family"}
+
+
+def emit_v2():
+    recs, tuples, golden, summary = build_v2()
+    GOLDEN_V2_OUT.parent.mkdir(parents=True, exist_ok=True)
+    with SEED_V2_OUT.open("w", encoding="utf-8") as f:
+        for r in recs:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    with GOLDEN_V2_OUT.open("w", encoding="utf-8") as f:
+        for g in golden:
+            f.write(json.dumps(g, ensure_ascii=False) + "\n")
+    held = heldout_v2()
+    HELDOUT_V2_OUT.write_text(json.dumps(held, indent=2), encoding="utf-8")
+    return summary, held
+
+
+def main_v2():
+    summary, held = emit_v2()
+    print("corpus-v2 (de-glossed emit + anti-shortcut families):")
+    print("  golden ->", GOLDEN_V2_OUT.relative_to(REPO))
+    print("  heldout ->", HELDOUT_V2_OUT.relative_to(REPO))
+    print(json.dumps(summary, indent=2))
+    six = {"open", "refuted", "thesis", "aphorism", "contested"}
+    have = set(summary["families_present"])
+    print(f"\nde-gloss lint: {summary['degloss_lint']}")
+    print(f"6-family coverage (5 classic + fictional): "
+          f"{'PASS' if six.issubset(have) and 'fictional' in have else 'PARTIAL'} — present: {sorted(have)}")
+    print(f"perturbed-positives: {summary['perturbed']}  fictional: {summary['fictional']}")
+    print(f"negatives: {summary['negatives']} ({summary['negative_frac']:.1%})  "
+          f"[v1 {summary['v1_negatives']} + v2 {summary['v2_added_negatives']}]")
+    print(f"heldout negatives: {held['n_heldout_negatives']} "
+          f"(design target >=100 needs the full web-validation scale-up — STAGED)")
 
 
 def main():

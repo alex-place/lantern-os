@@ -59,6 +59,34 @@ def _sha256_short(data: Any) -> str:
     return hashlib.sha256(json.dumps(data, default=str).encode()).hexdigest()[:16]
 
 
+# Tools whose output is LIVE or side-effecting — their results must never be
+# cached/replayed, otherwise the MCP surface diverges from keystone (dream) chat,
+# which calls tool-runner.js directly with no result cache. Caching a file Read
+# would serve stale contents after an edit; caching a policy-gated denial (from a
+# non-operator call) would poison every later operator call with the same args.
+_NEVER_CACHE_TOOLS = frozenset({
+    # canonical filesystem / shell / mutating shared tools
+    "Read", "LS", "Glob", "Grep", "Bash", "PowerShell", "Write", "Edit",
+    "workspace_read", "workspace_write", "workspace_list", "recall_memory",
+    "create_document", "generate_document",
+    # live operational tools (state changes between calls)
+    "queue_status", "get_status", "boot_check", "fleet_status", "system_status",
+    "task_run", "execute_task", "worker_tick", "worker_status",
+})
+
+
+def _result_is_cacheable_success(result: Any) -> bool:
+    """A result is cacheable only if it plainly succeeded. Denied/blocked/failed
+    dicts (ok:false / status in a deny set) must never be stored or replayed."""
+    if isinstance(result, dict):
+        if result.get("ok") is False:
+            return False
+        status = str(result.get("status", "")).lower()
+        if status in {"denied", "blocked", "error", "unavailable", "failed"}:
+            return False
+    return True
+
+
 # ── Pre-hook signatures ──
 
 class PreHook(Protocol):
@@ -99,9 +127,13 @@ class CsfCachePreHook:
         self.cache = CsfCacheManager(cache_dir)
 
     def __call__(self, ctx: HookContext) -> None:
+        if ctx.tool_name in _NEVER_CACHE_TOOLS:
+            return
         cache_key = _sha256_short({"tool": ctx.tool_name, "args": ctx.arguments})
         hit = self.cache.get(cache_key)
-        if hit is not None:
+        # Only replay a plainly-successful cached result. A stale denial/failure
+        # must never short-circuit a fresh call (fixes operator-gate poisoning).
+        if hit is not None and _result_is_cacheable_success(hit):
             ctx.result = hit
             ctx.cache_hit = True
             ctx.csf_validated = True
@@ -160,6 +192,11 @@ class CsfCachePostHook:
 
     def __call__(self, ctx: HookContext) -> None:
         if ctx.cache_hit or ctx.error:
+            return
+        if ctx.tool_name in _NEVER_CACHE_TOOLS:
+            return
+        # Never persist a denied/blocked/failed result — it would poison later calls.
+        if not _result_is_cacheable_success(ctx.result):
             return
         cache_key = _sha256_short({"tool": ctx.tool_name, "args": ctx.arguments})
         self.cache.set(cache_key, ctx.result, agent_id=ctx.agent_id, tool_name=ctx.tool_name)

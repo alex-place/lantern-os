@@ -47,6 +47,13 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 6. Honor the **External Reality Rule**: every important claim carries evidence — link to a
    real `file:line`, commit, or PR, with a confidence note.
 
+Numbering and index membership are enforced mechanically: the `ADR registry lint` PR gate
+(`node scripts/lint-adr-registry.mjs`) fails on duplicate 4-digit numbers, on an ADR file
+missing from the index table below, and on an index status cell that contradicts the file's
+own `status:` declaration. Numbers have collided three times under concurrent PRs
+(3×0001, 2×0008, 2×0023) — if the gate fires on your PR, renumber to the next free number
+against the *merged* master, not your branch's base.
+
 ## Status values
 
 - **Proposed** — drafted, under review, **not yet binding**. Default for any new ADR.
@@ -75,7 +82,12 @@ Agents and contributors may *draft* ADRs and open PRs for them, but must leave t
 | [0015](0015-qwen-teacher-verified-distillation.md) | Qwen-teacher verified distillation into Ouro — proposer, not imitation; execution is the teacher of record | Accepted (Alex Place, 2026-07-04) |
 | [0016](0016-provider-agnostic-oss-auth.md) | Provider-agnostic OSS auth — one identity + provider registry (local scrypt + Google + Discord + Patreon), verified-both linking | Accepted (Alex Place, 2026-07-02) |
 | [0017](0017-surprise-gated-decoding.md) | Surprise-gated decoding — mid-generation grounding intervention (CSF retrieval + web search + tool call) when rolling surprise crosses calibrated threshold | Accepted (Alex Place, 2026-07-02) |
+| [0018](0018-web-tier-split-and-cloud-multi-tenancy.md) | Split delivery into a hosted multi-tenant web tier and a full local desktop app — one Core, two profiles | Accepted (Alex Place, 2026-07-03) |
 | [0019](0019-ibkr-connectivity-client-portal-gateway.md) | IBKR connectivity — Client Portal Web API via local gateway, read-only (replaces the fabricated api.ibkr.com bearer-token path) | Accepted (Alex Place, 2026-07-04) |
+| [0020](0020-ibkr-live-order-placement.md) | IBKR live order placement — gated, dry-by-default | Proposed (awaiting Alex's approval) |
 | [0021](0021-serving-substrate-retain-ouro-custom-loop.md) | Serving substrate — retain the Ouro/Σ₀ custom transformers loop; reject an engine port (no adaptive-depth/hidden-state serving exists); defer a Qwen3.5-4B base swap | Accepted (Alex Place, 2026-07-04) |
+| [0022](0022-ibkr-per-user-self-service-oauth.md) | Per-user IBKR connection via self-service OAuth 1.0a | Accepted (operator-directed, 2026-07-05) — explicit approval record pending |
+| [0023](0023-default-profile-foregrounds-the-loop.md) | The default profile foregrounds the loop — extensions are opt-in behind flags | Proposed (awaiting Alex's approval) |
+| [0024](0024-sigma0-frontier-training-program.md) | Σ₀ frontier training program — honesty-native pretraining, phased PILOT→BASE→FRONTIER with kill-gates; certificate as training-time spec; distills to the ≤8GB serving artifact | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->

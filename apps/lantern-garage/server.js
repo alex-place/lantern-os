@@ -673,6 +673,24 @@ server.listen(port, host, () => {
     console.error("[feature-flags] nav-sync check failed (non-fatal):", e && e.message);
   }
 
+  // ── Continual-improvement flywheel (#2145) ──
+  // The harvest → exec-verify → train → eval-gated-promote loop
+  // (self-improvement-cron.js) is built but never fired. Wire it here, gated by
+  // SIGMA0_IMPROVEMENT_SCHEDULER=1 and default OFF so it does not run on dev/CI
+  // boots. When enabled it schedules a weekly pass; a GPU training run is only
+  // dispatched by maybeDispatchTraining() when promoted patterns clear
+  // TRAINING_PROMOTE_THRESHOLD (default 20), so enabling the scheduler alone does
+  // not force a training run without work to promote.
+  if (process.env.SIGMA0_IMPROVEMENT_SCHEDULER === "1") {
+    try {
+      const { startImprovementScheduler } = require("./lib/self-improvement-cron");
+      startImprovementScheduler(repoRoot);
+      console.info("[self-improvement] flywheel scheduler armed (weekly; SIGMA0_IMPROVEMENT_SCHEDULER=1)");
+    } catch (e) {
+      console.error("[self-improvement] scheduler failed to arm (non-fatal):", e && e.message);
+    }
+  }
+
   // ── Boot-time queue reconcile: sweep stale assigned claims ──
   // A claim file is written per issue an autowork run opens a draft PR for and never
   // removed; when the issue later closes the claim lingers and inflates the

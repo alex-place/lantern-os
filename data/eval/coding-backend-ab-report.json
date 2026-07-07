@@ -1,0 +1,239 @@
+{
+  "benchmark": "coding-backend-ab",
+  "ts": "1783372038",
+  "model": "qwen2.5-coder:latest",
+  "n": 25,
+  "raw_pass_at_1": 1.0,
+  "wrapped_pass_at_1": 1.0,
+  "wrapped_held_coverage": 1.0,
+  "wrapped_receipt_coverage": 1.0,
+  "wrapped_engine_is_qwen": 1.0,
+  "verdict": "wrapped preserves accuracy + adds accountability",
+  "per_task": [
+    {
+      "id": 1,
+      "name": "is_prime",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 2,
+      "name": "reverse_string",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 3,
+      "name": "fizzbuzz",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 4,
+      "name": "count_vowels",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 5,
+      "name": "factorial",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 6,
+      "name": "flatten_list",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 7,
+      "name": "palindrome",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 8,
+      "name": "sum_digits",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 9,
+      "name": "count_words",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 10,
+      "name": "second_largest",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 11,
+      "name": "caesar_cipher",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 12,
+      "name": "merge_sorted",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 13,
+      "name": "binary_search",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 14,
+      "name": "anagram",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 15,
+      "name": "max_subarray",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 16,
+      "name": "unique_chars",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 17,
+      "name": "remove_dups",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 18,
+      "name": "matrix_transpose",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 19,
+      "name": "roman_to_int",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 20,
+      "name": "balanced_parens",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 21,
+      "name": "fibonacci",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 22,
+      "name": "chunk_list",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 23,
+      "name": "rotate_left",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 24,
+      "name": "missing_number",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    },
+    {
+      "id": 25,
+      "name": "two_sum",
+      "raw": true,
+      "wrapped": true,
+      "held": true,
+      "receipt": true,
+      "engine": "qwen2.5-coder:latest"
+    }
+  ]
+}

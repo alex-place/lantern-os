@@ -1,0 +1,2169 @@
+[
+  {
+    "name": "queue_status",
+    "description": "",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "task_intake",
+    "description": "",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "priority": {
+          "type": "string",
+          "default": "medium"
+        }
+      },
+      "required": [
+        "description"
+      ]
+    }
+  },
+  {
+    "name": "task_cancel",
+    "description": "Cancel a queued task by id. Marks it status=cancelled but keeps it in the queue as a record (use task_delete to remove). Matches the full id or a unique prefix.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "task_id"
+      ]
+    }
+  },
+  {
+    "name": "task_delete",
+    "description": "Delete a queued task by id, removing it from the queue entirely. Matches the full id or a unique prefix.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "task_id"
+      ]
+    }
+  },
+  {
+    "name": "task_run",
+    "description": "Pick up a queued task and run it through the Convergence Loop (Kernel) — the honest\n    consumer for the queue. Claims the named task (full id or unique prefix) or the top\n    pending task, marks it active (so active_slots reflects real in-flight work), routes it\n    to the TOOL-ENABLED streaming chat path (Reason/Act) so the model (Gemini/Claude/OpenAI)\n    can actually call repo tools — Read/Grep/Glob plus operator Edit/Write/Bash on loopback —\n    instead of only proposing text, then writes an append-only Convergence Record + PCSF\n    receipt (Verify/Converge) and marks it done. Tool execution requires CHAT_TOOL_EXEC=1 on\n    the garage server. Per the LANTERN-DREAM rule, results are PROPOSALS: confidence is capped\n    at 0.3 until Σ₀-verified. tool_calls reports how many tools the model executed.\n\n    Pass `provider` (e.g. \"gemini\", \"claude\", \"openai\", \"grok\", \"ollama\") to PIN the\n    reasoner instead of auto-routing; it is forwarded to the streaming chat as the\n    request `provider`. Empty = auto-route (PCSF leaderboard). Loopback POST = operator,\n    so the pinned provider gets the full toolset.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        },
+        "provider": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "execute_task",
+    "description": "SUPERFLEET PHASE 3 — sandboxed EXECUTOR. Upgrades a claimed task from a\n    PROPOSAL into an executed change: claim a queued task → carve a git-worktree\n    SANDBOX off the base branch → run the local Σ₀/convergence coder → run bounded\n    in-house verification (py_compile / node --check) → on success commit + push a\n    NEW fix branch (never auto-merged) → emit a Convergence Record + PCSF receipt;\n    on failure record the failure pattern. The worktree is always auto-cleaned.\n\n    OPT-IN + BOUNDED: refuses unless SUPERFLEET_EXECUTOR=1 (the default queue\n    consumer remains task_run, the proposal generator). Push is a second opt-in\n    (SUPERFLEET_EXECUTOR_PUSH=1); otherwise it commits to the branch only. Pass\n    dry_run=1 to prove the whole flow without committing/pushing or mutating the\n    real repo (sandbox created + removed only).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        },
+        "dry_run": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "queue_clear",
+    "description": "Clear the work queue. With no args removes ALL tasks; pass status (e.g. pending, cancelled) to remove only tasks in that state. Returns how many were removed.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "dispatch_work",
+    "description": "",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "string",
+          "default": ""
+        },
+        "task": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "agent",
+        "task"
+      ]
+    }
+  },
+  {
+    "name": "boot_check",
+    "description": "Check orchestrator boot status. Reports honest slot counts from fleet status file.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "list_skills",
+    "description": "List available skills. Does not include fleet agents — see fleet_status for agent fleet.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_status",
+    "description": "Overall system status with honest fleet counts loaded from fleet status file.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "fleet_status",
+    "description": "Read the agent fleet status directly from data/status/super-jarvis-fleet.json.\n    Returns designed ring slot count, active vs sleeping slots, and the claim boundary.\n    Active slots = 0 means all agents are in sleep/design mode, not live workers.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "mesh_register_peer",
+    "description": "Register a peer node in the P2P mesh. Peers may donate resources (agent slots, compute).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "mcp_url": {
+          "type": "string",
+          "default": ""
+        },
+        "messages_url": {
+          "type": "string",
+          "default": ""
+        },
+        "donated_resources": {
+          "type": "string",
+          "default": "{}"
+        }
+      },
+      "required": [
+        "name",
+        "mcp_url"
+      ]
+    }
+  },
+  {
+    "name": "mesh_status",
+    "description": "Show P2P mesh topology: founder, peers, and aggregate donated resources.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "mesh_donate",
+    "description": "Update the resources a peer is willing to donate (opt-in).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "peer_id": {
+          "type": "string",
+          "default": ""
+        },
+        "resources": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "peer_id",
+        "resources"
+      ]
+    }
+  },
+  {
+    "name": "mesh_prune",
+    "description": "Remove stale peers that haven't sent a heartbeat. Founder-only control.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "max_age_seconds": {
+          "type": "string",
+          "default": 300
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "update_lantern_os",
+    "description": "Pull latest master, install dependencies, and optionally restart the server.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "restart": {
+          "type": "string",
+          "default": true
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "research_run",
+    "description": "Run the research convergence loop for one question: web-search the evidence,\n    persist it as memory, extract claims, verify each by cross-source corroboration\n    (External Reality Rule), and return a cited report carrying, for every claim,\n    [claim, evidence, confidence, source].",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "default": ""
+        },
+        "max_results": {
+          "type": "integer",
+          "default": 5
+        }
+      },
+      "required": [
+        "question"
+      ]
+    }
+  },
+  {
+    "name": "research_intake",
+    "description": "Queue a research question for the continuous research program (durable JSONL\n    queue that survives restarts). Drain it with research_run_next.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "default": ""
+        },
+        "priority": {
+          "type": "string",
+          "default": "medium"
+        }
+      },
+      "required": [
+        "question"
+      ]
+    }
+  },
+  {
+    "name": "research_run_next",
+    "description": "Run the highest-priority pending research task from the queue through the\n    convergence loop. Returns the cited report, or a queue_empty note.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer",
+          "default": 5
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "research_status",
+    "description": "Show the research program queue depth and per-status task breakdown.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "mcp_capability_status",
+    "description": "Self-diagnosing capability map for THIS MCP server — for each capability that\n    gates real work, report whether it is available, the blocker if not, and the\n    concrete next_action to enable it. An honest Observe/Verify surface (ported from\n    the orchestrator's get_mcp_capability_status): every field is read from live\n    process state — env flags, module-import success, the Node runtime — never\n    fabricated. Opt-in capabilities (off by design) are flagged and excluded from\n    known_gaps so a deliberate default isn't reported as a defect.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "github_get_me",
+    "description": "Get the authenticated GitHub user's profile (login, name, plan, counts).",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "github_get_file_contents",
+    "description": "Read a file or directory from a repo. Returns decoded text for files, a listing for dirs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "ref": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "github_create_or_update_file",
+    "description": "Create or update a single file (one commit). Provide sha to update an existing file.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "content": {
+          "type": "string",
+          "default": ""
+        },
+        "message": {
+          "type": "string",
+          "default": ""
+        },
+        "branch": {
+          "type": "string",
+          "default": ""
+        },
+        "sha": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "path",
+        "content",
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "github_delete_file",
+    "description": "Delete a file from a repo (one commit). Looks up the blob sha if not provided.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "message": {
+          "type": "string",
+          "default": ""
+        },
+        "branch": {
+          "type": "string",
+          "default": ""
+        },
+        "sha": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "path",
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "github_push_files",
+    "description": "Commit multiple files in a single atomic commit.\n\n    files: JSON array string, e.g. '[{\"path\":\"a.txt\",\"content\":\"hi\"}]'.\n    Uses the Git Data API (tree + commit + ref update).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "branch": {
+          "type": "string",
+          "default": ""
+        },
+        "message": {
+          "type": "string",
+          "default": ""
+        },
+        "files": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "branch",
+        "message",
+        "files"
+      ]
+    }
+  },
+  {
+    "name": "github_create_branch",
+    "description": "Create a new branch from an existing one (defaults to the repo's default branch).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "branch": {
+          "type": "string",
+          "default": ""
+        },
+        "from_branch": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "branch"
+      ]
+    }
+  },
+  {
+    "name": "github_list_branches",
+    "description": "List branches in a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_list_commits",
+    "description": "List commits on a branch/ref, optionally filtered by file path.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "sha": {
+          "type": "string",
+          "default": ""
+        },
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_get_commit",
+    "description": "Get a single commit's details, stats, and changed files.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "sha": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "sha"
+      ]
+    }
+  },
+  {
+    "name": "github_create_repository",
+    "description": "Create a new repository for the authenticated user.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "description": {
+          "type": "string",
+          "default": ""
+        },
+        "private": {
+          "type": "string",
+          "default": "true"
+        },
+        "autoInit": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "github_fork_repository",
+    "description": "Fork a repository into the authenticated user's account (or an org).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "organization": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_create_release",
+    "description": "Create a new release (and optionally a new tag).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "tag_name": {
+          "type": "string",
+          "default": ""
+        },
+        "name": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "draft": {
+          "type": "string",
+          "default": "false"
+        },
+        "prerelease": {
+          "type": "string",
+          "default": "false"
+        },
+        "target_commitish": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "tag_name"
+      ]
+    }
+  },
+  {
+    "name": "github_get_latest_release",
+    "description": "Get the latest published release of a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_list_releases",
+    "description": "List releases for a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "10"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_search_code",
+    "description": "Search code across GitHub using GitHub code-search syntax.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "20"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "github_search_repositories",
+    "description": "Search repositories by name, topic, language, stars, etc.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "20"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "github_search_issues",
+    "description": "Search issues and pull requests using GitHub search syntax.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "20"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "github_search_users",
+    "description": "Search GitHub users and organizations.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "20"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "github_list_issues",
+    "description": "List issues in a repository (filter by state: open/closed/all, and labels).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "state": {
+          "type": "string",
+          "default": "open"
+        },
+        "labels": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_get_issue",
+    "description": "Get a single issue with its body and metadata.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "issue_number": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "issue_number"
+      ]
+    }
+  },
+  {
+    "name": "github_create_issue",
+    "description": "Open a new issue. labels/assignees are comma-separated.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "labels": {
+          "type": "string",
+          "default": ""
+        },
+        "assignees": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "title"
+      ]
+    }
+  },
+  {
+    "name": "github_update_issue",
+    "description": "Update an issue's title/body/state (open/closed) or replace its labels.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "issue_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "state": {
+          "type": "string",
+          "default": ""
+        },
+        "labels": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "issue_number"
+      ]
+    }
+  },
+  {
+    "name": "github_add_issue_comment",
+    "description": "Add a comment to an issue or pull request.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "issue_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "issue_number",
+        "body"
+      ]
+    }
+  },
+  {
+    "name": "github_list_issue_comments",
+    "description": "List comments on an issue or pull request.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "issue_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "issue_number"
+      ]
+    }
+  },
+  {
+    "name": "github_update_issue_comment",
+    "description": "Update the body of an existing issue or PR comment.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "comment_id": {
+          "type": "integer",
+          "default": 10
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "comment_id",
+        "body"
+      ]
+    }
+  },
+  {
+    "name": "github_delete_issue_comment",
+    "description": "Delete an issue or PR comment by its comment id.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "comment_id": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "comment_id"
+      ]
+    }
+  },
+  {
+    "name": "github_list_pull_requests",
+    "description": "List pull requests (state: open/closed/all).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "state": {
+          "type": "string",
+          "default": "open"
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_get_pull_request",
+    "description": "Get a pull request. Set include_diff=true to also return the unified diff (truncated).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "include_diff": {
+          "type": "string",
+          "default": "false"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_create_pull_request",
+    "description": "Open a new pull request from head into base.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "head": {
+          "type": "string",
+          "default": ""
+        },
+        "base": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "draft": {
+          "type": "string",
+          "default": "false"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "title",
+        "head",
+        "base"
+      ]
+    }
+  },
+  {
+    "name": "github_update_pull_request",
+    "description": "Update a PR's title/body/state (open/closed) or base branch.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "state": {
+          "type": "string",
+          "default": ""
+        },
+        "base": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_merge_pull_request",
+    "description": "Merge a pull request. merge_method: merge | squash | rebase.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "merge_method": {
+          "type": "string",
+          "default": "merge"
+        },
+        "commit_title": {
+          "type": "string",
+          "default": ""
+        },
+        "commit_message": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_create_pull_request_review",
+    "description": "Submit a PR review. event: APPROVE | REQUEST_CHANGES | COMMENT.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "event": {
+          "type": "string",
+          "default": "COMMENT"
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_get_pull_request_files",
+    "description": "List files changed in a pull request with patch stats.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "100"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_add_pull_request_review_comment",
+    "description": "Add an inline review comment to a specific line in a PR diff.\n\n    commit_id: the SHA of the commit to comment on.\n    path: relative path to the file.\n    line: line number in the diff (leave blank to attach to the overall diff hunk).\n    side: RIGHT (new file) or LEFT (old file).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "commit_id": {
+          "type": "string",
+          "default": ""
+        },
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "line": {
+          "type": "integer",
+          "default": ""
+        },
+        "side": {
+          "type": "string",
+          "default": "RIGHT"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number",
+        "body",
+        "commit_id",
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "github_get_pull_request_status",
+    "description": "Get the combined CI status and check runs for a pull request's head commit.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_list_workflows",
+    "description": "List GitHub Actions workflows defined in a repository.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_list_workflow_runs",
+    "description": "List recent workflow runs (optionally for a specific workflow id or filename).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "workflow_id": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "20"
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_get_workflow_run",
+    "description": "Get details of a single workflow run, including jobs summary.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "run_id": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "run_id"
+      ]
+    }
+  },
+  {
+    "name": "github_run_workflow",
+    "description": "Trigger a workflow_dispatch run. workflow_id is the file name (e.g. ci.yml) or numeric id.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "workflow_id": {
+          "type": "string",
+          "default": ""
+        },
+        "ref": {
+          "type": "string",
+          "default": ""
+        },
+        "inputs": {
+          "type": "string",
+          "default": "{}"
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "workflow_id",
+        "ref"
+      ]
+    }
+  },
+  {
+    "name": "github_get_job_logs",
+    "description": "Fetch the logs for a single Actions job (truncated to the tail).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "job_id": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "job_id"
+      ]
+    }
+  },
+  {
+    "name": "github_list_notifications",
+    "description": "List inbox notifications. all=true includes read; participating=true filters to @-mentioned.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "all": {
+          "type": "string",
+          "default": "false"
+        },
+        "participating": {
+          "type": "string",
+          "default": "false"
+        },
+        "perPage": {
+          "type": "integer",
+          "default": "30"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "github_get_notification_thread",
+    "description": "Get a single notification thread by its id.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "thread_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "thread_id"
+      ]
+    }
+  },
+  {
+    "name": "github_mark_notification_read",
+    "description": "Mark a notification thread as read.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "thread_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "thread_id"
+      ]
+    }
+  },
+  {
+    "name": "github_dismiss_notification",
+    "description": "Dismiss (unsubscribe from) a notification thread so it no longer appears in the inbox.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "thread_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "thread_id"
+      ]
+    }
+  },
+  {
+    "name": "local_repo_status",
+    "description": "Git status of the canonical local checkout: branch, sha, dirty files, ahead/behind.\n    Read-only.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "local_repo_search",
+    "description": "Search the local checkout for a regex/string (ripgrep if available, else stdlib).\n    Read-only. Optional `glob` filters filenames (e.g. '*.py').",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "default": ""
+        },
+        "glob": {
+          "type": "string",
+          "default": ""
+        },
+        "max_results": {
+          "type": "integer",
+          "default": 50
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "pattern"
+      ]
+    }
+  },
+  {
+    "name": "local_file_read",
+    "description": "Read a file from the local checkout. Refuses path traversal and forbidden paths\n    (.env*, secrets, keys, private data).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "max_bytes": {
+          "type": "integer",
+          "default": 20000
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "local_worktree_create",
+    "description": "Create an isolated git worktree on a bot-owned branch (mcp-local/<task_id>) off\n    `base`. This is the only place edits are allowed — never the live working tree.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        },
+        "base": {
+          "type": "string",
+          "default": "master"
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "local_worktree_destroy",
+    "description": "Remove a task worktree and its bot branch.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "task_id"
+      ]
+    }
+  },
+  {
+    "name": "local_patch_apply",
+    "description": "Apply a unified diff inside the task's worktree, after deterministic safety checks:\n    target files must not be forbidden, must match `allowed_globs` (comma-separated, if\n    given), and the added lines must contain no secrets. Never touches a protected branch.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        },
+        "patch": {
+          "type": "string",
+          "default": ""
+        },
+        "allowed_globs": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "task_id",
+        "patch"
+      ]
+    }
+  },
+  {
+    "name": "local_test_run",
+    "description": "Run an ALLOWLISTED test/lint command (pytest, node --check, npm test/lint, ruff,\n    mypy, git diff --check). Runs in the task worktree if task_id given, else the repo.\n    Arbitrary shell is refused.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "default": ""
+        },
+        "task_id": {
+          "type": "string",
+          "default": ""
+        },
+        "timeout": {
+          "type": "integer",
+          "default": 600
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "command"
+      ]
+    }
+  },
+  {
+    "name": "recipe_list",
+    "description": "List the deterministic repair recipes (fixed playbooks per issue class).",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "recipe_run",
+    "description": "Return the deterministic contract + execution plan for a recipe. This is the router:\n    it hands the fixed contract (observe/allowed_edits/required_tests/forbidden/done_when)\n    and the exact next-tool sequence to the caller. Edits still flow through\n    local_patch_apply (validated) and local_test_run (gated) — the contract is the boss.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "recipe": {
+          "type": "string",
+          "default": ""
+        },
+        "issue": {
+          "type": "string",
+          "default": ""
+        },
+        "task_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "recipe"
+      ]
+    }
+  },
+  {
+    "name": "worker_status",
+    "description": "Report the local runner state: repo root, active task worktrees, receipt count.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "receipt_get",
+    "description": "Fetch all receipts for a task id (the replay/audit trail).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": [
+        "task_id"
+      ]
+    }
+  },
+  {
+    "name": "local_git_status",
+    "description": "Current branch, modified/staged/untracked file counts, ahead/behind remote,\n    and a risk assessment (low/medium/high) for mutation operations.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "local_worktree_risk",
+    "description": "Git status + risk level summary for safe mutation decisions.\n\n    Returns risk: low | medium | high with a human-readable reason.\n    High = protected branch or large pending changes.\n    Medium = behind remote or many staged files.\n    Low = clean feature branch.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "local_git_create_branch",
+    "description": "Create and checkout a new feature branch.\n\n    branch: name for the new branch (refused if it matches master/main/dev/production/release).\n    from_ref: base ref/SHA (default: current HEAD).\n    dry_run: 'true' (default) just validates; 'false' creates the branch.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "branch": {
+          "type": "string",
+          "default": ""
+        },
+        "from_ref": {
+          "type": "string",
+          "default": ""
+        },
+        "dry_run": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": [
+        "branch"
+      ]
+    }
+  },
+  {
+    "name": "local_git_stage_files",
+    "description": "Stage specific repo-relative file paths for the next commit.\n\n    paths: comma-separated repo-relative paths (e.g. 'src/foo.py,README.md').\n    Absolute paths, globs, and path traversal (../) are refused.\n    dry_run: 'true' (default) just validates; 'false' stages the files.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "string",
+          "default": ""
+        },
+        "dry_run": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": [
+        "paths"
+      ]
+    }
+  },
+  {
+    "name": "local_git_commit",
+    "description": "Commit currently staged files.\n\n    Refused on master/main/dev/production/release.\n    dry_run: 'true' (default) shows what would be committed; 'false' commits.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "default": ""
+        },
+        "dry_run": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": [
+        "message"
+      ]
+    }
+  },
+  {
+    "name": "local_git_push",
+    "description": "Push the current branch to remote.\n\n    Refused on master/main/dev/production/release.\n    set_upstream: 'true' (default) passes -u to set tracking.\n    dry_run: 'true' (default) shows what would be pushed; 'false' pushes.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "remote": {
+          "type": "string",
+          "default": "origin"
+        },
+        "set_upstream": {
+          "type": "string",
+          "default": "true"
+        },
+        "dry_run": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "local_git_open_pr",
+    "description": "Open a GitHub pull request for the current branch via the gh CLI.\n\n    base: target branch (default master). Current branch is the head.\n    draft: 'true' opens as a draft PR.\n    dry_run: 'true' (default) shows the plan; 'false' opens the PR.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "default": ""
+        },
+        "body": {
+          "type": "string",
+          "default": ""
+        },
+        "base": {
+          "type": "string",
+          "default": "master"
+        },
+        "draft": {
+          "type": "string",
+          "default": "false"
+        },
+        "dry_run": {
+          "type": "string",
+          "default": "true"
+        }
+      },
+      "required": [
+        "title"
+      ]
+    }
+  },
+  {
+    "name": "local_server_status",
+    "description": "Check which local Keystone servers are up (ports 4177, 4178, 8771)\n    and return the MCP server's own uptime.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_tunnel_canary",
+    "description": "Probe the MCP tunnel endpoint (mcp.lantern-os.net) via a lightweight\n    tools/list call to confirm end-to-end tunnel health.\n\n    Returns ok=True with latency_ms if reachable, error otherwise.\n    Read-only — never mutates anything.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
+    "name": "get_recent_task_failures",
+    "description": "Return the most recent failed/cancelled tasks from the queue ledger.\n\n    Reads data/queue/ledger.jsonl (or equivalent) for status=failed|cancelled events.\n    limit: max records to return (default 10).",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "convergence_run",
+    "description": "Run the Convergence Loop over the repo + queue: Observe→Reason→Act→Verify→\n    Converge. Modes: triage | status | issues | prs | checks | queue. Read-only;\n    returns a grounded proposal (confidence 0.3) with evidence.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "goal": {
+          "type": "string",
+          "default": ""
+        },
+        "mode": {
+          "type": "string",
+          "default": "triage"
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "github_triage_prs",
+    "description": "Pull open PRs + their checks/mergeability and return a ranked queue\n    (ready first, conflicting last) — the missing 'PR issues' brain.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "perPage": {
+          "type": "integer",
+          "default": 20
+        }
+      },
+      "required": [
+        "owner",
+        "repo"
+      ]
+    }
+  },
+  {
+    "name": "github_pr_status",
+    "description": "Return mergeability, checks, blockers, labels, and the recommended next\n    action for one PR — one clean call instead of five.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "required": [
+        "owner",
+        "repo",
+        "pull_number"
+      ]
+    }
+  },
+  {
+    "name": "github_work_issue",
+    "description": "Work a GitHub issue under hard safety gates.\n\n    mode=investigate : read the issue + record a fix_plan. NO writes.\n    mode=patch       : investigate + create a bot branch (MCP_BOT_BRANCH_PREFIX)\n                       + push proposed file_changes. NO PR, NO merge.\n    mode=pr          : patch + open a PR into MCP_DEFAULT_BASE_BRANCH. NEVER merges.\n\n    Safety (hard refuse → error dict): repo not allow-listed; writes disabled\n    (github_tools.WRITE_ENABLED False); any attempt to write the base branch.\n    Every action is appended to data/convergence/issue-work-records.jsonl.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "issue_number": {
+          "type": "integer",
+          "default": 0
+        },
+        "mode": {
+          "type": "string",
+          "default": "investigate"
+        },
+        "create_pr": {
+          "type": "string",
+          "default": false
+        },
+        "file_changes": {
+          "type": "string",
+          "default": null
+        },
+        "fix_plan": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "github_fix_failed_checks",
+    "description": "Inspect a PR's failed checks and propose/apply a fix under safety gates.\n\n    Reuses github_pr_status + github_get_job_logs to build a fix_plan.\n    create_pr=True (DEFAULT, SAFER): create a STACKED bot fix branch and open a\n    NEW PR — never touches the original branch. Only when create_pr=False AND the\n    original branch is clearly bot-owned (starts with MCP_BOT_BRANCH_PREFIX) do we\n    push directly to it.\n\n    Safety (hard refuse): repo not allow-listed; writes disabled; any attempt to\n    write the base branch; never merges. Receipts → pr-work-records.jsonl.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "owner": {
+          "type": "string",
+          "default": ""
+        },
+        "repo": {
+          "type": "string",
+          "default": ""
+        },
+        "pull_number": {
+          "type": "integer",
+          "default": 0
+        },
+        "create_pr": {
+          "type": "string",
+          "default": true
+        },
+        "file_changes": {
+          "type": "string",
+          "default": null
+        },
+        "fix_plan": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "worker_tick",
+    "description": "Claim and run up to N pending tasks once. Proves queue pickup without a\n    daemon — each task goes pending → active → done/failed, so active_slots\n    becomes meaningful while it runs.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "lantern_command",
+    "description": "Execute a Lantern bang command through the MCP backend the UI expects.\n    Routes: !convergance/!convergence→convergence_run, !autonomous-work N→investigate,\n    !pr-status N→github_pr_status, !triage-prs→github_triage_prs, !fix-pr N→status+plan,\n    !queue-run [N]→worker_tick.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "command": {
+          "type": "string",
+          "default": ""
+        }
+      },
+      "required": []
+    }
+  }
+]

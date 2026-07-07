@@ -226,30 +226,3 @@ class ConvergedTesseract:
     def set_dilation(self, ticks_per_second: float) -> None:
         """Adjust time dilation: higher = faster internal traversal."""
         self.dilation_engine.internal_ticks_per_second = max(0.01, ticks_per_second)
-
-
-# ------------------------------------------------------------------
-# Backward-compatible bridge to convergence_io_engine
-# ------------------------------------------------------------------
-
-def convergence_io_route_on_slice(slice_obj: WavefrontSlice) -> Dict[str, any]:
-    """Minimal convergence I/O route over a wavefront slice.
-
-    This is a placeholder bridge. In a full implementation, it would
-    feed the slice into the TesseractEngine's convergence pipeline.
-    """
-    return {
-        "slice_size": slice_obj.slice_size,
-        "active_states": slice_obj.active_count,
-        "center": slice_obj.center,
-        "precision": slice_obj.precision,
-    }
-
-
-def update_sensors(convergence_result: Dict[str, any]) -> None:
-    """Update sensors with convergence output.
-
-    Placeholder for sensor update hook. In production, this would
-    route to the Surface layer (dream-chat UI, agent badges, etc.)
-    """
-    pass

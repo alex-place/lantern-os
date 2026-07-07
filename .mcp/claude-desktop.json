@@ -7,7 +7,9 @@
       ],
       "env": {
         "MCP_SERVER_URL": "http://127.0.0.1:8771",
-        "PYTHONPATH": "src"
+        "PYTHONPATH": "src",
+        "CHAT_TOOL_EXEC": "1",
+        "MCP_SHARED_TOOL_OPERATOR": "1"
       }
     }
   }

@@ -60,6 +60,8 @@ const EXTENSION = {
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
+  // broker (IBKR) connect help — gated with the trading cluster it belongs to
+  "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // game — playable surface beside the loop (linked from Explore as a game card)
@@ -107,12 +109,25 @@ const SUBSYSTEMS = {
 //      exceeds this cap the contract test FAILS: either add core value, or raise the cap
 //      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
 //      instead of letting it accrete silently).
-const MAX_EXTENSION_RATIO = 0.95; // 17:19 ≈ 0.89 — reconciled onto master (#1980 kept kalshi-screener + reset-password).
+const MAX_EXTENSION_RATIO = 0.95; // 18:19 ≈ 0.95 — ibkr-setup-guide classified under trading; ibkr-connect redirect stub removed (not a surface).
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always
 //      render). This makes "optional capability beside the loop" true in practice, not paper.
 const ALWAYS_ON_MODULES = new Set(["account", "meta"]);
+
+// ── NAV FOREGROUND — extensions the product owner keeps in the DEFAULT nav ───────
+// The default app foregrounds the loop (ADR-0023): extension nav links are hidden
+// until their flag is on. These surfaces are an explicit exception — a deliberate
+// product decision to treat them as a first-class mainstay of the nav even though
+// they remain EXTENSIONs in the Σ₀ boundary (they don't serve a loop stage). The
+// trader is served to everyone (guest read-only), so its nav link is always shown.
+const NAV_FOREGROUND = new Set(["stock-trader.html"]);
+
+/** True if this extension surface should stay in the default nav despite being gated. */
+function isNavForegrounded(surface) {
+  return NAV_FOREGROUND.has(surface);
+}
 
 /** Classify one top-level surface filename. Returns null if unclassified. */
 function classify(surface) {
@@ -157,4 +172,4 @@ function summary() {
   };
 }
 
-module.exports = { LOOP_STAGES, CORE, EXTENSION, SUBSYSTEMS, MAX_EXTENSION_RATIO, ALWAYS_ON_MODULES, classify, classifySubsystem, unclassified, summary };
+module.exports = { LOOP_STAGES, CORE, EXTENSION, SUBSYSTEMS, MAX_EXTENSION_RATIO, ALWAYS_ON_MODULES, NAV_FOREGROUND, isNavForegrounded, classify, classifySubsystem, unclassified, summary };

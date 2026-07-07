@@ -19,6 +19,7 @@ const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail, sendPasswordResetEmail } = require("../lib/mailer");
+const { recordTractionEvent } = require("../lib/traction");
 const {
   getProfile,
   getProfileByEmail,
@@ -148,7 +149,23 @@ module.exports = async function authRoutes(req, res, url, deps) {
       }
       updates.email = payload.email;
     }
+    // Emit a verified `signup` traction event exactly once — email confirmation is
+    // the moment a local signup clears the hard email gate (OBSERVE stage). Guard on
+    // the pre-update flag so repeat clicks on the same link don't re-count. The
+    // ledger's classifyActor() files the operator's own confirmations as "operator",
+    // so this never inflates external adoption. Best-effort; never blocks the redirect.
+    const wasVerified = profile.emailVerified === true;
     updateProfile(profile.id, updates);
+    if (!wasVerified) {
+      recordTractionEvent({
+        kind: "signup",
+        actor: updates.email || profile.email || profile.id,
+        verified: true,
+        confidence: "high",
+        source: `email_verified:${profile.id}`,
+        note: "email address confirmed via verify-email link",
+      }).catch(() => {});
+    }
     res.writeHead(302, { Location: `${dest}?verify=1` });
     return res.end();
   }

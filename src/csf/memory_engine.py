@@ -197,6 +197,10 @@ _MAX_INDEX_SIZE = 100_000
 # cold-start cache, validated on load against registry sizes and rebuilt if stale.
 _INDEX_SAVE_EVERY = 128
 
+# #2086: raw tiers that a recall promotes UP toward an anchor (advancing the cube RAW→REFINED).
+# Records already at an anchor-or-higher tier are left as-is on recall.
+RECALL_PROMOTABLE = frozenset({Tier.TRACE, Tier.CORRECTION})
+
 
 class MemoryEngine:
     """Local-first cube-partitioned memory store."""
@@ -216,6 +220,7 @@ class MemoryEngine:
         # in-memory index stays current either way, so query() is unaffected.
         self._persist_index = persist_index
         self._writes_since_save = 0  # throttle counter for index persistence (#1728)
+        self._recall_promotions = 0  # #2086: count of retrieval-triggered tier promotions
         self._index_path = self.base / "_index.json"
         self._load_index()
 
@@ -528,6 +533,30 @@ class MemoryEngine:
             scored.sort(key=lambda x: x[0], reverse=True)
             return [rec for _, rec in scored[:limit]]
         return results
+
+    def recall_with_promotion(self, promote_to: Tier = Tier.ANCHOR, enabled: Optional[bool] = None,
+                              **query_kwargs) -> List[MemoryRecord]:
+        """Retrieval-triggered tier promotion (#2086). Query, then promote each recalled record
+        that still sits in a raw tier (TRACE/CORRECTION) toward `promote_to`, which advances its
+        cube partition (RAW→REFINED via _next_cube) so frequently-recalled memories graduate to a
+        more canonical, more-findable tier — the +22pp@5 recall win #1685 measured but left
+        unwired. Behind a flag: promotion is a no-op unless `enabled` (or env
+        CSF_RECALL_PROMOTION=1), so plain query() and the default recall path are UNCHANGED.
+        Returns the recalled records; the promoted copies are written for future recall.
+        """
+        results = self.query(**query_kwargs)
+        if enabled is None:
+            enabled = os.environ.get("CSF_RECALL_PROMOTION", "0") == "1"
+        if enabled:
+            for rec in list(results):
+                if rec.tier in RECALL_PROMOTABLE and rec.tier != promote_to:
+                    self.write(rec.promote(to_tier=promote_to, agent="recall"))
+                    self._recall_promotions += 1
+        return results
+
+    def recall_promotion_count(self) -> int:
+        """Retrieval-triggered promotions performed by this engine — the #2086 metric."""
+        return self._recall_promotions
 
     @staticmethod
     def _metadata_matches(record_meta: Dict[str, Any], filter_meta: Dict[str, Any]) -> bool:

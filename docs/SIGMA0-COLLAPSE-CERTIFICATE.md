@@ -499,6 +499,26 @@ These **extend the proven region of §1; they do not make the system globally un
 
 [#768]: https://github.com/alex-place/lantern-os/issues/768
 
+#### 1.2.2 Scope limit: routed (mixture-of-experts) loops are SWITCHED systems
+
+**Status: SCOPE NOTE — nothing in §1 certifies a routed loop.** Top-k expert routing makes
+the recurrent map **piecewise**: each routing pattern is its own smooth map, and the system
+*switches* between them as selections change. Everything above (α, `spectral_abscissa`, the
+§1.2.1 gates) then holds only **within a fixed routing region**; across route switches the
+correct tools are the switched/hybrid-systems literature — common or multiple Lyapunov
+functions and **average dwell-time** conditions (converse results: arXiv:2405.03560;
+LP-computable dwell-time bounds via multiple Lyapunov functions: arXiv:2303.17858; learned
+Lyapunov functions for piecewise-affine systems: arXiv:2008.06546). Practical consequences
+for any future MoE-recurrent Σ₀ (design home: SIGMA0-FRONTIER-TRAIN-BRIEF.md D2/D6):
+(1) **route-switch frequency is part of the stability object** — measure frozen-route
+contraction *and* the dwell-time statistics the model actually induces (tracked as a
+milestone issue); (2) **expert-choice routing** (arXiv:2202.09368: experts pick tokens →
+fixed capacity, balance by design) is the lower-discontinuity comparator to token-choice
+top-k; (3) do not quote §1 numbers for a routed loop without naming the routing regime.
+*In plain words:* a mixture-of-experts loop keeps swapping which sub-network is running;
+this certificate currently proves things about one sub-network at a time, and "how often it
+swaps" becomes a stability quantity of its own.
+
 ### 1.3 What the test actually checks
 
 **Verification.** The shipped test uses `A = −0.8·I`, which is **symmetric**
@@ -671,6 +691,70 @@ not defined` (masked at import time by PEP 563 string annotations, but breaking 
 runtime annotation introspection — Pydantic, FastAPI, dataclass eval, Sphinx
 autodoc). Fixed: `collapse.py:33` now reads `from typing import Dict, Optional`.
 Recorded here so the resolution is not lost.
+
+### 3.1 Design implication: scheduled grounding from certificate quantities
+
+**Status: DESIGN NOTE — a scheduling consequence extracted from the certificate's own
+objects (γ, c, P). The core inequality is machine-checked on synthetic maps
+(`experiments/sigma0_grounding_deadline.py`); the mapping onto real token-level grounding
+is CONJECTURED. This is not a new theorem in dynamical systems — the math is
+corollary-grade (geometric decay + a P-norm triangle inequality); the value is the
+design consequence, stated below.**
+
+*In plain words:* the longer a self-feeding loop runs inside a basin, the more external
+evidence it takes to pull it out — and the certificate's own numbers say exactly how the
+window closes. So grounding should run on a **schedule set by the contraction rate**, not
+only when the alarm rings: by the time the alarm (the §4 canary) is reliable, the cheap
+part of the window is already gone.
+
+**The commitment inequality (PROVEN, machine-checked).** Inside a certified basin
+`{V ≤ c}` with `V(F(x)) ≤ γ V(x)`, `γ < 1` (`V = xᵀPx`), an anchor `a` with budget
+`‖a‖ ≤ B` can raise `√V` by at most `B·√λ_max(P)`, while `V(x_n) ≤ γⁿV₀` decays. Escape
+(`V(x_n + a) > c`) is therefore possible **only if**
+
+$$B \;>\; B^*(n) \;=\; \frac{\sqrt{c} - \gamma^{n/2}\sqrt{V_0}}{\sqrt{\lambda_{\max}(P)}}
+\;\xrightarrow{\;n\to\infty\;}\; B^*_\infty = \sqrt{c/\lambda_{\max}(P)}.$$
+
+The required budget rises **geometrically at the certified rate** and saturates. Inverting:
+any budget `B < B*_∞` stops working after a **computable deadline**
+`n*(B) = 2·ln[√V₀/(√c − B√λ_max(P))]/ln(1/γ)`. Verified by construction (exact
+trust-region maximization of `V(x_n+a)` over the budget ball) on a normal basin —
+predicted deadlines 1.6/2.9/6.0 vs measured last-escapes 1/2/5, conservative in the right
+direction (`data/sigma0/grounding_deadline_report.json`).
+
+**Where it bites (MEASURED caveat).** The deadline binds in the Euclidean norm only for
+**well-conditioned** basins. In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`)
+the ceiling `B*_∞` is tiny (~0.002), so any realistic anchor escapes at *every* depth —
+the deadline exists but has no practical bite. Ouro's measured loop is in this sliver
+regime (`experiments/sigma0_loop_jacobian.py`: ρ_obs ≈ 0.88, strong non-normality), which
+**retro-dicts** the measured anchoring null (`experiments/ouro_canary_vs_logprob.py`:
+grounding stayed cheap at all depths). Supporting evidence, **not** validation — a
+retrodiction of our own null, not a prospective test.
+
+**The design shift (the actionable part):**
+
+1. **Grounding is a schedule, not only an event.** Inject external evidence with a period
+   below the commitment half-life `ln 2 / ln(1/ρ)` — for Ouro's measured ρ ≈ 0.88, ~5.4
+   loop steps (PROJECTION: measured rate composed with the inequality, not a new
+   measurement).
+2. **The §4 canary is demoted from primary trigger to audit.** Critical slowing down is
+   detectable only *after* contraction is deep — precisely when `B*(n)` has saturated. In
+   well-conditioned basins, canary-triggered Σ₀⁻¹ fires at the expensive end of the window
+   by construction. (CONSISTENT with — not proven by — the measured rank≠route split:
+   early-curve signals routed grounding positively, the late-curve loop canary negatively;
+   see `data/eval/ouro_canary_vs_logprob_results.json`.)
+3. **Conditioning decides the regime.** `cond(P)` of the local basin tells you whether the
+   deadline is a hard constraint (well-conditioned) or soft (sliver). Measuring it is
+   cheap and should accompany any certified rate.
+
+**Honest limits.** The additive-anchor model is a simplification — real grounding enters
+as tokens through attention, not as a clean latent displacement. The qualitative
+phenomenon ("early intervention beats late; models commit") is independently published
+(e.g. arXiv:2604.23235 measures per-token commitment); the contribution here is only the
+*certified composition* — deadline and cadence computed from this certificate's own
+quantities. A prospective test needs a **well-conditioned** loop (e.g. STARS-trained,
+arXiv:2605.26733) where the deadline should bite; on Ouro the theory predicts its own
+null.
 
 ---
 
@@ -1080,6 +1164,46 @@ model run; they do **not** prove a trained model is un-gameable — the §7.2 wa
 remains a live research risk, and the golden set is 159 curated items, not a population. The claim
 is only that §7.2's defenses are now *externally-checkable code with measured outputs*, not prose.
 
+### 7.4 Update (2026-07-05): the apparatus produces a passing model — and caught a real label-inflation
+
+**Status: MEASURED — three extensions of §7.3, each with a run pointer.** They strengthen the same
+claim; none closes the §7.2 trained-gamer risk.
+
+1. **The honesty axis discriminates *frontier* models, not just weak ones.** `sigma0_live_bench.py`
+   now runs Gemini via Vertex ADC alongside GPT-4o-mini on the full 159. The two sit **0.03 apart on
+   raw golden** (0.95 vs 0.92) but **21 points apart on confabulation** — GPT-4o-mini **0/42**, Gemini
+   2.5 Flash **9/42 (21.4%)**. §7.2's "calm-while-wrong" is not a small-model artifact; a frontier
+   model asserts one unseen negative in five as fact. Externally corroborated by **SimpleQA-Verified**
+   (Google DeepMind, [arXiv:2509.07968](https://arxiv.org/abs/2509.07968)), whose separate
+   Accuracy / Attempted / Hedged / F1 columns are the same accuracy-vs-honesty split this key draws.
+   (`docs/SIGMA0-HONESTY-BENCHMARK.md`.)
+
+2. **The apparatus produced a model that itself passes — a detector *and* a trainable target.** A
+   QLoRA honesty-tune of the local **Ouro-1.4B**, scored on **66 never-trained** held-out facts
+   (`experiments/sigma0_ouro_honesty_eval.py`, ledger `data/sigma0/ouro_honesty_eval_results.json`):
+   golden **0.958**, confabulation **2/20 = 10%**, over-abstention 2.2% — it **ties GPT-4o-mini on
+   golden and beats Gemini on confabulation**, at 1.4B local params, declining every open Millennium
+   problem and refuted claim it had never seen. *Honest scope:* n=20 held-out negatives (wide error
+   bars); the model is task-trained where the frontier rows are zero-shot; and the number required
+   feeding the adapter its exact training format — the earlier "the tune collapsed to always-assert"
+   readings were a **train/serve prompt-format mismatch (#2033)**, not a real collapse (a §7.2
+   verification-theater confound in our own measurement, now removed).
+
+3. **§7.2's "label inflation" attack, caught in the wild — by an independent model, not by static
+   validation.** The golden key's `continuum-hypothesis` row asserted the *proven* independence of CH
+   from ZFC (Gödel + Cohen) yet was labelled a HEURISTIC negative — a **true statement wearing the
+   wrong class**. A three-agent web-validation that checked each statement's *truth* **passed it** (the
+   statement is true); the mislabel surfaced only when an independent model **disagreed with the key**.
+   The refinement for §7.2's "one defense": *truth-checking a claim ≠ checking its class*, and the
+   catch came exactly from its rider — **bind the label to an external check the author does not
+   control**. Corrected and recorded (`data/sigma0/golden_web_validation.json → post_web_findings`;
+   enforced by `tests/test_golden_web_validation.py`).
+
+**Net.** §7.3's apparatus now (a) discriminates frontier models on the honesty axis, (b) has produced
+a small *local* model that passes on held-out data, and (c) has caught one real label-inflation the
+way §7.2 prescribes — including one hiding in our *own* answer-key. The trained-gamer /
+watched-vs-unwatched gap (§7.2) is untouched by all three; it remains the open risk.
+
 ---
 
 ## References (lineage)
@@ -1102,6 +1226,7 @@ is only that §7.2's defenses are now *externally-checkable code with measured o
 - **arXiv:2404.00781** — Elsayed & Mahmood, *Addressing Loss of Plasticity and Catastrophic Forgetting in Continual Learning* (UPGD) — the weight-perturbation σ; σ=0 = frozen / no plasticity (§7.1).
 - **arXiv:2503.01595** — *STAR: Stability-Inducing Weight Perturbation for Continual Learning* — worst-case weight perturbation for stability (§7.1).
 - **arXiv:2509.22764** — Kang et al., *In-Context Learning can Perform Continual Learning Like Humans* — continual learning in-context (zero parameter updates), beats gradient-based CL; the `σ_weights=0` escape (§7.1).
+- **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into [`RESEARCH-CANON.md`](RESEARCH-CANON.md) [11].
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated

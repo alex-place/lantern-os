@@ -2278,7 +2278,8 @@ async function handleStreamChat(req, url, res) {
         // its Bash habit); the clean preamble matches the training distribution so it
         // reliably emits a SAFE <tool_call>. Gated with execution so it toggles as a unit.
         const sysForOllama = process.env.CHAT_TOOL_EXEC === "1"
-          ? require("./tool-runner").renderToolPreamble()
+          ? require("./stream-chat/mcp-tools").augment(require("./tool-runner"))
+              .renderToolPreamble({ operator: require("./request-auth").isOperatorRequest(req) })
           : systemPrompt;
         const payload = JSON.stringify({
           model: ollamaModel,
@@ -2349,7 +2350,7 @@ async function handleStreamChat(req, url, res) {
           // answer on the real result. runTool enforces the per-tool policy (read-only runs;
           // shell/mutating need operator — same policy as the rest of the app).
           try {
-            const toolRunner = require("./tool-runner");
+            const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
             const execEnabled = process.env.CHAT_TOOL_EXEC === "1";
             let tc = toolRunner.parseToolCall(fullReply);
             if (tc && !execEnabled) {
@@ -2507,7 +2508,7 @@ async function handleStreamChat(req, url, res) {
     // the grounded single-shot path below is unchanged.
     if (process.env.CHAT_TOOL_EXEC === "1") {
       try {
-        const toolRunner = require("./tool-runner");
+        const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
         const tools = toolRunner.geminiTools({ operator });
@@ -2719,7 +2720,7 @@ async function handleStreamChat(req, url, res) {
       // Off by default → the single-shot path below is byte-identical for normal chat.
       if (process.env.CHAT_TOOL_EXEC === "1") {
         try {
-          const toolRunner = require("./tool-runner");
+          const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
           const { isOperatorRequest } = require("./request-auth");
           const operator = isOperatorRequest(req);
           const tools = toolRunner.anthropicTools({ operator });
@@ -2918,7 +2919,7 @@ async function handleStreamChat(req, url, res) {
     // the single-shot path below is byte-identical for normal chat.
     if (process.env.CHAT_TOOL_EXEC === "1") {
       try {
-        const toolRunner = require("./tool-runner");
+        const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
         const tools = toolRunner.openaiTools({ operator });
@@ -3069,7 +3070,7 @@ async function handleStreamChat(req, url, res) {
     // compatible, so it reuses the same turn helper + registry/executor.
     if (process.env.CHAT_TOOL_EXEC === "1") {
       try {
-        const toolRunner = require("./tool-runner");
+        const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
         const tools = toolRunner.openaiTools({ operator });
@@ -3195,7 +3196,7 @@ async function handleStreamChat(req, url, res) {
     // OpenAI-shaped, so it reuses the same turn helper + registry/executor.
     if (process.env.CHAT_TOOL_EXEC === "1") {
       try {
-        const toolRunner = require("./tool-runner");
+        const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
         const tools = toolRunner.openaiTools({ operator });

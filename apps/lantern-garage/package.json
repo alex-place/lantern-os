@@ -27,6 +27,10 @@
     "test:three-doors": "node ../../tests/test_three_doors_integration.spec.js",
     "test:showcase": "node test/static-mime.test.js && node test/showcase-manifest.test.js && node test/showcase-gallery-ui.test.js",
     "test:boundary": "node test/surface-boundary.test.js",
+    "test:coding-backend": "node test/coding-backend.test.js",
+    "test:local-engine": "node test/local-engine-qwen.test.js",
+    "test:coding-router": "node test/coding-router.test.js",
+    "test:coding-verifier": "node test/coding-verifier.test.js",
     "test:tenant": "node test/tenant.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
@@ -62,7 +66,7 @@
     "nodemailer": "^9.0.3",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
-    "sharp": "^0.35.2",
+    "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
