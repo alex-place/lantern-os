@@ -2140,6 +2140,32 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     return true;
   }
 
+  // GET /api/trading/news/sentiment?ticker=SPY&windowHours=48
+  // Directional (bullish/bearish) news sentiment for a symbol over a recent window
+  // — the Reason/Verify input the trader can weight. Omit ticker for the whole
+  // watchlist (one aggregate per ticker).
+  if (url.pathname === '/api/trading/news/sentiment' && req.method === 'GET') {
+    try {
+      const windowHours = Number(url.searchParams.get('windowHours')) || 48;
+      const ticker = (url.searchParams.get('ticker') || '').trim();
+      if (ticker) {
+        sendJson(res, tradingNews.symbolSentiment(ticker, { windowHours }), 200);
+        return true;
+      }
+      // No ticker → aggregate across the watchlist.
+      const fs = require('fs'); const path = require('path');
+      const wlPath = path.resolve(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
+      let tickers = [];
+      try { tickers = (JSON.parse(fs.readFileSync(wlPath, 'utf8')).tickers || []); } catch { /* empty */ }
+      tickers = tickers.filter((t) => /^[A-Z]{1,5}$/.test(t));
+      const symbols = tickers.map((t) => tradingNews.symbolSentiment(t, { windowHours }));
+      sendJson(res, { window_hours: windowHours, symbols }, 200);
+    } catch (error) {
+      sendJson(res, { error: 'sentiment query failed', details: error.message }, 500);
+    }
+    return true;
+  }
+
   // GET /api/trading/sigma0/calibration
   // Σ₀ council (Converge stage): Brier calibration + per-signal realized edge over
   // the trader's graded convergence outcomes. The learning input for re-weighting
