@@ -378,8 +378,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/positions
-  // Open positions from Alpaca
+  // Prefer the user's connected IBKR account (per-user OAuth, ADR-0022) so the
+  // header equity / Day P&L and the summary row reflect the broker they linked.
+  // Falls back to the legacy Alpaca traderAgent when no IBKR account is connected.
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
+    try {
+      const uid = getEffectiveUserId(req);
+      const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
+      if (ibkrAccount) {
+        const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
+        return true;
+      }
+    } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);
       return true;
