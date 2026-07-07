@@ -55,6 +55,8 @@ function _isUsMarketHours() {
   const mins = et.getHours() * 60 + et.getMinutes();
   return mins >= 570 && mins < 960;              // 09:30 (570) .. 16:00 (960) ET
 }
+const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
 // Overnight (market-closed) scanning is OFF by default — off-hours the only thing
 // to scan is crypto, and the user mostly wants it idle overnight. Flip on via the
@@ -73,6 +75,16 @@ async function _autoscanTick() {
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
       if (n) console.log(`[Trading] autoscan — ${n} signal(s)`);
+      // Act stage: autonomously execute the ENTER verdicts on the owner's IBKR
+      // account. No-op unless TRADER_AUTO_EXECUTE=1 (separate from manual arming);
+      // every order still passes the hard guard. Stocks only during market hours.
+      if (marketHours) {
+        const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: process.env.TRADER_AUTO_USER || 'local-owner' });
+        for (const e of (at.executed || [])) {
+          console.log(`[AutoTrader] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status} (p_win=${e.p_win})`);
+        }
+        if (at.enabled && !(at.executed || []).length && at.reason) console.log(`[AutoTrader] no action — ${at.reason}`);
+      }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
