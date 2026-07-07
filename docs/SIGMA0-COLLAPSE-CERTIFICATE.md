@@ -12,7 +12,7 @@ account of why an ungrounded self-improving system tends to collapse or diverge.
 > **One object, two timescales (structure — read before citing anything below).**
 > **Part I** (§0–§7, *the original Collapse Certificate*) certifies the **fast state `x`** — the
 > hidden-state trajectory inside one forward pass — and is **PROVEN / machine-checked where each
-> section's status line says so**. **Part II** (§8, *the Update Certificate Σ_θ*, merged in
+> section's status line says so**. **Part II** (§8, *the Model-Update Acceptance Gate Σ_θ*, merged in
 > 2026-07-07) certifies the **slow weights `θ`** — how the model changes across weight-update steps
 > — and is **HEURISTIC + imported external theorems, with NOTHING machine-checked or implemented
 > in-repo**. **Part III** (§9) composes them under timescale separation (a TARGET, not a theorem).
@@ -1223,12 +1223,16 @@ watched-vs-unwatched gap (§7.2) is untouched by all three; it remains the open 
 
 ---
 
-# Part II — Slow weights `θ`: the Update Certificate (Σ_θ)  [HEURISTIC + imported; NOT machine-checked]
+# Part II — Slow weights `θ`: the Model-Update Acceptance Gate (Σ_θ)  [HEURISTIC + imported; NOT machine-checked]
+
+> *Renamed from "Update Certificate" (2026-07-07, second external review): no general safety
+> theorem is claimed, so the label must not borrow Part I's authority. Σ_θ is a **heuristic
+> release protocol** — an acceptance gate.*
 
 **Status: THEORY.** Target claims resting on an imported proven backbone (TRPO / Gao / Dwork).
 **Nothing in Part II is machine-checked or implemented in-repo.** It was merged in on 2026-07-07 and
 adversarially reviewed the same day (§8.7), which demoted the strong "certificate" reading to an
-honest **gate + one real law**. Read accordingly — this is not §1–§3's machine-checked material.
+honest **gate + one falsifiable design constraint** (further corrected by a second review, §8.4). Read accordingly — this is not §1–§3's machine-checked material.
 
 > **Independent-synthesis corroboration — 2026-07-07 (grok + GPT, with a correlated-evidence
 > caveat).** Two further model syntheses converged on this framing (frozen base as Rule 0; RLVR as
@@ -1242,7 +1246,7 @@ honest **gate + one real law**. Read accordingly — this is not §1–§3's mac
 > an improvement gate (§8.1.2), a **verified-only dreaming guardrail** (§8.2 note), and a concrete
 > **rotating-holdout tier structure** operationalizing the §8.4 freshness law.
 
-## 8. The Update Certificate (Σ_θ)
+## 8. The Model-Update Acceptance Gate (Σ_θ)
 
 ### 8.0 Why Part II exists (the gap Part I leaves)
 
@@ -1347,7 +1351,15 @@ future training on "passed `H`," and each *rejected* candidate still leaks `H` i
 That is sequential model selection, not `B` bounded scalar queries — so the anchor cannot be a
 fixed set: it must be a **flow of genuinely fresh verified problems**, and *the safe update rate is
 bounded by the fresh-ground-truth sourcing rate.* This is Part I's "grounding is the safety
-mechanism" **with a rate attached** — a real, harsh, falsifiable design law.
+mechanism" **with a rate attached** — a real, harsh, falsifiable design constraint.
+
+**Second-review theory correction (2026-07-07): the "O(1)" wording was an overstatement in BOTH
+directions, and Dwork cuts both ways.** (a) *Naive, feedback-rich* reuse overfits the holdout
+[PROVEN]; but (b) **Thresholdout**-style controlled-information mechanisms validate **exponentially
+many** adaptive queries so long as only `B ≈ τ²n` of them overfit [PROVEN — arXiv:1506.02629; CACM
+2017]. So a *formally-managed* holdout can last far longer than naive reuse — the open quantity is
+the budget for **uncontrolled** model-level promotion gating, which is where the measurement below
+lands.
 
 **[MEASURED 2026-07-07 — §8.6 simulation run, `experiments/sigma_update_holdout_staleness.py`,
 32 seeds.]** The falsification harness (adaptive hill-climb whose only feedback is a holdout of size
@@ -1362,10 +1374,12 @@ mechanism" **with a rate attached** — a real, harsh, falsifiable design law.
   (0.57 vs 12.68); the gap only closes to <10% at `n ≥ 2000`. So sourcing fresh verified truth is
   worthless to skimp on precisely when it is scarce.
 
-**Net:** the surviving law is **fresh flow > fixed set, with an `n`-graded (not O(1)) staleness
-penalty that is worst when sourcing is slow.** [Dwork bound PROVEN but MISAPPLIED to model-gating;
-the fresh-flow dominance is now **MEASURED-by-simulation** (not a closed-form theorem — the sim shows
-the shape, it does not prove the constant).]
+**Net:** the surviving requirement is **fresh flow > fixed set, with an `n`-graded (not O(1))
+staleness penalty that is worst when sourcing is slow** — and, per the theory correction above, a
+third road exists the sim did not test: a **formal reusable-holdout mechanism (Thresholdout-class)**
+whose noise/threshold discipline stretches a fixed set with proven guarantees. [Naive-reuse decay:
+MEASURED-by-simulation (shape, not a closed-form constant); Thresholdout reuse: PROVEN, external;
+the budget for *this* uncontrolled gating protocol: measured in-sim, unproven in general.]
 
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
@@ -1407,8 +1421,16 @@ treating "passed the holdout" as unconditional evidence — without the §8.4 fr
    holdout **strictly dominates** a fixed one at every `n`, with a **severe small-`n` penalty (22× less
    true quality extracted at `n=50`), closing to <10% only at `n ≥ 2000`. This **refutes the strong
    "O(1) regardless of size"** wording (the budget is `n`-graded) while **confirming the operational
-   fresh-flow law** — see the MEASURED block in §8.4. *(Legs 1–3 still require the model-training A/B/C
-   harness on cloud L4 — this box cannot train locally; that is the remaining empirical gap.)*
+   fresh-flow law** — see the MEASURED block in §8.4. *(Follow-up worth one run: the same harness with
+   a Thresholdout wrapper, to measure how far the PROVEN controlled-reuse mechanism stretches the
+   fixed set in this protocol. Legs 1–3 still require the model-training A/B/C harness on cloud L4 —
+   this box cannot train locally; that is the remaining empirical gap.)*
+5. **Incremental-validity teeth (the strongest genuine research question here):** does the Part I
+   fast-state signal **add detection power** for bad checkpoints over the external gate alone —
+   catching more, earlier, at acceptable false-positive cost? (`external gate` vs `external + Σ₀`
+   on planted hacks/regressions.) No prior art surfaced for internal-state monitors as an
+   *incremental* checkpoint-gate signal (bounded search, 2026-07-07). If Σ₀ adds nothing, Gate B is
+   honestly decorative; if it adds early detection, that is a measurable systems contribution.
 
 ### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
 
@@ -1418,17 +1440,18 @@ review attacked Σ_θ and landed four hits — three fatal to the strong version
 tool, model-gating is O(1)-leaky → §8.4; (4) it's a gate, not a certificate, no potential proven
 monotone → §8.3. **What survives, and it is sharper than what walked in:** (i) the right object is
 the θ-flow, not the x-Jacobian — Part I provably can't see hacking/forgetting; (ii) Σ_θ is an honest
-**veto** with an imported partial guarantee; (iii) the real law — *non-Goodharting cannot be
+**veto** with an imported partial guarantee; (iii) the surviving design constraint — *non-Goodharting cannot be
 certified with a fixed finite holdout; the slow-scale anchor must renew as fast as the loop learns.*
 That is Part I's principle, one axis harder. **This is the protocol working: a critic turned an
-overclaimed certificate into an honest gate plus one real law — the intended outcome.**
+overclaimed certificate into an honest gate plus one falsifiable design constraint — the intended outcome. A second review then corrected the constraint's own overstatement (the "O(1) gates" claim, §8.4) — the protocol applied to itself.**
 
 ### 8.8 Part II sources
 
 - Schulman et al., *Trust Region Policy Optimization*, arXiv:1502.05477 (2015) — monotonic-improvement lower bound (Part II's PROVEN backbone).
 - Gao, Schulman, Hilton, *Scaling Laws for Reward Model Overoptimization*, arXiv:2210.10760 (2023) — gold score as a function of KL-from-base (sets the budget `Δ`).
-- Dwork, Feldman, Hardt, Pitassi, Reingold, Roth, *The reusable holdout*, Science 349 (2015); *Preserving Statistical Validity in Adaptive Data Analysis*, arXiv:1411.2664 — the adaptive-query bound that §8.4 shows is **mis**applied to model-gating.
+- Dwork, Feldman, Hardt, Pitassi, Reingold, Roth, *The reusable holdout*, Science 349 (2015); *Generalization in Adaptive Data Analysis and Holdout Reuse*, arXiv:1506.02629; arXiv:1411.2664 — both directions of §8.4: naive reuse overfits, **and** Thresholdout validates exponentially many queries at overfitting budget `B ≈ τ²n`.
 - EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
+- Close prior art surfaced by the harder novelty search (2026-07-07, all corpus/web-verified): ADOWIP budgeted when-to-update gating (arXiv:2606.25068); Uncertainty-Guided Checkpoint Selection for RL finetuning (arXiv:2511.09864); *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant* (arXiv:2606.11417) — nearest neighbor to the §8.4 sealed-promotion-set discipline; *Learning, Fast and Slow* (arXiv:2605.12484) — prior art for the fast/slow timescale framing itself.
 - Backing research: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md); decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
 
@@ -1451,7 +1474,7 @@ Ex. 8.4), the fast and slow flows can be certified **separately and composed**:
 This is why Σ₀ and Σ_θ are **two faces of one certificate over one object at two timescales**, not
 two subsystems — the completion of Part I along the `θ`-axis it deferred in §0. Honest caveat: with
 Part II only a gate (§8.3) and (c) unproven, the composition is a *design target*, not a theorem —
-the whole system's safety still rests on the fresh-anchor law (§8.4), i.e. on grounding.
+the whole system's safety still rests on the fresh-anchor requirement (§8.4), i.e. on grounding.
 
 ---
 
