@@ -30,7 +30,7 @@ import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from eval_ledger import append_leaderboard  # noqa: E402  (#2108)
+from eval_ledger import append_leaderboard, checkpoint_id  # noqa: E402  (#2108)
 
 GOLDEN_PATH = os.path.join(ROOT, "data", "eval", "coding-golden.jsonl")
 
@@ -196,6 +196,10 @@ def main():
         "bytes_per_correct": round(correct_bytes / n_correct_tasks) if n_correct_tasks else None,
         "words_per_correct": round(correct_words / n_correct_tasks) if n_correct_tasks else None,
     }
+    if a.engine == "loop":
+        # Loop mode ignores --model (an Ollama tag) and loads --base-model/--adapter
+        # in-process — stamp what was actually loaded, not the box's OURO_* env.
+        summary["served_checkpoint"] = checkpoint_id(a.base_model, a.adapter)
 
     os.makedirs(os.path.join(ROOT, "data", "eval", "runs"), exist_ok=True)
     runs_path = os.path.join(ROOT, "data", "eval", "runs", f"{a.label}-{a.ts}.jsonl")
