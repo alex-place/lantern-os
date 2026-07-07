@@ -13,3 +13,7 @@ the full flow is testable locally. Proxied/public traffic and any SMTP-configure
 deployment never receive it (gated by `isLoopback` + `smtpConfigured`, mirroring
 `isLocalBypass`). Verified both ways: present on loopback, absent with an
 `x-forwarded-for` header.
+
+A successful sign-in now shows a brief "Signed in successfully ✓ — welcome back!"
+banner (submit parked at "Signed in ✓") before redirecting into the app, so a
+completed login is acknowledged instead of an instant, unremarked jump.

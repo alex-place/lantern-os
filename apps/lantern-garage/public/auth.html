@@ -510,6 +510,18 @@
     document.getElementById("verify-view").hidden = true;
     document.getElementById("signin-view").hidden = false;
   }
+  // Brief "you're in" banner shown on the sign-in view right before we redirect
+  // into the app, so a successful login is acknowledged and never looks like a no-op.
+  function showSignedIn() {
+    document.getElementById("verify-view").hidden = true;
+    document.getElementById("signin-view").hidden = false;
+    document.getElementById("auth-error").classList.remove("show");
+    const submit = document.getElementById("local-submit");
+    submit.disabled = true;
+    submit.textContent = "Signed in ✓";
+    hideNotice();
+    showNotice("Signed in successfully ✓ — welcome back! Taking you in…");
+  }
 
   async function submitLocal(e) {
     e.preventDefault();
@@ -518,6 +530,7 @@
     const name = document.getElementById("local-name").value.trim();
     const errEl = document.getElementById("local-error");
     const submit = document.getElementById("local-submit");
+    let signedIn = false;        // set on a successful login → keep the button parked
     errEl.style.color = "";      // reset (forgot-password recolors this to the accent)
     errEl.textContent = "";
 
@@ -550,7 +563,10 @@
           showVerifyScreen(email, { delivery: data.emailDelivery, devLink: data.devVerifyLink });
           return;
         }
-        location.href = safeReturnTo();
+        // Signed in — confirm with a success banner, then continue to the app.
+        signedIn = true;
+        showSignedIn();
+        setTimeout(() => { location.href = safeReturnTo(); }, 1200);
         return;
       }
       // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
@@ -571,8 +587,9 @@
     } catch (_) {
       errEl.textContent = "Network error. Please try again.";
     } finally {
-      submit.disabled = false;
-      submit.textContent = prev;
+      // On a successful sign-in we keep the button parked ("Signed in ✓") while the
+      // brief success banner shows and we redirect — don't re-enable it.
+      if (!signedIn) { submit.disabled = false; submit.textContent = prev; }
     }
   }
 
