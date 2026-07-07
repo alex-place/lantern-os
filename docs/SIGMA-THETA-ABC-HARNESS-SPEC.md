@@ -28,8 +28,10 @@ result of the decision tree, not a failure.
 
 All three start from the identical frozen checkpoint and are trained to **equal GPU-hours** (not equal
 epochs) so the comparison is compute-fair. Base + trainer: `scripts/train-qlora-ouro.py`
-(`--base ByteDance/Ouro-1.4B --lora-r 16`). Arm C's RL stage is the one **genuinely missing piece** —
-see §6 (the GRPO trainer is not yet in-repo; it is the only new training code this program needs).
+(`--base ByteDance/Ouro-1.4B --lora-r 16`). Arm C's RL stage is `scripts/rlvr_grpo_ouro.py` — its
+GRPO math (group-relative advantage, adaptive-rollout skip, exec reward, KL trust region) is
+**implemented and self-tested** (`--self-test`; CI `tests/test_grpo_ouro.py`, 5/5); only the L4
+generation/optimizer loop remains host-wiring (see §6).
 
 ## 2. Data pipeline (verified-only; decontaminated; rotating holdouts)
 **Sources (verified traces only):** `data/csf_memory/raw.jsonl`, `data/autowork-runs/*.jsonl` —
@@ -78,8 +80,8 @@ python scripts/eval_sigma0_adapter.py --base ByteDance/Ouro-1.4B --adapter "" --
 KEYSTONE_L4=1 python scripts/train-qlora-ouro.py --base ByteDance/Ouro-1.4B --data <verified_distill> --lora-r 16 --out A/
 # 3. ARM B — + verified replay + generic anchor (25 GPU-h replay-ablation budget)
 KEYSTONE_L4=1 python scripts/train-qlora-ouro.py --base ByteDance/Ouro-1.4B --data <distill+replay+anchor> --lora-r 16 --out B/
-# 4. ARM C — B recipe + narrow RLVR/GRPO (15 GPU-h; needs the GRPO trainer, §6)
-KEYSTONE_L4=1 python scripts/rlvr_grpo_ouro.py --warm-start B/ --tasks <exec_graded> --out C/     # TODO trainer
+# 4. ARM C — B recipe + narrow RLVR/GRPO (15 GPU-h; scripts/rlvr_grpo_ouro.py, §6)
+KEYSTONE_L4=1 python scripts/rlvr_grpo_ouro.py --warm-start B/ --tasks <exec_graded> --out C/ --group 8 --steps 300
 # 5. EVAL all three + baseline → the 7 metrics, then gate + decide (NO GPU; runs in CI too)
 python experiments/sigma_theta_abc/harness.py --run   # applies sigma_theta_gate + abc_decision
 # 6. RED-TEAM (5 GPU-h): plant a reward-hack, a retention regression, a format exploit; confirm the
@@ -99,13 +101,30 @@ python experiments/sigma_theta_abc/harness.py --run   # applies sigma_theta_gate
   → dreaming = replay+verification, RLVR waits; **A wins** → replay recipe needs work; **none beat
   retrieval** → stop updating weights, improve retrieval/tools (Rule 0 holds).
 
-## 6. What is real now vs the remaining gap
-- **REAL now (no GPU):** the Σ_θ gate, the A/B/C decision tree, and their self-test (8/8 green); the
-  data/holdout discipline; the measured §8.4 fresh-flow law that sets the promotion-set policy.
-- **NEEDS cloud L4 (the empirical gap):** the three training runs themselves, and one piece of **new**
-  training code — a narrow **GRPO/RLVR trainer** for Ouro (`scripts/rlvr_grpo_ouro.py`, TODO). Arms A/B
-  reuse `train-qlora-ouro.py` unchanged; only arm C needs the RL loop. Per ADR-0025, RL stays disabled
-  until Gate A’s holdout is flat-or-up over a sustained window, so A/B can run first and C is optional.
+## 6. Arm-C GRPO/RLVR trainer (`scripts/rlvr_grpo_ouro.py`)
+Warm-start from arm B's adapter, then a *narrow* on-policy GRPO pass with an **execution-verified**
+reward (code is run against tests, reward ∈ {0,1} — no learned, hackable reward model). GRPO needs no
+value critic; advantage is group-relative. Per-step recipe:
+```
+sample G completions/prompt (temp>0) → exec-grade each → group-relative advantage
+A_i = (r_i − mean(group)) / (std+ε) → DROP zero-advantage groups (all-pass/all-fail carry no
+gradient — adaptive rollout, arXiv:2602.14338) → policy-gradient loss −A·logπ + kl_coef·KL(π‖base);
+abort the step if batch KL > kl_max (trust region → Σ_θ gate cond 4); optimizer.step() on LoRA only;
+every N steps eval Gate A — if the exec holdout regresses (correct-set turnover, arXiv:2606.03087),
+STOP + roll back. RL runs ONLY while Gate A is flat-or-up (ADR-0025).
+```
+Conventions match `train-qlora-ouro.py` (peft + transformers directly, **no trl** — trl's GRPOTrainer
+fights Ouro's custom transformers-4.57 loop code; Ouro is a LoopLM so weights apply T×/token and we
+backprop the LoRA deltas only — Hybrid-LoRA for RLVR, arXiv:2605.18822).
+
+- **REAL now (no GPU, CI-tested):** the GRPO advantage math, adaptive-rollout skip, exec-reward wiring,
+  and KL trust-region term (`--self-test`; `tests/test_grpo_ouro.py`, 5/5) — plus the Σ_θ gate + A/B/C
+  decision tree (`tests/test_sigma_theta_gate.py`, 8/8), the data/holdout discipline, and the measured
+  §8.4 fresh-flow law.
+- **NEEDS cloud L4 (the empirical gap):** the three training runs, and the one host-only piece — wiring
+  `model.generate` + the peft optimizer around the (tested) GRPO functions. `--run` refuses off-L4.
+  Arms A/B reuse `train-qlora-ouro.py` unchanged. Per ADR-0025, RL stays disabled until Gate A's holdout
+  is flat-or-up over a sustained window, so A/B can run first and C is optional.
 
 ## 7. Evidence discipline
 Every result carries a class (PROVEN/MEASURED/HEURISTIC) and an artifact pointer; the promotion set is
