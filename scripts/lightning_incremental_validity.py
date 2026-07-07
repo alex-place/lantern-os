@@ -11,6 +11,11 @@ import os
 import sys
 import time
 
+
+def safe(s):
+    """Windows cp1252 console cannot print arbitrary studio-log unicode — sanitize."""
+    return (s or "").encode("ascii", "replace").decode("ascii")
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lightning_dispatch import _get_studio, _sdk  # reuse the debugged studio plumbing
 
@@ -53,7 +58,7 @@ def main():
             time.sleep(30)
             tail = studio.run("tail -c 3000 /tmp/siv.log 2>/dev/null || echo ''")
             last = (tail or "").strip().splitlines()
-            print("  |", last[-1][:160] if last else "(empty)")
+            print("  |", safe(last[-1][:160]) if last else "(empty)")
             if "SIV_REPORT_JSON:" in (tail or "") or "PAYLOAD_DONE" in (tail or ""):
                 full = studio.run("cat /tmp/siv_report.json 2>/dev/null || echo ''")
                 if full and full.strip().startswith("{"):
@@ -61,7 +66,7 @@ def main():
                 break
             if "Traceback" in (tail or ""):
                 print("PAYLOAD ERROR — full tail:")
-                print(studio.run("tail -c 6000 /tmp/siv.log"))
+                print(safe(studio.run("tail -c 6000 /tmp/siv.log")))
                 break
         if report:
             os.makedirs("data/sigma0", exist_ok=True)
