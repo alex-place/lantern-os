@@ -47,15 +47,53 @@ def _finite(x):
 
 
 def _stability_gates(A_tensor):
-    """Compute #768 region-wideners (numerical-range, Lyapunov, ε-pseudospectral, Kreiss)
-    on a Jacobian A. Returns a dict summary (never raises — None on import/compute fail)."""
+    """Stability certificate on the empirical loop Jacobian A. Returns a dict, or None on
+    total failure (never raises). Two independently-computed layers:
+
+      • JSRR (acceptance gate) — the DISCRETE spectral-radius criterion ρ(A)<1 (STARS,
+        arXiv:2605.26733), numpy-only, computed FIRST so it survives even in the minimal
+        inference venv where scipy (needed by the continuous gates below) is absent.
+      • #768 continuous region-wideners + non-normal dichotomy — best-effort telemetry
+        (scipy-dependent Lyapunov/Kreiss legs); a stricter, over-rejecting sufficient
+        contraction test kept for diagnostics and as an acceptance FALLBACK.
+    """
     try:
         _src = os.path.join(os.path.dirname(__file__), "..", "..")
         if _src not in sys.path:
             sys.path.insert(0, _src)
+        # jsrr_certificate is numpy-only; importing it must not depend on scipy.
+        from cio_sde.collapse import jsrr_certificate  # noqa: PLC0415
+    except Exception:
+        return None
+
+    out = {}
+    # JSRR discrete acceptance gate — the object externally validated on real looped LLMs.
+    # Margin tunable via SIGMA0_JSRR_MARGIN (default 0.0 = STARS' literal ρ<1).
+    try:
+        _margin = float(os.environ.get("SIGMA0_JSRR_MARGIN", "0.0") or 0.0)
+    except Exception:
+        _margin = 0.0
+    try:
+        j = jsrr_certificate(A_tensor, margin=_margin)
+        out["jsrr"] = {
+            "spectral_radius": _finite(j.spectral_radius),
+            "radius_estimate": _finite(j.radius_estimate),
+            "spectral_norm": _finite(j.spectral_norm),
+            "penalty": _finite(j.penalty),
+            "margin": _finite(j.margin),
+            "regime": j.regime,
+            "stable": bool(j.stable),
+        }
+    except Exception:
+        out["jsrr"] = None
+
+    # #768 continuous region-wideners (numerical-range, Lyapunov, ε-pseudospectral, Kreiss)
+    # — scipy-dependent; best-effort. Certify contraction of the FULL Jacobian and
+    # over-reject non-normal A, so they are diagnostic + acceptance fallback, not primary.
+    try:
         from cio_sde.collapse import stability_gates, dichotomy_certificate  # noqa: PLC0415
         g = stability_gates(A_tensor, margin=0.0)
-        out = {
+        out.update({
             "gate_numerical_range": g.gate_numerical_range,
             "gate_lyapunov": g.gate_lyapunov,
             "gate_pseudospectral": g.gate_pseudospectral,
@@ -65,12 +103,10 @@ def _stability_gates(A_tensor):
             "pseudospectral_abscissa": _finite(g.pseudospectral_abscissa),
             "lyapunov_transient_bound": _finite(g.lyapunov_transient_bound),
             "kreiss_bound": _finite(g.kreiss_bound),
-        }
-        # #768 contraction half — the non-normal spectral dichotomy. The gates above
-        # certify contraction of the FULL Jacobian (and over-reject non-normal A); the
-        # dichotomy splits by A's own spectrum (cross-term vanishes by invariance) and
-        # reports the actual fate of the ungrounded decode drift: COLLAPSE onto the slow
-        # manifold vs DIVERGE. Purely diagnostic; reported, not consumed by the gate.
+        })
+        # #768 contraction half — the non-normal spectral dichotomy: splits by A's own
+        # spectrum (cross-term vanishes by invariance) and reports the ungrounded decode
+        # drift's fate (COLLAPSE onto the slow manifold vs DIVERGE). Purely diagnostic.
         try:
             dc = dichotomy_certificate(A_tensor, delta=0.0)
             out["dichotomy"] = {
@@ -85,9 +121,28 @@ def _stability_gates(A_tensor):
             }
         except Exception:
             out["dichotomy"] = None
-        return out
     except Exception:
+        pass  # continuous gates unavailable (e.g. no scipy) — JSRR still gates acceptance
+
+    return out or None
+
+
+def _accept_stability(cert):
+    """Convergence-acceptance verdict for a generation's empirical loop Jacobian.
+
+    Primary signal is the JSRR discrete criterion ρ(A)<1 (STARS, arXiv:2605.26733) — the
+    stability object validated on real looped LLMs. Falls back to the #768 continuous
+    `proven_contracting` gate when JSRR is absent (older cert dict / compute failure).
+    Returns None when there is no certificate at all (too few tokens) — an honest unknown,
+    never a fabricated False (and None is falsy, so a consumer that requires acceptance
+    safely declines rather than trusting an un-certified trajectory)."""
+    if not isinstance(cert, dict):
         return None
+    jsrr = cert.get("jsrr")
+    if isinstance(jsrr, dict) and jsrr.get("stable") is not None:
+        return bool(jsrr["stable"])
+    pc = cert.get("proven_contracting")
+    return bool(pc) if pc is not None else None
 
 
 def assemble_reason_verdict(out):
@@ -120,15 +175,20 @@ def assemble_reason_verdict(out):
     """
     gates = out.get("stability_gates") if isinstance(out.get("stability_gates"), dict) else {}
     dichotomy = gates.get("dichotomy") if isinstance(gates.get("dichotomy"), dict) else {}
+    jsrr = gates.get("jsrr") if isinstance(gates.get("jsrr"), dict) else {}
     fate = str(dichotomy.get("fate") or "").upper()
+    regime = str(jsrr.get("regime") or "").lower()   # JSRR discrete verdict (primary gate)
     signal = out.get("canary_signal", "none")
 
-    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}
-    if gates.get("proven_contracting"):
+    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. JSRR's discrete regime
+    # is the primary read (it is the acceptance gate); the #768 continuous proven_contracting
+    # and the dichotomy fate corroborate. Absent JSRR (older cert), this reduces exactly to
+    # the prior proven_contracting/fate logic — so the reason_verdict contract is unchanged.
+    if regime == "contraction" or gates.get("proven_contracting"):
         stable = "contract"
-    elif fate == "DIVERGE":
+    elif regime == "divergent" or fate == "DIVERGE":
         stable = "diverge"
-    elif fate in ("COLLAPSE", "MARGINAL"):
+    elif regime == "critical" or fate in ("COLLAPSE", "MARGINAL"):
         stable = "spiral"
     else:
         stable = None  # too few tokens / no certificate — honest unknown, not a guess
@@ -549,12 +609,15 @@ class Sigma0LoopLM:
             # #768: Lyapunov / numerical-range / ε-pseudospectral gates + Kreiss bound on
             # the empirical Jacobian. None = not enough tokens to estimate.
             "stability_gates": stability_cert,
-            # #768 acceptance gate — the certificate is CONSUMED here (not just reported):
-            # the generation's latent exit-depth trajectory is convergence-ACCEPTED iff its
-            # empirical Jacobian is provably contracting by either region-widener gate.
-            # None = no certificate (too few tokens). This is the gate the issue asked for.
-            "stability_accepted": (bool(stability_cert["proven_contracting"])
-                                   if stability_cert is not None else None),
+            # Acceptance gate — the certificate is CONSUMED here (not just reported): the
+            # generation's latent exit-depth trajectory is convergence-ACCEPTED iff its
+            # empirical loop Jacobian passes the JSRR discrete criterion ρ(A)<1 (STARS,
+            # arXiv:2605.26733) — the stability object externally validated on real looped
+            # LLMs, and the criterion appropriate to a DISCRETE iterated loop. The #768
+            # continuous gate (proven_contracting) is a stricter, over-rejecting sufficient
+            # condition kept as fallback when JSRR is unavailable, and as telemetry above.
+            # None = no certificate (too few tokens to estimate the Jacobian).
+            "stability_accepted": _accept_stability(stability_cert),
         }
         if dc is not None:   # Σ₀ decode canary telemetry (#766)
             out["canary_max_proximity"] = round(canary_max_prox, 4)
