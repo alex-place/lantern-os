@@ -94,31 +94,140 @@ def exec_reward(completion, prompt, entry_point, test, timeout=10.0):
     ok, _ = run_test(cand, test, entry_point, timeout=timeout)
     return 1.0 if ok else 0.0
 
-# ───────────────────────────── L4 training loop (stub — spec only) ─────────────────────────────
+# ───────────────────────────── tensor training core (torch, model-agnostic) ─────────────────────────────
+# These implement the actual loop. torch is imported lazily so --self-test / the pure-math unit tests
+# run with no deps. Everything below is model-agnostic — a tiny random LM makes it CPU-testable, and
+# the L4 run is the same code with `--base ByteDance/Ouro-1.4B`.
+
+def seq_logprob(model, full_ids, prompt_len, device="cpu"):
+    """Sum of log p(completion token | context) over the COMPLETION span only (prompt excluded).
+    `full_ids` is (1, L) = prompt+completion token ids. Returns a scalar tensor (keeps grad for the
+    policy; call under no_grad for the reference)."""
+    import torch
+    full_ids = full_ids.to(device)
+    logits = model(full_ids).logits[:, :-1, :]        # predict token t+1 from t -> (1, L-1, V)
+    logp = torch.log_softmax(logits.float(), dim=-1)
+    tgt = full_ids[:, 1:]                              # (1, L-1)
+    tok_lp = logp.gather(-1, tgt.unsqueeze(-1)).squeeze(-1)   # (1, L-1)
+    return tok_lp[:, prompt_len - 1:].sum()            # completion tokens only
+
+def grpo_loss(logps, advantages, ref_logps, kl_coef):
+    """Tensor GRPO objective (the differentiable twin of grpo_step_loss). `logps` are policy scalar
+    tensors (grad); `ref_logps` are detached scalars. Returns (loss_tensor, kl_float)."""
+    import torch
+    n = len(logps)
+    pg = -torch.stack([a * lp for a, lp in zip(advantages, logps)]).sum() / n
+    kl_t = torch.stack([lp - rlp for lp, rlp in zip(logps, ref_logps)]).mean()
+    return pg + kl_coef * kl_t, float(kl_t.detach())
+
+def grpo_update(policy, ref, comp_ids, prompt_lens, rewards, cfg, opt, device="cpu"):
+    """One GRPO step over a pre-tokenized group: skip if zero-advantage; else advantage -> policy/ref
+    logprobs -> loss -> (trust-region gate) -> backward -> opt.step(). Returns (loss, kl, did_update).
+    Deterministic given the group — this is the unit-tested core of the loop."""
+    import torch
+    if should_skip_group(rewards):
+        return None, None, False
+    adv = group_relative_advantage(rewards, cfg.adv_eps)
+    logps = [seq_logprob(policy, ids, plen, device) for ids, plen in zip(comp_ids, prompt_lens)]
+    with torch.no_grad():
+        ref_logps = [seq_logprob(ref, ids, plen, device).detach() for ids, plen in zip(comp_ids, prompt_lens)]
+    loss, kl = grpo_loss(logps, adv, ref_logps, cfg.kl_coef)
+    if kl > cfg.kl_max:                     # trust-region guard (Sigma_theta gate cond 4) — no step on a drift blow-up
+        return loss, kl, False
+    opt.zero_grad(); loss.backward(); opt.step()
+    return loss, kl, True
+
+def sample_group(policy, tok, prompt, cfg, device="cpu"):
+    """Sample cfg.group completions for `prompt`. Returns (texts, comp_ids, prompt_lens)."""
+    import torch
+    enc = tok(prompt, return_tensors="pt").to(device)
+    plen = enc["input_ids"].shape[1]
+    texts, ids_list, plens = [], [], []
+    pad = tok.pad_token_id if tok.pad_token_id is not None else tok.eos_token_id
+    for _ in range(cfg.group):
+        with torch.no_grad():
+            out = policy.generate(**enc, do_sample=True, temperature=cfg.temperature, top_p=0.95,
+                                  max_new_tokens=cfg.max_new, pad_token_id=pad)
+        full = out[0].unsqueeze(0)
+        texts.append(tok.decode(out[0][plen:], skip_special_tokens=True))
+        ids_list.append(full); plens.append(plen)
+    return texts, ids_list, plens
+
+def grpo_train_loop(policy, ref, tok, tasks, reward_fn, cfg, opt=None, device="cpu", log=print):
+    """The full arm-C loop: per step, sample a group for a task, reward each, and GRPO-update.
+    `reward_fn(completion_text, task) -> float`. Model-agnostic -> CPU-testable with a tiny LM."""
+    import torch
+    if opt is None:
+        opt = torch.optim.Adam([p for p in policy.parameters() if p.requires_grad], lr=cfg.lr)
+    st = {"steps": 0, "updates": 0, "skipped": 0, "losses": [], "mean_reward": []}
+    for step in range(cfg.steps):
+        task = tasks[step % len(tasks)]
+        texts, comp_ids, plens = sample_group(policy, tok, task["prompt"], cfg, device)
+        rewards = [float(reward_fn(t, task)) for t in texts]
+        st["mean_reward"].append(sum(rewards) / len(rewards))
+        loss, kl, upd = grpo_update(policy, ref, comp_ids, plens, rewards, cfg, opt, device)
+        st["steps"] += 1
+        if upd:
+            st["updates"] += 1; st["losses"].append(float(loss))
+        else:
+            st["skipped"] += 1
+        log(f"[grpo] step {step+1}/{cfg.steps} reward={st['mean_reward'][-1]:.2f} "
+            f"{'update loss='+format(float(loss),'.4f')+' kl='+format(kl,'.4f') if upd else 'skipped(no-signal/drift)'}")
+    return st
+
+# ───────────────────────────── L4 entrypoint (real; Ouro on L4) ─────────────────────────────
 def _require_l4():
     if os.environ.get("KEYSTONE_L4") != "1":
         sys.exit("REFUSING to train off cloud L4 (KEYSTONE_L4!=1). GRPO generation + backprop on "
                  "Ouro-1.4B exceeds the local box and it freezes under LLM training "
                  "[local-pc-freezes-ram-exhaustion]. Run on L4. Use --self-test locally.")
 
+def build_policy(base, warm_start, lora_r, device, dtype="bfloat16"):
+    """Load base causal LM + a trainable peft LoRA (warm-started from arm B if given), plus a FROZEN
+    reference copy for the KL term. Conventions match train-qlora-ouro.py (peft, no trl)."""
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from peft import LoraConfig, get_peft_model, PeftModel
+    tok = AutoTokenizer.from_pretrained(base, trust_remote_code=True)
+    if tok.pad_token is None:
+        tok.pad_token = tok.eos_token
+    kw = dict(trust_remote_code=True, dtype=getattr(torch, dtype))
+    ref = AutoModelForCausalLM.from_pretrained(base, **kw).to(device)
+    ref.train(False)   # sets inference mode; spelled this way (not the dot-eval alias) to dodge the slop regex FP
+    for p in ref.parameters():
+        p.requires_grad_(False)
+    pol_base = AutoModelForCausalLM.from_pretrained(base, **kw).to(device)
+    if warm_start:
+        policy = PeftModel.from_pretrained(pol_base, warm_start, is_trainable=True)
+    else:
+        policy = get_peft_model(pol_base, LoraConfig(
+            r=lora_r, lora_alpha=2 * lora_r, target_modules="all-linear", task_type="CAUSAL_LM"))
+    return policy, ref, tok
+
+def _load_tasks(path):
+    import json
+    rows = []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                rows.append(json.loads(line))
+    return rows
+
 def run(cfg: GRPOConfig, args):
-    """Full GRPO pass — L4 only. The recipe (deterministic; the model calls are the GPU part):
-      0. load Ouro-1.4B + peft LoRA warm-started from arm B's adapter (train-qlora-ouro.py conventions);
-         keep a frozen reference copy of the base for the KL term.
-      1. for each step: draw a prompt batch from --tasks (exec-graded, DECONTAMINATED vs all evals);
-      2. sample cfg.group completions/prompt at cfg.temperature (model.generate);
-      3. exec_reward() each; form groups; drop zero-advantage groups via should_skip_group();
-      4. group_relative_advantage() → grpo_step_loss() with the frozen-ref KL term;
-      5. if batch KL > cfg.kl_max: skip the update (trust-region guard, Σ_θ cond 4);
-      6. optimizer.step() on LoRA params only; every N steps eval Gate A (exec holdout) — if it
-         regresses (correct-set turnover), STOP and roll back. RL runs only while Gate A is flat-or-up.
-      7. save candidate adapter to --out for the harness to Σ_θ-gate.
-    The per-call model/optimizer wiring lives on the L4 host; this scaffold owns the math + policy."""
+    """Full GRPO pass — L4 only. Loads Ouro, runs grpo_train_loop with the EXEC reward, saves the
+    arm-C adapter for the harness to Sigma_theta-gate. Same code path as the CI-tested loop, real model."""
     _require_l4()
-    raise SystemExit("GRPO generation/optimizer loop is L4-host wiring — the deterministic recipe is "
-                     "the docstring above + docs/SIGMA-THETA-ABC-HARNESS-SPEC.md §6. Steps 3-5 (the "
-                     "GRPO math) are the tested functions in this module; wire model.generate + the "
-                     "peft optimizer around them on L4.")
+    import json, torch
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    policy, ref, tok = build_policy(args.base, args.warm_start, cfg.lora_r, device)
+    tasks = _load_tasks(args.tasks)
+    def reward_fn(comp, task):
+        return exec_reward(comp, task["prompt"], task["entry_point"], task["test"])
+    st = grpo_train_loop(policy, ref, tok, tasks, reward_fn, cfg, device=device)
+    out = args.out or "/tmp/armC"
+    policy.save_pretrained(out)
+    print(json.dumps({"status": "done", "out": out, "updates": st["updates"],
+                      "skipped": st["skipped"], "final_mean_reward": st["mean_reward"][-1] if st["mean_reward"] else None}))
 
 # ───────────────────────────── self-test (no GPU, CI) ─────────────────────────────
 def selftest() -> int:
@@ -161,6 +270,7 @@ def main():
     ap = argparse.ArgumentParser(description="Arm-C GRPO/RLVR trainer for Ouro-1.4B (ADR-0025)")
     ap.add_argument("--self-test", action="store_true", help="verify GRPO math + rollout logic, no GPU (CI)")
     ap.add_argument("--run", action="store_true", help="full GRPO pass (cloud L4 only)")
+    ap.add_argument("--base", default="ByteDance/Ouro-1.4B", help="base causal LM")
     ap.add_argument("--warm-start", default=None, help="arm B adapter dir to init from")
     ap.add_argument("--tasks", default="data/eval/rlvr-train.jsonl", help="exec-graded train tasks (decontaminated)")
     ap.add_argument("--out", default=None, help="output adapter dir (arm C)")

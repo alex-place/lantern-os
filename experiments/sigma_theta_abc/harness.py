@@ -98,13 +98,52 @@ def _require_l4():
         sys.exit("REFUSING to train off cloud L4 (KEYSTONE_L4!=1). The local box freezes under LLM "
                  "training [local-pc-freezes-ram-exhaustion]. Run the spec on L4. Use --self-test locally.")
 
+def plan_commands(args):
+    """The deterministic training recipe: the exact subprocess command per arm (SPEC §4 runbook).
+    Pure — returns a list of {arm, cmd}. Testable without a GPU; the L4 host just runs each `cmd`."""
+    base = getattr(args, "base", "ByteDance/Ouro-1.4B")
+    out = getattr(args, "out", "runs/abc")
+    plans = []
+    for arm, spec in ARMS.items():
+        if spec["rlvr"]:   # arm C — the GRPO trainer, warm-started from arm B
+            cmd = ["python", "scripts/rlvr_grpo_ouro.py", "--run", "--base", base,
+                   "--warm-start", f"{out}/B", "--tasks", "data/eval/rlvr-train.jsonl",
+                   "--out", f"{out}/{arm}", "--group", "8", "--steps", "300"]
+        else:              # arms A/B — the existing distillation trainer, different data mix
+            data = "data/eval/distill-replay.jsonl" if spec["replay"] else "data/eval/distill.jsonl"
+            cmd = ["python", "scripts/train-qlora-ouro.py", "--base", base, "--data", data,
+                   "--lora-r", "16", "--out", f"{out}/{arm}"]
+        plans.append({"arm": arm, "replay": spec["replay"], "rlvr": spec["rlvr"], "cmd": cmd})
+    return plans
+
+def decide(results, cfg=None):
+    """Evaluate + decide from measured per-arm metrics (the back half — NO GPU). `results` maps
+    'retrieval'/'A'/'B'/'C' -> the 7-metric dict. Returns {decision, gates} — the shippable verdict."""
+    cfg = cfg or GateConfig()
+    decision = abc_decision(results, cfg)
+    gates = {a: sigma_theta_gate(results[a], cfg) for a in ("A", "B", "C") if a in results}
+    return {"decision": decision, "gates": {a: {"accept": g["accept"], "failed": g["failed"]} for a, g in gates.items()}}
+
 def run(args):
-    """Full A/B/C run — L4 only. Each stage shells to the existing tracked scripts; this function
-    is the deterministic recipe + the gate/decision application. See the SPEC for exact commands."""
-    _require_l4()
-    raise SystemExit("Orchestration body is spec-only in this scaffold — the per-stage subprocess "
-                     "calls are enumerated in docs/SIGMA-THETA-ABC-HARNESS-SPEC.md §4 (Runbook). "
-                     "Wire them on the L4 host, where train-qlora-ouro.py / eval_sigma0_adapter.py run.")
+    """A/B/C run. Two entry points:
+      --results FILE : evaluate + decide from measured metrics (the back half; no GPU, CI-safe).
+      (default)      : the training front half — L4 only; runs plan_commands() then re-invokes
+                       --results on the assembled metrics. Each arm shells to a tracked script."""
+    import json, subprocess
+    if getattr(args, "results", None):
+        with open(args.results, encoding="utf-8") as f:
+            report = decide(json.load(f))
+        print(json.dumps(report, indent=2, default=lambda o: o))
+        return report
+    _require_l4()   # the training half is L4-only
+    for p in plan_commands(args):
+        print(f"[abc] arm {p['arm']}: {' '.join(p['cmd'])}")
+        subprocess.run(p["cmd"], check=True)
+    # after training, evaluate each arm -> assemble the 7-metric results, then decide. The eval glue
+    # (eval_sigma0_adapter.py / eval_humaneval_ouro.py -> the 7 metrics) is the remaining L4-host wiring;
+    # it writes <out>/results.json, which is then fed back through `decide` above.
+    raise SystemExit("Training arms dispatched; wire the eval->7-metric assembly on the L4 host "
+                     "(SPEC §3), then re-run with --results <out>/results.json to gate + decide.")
 
 # ─────────────────────────── self-test (no GPU, CI-safe) ───────────────────────────
 def selftest() -> int:
@@ -172,13 +211,17 @@ def selftest() -> int:
 def main():
     ap = argparse.ArgumentParser(description="Σ_θ A/B/C continual-update harness (ADR-0025)")
     ap.add_argument("--self-test", action="store_true", help="verify gate + decision logic, no GPU (CI)")
-    ap.add_argument("--run", action="store_true", help="full A/B/C run (cloud L4 only)")
+    ap.add_argument("--run", action="store_true", help="A/B/C run: train (L4) or --results decide (no GPU)")
+    ap.add_argument("--results", default=None, help="per-arm metrics JSON -> gate + decide (no GPU)")
+    ap.add_argument("--base", default="ByteDance/Ouro-1.4B")
+    ap.add_argument("--out", default="runs/abc")
     ap.add_argument("--budget-hours", type=float, default=100.0)
     a = ap.parse_args()
     if a.self_test:
         sys.exit(selftest())
-    if a.run:
+    if a.run or a.results:
         run(a)
+        return
     ap.print_help()
 
 if __name__ == "__main__":

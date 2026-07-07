@@ -68,3 +68,31 @@ def test_decision_c_wins_when_rlvr_helps():
            "C": dict(g, fresh_pass1=0.90, retention_pass1=0.90, proxy_reward=0.8, world_eval=0.89)}
     d = H.abc_decision(res, CFG)
     assert d["winner"] == "C" and d["rl_enabled"] is True
+
+
+def test_plan_commands_wires_each_arm_to_the_right_trainer():
+    class A:
+        base = "ByteDance/Ouro-1.4B"
+        out = "runs/abc"
+    plans = H.plan_commands(A())
+    assert [p["arm"] for p in plans] == ["A", "B", "C"]
+    byarm = {p["arm"]: " ".join(p["cmd"]) for p in plans}
+    assert "train-qlora-ouro.py" in byarm["A"] and "rlvr_grpo_ouro.py" not in byarm["A"]
+    assert "rlvr_grpo_ouro.py" in byarm["C"] and "--warm-start" in byarm["C"]  # C warm-starts from B
+
+
+def test_decide_reports_winner_and_gates():
+    g = _good()
+    res = {"retrieval": dict(g, fresh_pass1=0.80), "A": dict(g, fresh_pass1=0.84),
+           "B": dict(g, fresh_pass1=0.86, retention_pass1=0.90),
+           "C": dict(g, fresh_pass1=0.90, retention_pass1=0.90, proxy_reward=0.8, world_eval=0.89)}
+    rep = H.decide(res)
+    assert rep["decision"]["winner"] == "C"
+    assert set(rep["gates"]) == {"A", "B", "C"}
+
+
+def test_decide_stops_updates_when_none_beat_retrieval():
+    g = _good()
+    res = {"retrieval": dict(g, fresh_pass1=0.86), "A": dict(g, fresh_pass1=0.865),
+           "B": dict(g, fresh_pass1=0.865), "C": dict(g, fresh_pass1=0.865)}
+    assert H.decide(res)["decision"]["winner"] is None
