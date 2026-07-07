@@ -1,13 +1,24 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-04
+updated: 2026-07-07
 ---
 
-# Σ₀ — The Collapse Certificate
+# Σ — The Convergence Certificate
 
 *A computable stability certificate for convergence dynamics, and an honest
 account of why an ungrounded self-improving system tends to collapse or diverge.*
+
+> **One object, two timescales (structure — read before citing anything below).**
+> **Part I** (§0–§7, *the original Collapse Certificate*) certifies the **fast state `x`** — the
+> hidden-state trajectory inside one forward pass — and is **PROVEN / machine-checked where each
+> section's status line says so**. **Part II** (§8, *the Update Certificate Σ_θ*, merged in
+> 2026-07-07) certifies the **slow weights `θ`** — how the model changes across weight-update steps
+> — and is **HEURISTIC + imported external theorems, with NOTHING machine-checked or implemented
+> in-repo**. **Part III** (§9) composes them under timescale separation (a TARGET, not a theorem).
+> The evidence-class discipline is strict and asymmetric: **Part II must never be read with Part
+> I's authority.** The two are one certificate because they are the fast and slow faces of the same
+> dynamical object `ẋ = f(x,u,θ)` — Part I holds `θ` fixed; Part II is the θ-flow Part I defers.
 
 ---
 
@@ -335,6 +346,12 @@ status cannot silently drift.
 [#1997]: https://github.com/alex-place/lantern-os/pull/1997
 
 ---
+
+# Part I — Fast state `x`: the Collapse Certificate  [PROVEN where marked / machine-checked]
+
+*This is the original certificate in full. It certifies the within-forward-pass hidden-state flow
+with `θ` held fixed. Every §0–§7 status line and evidence class below is unchanged by the Part II
+merge.*
 
 ## 0. The object
 
@@ -1203,6 +1220,218 @@ claim; none closes the §7.2 trained-gamer risk.
 a small *local* model that passes on held-out data, and (c) has caught one real label-inflation the
 way §7.2 prescribes — including one hiding in our *own* answer-key. The trained-gamer /
 watched-vs-unwatched gap (§7.2) is untouched by all three; it remains the open risk.
+
+---
+
+# Part II — Slow weights `θ`: the Update Certificate (Σ_θ)  [HEURISTIC + imported; NOT machine-checked]
+
+**Status: THEORY.** Target claims resting on an imported proven backbone (TRPO / Gao / Dwork).
+**Nothing in Part II is machine-checked or implemented in-repo.** It was merged in on 2026-07-07 and
+adversarially reviewed the same day (§8.7), which demoted the strong "certificate" reading to an
+honest **gate + one real law**. Read accordingly — this is not §1–§3's machine-checked material.
+
+> **Independent-synthesis corroboration — 2026-07-07 (grok + GPT, with a correlated-evidence
+> caveat).** Two further model syntheses converged on this framing (frozen base as Rule 0; RLVR as
+> the forgetting-robust engine; dreaming = verified offline replay; the collapse cert as Gate-0
+> early-abort, **not** the authority; the exec holdout as load-bearing with a freshness budget).
+> **Honest weight:** all three syntheses read a largely *overlapping* recent corpus, so this
+> agreement is **correlated, not independent** — shared reading can be shared bias. It corroborates
+> the *shape* and does **not** upgrade any evidence class here; the load-bearing external checks
+> remain the adversarial refutation (§8.7) and the still-unrun harness (§8.6). Three genuinely new,
+> non-redundant contributions were folded in: a **fresh-task GAIN** leg turning the safety-veto into
+> an improvement gate (§8.1.2), a **verified-only dreaming guardrail** (§8.2 note), and a concrete
+> **rotating-holdout tier structure** operationalizing the §8.4 freshness law.
+
+## 8. The Update Certificate (Σ_θ)
+
+### 8.0 Why Part II exists (the gap Part I leaves)
+
+Part I certifies the fast state `x` and **freezes the slow parameters `θ`** (§0). It therefore
+cannot gate a **weight update**: reward hacking and catastrophic forgetting are not properties of
+the hidden-state Jacobian `A` at fixed `θ` — they live in the **θ-flow**, measured against the
+**reward boundary and the held-out task distribution**. (Established by the 2026-07-07 RLVR research
+and an independent adversarial cross-check: *hidden-state stability cannot detect reward hacking or
+forgetting; a model can pass every spectral screen while becoming a reward parrot.*) Σ_θ is the
+missing half of *this* object — certify the slow θ-flow the way Part I certifies the fast x-flow.
+
+### 8.1 The parallel (the "fit")
+
+| | **Part I — Collapse** (fast `x`) | **Part II — Update** (slow `θ`) |
+|---|---|---|
+| Timescale | within one forward pass | across update steps |
+| State | hidden state `x` | weights `θ` / policy `π_θ` |
+| Dynamics | `ẋ = f(x,u,θ)`, Jacobian `A` | `θ_{t+1} = U(θ_t)` — an RLVR/distill step |
+| Lyapunov object | `V(x)=½‖P_M x‖²` | retention deficit `D=R*−R_H` + Goodhart gap `G=Ĵ−R_H` |
+| Certified quantity | `max Re λ(A) < 0` | improvement sign on the **held-out** objective, KL-bounded |
+| Two **failure** fates | collapse / diverge | Goodhart-collapse / capability-divergence |
+| The "42-state" | frozen self-agreeing null | the "reward-parrot": `Ĵ` saturated, `R_H` frozen/falling |
+| Safety mechanism | external anchor (grounding) | external held-out anchor the model doesn't control |
+| One-level-up failure | honesty theater (§7.2) | **holdout theater** (§8.4) |
+
+The two-fate structure is Part I's dichotomy restated at the slow scale: *an update process that
+optimizes only its own reward proxy has two **failure** fates and no happy third; the only escape is
+a held-out external anchor* (corrected for exhaustiveness in §8.2).
+
+### 8.0.1 The object
+
+Fast: `ẋ = f(x,u,θ)` — Part I, certified at each frozen `θ`. Slow: `θ_{t+1} = U(θ_t)`, `U` = one
+RLVR/distillation step. `Ĵ(θ)` = **proxy** reward (training verifier: exec pass / tests / format).
+`H` = a **frozen external held-out** suite the model does not control; `R_H(θ)` = pass-rate on `H`
+(true-objective estimate). `D(θ)=R*−R_H(θ)` = retention deficit; `G(θ)=Ĵ(θ)−R_H(θ)` = Goodhart gap.
+
+### 8.1.1 The admissibility gate (three legs)
+
+`θ→θ'=U(θ)` is **admissible** iff all hold: **(1) Retention non-regression** `R_H(θ')≥R_H(θ)−τ` —
+rejects forgetting/correct-set-turnover by construction. **(2) Trust-region** `D_KL(π_θ‖π_θ')≤δ`,
+cumulative `D_KL(π_base‖π_θ)≤Δ` — the mechanism behind RLVR's measured forgetting-robustness.
+**(3) Goodhart-gap non-growth** `G(θ')≤G(θ)+η` — if `Ĵ` rises but `R_H` doesn't, refuse. **Honest
+weakness of leg 3 (review hit #2):** given leg 1 it is a capped proxy-inflation rule and **cannot
+catch a hack that games `Ĵ` without *yet* moving `R_H`** — the latent hack. Leg 3 is a laggy
+decorrelation warning, not a principled anti-Goodhart guarantee.
+
+### 8.1.2 The fuller release gate — veto → improvement gate (convergent GPT synthesis, 2026-07-07)
+
+The three legs are the minimal *safety* core: they can only **veto** a bad update (§8.2). A no-op
+update passes all three — so as a **release** gate they are incomplete. The convergent synthesis
+adds a positive-improvement requirement and two operational guards. A candidate `θ'` is **promoted**
+(not merely admissible) iff:
+
+1. **Fresh-task gain** — improves ≥ `γ` on *unseen* hidden execution tasks. *(New: this is what
+   turns the veto into an improvement gate; legs 1–3 alone never require getting better.)*
+2. **Retention** — historic verified suite drops ≤ `ε` (= leg 1).
+3. **Reward integrity** — proxy `Ĵ` may rise only if the independent held-out score does not fall
+   (= leg 3, stated as the promotion form).
+4. **Drift budget** — `D_KL(prior‖θ')` **and adapter-norm** below limits (= leg 2, + norm cap).
+5. **Fast-state stability** — Part I's collapse monitor shows no degeneration (Gate-0 early-abort).
+6. **Data integrity** — no held-out contamination; full provenance on every training trace. *(New:
+   the provenance/leakage guard §8.4 needs to hold.)*
+7. **Rollback** — the prior adapter/checkpoint stays instantly redeployable. *(New: one bad run must
+   never be permanent — this is what makes a *low-rate certified exception* actually safe.)*
+
+Honest label: this is a **conditional release certificate — a checklist, not a theorem** of safe
+self-improvement. It inherits every soundness caveat of §8.3–§8.4; conditions 1/6/7 are the
+convergent additions.
+
+### 8.2 The fates, corrected (review hit #1)
+
+The strong "exactly two fates" reading is **false as a partition** — an ungated update can also
+jointly improve `Ĵ` and `R_H`, benignly plateau, or drift through bounded-KL policies. The honest
+statement, matching how Part I treats *its* dichotomy: **collapse (Goodhart freeze) and divergence
+(forgetting / KL runaway) are the two *failure* fates of a process optimizing only its proxy `Ĵ`.**
+Real improvement is not a third fate — it is the *grounded* path, reachable only with an external
+`R_H` in the loop. The gate cannot *guarantee* you land there; it can only **veto** updates provably
+on a failure path *as measured against the anchor*. Certification is a veto, not a guarantee.
+
+### 8.3 The guarantee — honestly labeled (gate, not certificate — review hit #4)
+
+- **PROVEN backbone (imported).** Under the KL trust region, when the surrogate exceeds the
+  worst-case KL penalty, the true return is monotonically non-decreasing:
+  `J(π') ≥ L_π(π') − C·D_KL^max`, `C=4εγ/(1−γ)²` (Schulman et al., TRPO, arXiv:1502.05477). **[PROVEN
+  — external]**
+- **The overoptimization curve is known.** The held-out ("gold") score is an empirically-fit
+  function of `D_KL(π_base‖π_θ)` (Gao, Schulman, Hilton, arXiv:2210.10760), so the budget `Δ` can be
+  set where the fitted curve turns over. **[MEASURED — external]**
+- **Single potential, but only trivially monotone.** Fold the legs into
+  `Φ(θ)=D(θ)+λ·max(0,G(θ)−G₀)` with admissibility `Φ(θ')≤Φ(θ)`. This is ONE potential — but
+  monotone **by imposition**, not proven monotone under the dynamics. A Lyapunov certificate proves
+  a potential *must* decrease; here we *reject* anything that raises `Φ` and inherit all soundness
+  from the anchor `R_H`. **So Σ_θ is a GATE, not a certificate.** **[HEURISTIC]**
+
+### 8.4 The load-bearing open problem — holdout theater (review hit #3, the sharpest)
+
+"**Iff `H` remains a valid external anchor**" is the crux, and the exact parallel of §7.2's honesty
+theater. The tempting tool — Dwork et al.'s **reusable holdout** (Science 349, 2015; arXiv:1411.2664:
+`n` samples answer `B` adaptive scalar queries at error `~√(log B/n)`) — **does not apply here.** An
+accept/reject gate on a whole **model** is high-leakage **selection**: each acceptance conditions all
+future training on "passed `H`," and each *rejected* candidate still leaks `H` into the optimizer.
+That is sequential model selection, not `B` bounded scalar queries — so the realistic budget is
+**O(1) gates per holdout, not `B`.** **Corrected requirement (what survives):** because a fixed `H`
+goes stale in O(1) adaptive gates, the slow-scale anchor **cannot be a fixed set** — it must be a
+**flow of genuinely fresh verified problems**, and *the safe update rate is bounded by the fresh-
+ground-truth sourcing rate.* This is Part I's "grounding is the safety mechanism" **with a rate
+attached** — a real, harsh, falsifiable design law. **[Dwork bound PROVEN but MISAPPLIED to
+model-gating; the surviving fresh-flow claim is HEURISTIC; §8.6 tests it.]**
+
+**Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
+freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
+is never one it has already leaked into:
+
+```
+exploration set        → tune / select freely (assume burned)
+private retention set   → limited-feedback regression check (rare reads)
+fresh promotion set     → used ONCE per release, then retired
+incoming verified tasks → continually replenish the promotion pool (the flow)
+```
+
+The release decision (§8.1.2) is made against the **fresh promotion set**, retired after use; the
+sourcing rate of *incoming verified tasks* is the rate limit on safe updates. (Naïve repeated reuse
+of one visible holdout overfits it — Dwork et al., arXiv:1506.02629, *Generalization in Adaptive
+Data Analysis and Holdout Reuse*.) **[HEURISTIC operational design; the overfitting result it rests
+on is PROVEN.]**
+
+### 8.5 What is and isn't claimed
+
+**Claimed:** a computable three-leg gate anchored entirely to an external holdout; a proven
+monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao); the
+correct diagnosis that the anchor must be a fresh-data flow. **NOT claimed:** any in-repo proof or
+machine-check (there is none); that "two fates" is exhaustive (§8.2); that the reusable-holdout bound
+governs model-gating (§8.4); that a single potential is *proven* monotone (§8.3). **The trap:**
+treating "passed the holdout" as unconditional evidence — without the §8.4 fresh-flow discipline,
+Σ_θ is holdout theater, the same collapse it exists to prevent, one level up.
+
+### 8.6 Minimal falsification path (before trusting any of this)
+
+1. Implement `D`, `G`, and the KL trust region as a gate around one RLVR/distill step.
+2. **Reward-hacking teeth:** plant an update that games the verifier (`Ĵ↑`, `R_H↓`); confirm leg 1/3
+   rejects where a Part-I-only (collapse) gate accepts. *(If Part I already caught it, Σ_θ is
+   redundant — this is the whole point.)*
+3. **Forgetting teeth:** plant a held-out regression; confirm leg 1 rejects.
+4. **Budget teeth:** gate repeatedly against a fixed `H`; measure the true generalization gap growing
+   as adaptive gates accumulate; confirm a fixed holdout goes stale in ~O(1), not `~√(log B/n)`.
+   Without this test, §8.4 is unverified.
+
+### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
+
+Per the Σ₀ protocol (anchor a self-referential construction before trusting it), an outside theory
+review attacked Σ_θ and landed four hits — three fatal to the strong version, all folded in above:
+(1) "two fates" isn't exhaustive → §8.2; (2) leg 3 is weak/laggy → §8.1.1; (3) Dwork is the wrong
+tool, model-gating is O(1)-leaky → §8.4; (4) it's a gate, not a certificate, no potential proven
+monotone → §8.3. **What survives, and it is sharper than what walked in:** (i) the right object is
+the θ-flow, not the x-Jacobian — Part I provably can't see hacking/forgetting; (ii) Σ_θ is an honest
+**veto** with an imported partial guarantee; (iii) the real law — *non-Goodharting cannot be
+certified with a fixed finite holdout; the slow-scale anchor must renew as fast as the loop learns.*
+That is Part I's principle, one axis harder. **This is the protocol working: a critic turned an
+overclaimed certificate into an honest gate plus one real law — the intended outcome.**
+
+### 8.8 Part II sources
+
+- Schulman et al., *Trust Region Policy Optimization*, arXiv:1502.05477 (2015) — monotonic-improvement lower bound (Part II's PROVEN backbone).
+- Gao, Schulman, Hilton, *Scaling Laws for Reward Model Overoptimization*, arXiv:2210.10760 (2023) — gold score as a function of KL-from-base (sets the budget `Δ`).
+- Dwork, Feldman, Hardt, Pitassi, Reingold, Roth, *The reusable holdout*, Science 349 (2015); *Preserving Statistical Validity in Adaptive Data Analysis*, arXiv:1411.2664 — the adaptive-query bound that §8.4 shows is **mis**applied to model-gating.
+- EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
+- Backing research: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md); decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
+- *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
+
+---
+
+# Part III — Two-timescale composition  [TARGET]
+
+## 9. Composing Part I and Part II
+
+RLVR runs many forward passes per gradient step, so `x` reaches quasi-equilibrium between weight
+updates: the timescale ratio `ε = τ_x/τ_θ` is small. Under timescale separation (two-timescale
+stochastic approximation — Borkar 1997; singular perturbation — Khalil, already cited by Part I at
+Ex. 8.4), the fast and slow flows can be certified **separately and composed**:
+
+> **The full self-improving system is certified iff (a) Part I holds on the fast `x`-flow at each
+> frozen `θ`, AND (b) Part II's gate holds on the slow `θ`-flow, AND (c) `ε` is small enough that
+> the quasi-equilibrium approximation is valid.** **[TARGET — the imported tools (Borkar, Khalil)
+> are proven; this composition statement is NOT proven or machine-checked here.]**
+
+This is why Σ₀ and Σ_θ are **two faces of one certificate over one object at two timescales**, not
+two subsystems — the completion of Part I along the `θ`-axis it deferred in §0. Honest caveat: with
+Part II only a gate (§8.3) and (c) unproven, the composition is a *design target*, not a theorem —
+the whole system's safety still rests on the fresh-anchor law (§8.4), i.e. on grounding.
 
 ---
 
