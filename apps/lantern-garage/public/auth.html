@@ -99,24 +99,29 @@
     }
     .auth-card .sub { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 
-    /* Error banner */
+    /* Error banner. Text colour defaults to a dark shade that reads on the light
+       tint; the dark-theme overrides below swap in the pale shades. */
     .auth-error {
       display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
       border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);
       background: color-mix(in srgb, #ef4444 12%, transparent);
-      color: #fca5a5; font-size: 13px; line-height: 1.5;
+      color: #b91c1c; font-size: 13px; line-height: 1.5;
     }
     .auth-error.show { display: block; }
-    .field-error { color: #f87171; font-size: 12px; min-height: 14px; }
+    .field-error { color: #dc2626; font-size: 12px; min-height: 14px; }
     /* Success / info banner (email confirmation) */
     .auth-notice {
       display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
       border: 1px solid color-mix(in srgb, #34d399 45%, transparent);
       background: color-mix(in srgb, #34d399 12%, transparent);
-      color: #bbf7d0; font-size: 13px; line-height: 1.5;
+      color: #065f46; font-size: 13px; line-height: 1.5;
     }
     .auth-notice.show { display: block; }
     .auth-notice a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+    /* Dark theme: the tint sits on a dark card, so the pale shades read best. */
+    html[data-theme="dark"] .auth-error  { color: #fca5a5; }
+    html[data-theme="dark"] .field-error { color: #f87171; }
+    html[data-theme="dark"] .auth-notice { color: #bbf7d0; }
 
     /* Provider (OAuth) buttons */
     .auth-actions { display: flex; flex-direction: column; gap: 7px; }
