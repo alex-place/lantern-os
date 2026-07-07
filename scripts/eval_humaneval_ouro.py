@@ -136,6 +136,17 @@ def make_candidate(text, entry_point, he_prompt):
         if i >= 0:               # model re-emitted the whole function → use prompt preamble + it
             di = he_prompt.find(f"def {entry_point}")
             preamble = he_prompt[:di] if di >= 0 else ""
+            # Preserve import lines the MODEL emitted before the def. HumanEval prompts
+            # don't always ship the needed import (e.g. get_positive has no `from typing
+            # import List`, is_prime has no `from math import sqrt`), and the model
+            # legitimately supplies it. Extracting from the def onward would silently
+            # drop those imports, producing a spurious NameError at run time and
+            # deflating the measured pass@1 — the answer is correct, the harness lost it.
+            model_imports = [
+                ln for ln in c[:i].splitlines()
+                if ln.lstrip().startswith(("import ", "from ")) and ln.strip() not in preamble
+            ]
+            imp = ("\n".join(model_imports) + "\n") if model_imports else ""
             lines = c[i:].splitlines()
             blk = [lines[0]]
             for ln in lines[1:]:
@@ -143,7 +154,7 @@ def make_candidate(text, entry_point, he_prompt):
                     blk.append(ln)
                 else:
                     break
-            cand = (preamble + "\n".join(blk).rstrip()).replace("\t", "    ")
+            cand = (preamble + imp + "\n".join(blk).rstrip()).replace("\t", "    ")
             try:
                 compile(cand, "<c>", "exec"); return cand
             except SyntaxError:
