@@ -30,6 +30,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 // ── CORE — the convergence loop itself ──────────────────────────────────────────
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
+  "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
   "dream-chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
@@ -68,7 +69,6 @@ const EXTENSION = {
   "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
-  "welcome.html":                  ["account", null],
   "entry.html":                    ["account", null],
   "profile.html":                  ["account", null],
   "reset-password.html":           ["account", null],
