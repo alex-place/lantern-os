@@ -177,23 +177,6 @@
   </style>
 </head>
 <body>
-<nav class="site-nav">
-  <a class="nav-brand" href="/">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    unisona.ai
-  </a>
-  <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/stock-trader.html">Trader</a>
-    <a href="/orchestration.html">Orchestration</a>
-    <a href="/work.html">Work</a>
-    <a href="/explore.html">Explore</a>
-  </div>
-  <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light/dark">☀</button>
-  </div>
-</nav>
-
 <div class="page">
 <div class="settings-shell">
 
@@ -358,9 +341,8 @@
 
 <div id="toast"></div>
 
-<script src="/js/theme-toggle.js"></script>
 <script>
-document.getElementById('theme-toggle').addEventListener('click', () => { if (window.toggleTheme) toggleTheme(); });
+// Theme toggle is wired by the injected site-chrome nav's onclick + js/theme-toggle.js (#2254).
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 let _tt;
@@ -559,6 +541,8 @@ async function overlayServerKeys() {
 initLocalKeys();
 overlayServerKeys();
 </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

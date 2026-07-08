@@ -43,18 +43,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav">
-    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">unisona.ai</span></a>
-    <div class="nav-links">
-      <a href="/dream-chat.html">Chat</a>
-      <a href="/grounding-diff.html">Grounding</a>
-      <a href="/drift.html" class="active">Drift</a>
-      <a href="/knowledgecenter.html">Help</a>
-    </div>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
-  </nav>
-
-  <main class="w">
+<main class="w">
     <h1>Drift Monitor</h1>
     <p class="lede">Two passive canaries watch every reply: <b>collapse</b> (repetition / degeneration) and the <b>42-state</b> (fluent but unanchored). They only fire when something trips, so this is a stream of drift incidents — a "is my agent quietly drifting?" monitor. Both axes are kept separate on purpose; a 42-state reply looks healthy on the collapse axis.</p>
 
@@ -111,5 +100,7 @@
     }
     load();
   </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 </body>
 </html>
