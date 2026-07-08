@@ -68,6 +68,7 @@ const EXTENSION = {
   "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
+  "welcome.html":                  ["account", null],
   "entry.html":                    ["account", null],
   "profile.html":                  ["account", null],
   "reset-password.html":           ["account", null],
