@@ -49,13 +49,33 @@ const DEFAULT_PARAMS = {
   sigmaNowcastF: 1.5,    // same-day high: much of the heating already observed
   meanUncF: 0.8,         // +/- downshift uncertainty (shrinks once IEM measures it)
   sigmaLo: 0.6, sigmaHi: 1.30,  // band multipliers; 0.6*2.4=1.44F floor for a tight market
+  // Daily-high normals + summer fallback. Defaults are NYC/KNYC (NCEI 1991-2020); a city
+  // supplies its own via paramsForCity so the oracle is data, not code (#2220).
+  normals: NORMAL_HIGH_F,
+  defaultNormal: DEFAULT_SUMMER_NORMAL_F,
   // P(actual KNYC high >= 100 F | NWS forecast high), from the >=100 record + the
-  // 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated.
+  // 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated. City-specific.
   ceilingTable: [
     [99.0, 0.03], [100.0, 0.08], [101.0, 0.13],
     [102.0, 0.19], [103.0, 0.27], [104.0, 0.38],
   ],
 };
+
+/** Build an effective params object for a city: the fitted σ/bias (currently NYC-fit — the
+ *  only certified city) overlaid with the city's own normals + ceiling table. Non-NYC cities
+ *  reuse the NYC σ/bias as a PRIOR until they carry their own fit; the city registry's
+ *  `certified` flag is what actually gates trading, not this function (#2220). */
+function paramsForCity(city, P = PARAMS) {
+  if (!city) return P;
+  return {
+    ...P,
+    // A city carries its OWN daily normals or none — never silently inherit another city's
+    // table. With no normals, normalHigh falls back to this city's defaultNormal.
+    normals: city.normals || {},
+    defaultNormal: city.defaultNormal != null ? city.defaultNormal : P.defaultNormal,
+    ceilingTable: isCeilingTable(city.ceilingTable) ? city.ceilingTable : P.ceilingTable,
+  };
+}
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 function isCeilingTable(t) {
@@ -101,13 +121,14 @@ function interp(table, x) {
   return table[table.length - 1][1];
 }
 
-function normalHigh(month, day) {
-  const v = NORMAL_HIGH_F[`${month}-${day}`];
-  return v == null ? DEFAULT_SUMMER_NORMAL_F : v;
+function normalHigh(month, day, P = PARAMS) {
+  const table = P.normals || NORMAL_HIGH_F;
+  const v = table[`${month}-${day}`];
+  return v == null ? (P.defaultNormal != null ? P.defaultNormal : DEFAULT_SUMMER_NORMAL_F) : v;
 }
 
 function calibratedMean(forecastHigh, month, day, P = PARAMS) {
-  const anomaly = forecastHigh - normalHigh(month, day);
+  const anomaly = forecastHigh - normalHigh(month, day, P);
   return forecastHigh - P.coolBiasF - P.regressionK * Math.max(0, anomaly);
 }
 
@@ -269,7 +290,7 @@ function selfTest() {
 
 module.exports = {
   calibratedMean, sigmaForLead, calibratedDistribution, distribution,
-  robustEdgeReport, kalshiFeeCents, parseBand, selfTest,
+  robustEdgeReport, kalshiFeeCents, parseBand, selfTest, paramsForCity, normalHigh,
   CEILING_TABLE, loadParams, DEFAULT_PARAMS, paramsSource: () => PARAMS._source,
 };
 
