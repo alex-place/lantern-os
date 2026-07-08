@@ -71,32 +71,30 @@
   // Inject the component CSS once (colors come from site.css tokens, so it themes + is AA).
   function injectCss() {
     if (document.getElementById("ev-chip-css")) return;
+    // Host-INDEPENDENT: translucent backgrounds + fixed AA-safe semantic colors + inherited
+    // text, so the chip renders correctly on ANY surface — whether or not it loads site.css
+    // or defines the same token names (kalshi-screener, e.g., has no --gold/--muted/--surface).
     var css =
+      ".ev-chip,.ev-chip-c{color:inherit}" +
       ".ev-chip{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:7px;padding:5px 9px;" +
       "border-radius:7px;font-size:11px;line-height:1.4;border:1px solid;" +
       "font-family:'IBM Plex Mono',ui-monospace,monospace}" +
-      ".ev-chip .ev-lead{font-weight:800;letter-spacing:.1em;font-size:9.5px;padding:1px 6px;border-radius:4px}" +
-      ".ev-chip .ev-ev{font-weight:800}" +
+      ".ev-chip .ev-lead,.ev-chip-c .ev-lead{font-weight:800;letter-spacing:.1em;border-radius:4px}" +
+      ".ev-chip .ev-lead{font-size:9.5px;padding:1px 6px}" +
+      ".ev-chip .ev-ev,.ev-chip-c .ev-ev{font-weight:800}" +
       ".ev-chip .ev-sub{opacity:.7;font-size:10px;flex-basis:100%}" +
-      ".ev-chip.measured{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.4);color:var(--text)}" +
-      ".ev-chip.measured .ev-lead{background:var(--green);color:#06240f}" +
-      ".ev-chip.measured .ev-ev{color:var(--green)}" +
-      ".ev-chip.unproven{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);color:var(--text)}" +
-      ".ev-chip.unproven .ev-lead{background:var(--gold);color:#3a2905}" +
-      ".ev-chip.unproven .ev-ev{color:var(--gold)}" +
-      ".ev-chip.dead{background:var(--surface2);border-color:var(--border);color:var(--muted)}" +
-      ".ev-chip.dead .ev-lead{background:var(--muted);color:var(--surface)}" +
+      // semantic tints (translucent → work on light or dark host); solid lead pills carry
+      // fixed AA-safe fg/bg pairs (dark text on the light-green/gold, white on the grey).
+      ".ev-chip.measured,.ev-chip-c.measured{background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.5)}" +
+      ".ev-chip.measured .ev-lead,.ev-chip-c.measured .ev-lead{background:#10b981;color:#06240f}" +
+      ".ev-chip.unproven,.ev-chip-c.unproven{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.55)}" +
+      ".ev-chip.unproven .ev-lead,.ev-chip-c.unproven .ev-lead{background:#f59e0b;color:#3a2905}" +
+      ".ev-chip.dead,.ev-chip-c.dead{background:rgba(107,114,128,.14);border-color:rgba(107,114,128,.4);opacity:.9}" +
+      ".ev-chip.dead .ev-lead,.ev-chip-c.dead .ev-lead{background:#4b5563;color:#fff}" +
       // compact pill for dense tables/watchlists
       ".ev-chip-c{display:inline-flex;align-items:center;gap:5px;padding:1px 6px;border-radius:5px;" +
       "border:1px solid;font-size:10px;font-family:'IBM Plex Mono',ui-monospace,monospace;white-space:nowrap}" +
-      ".ev-chip-c .ev-lead{font-weight:800;letter-spacing:.08em;font-size:9px;padding:0 4px;border-radius:3px}" +
-      ".ev-chip-c .ev-ev{font-weight:700}" +
-      ".ev-chip-c.measured{background:rgba(16,185,129,.08);border-color:rgba(16,185,129,.4);color:var(--text)}" +
-      ".ev-chip-c.measured .ev-lead{background:var(--green);color:#06240f}.ev-chip-c.measured .ev-ev{color:var(--green)}" +
-      ".ev-chip-c.unproven{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.4);color:var(--text)}" +
-      ".ev-chip-c.unproven .ev-lead{background:var(--gold);color:#3a2905}.ev-chip-c.unproven .ev-ev{color:var(--gold)}" +
-      ".ev-chip-c.dead{background:var(--surface2);border-color:var(--border);color:var(--muted)}" +
-      ".ev-chip-c.dead .ev-lead{background:var(--muted);color:var(--surface)}";
+      ".ev-chip-c .ev-lead{font-size:9px;padding:0 4px;letter-spacing:.08em}";
     var st = document.createElement("style");
     st.id = "ev-chip-css";
     st.textContent = css;
