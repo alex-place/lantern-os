@@ -106,7 +106,35 @@ function stats(allTrades) {
   };
 }
 
+// --live : summarize the autopilot's REALIZED trades (data/.../autopilot-trades.jsonl)
+// so you can compare live win-rate / P&L against the backtest's expectancy.
+function summarizeLive() {
+  const fs = require('fs');
+  const f = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+  let rows = [];
+  try { rows = fs.readFileSync(f, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); }
+  catch { console.log('no autopilot-trades.jsonl yet — the autopilot has not closed a trade.'); return; }
+  const exits = rows.filter((r) => r.event === 'exit' && typeof r.pnl === 'number');
+  const entries = rows.filter((r) => r.event === 'entry');
+  console.log(`Autopilot REALIZED trades — ${entries.length} entries, ${exits.length} closed\n`);
+  if (!exits.length) { console.log('  no closed trades yet.'); return; }
+  const wins = exits.filter((e) => e.pnl > 0);
+  const totalPnl = exits.reduce((s, e) => s + e.pnl, 0);
+  const grossW = wins.reduce((s, e) => s + e.pnl, 0);
+  const grossL = exits.filter((e) => e.pnl <= 0).reduce((s, e) => s + e.pnl, 0);
+  for (const e of exits.slice(-15)) console.log(`  ${(e.symbol || '').padEnd(6)} ${e.pnl >= 0 ? '+' : ''}$${e.pnl.toFixed(2)} (${e.pnl_pct != null ? e.pnl_pct.toFixed(2) + '%' : ''})  ${e.ts}`);
+  console.log('\n── REALIZED ─────────────────────────────');
+  console.log(JSON.stringify({
+    closed: exits.length,
+    win_rate: +(wins.length / exits.length * 100).toFixed(1),
+    total_pnl: +totalPnl.toFixed(2),
+    avg_pnl: +(totalPnl / exits.length).toFixed(2),
+    profit_factor: grossL ? +(grossW / Math.abs(grossL)).toFixed(2) : Infinity,
+  }, null, 2));
+}
+
 (async () => {
+  if (process.argv.includes('--live')) return summarizeLive();
   const syms = process.argv.slice(2).length ? process.argv.slice(2)
     : ['SPY', 'QQQ', 'AAPL', 'NVDA', 'TSLA', 'MSFT', 'AMZN', 'META', 'GOOGL', 'AMD', 'JPM', 'INTC'];
   console.log(`Σ₀ TA-core backtest — ${syms.length} tickers, 15m bars, ~1mo history\n`);

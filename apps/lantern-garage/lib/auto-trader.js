@@ -1,5 +1,20 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
+// Per-trade outcome log (append-only JSONL) — the honest record that lets us
+// MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
+// instead of eyeballing it. Resolved relative to this module so it's found
+// regardless of the server's cwd (same reason as the credential store).
+const TRADES_LOG = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+function logTrade(rec) {
+  try {
+    fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
+    fs.appendFileSync(TRADES_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n');
+  } catch (_e) { /* logging must never break trading */ }
+}
+
 /**
  * auto-trader.js — autonomous stock EXECUTION over the Σ₀ scan (Act stage).
  *
@@ -111,7 +126,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   if (!account || !(account.equity > 0)) { out.reason = 'account/equity unavailable'; return out; }
   const positions = await bridge.getIBKRPositions(userId).catch(() => []);
   const heldQty = {};
-  for (const p of (positions || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
+  const heldPos = {}; // full position (for realized-P&L logging on exit)
+  for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
 
   // Daily-loss circuit breaker: once the account's day P&L is at/below the limit,
   // stop opening NEW positions (exits still run — closing losers is allowed).
@@ -144,6 +160,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
       if (held > 0) {
         const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
+        const hp = heldPos[sym] || {};
+        // Realized P&L on the closed long (the position's unrealized P&L becomes real).
+        logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
       } else {
@@ -175,6 +194,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
         const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc' }).catch((e) => ({ status: 'error', reason: e.message }));
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
+    }
+    if (r && r.status === 'placed') {
+      const pl = s.plan || {};
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
     }
     out.executed.push(exec);
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') opened += 1; }
