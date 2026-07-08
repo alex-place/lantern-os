@@ -358,8 +358,8 @@
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/adr/README.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Architecture Decision Records (ADRs)</span>
-        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Note: two conflicting 0008 rows in the index table.</span>
-        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jun 2026</span></span>
+        <span class="doc-sum">Index and authoring rules for the append-only ADR log; approval gate and status values. Each ADR listed exactly once (0008 collision reconciled 2026-07-01).</span>
+        <span class="doc-foot"><span class="doc-cat">ADR · Index</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
       </a>
       <a class="doc-card" data-cat="research" data-type="md" data-status="reference" data-grounding="partial" href="/repo/docs/RESEARCH-CANON.md">
         <span class="doc-top"><span class="doc-ico">🧪</span><span class="doc-fmt">MD</span></span>
@@ -493,6 +493,12 @@
         <span class="doc-sum">ADR: two servers from two git worktrees (4177 stable auto-deploys master, 4178 dev); matches current dual-boot setup. Status: Proposed.</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="architecture" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/ARXIV-CORPUS.md">
+        <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">arXiv Recent-Research Corpus</span>
+        <span class="doc-sum">Local corpus of post-cutoff AI/LLM arXiv papers (abstracts + metadata) on drive F:, retrieved by BM25 to ground chat answers in research published after the model&#39;s training cutoff. Strengthens the Remember stage.</span>
+        <span class="doc-foot"><span class="doc-cat">Architecture</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
+      </a>
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="living" data-grounding="partial" href="/repo/docs/convergence-core-mapping.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Code → Convergence Core Mapping</span>
@@ -613,6 +619,12 @@
         <span class="doc-sum">Proposed (not approved): fork a PLT looped-coder into a Keystone-owned Σ₀ base, adapter-only, council+CSF native; staged, each stage gated on on-box evidence.</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="grounded" href="/repo/docs/adr/0013-subsystem-register-one-loop-gate.md">
+        <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0013: Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction</span>
+        <span class="doc-sum">ADR (Proposed, awaiting Alex): every public surface is registered CORE (one loop stage) or gated EXTENSION in lib/surface-registry.js, enforced by test:boundary + audit:orphans; consolidates three colliding 0001 drafts from PR #1813.</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
+      </a>
       <a class="doc-card" data-cat="architecture" data-type="md" data-status="draft" data-grounding="partial" href="/repo/docs/CONVERGENCE-HOOKS.md">
         <span class="doc-top"><span class="doc-ico">🏛️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Convergence Hooks: Σ₀ Loop Across All Steps</span>
@@ -630,6 +642,12 @@
         <span class="doc-title">Beating zstd-19 in CSF — a grounded theorization</span>
         <span class="doc-sum">Grounded analysis of what can beat zstd-19 on the project&#39;s logs; concludes only the schema-columnar transform wins today, neural/retrieval variants deferred or refuted by a real probe.</span>
         <span class="doc-foot"><span class="doc-cat">Research</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jun 2026</span></span>
+      </a>
+      <a class="doc-card" data-cat="research" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/research/2026-07-08-cpu-only-serving-ternary-and-gguf.md">
+        <span class="doc-top"><span class="doc-ico">🧪</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">CPU-only serving — the two real routes (GGUF now, ternary/bitnet.cpp target)</span>
+        <span class="doc-sum">Grounded status: not running CPU-only yet (4-bit=CUDA-only); GGUF+llama.cpp (Q4_K_M, now) vs ternary 1.58-bit+bitnet.cpp (BitDistill 10x mem/2.65x CPU, ADR-0026); T-SAR is hardware. Primary sources downloaded.</span>
+        <span class="doc-foot"><span class="doc-cat">Research</span><span class="doc-badge b-status" data-s="living">Living</span><span class="doc-badge b-ground" data-g="grounded">Grounded</span><span class="doc-date">Jul 2026</span></span>
       </a>
       <a class="doc-card" data-cat="research" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md">
         <span class="doc-top"><span class="doc-ico">🧪</span><span class="doc-fmt">MD</span></span>
@@ -955,10 +973,94 @@
         <span class="doc-sum">Runbook to train the XGBoost V10 video scorer from YouTube Shorts; runs on mock data, real-API integration into the scorer still a to-do.</span>
         <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="draft">Draft</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
-      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/handoffs/sigma0-continual-training-2026-06-21.md">
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0026-ternary-serving-artifact-distillation-target.md">
         <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">Handoff: Σ₀ continual-training loop (close the flywheel)</span>
-        <span class="doc-sum">Tracking issue: 911</span>
+        <span class="doc-title">0026 ternary serving artifact distillation target</span>
+        <span class="doc-sum">APPROVAL GATE (ADR-0001): agents draft Proposed / approved-by: pending and never</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0021-serving-substrate-retain-ouro-custom-loop.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0021: Serving substrate — retain the Ouro/Σ₀ custom transformers loop; reject an engine port; defer a base-model swap</span>
+        <span class="doc-sum">- Status: Accepted</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0024-sigma0-frontier-training-program.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0024: Σ₀ frontier training program — honesty-native pretraining</span>
+        <span class="doc-sum">- Status: Proposed (requires Alex&#39;s explicit acceptance; agents may not flip this)</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-serving-and-rho-convergence.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Convergence record — serving substrate + certificate ρ control-check (2026-07-04)</span>
+        <span class="doc-sum">Two convergence records from grounding the &quot;serve our own transformer&quot; design against mid-2026</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-READING-PACK.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Î£â‚€ Reading Pack â€” verified sources for the model-design + frontier-training briefs</span>
+        <span class="doc-sum">primary source pasted in-session) on 2026-07-05/06 before inclusion. Never cite an ID you have</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-PLT-HANDOFF.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Keystone-Σ₀ PLT — Handoff (2026-07-01)</span>
+        <span class="doc-sum">What this is: the pick-up sheet for the &quot;loopcoder swap&quot; — bootstrapping our own</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Local Qwen → Ouro crystallization — a cloud-free distillation teacher (2026-07-02)</span>
+        <span class="doc-sum">Loop stage: Reason (model selection) + Verify (execution-gated distillation) + Converge</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-serving-design-sota.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Serving design vs. mid-2026 SOTA — web-grounded research memo</span>
+        <span class="doc-sum">Method: 4 parallel web-research lenses (Fable-max agents) + an adversarial verify pass</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-UPDATE-CERTIFICATE.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ_θ — The Update Certificate → MERGED</span>
+        <span class="doc-sum">The Update Certificate — renamed the Model-Update Acceptance Gate (Σθ) after second review — is now Part II (§8) of the unified</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-FRONTIER-TRAIN-BRIEF.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ Frontier Training Brief — the honesty-native pretrained model</span>
+        <span class="doc-sum">Governance: the program this brief designs requires an accepted ADR</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-HONESTY-BENCHMARK.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ Honesty Benchmark — results + competitor comparison</span>
+        <span class="doc-sum">Two complementary benchmarks measure the same honesty axis — does a model decline on</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-MODEL-DESIGN.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ Model Design (serving layer) — Fable-max deliverable + orchestrator adjudication</span>
+        <span class="doc-sum">All context is read and cross-checked, with three session-measured additions (binomial CIs, the gloss-leak count, on-disk corpus stats).…</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-MODEL-DESIGN-BRIEF.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ Model Design Brief — the honest model (reusable, max-reasoning)</span>
+        <span class="doc-sum">Purpose: Give a max-reasoning model (Fable 5 @ effort=max) accurate ground truth so it</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/research/SIGMA0-ARXIV-READING-PACK-2026-07.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ verified arXiv reading pack — July 2026</span>
+        <span class="doc-sum">This is a compact, source-verified reading pack for the next Lantern / Ouro work. It is tied to real open seams in this repository rather than a…</span>
+        <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="training" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA0-PHYSICS-EINSTEIN-COMPARISON.md">
+        <span class="doc-top"><span class="doc-ico">🧠</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀, Physics, and Einstein</span>
+        <span class="doc-sum">Σ₀ is currently a local stability-and-control framework for an engineered dynamical system. General relativity is a relativistic theory of…</span>
         <span class="doc-foot"><span class="doc-cat">Training &amp; models</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="trading" data-type="md" data-status="reference" data-grounding="ungrounded" href="/repo/docs/KALSHI-API-SPEC.md">
@@ -1135,6 +1237,36 @@
         <span class="doc-sum">Step-by-step guide to enable the YouTube Data API v3, create/restrict a key, manage quota, and wire the Shorts collector for the creator training pipeline.</span>
         <span class="doc-foot"><span class="doc-cat">Setup &amp; integrations</span><span class="doc-badge b-status" data-s="reference">Reference</span><span class="doc-badge b-ground" data-g="ungrounded">Ungrounded</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="setup" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0019-ibkr-connectivity-client-portal-gateway.md">
+        <span class="doc-top"><span class="doc-ico">🔌</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0019: IBKR connectivity — Client Portal Web API via local gateway (read-only)</span>
+        <span class="doc-sum">- Status: Accepted (Alex Place, 2026-07-04)</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="setup" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0020-ibkr-live-order-placement.md">
+        <span class="doc-top"><span class="doc-ico">🔌</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0020: IBKR live order placement — gated, dry-by-default</span>
+        <span class="doc-sum">- Status: Proposed (awaiting Alex&#39;s approval per the ADR-0001 gate)</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="setup" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0022-ibkr-per-user-self-service-oauth.md">
+        <span class="doc-top"><span class="doc-ico">🔌</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0022: Per-user IBKR connection via self-service OAuth 1.0a</span>
+        <span class="doc-sum">- Status: Accepted (operator-directed, 2026-07-05)</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="setup" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-03-node-ibkr-trader-audit.md">
+        <span class="doc-top"><span class="doc-ico">🔌</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Audit: does master&#39;s Node/IBKR trader have the Python engine&#39;s bugs? — Σ₀ review</span>
+        <span class="doc-sum">Master deleted the Python/Alpaca trader and replaced it with a Node engine</span>
+        <span class="doc-foot"><span class="doc-cat">Setup &amp; integrations</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="setup" data-type="md" data-status="unreviewed" href="/repo/docs/GOOGLE-OAUTH.md">
+        <span class="doc-top"><span class="doc-ico">🔌</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Google Sign-In Setup (&quot;Continue with Google&quot;)</span>
+        <span class="doc-sum">The provider-agnostic OAuth engine (ADR-0016) already ships a fully-wired Google</span>
+        <span class="doc-foot"><span class="doc-cat">Setup &amp; integrations</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="ops" data-type="md" data-status="living" data-grounding="ungrounded" href="/repo/docs/ADMIN-FEATURE-FLAGS.md">
         <span class="doc-top"><span class="doc-ico">⚙️</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Admin Feature Flags &amp; Navigation Visibility</span>
@@ -1213,6 +1345,12 @@
         <span class="doc-sum">Prepared-not-executed runbook to purge large blobs from git history via filter-repo mirror clone; blast radius and deployer-pause steps.</span>
         <span class="doc-foot"><span class="doc-cat">Operations</span><span class="doc-badge b-status" data-s="reference">Reference</span><span class="doc-badge b-ground" data-g="ungrounded">Ungrounded</span><span class="doc-date">Jun 2026</span></span>
       </a>
+      <a class="doc-card" data-cat="ops" data-type="md" data-status="unreviewed" href="/repo/docs/ops/gce-cloud-deploy-runbook.md">
+        <span class="doc-top"><span class="doc-ico">⚙️</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">GCE Cloud Deploy Runbook (unisona.ai)</span>
+        <span class="doc-sum">Operational record of the live single-tenant cloud deployment of master on Google</span>
+        <span class="doc-foot"><span class="doc-cat">Operations</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="reports" data-type="md" data-status="living" data-grounding="grounded" href="/repo/docs/KNOWLEDGE-CENTER-AUDIT-2026-06-30.md">
         <span class="doc-top"><span class="doc-ico">📋</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Knowledge Center — Σ₀ Grounding Baseline (2026-06-30)</span>
@@ -1231,12 +1369,6 @@
         <span class="doc-sum">Re-runnable harness measuring Keystone&#39;s live memory retrieval on LongMemEval vs Letta/Mem0/Zep; committed fixture is synthetic, real dataset gitignored, incumbents wired not run.</span>
         <span class="doc-foot"><span class="doc-cat">Audits &amp; reports</span><span class="doc-badge b-status" data-s="reference">Reference</span><span class="doc-badge b-ground" data-g="partial">Partial</span><span class="doc-date">Jun 2026</span></span>
       </a>
-      <a class="doc-card" data-cat="reports" data-type="md" data-status="unreviewed" href="/repo/docs/adr/adr-001-subsystem-one-loop-audit.md">
-        <span class="doc-top"><span class="doc-ico">📋</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">ADR 001: Subsystem One-Loop Audit</span>
-        <span class="doc-sum">Proposed</span>
-        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
-      </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="reference" data-grounding="grounded" href="/repo/docs/caad/architecture/grounding/grounding-manifest.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Grounding Knowledge Base — Provenance Manifest</span>
@@ -1249,10 +1381,46 @@
         <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
-      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0001-subsystem-register-one-loop-gate.md">
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0014-unisona-desktop-launcher.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">ADR 0001: Subsystem Register and One-Loop Gate Audit</span>
-        <span class="doc-sum">Proposed</span>
+        <span class="doc-title">0014 unisona desktop launcher</span>
+        <span class="doc-sum">Approved in-session by Alex Place on 2026-07-02 (&quot;Write it up as an ADR,</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0015-qwen-teacher-verified-distillation.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">0015 qwen teacher verified distillation</span>
+        <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0016-provider-agnostic-oss-auth.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">0016 provider agnostic oss auth</span>
+        <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0018-web-tier-split-and-cloud-multi-tenancy.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">0018 web tier split and cloud multi tenancy</span>
+        <span class="doc-sum">APPROVAL GATE: leave status Proposed and approved-by pending. An ADR is not</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0023-default-profile-foregrounds-the-loop.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">0023 default profile foregrounds the loop</span>
+        <span class="doc-sum">APPROVAL GATE: status stays Proposed and approved-by pending until Alex Place</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0017-surprise-gated-decoding.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0017: Surprise-Gated Decoding — grounded intervention (CSF + web search + tool call)</span>
+        <span class="doc-sum">- Status: Accepted (Alex Place, 2026-07-02)</span>
+        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0025-rlvr-dreaming-continual-updates-double-gated.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">ADR-0025: RLVR + &quot;dreaming&quot; continual weight updates, double-gated</span>
+        <span class="doc-sum">- Status: Accepted — approved by Alex Place, 2026-07-07 (explicit operator directive in-session: &quot;approve ADR-0025&quot;). Drafted Proposed per the ADR…</span>
         <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-hff-500y-merge-convergence.md">
@@ -1261,10 +1429,46 @@
         <span class="doc-sum">Lantern OS&#39;s existing Remember/Verify-stage patterns (External Reality Rule, CSF long-memory archive) are directly reusable inside the HFF…</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-image-adapter-oss-cdn-phase1.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Convergence Record — OSS Image-Model Adapter (Phase 1)</span>
+        <span class="doc-sum">- Date: 2026-07-01</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-depth-accuracy-and-readout.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Does forcing recurrent depth improve Ouro&#39;s output? (Trilogy hardening)</span>
+        <span class="doc-sum">Artifacts: experiments/sigma0depthaccuracy.py, data/sigma0/depthaccuracyreport.json</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-hidden-state-truth-probe.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Does Ouro internally &quot;know&quot; truth? A confound-controlled hidden-state probe</span>
+        <span class="doc-sum">Artifacts: experiments/sigma0hiddenprobe.py, data/sigma0/hiddenprobereport.json</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/FRONTIER-DIRECTIONS-2026-H2.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Frontier Directions — Deep Research + Design (2026 H2)</span>
         <span class="doc-sum">We evaluated four candidate frontier directions for Keystone OS. The pattern is consistent and uncomfortable: each direction began with a…</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/HOOKS.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Git Hooks — repo-managed, contributor-shared</span>
+        <span class="doc-sum">The hooks that gate commits and pushes are version-controlled and shared by</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/patreon-login-wiring.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Handoff — Finish Patreon login (credentials live on your device)</span>
+        <span class="doc-sum">Branch: claude/sigma0-ev-council (3 new commits, pushed to fork kriskin9-hash/lantern-os)</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-qexit-adaptivity.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Is Ouro&#39;s Q-exit actually adaptive? Weakly — to token-entropy, not task difficulty</span>
+        <span class="doc-sum">Artifacts: experiments/sigma0qexitadaptive.py, data/sigma0/qexitadaptivereport.json</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-01-surprise-leak-layer2-result.md">
@@ -1279,17 +1483,65 @@
         <span class="doc-sum">Loop stages: Verify (the leak).</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
-      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/handoffs/opus-autowork-keystone-2026-06-18.md">
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-06-loop-value-experiment-2178.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">Opus 4.8 Autonomous Work Handoff</span>
-        <span class="doc-sum">Duration: 4 hours</span>
+        <span class="doc-title">Loop-value experiment — does Ouro&#39;s recurrent depth add value? (#2178)</span>
+        <span class="doc-sum">Consequence: Ouro stays research-only; Qwen2.5-Coder remains the local engine (2171).</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
-      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/adr/0001-subsystem-register.md">
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/OSS-BASELINE.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
-        <span class="doc-title">Subsystem Register for One-Loop Alignment</span>
-        <span class="doc-sum">Context:</span>
-        <span class="doc-foot"><span class="doc-cat">ADR</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+        <span class="doc-title">OSS Landscape Baseline — 2026-07-06</span>
+        <span class="doc-sum">What this is: a grounded, verified snapshot of the open-source terrain across every layer the</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-07-rlvr-continual-learning-dreaming-weight-updates.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Spending compute to update Σ₀&#39;s base weights: RLVR + dreaming, gated by the stability certificate</span>
+        <span class="doc-sum">- Task: research how to spend compute to update the base model weights for Σ₀ using RLVR (RL with verifiable rewards) for continual learning + a…</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-05-halueval-surprise-gated.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Surprise-gated grounding on HaluEval: the design test (four-arm), honestly</span>
+        <span class="doc-sum">Artifacts: experiments/haluevalgated.py, data/eval/haluevalgatedresults.json</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-04-pr-outcome-signal.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">The council backtest, honestly: a real null + the runnable owner-only cousin</span>
+        <span class="doc-sum">Artifacts: experiments/proutcomesignal.py, data/sigma0/proutcomesignalreport.json</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-05-grounding-deadline.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">The Grounding Deadline: a scheduling consequence of the collapse certificate</span>
+        <span class="doc-sum">PROJECTION (Ouro) · Loop stage: Verify/Converge</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/v1.9-issue-list.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">unisona.ai v1.9 — Issue List</span>
+        <span class="doc-sum">Grounded in the Σ₀ council review + verified competitive research (2026-07). Each issue</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-03-verso-competitive-analysis.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Verso competitive analysis — how the Kalshi terminal wins</span>
+        <span class="doc-sum">Competitor: verso.trading — &quot;the Bloomberg Terminal for</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/SIGMA-THETA-ABC-HARNESS-SPEC.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ_θ A/B/C Continual-Update Harness — Cloud L4 Spec</span>
+        <span class="doc-sum">arms run on cloud L4). Governs: ADR-0025(adr/0025-rlvr-dreaming-continual-updates-double-gated.md).</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
+      </a>
+      <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-02-weather-oracle-constant-fit.md">
+        <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
+        <span class="doc-title">Σ₀ weather oracle — fitting the distribution constants from IEM (#1871, part 1)</span>
+        <span class="doc-sum">The oracle (kalshi-weather-edge.js) is a complete in-house predictive-distribution model, but</span>
+        <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="lore" data-type="md" data-status="lore" data-grounding="ungrounded" href="/repo/docs/lore/CAST.md">
         <span class="doc-top"><span class="doc-ico">📜</span><span class="doc-fmt">MD</span></span>
