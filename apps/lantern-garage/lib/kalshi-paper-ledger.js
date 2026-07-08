@@ -125,9 +125,35 @@ function openPosition(o) {
   return entry;
 }
 
-function closePosition(id, { exitTag = "MANUAL", exitPriceCents = null, pnlPct = null } = {}) {
-  append({ event: "close", id, exitTag, exitPriceCents, pnlPct, closedAt: new Date().toISOString() });
+function closePosition(id, { exitTag = "MANUAL", exitPriceCents = null, pnlPct = null,
+  settledBucket = null, settledHigh = null } = {}) {
+  const rec = { event: "close", id, exitTag, exitPriceCents, pnlPct, closedAt: new Date().toISOString() };
+  // Weather-edge (#2218): stamp the observed outcome so kalshi-weather-verify can grade the
+  // predictive distribution stamped at open. settledBucket is the ladder index that resolved
+  // YES; settledHigh is the settled °F (either resolves through the ladder in the verifier).
+  if (Number.isInteger(settledBucket)) rec.settledBucket = settledBucket;
+  if (settledHigh != null) rec.settledHigh = settledHigh;
+  append(rec);
   return { ok: true, id, exitTag };
+}
+
+/** Weather-edge close support (#2218): find which ladder bucket actually settled YES by
+ *  polling the sibling tickers stamped at open. Returns the ladder index, or null if the
+ *  outcome can't be resolved yet (leaves the verifier to skip this record rather than guess). */
+async function resolveSettledBucket(pos) {
+  const ladder = pos && pos.ladder;
+  if (!Array.isArray(ladder) || !ladder.length) return null;
+  const kalshi = require("./kalshi-api");
+  for (let i = 0; i < ladder.length; i++) {
+    const ticker = Array.isArray(ladder[i]) ? ladder[i][0] : null;
+    if (!ticker) continue;
+    try {
+      const r = await kalshi.getMarket(ticker);
+      const result = String(r.data?.market?.result || "").toLowerCase();
+      if (result === "yes") return i;
+    } catch { /* ignore; treat as unresolved */ }
+  }
+  return null; // no sibling reported YES yet
 }
 
 // Normalize price cents from Kalshi market object (API may return dollars or cents)
@@ -190,7 +216,15 @@ async function pollOpen() {
           const won = result === side;
           const exitCents = won ? 100 : 0;
           const settledPnlPct = Math.round(((exitCents - entryCents) / entryCents) * 100);
-          closePosition(pos.id, { exitTag: won ? "WON" : "LOST", exitPriceCents: exitCents, pnlPct: settledPnlPct });
+          // Weather-edge (#2218): stamp which ladder bucket settled YES so the distribution
+          // verifier can grade the forecast. If we held the winning bucket its index is known
+          // directly; otherwise poll the siblings stamped at open. No-op for non-weather rows.
+          let settledBucket = null;
+          if (Array.isArray(pos.ladder) && pos.ladder.length) {
+            const heldIdx = pos.ladder.findIndex((b) => Array.isArray(b) && b[0] === pos.ticker);
+            settledBucket = (won && heldIdx >= 0) ? heldIdx : await resolveSettledBucket(pos);
+          }
+          closePosition(pos.id, { exitTag: won ? "WON" : "LOST", exitPriceCents: exitCents, pnlPct: settledPnlPct, settledBucket });
           results.push({ ...pos, title: market.title || pos.ticker,
             resolved: true, won, pnlPct: settledPnlPct, exitPriceCents: exitCents, minsToClose: 0, status: "resolved" });
         } else {

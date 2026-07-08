@@ -206,7 +206,10 @@ function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, 
   const verdict = actionable.length
     ? "robust: " + actionable.map((r) => `${r.side.toUpperCase()} ${r.bucket} (>=${r.worst_c >= 0 ? "+" : ""}${Math.round(r.worst_c)}c)`).join(", ")
     : "no certified edge";
-  return { rows, actionable, verdict };
+  // dist (nominal, keyed by ladder label) + ladder are surfaced so the paper ledger can
+  // stamp the predictive distribution at open — the join the distribution verifier needs
+  // to accrue graded outcomes (kalshi-weather-verify gradedRecords, #2218).
+  return { rows, actionable, verdict, dist: nominal, ladder };
 }
 
 // ── bucket subtitle parser: "100° or above"->[100,null], "94° to 95°"->[94,95] ──

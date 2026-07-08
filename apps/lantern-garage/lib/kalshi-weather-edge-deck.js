@@ -121,6 +121,12 @@ function cardFor(m, row, ctx) {
     // (kalshi-calibration reads pPredicted off resolved rows to compute Brier + bias).
     pPredicted: Math.round(pWinBucket * 1000) / 1000,
     pPredictedRaw: Math.round(rawPWin * 1000) / 1000,
+    // Distribution stamp (#2218): the full predictive dist over the ladder + the held
+    // bucket. The paper-trade POST forwards these onto the open row so kalshi-weather-verify
+    // can join open (dist+ladder) with close (settledBucket) and accrue graded outcomes.
+    dist: ctx.dist || null,
+    ladder: ctx.ladder || null,
+    heldBucket: m.ticker,
     calibration: ctx.calibrator ? ctx.calibrator.report : "no calibrator",
     sigma0: {
       end_state: pWinBucket >= 0.5 ? row.side.toUpperCase() : (isNo ? "YES" : "NO"),
@@ -211,7 +217,9 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     let openInGroup = 0;
     for (const row of rep.actionable) {
       const m = grp.markets.find((x) => x.ticker === row.bucket);
-      if (m) { cards.push(cardFor(m, { ...row }, { ...ctx, openInGroup })); openInGroup++; }
+      // dist+ladder ride along so the card can stamp the predictive distribution onto the
+      // paper position at open, giving the distribution verifier something to grade (#2218).
+      if (m) { cards.push(cardFor(m, { ...row }, { ...ctx, openInGroup, dist: rep.dist, ladder: rep.ladder })); openInGroup++; }
     }
   }
 
