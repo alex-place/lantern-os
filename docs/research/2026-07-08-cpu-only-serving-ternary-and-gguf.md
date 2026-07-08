@@ -38,3 +38,43 @@ The daily arXiv harvest already holds the ternary/CPU frontier — 9/10 ADR-0026
 3. **Then ADR-0026's target:** BitDistill a bigger frontier base (or Ouro) to 1.58-bit, gated by the Σ_θ accept gate, served via bitnet.cpp — the 2–2.5×-params-per-GB win.
 
 Bottom line: **not yet running CPU-only; the current 4-bit can't; GGUF is the fast real path and ternary/bitnet.cpp is the strategic one — both now grounded in downloaded primary sources.**
+
+---
+
+## 5. Reverse-engineered implementation ladder (full reports + on-box measurements, 2026-07-08 update)
+
+§4 was written before validation. This section supersedes it where they conflict, working
+**backwards from the papers' achieved results** (full texts in `data/research/ternary/extracts/`)
+to what our stack concretely needs. Two §4 corrections first, both MEASURED/verified:
+
+- **§4.1 "GGUF-convert Ouro → Q4_K_M" is REFUTED as written.** llama.cpp master (checked
+  2026-07-08) has no `OuroForCausalLM`/`keystone_plt` arch; its `IQuestCoderForCausalLM` entry maps
+  to the **plain LLAMA graph** (`conversion/__init__.py` L109) — no CPU runtime implements
+  recurrent depth. Measured consequences (#2270): qwen-7B GGUF under ollama `num_gpu:0` = **2.09
+  tok/s** (CPU fallback exists today); crystallized Ouro+grounding-v2 via transformers-CPU =
+  correct code but **0.09 tok/s** (pure-Python looped forward). The loop, not quantization, is the
+  CPU blocker.
+- **However, the loop is unroll-clean** (`modeling_ouro.py:592-616`): steps are purely sequential,
+  KV is per-(layer×step) (`max_cache_size = layers × ut_steps`, L546) with no cross-step attention
+  and no embedding re-injection — i.e. Ouro-1.4B×R ≡ a 24R-layer transformer with weights repeating
+  every 24 layers, plus sandwich norms (4/layer) and an inter-block final-norm. Exact llama.cpp
+  support = a modest new arch (shared-tensor loop + extra norm), not a research problem. Fixed
+  depth-3 matches how we already serve it.
+
+### The ladder, cheapest-first
+
+| Rung | What | Cost | Expected result (from the reports) |
+|---|---|---|---|
+| **0** | Run **BitNet-b1.58-2B-4T-gguf** (MIT, exists on HF) under **mainline llama.cpp/ollama** — `BitnetForCausalLM` arch + `TQ1_0/TQ2_0` quants are already in master — or `bitnet.cpp` for full speed | download ~1.2 GB; zero training | 2B4T tech report: **29 ms/token CPU (~34 tok/s), 0.4 GB non-embedding** — ~16× our measured qwen-CPU rate; accuracy ≈ Qwen2.5-1.5B class (avg 54.19 vs 55.23) |
+| **1** | Gate rung 0 on **our** evals (6-task smoke, de-glossed honesty holdout) and register in `local-model-registry` as the **offline/CPU fallback brain** (`verified:false` until it wins) | one eval session | honest fit: 1.5B-class capability, not a coder-lead |
+| **2** | **Crystallize onto a ternary base** — open question: `bitnet.cpp` is **inference-only** (repo verified); BitDistill training code availability must be confirmed; TII's **Falcon-E** family (1B–3B ternary, bitnet.cpp-supported) ships a fine-tuning story worth testing first | small experiment | if LoRA/QAT-SFT on ternary works → our verified-trace corpus rides on a CPU-fast base |
+| **3** | **ADR-0026 proper**: BitDistill our llama-family student → 1.58-bit. Full recipe from the paper: Stage-1 SubLN insert (cheap) → **Stage-2 continue-pretrain on 10B FALCON tokens** (the cost gate: ≈weeks on one L4 → needs a multi-GPU cloud burst, ~8×H100-day class) → Stage-3 logits+MiniLM-attention distill FT (seq 512, cheap). Validated at 0.6B/1.7B/4B on Qwen3; skipping Stage-2 (BitNet-SFT) degrades with scale — don't skip | the real training run | FP-comparable accuracy, **10× memory, 2.65× CPU** vs FP16 |
+| **L** *(parallel)* | **llama.cpp `ouro` arch** (unrolled shared-tensor graph): makes the looped Σ₀ line + every crystallized adapter first-class in ollama, CPU **and** GPU | days of C++, upstreamable | est. 2–4 tok/s CPU at Q4 (5.6B-effective; qwen-7B measured 2.09) — ~25–40× over transformers-CPU |
+
+### Bottom line (updated)
+
+A CPU-only *artifact* now exists off-the-shelf (rung 0) — the fastest honest path to "runs
+CPU-only" is **adopt + gate**, not train. Our *own* models reach CPU either via the ouro-arch
+unroll (rung L, exact) or by making the next distill student llama-family ternary (rung 3, the
+ADR-0026 target whose real cost gate is Stage-2's 10B tokens). GPU serving via the ADR's
+ternary-kernel swap is unaffected; transformers-CPU remains proof-of-existence only (0.09 tok/s).
