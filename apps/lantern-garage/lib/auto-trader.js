@@ -41,10 +41,15 @@ const DEFAULTS = {
   positionPct: 2.5,        // AVERAGE position as % of equity (conviction scales it)
   maxPositionPct: 5,       // HARD cap per position as % of equity ($50k on $1M)
   maxNewPerScan: 3,        // cap new entries opened in a single scan tick
-  cooldownMs: 30 * 60000,  // don't re-order the same symbol within 30 min
+  cooldownMs: 45 * 60000,  // don't re-ENTER the same symbol within 45 min (anti-churn)
   minPrice: 1,             // skip sub-$1 names
   stopPct: 2,              // protective stop % below entry (broker-side STP)
   maxDailyLossPct: 2,      // halt NEW entries once day P&L ≤ -this% of equity
+  // ── Anti-churn (added after a 103-fill/-$1k whipsaw day) ──────────────────
+  minHoldMin: 20,          // don't signal-EXIT a long within N min of entering
+  exitMinPwin: 0.6,        // only exit on a STRONG bearish signal (p_win ≥ this)
+  persistScans: 2,         // act only after the same direction holds N consecutive scans
+  persistWindowMs: 200000, // …seen within this window (≈3 scans) — else it's stale
 };
 
 function cfg() {
@@ -59,6 +64,11 @@ function cfg() {
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
     maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
+    minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
+    exitMinPwin: n('TRADER_EXIT_MIN_PWIN', DEFAULTS.exitMinPwin),        // anti-churn: exit only on strong bearish
+    persistScans: n('TRADER_PERSIST_SCANS', DEFAULTS.persistScans),      // anti-churn: N consecutive scans
+    persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
+    requirePersist: process.env.TRADER_REQUIRE_PERSIST !== '0',          // on by default
     allowShorts: process.env.TRADER_ALLOW_SHORTS === '1',
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
   };
@@ -107,8 +117,10 @@ function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.posi
   return qty;
 }
 
-// Per-symbol cooldown state (in-process; a restart clears it — safe, just re-checks).
-const _lastOrderAt = new Map();
+// Per-symbol state (in-process; a restart clears it — safe, just re-checks).
+const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
+const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
+const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 
 /**
  * Execute the ENTER verdicts from a scan against the user's IBKR account.
@@ -155,14 +167,31 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     // + cash-qty orders) — skip so the autopilot doesn't churn on un-tradable names.
     if (/^[A-Z]{2,5}USD$/.test(sym)) { out.skipped.push({ ...record, why: 'crypto not tradable on this account' }); continue; }
 
+    // ── Signal persistence (anti-churn): require the SAME direction to hold for
+    //    `persistScans` consecutive scans before acting, so single-scan RSI/zone
+    //    noise can't whipsaw the position in and out (103 fills/-$1k in one day). ──
+    const streak = _dirStreak.get(sym);
+    const fresh = streak && (now - streak.at) < c.persistWindowMs;
+    const count = fresh && streak.dir === s.direction ? streak.count + 1 : 1;
+    _dirStreak.set(sym, { dir: s.direction, count, at: now });
+    const persistent = !c.requirePersist || count >= c.persistScans;
+
     // ── BEARISH: only ever CLOSE a long we already hold. NEVER open or deepen a
     //    short (longs-only). Critically, cancel the resting protective stop when we
     //    close — an orphaned GTC stop would otherwise fire on the now-flat position
     //    and open an unintended short (this is what put JPM/META short). ──
     if (!bullish) {
       if (held > 0) {
+        // Anti-churn gates on the signal-exit (the broker stop still protects the
+        // downside independently): (1) don't dump a long we just opened, (2) only
+        // exit on a STRONG bearish read, (3) require it to persist across scans.
+        const entryAt = _entryAt.get(sym) || 0;
+        if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
+        if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
+        if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
         const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
+        _entryAt.delete(sym);
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
@@ -179,6 +208,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
+    if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bullish scans (persistence)` }); continue; }
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
     // Defensive: on a stray short, clear any stale resting orders before re-entering.
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
@@ -203,12 +233,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') opened += 1; }
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
   }
   return out;
 }
 
-/** Test/ops helper: clear the cooldown map. */
-function _resetCooldowns() { _lastOrderAt.clear(); }
+/** Test/ops helper: clear the per-symbol state. */
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, _resetCooldowns };
