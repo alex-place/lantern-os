@@ -9,8 +9,8 @@
   position: absolute;
   top: -40px;
   left: 0;
-  background: var(--accent);
-  color: white;
+  background: var(--accent-strong);
+  color: #fff;
   padding: 8px 16px;
   text-decoration: none;
   z-index: 100;
@@ -31,6 +31,7 @@
   --accent-dim: #cffafe;
   --accent-hover: #06b6d4;
   --accent-strong: #0369a1; /* AA-compliant (≥4.5:1) as text on --surface */
+  --accent-strong-hover: #075985; /* darker still — white text stays ≥4.5:1 (#2251) */
   --green: #10b981;
   --gold: #f59e0b;
   --danger: #ef4444;
@@ -50,6 +51,7 @@
   --accent-dim: #164e63;
   --accent-hover: #0891b2;
   --accent-strong: #06b6d4; /* AA-compliant (≥4.5:1) as text on --surface */
+  --accent-strong-hover: #0e7490; /* filled-button hover; dark text sits on it in dark theme (#2251) */
   --green: #34d399;
   --gold: #fbbf24;
   --danger: #ef4444;
@@ -146,12 +148,12 @@ html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
 html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
 .nav-cta {
   font-size: 13px; font-weight: 600; padding: 7px 16px;
-  background: var(--accent); color: #fff; border: none;
+  background: var(--accent-strong); color: #fff; border: none;
   border-radius: 8px; cursor: pointer; text-decoration: none;
   transition: background 0.15s;
   white-space: nowrap;
 }
-.nav-cta:hover { background: var(--accent-hover); }
+.nav-cta:hover { background: var(--accent-strong-hover); }
 
 /* ── Patreon support link in nav ── */
 .nav-support {
@@ -281,7 +283,7 @@ html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font-weight: 600;
   font-size: 15px;
@@ -293,9 +295,14 @@ html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
   transition: background 0.15s, transform 0.1s;
 }
 .btn-primary:hover {
-  background: var(--accent-hover);
+  background: var(--accent-strong-hover);
   transform: translateY(-1px);
 }
+/* Dark theme: the accent is bright cyan, so white text on filled buttons fails AA.
+   Use dark text on the accent instead (standard dark-mode pattern) — ≥8:1 (#2251). */
+[data-theme="dark"] .skip-link,
+[data-theme="dark"] .nav-cta,
+[data-theme="dark"] .btn-primary { color: var(--bg); }
 .btn-ghost {
   display: inline-flex;
   align-items: center;
