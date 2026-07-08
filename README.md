@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-06-26
+updated: 2026-07-07
 ---
 
 # Keystone OS
@@ -105,7 +105,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 | **Auto-Deployment** | ✅ Live | Hourly master branch pulls, pre-deploy tests, automatic rollback |
 | **Convergence Routing** | ✅ Live | 120+ Keystone intent routes, >70% cache hit rate, deterministic local routing |
 | **Multi-Provider Fallback** | ✅ Live | Claude → OpenAI → Gemini → Grok → Local Ollama, with capacity gates |
-| **[Σ₀ Ouro Coder](docs/SIGMA0-OURO-CODER.md)** | ✅ Live (2026-06-20) | Local looped Ouro-1.4B + Σ₀ QLoRA fine-tuned on past Claude sessions; drop-in served, adaptive Q-exit depth, continually retrained (supersedes the Qwen `lantern-sigma0-coder`) |
+| **Local coding engine — Qwen2.5-Coder** | ✅ Live (#2171) | Qwen2.5-Coder served via Ollama `:11434` is the local-first coder (VRAM-gated registry). Graded on HumanEval — see [BENCHMARKS.md](docs/BENCHMARKS.md). **Ouro-1.4B is the Σ₀ kernel/research base + adapter host, not the coding engine** — its recurrent-depth "Ouro Coder" looping tested **NEGATIVE** (adds no accuracy, ~15× slower; #2178). |
 | **CSF Memory Archive** | ✅ Live | Symbolic searchable format, tiered promotion (trace → skill) |
 | **MCP Server** | ✅ Live | Local tool surface, agent registration, OAuth2 protected endpoint |
 | **Discord Integration** | ✅ Live | Bot with convergence-aware responses |

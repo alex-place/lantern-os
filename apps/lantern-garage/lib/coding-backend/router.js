@@ -77,11 +77,17 @@ function _receiptOutcomes(dataDir) {
   }
   const out = [];
   for (const r of byId.values()) {
+    // Precedence (#2174): a decisive verifier FAILURE is authoritative — the code
+    // didn't work, even if the user force-applied it. Otherwise the user's terminal
+    // decision decides (a reject must never count as success just because a cheap
+    // verdict passed). A decisive verifier PASS only supplies an outcome while the
+    // patch is still unresolved ("proposed"); once resolved, apply/reject wins.
     let success;
-    if (r.test && typeof r.test.passed === "boolean") success = r.test.passed; // verifier wins (#2174)
+    if (r.test && r.test.passed === false) success = false; // proven failure — decisive
     else if (r.status === "applied") success = true;
     else if (r.status === "rejected" || r.status === "apply_failed") success = false;
-    else continue; // "proposed" — unresolved, no outcome yet
+    else if (r.test && r.test.passed === true) success = true; // verified pass, still unresolved
+    else continue; // "proposed" with no decisive verdict — no outcome yet
     out.push({ repo: r.repo || null, backend: r.backend, taskType: r.taskType || "other", success, ts: r.ts, receiptId: r.id });
   }
   return out;

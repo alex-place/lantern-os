@@ -42,10 +42,16 @@ function haltFile() {
  *   mode = account mode from IbkrCpapi.inferMode ('paper'|'live'|'unknown').
  * @returns {{allowed:boolean, dry:boolean, reason:string, mode:string, caps:object}}
  */
-function orderGate({ mode = "unknown", qty, price } = {}) {
-  const maxQty = envInt("MAX_ORDER_QTY", 100);
-  const maxNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
-  const caps = { maxQty, maxNotional };
+function orderGate({ mode = "unknown", qty, price, equity } = {}) {
+  const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
+  // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
+  // equity (default 5% → $50k on $1M). Falls back to the flat MAX_ORDER_NOTIONAL
+  // only when equity is unknown, so we never place a huge order while blind.
+  const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 5;
+  const eq = Number(equity) || 0;
+  const flatNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
+  const maxNotional = eq > 0 ? eq * (maxPositionPct / 100) : flatNotional;
+  const caps = { maxQty, maxNotional: Math.round(maxNotional), maxPositionPct, equity: eq || null };
   const q = Number(qty) || 0;
   const px = Number(price) || 0;
   const notional = q * px;
@@ -55,7 +61,7 @@ function orderGate({ mode = "unknown", qty, price } = {}) {
   if (halt) return deny(`global halt engaged (data/kalshi/${halt}) — all live trading stopped`);
   if (!q || q <= 0) return deny("qty must be > 0");
   if (q > maxQty) return deny(`qty ${q} exceeds MAX_ORDER_QTY ${maxQty}`);
-  if (px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds MAX_ORDER_NOTIONAL $${maxNotional}`);
+  if (px > 0 && notional > maxNotional) return deny(`notional $${notional.toFixed(0)} exceeds cap $${Math.round(maxNotional)} (${eq > 0 ? maxPositionPct + "% of equity" : "flat MAX_ORDER_NOTIONAL — equity unknown"})`);
   if (process.env.TRADER_LIVE !== "1") return deny("TRADER_LIVE=0 — dry run (no real order placed); set TRADER_LIVE=1 to arm");
   if (mode === "unknown") return deny("account mode unknown — refusing to place a real order");
   if (mode === "live" && process.env.TRADER_ALLOW_LIVE_ACCOUNT !== "1") {

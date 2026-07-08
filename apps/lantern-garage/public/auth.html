@@ -99,24 +99,29 @@
     }
     .auth-card .sub { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
 
-    /* Error banner */
+    /* Error banner. Text colour defaults to a dark shade that reads on the light
+       tint; the dark-theme overrides below swap in the pale shades. */
     .auth-error {
       display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
       border: 1px solid color-mix(in srgb, #ef4444 45%, transparent);
       background: color-mix(in srgb, #ef4444 12%, transparent);
-      color: #fca5a5; font-size: 13px; line-height: 1.5;
+      color: #b91c1c; font-size: 13px; line-height: 1.5;
     }
     .auth-error.show { display: block; }
-    .field-error { color: #f87171; font-size: 12px; min-height: 14px; }
+    .field-error { color: #dc2626; font-size: 12px; min-height: 14px; }
     /* Success / info banner (email confirmation) */
     .auth-notice {
       display: none; margin-bottom: 16px; padding: 11px 14px; border-radius: 12px;
       border: 1px solid color-mix(in srgb, #34d399 45%, transparent);
       background: color-mix(in srgb, #34d399 12%, transparent);
-      color: #bbf7d0; font-size: 13px; line-height: 1.5;
+      color: #065f46; font-size: 13px; line-height: 1.5;
     }
     .auth-notice.show { display: block; }
     .auth-notice a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+    /* Dark theme: the tint sits on a dark card, so the pale shades read best. */
+    html[data-theme="dark"] .auth-error  { color: #fca5a5; }
+    html[data-theme="dark"] .field-error { color: #f87171; }
+    html[data-theme="dark"] .auth-notice { color: #bbf7d0; }
 
     /* Provider (OAuth) buttons */
     .auth-actions { display: flex; flex-direction: column; gap: 7px; }
@@ -227,6 +232,9 @@
 
   <!-- ── Sign-in card ── -->
   <div class="auth-card" id="auth-gate">
+
+    <!-- ── Sign-in view — every way to get in ── -->
+    <div id="signin-view">
     <h2>Sign in</h2>
     <p class="sub" id="auth-message">
       Choose how you'd like to continue.
@@ -245,6 +253,7 @@
         <input type="text" id="local-name" name="name" placeholder="Display name" autocomplete="name" hidden>
         <input type="email" id="local-email" name="email" placeholder="you@email.com" autocomplete="email" required>
         <input type="password" id="local-password" name="password" placeholder="Password (min 8 characters)" autocomplete="current-password" required minlength="8">
+        <input type="password" id="local-confirm" name="confirm" placeholder="Confirm password" autocomplete="new-password" minlength="8" hidden>
         <div class="field-error" id="local-error"></div>
         <button type="submit" class="btn-local" id="local-submit">Sign in</button>
       </form>
@@ -263,6 +272,26 @@
 
     <div class="auth-divider">or</div>
     <a href="/" class="btn-ghost">Continue without an account</a>
+    </div><!-- /#signin-view -->
+
+    <!-- ── Confirm-email view — replaces the whole sign-in view until the address
+         is confirmed. "Takes away all this stuff" and shows one clear next step. -->
+    <div id="verify-view" hidden>
+      <h2>Confirm your email</h2>
+      <p class="sub">
+        Please confirm your email before signing in. We sent a confirmation link to
+        <strong id="verify-email-addr"></strong>. Open it, then come back here to sign in.
+      </p>
+      <div class="auth-notice" id="verify-notice" role="status"></div>
+      <!-- Dev-only: shown only when the server (loopback + no mail server) returns a
+           confirmation link, so local testing can complete the flow without email. -->
+      <a id="verify-dev-link" class="btn-ghost" href="#" hidden style="margin-bottom:8px; color:var(--accent)">🔧 Dev: open confirmation link (no mail server)</a>
+      <div class="auth-actions" style="margin-top:4px">
+        <button type="button" class="btn-local" id="verify-continue">I've confirmed my email — sign in</button>
+        <button type="button" class="btn-ghost" id="verify-resend">Resend confirmation</button>
+        <button type="button" class="btn-ghost" id="verify-back">← Back</button>
+      </div>
+    </div><!-- /#verify-view -->
   </div>
 </main>
 
@@ -414,23 +443,84 @@
   function setLocalMode(mode) {
     localMode = mode;
     const nameInput = document.getElementById("local-name");
+    const confirmInput = document.getElementById("local-confirm");
     const submit = document.getElementById("local-submit");
     const toggleWrap = document.getElementById("local-toggle-wrap");
     const pw = document.getElementById("local-password");
     if (mode === "register") {
       nameInput.hidden = false;
+      // Creating an account requires confirming the password — reveal + require it.
+      confirmInput.hidden = false;
+      confirmInput.required = true;
       pw.setAttribute("autocomplete", "new-password");
+      pw.setAttribute("placeholder", "Create a password (min 8 characters)");
       submit.textContent = "Create account";
       toggleWrap.innerHTML = 'Already have an account? <a id="local-toggle">Sign in</a>';
     } else {
       nameInput.hidden = true;
+      confirmInput.hidden = true;
+      confirmInput.required = false;
+      confirmInput.value = "";
       pw.setAttribute("autocomplete", "current-password");
+      pw.setAttribute("placeholder", "Password (min 8 characters)");
       submit.textContent = "Sign in";
       toggleWrap.innerHTML = 'New here? <a id="local-toggle">Create an account</a>';
     }
     document.getElementById("local-toggle").addEventListener("click", () =>
       setLocalMode(localMode === "login" ? "register" : "login")
     );
+  }
+
+  // ── Confirm-email screen — swaps out the entire sign-in view until the address
+  // is confirmed. Reached after a fresh signup (pendingVerification) or when a
+  // login is blocked because the email is still unconfirmed.
+  let verifyEmail = "";
+  let verifyDevLink = "";
+  // opts: { delivery: "sent"|"logged", devLink?: string, reason?: "unverified" }
+  function showVerifyScreen(email, opts) {
+    opts = opts || {};
+    verifyEmail = email;
+    verifyDevLink = opts.devLink || "";
+    document.getElementById("verify-email-addr").textContent = email;
+    const vn = document.getElementById("verify-notice");
+    let msg = "";
+    if (opts.reason === "unverified") {
+      // Login was blocked because the address still isn't confirmed — say so,
+      // rather than silently bouncing back to the same screen.
+      msg = "This email isn't confirmed yet. Open the confirmation link we sent (check your spam), then sign in — or resend it below.";
+    } else if (opts.delivery === "logged") {
+      msg = "No mail server is configured here, so the confirmation link was written to the server log.";
+    }
+    if (msg) { vn.textContent = msg; vn.classList.add("show"); }
+    else { vn.textContent = ""; vn.classList.remove("show"); }
+    // Dev-only self-service confirm link (server returns it on loopback + no SMTP).
+    setDevLink(verifyDevLink);
+    // Clear any stale sign-in banners, then hide the whole sign-in view.
+    document.getElementById("auth-error").classList.remove("show");
+    hideNotice();
+    document.getElementById("signin-view").hidden = true;
+    document.getElementById("verify-view").hidden = false;
+  }
+  function setDevLink(href) {
+    const dl = document.getElementById("verify-dev-link");
+    if (href) { dl.href = href; dl.hidden = false; }
+    else { dl.hidden = true; dl.removeAttribute("href"); }
+  }
+  function showSigninScreen() {
+    document.getElementById("verify-view").hidden = true;
+    document.getElementById("signin-view").hidden = false;
+  }
+  // Brief "you're in" banner shown on the sign-in view right before we redirect
+  // into the app, so a successful login is acknowledged and never looks like a no-op.
+  function showSignedIn() {
+    document.getElementById("verify-view").hidden = true;
+    document.getElementById("signin-view").hidden = false;
+    document.getElementById("auth-error").classList.remove("show");
+    const submit = document.getElementById("local-submit");
+    submit.disabled = true;
+    submit.textContent = "Signed in ✓";
+    hideNotice();
+    showNotice("Signed in successfully ✓ — welcome back! Taking you in…");
   }
 
   async function submitLocal(e) {
@@ -440,7 +530,18 @@
     const name = document.getElementById("local-name").value.trim();
     const errEl = document.getElementById("local-error");
     const submit = document.getElementById("local-submit");
+    let signedIn = false;        // set on a successful login → keep the button parked
+    errEl.style.color = "";      // reset (forgot-password recolors this to the accent)
     errEl.textContent = "";
+
+    // Creating an account: the password and its confirmation must match EXACTLY
+    // (case-sensitive — plain string comparison) before we call the server.
+    if (localMode === "register") {
+      const confirm = document.getElementById("local-confirm").value;
+      if (password.length < 8) { errEl.textContent = "Password must be at least 8 characters."; return; }
+      if (password !== confirm) { errEl.textContent = "Passwords don't match."; return; }
+    }
+
     submit.disabled = true;
     const prev = submit.textContent;
     submit.textContent = "…";
@@ -458,26 +559,20 @@
         // Registration is gated on email confirmation — do NOT navigate; show a
         // "check your email" notice with a resend link instead.
         if (data.pendingVerification) {
-          const dev = data.emailDelivery === "logged"
-            ? " (No mail server is configured here, so the link was written to the server log.)"
-            : "";
-          showNotice(
-            "Almost there — we sent a confirmation link to <strong>" + _safeEmail(email) +
-            "</strong>. Click it, then sign in." + dev +
-            ' <a href="#" data-resend="' + _safeEmail(email) + '">Resend</a>'
-          );
-          setLocalMode("login");
+          // Swap the whole card for the dedicated "confirm your email" screen.
+          showVerifyScreen(email, { delivery: data.emailDelivery, devLink: data.devVerifyLink });
           return;
         }
-        location.href = safeReturnTo();
+        // Signed in — confirm with a success banner, then continue to the app.
+        signedIn = true;
+        showSignedIn();
+        setTimeout(() => { location.href = safeReturnTo(); }, 1200);
         return;
       }
-      // Unconfirmed email → sign-in blocked, offer a resend.
+      // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
+      // with a clear reason (and the dev confirm link when the server supplies it).
       if (data.error === "email_unverified") {
-        showNotice(
-          "Please confirm your email before signing in." +
-          ' <a href="#" data-resend="' + _safeEmail(email) + '">Resend confirmation</a>'
-        );
+        showVerifyScreen(email, { reason: "unverified", devLink: data.devVerifyLink });
         return;
       }
       const map = {
@@ -492,8 +587,9 @@
     } catch (_) {
       errEl.textContent = "Network error. Please try again.";
     } finally {
-      submit.disabled = false;
-      submit.textContent = prev;
+      // On a successful sign-in we keep the button parked ("Signed in ✓") while the
+      // brief success banner shows and we redirect — don't re-enable it.
+      if (!signedIn) { submit.disabled = false; submit.textContent = prev; }
     }
   }
 
@@ -544,6 +640,39 @@
     setLocalMode("login");
     document.getElementById("local-form").addEventListener("submit", submitLocal);
     document.getElementById("forgot-link").addEventListener("click", requestPasswordReset);
+
+    // ── Confirm-email screen controls ──
+    // Go back to the previous (sign-in) screen without confirming.
+    document.getElementById("verify-back").addEventListener("click", showSigninScreen);
+    // "I've confirmed" — the user clicked the emailed link (usually in another tab)
+    // and is ready to sign in. Return them to the login screen, pre-filled.
+    document.getElementById("verify-continue").addEventListener("click", () => {
+      showSigninScreen();
+      setLocalMode("login");
+      if (verifyEmail) document.getElementById("local-email").value = verifyEmail;
+      document.getElementById("local-error").textContent = "";
+      hideNotice();
+      showNotice("If your email is confirmed, sign in below to continue.");
+      document.getElementById("local-password").focus();
+    });
+    // Re-send the confirmation link, reporting back in the verify screen's own banner.
+    document.getElementById("verify-resend").addEventListener("click", async () => {
+      const vn = document.getElementById("verify-notice");
+      let data = {};
+      try {
+        const r = await fetch("/api/auth/resend-verification", {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: verifyEmail }),
+        });
+        data = await r.json().catch(() => ({}));
+      } catch (_) {}
+      vn.textContent = "Confirmation email re-sent to " + verifyEmail + ". Check your inbox (and spam).";
+      vn.classList.add("show");
+      // Dev (loopback + no mail server): the resend hands back a fresh link.
+      if (data.devVerifyLink) { verifyDevLink = data.devVerifyLink; setDevLink(verifyDevLink); }
+    });
+
     checkSession();
   });
 </script>
