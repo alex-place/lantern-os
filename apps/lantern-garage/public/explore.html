@@ -1701,7 +1701,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // rebuild) and dedupe by stable card id; a bottom sentinel pulls the next page
   // as it nears the viewport. /api/explore/feed/page → lib/explore-feed pagedFeed.
   let filterEpoch = 0;        // bumped on filter change to cancel in-flight pages
-  const PAGE = 9;
+  const PAGE = 24;   // fuller first load — 9 left the finance filter looking sparse before auto-load kicked in
   const MAX_CYCLES = 2;       // after looping the catalog this many times, stop auto-loading
 
   // Sentinel below the stream — when it nears view, pull the next page.

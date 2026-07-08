@@ -471,6 +471,7 @@ class IbkrCpapi {
       orderType: o.orderType || o.order_type || '',
       price: firstNum(o.price, o.limit_price),
       avgPrice: firstNum(o.avgPrice, o.average_price),
+      time: firstNum(o.lastExecutionTime_r) || o.lastExecutionTime || o.orderTime || null,
     }));
   }
 

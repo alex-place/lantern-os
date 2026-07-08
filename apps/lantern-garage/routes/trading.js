@@ -465,6 +465,29 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     try {
       const limitParam = parseInt(url.searchParams.get('limit') || '50', 10);
       let orders = [];
+      // Prefer the connected IBKR account's own orders (working + filled) so the
+      // Orders / Order-history tabs reflect the autopilot's trades — the legacy
+      // agent/ledger only knew manual orders, so history showed "None".
+      const ibkr = await bridge.getIBKROpenOrders(getEffectiveUserId(req)).catch(() => null);
+      if (Array.isArray(ibkr) && ibkr.length) {
+        const norm = (s) => {
+          const x = String(s || '').toLowerCase();
+          if (/fill/.test(x)) return 'filled';
+          if (/cancel/.test(x)) return 'canceled';
+          if (/submit|presubmit|pending|inactive/.test(x)) return 'open';
+          return x || 'unknown';
+        };
+        const tstr = (t) => { const n = Number(t); return n > 1e11 ? new Date(n).toISOString() : (t || ''); };
+        orders = ibkr.map((o) => ({
+          id: o.orderId, symbol: o.symbol, side: String(o.side || '').toLowerCase(),
+          qty: o.qty, type: String(o.orderType || 'market').toLowerCase(),
+          limit_price: o.orderType === 'STP' || o.orderType === 'LMT' ? o.price : null,
+          status: norm(o.status), filled_avg_price: o.avgPrice || 0,
+          filled_at: tstr(o.time), created_at: tstr(o.time),
+        }));
+        sendJson(res, orders, 200);
+        return true;
+      }
       if (traderAgent) {
         const r = await traderAgent.getOrders(limitParam > 0 ? limitParam : 50);
         orders = (r && Array.isArray(r.orders)) ? r.orders : [];

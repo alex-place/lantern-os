@@ -109,12 +109,20 @@ class TradingAPIBridge {
     const summary = await client.getAccountSummary(status.accountId);
     if (!summary) return null;
     const { equity, cash, buyingPower, unrealizedPnl } = summary;
+    // Broker-authoritative P&L (dpl/upl/rpl) so the footer's Realized/Unrealized/Day
+    // fields populate (they were "—" because these keys were never returned).
+    const pnl = await client.getPnl(status.accountId).catch(() => null);
+    const unrealized = pnl && pnl.unrealizedPnl != null ? pnl.unrealizedPnl : (unrealizedPnl != null ? unrealizedPnl : 0);
+    const realized = pnl && pnl.realizedPnl != null ? pnl.realizedPnl : 0;
+    const day = pnl && pnl.dailyPnl != null ? pnl.dailyPnl : unrealized;
     return {
       account_id: status.accountId,
       equity: equity != null ? equity : 0,
       cash: cash != null ? cash : 0,
-      pnl_today: unrealizedPnl != null ? unrealizedPnl : 0,
-      pnl_pct: (unrealizedPnl != null && equity) ? (unrealizedPnl / equity) * 100 : 0,
+      unrealized,                 // footer "Unrealized P&L" (was —)
+      realized_today: realized,   // footer "Realized P&L" (was —)
+      pnl_today: day,             // footer "Day P&L" (broker dpl)
+      pnl_pct: equity ? (day / equity) * 100 : 0,
       buying_power: buyingPower != null ? buyingPower : 0,
       mode: status.mode,
       source: 'ibkr-cpapi',
