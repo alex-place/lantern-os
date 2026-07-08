@@ -510,18 +510,12 @@
     <button class="tp-tab active" role="tab" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
     <button class="tp-tab" role="tab" data-tab="orders" onclick="tpTab('orders')">Orders</button>
     <button class="tp-tab" role="tab" data-tab="history" onclick="tpTab('history')">Order history</button>
-    <button class="tp-tab" role="tab" data-tab="signals" onclick="tpTab('signals')">⚡ Σ₀ Signals</button>
-    <button class="tp-tab" role="tab" data-tab="council" onclick="tpTab('council')">🎯 Council</button>
-    <button class="tp-tab" role="tab" data-tab="feed" onclick="tpTab('feed')">Agent Feed</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
     <div class="tp-pane active" id="tp-positions"></div>
     <div class="tp-pane" id="tp-orders"></div>
     <div class="tp-pane" id="tp-history"></div>
-    <div class="tp-pane" id="tp-signals"><div id="sigma0Signals"></div></div>
-    <div class="tp-pane" id="tp-council"><div id="sigma0Council"><div class="s0-empty">Loading council…</div></div></div>
-    <div class="tp-pane" id="tp-feed"><div id="agentLog"></div></div>
   </div>
 </div>
 
@@ -2679,16 +2673,12 @@ function startDashboard(){
   applyGridCols();
   fullRefresh();
   loadBars();
-  loadAgentLog();
   loadOrders();
-  loadCouncil();
   refreshOvernightScan();
   setInterval(fullRefresh,         30000);
   setInterval(loadWatchlistPrices,  3000);   // #1627: tighter so the tick-flash is responsive
   setInterval(loadBars,            15000);
-  setInterval(loadAgentLog,         5000);
   setInterval(loadOrders,          60000);
-  setInterval(loadCouncil,         60000);   // Σ₀ Converge: calibration + per-signal edge
   setInterval(refreshOvernightScan, 60000);  // reflect the auto-reset at market open
 }
 // 🌙 Overnight (market-closed) crypto scanning toggle (#1714)
