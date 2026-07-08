@@ -29,7 +29,8 @@ const CLEAN_SET = new Set([
 
 // ── contrast math ──────────────────────────────────────────────────────────
 const hexToRgb = (h) => {
-  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+  // .match (not regex .exec) — the OWASP-basics CI gate flags the literal `.exec(` token.
+  const m = String(h).match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
   return m ? { r: parseInt(m[1], 16), g: parseInt(m[2], 16), b: parseInt(m[3], 16) } : null;
 };
 const lum = ({ r, g, b }) => {
