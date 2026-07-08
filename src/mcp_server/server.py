@@ -23,6 +23,7 @@ capabilities. Shared user-facing tools are discovered from tool-runner.js.
 
 import os
 import sys
+import inspect
 import json
 import uuid
 import asyncio
@@ -734,40 +735,57 @@ def _tool_fleet_status() -> Dict[str, Any]:
 
 _mesh = get_mesh_bridge()
 
+# Server event loop, captured at startup so sync code running in a threadpool
+# worker (e.g. _handle_jsonrpc) can drive async tools (mesh_*) on the SAME loop
+# the mesh bridge's asyncio.Lock is bound to. Awaiting on a fresh asyncio.run()
+# loop would raise "bound to a different event loop" (#2100).
+_SERVER_LOOP: "asyncio.AbstractEventLoop | None" = None
 
-def _tool_mesh_register_peer(name: str, mcp_url: str, messages_url: str = "", donated_resources: str = "{}") -> Dict[str, Any]:
+
+@app.on_event("startup")
+async def _capture_server_loop() -> None:
+    global _SERVER_LOOP
+    _SERVER_LOOP = asyncio.get_running_loop()
+
+
+def _run_coro_blocking(coro):
+    """Run an awaitable to completion from sync code. On the live server, marshal
+    onto the captured server loop (thread-safe); off-server (tests), spin one."""
+    if _SERVER_LOOP is not None and _SERVER_LOOP.is_running():
+        return asyncio.run_coroutine_threadsafe(coro, _SERVER_LOOP).result(timeout=30)
+    return asyncio.run(coro)
+
+
+async def _tool_mesh_register_peer(name: str, mcp_url: str, messages_url: str = "", donated_resources: str = "{}") -> Dict[str, Any]:
     """Register a peer node in the P2P mesh. Peers may donate resources (agent slots, compute)."""
     resources = json.loads(donated_resources) if donated_resources else {}
-    # NOTE: this is a sync wrapper; the real mesh bridge is async.
-    # For the MCP tool registry we return a serializable dict.
-    loop = asyncio.get_event_loop()
-    result = loop.run_until_complete(_mesh.register_peer(
+    # Async tool: awaited by the dispatchers on the server's own loop. The old
+    # sync wrapper's run_until_complete() raised "This event loop is already
+    # running" on every live call (#2100), and MeshBridge's asyncio.Lock must
+    # stay on the server loop — do not run these on a side loop.
+    return await _mesh.register_peer(
         name=name,
         mcp_url=mcp_url,
         messages_url=messages_url or None,
         donated_resources=resources,
-    ))
-    return result
+    )
 
 
-def _tool_mesh_status() -> Dict[str, Any]:
+async def _tool_mesh_status() -> Dict[str, Any]:
     """Show P2P mesh topology: founder, peers, and aggregate donated resources."""
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_mesh.get_topology())
+    return await _mesh.get_topology()
 
 
-def _tool_mesh_donate(peer_id: str, resources: str) -> Dict[str, Any]:
+async def _tool_mesh_donate(peer_id: str, resources: str) -> Dict[str, Any]:
     """Update the resources a peer is willing to donate (opt-in)."""
     parsed = json.loads(resources) if resources else {}
-    loop = asyncio.get_event_loop()
-    result = loop.run_until_complete(_mesh.update_donation(peer_id, parsed))
+    result = await _mesh.update_donation(peer_id, parsed)
     return result or {"error": "peer not found"}
 
 
-def _tool_mesh_prune(max_age_seconds: float = 300.0) -> Dict[str, Any]:
+async def _tool_mesh_prune(max_age_seconds: float = 300.0) -> Dict[str, Any]:
     """Remove stale peers that haven't sent a heartbeat. Founder-only control."""
-    loop = asyncio.get_event_loop()
-    removed = loop.run_until_complete(_mesh.prune_stale_peers(max_age_seconds))
+    removed = await _mesh.prune_stale_peers(max_age_seconds)
     return {"pruned": removed, "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
@@ -1202,7 +1220,6 @@ def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
                     },
                 })
                 continue
-            import inspect
             sig = inspect.signature(fn)
             parameters = {
                 "type": "object",
@@ -1263,6 +1280,8 @@ def _handle_jsonrpc(req: Dict[str, Any]) -> Dict[str, Any]:
                 result = registry.run(tool_name, tool_args, fn=fn, request_id=str(req_id))
             else:
                 result = fn(**tool_args)
+            if inspect.isawaitable(result):  # async tools (mesh_*) — #2100
+                result = _run_coro_blocking(result)
             return {
                 "jsonrpc": "2.0",
                 "id": req_id,
@@ -1538,7 +1557,6 @@ async def mcp_streamable_http(request: Request):
 
 def _build_openapi_spec(base_url: str) -> Dict[str, Any]:
     """Generate an OpenAPI 3.1.0 spec from TOOLS_REGISTRY for ChatGPT Actions."""
-    import inspect
     paths: Dict[str, Any] = {}
 
     for name, fn in TOOLS_REGISTRY.items():
@@ -1622,7 +1640,6 @@ async def tool_call_rest(tool_name: str, request: Request):
     if not fn:
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
     # Coerce query params to the expected types using the function signature
-    import inspect
     sig = inspect.signature(fn)
     kwargs: Dict[str, Any] = {}
     for param_name, param in sig.parameters.items():
@@ -1643,6 +1660,8 @@ async def tool_call_rest(tool_name: str, request: Request):
             kwargs[param_name] = raw
     try:
         result = fn(**kwargs)
+        if inspect.isawaitable(result):  # async tools (mesh_*) — #2100
+            result = await result
         return JSONResponse(result)
     except TypeError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

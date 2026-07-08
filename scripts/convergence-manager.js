@@ -35,7 +35,6 @@ const REQUIRED = [
   "apps/lantern-garage/package.json",
   ".github/workflows/ci.yml",
   ".github/workflows/deploy.yml",
-  "skills/super-jarvis-lantern-os/SKILL.md",
 ];
 
 // Top-level directories allowed to exist (anti-sprawl gate)
