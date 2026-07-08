@@ -35,21 +35,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav">
-    <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-      <span style="font-size:18px;font-weight:600">unisona.ai</span>
-    </a>
-    <div class="nav-links">
-      <a href="/dream-chat.html">Chat</a>
-      <a href="/grounding-diff.html">Grounding</a>
-      <a href="/metrics.html" class="active">Metrics</a>
-      <a href="/knowledgecenter.html">Help</a>
-    </div>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
-  </nav>
-
-  <main class="m-wrap">
+<main class="m-wrap">
     <div class="m-head">
       <h1>Outcome Metrics</h1>
       <p>The three numbers that turn "trustworthy action layer" from an assertion into evidence (Σ₀ External Reality Rule, applied to ourselves). Computed from append-only logs; movement is measured against the first captured baseline.</p>
@@ -158,5 +144,7 @@
     }
     load();
   </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 </body>
 </html>

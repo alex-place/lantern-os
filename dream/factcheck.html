@@ -44,21 +44,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav">
-    <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-      <span style="font-size:18px;font-weight:600">unisona.ai</span>
-    </a>
-    <div class="nav-links">
-      <a href="/dream-chat.html">Chat</a>
-      <a href="/grounding-diff.html">Grounding</a>
-      <a href="/factcheck.html" class="active">Fact-check</a>
-      <a href="/knowledgecenter.html">Help</a>
-    </div>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
-  </nav>
-
-  <main class="fc-wrap">
+<main class="fc-wrap">
     <div class="fc-head">
       <h1>Did this actually happen?</h1>
       <p>Paste any viral claim, headline, or DM. Unisona searches real sources and weighs the claim against them — returning a verdict, its confidence, and the sources so you can check the work. When the evidence is thin, it says so rather than guessing.</p>
@@ -123,5 +109,7 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); check(); }
     });
   </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 </body>
 </html>

@@ -29,18 +29,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav">
-    <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">unisona.ai</span></a>
-    <div class="nav-links">
-      <a href="/dream-chat.html">Chat</a>
-      <a href="/metrics.html">Metrics</a>
-      <a href="/systems.html" class="active">Systems</a>
-      <a href="/knowledgecenter.html">Help</a>
-    </div>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle theme" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
-  </nav>
-
-  <main class="w">
+<main class="w">
     <h1>Systems Health</h1>
     <p class="lede">One signal for what is actually running. Every moving part — this server, the local model, MCP, the dev dual-server, the trader, cloud providers — as up, down, or disabled with the reason. Backed by <code>GET /api/health?full=1</code>.</p>
     <div class="overall" id="overall"><span class="dot"></span><span id="overallText">Checking…</span></div>
@@ -72,5 +61,7 @@
     }
     load(); setInterval(load, 15000);
   </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 </body>
 </html>
