@@ -897,12 +897,18 @@ function timeAxisTicks(bars, maxTicks){
   if(n < 2) return [];
   const dates = bars.map(b => new Date(String(b.timestamp).replace(' ','T')));
   if(dates.some(d => isNaN(d.getTime()))) return [];
-  // Pick the finest bucket level whose label count fits the width.
+  // Pick the finest bucket level whose label count fits the width — BUT if that
+  // level is too sparse (a coarse step like 1/day when zoomed out), step to the
+  // next-finer level (which overshoots) and let the thinning below trim it evenly.
+  // Keeps a CONSISTENT gridline density across zoom instead of collapsing to a few.
+  const minTicks = Math.max(3, Math.floor(maxTicks * 0.55));
   let level = TIME_LEVELS[TIME_LEVELS.length-1];
+  let finer = null;
   for(const lv of TIME_LEVELS){
     let count = 1;
     for(let i=1;i<n;i++) if(lv.key(dates[i]) !== lv.key(dates[i-1])) count++;
-    if(count <= maxTicks){ level = lv; break; }
+    if(count <= maxTicks){ level = (count < minTicks && finer) ? finer : lv; break; }
+    finer = lv;
   }
   // One tick at the first bar that ENTERS each new bucket — i.e. a real boundary
   // (top of the hour/day/…). The leftmost visible bar is NOT force-labelled
