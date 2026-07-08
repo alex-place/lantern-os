@@ -39,6 +39,7 @@
   tbody td.l{text-align:left;white-space:normal;max-width:420px}
   tbody tr:hover{background:var(--bg1)}
   .tkr{color:var(--text2);font-size:10px}
+  .ev-row{margin-top:4px}
   .ttl{color:var(--text0)}
   .ev{font-weight:800}.ev.pos{color:var(--green)}.ev.neg{color:var(--red)}
   .side{font-weight:700;font-size:10px;padding:1px 5px;border-radius:4px}
@@ -84,6 +85,7 @@
   </table>
 </div>
 
+<script src="/js/evidence-chip.js"></script>
 <script>
 const API='/api/trading/kalshi/screener';
 const state={ sort:'edge', groundedOnly:false, posOnly:false, q:'' };
@@ -105,7 +107,7 @@ function rowHTML(r){
   const brier=(grounded&&e.brier!=null)?`<span class="brier">${e.brier.toFixed(2)}${e.n?'·'+e.n:''}</span>`:'<span class="none">—</span>';
   const mk=r.yes_ask!=null?r.yes_ask+'¢':'—';
   return `<tr>
-    <td class="l"><div class="ttl">${(r.title||r.ticker||'').replace(/</g,'&lt;')}</div><div class="tkr">${(r.ticker||'')}</div></td>
+    <td class="l"><div class="ttl">${(r.title||r.ticker||'').replace(/</g,'&lt;')}</div><div class="tkr">${(r.ticker||'')}</div><div class="ev-row">${window.evidenceChip.compact(window.evidenceChip.kalshiSig(r))}</div></td>
     <td class="mk">${mk}</td>
     <td>${py}</td>
     <td>${side}</td>
