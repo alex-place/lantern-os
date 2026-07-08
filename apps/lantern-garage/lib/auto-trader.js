@@ -136,15 +136,40 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
 
   const signals = (scan && Array.isArray(scan.signals)) ? scan.signals : [];
   const enters = signals.filter((s) => s && s.convergence && s.convergence.decision === 'ENTER');
-  if (!enters.length) { out.reason = 'no ENTER signals'; return out; }
 
-  // Broker truth: current account + open positions (never trade blind).
+  // Broker truth: current account + open positions (never trade blind). Fetched
+  // BEFORE the no-signals early-return so the stop-reconciliation below runs every
+  // scan even when there are no new ENTER signals.
   const account = await bridge.getIBKRAccount(userId).catch(() => null);
   if (!account || !(account.equity > 0)) { out.reason = 'account/equity unavailable'; return out; }
   const positions = await bridge.getIBKRPositions(userId).catch(() => []);
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+
+  // ── Re-protect naked longs: any held long that's lost its protective stop (the
+  //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
+  //    SELL STP. Runs every scan so a long is never left unprotected. ──
+  try {
+    const openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+    const hasStop = (sym) => (openOrders || []).some((o) =>
+      String(o.symbol || '').toUpperCase() === sym &&
+      /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '') &&
+      /submit|pending|presubmit/i.test(o.status || ''));
+    for (const [sym, p] of Object.entries(heldPos)) {
+      const qty = Number(p.qty) || 0;
+      if (qty > 0 && !hasStop(sym)) {
+        const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
+        const stop = stopPriceFor(entry, c.stopPct);
+        if (stop) {
+          const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
+          (out.reprotected = out.reprotected || []).push({ symbol: sym, qty, stop, status: sr && sr.status });
+        }
+      }
+    }
+  } catch (_e) { /* fail-soft — the daily-loss breaker still guards the account */ }
+
+  if (!enters.length) { out.reason = 'no ENTER signals'; return out; }
 
   // Daily-loss circuit breaker: once the account's day P&L is at/below the limit,
   // stop opening NEW positions (exits still run — closing losers is allowed).
