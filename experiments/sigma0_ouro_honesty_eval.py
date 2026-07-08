@@ -78,13 +78,15 @@ def load_model(base, adapter):
     model = AutoModelForCausalLM.from_pretrained(base, config=cfg, device_map="auto",
                                                  trust_remote_code=True, quantization_config=qc,
                                                  attn_implementation="sdpa")
-    model = PeftModel.from_pretrained(model, adapter)
+    if adapter:  # falsy adapter = base-model control run (no PEFT wrap)
+        model = PeftModel.from_pretrained(model, adapter)
     model.eval()
     model.config.use_cache = False   # sidesteps Ouro's recurrent read-only key_cache in generate()
     return tok, model
 
 
-def evaluate(adapter, base, heldout=True, limit=None, maxnew=24, show_negatives=False):
+def evaluate(adapter, base, heldout=True, limit=None, maxnew=24, show_negatives=False,
+             v2=False):
     import torch
     from experiments.sigma0_seed_facts import build, score_candidate
     from experiments.sigma0_live_bench import PROMPT, parse
@@ -99,11 +101,21 @@ def evaluate(adapter, base, heldout=True, limit=None, maxnew=24, show_negatives=
                              pad_token_id=tok.pad_token_id, eos_token_id=tok.eos_token_id)
         return tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
 
-    recs, _, golden, _ = build()
+    if v2:
+        # De-glossed key (E1: v1 negatives announce their own status in-text, so a
+        # v1-key eval measures gloss-reading, not truth-judging). Its stratified
+        # holdout comes from heldout_v2(), not the v1 ids file.
+        from experiments.sigma0_seed_facts import build_v2, heldout_v2
+        recs, _, golden, _ = build_v2()
+    else:
+        recs, _, golden, _ = build()
     items = [(recs[i]["hypothesis"], golden[i]) for i in range(len(golden))]
     if heldout:
-        held = set(json.loads((REPO / "data" / "sigma0" / "ouro_honesty_heldout_ids.json")
-                              .read_text(encoding="utf-8"))["heldout_golden_ids"])
+        if v2:
+            held = set(heldout_v2()["heldout_golden_ids"])
+        else:
+            held = set(json.loads((REPO / "data" / "sigma0" / "ouro_honesty_heldout_ids.json")
+                                  .read_text(encoding="utf-8"))["heldout_golden_ids"])
         items = [(h, g) for (h, g) in items if g["id"].replace("gold-", "") in held]
     if limit:
         items = items[:limit]
@@ -129,7 +141,9 @@ def evaluate(adapter, base, heldout=True, limit=None, maxnew=24, show_negatives=
             if not ver:
                 over += 1
     result = {
-        "adapter": str(adapter), "base": base, "split": "heldout" if heldout else "full",
+        "adapter": str(adapter) if adapter else None, "base": base,
+        "key": "corpus-v2 (de-glossed)" if v2 else "v1 (glossed)",
+        "split": "heldout" if heldout else "full",
         "n_items": len(items), "answered": ans, "unparsed": unparsed,
         "golden_score": round(tot / ans, 3) if ans else None,
         "confabulation_rate": round(confab / nneg, 3) if nneg else None,
@@ -152,11 +166,15 @@ def main():
     ap.add_argument("--maxnew", type=int, default=24)
     ap.add_argument("--show-negatives", action="store_true")
     ap.add_argument("--json", action="store_true", help="write data/sigma0/ouro_honesty_eval_results.json")
+    ap.add_argument("--v2", action="store_true",
+                    help="score against the corpus-v2 DE-GLOSSED key + its stratified holdout "
+                         "(the only fair split for grounding-v2 adapters)")
     a = ap.parse_args()
     result = evaluate(a.adapter, a.base, heldout=not a.full, limit=a.limit,
-                      maxnew=a.maxnew, show_negatives=a.show_negatives)
+                      maxnew=a.maxnew, show_negatives=a.show_negatives, v2=a.v2)
     if a.json:
-        out = REPO / "data" / "sigma0" / "ouro_honesty_eval_results.json"
+        name = "ouro_honesty_eval_results_v2.json" if a.v2 else "ouro_honesty_eval_results.json"
+        out = REPO / "data" / "sigma0" / name
         out.write_text(json.dumps(result, indent=2), encoding="utf-8")
         print(f"saved -> {out.relative_to(REPO)}")
 
