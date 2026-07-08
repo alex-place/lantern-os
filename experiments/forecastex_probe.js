@@ -32,12 +32,18 @@ const IbkrCpapi = require("../apps/lantern-garage/lib/ibkr-cpapi");
 
 const OUT_DIR = path.resolve(__dirname, "../data/kalshi");
 
-// Candidate ForecastEx identifiers for the NYC daily-high market. We don't know IBKR's
-// exact symbol yet — try a spread of plausible ones and report whatever resolves. Override
-// by passing symbols on the command line.
+// ForecastEx lists by ECONOMIC NAME (not short ticker) and only surfaces with name:true.
+// Matches carry exchange FORECASTX and secType IND (underlying) / EC (tradeable Event
+// Contract). Live probe 2026-07-08 confirmed: NYC daily high = symbol UHLGA, conid
+// 853400786; econ underlyings CPI/Unemployment/GDP/Fed Funds also list. Search these name
+// phrases; override on the command line. (The old ticker guesses — KNYC/HIGHNY — never
+// resolved: the underlying is "New York City Daily Temperature High".)
 const DEFAULT_CANDIDATES = [
-  "KNYC", "HIGHNY", "NYCHIGH", "TMAXNYC", "NYCTEMP", "FORECASTEX", "WEATHER",
+  "New York City Daily Temperature High", "Chicago", "Denver", "Miami",
+  "Consumer Price Index", "Unemployment", "GDP", "Fed Funds",
 ];
+const FORECASTX = "FORECASTX";
+const isForecastX = (m) => JSON.stringify(m || {}).includes(FORECASTX);
 
 // The oracle's NYC-high bucket ladder (the shape production is calibrated to). Used only to
 // show ForecastEx strikes side-by-side with what the oracle expects — no trading logic.
@@ -117,27 +123,37 @@ async function main() {
     findings.notes.push(`Account permission probe failed: ${e.message}`);
   }
 
-  // 1. Contract discovery — search each candidate with NO secType filter so every match
-  //    class comes back, then record the (secType, conid, exchange, description) shape.
+  // 1. Contract discovery — search each candidate with name:true (ForecastEx underlyings
+  //    only surface by economic name), keep the FORECASTX matches, record their shape.
   for (const sym of symbols) {
-    const r = await client._request("POST", "/iserver/secdef/search", { symbol: sym, name: false })
+    const r = await client._request("POST", "/iserver/secdef/search", { symbol: sym, name: true })
       .catch((e) => ({ ok: false, error: e.message }));
-    const matches = r && r.ok && Array.isArray(r.json) ? r.json : [];
-    findings.searched.push({ symbol: sym, matchCount: matches.length, ok: !!(r && r.ok) });
+    const all = r && r.ok && Array.isArray(r.json) ? r.json : [];
+    const matches = all.filter(isForecastX);
+    findings.searched.push({ symbol: sym, matchCount: all.length, forecastxCount: matches.length, ok: !!(r && r.ok) });
     for (const m of matches) {
-      const rec = {
-        symbol: sym,
+      findings.resolved.push({
+        symbol: m.symbol || sym,
+        query: sym,
         conid: m.conid ?? m.conidex ?? null,
-        secType: m.secType || (m.sections && m.sections[0] && m.sections[0].secType) || null,
-        description: m.description || m.companyName || m.companyHeader || null,
-        exchange: m.exchange || m.listingExchange || null,
-        sections: m.sections || null,
-      };
-      findings.resolved.push(rec);
-      const blob = JSON.stringify(m).toLowerCase();
-      if (blob.includes("forecast") || blob.includes("prediction")) {
-        rec.likelyForecastEx = true;
-      }
+        secType: m.secType || (Array.isArray(m.sections) && m.sections[0] && m.sections[0].secType) || null,
+        sections: Array.isArray(m.sections) ? m.sections.map((s) => s.secType) : null,
+        description: m.companyHeader || m.companyName || m.description || null,
+        likelyForecastEx: true,
+      });
+    }
+  }
+
+  // 1b. For each FORECASTX underlying, resolve the tradeable Event-Contract (EC) shape via
+  //     secdef/info. The daily temperature buckets are secType EC (not OPT); record the
+  //     status so a failure to enumerate the ladder is a visible finding, not a silent gap.
+  for (const rec of findings.resolved.filter((r) => r.conid).slice(0, 12)) {
+    const info = await client._request("GET", `/iserver/contract/${encodeURIComponent(rec.conid)}/info`)
+      .catch((e) => ({ ok: false, error: e.message }));
+    if (info && info.ok && info.json) {
+      rec.instrumentType = info.json.instrument_type || null;
+      rec.hasRelatedContracts = info.json.has_related_contracts ?? null;
+      rec.validExchanges = info.json.valid_exchanges || null;
     }
   }
 

@@ -1,13 +1,21 @@
 "use strict";
 
 /**
- * Cross-venue divergence monitor (#2221) — READ-ONLY. Kalshi (KXHIGHNY) and IBKR ForecastEx
- * list the same NYC daily-high contract and settle on the IDENTICAL KNYC Daily Climatological
- * Report, but keep separate order books. When the same temperature bucket is priced apart on
- * the two books by more than the (tiny) combined fee, that gap is a near-market-neutral arb:
- * buy the cheaper YES, sell the dearer YES (or its NO). This module only DETECTS and reports
- * such gaps — it contains NO order code and never will; orders are a separate, gated step
- * taken only after divergence is shown to exist and be fillable.
+ * Cross-venue divergence monitor (#2221) — READ-ONLY.
+ *
+ * ⚠️ SETTLEMENT-STATION CAVEAT (live probe 2026-07-08, docs/research/2026-07-08-forecastex-
+ * probe-findings.md): the original premise — that Kalshi and ForecastEx settle NYC daily-high
+ * on the IDENTICAL KNYC report — is FALSE. ForecastEx NYC (`UHLGA`) settles on LaGuardia
+ * (KLGA); Kalshi `KXHIGHNY` settles on Central Park (KNYC). LGA runs a systematic ~1–3°F
+ * warmer, so a position spanning the two books is NOT market-neutral — it carries KLGA↔KNYC
+ * BASIS RISK. Treat a flagged gap as a BASIS signal to investigate, not a riskless arb, until
+ * a same-station pair is found. The alignment + fee math below is unchanged and correct; only
+ * the neutrality interpretation changed.
+ *
+ * When the same temperature bucket is priced apart on the two books by more than the (tiny)
+ * combined fee, that gap is flagged. This module only DETECTS and reports — it contains NO
+ * order code and never will; orders are a separate, gated step taken only after a divergence
+ * is shown to exist, be fillable, AND rest on a comparable settlement basis.
  *
  * Buckets are matched by their [lo, hi] °F range, NOT by ticker/label — the two venues use
  * different symbols for the same outcome, but the settlement temperature ranges are the same.
