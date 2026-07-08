@@ -49,7 +49,12 @@ def load_model(base, adapter):
     if _require_free_ram is not None:
         _require_free_ram(what=f"Ouro model '{base}'")
 
-    from datasets import Dataset  # noqa: F401  (import before torch on Windows: pyarrow/CUDA DLL)
+    # NOTE: do NOT `from datasets import Dataset` here. It pulls in pyarrow, whose
+    # import intermittently segfaults (Windows access violation) under memory
+    # pressure on this box — and datasets is unused by this eval. The working
+    # baseline eval (scripts/eval_sigma0_adapter.py) never imports datasets. We
+    # init numpy explicitly before torch instead (stable, no pyarrow).
+    import numpy  # noqa: F401
     import torch
     from transformers import (AutoModelForCausalLM, AutoTokenizer, AutoConfig,
                               BitsAndBytesConfig)
