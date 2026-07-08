@@ -33,6 +33,7 @@ const WEIGHTS = {
   volume: 0.07, // volume spike confirms the move (Tier-1)
   momentum: 0.1, // MACD histogram + price-vs-MA agree with direction (Tier-1)
   earnings: 0.11, // last reported EPS surprise vs consensus agrees with direction (Tier-2)
+  sector: 0.08, // ticker's sector ETF trend agrees with direction (Tier-2)
   backtest: 0.0, // folded into base_rate instead (see below)
 };
 
@@ -256,7 +257,14 @@ function scoreConvergence(ev, weights = null) {
   const surpSigned = surp == null ? 0 : (direction === "BULLISH" ? surp : direction === "BEARISH" ? -surp : 0);
   const earnings = surp == null ? 0.5 : _clamp(0.5 + 0.5 * Math.tanh(surpSigned / 15), 0.05, 0.95);
 
-  const signals = { grok, claude, zone, structure, pattern, trend, news, volume, momentum, earnings };
+  // Sector strength (framework Step 5): the ticker's SPDR-sector trend, signed to
+  // the trade direction — a long in a leading sector confirms, a lagging one cuts.
+  // `sector_trend` is a fraction (e.g. +0.03 = sector +3%); ±4% saturates.
+  const sct = _num(ev.sector_trend);
+  const sctSigned = sct == null ? 0 : (direction === "BULLISH" ? sct : direction === "BEARISH" ? -sct : 0);
+  const sector = sct == null ? 0.5 : _clamp(0.5 + 0.5 * Math.tanh(sctSigned / 0.04), 0.1, 0.9);
+
+  const signals = { grok, claude, zone, structure, pattern, trend, news, volume, momentum, earnings, sector };
 
   // ── p_win = base_rate + Σ wᵢ·(signalᵢ − 0.5) ──────────────────────────────
   // `weights` lets the caller pass realized-edge-adapted weights (adaptWeights);
@@ -296,6 +304,7 @@ function scoreConvergence(ev, weights = null) {
     volume: "volume",
     momentum: "momentum (MACD/MA)",
     earnings: "earnings surprise",
+    sector: "sector strength",
     pattern: "pattern",
     trend: "trend",
     news: "news",

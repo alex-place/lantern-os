@@ -17,6 +17,7 @@
 
 const yahoo = require("../market-data-yahoo");
 const { rsi, adaptiveRsiThresholds, macd, priceVsSma, volumeRatio, atr } = require("./indicators");
+const sectors = require("./sectors");
 const { findSrZones } = require("./sr-zones");
 const { detectCandlePatterns } = require("./candles");
 const { checkMarketStructureShift } = require("./market-structure");
@@ -130,7 +131,7 @@ function candleGrade(candle) {
 // `news_sentiment` ∈ [-1,1] is an EXTERNAL anchor (Σ₀): the EV layer signs it to
 // the direction and weights it lightly (WEIGHTS.news), so one headline can nudge
 // but never dominate the TA evidence.
-function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0, volume_ratio, macd_hist, ma_signal, earnings_surprise }) {
+function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend }) {
   const evInput = {
     direction,
     news_sentiment,
@@ -138,6 +139,7 @@ function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, ne
     macd_hist,             // Tier-1: MACD histogram (momentum)
     ma_signal,             // Tier-1: price vs MA (momentum)
     earnings_surprise,     // Tier-2: last EPS surprise vs consensus (signed %)
+    sector_trend,          // Tier-2: sector ETF trend (signed fraction)
     in_zone: sr.in_zone,
     zone_strength: sr.zone_strength,
     zone_touches: (sr.nearest_zone && sr.nearest_zone.touches) || sr.touches || 0,
@@ -199,6 +201,17 @@ async function scanAll(watchlist) {
   const bars15 = ((await yahoo.getBarsMulti(list, "15m").catch(() => ({ bars: {} }))).bars) || {};
   const bars1h = ((await yahoo.getBarsMulti(list, "1h").catch(() => ({ bars: {} }))).bars) || {};
 
+  // Tier-2 sector strength: fetch each needed sector ETF's daily bars ONCE and
+  // compute its trend, then look up per ticker (many tickers share a sector).
+  const sectorMom = {}; // etf -> signed momentum fraction
+  try {
+    const etfs = sectors.etfsFor(list);
+    if (etfs.length) {
+      const etfBars = ((await yahoo.getBarsMulti(etfs, "1d").catch(() => ({ bars: {} }))).bars) || {};
+      for (const e of etfs) sectorMom[e] = sectors.sectorMomentum((etfBars[e] && etfBars[e].bars) || []);
+    }
+  } catch (_e) { /* fail-soft: sector signal stays neutral */ }
+
   const signals = [];
   const zones = {};
   const logs = [];
@@ -248,7 +261,9 @@ async function scanAll(watchlist) {
       let earn = null;
       try { earn = await yahoo.getEarningsSurprise(t); } catch (_e) { /* fail-soft */ }
       const earnings_surprise = earn ? earn.surprisePct : null;
-      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise });
+      const secEtf = sectors.sectorFor(t);
+      const sector_trend = secEtf && sectorMom[secEtf] != null ? sectorMom[secEtf] : null;
+      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend });
 
       // Trade plan (framework Step 6): ATR-based risk unit, R-multiple targets, and
       // an ATR-scaled holding-horizon estimate. Levels prefer real S/R when close.
@@ -283,6 +298,7 @@ async function scanAll(watchlist) {
         convergence, // Σ₀ EV verdict: { decision:'ENTER'|'SKIP', p_win, ev_r, size_mult }
         news: { label: newsSent.label, score: newsSent.impact_weighted_score, n: newsSent.n }, // external anchor
         earnings: earn ? { surprise_pct: earn.surprisePct, quarter: earn.quarter } : null, // Tier-2
+        sector: secEtf ? { etf: secEtf, trend_pct: sector_trend != null ? r2(sector_trend * 100) : null } : null, // Tier-2
         volume_ratio: r2(volume_ratio),
         plan: { stop: r2(stopPx), target1: r2(dirUp ? price + tr * riskAbs : price - tr * riskAbs), target2: r2(dirUp ? price + tr * 1.7 * riskAbs : price - tr * 1.7 * riskAbs), hold_days: holdDays },
         reasons: gate.reason,
