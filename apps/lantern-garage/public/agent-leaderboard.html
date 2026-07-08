@@ -214,25 +214,6 @@
 </head>
 <body>
 
-<nav class="site-nav">
-  <a class="nav-brand" href="/stock-trader.html">
-    <span class="brand-icon"><span class="mandala-icon spin-slow"></span></span>
-    unisona.ai
-  </a>
-  <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
-    <a href="/agent-status.html">System</a>
-    <a href="/agent-leaderboard.html" class="active">Leaderboard</a>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Unisona on Patreon</a>
-  </div>
-  <div class="nav-actions">
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode">☀</button>
-    <a class="nav-cta" href="/dream-chat.html">Open Chat</a>
-  </div>
-</nav>
-
 <div class="page" role="main">
   <div class="leaderboard-page">
     <div class="leaderboard-header">
@@ -285,34 +266,9 @@
   </div>
 </div>
 
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div class="footer-brand"><span>unisona.ai</span></div>
-    <span class="sep">·</span>
-    <a href="/knowledgecenter.html">Help</a>
-        <span class="sep" style="margin: 0 4px;">·</span>
-        <a href="https://www.patreon.com/c/lanterndreamjournal" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Unisona on Patreon</a>
-    <span class="sep">·</span>
-    <a href="https://github.com/anthropics/lantern-os" target="_blank" rel="noopener">GitHub</a>
-    <span class="ml">Made with care for dreamers</span>
-  </div>
-</footer>
-
 <script>
-  const themeToggle = document.getElementById('theme-toggle');
-  const html = document.documentElement;
-  const savedTheme = localStorage.getItem('theme') || 'dark';
-  html.setAttribute('data-theme', savedTheme);
-  themeToggle.textContent = savedTheme === 'dark' ? '☀' : '🌙';
-
-  themeToggle.addEventListener('click', () => {
-    const current = html.getAttribute('data-theme');
-    const next = current === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
-    themeToggle.textContent = next === 'dark' ? '☀' : '🌙';
-  });
-
+  // Theme handling is provided by js/theme-toggle.js + the injected site-chrome nav (#2254);
+  // the old inline theme-toggle button/handler was removed with the inline nav.
   let autoRefreshInterval = null;
 
   async function loadData() {
@@ -412,6 +368,8 @@
   document.getElementById('taskTypeSelect').addEventListener('change', loadData);
 </script>
 
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

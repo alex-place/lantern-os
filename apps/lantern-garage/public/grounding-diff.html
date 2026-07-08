@@ -51,23 +51,7 @@
   </style>
 </head>
 <body>
-  <nav class="site-nav">
-    <a class="nav-brand" href="/">
-      <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-      <span style="font-size:18px;font-weight:600">unisona.ai</span>
-    </a>
-    <div class="nav-links">
-      <a href="/dream-chat.html">Chat</a>
-      <a href="/stock-trader.html">Trader</a>
-      <a href="/create.html">Create</a>
-      <a href="/explore.html">Explore</a>
-      <a href="/grounding-diff.html" class="active">Grounding</a>
-      <a href="/knowledgecenter.html">Help</a>
-    </div>
-    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode" onclick="(function(){var h=document.documentElement;h.setAttribute('data-theme',h.getAttribute('data-theme')==='dark'?'light':'dark');})()">☀</button>
-  </nav>
-
-  <main class="gd-wrap">
+<main class="gd-wrap">
     <div class="gd-head">
       <h1>Grounding Diff</h1>
       <p>Every factual claim the system makes, surfaced as its mandated tuple — <b>claim · evidence · source · confidence</b> — the External Reality Rule made visible. Claims whose approved peers disagree on an overlapping scope are flagged as <span style="color:#f59e0b">contradictions</span>.</p>
@@ -185,5 +169,7 @@
     document.getElementById('f-only-contra').addEventListener('change', load);
     load();
   </script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
 </body>
 </html>
