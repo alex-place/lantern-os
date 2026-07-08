@@ -62,10 +62,14 @@ function loadEnv() {
   } catch (e) { report.error = e.message; }
 
   const r = report.result || {};
-  const stamp = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })).toISOString().slice(0, 10);
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.toISOString().slice(0, 10);
+  const hhmm = String(et.getHours()).padStart(2, '0') + String(et.getMinutes()).padStart(2, '0');
+  const phase = et.getHours() >= 15 ? 'close' : 'open'; // 15:00 ET+ = end-of-day P&L snapshot
+  const stamp = `${phase}-${day}-${hhmm}`;
   const dir = path.join(ROOT, 'data', 'lantern-garage', 'trading');
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, `open-verify-${stamp}.json`), JSON.stringify(report, null, 2));
+  fs.writeFileSync(path.join(dir, `verify-${stamp}.json`), JSON.stringify(report, null, 2));
   const txt = [
     `OPEN VERIFICATION — ${report.verifiedAt} (ET)`,
     `IBKR connected : ${r.connected}   account ${r.account || '?'}   equity $${r.equity || '?'}`,
@@ -80,6 +84,6 @@ function loadEnv() {
     `VERDICT: ${r.ok ? '✅ HEALTHY — no shorts, stops present, sizing ~% of portfolio, connected' : '⚠️ REVIEW NEEDED — see the checks above'}`,
     report.error ? `ERROR: ${report.error}` : '',
   ].filter((l) => l !== undefined).join('\n');
-  fs.writeFileSync(path.join(dir, `open-verify-${stamp}.txt`), txt);
+  fs.writeFileSync(path.join(dir, `verify-${stamp}.txt`), txt);
   console.log(txt);
 })();
