@@ -273,6 +273,13 @@
      that plot area so percentage-based positions line up with the canvas. */
   .chart-canvas{position:absolute;inset:0;width:100%;height:100%}
   .ladder-overlay{position:absolute;left:0;right:52px;top:0;bottom:16px}
+  /* TradingView-style crosshair: dashed lines + price(right)/time(bottom) labels. */
+  .xh-v,.xh-h{position:absolute;pointer-events:none;z-index:7;display:none}
+  .xh-v{width:0;top:0;bottom:16px;border-left:1px dashed var(--tv-text-secondary,#8892a0)}
+  .xh-h{height:0;left:0;right:52px;border-top:1px dashed var(--tv-text-secondary,#8892a0)}
+  .xh-lbl{position:absolute;pointer-events:none;z-index:8;display:none;font-family:var(--mono);font-size:9px;line-height:1;padding:2px 4px;border-radius:2px;background:var(--bg3,#2a2e39);color:var(--text0,#e8eaed);white-space:nowrap}
+  .xh-price{right:0;transform:translateY(-50%)}
+  .xh-time{bottom:0;transform:translateX(-50%)}
   /* Header chart controls */
   .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
@@ -699,6 +706,7 @@ const CHART_CANDLE_DOWN = '#ef5350';
 // record the most recently rendered price range so wheel/drag handlers can
 // map cursor position to a price without recomputing the auto range.
 const chartView = {};
+const _crossData = {};   // canvas.id -> { bars, rMin, rMax } for the crosshair readout
 function getChartView(key){
   if(!chartView[key]) chartView[key] = { barOffset:0, visibleBars:null, yMin:null, yMax:null, lastRMin:null, lastRMax:null };
   return chartView[key];
@@ -948,6 +956,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
   if(rMax<=rMin) return;
+  _crossData[canvas.id] = { bars, rMin, rMax };   // for the hover crosshair readout
 
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
@@ -1874,6 +1883,47 @@ function _ladderTarget(ladderEl){
   return { dataTicker, viewKey: overlay.id, canvas };
 }
 
+// ── Crosshair (TradingView-style price/time readout at the cursor) ────────────
+function _ensureXh(ladder){
+  if(ladder._xh) return ladder._xh;
+  const mk = (cls) => { const el=document.createElement('div'); el.className=cls; ladder.appendChild(el); return el; };
+  const xh = { v: mk('xh-v'), h: mk('xh-h'), price: mk('xh-lbl xh-price'), time: mk('xh-lbl xh-time') };
+  ladder._xh = xh;
+  return xh;
+}
+function _hideXh(ladder){
+  const xh = ladder && ladder._xh; if(!xh) return;
+  for(const el of [xh.v, xh.h, xh.price, xh.time]) el.style.display='none';
+}
+function _fmtCrossTime(ts){
+  const d = new Date(String(ts).replace(' ','T'));
+  if(isNaN(d)) return '';
+  return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+// x,y are cursor coords relative to the canvas (CSS px); w,h the canvas size.
+function _updateXh(ladder, canvasId, x, y, w, h){
+  const data = _crossData[canvasId];
+  const pw = w - AXIS_W, ph = h - AXIS_H;
+  if(!data || x < 0 || x > pw || y < 0 || y > ph){ _hideXh(ladder); return; }
+  const xh = _ensureXh(ladder);
+  const price = data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y
+  const n = (data.bars || []).length;
+  let timeLabel = '';
+  if(n >= 1){
+    const slotW = pw/n;
+    const idx = Math.max(0, Math.min(n-1, Math.floor(x/slotW)));  // nearest bar for the TIME TEXT
+    const b = data.bars[idx];
+    if(b && b.timestamp) timeLabel = _fmtCrossTime(b.timestamp);
+  }
+  const dec = price >= 100 ? 2 : price >= 1 ? 3 : 4;
+  // The line + labels follow the cursor x directly (smooth), not snapped to a bar —
+  // only the time TEXT reflects the nearest bar. Feels continuous on wide-bar cards.
+  xh.v.style.left = x+'px';   xh.v.style.display='block';
+  xh.h.style.top  = y+'px';   xh.h.style.display='block';
+  xh.price.style.top = y+'px'; xh.price.textContent = fmt(price, dec); xh.price.style.display='block';
+  xh.time.style.left = x+'px'; xh.time.textContent = timeLabel;        xh.time.style.display = timeLabel ? 'block' : 'none';
+}
+
 // ── Smooth zoom (centered, animated, TradingView-style) ──────────────────────
 // Zoom works on GOAL values (gVis/gOff for the time window, gYMin/gYMax for the
 // price range); a per-chart rAF loop eases the LIVE values toward those goals,
@@ -1992,6 +2042,7 @@ document.addEventListener('mousedown', function(e){
     startYMin: view.lastRMin, startYMax: view.lastRMax
   };
   ladder.style.cursor = mode==='zoomY' ? 'ns-resize' : mode==='zoomX' ? 'ew-resize' : 'grabbing';
+  _hideXh(ladder);   // hide the crosshair while panning/zooming
   e.preventDefault();
 });
 
@@ -2033,15 +2084,18 @@ document.addEventListener('mousemove', function(e){
 
   // Cursor feedback for the interactive regions (axes vs. pannable plot).
   const ladder = e.target.closest('.zone-ladder');
+  if(ladder !== _lastXhLadder){ if(_lastXhLadder) _hideXh(_lastXhLadder); _lastXhLadder = ladder; }
   if(!ladder) return;
   const target = _ladderTarget(ladder);
-  if(!target){ ladder.style.cursor=''; return; }
+  if(!target){ ladder.style.cursor=''; _hideXh(ladder); return; }
   const rect = target.canvas.getBoundingClientRect();
   const x = e.clientX-rect.left, y = e.clientY-rect.top;
   const w = rect.width, h = rect.height;
-  if(x<0||x>w||y<0||y>h){ ladder.style.cursor=''; return; }
+  if(x<0||x>w||y<0||y>h){ ladder.style.cursor=''; _hideXh(ladder); return; }
   ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : 'grab';
+  _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
+let _lastXhLadder = null;
 
 document.addEventListener('mouseup', function(e){
   if(!_chartDrag) return;
