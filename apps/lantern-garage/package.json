@@ -27,6 +27,7 @@
     "test:three-doors": "node ../../tests/test_three_doors_integration.spec.js",
     "test:showcase": "node test/static-mime.test.js && node test/showcase-manifest.test.js && node test/showcase-gallery-ui.test.js",
     "test:boundary": "node test/surface-boundary.test.js",
+    "test:brand": "node test/brand-unisona.test.js",
     "test:coding-backend": "node test/coding-backend.test.js",
     "test:local-engine": "node test/local-engine-qwen.test.js",
     "test:coding-router": "node test/coding-router.test.js",
