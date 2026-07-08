@@ -60,6 +60,35 @@ const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, gene
 const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
 const { appendJsonlQueued } = require("./file-queue");
+
+// Intents that make a concrete change to existing code. Module-scope so the patch
+// directive helper below and the request handler share one definition.
+const CODING_INTENTS = new Set(["coding_change", "code_review"]);
+
+// Directive appended to a coding-change turn's system prompt (#2218 SWE-bench leak).
+// The router prompt is an assistant persona: on a code-fix turn the model wrote a
+// prose explanation ("Here's how you'd fix it…") and sometimes misfired into GitHub
+// tools, so 0/20 SWE-bench turns emitted an extractable diff even though the same
+// model, hit directly, produced 20/20 patches. This is a chat-layer format leak, not
+// a capability gap. Product-safe: it REQUIRES a fenced diff block but still allows
+// prose around it, so interactive users keep their explanation AND get a copy-paste
+// patch (the diff extractor pulls the fenced block).
+const CODING_PATCH_DIRECTIVE =
+  "\n\nCODE CHANGES — OUTPUT FORMAT: When your reply modifies existing code, you MUST " +
+  "include the change as a unified diff inside a single ```diff code block, with valid " +
+  "`diff --git a/<path> b/<path>` headers and `@@` hunks whose context lines match the " +
+  "given source exactly. A brief explanation is fine, but the ```diff block must always be " +
+  "present when you change code. For a self-contained fix task where full source is provided, " +
+  "emit only the patch — do not call tools, search the web, or write a reproduction script; " +
+  "produce the diff directly from the source you were given.";
+
+// Whether a turn should carry the patch directive. Triggers on the classified coding
+// intent OR the caller's explicit routeIntent, because a raw single-shot patch prompt
+// (SWE-bench, an API caller) won't always self-classify as coding. Never in RP mode.
+function codingPatchDirective(isCodingIntent, routeIntent, isRpMode) {
+  if (isRpMode) return "";
+  return (isCodingIntent || CODING_INTENTS.has(routeIntent)) ? CODING_PATCH_DIRECTIVE : "";
+}
 const { emitClaimDraft } = require("./claim-drafter");
 
 const repoRoot = path.resolve(__dirname, "../../../");
@@ -1478,7 +1507,6 @@ async function handleStreamChat(req, url, res) {
       : "[ouro-router] unavailable → keyword fallback");
   }
 
-  const CODING_INTENTS = new Set(["coding_change", "code_review"]);
   const isCodingIntent = ouroRoute ? ouroRoute.isCoding : CODING_INTENTS.has(converganceDecision?.intent);
 
   const routeDecision = classifyIntent(message);
@@ -1540,7 +1568,10 @@ async function handleStreamChat(req, url, res) {
     : isRpMode
       ? `${agent.systemPrompt}\n\n${dreamContext}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic. Use the dreamer's own words back to them. When the dreamer asks about previous dreams or doors, use the CSF memory and door state above — never fabricate memories.${DOORS_INSTRUCTION}${surfaceMode === "three-doors" ? THREE_DOORS_PREAMBLE : ""}`
       : ROUTER_PROMPT;
-  const systemPrompt = isRpMode ? baseSystemPrompt : `${KEYSTONE_IDENTITY}\n\n${baseSystemPrompt}`;
+  let systemPrompt = isRpMode ? baseSystemPrompt : `${KEYSTONE_IDENTITY}\n\n${baseSystemPrompt}`;
+
+  // Coding-change patch directive (#2218 SWE-bench leak) — see codingPatchDirective().
+  systemPrompt += codingPatchDirective(isCodingIntent, routeIntent, isRpMode);
 
 
   const sendToken = (token) => sse.sendToken(res, token);
@@ -3450,4 +3481,4 @@ async function handleStreamChat(req, url, res) {
   await streamLocalFallback(fallbackReason);
 }
 
-module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder, stripModelArtifacts };
+module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder, stripModelArtifacts, codingPatchDirective, CODING_PATCH_DIRECTIVE };
