@@ -84,7 +84,9 @@ async function main() {
     return finish(findings);
   }
 
-  const client = new IbkrCpapi({ oauth1: signer });
+  // 15 s: the EC contract-detail endpoints answer slowly (a real 503 for an unentitled
+  // account can take >6 s); the default 6 s timeout would mask it as a bare timeout.
+  const client = new IbkrCpapi({ oauth1: signer, timeoutMs: 15000 });
 
   // 0. Auth — read-only session is enough for secdef/search + snapshot.
   const p = await client.probe().catch((e) => ({ error: e.message }));
@@ -108,16 +110,24 @@ async function main() {
     const accounts = await client.getAccounts();
     const summary = findings.accountId ? await client.getAccountSummary(findings.accountId) : null;
     const hay = JSON.stringify({ accounts, summary }).toLowerCase();
+    // tradingType is the decisive entitlement signal: "STKNOPT" = Stocks+Options only, i.e.
+    // NO ForecastEx event contracts (live probe 2026-07-08). An EC-entitled account shows a
+    // tradingType that includes event/EC access.
+    const acct = (Array.isArray(accounts) ? accounts : []).find((a) => a && (a.accountId === findings.accountId || a.id === findings.accountId)) || (accounts || [])[0] || {};
+    const tradingType = acct.tradingType || null;
     findings.permissionSignals = {
       accountsListed: Array.isArray(accounts) ? accounts.length : 0,
+      tradingType,
+      stkOptOnly: tradingType === "STKNOPT",
       mentionsForecastEx: hay.includes("forecast"),
       mentionsPrediction: hay.includes("prediction") || hay.includes("event"),
       raw: { accounts: accounts || null },
     };
-    if (!findings.permissionSignals.mentionsForecastEx) {
+    if (tradingType === "STKNOPT") {
       findings.notes.push(
-        "No 'forecast'/'event' string in the accounts/summary payload — this is NOT proof " +
-        "the permission is absent; confirm on IBKR's account Trading Permissions page.");
+        `Account ${findings.accountId} tradingType=STKNOPT (Stocks+Options only) — NOT entitled ` +
+        "to ForecastEx event contracts. The EC ladder + market data will 503; a " +
+        "ForecastEx-permissioned account is required to enumerate buckets/depth.");
     }
   } catch (e) {
     findings.notes.push(`Account permission probe failed: ${e.message}`);
@@ -154,6 +164,29 @@ async function main() {
       rec.instrumentType = info.json.instrument_type || null;
       rec.hasRelatedContracts = info.json.has_related_contracts ?? null;
       rec.validExchanges = info.json.valid_exchanges || null;
+    }
+  }
+
+  // 1c. EC-ladder entitlement probe on the first resolved underlying. A 503 here (with a
+  //     STKNOPT account) is the definitive "not entitled" signal — no month string fixes it.
+  //     On a ForecastEx-permissioned account this returns the bucket ladder instead.
+  const ladderTarget = findings.resolved.find((r) => r.conid);
+  if (ladderTarget) {
+    const months = (process.env.FORECASTEX_EC_MONTH ? [process.env.FORECASTEX_EC_MONTH] : ["JUL26", "AUG26"]);
+    findings.ecLadder = { conid: ladderTarget.conid, attempts: [], entitled: null };
+    for (const mo of months) {
+      const r = await client._request("GET",
+        `/iserver/secdef/info?conid=${encodeURIComponent(ladderTarget.conid)}&secType=EC&month=${encodeURIComponent(mo)}`)
+        .catch((e) => ({ status: 0, error: e.message }));
+      findings.ecLadder.attempts.push({ month: mo, status: r.status, error: r.error || null,
+        buckets: Array.isArray(r.json) ? r.json.length : null });
+      if (r.status === 200 && r.json) { findings.ecLadder.entitled = true; findings.ecLadder.data = r.json; break; }
+      if (r.status === 503) findings.ecLadder.entitled = false;
+    }
+    if (findings.ecLadder.entitled === false) {
+      findings.notes.push(
+        "EC ladder endpoint returns 503 — ForecastEx contract details/market-data are not " +
+        "served to this account. Ladder + per-bucket depth require a ForecastEx-entitled account.");
     }
   }
 

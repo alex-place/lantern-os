@@ -23,19 +23,28 @@ on Central Park. They are *different* underlyings, so the "same contract, cheape
 - NYC daily high: symbol **`UHLGA`**, conid **853400786**, "New York City Daily
   Temperature High". 52 FORECASTX underlyings resolved across the searched names.
 
-**2. Fill depth at the ~1¢ spread?** — **NOT MEASURED.** The `IND` underlying carries no
-order book (snapshot returns symbol only, no bid/ask). The `EC` bucket ladder could not be
-enumerated: `/iserver/secdef/info?conid=…&secType=EC&month=…` returned empty/timeout for
-every month format tried (`JUL26`, `AUG26`, …), and `/secdef/strikes` (OPT) returned empty
-`call/put` (these aren't options). **Open item:** find the correct EC month/maturity
-parameter (daily contracts may only surface intraday near settlement), then snapshot a
-bucket conid twice to warm the subscription. The 1¢ tick is confirmed; per-bucket depth is not.
+**2. Fill depth at the ~1¢ spread?** — **NOT RETRIEVABLE FROM THIS ACCOUNT — entitlement gap
+(RESOLVED 2026-07-08).** The blocker is NOT the EC month parameter. Diagnosis:
+- `/iserver/secdef/info?conid=…&secType=EC&month=…` returns a **persistent HTTP 503** (3/3
+  retries, every month format) — the earlier "status 0" was just the 6 s client timeout
+  truncating the 503.
+- `/iserver/contract/853400786/info-and-rules` → **`has_related_contracts: false`**.
+- `/iserver/marketdata/snapshot` on the underlying returns **no** bid/ask/last fields.
+- `/portfolio/accounts` → **`tradingType: "STKNOPT"`** (DEMO, IB-CAN): this account is
+  entitled to **Stocks + Options only**, not ForecastEx event contracts.
 
-**3. Does the account carry ForecastEx / EC trading permission?** — **UNCONFIRMED.** The
-handshake authenticates and lists account DUR193395, and secdef/search returns the
-contracts, but there is no explicit ForecastEx/event-contract permission flag in the
-accounts/summary payload (search visibility ≠ trade permission). Confirm on IBKR's Trading
-Permissions page before any order path.
+Together these are conclusive: **DUR193395 lacks ForecastEx (EC) entitlement**, so IBKR won't
+serve the EC contract ladder or its market data from this session — no month string fixes
+that. The 1¢ tick is confirmed (from the underlying `trsrv/secdef` increment rule); per-bucket
+depth needs a **ForecastEx-permissioned account**. Note ForecastEx is a US CFTC-regulated
+venue; an IB-CAN demo may not be eligible — an eligible US-entity account with the ForecastEx
+permission enabled is the prerequisite to enumerate the ladder + depth.
+
+**3. Does the account carry ForecastEx / EC trading permission?** — **NO (confirmed
+2026-07-08).** `/portfolio/accounts` reports `tradingType: "STKNOPT"` (Stocks + Options only)
+for DUR193395, and every EC contract-detail endpoint returns a persistent 503 with no market
+data — search *visibility* of the contracts does not imply *trade/data* entitlement. A
+ForecastEx-permissioned account is required before the port can proceed.
 
 **4. Do the strikes line up with the oracle's bucket ladder?** — **CANNOT CONFIRM** (blocked
 by #2, no EC ladder retrieved) — and **moot until the settlement-station issue is resolved**,
