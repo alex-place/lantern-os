@@ -344,17 +344,24 @@ function financeCards(ctx) {
     // (External-Reality Rule — the ranking is explained, not opaque), then the
     // generic impact/ticker line.
     const personal = Array.isArray(r.relevanceWhy) ? r.relevanceWhy : [];
+    // Directional sentiment chip (bullish/bearish) — the external-anchor signal the
+    // trader also uses. Backfill from the headline for records saved before the
+    // `direction` field existed. Neutral is left off to avoid meta-line clutter.
+    const dir = r.direction || (headline ? tradingNews.scoreDirection(headline).direction : "neutral");
+    const dirChip = dir === "bullish" ? "▲ bullish" : dir === "bearish" ? "▼ bearish" : "";
     // Personalized cards already name their top signals (ticker/impact/fresh) in
     // `relevanceWhy`; only fall back to the generic impact/ticker line when there
     // is no per-user context, so the evidence never repeats itself.
-    const why = (personal.length
-      ? [...personal, "market news"]
-      : [
-          r.impact ? `impact ${r.impact}` : "",
-          symbols.length ? symbols.map((s) => s.toUpperCase()).join(", ") : "",
-          "market news",
-        ]
-    ).filter(Boolean).join(" · ");
+    const why = [
+      dirChip,
+      ...(personal.length
+        ? [...personal, "market news"]
+        : [
+            r.impact ? `impact ${r.impact}` : "",
+            symbols.length ? symbols.map((s) => s.toUpperCase()).join(", ") : "",
+            "market news",
+          ]),
+    ].filter(Boolean).join(" · ");
     // Lead image, in preference order (never the headline — that would render the
     // title twice): (1) the REAL article cover from the source; (2) the primary
     // ticker's company logo; (3) a clean minimal finance cover (glyph + source).

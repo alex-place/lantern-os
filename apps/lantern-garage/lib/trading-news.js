@@ -36,9 +36,45 @@ function _impactToSentiment(impact) {
   return "low";
 }
 
+// Directional sentiment (bullish / bearish / neutral) from the headline text —
+// DISTINCT from `impact` (magnitude) and from `sentiment` (which is really an
+// impact tier). Lexicon-based, dependency-free: count bullish vs bearish cue
+// words and net them. Feeds per-symbol aggregation the trader uses to weight news.
+const _BULL_WORDS = [
+  "beat", "beats", "surge", "surges", "soar", "soars", "rally", "rallies", "jump", "jumps",
+  "gain", "gains", "upgrade", "upgraded", "outperform", "tops", "record high", "all-time high",
+  "raises guidance", "raised", "raises", "strong", "growth", "wins", "win", "approval", "approved",
+  "buyback", "breakthrough", "bullish", "rebound", "recover", "recovers", "profit", "profits",
+  "dividend hike", "expands", "expansion", "boost", "boosts", "optimistic", "upbeat",
+];
+const _BEAR_WORDS = [
+  "miss", "misses", "plunge", "plunges", "plummet", "crash", "crashes", "tumble", "tumbles",
+  "drop", "drops", "fall", "falls", "sink", "sinks", "downgrade", "downgraded", "cut", "cuts",
+  "slump", "lawsuit", "sued", "sues", "probe", "investigation", "recall", "layoff", "layoffs",
+  "bankruptcy", "warns", "warning", "weak", "loss", "losses", "halt", "halts", "fraud", "bearish",
+  "slashes", "slash", "delay", "delays", "selloff", "sell-off", "default", "resigns", "resign",
+];
+
+/** @returns {{direction:'bullish'|'bearish'|'neutral', direction_score:number}} score in [-100,100]. */
+function scoreDirection(headline) {
+  const h = " " + String(headline || "").toLowerCase() + " ";
+  let bull = 0, bear = 0;
+  for (const w of _BULL_WORDS) if (h.includes(w)) bull += 1;
+  for (const w of _BEAR_WORDS) if (h.includes(w)) bear += 1;
+  const net = bull - bear;
+  const direction = net > 0 ? "bullish" : net < 0 ? "bearish" : "neutral";
+  const direction_score = Math.max(-100, Math.min(100, net * 35));
+  return { direction, direction_score };
+}
+
 function _csfEntityRecord(item, memoryId) {
   const now = _now();
   const sentiment = _impactToSentiment(item.impact || 0);
+  // Directional sentiment — precomputed by the caller, else derived here so every
+  // source (Yahoo/dashboard/Finnhub/manual) is scored uniformly.
+  const dir = (item.direction && typeof item.direction_score === "number")
+    ? { direction: item.direction, direction_score: item.direction_score }
+    : scoreDirection(item.headline || item.title || "");
   const symbols = Array.isArray(item.symbols) ? item.symbols : [];
   const base = {
     memory_id: memoryId,
@@ -56,6 +92,8 @@ function _csfEntityRecord(item, memoryId) {
       symbols,
       impact: item.impact || 0,
       sentiment,
+      direction: dir.direction,             // bullish | bearish | neutral (directional)
+      direction_score: dir.direction_score, // signed [-100,100]
       impact_score: item.impact || 0,
       summary: item.summary || "",
       raw: item,
@@ -66,7 +104,7 @@ function _csfEntityRecord(item, memoryId) {
     promoted_from: null,
     promotion_chain: [],
     cube_partition: "raw",
-    tags: ["trading", "news", sentiment, ...symbols].filter(Boolean),
+    tags: ["trading", "news", sentiment, dir.direction, ...symbols].filter(Boolean),
     agents: ["trading-news"],
     checksum: "",
     vector_embedding: null,
@@ -194,9 +232,66 @@ function queryNewsTradeRelations({ ticker = "", limit = 50 } = {}) {
   }
 }
 
+/**
+ * Aggregate directional news sentiment for a symbol over a recent window. The
+ * Verify/Reason input the Σ₀ trader can weight: net bullish vs bearish, impact-
+ * weighted, over the last `windowHours`. Older news decays out of the window.
+ * @param {string} ticker
+ * @param {{ windowHours?: number, limit?: number }} opts
+ * @returns {{ ticker, n, bullish, bearish, neutral, net_score, label, impact_weighted_score, latest }}
+ */
+// Source credibility multiplier (Tier-1, Step 1). Wire services / exchange feeds
+// are the most reliable; a bare/unknown source is discounted. Substring match on
+// the source name, case-insensitive.
+const SOURCE_TIERS = [
+  [1.4, /reuters|bloomberg|associated press|\bap\b|wall street journal|wsj|financial times|\bft\b|cnbc|dow jones|marketwatch|barron/i],
+  [1.2, /finnhub|alpha ?vantage|nasdaq|nyse|sec\b|edgar|yahoo finance|seeking ?alpha|the motley fool|motley fool|investor|benzinga/i],
+  [0.7, /reddit|twitter|\bx\.com|blog|substack|medium|discord|telegram/i],
+];
+function sourceCredibility(source) {
+  const s = String(source || "");
+  if (!s) return 0.85; // unattributed → mild discount, not zero
+  for (const [w, re] of SOURCE_TIERS) if (re.test(s)) return w;
+  return 1.0; // known-but-unranked source → neutral
+}
+
+function symbolSentiment(ticker, { windowHours = 48, limit = 200 } = {}) {
+  const sym = String(ticker || "").toUpperCase();
+  const cutoff = Date.now() - windowHours * 3600 * 1000;
+  const items = queryRecentNews({ ticker: sym, limit }).filter((r) => {
+    const t = Date.parse(r.published || r.date || r.recorded_at || "");
+    return !Number.isFinite(t) || t >= cutoff; // keep undated items; drop stale ones
+  });
+  let bullish = 0, bearish = 0, neutral = 0, scoreSum = 0, weightSum = 0, weightedSum = 0;
+  for (const r of items) {
+    // Backfill direction for records written before this field existed.
+    const d = r.direction || scoreDirection(r.headline || "").direction;
+    const ds = typeof r.direction_score === "number" ? r.direction_score
+      : scoreDirection(r.headline || "").direction_score;
+    if (d === "bullish") bullish++; else if (d === "bearish") bearish++; else neutral++;
+    scoreSum += ds;
+    // Weight by impact AND source credibility (Tier-1 Step 1): a wire-service /
+    // exchange-feed headline counts more than an unattributed blog. Was uniform.
+    const w = (1 + (Number(r.impact) || 0) / 100) * sourceCredibility(r.source);
+    weightedSum += ds * w; weightSum += w;
+  }
+  const n = items.length;
+  const net_score = n ? Math.round(scoreSum / n) : 0;
+  const impact_weighted_score = weightSum ? Math.round(weightedSum / weightSum) : 0;
+  const label = impact_weighted_score > 8 ? "bullish"
+    : impact_weighted_score < -8 ? "bearish" : "neutral";
+  return {
+    ticker: sym, n, bullish, bearish, neutral,
+    net_score, impact_weighted_score, label,
+    latest: items[0] || null,
+  };
+}
+
 module.exports = {
   recordNewsItem,
   linkNewsTrade,
   queryRecentNews,
   queryNewsTradeRelations,
+  scoreDirection,
+  symbolSentiment,
 };

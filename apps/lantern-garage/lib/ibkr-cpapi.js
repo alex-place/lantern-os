@@ -227,10 +227,20 @@ class IbkrCpapi {
       // (401/403) until the OAuth consumer is activated (up to ~24h). Capture the
       // real HTTP status + any IBKR message so the UI can say which it is.
       const msg = (r.json && (r.json.error || r.json.message)) || r.error || null;
-      this._lstError = {
-        code: r.status === 401 || r.status === 403 ? 'not_activated_or_unauthorized' : (r.status ? `http_${r.status}` : 'unreachable'),
-        status: r.status, detail: msg,
-      };
+      // IBKR encodes the real reason in the body (e.g. "id: 164, error: invalid
+      // consumer"). A 401 with "invalid consumer" means the consumer key was never
+      // registered — waiting will NEVER fix it — so keep it distinct from a
+      // genuinely-pending activation instead of lumping all 401s into "retry later".
+      const lower = String(msg || '').toLowerCase();
+      let code;
+      if (r.status === 401 || r.status === 403) {
+        code = /invalid consumer/.test(lower) ? 'invalid_consumer'
+          : /invalid signature|signature/.test(lower) ? 'lst_signature_mismatch'
+          : 'not_activated_or_unauthorized';
+      } else {
+        code = r.status ? `http_${r.status}` : 'unreachable';
+      }
+      this._lstError = { code, status: r.status, detail: msg };
       return null;
     }
     if (!r.json || !r.json.diffie_hellman_response) { this._lstError = { code: 'no_dh_response' }; return null; }
@@ -348,7 +358,20 @@ class IbkrCpapi {
     if (!sym) return null;
     const r = await this._request('POST', '/iserver/secdef/search', { symbol: sym, name: false, secType });
     if (!r.ok || !Array.isArray(r.json) || r.json.length === 0) return null;
-    const match = r.json.find((c) => String(c.symbol || '').toUpperCase() === sym) || r.json[0];
+    // IBKR returns the same symbol on many venues/instrument types — e.g. "GLD"
+    // yields a HK *index* [IND] AND the ARCA *ETF* [STK]. Pick the tradable one:
+    // exact symbol + a section offering the requested secType (STK) + a primary US
+    // venue, degrading gracefully. Prevents ordering an index/foreign listing.
+    const US = /^(NASDAQ|NYSE|ARCA|NYSEARCA|BATS|AMEX|IEX|PINK)$/i;
+    const offers = (c) => Array.isArray(c.sections) && c.sections.some((s) => String(s.secType).toUpperCase() === secType);
+    const exact = (c) => String(c.symbol || '').toUpperCase() === sym;
+    const venue = (c) => String(c.description || '');
+    const match =
+      r.json.find((c) => exact(c) && offers(c) && US.test(venue(c))) ||
+      r.json.find((c) => exact(c) && offers(c)) ||
+      r.json.find(offers) ||
+      r.json.find(exact) ||
+      r.json[0];
     return {
       conid: match.conid != null ? Number(match.conid) : null,
       symbol: match.symbol || sym,
@@ -363,10 +386,14 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY' } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
-    const gate = orderGate({ mode, qty, price, symbol, side });
+    // Prefer the caller-supplied equity; else read the account so the guard's
+    // per-position cap scales with the portfolio (% of equity, not a flat $).
+    let eq = Number(equity) || 0;
+    if (!eq) { try { const s = await this.getAccountSummary(status.accountId); eq = (s && s.equity) || 0; } catch (_e) { /* fall back to flat cap */ } }
+    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq });
     const order = {
       symbol: symbol || null,
       conid: conid != null ? Number(conid) : null,
@@ -398,15 +425,19 @@ class IbkrCpapi {
 
     const ticket = {
       conid: Number(cid),
-      orderType, // 'MKT' | 'LMT'
+      orderType, // 'MKT' | 'LMT' | 'STP'
       side: order.side, // 'BUY' | 'SELL'
       quantity: order.qty,
       tif,
     };
-    if (orderType === 'LMT' && order.price != null) ticket.price = order.price;
+    // LMT needs a limit price; STP (protective stop) needs a trigger price — both
+    // ride the `price` field in IBKR's ticket. MKT carries none.
+    if ((orderType === 'LMT' || orderType === 'STP') && order.price != null) ticket.price = order.price;
 
-    // Body is a JSON ARRAY of tickets (IBKR Web API "New Order Example").
-    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, [ticket]);
+    // Body must be { orders: [ticket, …] }. IBKR's Web API rejects a bare array
+    // with 400 "Missing order parameters" — verified live against a paper account
+    // (a bare [ticket] → 400, { orders:[ticket] } → 200 PreSubmitted).
+    let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [ticket] });
     // Order reply messages [{id, message, messageIds}] must be confirmed to proceed.
     let confirms = 0;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
@@ -448,6 +479,17 @@ class IbkrCpapi {
     if (!orderId) return null;
     const r = await this._request('GET', `/iserver/account/order/status/${encodeURIComponent(orderId)}`);
     return r.ok ? r.json : null;
+  }
+
+  /** DELETE /iserver/account/{acct}/order/{id} — cancel a working order. Returns
+   *  { ok, status }. Used to cancel a protective stop when the position it guards
+   *  is closed, so the stop can't later fire on a flat position and open a short. */
+  async cancelOrder(orderId) {
+    if (!orderId) return { ok: false, error: 'no_order_id' };
+    const acct = await this.resolveAccountId();
+    if (!acct) return { ok: false, error: 'no_account' };
+    const r = await this._request('DELETE', `/iserver/account/${encodeURIComponent(acct)}/order/${encodeURIComponent(orderId)}`);
+    return { ok: r.ok, status: r.status, json: r.json };
   }
 
   /**
@@ -506,6 +548,8 @@ class IbkrCpapi {
 /** Plain-English reason for a not-connected IBKR status (drives the UI banner). */
 function reasonText(reason, lstErr) {
   switch (reason) {
+    case 'invalid_consumer':
+      return "IBKR rejects your consumer key as unknown (error 164, “invalid consumer”). This is NOT an activation delay — waiting won’t help. Register the consumer in IBKR’s Self-Service OAuth portal and enter the EXACT consumer key IBKR accepts.";
     case 'not_activated_or_unauthorized':
       return "IBKR rejected the OAuth handshake — your consumer isn't active yet. IBKR can take up to ~24h to enable a new one; try Recheck later.";
     case 'lst_signature_mismatch':

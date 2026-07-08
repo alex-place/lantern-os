@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-07-01
+updated: 2026-07-07
 ---
 
 # AGENTS.md — Keystone OS
@@ -105,11 +105,11 @@ Claude is expensive. Use it for design decisions and complex debugging. Delegate
 | PCSF file updates | Any agent | JSON edits, no logic |
 | CSF ingestion docs | Any agent | Markdown, no code |
 | `requirements.txt` edits | Any agent | One-line changes |
-| Coding work (autowork) | **[Σ₀ Ouro Coder](docs/SIGMA0-OURO-CODER.md)** | Local looped Ouro-1.4B + Σ₀ QLoRA; $0, private, drop-in served on `:11434` |
+| Coding work (autowork) | **Qwen2.5-Coder** (local engine, #2171) | Served via Ollama `:11434`; $0, private, VRAM-gated. Ouro-1.4B is kernel/research only. |
 
 **Claude is for:** Orchestrator bugs, stream architecture, provider chain logic, system prompt design, security review.
 
-**Local coding model:** the [Σ₀ Ouro Coder](docs/SIGMA0-OURO-CODER.md) is the project's own coding agent — a looped **Ouro-1.4B** model with a Σ₀ QLoRA fine-tune on past Claude sessions, served drop-in via `scripts/ouro_serve.py` (no Ollama binary) and continually retrained ([SIGMA0-CONTINUAL-TRAINING.md](docs/SIGMA0-CONTINUAL-TRAINING.md)). It backs autowork and the Keystone desk as the local-first coder. (The earlier Qwen-based `lantern-sigma0-coder` is deprecated.)
+**Local coding model:** the local-first coder is **Qwen2.5-Coder** (#2171), served via Ollama on `:11434` and selected by the VRAM-gated registry (`apps/lantern-garage/lib/local-model-registry.js`); it's graded on HumanEval in [BENCHMARKS.md](docs/BENCHMARKS.md). **Ouro-1.4B is the Σ₀ kernel/research base and adapter host — not the coding engine:** its recurrent-depth "Ouro Coder" looping was measured **NEGATIVE** (#2178 — deeper looping adds no accuracy and is ~15× slower; the *adapter*, not the loop, is the capability), so it stays research-only. (Earlier docs had this inverted — claiming an Ouro coder superseded Qwen; the reverse is true.)
 
 ### 4. Don't re-read files you've already read
 

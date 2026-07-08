@@ -248,6 +248,7 @@ const routes = [
   require("./routes/media"), // Video/media streaming (range requests)
   require("./routes/rag"),
   require("./routes/operator"),
+  require("./routes/coding"),           // coding control-plane surface (#2185): route/verify/approve
   require("./routes/api-tools-log"),     // Tool execution logs
   require("./routes/files"),
   require("./routes/files-upload"),
@@ -281,6 +282,7 @@ const routes = [
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
   require("./routes/ibkr"),               // per-user IBKR connect/disconnect (ADR-0022)
+  require("./routes/indeed"),             // per-user Indeed OAuth connect (MCP connector)
   require("./routes/trading"),
   require("./routes/agent-performance"),
   require("./routes/leaderboard"),

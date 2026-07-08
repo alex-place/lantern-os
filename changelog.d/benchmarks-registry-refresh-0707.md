@@ -1,0 +1,1 @@
+docs(benchmarks): registry refresh 2026-07-07 — live SOTA re-validated (HumanEval/SWE-bench leaders unchanged; LongMemEval now MemPalace 96.6/OMEGA 95.4; HaluEval detection SOTA = hidden-state probing 98.5 AUROC), local HaluEval closed-book rows added (Ouro base 0.05 → honesty adapter 0.40), stale HumanEval chat-layer note fixed (full-164 chat cell filled at 0.829).

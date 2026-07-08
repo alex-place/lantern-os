@@ -250,6 +250,72 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "propose_coding_change",
+      "description": "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "What the change should do."
+          },
+          "repo_path": {
+            "type": "string",
+            "description": "Repo to change (default: this repo)."
+          },
+          "backend": {
+            "type": "string",
+            "description": "Force a backend (mock|ollama|aider|openhands); default routes by measured per-repo outcome."
+          }
+        },
+        "required": [
+          "task"
+        ]
+      },
+      "policy": "mutating",
+      "operator_required": true,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "job_search",
+      "description": "Search LIVE job openings from real job boards (Jobicy + Remotive) and return real apply URLs — never invent listings. A useful search needs a job TITLE or KEYWORD (the `query`): use the user's stated role, or a role you already know from their profile/history; if you don't know it, ask them what role/field they want before calling this. Defaults to REMOTE roles open to US applicants; pass `location` (a US city/state/ZIP, or a region like 'uk'/'europe'/'canada') to narrow. If the tool reports the boards are unreachable, tell the user rather than making up jobs.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Job title or keywords — REQUIRED, e.g. 'backend engineer', 'registered nurse', 'ux designer'"
+          },
+          "location": {
+            "type": "string",
+            "description": "Optional. US city/state/ZIP for a location, or a region ('uk','europe','canada'). Omit for remote roles open to US applicants (the default)."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max postings to return (1–15, default 6)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "github_issue",
       "description": "Look up a specific GitHub issue or pull request by number in this project's repo, returning its title, state, labels, and body. Use this whenever the user asks to find, show, view, read, or summarize an issue or PR by number (e.g. \"find issue #1342\", \"what's PR 1200 about\"). Do NOT grep the repo for issue numbers — issues live on GitHub, not in the files.",
       "input_schema": {

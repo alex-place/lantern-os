@@ -33,6 +33,7 @@ const { render: renderDocument, listTemplates: listDocTemplates } = require("./d
 const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
 const { getCreatorRuntime } = require("./creator-runtime");
+const jobSearch = require("./job-search");
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 // User workspace: outside the repo, for user artifacts (resumes, exports, generated docs).
@@ -340,6 +341,88 @@ const REGISTRY = {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);
         if (r.snippet) lines.push(`    snippet: ${r.snippet}`);
+      });
+      return lines.join("\n");
+    },
+  },
+
+  // ── Coding control plane (#2185): propose → verify → HOLD for approval ──────
+  // The idiomatic seam onto the coding backend (routes/coding.js is the HTTP twin).
+  // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
+  // never applies a repo change itself. Operator-only (policy: mutating).
+  propose_coding_change: {
+    policy: "mutating",
+    desc:
+      "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
+    schema: {
+      type: "object",
+      properties: {
+        task: { type: "string", description: "What the change should do." },
+        repo_path: { type: "string", description: "Repo to change (default: this repo)." },
+        backend: { type: "string", description: "Force a backend (mock|ollama|aider|openhands); default routes by measured per-repo outcome." },
+      },
+      required: ["task"],
+    },
+    async run(i) {
+      const task = String(i.task || "").trim();
+      if (!task) return "[error: task is required]";
+      const cb = require("./coding-backend");
+      const repoPath = i.repo_path || REPO;
+      let r;
+      try {
+        r = i.backend
+          ? await cb.runCodingTask({ task, repoPath, backend: String(i.backend), why: "chat tool" })
+          : await cb.routeCodingTask({ task, repoPath, candidates: cb.listBackends(), defaultBackend: "aider", why: "chat tool" });
+      } catch (e) {
+        return `[propose_coding_change error: ${e.message}]`;
+      }
+      if (!r || !r.ok) return `[propose_coding_change failed: ${(r && r.error) || "no proposal"}${r && r.hint ? " — " + r.hint : ""}]`;
+      const v = r.verification || {};
+      const files = (r.proposal && r.proposal.filesChanged) || [];
+      const verdict = v.decisive ? (v.passed === false ? "FAILED" : "passed") : "not decisive (guard-only)";
+      return [
+        `Proposed ${files.length} file change(s) via backend '${r.backend}' — HELD for approval (NOT applied).`,
+        files.length ? `Files: ${files.join(", ")}` : null,
+        `Verification: ${verdict}${v.enforce ? " [enforced]" : ""}${r.blocked ? " — BLOCKED from apply until overridden" : ""}`,
+        r.routing ? `Routing: ${r.routing.backend} (${r.routing.hasSignal ? "measured outcome" : "cold-start"})` : null,
+        `Pending id: ${r.pendingId} — approve via POST /api/coding/approve (operator).`,
+      ].filter(Boolean).join("\n");
+    },
+  },
+
+  // Live job-openings search. The user asks the assistant to find jobs (e.g. via the
+  // "🧭 Job search" chip, which just sends such a message) and the model calls this. It
+  // returns REAL current postings with real apply URLs from public job boards — never
+  // invents listings (Σ₀ External Reality Rule). guest_safe: read-only web data, no
+  // per-user state. If the model has no role yet, it should ask the user for one.
+  job_search: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Search LIVE job openings from real job boards (Jobicy + Remotive) and return real apply URLs — never invent listings. A useful search needs a job TITLE or KEYWORD (the `query`): use the user's stated role, or a role you already know from their profile/history; if you don't know it, ask them what role/field they want before calling this. Defaults to REMOTE roles open to US applicants; pass `location` (a US city/state/ZIP, or a region like 'uk'/'europe'/'canada') to narrow. If the tool reports the boards are unreachable, tell the user rather than making up jobs.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Job title or keywords — REQUIRED, e.g. 'backend engineer', 'registered nurse', 'ux designer'" },
+        location: { type: "string", description: "Optional. US city/state/ZIP for a location, or a region ('uk','europe','canada'). Omit for remote roles open to US applicants (the default)." },
+        limit: { type: "integer", description: "Max postings to return (1–15, default 6)" },
+      },
+      required: ["query"],
+    },
+    async run(i) {
+      const out = await jobSearch.searchJobs({ query: i.query, location: i.location, limit: i.limit });
+      if (out.needQuery) {
+        return "[job_search: no job title/keyword given. Ask the user what role or field they want to search for (and, optionally, a location or ZIP — otherwise it defaults to remote roles open to US applicants).]";
+      }
+      if (out.error) {
+        return `[job_search: the job boards are unreachable right now (${out.error}) — tell the user live search failed and to try again shortly. Do NOT fabricate listings.]`;
+      }
+      const where = out.location ? out.location : `remote · ${out.geo.toUpperCase()}-eligible`;
+      if (!out.count) return `[job_search: no live postings matched "${out.query}" (${where}) — suggest broader keywords or a different location.]`;
+      const lines = [`job_search("${out.query}", ${where}) via ${out.source} — ${out.count} live posting(s):\n`];
+      out.jobs.forEach((j, idx) => {
+        lines.push(`[${idx + 1}] ${j.title} — ${j.company}`);
+        lines.push(`    ${j.location}${j.salary ? ` · ${j.salary}` : ""}${j.posted ? ` · posted ${j.posted}` : ""}`);
+        lines.push(`    apply: ${j.url}`);
       });
       return lines.join("\n");
     },
