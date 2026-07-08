@@ -63,6 +63,10 @@ function postJson(endpoint, body, timeoutMs) {
     }
     const lib = u.protocol === "https:" ? https : http;
     const payload = Buffer.from(JSON.stringify(body));
+    const MAX_BYTES = 1024 * 1024; // cap the response so a huge/hostile body can't OOM us
+    // Hard overall deadline independent of socket activity, so a slow drip-feed
+    // cannot hold the call open past timeoutMs.
+    const hardTimer = setTimeout(() => req.destroy(new Error("minicheck timeout")), timeoutMs);
     const req = lib.request(
       u,
       {
@@ -72,8 +76,17 @@ function postJson(endpoint, body, timeoutMs) {
       },
       (res) => {
         let data = "";
-        res.on("data", (c) => (data += c));
+        let bytes = 0;
+        res.on("data", (c) => {
+          bytes += c.length;
+          if (bytes > MAX_BYTES) {
+            req.destroy(new Error("minicheck response too large"));
+            return;
+          }
+          data += c;
+        });
         res.on("end", () => {
+          clearTimeout(hardTimer);
           try {
             resolve({ status: res.statusCode, json: JSON.parse(data || "{}") });
           } catch (e) {
@@ -83,7 +96,10 @@ function postJson(endpoint, body, timeoutMs) {
       }
     );
     req.on("timeout", () => req.destroy(new Error("minicheck timeout")));
-    req.on("error", reject);
+    req.on("error", (e) => {
+      clearTimeout(hardTimer);
+      reject(e);
+    });
     req.end(payload);
   });
 }

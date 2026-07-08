@@ -16,6 +16,7 @@
 const fs = require("fs");
 const path = require("path");
 const { safeExec, tokenizeCommand } = require("../../safe-exec");
+const { resolveInsideRepo } = require("../fs-guard");
 
 function tail(s, n = 2000) {
   s = String(s || "");
@@ -56,18 +57,25 @@ async function runTests({ repoPath, files, task }, opts = {}) {
     return { name: "tests-run", skipped: true, reason: `repoPath not found: ${repoPath}` };
   }
 
-  // Snapshot original state of ONLY the proposal's files, then materialise them.
-  const snapshot = (files || []).map((f) => {
-    const abs = path.join(repoPath, f.path);
-    const existed = fs.existsSync(abs);
-    return { abs, existed, original: existed ? fs.readFileSync(abs) : null, content: f.content };
-  });
+  // Containment: refuse the WHOLE run if any proposal path escapes the repo — do
+  // not partially materialise. The verifier must never write outside the sandbox.
+  const snapshot = [];
+  for (const f of files || []) {
+    const g = resolveInsideRepo(repoPath, f.path);
+    if (!g.ok) {
+      return { name: "tests-run", skipped: true, reason: `refused: ${g.reason}` };
+    }
+    const existed = fs.existsSync(g.abs);
+    snapshot.push({ abs: g.abs, existed, original: existed ? fs.readFileSync(g.abs) : null, content: f.content });
+  }
 
   let passed;
   let evidence;
+  const createdDirs = []; // topmost dir we create per file → removed on restore
   try {
     for (const s of snapshot) {
-      fs.mkdirSync(path.dirname(s.abs), { recursive: true });
+      const firstCreated = fs.mkdirSync(path.dirname(s.abs), { recursive: true });
+      if (firstCreated) createdDirs.push(firstCreated);
       fs.writeFileSync(s.abs, s.content);
     }
     try {
@@ -80,27 +88,43 @@ async function runTests({ repoPath, files, task }, opts = {}) {
       passed = true;
       evidence = { cmd: cmd.label, exitCode: 0, tail: tail(out) };
     } catch (e) {
-      passed = false;
-      const timedOut = e.killed || e.signal === "SIGTERM";
-      evidence = {
-        cmd: cmd.label,
-        exitCode: e.status != null ? e.status : null,
-        timedOut: !!timedOut,
-        tail: tail(String(e.stdout || "") + String(e.stderr || "") + (timedOut ? "\n[timed out]" : "")),
-      };
+      // A maxBuffer overflow (huge-but-maybe-passing output) is UNDECIDABLE — the
+      // process may have exited 0. Don't report a false failure; skip instead.
+      if (e && (e.code === "ENOBUFS" || /maxBuffer/i.test(String(e.message)))) {
+        passed = undefined;
+        evidence = { cmd: cmd.label, reason: "test output exceeded buffer — cannot decide pass/fail" };
+      } else {
+        passed = false;
+        const timedOut = e.killed || e.signal === "SIGTERM";
+        evidence = {
+          cmd: cmd.label,
+          exitCode: e.status != null ? e.status : null,
+          timedOut: !!timedOut,
+          tail: tail(String(e.stdout || "") + String(e.stderr || "") + (timedOut ? "\n[timed out]" : "")),
+        };
+      }
     }
   } finally {
-    // Restore: put every touched file back exactly, delete files we created.
+    // Restore: put every touched file back exactly, delete files we created…
     for (const s of snapshot) {
       try {
         if (s.existed) fs.writeFileSync(s.abs, s.original);
         else if (fs.existsSync(s.abs)) fs.unlinkSync(s.abs);
       } catch {
-        /* best-effort restore; a failure here is logged by the caller's evidence */
+        /* best-effort restore; a failure here is surfaced via evidence */
+      }
+    }
+    // …and remove any directories we created so the tree is left as found.
+    for (const d of createdDirs) {
+      try {
+        fs.rmSync(d, { recursive: true, force: true });
+      } catch {
+        /* best-effort */
       }
     }
   }
 
+  if (passed === undefined) return { name: "tests-run", skipped: true, reason: evidence.reason, evidence };
   return { name: "tests-run", decisive: true, skipped: false, passed, evidence };
 }
 

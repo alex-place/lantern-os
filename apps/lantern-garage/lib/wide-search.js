@@ -35,6 +35,40 @@ const { extractKeywords } = require("./autowork-research");
 let callLlm = null;
 try { ({ callLlm } = require("./self-edit-engine")); } catch (_e) { /* optional — runs degraded */ }
 
+// Local arXiv corpus — post-cutoff AI/ML papers, retrieved by BM25 from drive F:.
+// Optional + fail-safe: any load/parse error yields [] so a missing corpus never
+// blocks web research. queryArxiv() self-gates to AI-research questions, so it
+// contributes nothing on non-AI topics.
+let queryArxiv = null;
+try { ({ queryArxiv } = require("./arxiv-index")); } catch (_e) { /* corpus lib absent — web only */ }
+
+// How many local papers to fold into the pool (0 disables). Kept small: these are
+// high-signal, already-relevant sources, and they compete with web results in the
+// same low-pass prune, so a few good ones beat flooding the context.
+const ARXIV_K = parseInt(process.env.WIDE_SEARCH_ARXIV_K || "4", 10);
+const ARXIV_ENABLED = process.env.WIDE_SEARCH_ARXIV !== "0" && ARXIV_K > 0;
+
+/**
+ * Pull local arXiv papers relevant to the query and shape them like web pool items
+ * (title/url/snippet/via) so the rest of the loop treats them as ordinary sources —
+ * same prune, same [n] citation, same confidence math. `via: "arxiv:<id>"` keeps them
+ * auditable as local-corpus grounding rather than web hits.
+ */
+function localArxivSources(query) {
+  if (!ARXIV_ENABLED || typeof queryArxiv !== "function") return [];
+  try {
+    const papers = queryArxiv(query, ARXIV_K) || [];
+    return papers.map((p) => ({
+      title: p.title || p.id,
+      url: p.url || `https://arxiv.org/abs/${p.id}`,
+      snippet: `${p.snippet || ""}${p.published ? ` (arXiv ${p.id}, ${p.published})` : ` (arXiv ${p.id})`}`,
+      via: [`arxiv:${p.id}`],
+    }));
+  } catch (_e) {
+    return [];
+  }
+}
+
 // Default fidelity ladder: cheap/local first, stronger model for synthesis only.
 // "auto" cascades Vertex → Claude → Gemini → … (whatever has funded quota).
 const LOW = process.env.WIDE_SEARCH_LOW_PROVIDER || "ollama";
@@ -254,6 +288,18 @@ async function wideSearch(o) {
 
   emit("observe", "fanning_out", { count: subqueries.length, perQuery });
   const pool = await fanOut(subqueries, { perQuery, emit });
+
+  // Fold in local arXiv grounding (post-cutoff AI papers), deduped by URL against the
+  // web pool so a paper that also surfaced on the web isn't double-counted.
+  const localPapers = localArxivSources(q);
+  if (localPapers.length) {
+    const seen = new Set(pool.map((s) => s.url));
+    let added = 0;
+    for (const p of localPapers) {
+      if (p.url && !seen.has(p.url)) { pool.push(p); seen.add(p.url); added += 1; }
+    }
+    emit("observe", "local_arxiv", { found: localPapers.length, added });
+  }
   emit("observe", "pool", { totalSources: pool.length });
 
   if (!pool.length) {

@@ -707,6 +707,99 @@ def discrete_dichotomy_certificate(A: Tensor, delta: float = 0.0,
     )
 
 
+@dataclass
+class JsrrCertificate:
+    """Jacobian Spectral Radius acceptance gate for the discrete loop x_{k+1}=A x_k.
+
+    Ports the stability criterion validated externally on real looped LLMs — STARS,
+    "Stabilizing Recurrent Dynamics for Test-Time Scalable Latent Reasoning in Looped
+    Language Models" (arXiv:2605.26733): a recurrent fixed point h* is asymptotically
+    stable iff ρ(J(h*)) < 1, and STARS trains toward it by penalising the JSRR loss
+    ‖J v‖₂² (their Eq. 3) estimated by single-step power iteration on a Jacobian-vector
+    product. Here the loop's empirical exit-depth Jacobian A is already materialised, so
+    ρ is taken EXACTLY from its eigen-moduli (the canonical discrete-family computation,
+    shared with discrete_dichotomy_certificate); the STARS single-step surrogate is
+    reported alongside for continuity with a JVP-only training/serving path (the matvec
+    form lives in experiments/sigma0_jacobian_stability.py, #2029).
+    """
+    spectral_radius: float      # exact ρ(A)=max|λ| — the discrete asymptotic-stability criterion
+    radius_estimate: float      # STARS single-step power-iteration proxy ‖A v‖₂ (‖v‖=1)
+    spectral_norm: float        # σ_max=‖A‖₂ — the quantity the surrogate bounds (ρ ≤ σ_max always)
+    penalty: float              # STARS JSRR loss surrogate ‖A v‖₂² (Eq. 3); reusable as a regulariser
+    margin: float               # safety band: stable demands ρ < 1 − margin
+    stable: bool                # ρ < 1 − margin  → accept (asymptotically stable fixed point)
+    regime: str                 # 'contraction' (ρ<1) | 'critical' (ρ≈1) | 'divergent' (ρ>1)
+
+    def summary(self) -> str:
+        return (f"JSRR: ρ={self.spectral_radius:.4f} (‖Av‖≈{self.radius_estimate:.4f}, "
+                f"σ_max={self.spectral_norm:.4f}) {self.regime} → "
+                f"{'ACCEPT' if self.stable else 'reject'} (margin {self.margin:g})")
+
+
+@torch.no_grad()
+def jsrr_certificate(A: Tensor, margin: float = 0.0, seed: int = 0) -> JsrrCertificate:
+    """Discrete spectral-radius acceptance gate (JSRR / STARS, arXiv:2605.26733).
+
+    Accept iff ρ(A) < 1 − `margin`, where ρ is the exact largest eigen-modulus of the
+    (mean) Jacobian A. Unlike the continuous #768 gates (stability_gates), which certify
+    contraction of e^{tA} and conservatively over-reject non-normal A with transient
+    growth, this is the DISCRETE criterion appropriate to an iterated recurrent loop —
+    the same object STARS regularises on real looped LLMs. numpy-only (no scipy), so it
+    is importable in the minimal inference venv; never raises (nan-safe verdict on a
+    degenerate A). `margin=0` is STARS' literal ρ<1; a small band (~0.05) rejects states
+    hugging the critical circle, and CART (arXiv:2606.01495) found trained gates settle
+    ρ∈[0.79,0.83], i.e. comfortably inside a 0.05 band.
+    """
+    import numpy as np
+    Abar = A.mean(0) if A.dim() == 3 else A
+    M = Abar.detach().cpu().numpy().astype(float)
+
+    # exact discrete spectral radius ρ = max|λ| (canonical; shares the eigvals path with
+    # discrete_dichotomy_certificate). σ_max = largest singular value ≥ ρ, the bound the
+    # STARS single-step surrogate ‖Av‖ approximates from below.
+    try:
+        rho = float(np.abs(np.linalg.eigvals(M)).max())
+    except Exception:
+        rho = float("nan")
+    try:
+        spectral_norm = float(np.linalg.svd(M, compute_uv=False).max())
+    except Exception:
+        spectral_norm = float("nan")
+
+    # STARS single-step power iteration on a random unit v: estimate ‖Av‖ (radius proxy)
+    # and the JSRR training-loss surrogate ‖Av‖² (Eq. 3). One step matches STARS exactly;
+    # it is a σ_max estimate (a ρ upper bound), reported for parity with the JVP-only path.
+    try:
+        rng = np.random.RandomState(seed)
+        v = rng.randn(M.shape[0])
+        v = v / (np.linalg.norm(v) or 1.0)
+        Av = M @ v
+        radius_estimate = float(np.linalg.norm(Av))
+        penalty = float(radius_estimate ** 2)
+    except Exception:
+        radius_estimate, penalty = float("nan"), float("nan")
+
+    # regime + verdict (mirrors experiments/sigma0_jacobian_stability.stability_verdict)
+    if rho != rho:                       # nan ⇒ cannot certify → do not accept
+        regime, stable = "divergent", False
+    elif abs(rho - 1.0) < 1e-9:
+        regime, stable = "critical", (rho < 1.0 - margin)
+    elif rho < 1.0:
+        regime, stable = "contraction", (rho < 1.0 - margin)
+    else:
+        regime, stable = "divergent", False
+
+    return JsrrCertificate(
+        spectral_radius=rho,
+        radius_estimate=radius_estimate,
+        spectral_norm=spectral_norm,
+        penalty=penalty,
+        margin=float(margin),
+        stable=bool(stable),
+        regime=regime,
+    )
+
+
 @torch.no_grad()
 def lyapunov_value(x: Tensor, A: Tensor, eig_eps: float = 1e-2) -> float:
     """V(x) = ½‖P_M x‖² — energy in the active (non-null) subspace of A_s."""

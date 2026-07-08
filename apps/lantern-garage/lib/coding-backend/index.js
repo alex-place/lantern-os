@@ -122,10 +122,16 @@ async function runCodingTask({ task, repoPath, backend = "aider", why = "", repo
   // router reads as the authoritative outcome. Never throws (adapters degrade to
   // skipped). Policy (enforce / runTests) is configurable via opts.verify + env.
   const verifier = require("./verifier");
-  const verdict = await verifier.verifyProposal(
-    { repoPath, files, task, taskType: _taskType, patchPreview, backend },
-    opts.verify || {}
-  );
+  let verdict;
+  try {
+    verdict = await verifier.verifyProposal(
+      { repoPath, files, task, taskType: _taskType, patchPreview, backend },
+      opts.verify || {}
+    );
+  } catch (e) {
+    // The verifier must never sink a proposal; degrade to an undecisive verdict.
+    verdict = { passed: null, decisive: false, enforce: false, error: `verifier failed: ${e.message}`, checks: [] };
+  }
   const blocked = verifier.isBlocked(verdict);
 
   // The receipt — the accountable artifact no raw coding agent emits.
@@ -198,12 +204,15 @@ async function approveCodingPatch(pendingId, opts = {}) {
   }
 
   const { repoPath, files, receiptId } = rec.input;
+  const { resolveInsideRepo } = require("./fs-guard");
   const applied = [];
   try {
     for (const f of files) {
-      const abs = path.join(repoPath, f.path);
-      fs.mkdirSync(path.dirname(abs), { recursive: true });
-      fs.writeFileSync(abs, f.content);
+      // Containment: a proposal path must never write outside the repo.
+      const g = resolveInsideRepo(repoPath, f.path);
+      if (!g.ok) throw new Error(g.reason);
+      fs.mkdirSync(path.dirname(g.abs), { recursive: true });
+      fs.writeFileSync(g.abs, f.content);
       applied.push(f.path);
     }
   } catch (e) {

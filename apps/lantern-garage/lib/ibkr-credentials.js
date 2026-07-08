@@ -15,7 +15,15 @@ const fs = require('fs');
 const path = require('path');
 const IbkrOAuth1 = require('./ibkr-oauth1');
 
-const DIR = path.join(process.cwd(), 'data', 'ibkr-credentials');
+// Resolve the store relative to THIS module (apps/lantern-garage/data), NOT the
+// process cwd — otherwise a server started from the repo root vs. apps/lantern-garage
+// looks in different places and can't find creds saved by the other, showing a
+// spurious "Connect broker" / hasCredentials:false. An explicit IBKR_CRED_DIR wins.
+// A legacy cwd-relative dir is honored read-only so pre-existing creds still load.
+const DIR = process.env.IBKR_CRED_DIR
+  ? path.resolve(process.env.IBKR_CRED_DIR)
+  : path.join(__dirname, '..', 'data', 'ibkr-credentials');
+const LEGACY_DIR = path.join(process.cwd(), 'data', 'ibkr-credentials');
 const REQUIRED = ['consumerKey', 'accessToken', 'accessTokenSecret', 'signaturePem', 'encryptionPem', 'dhPrime'];
 
 function _key() {
@@ -34,7 +42,16 @@ function _decrypt(blob) {
   const pt = Buffer.concat([d.update(Buffer.from(blob.ct, 'base64')), d.final()]);
   return JSON.parse(pt.toString('utf8'));
 }
-function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)) + '.enc.json'); }
+function _name(userId) { return encodeURIComponent(String(userId)) + '.enc.json'; }
+function _file(userId) { return path.join(DIR, _name(userId)); }
+// The path to READ from: the canonical location, or the legacy cwd-relative one if
+// that's where a pre-fix server saved it. Writes always go to the canonical DIR.
+function _readFile(userId) {
+  const primary = _file(userId);
+  if (fs.existsSync(primary)) return primary;
+  const legacy = path.join(LEGACY_DIR, _name(userId));
+  return legacy !== primary && fs.existsSync(legacy) ? legacy : primary;
+}
 
 /** Validate + normalize an incoming credentials payload. Returns {creds}|{error}. */
 function normalize(input) {
@@ -62,10 +79,10 @@ function save(userId, creds) {
   fs.writeFileSync(_file(userId), JSON.stringify(_encrypt(creds)), { mode: 0o600 });
 }
 function load(userId) {
-  try { return _decrypt(JSON.parse(fs.readFileSync(_file(userId), 'utf8'))); }
+  try { return _decrypt(JSON.parse(fs.readFileSync(_readFile(userId), 'utf8'))); }
   catch (e) { return null; }
 }
-function has(userId) { return fs.existsSync(_file(userId)); }
+function has(userId) { return fs.existsSync(_readFile(userId)); }
 function remove(userId) { try { fs.unlinkSync(_file(userId)); return true; } catch { return false; } }
 
 /** Build an IbkrOAuth1 signer for a user, or null if not connected / unreadable. */

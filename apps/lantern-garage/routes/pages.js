@@ -95,7 +95,7 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   if (PUBLIC_PAGES[pathname]) {
     const filePath = path.join(deps.publicRoot, PUBLIC_PAGES[pathname]);
     if (fs.existsSync(filePath)) {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate" });
       res.end(require("../lib/desktop-heartbeat").injectHeartbeat(fs.readFileSync(filePath, "utf-8")));
       return true;
     }
@@ -113,7 +113,7 @@ module.exports = async function pagesRoute(req, res, url, deps) {
 
     const filePath = path.join(deps.publicRoot, page.file);
     if (fs.existsSync(filePath)) {
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate" });
       res.end(require("../lib/desktop-heartbeat").injectHeartbeat(fs.readFileSync(filePath, "utf-8")));
       return true;
     }
@@ -124,7 +124,7 @@ module.exports = async function pagesRoute(req, res, url, deps) {
     const filePath = path.join(deps.publicRoot, pathname.slice(1));
     if (fs.existsSync(filePath)) {
       if (!requireAuth(req, res)) return true;
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate" });
       res.end(require("../lib/desktop-heartbeat").injectHeartbeat(fs.readFileSync(filePath, "utf-8")));
       return true;
     }

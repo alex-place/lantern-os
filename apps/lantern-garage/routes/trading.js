@@ -55,6 +55,8 @@ function _isUsMarketHours() {
   const mins = et.getHours() * 60 + et.getMinutes();
   return mins >= 570 && mins < 960;              // 09:30 (570) .. 16:00 (960) ET
 }
+const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
 // Overnight (market-closed) scanning is OFF by default — off-hours the only thing
 // to scan is crypto, and the user mostly wants it idle overnight. Flip on via the
@@ -73,6 +75,16 @@ async function _autoscanTick() {
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
       if (n) console.log(`[Trading] autoscan — ${n} signal(s)`);
+      // Act stage: autonomously execute the ENTER verdicts on the owner's IBKR
+      // account. No-op unless TRADER_AUTO_EXECUTE=1 (separate from manual arming);
+      // every order still passes the hard guard. Stocks only during market hours.
+      if (marketHours) {
+        const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: process.env.TRADER_AUTO_USER || 'local-owner' });
+        for (const e of (at.executed || [])) {
+          console.log(`[AutoTrader] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status} (p_win=${e.p_win})`);
+        }
+        if (at.enabled && !(at.executed || []).length && at.reason) console.log(`[AutoTrader] no action — ${at.reason}`);
+      }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
@@ -378,8 +390,19 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   }
 
   // GET /api/trading/positions
-  // Open positions from Alpaca
+  // Prefer the user's connected IBKR account (per-user OAuth, ADR-0022) so the
+  // header equity / Day P&L and the summary row reflect the broker they linked.
+  // Falls back to the legacy Alpaca traderAgent when no IBKR account is connected.
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
+    try {
+      const uid = getEffectiveUserId(req);
+      const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
+      if (ibkrAccount) {
+        const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
+        return true;
+      }
+    } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);
       return true;
@@ -548,7 +571,13 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
         sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
         return true;
       }
-      const result = await traderAgent.placeOrder({ ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit });
+      // Prefer the user's connected IBKR account (per-user OAuth) so BUY/SELL on the
+      // trader page trades the account shown in the header. Falls back to the legacy
+      // agent when no IBKR account is linked. Order is HARD-GATED inside placeOrder.
+      const uid = getEffectiveUserId(req);
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
+        || await traderAgent.placeOrder(orderReq);
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
@@ -580,6 +609,17 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
     const klass = (url.searchParams.get('class') || '').trim();   // optional filter: us_equity | crypto
     const limit = Math.min(60, parseInt(url.searchParams.get('limit'), 10) || 30);
     try {
+      // Prefer the connected IBKR account's own contract search — makes ANY tradable
+      // US stock/ETF findable (not just a seed list), and only shows tradable names.
+      // Falls back to the Yahoo probe below when no IBKR account is linked. Skip for
+      // the crypto filter (IBKR crypto isn't tradable on this account).
+      if (q && klass !== 'crypto') {
+        const ibkr = await bridge.searchIBKRSymbols(getEffectiveUserId(req), q).catch(() => null);
+        if (Array.isArray(ibkr) && ibkr.length) {
+          sendJson(res, { results: ibkr.slice(0, limit), total: ibkr.length, query: q, source: 'ibkr' }, 200);
+          return true;
+        }
+      }
       const assets = await traderAgent.getAllAssets();
       let pool = klass ? assets.filter((a) => a.class === klass) : assets;
       let results;
@@ -2119,6 +2159,32 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { records, count: records.length }, 200);
     } catch (error) {
       sendJson(res, { error: 'News query failed', details: error.message, records: [] }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/news/sentiment?ticker=SPY&windowHours=48
+  // Directional (bullish/bearish) news sentiment for a symbol over a recent window
+  // — the Reason/Verify input the trader can weight. Omit ticker for the whole
+  // watchlist (one aggregate per ticker).
+  if (url.pathname === '/api/trading/news/sentiment' && req.method === 'GET') {
+    try {
+      const windowHours = Number(url.searchParams.get('windowHours')) || 48;
+      const ticker = (url.searchParams.get('ticker') || '').trim();
+      if (ticker) {
+        sendJson(res, tradingNews.symbolSentiment(ticker, { windowHours }), 200);
+        return true;
+      }
+      // No ticker → aggregate across the watchlist.
+      const fs = require('fs'); const path = require('path');
+      const wlPath = path.resolve(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
+      let tickers = [];
+      try { tickers = (JSON.parse(fs.readFileSync(wlPath, 'utf8')).tickers || []); } catch { /* empty */ }
+      tickers = tickers.filter((t) => /^[A-Z]{1,5}$/.test(t));
+      const symbols = tickers.map((t) => tradingNews.symbolSentiment(t, { windowHours }));
+      sendJson(res, { window_hours: windowHours, symbols }, 200);
+    } catch (error) {
+      sendJson(res, { error: 'sentiment query failed', details: error.message }, 500);
     }
     return true;
   }

@@ -192,6 +192,16 @@ def selftest():
     print(f"[selftest] fenced wrong reply   -> pass={ok} (want False)")
     fails += 1 if ok else 0
 
+    # #2194 regression: the model writes a top-level import ABOVE the function.
+    # It must be hoisted into the candidate, not dropped (else NameError = false miss).
+    imp_prompt = ('from typing import List\n\n\ndef total(nums: List[int]) -> int:\n    """Sum the list using reduce."""\n')
+    imp_test = "def check(candidate):\n    assert candidate([1, 2, 3]) == 6\n    assert candidate([]) == 0\n"
+    imp_reply = "```python\nfrom functools import reduce\n\ndef total(nums):\n    return reduce(lambda a, b: a + b, nums, 0)\n```"
+    cand = make_candidate(imp_reply, "total", imp_prompt)
+    ok, note = run_test(cand, imp_test, "total")
+    print(f"[selftest] import-above-fn (#2194) -> pass={ok} ({note})")
+    fails += 0 if ok else 1
+
     # SSE parse: the REAL live wire format (data: {"type":"token","text":...}).
     raw = ('data: {"type":"route","agent":"keystone"}\n\n'
            'data: {"type":"token","text":"```python\\ndef add(a, b):\\n    return a + b\\n```"}\n\n'

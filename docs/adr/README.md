@@ -89,5 +89,7 @@ against the *merged* master, not your branch's base.
 | [0022](0022-ibkr-per-user-self-service-oauth.md) | Per-user IBKR connection via self-service OAuth 1.0a | Accepted (operator-directed, 2026-07-05) — explicit approval record pending |
 | [0023](0023-default-profile-foregrounds-the-loop.md) | The default profile foregrounds the loop — extensions are opt-in behind flags | Proposed (awaiting Alex's approval) |
 | [0024](0024-sigma0-frontier-training-program.md) | Σ₀ frontier training program — honesty-native pretraining, phased PILOT→BASE→FRONTIER with kill-gates; certificate as training-time spec; distills to the ≤8GB serving artifact | Proposed (awaiting Alex's approval) |
+| [0025](0025-rlvr-dreaming-continual-updates-double-gated.md) | RLVR + generative-replay ("dreaming") continual weight updates, double-gated by a frozen exec-holdout (load-bearing) + the Σ₀ stability cert (cheap early-abort); the mechanism for ADR-0010's verify-gated last-resort path | Accepted (Alex Place, 2026-07-07) |
+| [0026](0026-ternary-serving-artifact-distillation-target.md) | Ternary (1.58-bit / W1.58A8) as the distillation-target format for the ≤8GB serving artifact — BitDistill-style QAT-distill from the FP teacher, accepted by the Σ_θ gate, served as a layer-level kernel swap inside the custom Ouro loop (resolves ADR-0024 Phase-2 / D7) | Accepted (Alex Place, 2026-07-07) |
 
 <!-- Add new ADRs to this table on merge. -->
