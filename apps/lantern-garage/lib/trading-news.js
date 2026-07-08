@@ -240,6 +240,21 @@ function queryNewsTradeRelations({ ticker = "", limit = 50 } = {}) {
  * @param {{ windowHours?: number, limit?: number }} opts
  * @returns {{ ticker, n, bullish, bearish, neutral, net_score, label, impact_weighted_score, latest }}
  */
+// Source credibility multiplier (Tier-1, Step 1). Wire services / exchange feeds
+// are the most reliable; a bare/unknown source is discounted. Substring match on
+// the source name, case-insensitive.
+const SOURCE_TIERS = [
+  [1.4, /reuters|bloomberg|associated press|\bap\b|wall street journal|wsj|financial times|\bft\b|cnbc|dow jones|marketwatch|barron/i],
+  [1.2, /finnhub|alpha ?vantage|nasdaq|nyse|sec\b|edgar|yahoo finance|seeking ?alpha|the motley fool|motley fool|investor|benzinga/i],
+  [0.7, /reddit|twitter|\bx\.com|blog|substack|medium|discord|telegram/i],
+];
+function sourceCredibility(source) {
+  const s = String(source || "");
+  if (!s) return 0.85; // unattributed → mild discount, not zero
+  for (const [w, re] of SOURCE_TIERS) if (re.test(s)) return w;
+  return 1.0; // known-but-unranked source → neutral
+}
+
 function symbolSentiment(ticker, { windowHours = 48, limit = 200 } = {}) {
   const sym = String(ticker || "").toUpperCase();
   const cutoff = Date.now() - windowHours * 3600 * 1000;
@@ -255,7 +270,9 @@ function symbolSentiment(ticker, { windowHours = 48, limit = 200 } = {}) {
       : scoreDirection(r.headline || "").direction_score;
     if (d === "bullish") bullish++; else if (d === "bearish") bearish++; else neutral++;
     scoreSum += ds;
-    const w = 1 + (Number(r.impact) || 0) / 100; // higher-impact news weighs more
+    // Weight by impact AND source credibility (Tier-1 Step 1): a wire-service /
+    // exchange-feed headline counts more than an unattributed blog. Was uniform.
+    const w = (1 + (Number(r.impact) || 0) / 100) * sourceCredibility(r.source);
     weightedSum += ds * w; weightSum += w;
   }
   const n = items.length;
