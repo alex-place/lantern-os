@@ -75,7 +75,71 @@ function adaptiveRsiThresholds(closes) {
   };
 }
 
-module.exports = { rsi, rsiSeries, adaptiveRsiThresholds, RSI_FALLBACK };
+// ── EMA / MACD / volume (Tier-1 confirmation signals) ───────────────────────
+/** Exponential moving average series over `values` (period). [] if too short. */
+function emaSeries(values, period) {
+  if (!Array.isArray(values) || values.length < period) return [];
+  const k = 2 / (period + 1);
+  let ema = values.slice(0, period).reduce((a, b) => a + b, 0) / period; // seed = SMA
+  const out = [ema];
+  for (let i = period; i < values.length; i++) { ema = values[i] * k + ema * (1 - k); out.push(ema); }
+  return out;
+}
+
+/** MACD(fast,slow,signal) over closes → { macd, signal, histogram } (latest values),
+ *  or null when there aren't enough bars. Histogram sign/curl is the confirmation. */
+function macd(closes, fast = 12, slow = 26, signalP = 9) {
+  if (!Array.isArray(closes) || closes.length < slow + signalP) return null;
+  const ef = emaSeries(closes, fast);
+  const es = emaSeries(closes, slow);
+  // align the two EMA series to the same (later) start
+  const off = ef.length - es.length;
+  const macdLine = es.map((v, i) => ef[i + off] - v);
+  const sig = emaSeries(macdLine, signalP);
+  if (!sig.length) return null;
+  const m = macdLine[macdLine.length - 1];
+  const s = sig[sig.length - 1];
+  return { macd: m, signal: s, histogram: m - s };
+}
+
+/** Price vs its SMA(period): +1 above, -1 below, 0 flat/insufficient. */
+function priceVsSma(closes, period = 20) {
+  if (!Array.isArray(closes) || closes.length < period) return 0;
+  const sma = closes.slice(-period).reduce((a, b) => a + b, 0) / period;
+  const last = closes[closes.length - 1];
+  if (last > sma * 1.001) return 1;
+  if (last < sma * 0.999) return -1;
+  return 0;
+}
+
+/** Recent volume vs its own average → ratio (1 = normal, >1 = spike). Uses the
+ *  last bar's volume against the trailing `lookback` average. 1 when unavailable. */
+function volumeRatio(bars, lookback = 20) {
+  if (!Array.isArray(bars) || bars.length < 3) return 1;
+  const vols = bars.map((b) => Number(b.volume) || 0).filter((v) => v > 0);
+  if (vols.length < 3) return 1;
+  const recent = vols[vols.length - 1];
+  const window = vols.slice(-Math.min(lookback + 1, vols.length), -1);
+  const avg = window.reduce((a, b) => a + b, 0) / (window.length || 1);
+  return avg > 0 ? recent / avg : 1;
+}
+
+/** Average True Range over OHLC bars (period). Used to size stops/targets and
+ *  estimate a holding horizon. 0 when unavailable. */
+function atr(bars, period = 14) {
+  if (!Array.isArray(bars) || bars.length < 2) return 0;
+  const trs = [];
+  for (let i = 1; i < bars.length; i++) {
+    const h = Number(bars[i].high), l = Number(bars[i].low), pc = Number(bars[i - 1].close);
+    if (![h, l, pc].every(Number.isFinite)) continue;
+    trs.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+  }
+  if (!trs.length) return 0;
+  const w = trs.slice(-period);
+  return w.reduce((a, b) => a + b, 0) / w.length;
+}
+
+module.exports = { rsi, rsiSeries, adaptiveRsiThresholds, RSI_FALLBACK, emaSeries, macd, priceVsSma, volumeRatio, atr };
 
 if (require.main === module) {
   // Rising, oscillating series → RSI should sit above 50; bands straddle it.

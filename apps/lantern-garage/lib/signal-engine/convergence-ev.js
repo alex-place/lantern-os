@@ -30,6 +30,9 @@ const WEIGHTS = {
   pattern: 0.12, // A/B/C candle pattern grade
   trend: 0.1, // higher-tf trend agrees with the trade direction
   news: 0.1, // ticker news sentiment agrees with direction
+  volume: 0.07, // volume spike confirms the move (Tier-1)
+  momentum: 0.1, // MACD histogram + price-vs-MA agree with direction (Tier-1)
+  earnings: 0.11, // last reported EPS surprise vs consensus agrees with direction (Tier-2)
   backtest: 0.0, // folded into base_rate instead (see below)
 };
 
@@ -236,7 +239,24 @@ function scoreConvergence(ev, weights = null) {
   const signed = direction === "BULLISH" ? raw_news : direction === "BEARISH" ? -raw_news : 0.0;
   const news = _clamp(0.5 + 0.5 * signed, 0.0, 1.0);
 
-  const signals = { grok, claude, zone, structure, pattern, trend, news };
+  // Volume confirmation (framework Step 4): a spike behind the move is conviction,
+  // thin volume is weak. Non-directional — it strengthens or softens the setup.
+  const vr = _num(ev.volume_ratio);
+  const volume = vr == null ? 0.5 : _clamp(0.5 + 0.35 * Math.tanh(vr - 1), 0.15, 0.9);
+
+  // Momentum confirmation (Step 5): MACD histogram + price-vs-MA, each signed to
+  // the trade direction. Agreement lifts, disagreement cuts.
+  const dirSign = direction === "BULLISH" ? 1 : direction === "BEARISH" ? -1 : 0;
+  const agree = (v) => (dirSign === 0 || !v ? 0 : Math.sign(v) === dirSign ? 1 : -1);
+  const momentum = _clamp(0.5 + 0.22 * agree(_num(ev.macd_hist)) + 0.16 * agree(_num(ev.ma_signal)), 0.1, 0.9);
+
+  // Earnings surprise (framework Step 3 — the beat/miss vs consensus, "more
+  // important than the headline"). Signed % → signal via tanh (±15% saturates).
+  const surp = _num(ev.earnings_surprise);
+  const surpSigned = surp == null ? 0 : (direction === "BULLISH" ? surp : direction === "BEARISH" ? -surp : 0);
+  const earnings = surp == null ? 0.5 : _clamp(0.5 + 0.5 * Math.tanh(surpSigned / 15), 0.05, 0.95);
+
+  const signals = { grok, claude, zone, structure, pattern, trend, news, volume, momentum, earnings };
 
   // ── p_win = base_rate + Σ wᵢ·(signalᵢ − 0.5) ──────────────────────────────
   // `weights` lets the caller pass realized-edge-adapted weights (adaptWeights);
@@ -273,6 +293,9 @@ function scoreConvergence(ev, weights = null) {
     claude: "Claude conviction",
     zone: "zone",
     structure: "1-min structure",
+    volume: "volume",
+    momentum: "momentum (MACD/MA)",
+    earnings: "earnings surprise",
     pattern: "pattern",
     trend: "trend",
     news: "news",

@@ -165,6 +165,69 @@ function cacheSet(key, data) {
   _cache.set(key, { data, time: Date.now() });
 }
 
+// ── Earnings surprise (Tier-2: actual EPS vs consensus) ─────────────────────
+// Yahoo's quoteSummary now needs a cookie+crumb; fetch once and reuse. Keyless.
+let _crumb = null; // { crumb, cookie, time }
+function _rawGet(url, headers) {
+  return new Promise((resolve) => {
+    const req = https.request(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0)', Accept: 'application/json,*/*', ...(headers || {}) } }, (res) => {
+      let d = '';
+      res.on('data', (c) => (d += c));
+      res.on('end', () => resolve({ status: res.statusCode, body: d, headers: res.headers }));
+    });
+    req.on('error', () => resolve({ status: 0 }));
+    req.setTimeout(REQUEST_TIMEOUT, () => req.destroy());
+    req.end();
+  });
+}
+async function _getCrumb(force) {
+  if (!force && _crumb && Date.now() - _crumb.time < 6 * 3600 * 1000) return _crumb;
+  const c1 = await _rawGet('https://fc.yahoo.com/');
+  const cookie = ((c1.headers && c1.headers['set-cookie']) || []).map((s) => s.split(';')[0]).join('; ');
+  if (!cookie) return null;
+  const cr = await _rawGet('https://query1.finance.yahoo.com/v1/test/getcrumb', { Cookie: cookie });
+  if (cr.status !== 200 || !cr.body || /[<{]/.test(cr.body)) return null;
+  _crumb = { crumb: cr.body.trim(), cookie, time: Date.now() };
+  return _crumb;
+}
+
+/**
+ * Latest reported earnings surprise for a US equity (keyless Yahoo quoteSummary).
+ * Returns { surprisePct, epsActual, epsEstimate, quarter } or null. surprisePct is
+ * signed (%): + = beat, − = miss. Cached 6h (earnings are quarterly). Framework
+ * Step 3 — "the beat/miss vs expectations matters more than the headline itself."
+ */
+async function getEarningsSurprise(ticker) {
+  const sym = tickerToYahoo(ticker);
+  if (isCrypto(ticker) || !/^[A-Z.]{1,6}$/.test(sym)) return null;
+  const key = `earn_${sym}`;
+  const hit = cacheGet(key, 6 * 3600 * 1000);
+  if (hit !== null) return hit;
+  const doFetch = async (retry) => {
+    const cr = await _getCrumb(retry);
+    if (!cr) return null;
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=earningsHistory&crumb=${encodeURIComponent(cr.crumb)}`;
+    const r = await _rawGet(url, { Cookie: cr.cookie });
+    if (r.status === 401 && !retry) return doFetch(true); // stale crumb → refresh once
+    if (r.status !== 200) return null;
+    try {
+      const hist = JSON.parse(r.body).quoteSummary.result[0].earningsHistory.history;
+      const rows = (hist || []).filter((h) => h && h.epsActual && h.epsEstimate);
+      const last = rows[rows.length - 1]; // most recent quarter
+      if (!last) return null;
+      const act = last.epsActual.raw, est = last.epsEstimate.raw;
+      const surprisePct = last.surprisePercent && last.surprisePercent.raw != null
+        ? last.surprisePercent.raw * 100
+        : (est ? ((act - est) / Math.abs(est)) * 100 : 0);
+      return { surprisePct: round(surprisePct, 1), epsActual: act, epsEstimate: est, quarter: (last.quarter && last.quarter.fmt) || null };
+    } catch (_e) { return null; }
+  };
+  let out = null;
+  try { out = await doFetch(false); } catch (_e) { out = null; }
+  cacheSet(key, out); // cache null too (avoid hammering on a symbol with no data)
+  return out;
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -351,5 +414,6 @@ async function validateSymbol(ticker) {
 
 module.exports = {
   getQuotes, getBars, getBarsMulti, getMarketStatus, validateSymbol,
+  getEarningsSurprise,
   isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
 };

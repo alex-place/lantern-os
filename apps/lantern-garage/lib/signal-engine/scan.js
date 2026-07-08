@@ -16,7 +16,7 @@
 "use strict";
 
 const yahoo = require("../market-data-yahoo");
-const { rsi, adaptiveRsiThresholds } = require("./indicators");
+const { rsi, adaptiveRsiThresholds, macd, priceVsSma, volumeRatio, atr } = require("./indicators");
 const { findSrZones } = require("./sr-zones");
 const { detectCandlePatterns } = require("./candles");
 const { checkMarketStructureShift } = require("./market-structure");
@@ -130,10 +130,14 @@ function candleGrade(candle) {
 // `news_sentiment` ∈ [-1,1] is an EXTERNAL anchor (Σ₀): the EV layer signs it to
 // the direction and weights it lightly (WEIGHTS.news), so one headline can nudge
 // but never dominate the TA evidence.
-function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0 }) {
+function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0, volume_ratio, macd_hist, ma_signal, earnings_surprise }) {
   const evInput = {
     direction,
     news_sentiment,
+    volume_ratio,          // Tier-1: volume-spike confirmation
+    macd_hist,             // Tier-1: MACD histogram (momentum)
+    ma_signal,             // Tier-1: price vs MA (momentum)
+    earnings_surprise,     // Tier-2: last EPS surprise vs consensus (signed %)
     in_zone: sr.in_zone,
     zone_strength: sr.zone_strength,
     zone_touches: (sr.nearest_zone && sr.nearest_zone.touches) || sr.touches || 0,
@@ -232,7 +236,37 @@ async function scanAll(watchlist) {
       let newsSent = { label: "neutral", impact_weighted_score: 0, n: 0 };
       try { newsSent = tradingNews.symbolSentiment(t, { windowHours: 48 }); } catch (_e) { /* fail-soft */ }
       const news_sentiment = (Number(newsSent.impact_weighted_score) || 0) / 100;
-      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment });
+
+      // Tier-1 confirmation inputs from the 15m bars: volume spike, MACD histogram,
+      // price-vs-MA. Each feeds the EV model as a weighted signal.
+      const closes15 = b15.map((b) => b.close);
+      const volume_ratio = volumeRatio(b15);
+      const m = macd(closes15);
+      const macd_hist = m ? m.histogram : 0;
+      const ma_signal = priceVsSma(closes15, 20);
+      // Tier-2: last reported EPS surprise vs consensus (keyless Yahoo; cached 6h).
+      let earn = null;
+      try { earn = await yahoo.getEarningsSurprise(t); } catch (_e) { /* fail-soft */ }
+      const earnings_surprise = earn ? earn.surprisePct : null;
+      const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise });
+
+      // Trade plan (framework Step 6): ATR-based risk unit, R-multiple targets, and
+      // an ATR-scaled holding-horizon estimate. Levels prefer real S/R when close.
+      const a = atr(b15);
+      const r2 = (x) => Math.round(x * 100) / 100;
+      const dirUp = direction === "BULLISH";
+      const risk = Math.max((a || 0) * 2, price * 0.015);
+      let stopPx = dirUp ? price - risk : price + risk;
+      // Prefer a real S/R level for the stop ONLY when it's a sensible distance
+      // (≥0.5% so the risk isn't near-zero, <6% so it isn't absurdly wide).
+      const near = (lvl) => Math.abs(price - lvl) / price;
+      if (dirUp && sr.support > 0 && sr.support < price && near(sr.support) >= 0.005 && near(sr.support) < 0.06) stopPx = sr.support;
+      if (!dirUp && sr.resistance > price && near(sr.resistance) >= 0.005 && near(sr.resistance) < 0.06) stopPx = sr.resistance;
+      const riskAbs = Math.max(Math.abs(price - stopPx), price * 0.008); // floor risk at 0.8%
+      const tr = (convergence && convergence.target_r) || 2;
+      const dailyMove = (a || price * 0.005) * 5.1; // 15m ATR → ~daily (√26)
+      const holdDays = Math.max(1, Math.min(15, Math.round((tr * riskAbs) / dailyMove)));
+
       signals.push({
         symbol: t,
         direction,
@@ -248,6 +282,9 @@ async function scanAll(watchlist) {
         tesseract: tess.action || null,
         convergence, // Σ₀ EV verdict: { decision:'ENTER'|'SKIP', p_win, ev_r, size_mult }
         news: { label: newsSent.label, score: newsSent.impact_weighted_score, n: newsSent.n }, // external anchor
+        earnings: earn ? { surprise_pct: earn.surprisePct, quarter: earn.quarter } : null, // Tier-2
+        volume_ratio: r2(volume_ratio),
+        plan: { stop: r2(stopPx), target1: r2(dirUp ? price + tr * riskAbs : price - tr * riskAbs), target2: r2(dirUp ? price + tr * 1.7 * riskAbs : price - tr * 1.7 * riskAbs), hold_days: holdDays },
         reasons: gate.reason,
       });
     }
