@@ -3022,5 +3022,17 @@
   "action": "keep",
   "mergeInto": "",
   "reason": "Every number has an on-disk artifact (corpus/CSF/eval JSONL); crystallize-not-distill verdicts from two adversarial councils; documents PR #1807 + issue #1829."
+ },
+ {
+  "path": "docs/research/2026-07-08-cpu-only-serving-ternary-and-gguf.md",
+  "title": "CPU-only serving — the two real routes (GGUF now, ternary/bitnet.cpp target)",
+  "category": "research",
+  "status": "Living",
+  "updated": "2026-07-08",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "description": "Grounded status: not running CPU-only yet (4-bit=CUDA-only); GGUF+llama.cpp (Q4_K_M, now) vs ternary 1.58-bit+bitnet.cpp (BitDistill 10x mem/2.65x CPU, ADR-0026); T-SAR is hardware. Primary sources downloaded.",
+  "reason": "Claims [claim/evidence/class]; numbers from downloaded PDFs; backs ADR-0026."
  }
 ]
