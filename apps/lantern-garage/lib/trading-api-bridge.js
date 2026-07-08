@@ -129,7 +129,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -146,6 +146,9 @@ class TradingAPIBridge {
     const orderType = t === 'limit' ? 'LMT' : t === 'stop' ? 'STP' : 'MKT';
     // A protective stop must survive the session → GTC by default; entries default DAY.
     const defaultTif = orderType === 'STP' ? 'gtc' : 'day';
+    // Equity for the guard's %-of-portfolio cap: caller-supplied, else read it.
+    let eq = Number(equity) || 0;
+    if (!eq) { const acct = await this.getIBKRAccount(userId).catch(() => null); eq = (acct && acct.equity) || 0; }
     const r = await client.placeOrder({
       symbol: ticker,
       side,
@@ -153,6 +156,7 @@ class TradingAPIBridge {
       orderType,
       price: orderType === 'STP' ? stopPrice : limitPrice,
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
+      equity: eq,
     });
     const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read

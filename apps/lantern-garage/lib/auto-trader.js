@@ -1,5 +1,20 @@
 'use strict';
 
+const fs = require('fs');
+const path = require('path');
+
+// Per-trade outcome log (append-only JSONL) — the honest record that lets us
+// MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
+// instead of eyeballing it. Resolved relative to this module so it's found
+// regardless of the server's cwd (same reason as the credential store).
+const TRADES_LOG = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+function logTrade(rec) {
+  try {
+    fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
+    fs.appendFileSync(TRADES_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n');
+  } catch (_e) { /* logging must never break trading */ }
+}
+
 /**
  * auto-trader.js — autonomous stock EXECUTION over the Σ₀ scan (Act stage).
  *
@@ -23,7 +38,8 @@
  */
 
 const DEFAULTS = {
-  positionPct: 0.2,        // % of equity per new position (before the notional cap)
+  positionPct: 2.5,        // AVERAGE position as % of equity (conviction scales it)
+  maxPositionPct: 5,       // HARD cap per position as % of equity ($50k on $1M)
   maxNewPerScan: 3,        // cap new entries opened in a single scan tick
   cooldownMs: 30 * 60000,  // don't re-order the same symbol within 30 min
   minPrice: 1,             // skip sub-$1 names
@@ -38,6 +54,7 @@ function cfg() {
   };
   return {
     positionPct: n('TRADER_POSITION_PCT', DEFAULTS.positionPct),
+    maxPositionPct: n('TRADER_MAX_POSITION_PCT', DEFAULTS.maxPositionPct),
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
@@ -75,15 +92,18 @@ function stopPriceFor(entry, stopPct) {
  *                   qty·price ≤ maxNotional.
  * Returns 0 when unpriced/negative — the caller then skips.
  */
-function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.positionPct, maxNotional = 2000, maxQty = 100 }) {
+function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.positionPct, maxPositionPct = DEFAULTS.maxPositionPct, maxQty = 100000 }) {
   const px = Number(price);
   const eq = Number(equity);
   if (!(px > 0) || !(eq > 0)) return 0;
   const mult = Math.max(0.5, Math.min(1.5, Number(sizeMult) || 1));
-  const base = Math.min(eq * (positionPct / 100), maxNotional);
-  let qty = Math.floor((base * mult) / px);
+  // % of PORTFOLIO — scales with equity. Average positionPct, conviction-scaled,
+  // hard-capped at maxPositionPct of equity (e.g. 2.5% avg, 5%/$50k max on $1M).
+  const capNotional = eq * (maxPositionPct / 100);
+  const targetNotional = Math.min(eq * (positionPct / 100) * mult, capNotional);
+  let qty = Math.floor(targetNotional / px);
   qty = Math.max(0, Math.min(qty, maxQty));
-  while (qty > 0 && qty * px > maxNotional) qty -= 1; // respect notional cap exactly
+  while (qty > 0 && qty * px > capNotional) qty -= 1; // never exceed the % cap
   return qty;
 }
 
@@ -111,7 +131,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   if (!account || !(account.equity > 0)) { out.reason = 'account/equity unavailable'; return out; }
   const positions = await bridge.getIBKRPositions(userId).catch(() => []);
   const heldQty = {};
-  for (const p of (positions || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
+  const heldPos = {}; // full position (for realized-P&L logging on exit)
+  for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
 
   // Daily-loss circuit breaker: once the account's day P&L is at/below the limit,
   // stop opening NEW positions (exits still run — closing losers is allowed).
@@ -120,8 +141,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   const haltEntries = typeof dayPnl === 'number' && dayPnl <= -dailyLimit;
   if (haltEntries) out.circuit_breaker = { dayPnl, limit: -Math.round(dailyLimit) };
 
-  const maxNotional = Number(caps.maxNotional) || parseFloat(process.env.MAX_ORDER_NOTIONAL) || 2000;
-  const maxQty = Number(caps.maxQty) || parseFloat(process.env.MAX_ORDER_QTY) || 100;
   let opened = 0;
 
   for (const s of enters) {
@@ -144,6 +163,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
       if (held > 0) {
         const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
+        const hp = heldPos[sym] || {};
+        // Realized P&L on the closed long (the position's unrealized P&L becomes real).
+        logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
       } else {
@@ -162,10 +184,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
 
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxNotional, maxQty });
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
-    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'buy', qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
@@ -175,6 +197,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
         const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc' }).catch((e) => ({ status: 'error', reason: e.message }));
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
+    }
+    if (r && r.status === 'placed') {
+      const pl = s.plan || {};
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
     }
     out.executed.push(exec);
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') opened += 1; }

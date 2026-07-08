@@ -386,10 +386,14 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY' } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
-    const gate = orderGate({ mode, qty, price, symbol, side });
+    // Prefer the caller-supplied equity; else read the account so the guard's
+    // per-position cap scales with the portfolio (% of equity, not a flat $).
+    let eq = Number(equity) || 0;
+    if (!eq) { try { const s = await this.getAccountSummary(status.accountId); eq = (s && s.equity) || 0; } catch (_e) { /* fall back to flat cap */ } }
+    const gate = orderGate({ mode, qty, price, symbol, side, equity: eq });
     const order = {
       symbol: symbol || null,
       conid: conid != null ? Number(conid) : null,
