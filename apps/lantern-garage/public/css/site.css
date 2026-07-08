@@ -4,6 +4,17 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ── Mobile safety net (#2255) — prevent horizontal overflow on every surface ──
+   site.css loads on all surfaces, so these defensive rules harden pages the audit
+   can't individually reach (e.g. gated dashboards). They only cap oversized content;
+   correctly-sized elements (icons, small images) are untouched. */
+html, body { max-width: 100%; overflow-x: hidden; }
+img, svg, video, canvas, iframe { max-width: 100%; height: auto; }
+table { max-width: 100%; }
+pre, code, kbd { overflow-x: auto; }                 /* long code scrolls in place, not the page */
+/* long unbreakable strings (URLs, hashes, tickers, addresses) wrap instead of forcing width */
+p, li, dd, dt, td, th, blockquote, figcaption { overflow-wrap: break-word; }
+
 /* ── Skip to content link (accessibility) ── */
 .skip-link {
   position: absolute;
