@@ -266,7 +266,7 @@ async function handleOAuthCallback(providerId, req, res, query) {
       return res.end();
     }
 
-    const { profile, linked } = getOrCreateFromIdentity(providerId, user, role);
+    const { profile, linked, created } = getOrCreateFromIdentity(providerId, user, role);
     // Auto-linked into an existing account (verified-email match) = a new sign-in
     // method on an existing account → notify the owner.
     if (linked && profile && profile.email) {
@@ -275,7 +275,11 @@ async function handleOAuthCallback(providerId, req, res, query) {
 
     // Resolve returnTo from the OLD session/cookie BEFORE regenerating the session
     // (regeneration drops the one-time flow state, which is what we want).
-    const returnTo = safeReturnTo(req.session.return_to || (ck && ck.return_to), "/dream-chat.html");
+    // First-run onboarding (#2079): a newly-created profile with no explicit destination
+    // lands on the short welcome surface instead of a cold, possibly provider-less chat.
+    // Returning users (and anyone with an explicit returnTo) go straight through.
+    const firstRunLanding = created ? "/welcome.html" : "/dream-chat.html";
+    const returnTo = safeReturnTo(req.session.return_to || (ck && ck.return_to), firstRunLanding);
 
     // establishSession regenerates the session id (anti-fixation) then persists.
     establishSession(
