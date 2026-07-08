@@ -1,0 +1,25 @@
+{"id": 1, "name": "is_prime", "fn": "is_prime", "ok": true, "passed": 5, "total": 5, "latency_s": 136.21, "reply_bytes": 444, "reply_words": 81, "errors": []}
+{"id": 2, "name": "reverse_string", "fn": "reverse_string", "ok": true, "passed": 3, "total": 3, "latency_s": 90.88, "reply_bytes": 632, "reply_words": 65, "errors": []}
+{"id": 3, "name": "fizzbuzz", "fn": "fizzbuzz", "ok": true, "passed": 4, "total": 4, "latency_s": 95.84, "reply_bytes": 645, "reply_words": 110, "errors": []}
+{"id": 4, "name": "count_vowels", "fn": "count_vowels", "ok": true, "passed": 3, "total": 3, "latency_s": 91.34, "reply_bytes": 464, "reply_words": 84, "errors": []}
+{"id": 5, "name": "factorial", "fn": "factorial", "ok": true, "passed": 4, "total": 4, "latency_s": 92.48, "reply_bytes": 746, "reply_words": 131, "errors": []}
+{"id": 6, "name": "flatten_list", "fn": "flatten_list", "ok": true, "passed": 3, "total": 3, "latency_s": 92.38, "reply_bytes": 540, "reply_words": 83, "errors": []}
+{"id": 7, "name": "palindrome", "fn": "is_palindrome", "ok": true, "passed": 3, "total": 3, "latency_s": 94.04, "reply_bytes": 762, "reply_words": 125, "errors": []}
+{"id": 8, "name": "sum_digits", "fn": "sum_digits", "ok": true, "passed": 3, "total": 3, "latency_s": 100.38, "reply_bytes": 607, "reply_words": 86, "errors": []}
+{"id": 9, "name": "count_words", "fn": "count_words", "ok": true, "passed": 3, "total": 3, "latency_s": 180.55, "reply_bytes": 306, "reply_words": 53, "errors": []}
+{"id": 10, "name": "second_largest", "fn": "second_largest", "ok": true, "passed": 3, "total": 3, "latency_s": 180.27, "reply_bytes": 903, "reply_words": 138, "errors": []}
+{"id": 11, "name": "caesar_cipher", "fn": "caesar", "ok": false, "passed": 0, "total": 3, "latency_s": 184.28, "reply_bytes": 258, "reply_words": 32, "errors": ["caesar('abc', 1): not all arguments converted during string formatting", "caesar('xyz', 2): not all arguments converted during string formatting", "caesar('Hello!', 13): chr() arg not in range(0x110000)"]}
+{"id": 12, "name": "merge_sorted", "fn": "merge_sorted", "ok": true, "passed": 3, "total": 3, "latency_s": 185.48, "reply_bytes": 315, "reply_words": 38, "errors": []}
+{"id": 13, "name": "binary_search", "fn": "binary_search", "ok": true, "passed": 3, "total": 3, "latency_s": 191.3, "reply_bytes": 616, "reply_words": 101, "errors": []}
+{"id": 14, "name": "anagram", "fn": "is_anagram", "ok": false, "passed": 1, "total": 3, "latency_s": 191.68, "reply_bytes": 884, "reply_words": 127, "errors": ["is_anagram('listen','silent'): got False, want True", "is_anagram('Astronomer','Moon starer'): got False, want True"]}
+{"id": 15, "name": "max_subarray", "fn": "max_subarray", "ok": true, "passed": 3, "total": 3, "latency_s": 177.42, "reply_bytes": 672, "reply_words": 94, "errors": []}
+{"id": 16, "name": "unique_chars", "fn": "has_unique_chars", "ok": true, "passed": 3, "total": 3, "latency_s": 175.76, "reply_bytes": 661, "reply_words": 110, "errors": []}
+{"id": 17, "name": "remove_dups", "fn": "remove_duplicates", "ok": true, "passed": 3, "total": 3, "latency_s": 175.36, "reply_bytes": 591, "reply_words": 97, "errors": []}
+{"id": 18, "name": "matrix_transpose", "fn": "transpose", "ok": true, "passed": 2, "total": 2, "latency_s": 176.86, "reply_bytes": 970, "reply_words": 156, "errors": []}
+{"id": 19, "name": "roman_to_int", "fn": "roman_to_int", "ok": false, "passed": 0, "total": 5, "latency_s": 176.65, "reply_bytes": 250, "reply_words": 44, "errors": ["roman_to_int('III'): 0", "roman_to_int('IV'): 0", "roman_to_int('IX'): 0"]}
+{"id": 20, "name": "balanced_parens", "fn": "is_balanced", "ok": true, "passed": 4, "total": 4, "latency_s": 175.97, "reply_bytes": 474, "reply_words": 74, "errors": []}
+{"id": 21, "name": "fibonacci", "fn": "fibonacci", "ok": true, "passed": 4, "total": 4, "latency_s": 177.09, "reply_bytes": 755, "reply_words": 121, "errors": []}
+{"id": 22, "name": "chunk_list", "fn": "chunk_list", "ok": true, "passed": 3, "total": 3, "latency_s": 176.78, "reply_bytes": 878, "reply_words": 142, "errors": []}
+{"id": 23, "name": "rotate_left", "fn": "rotate_left", "ok": true, "passed": 3, "total": 3, "latency_s": 175.57, "reply_bytes": 494, "reply_words": 83, "errors": []}
+{"id": 24, "name": "missing_number", "fn": "missing_number", "ok": true, "passed": 3, "total": 3, "latency_s": 176.82, "reply_bytes": 786, "reply_words": 134, "errors": []}
+{"id": 25, "name": "two_sum", "fn": "two_sum", "ok": true, "passed": 3, "total": 3, "latency_s": 177.86, "reply_bytes": 676, "reply_words": 106, "errors": []}

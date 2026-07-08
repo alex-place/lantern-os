@@ -49,13 +49,33 @@ const DEFAULT_PARAMS = {
   sigmaNowcastF: 1.5,    // same-day high: much of the heating already observed
   meanUncF: 0.8,         // +/- downshift uncertainty (shrinks once IEM measures it)
   sigmaLo: 0.6, sigmaHi: 1.30,  // band multipliers; 0.6*2.4=1.44F floor for a tight market
+  // Daily-high normals + summer fallback. Defaults are NYC/KNYC (NCEI 1991-2020); a city
+  // supplies its own via paramsForCity so the oracle is data, not code (#2220).
+  normals: NORMAL_HIGH_F,
+  defaultNormal: DEFAULT_SUMMER_NORMAL_F,
   // P(actual KNYC high >= 100 F | NWS forecast high), from the >=100 record + the
-  // 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated.
+  // 2013-2025 near-miss streak (many 99 F, zero 100 F). Interpolated. City-specific.
   ceilingTable: [
     [99.0, 0.03], [100.0, 0.08], [101.0, 0.13],
     [102.0, 0.19], [103.0, 0.27], [104.0, 0.38],
   ],
 };
+
+/** Build an effective params object for a city: the fitted σ/bias (currently NYC-fit — the
+ *  only certified city) overlaid with the city's own normals + ceiling table. Non-NYC cities
+ *  reuse the NYC σ/bias as a PRIOR until they carry their own fit; the city registry's
+ *  `certified` flag is what actually gates trading, not this function (#2220). */
+function paramsForCity(city, P = PARAMS) {
+  if (!city) return P;
+  return {
+    ...P,
+    // A city carries its OWN daily normals or none — never silently inherit another city's
+    // table. With no normals, normalHigh falls back to this city's defaultNormal.
+    normals: city.normals || {},
+    defaultNormal: city.defaultNormal != null ? city.defaultNormal : P.defaultNormal,
+    ceilingTable: isCeilingTable(city.ceilingTable) ? city.ceilingTable : P.ceilingTable,
+  };
+}
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 function isCeilingTable(t) {
@@ -101,13 +121,14 @@ function interp(table, x) {
   return table[table.length - 1][1];
 }
 
-function normalHigh(month, day) {
-  const v = NORMAL_HIGH_F[`${month}-${day}`];
-  return v == null ? DEFAULT_SUMMER_NORMAL_F : v;
+function normalHigh(month, day, P = PARAMS) {
+  const table = P.normals || NORMAL_HIGH_F;
+  const v = table[`${month}-${day}`];
+  return v == null ? (P.defaultNormal != null ? P.defaultNormal : DEFAULT_SUMMER_NORMAL_F) : v;
 }
 
 function calibratedMean(forecastHigh, month, day, P = PARAMS) {
-  const anomaly = forecastHigh - normalHigh(month, day);
+  const anomaly = forecastHigh - normalHigh(month, day, P);
   return forecastHigh - P.coolBiasF - P.regressionK * Math.max(0, anomaly);
 }
 
@@ -166,11 +187,14 @@ function calibrationBand(forecastHigh, leadDays, month, day, P = PARAMS) {
 // ── Verify: robust edge vs market, net of Kalshi fees ─────────────────────────
 function kalshiFeeCents(price) { return Math.max(1, Math.ceil(7 * price * (1 - price))); }
 
-function bestSideNet(fair, ask) {
+// feeCents(price)->cents is injectable so the SAME band-robust gate can price a trade on a
+// different venue (e.g. ForecastEx's ~1¢ flat rail, forecastex-fees.js) — the fee is the
+// only venue-specific term; the edge math is identical (#2217). Defaults to Kalshi.
+function bestSideNet(fair, ask, feeCents = kalshiFeeCents) {
   const fairC = 100 * fair;
-  const yes = (fairC - 100 * ask) - kalshiFeeCents(ask);
+  const yes = (fairC - 100 * ask) - feeCents(ask);
   const noAsk = 1 - ask;
-  const no = ((100 - fairC) - 100 * noAsk) - kalshiFeeCents(noAsk);
+  const no = ((100 - fairC) - 100 * noAsk) - feeCents(noAsk);
   return yes >= no ? ["yes", yes] : ["no", no];
 }
 
@@ -179,7 +203,7 @@ function bestSideNet(fair, ask) {
  * only if the side is identical across all band scenarios AND the worst-case net edge
  * still clears fees + minEdgeCents. worst_c is what you can rely on; best_c the corner.
  */
-function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, day = 1, minEdgeCents = 5, P = PARAMS) {
+function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, day = 1, minEdgeCents = 5, P = PARAMS, feeCents = kalshiFeeCents) {
   const scen = calibrationBand(forecastHigh, leadDays, month, day, P);
   const dists = scen.map(([m, s]) => distribution(m, s, ladder, forecastHigh, P));
   const nominal = dists[0];
@@ -187,7 +211,7 @@ function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, 
   for (const [lbl] of ladder) {
     const a = marketAsk[lbl];
     if (a == null) continue;
-    const outcomes = dists.map((d) => bestSideNet(d[lbl], a));
+    const outcomes = dists.map((d) => bestSideNet(d[lbl], a, feeCents));
     const sides = new Set(outcomes.map((o) => o[0]));
     const nets = outcomes.map((o) => o[1]);
     const consistent = sides.size === 1;
@@ -206,7 +230,10 @@ function robustEdgeReport(forecastHigh, leadDays, ladder, marketAsk, month = 7, 
   const verdict = actionable.length
     ? "robust: " + actionable.map((r) => `${r.side.toUpperCase()} ${r.bucket} (>=${r.worst_c >= 0 ? "+" : ""}${Math.round(r.worst_c)}c)`).join(", ")
     : "no certified edge";
-  return { rows, actionable, verdict };
+  // dist (nominal, keyed by ladder label) + ladder are surfaced so the paper ledger can
+  // stamp the predictive distribution at open — the join the distribution verifier needs
+  // to accrue graded outcomes (kalshi-weather-verify gradedRecords, #2218).
+  return { rows, actionable, verdict, dist: nominal, ladder };
 }
 
 // ── bucket subtitle parser: "100° or above"->[100,null], "94° to 95°"->[94,95] ──
@@ -266,7 +293,7 @@ function selfTest() {
 
 module.exports = {
   calibratedMean, sigmaForLead, calibratedDistribution, distribution,
-  robustEdgeReport, kalshiFeeCents, parseBand, selfTest,
+  robustEdgeReport, kalshiFeeCents, parseBand, selfTest, paramsForCity, normalHigh,
   CEILING_TABLE, loadParams, DEFAULT_PARAMS, paramsSource: () => PARAMS._source,
 };
 

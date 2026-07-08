@@ -1379,7 +1379,10 @@ async function act(dir,fromSwipe){
     busy=true;
     try{
       const o={ticker:card.ticker, side:card.favSide, action:'buy', type:'limit', count:1, limitCents:card.favAsk,
-        source:'kalshi-paper', pPredicted:card.pPredicted};
+        source:'kalshi-paper', pPredicted:card.pPredicted,
+        // Weather-edge distribution stamp (#2218): forward dist+ladder+heldBucket so the
+        // verifier can grade the forecast distribution once the market settles.
+        dist:card.dist, ladder:card.ladder, heldBucket:card.heldBucket};
       const res=await j('/paper-trade',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(o)});
       if(res&&res.wallet) walletState=res.wallet;
       showPaperResult(res,card);
