@@ -68,6 +68,12 @@ jobs:
       - name: Run Explore feed UI behavioral test
         run: node apps/lantern-garage/test/explore-feed-ui.test.js
 
+      - name: Brand guard (user-visible brand is Unisona, #2250)
+        run: node apps/lantern-garage/test/brand-unisona.test.js
+
+      - name: WCAG-AA audit — all surfaces, both themes (#2251)
+        run: node scripts/a11y-audit.js
+
       - name: Check keyboard navigation
         run: |
           echo "🔍 Checking for keyboard-accessible elements..."

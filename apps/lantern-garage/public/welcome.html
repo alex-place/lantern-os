@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <meta name="loop-stage" content="observe">
+  <link rel="manifest" href="/manifest.json">
+  <script>
+    // Apply saved theme before paint (avoid flash), and forward returning users straight to
+    // chat — welcome is a one-time first-run surface (#2079).
+    (function () {
+      try {
+        var s = localStorage.getItem('lantern-theme');
+        var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
+        if (localStorage.getItem('unisona_welcomed') === '1') {
+          location.replace('/dream-chat.html');
+        }
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Welcome — unisona.ai</title>
+  <style>
+    .welcome-main { max-width: 640px; margin: 0 auto; padding: 56px 20px 80px; text-align: center; }
+    .welcome-mandala { width: 72px; height: 72px; margin: 0 auto 20px; display: block; }
+    .welcome-main h1 { font-size: clamp(1.6rem, 6vw, 2.2rem); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+    .welcome-lede { font-size: 1.05rem; color: var(--muted); margin-bottom: 32px; line-height: 1.6; }
+    .welcome-cta { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .welcome-hint { font-size: 0.9rem; color: var(--muted); margin-bottom: 36px; }
+    .welcome-hint a { color: var(--accent-strong); font-weight: 600; text-decoration: none; }
+    .welcome-hint a:hover { text-decoration: underline; }
+    .welcome-steps {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px; text-align: left; margin-top: 8px;
+    }
+    .welcome-step {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 16px 18px; text-decoration: none; color: inherit;
+      display: block; transition: box-shadow 0.15s, border-color 0.15s;
+    }
+    .welcome-step:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+    .welcome-step .ico { font-size: 1.3rem; }
+    .welcome-step .st-title { font-weight: 700; font-size: 0.95rem; margin: 8px 0 4px; }
+    .welcome-step .st-sub { font-size: 0.82rem; color: var(--muted); line-height: 1.45; }
+    .welcome-skip { display: inline-block; margin-top: 28px; font-size: 0.85rem; color: var(--muted); text-decoration: none; }
+    .welcome-skip:hover { color: var(--text); text-decoration: underline; }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#welcome-main">Skip to content</a>
+
+<main class="welcome-main" id="welcome-main">
+  <img class="welcome-mandala" src="/mandala.svg" alt="" aria-hidden="true">
+  <h1>Welcome to Unisona</h1>
+  <p class="welcome-lede">Your local-first AI that remembers what matters to you, reasons over it, takes action with tools, and checks its answers against real evidence.</p>
+
+  <div class="welcome-cta">
+    <a class="btn-primary" href="/dream-chat.html" id="start-chat">Start chatting →</a>
+  </div>
+  <p class="welcome-hint">
+    Want the strongest answers? <a href="/api-keys-settings.html" id="add-key">Add a provider key</a> —
+    it works without one, but your own key unlocks the best models.
+  </p>
+
+  <div class="welcome-steps">
+    <a class="welcome-step" href="/dream-chat.html" data-first-value>
+      <div class="ico" aria-hidden="true">💬</div>
+      <div class="st-title">Ask anything</div>
+      <div class="st-sub">Start a conversation — it remembers context across sessions.</div>
+    </a>
+    <a class="welcome-step" href="/explore.html" data-first-value>
+      <div class="ico" aria-hidden="true">🧭</div>
+      <div class="st-title">Explore</div>
+      <div class="st-sub">A personalized feed grounded in real sources.</div>
+    </a>
+    <a class="welcome-step" href="/knowledgecenter.html" data-first-value>
+      <div class="ico" aria-hidden="true">📚</div>
+      <div class="st-title">Learn the basics</div>
+      <div class="st-sub">What Unisona can (and can't) do, in plain English.</div>
+    </a>
+  </div>
+
+  <a class="welcome-skip" href="/dream-chat.html" id="skip-welcome">Skip for now</a>
+</main>
+
+<script>
+  // Mark the user as welcomed once they take ANY first action, so they never see this
+  // surface again (the pre-paint guard forwards returning users straight to chat).
+  (function () {
+    function markWelcomed() { try { localStorage.setItem('unisona_welcomed', '1'); } catch (e) {} }
+    document.querySelectorAll('#start-chat, #add-key, #skip-welcome, [data-first-value]')
+      .forEach(function (el) { el.addEventListener('click', markWelcomed); });
+  })();
+</script>
+<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/site-chrome.js" defer></script>
+</body>
+</html>
