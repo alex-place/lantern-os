@@ -39,6 +39,37 @@ function loadEnv() {
     const orders = await c.getLiveOrders();
     const pnl = await c.getPnl(acct).catch(() => null);
 
+    // ── CHURN CHECK — the whole point of the anti-churn fix. Count this session's
+    //    fills + round-trips + realized P&L vs the 2026-07-08 baseline (103 fills,
+    //    ~7 round-trips/symbol, −$1007 realized) that motivated it. ──
+    const BASELINE = { date: '2026-07-08', fills: 103, realized: -1007, roundTripsPerSym: 7 };
+    let churn = null;
+    try {
+      const raw = await c._request('GET', '/iserver/account/orders');
+      const filled = ((raw.json && raw.json.orders) || []).filter((o) => /fill/i.test(o.status || ''));
+      const bySym = {};
+      for (const o of filled) {
+        const s = o.ticker || o.symbol; if (!s) continue;
+        const g = bySym[s] || (bySym[s] = { buys: 0, sells: 0, buyQ: 0, sellQ: 0, buyN: 0, sellN: 0 });
+        const q = Number(o.filledQuantity || o.totalSize || 0) || 0;
+        const px = Number(o.avgPrice || o.price || 0) || 0;
+        if (/buy/i.test(o.side)) { g.buys++; g.buyQ += q; g.buyN += q * px; } else { g.sells++; g.sellQ += q; g.sellN += q * px; }
+      }
+      let realized = 0, roundTrips = 0;
+      for (const g of Object.values(bySym)) {
+        const cq = Math.min(g.buyQ, g.sellQ);
+        realized += cq * ((g.sellQ ? g.sellN / g.sellQ : 0) - (g.buyQ ? g.buyN / g.buyQ : 0));
+        roundTrips += Math.min(g.buys, g.sells);
+      }
+      const syms = Object.keys(bySym).length;
+      const rtPerSym = syms ? +(roundTrips / syms).toFixed(1) : 0;
+      churn = {
+        fills: filled.length, symbols: syms, roundTrips, roundTripsPerSym: rtPerSym,
+        realized: Math.round(realized), baseline: BASELINE,
+        verdict: filled.length <= BASELINE.fills * 0.6 ? 'REDUCED' : filled.length >= BASELINE.fills * 0.9 ? 'STILL_CHURNING' : 'IMPROVED',
+      };
+    } catch (_e) {}
+
     const stops = orders.filter((o) => /stop|stp/i.test(o.orderType || '') && /submit|pending|presubmit/i.test(o.status || ''));
     const shorts = pos.filter((p) => p.qty < 0).map((p) => p.symbol);
     const longsNoStop = pos.filter((p) => p.qty > 0 && !stops.some((s) => String(s.symbol).toUpperCase() === String(p.symbol).toUpperCase())).map((p) => p.symbol);
@@ -56,7 +87,7 @@ function loadEnv() {
       connected: !!st.connected, account: acct,
       equity: eq, dayPnl: pnl && pnl.dailyPnl, unrealizedPnl: pnl && pnl.unrealizedPnl,
       positions: pos.length, shorts, longsMissingStop: longsNoStop,
-      workingStops: stops.length, avgPositionPct: avgPct, oversized, sizes,
+      workingStops: stops.length, avgPositionPct: avgPct, oversized, sizes, churn,
       ok: !!st.connected && shorts.length === 0 && longsNoStop.length === 0 && oversized.length === 0,
     };
   } catch (e) { report.error = e.message; }
@@ -78,6 +109,9 @@ function loadEnv() {
     `shorts         : ${(r.shorts || []).join(', ') || 'NONE ✓'}`,
     `longs w/o stop : ${(r.longsMissingStop || []).join(', ') || 'NONE ✓'}   (working stops: ${r.workingStops})`,
     `avg size       : ${r.avgPositionPct != null ? r.avgPositionPct + '% of equity' : 'n/a'}   oversized(>5%): ${(r.oversized || []).join(', ') || 'none ✓'}`,
+    r.churn
+      ? `CHURN CHECK    : ${r.churn.fills} fills / ${r.churn.roundTripsPerSym} round-trips-per-symbol  (baseline ${r.churn.baseline.fills} fills / ${r.churn.baseline.roundTripsPerSym} on ${r.churn.baseline.date})  → ${r.churn.verdict === 'REDUCED' ? '✅ CHURN REDUCED' : r.churn.verdict === 'STILL_CHURNING' ? '⚠️ STILL CHURNING' : '◐ improved'}   realized $${r.churn.realized}`
+      : `CHURN CHECK    : n/a`,
     `positions detail:`,
     ...(r.sizes || []).map((s) => `   ${String(s.sym).padEnd(6)} qty ${s.qty}  $${s.notional} (${s.pct}%)  uPnL $${s.uPnL}`),
     ``,
