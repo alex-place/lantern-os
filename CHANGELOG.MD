@@ -1,3 +1,7 @@
+## [1.8.115] - 2026-07-09
+### Changed
+- **Repo slimmed for agentic context (#2306, #2307, #2309, #2310, #2315).** Cut file-count and binary noise that bloats agent Glob/Grep/tree and clones: untracked the force-added `payment-bridge/node_modules/` (174 files), folded 463 accumulated `changelog.d/` fragments into this file (they never folded at release; `.gitkeep` retained), removed `docs/archive/` (38 stale docs; git history retains them), deleted the dead `src/hff-api/app-legacy.py` (the live WSGI entrypoint is `safe_app:app`), and untracked 14 volatile `data/csf_memory/raw/trace/*.json` runtime traces (now gitignored alongside root `agentic*` harness dumps). Media (mp3/csf), runtime JSONL logs, flat-RAG dumps, monolith splits, and root-md consolidation are tracked separately (#2311-#2314, #2316-#2317) — they need R2 hosting or per-file care. Improves Reason + Act.
+
 ## [Unreleased] — folded changelog fragments (repo-slim #2309)
 
 _The accumulated `changelog.d/` fragments below were folded into CHANGELOG.md to cut file-count noise for agentic context (#2309). New fragments still land in `changelog.d/` and fold at each release._
