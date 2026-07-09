@@ -1,3 +1,0 @@
-### Dream-chat: OpenAI image generation wired in (with keyless fallback)
-
-- "Draw me a picture of X" (or `!image X`) now generates via the **OpenAI Images API** first — a new server-side path (`lib/openai-image.js` + `POST /api/image/ai-generate`, Node `fetch`, gpt-image-1 with a dall-e-3 fallback) that keeps the API key server-side and serves the result from `/images/…`. If OpenAI is unavailable (no key, billing limit, content refusal, timeout), it falls back to the existing keyless source so an image still appears. Also fixed a latent bug: `/api/image/*` used `collectRequestBody` as a callback, but it is promise-style — the endpoint hung.

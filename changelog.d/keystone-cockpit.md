@@ -1,4 +1,0 @@
-### Keystone Cockpit: the human-in-the-loop spine (profile + action gate)
-
-- New `src/keystone/cockpit.py` realizes the personal-AI flow: ask → identify task + needed evidence → show what it found + plans → **you approve anything that sends/schedules/submits/spends/changes records**. Two gates: a durable-but-editable **Profile** (facts are *approved* = durable truth, or *proposed* = held until you approve; save only on approval; append-only JSONL persistence), and an **ActionGate** (mutating action kinds are held until approved; read/draft/plan need none).
-- The **Question Machine** applied to personal facts: `Cockpit.next_question(task)` surfaces the *smallest useful question* — the single highest-priority missing fact, one at a time ("Which CareSource role?", "What insurance plan?", "Who needs the dentist appointment?"). 8 tests; docs/KEYSTONE-COCKPIT.md.

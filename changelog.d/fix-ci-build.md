@@ -1,4 +1,0 @@
-### Fixed
-- **Static surface CI** is green again: `tests/test_mcp_tool_parity.py` had a `SyntaxError` (an unclosed `[` from a botched #1279 edit) that aborted pytest collection for the whole suite. Reconstructed the assertion against the real canonical 15-tool surface (the 10 originals plus the ADR-0008 `workspace_*`, `create_document`, and `local_eval_keystone_run` tools) and aligned its operator expectations with the #1213 guest-safe model (read-policy filesystem tools require operator; only `web_search`/`web_fetch` run for guests).
-- Regenerated `manifests/tool-capability-manifest-v1.json` so the stored capability manifest matches the live `tool-runner.js` surface (15 tools, current descriptions) — the fallback-manifest path the parity test exercises was stale at 10 tools.
-- **Convergence Manager** anti-sprawl no longer blocks master: added the tracked top-level `notebooks/` directory to `ALLOWED_TOP` in `scripts/convergence-manager.js`.
