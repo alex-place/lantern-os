@@ -110,11 +110,86 @@ function backtestG1(days = []) {
 
 const fmt = (x) => (x == null ? "—" : x.toFixed(4));
 
-/** Proxy data source — NOT wired. Building the ensemble feed (NWS NBM probabilistic Tmax or
- *  ECMWF open ENS, per-station) is the Phase-0 data step; do that behind the market-data client
- *  and feed backtestG1. Throws so a placeholder is never mistaken for a live feed (#2239). */
-function fetchEnsembleProxy(_station, _date) {
-  throw new Error("ensemble proxy not wired — Phase-0 data step (NBM prob-Tmax / ECMWF ENS) pending (#2239)");
+// ── Proxy data feed (WIRED, #2239) ───────────────────────────────────────────
+// Ensemble proxy = a TIME-LAGGED ensemble from NWS NBM/NBS MOS: within a fetch window each
+// model RUN forecasting the target local day contributes one member (its max-over-day tmp).
+// This is the cheap, free, honest proxy the scoping prescribed — NOT GenCast and NOT a
+// same-init perturbed ensemble; it conflates lead-time with spread, and that caveat rides
+// with any G1 number it produces. Source: IEM (mesonet.agron.iastate.edu), same endpoints the
+// oracle's fit tool uses. Settled highs = ASOS hourly max (proxy for the NWS CLI daily high).
+const km = require("./kalshi-mos");
+
+const IEM_MOS = "https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py";
+const IEM_ASOS = "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py";
+const UA = { "User-Agent": "keystone-os-weather-gencast-g1 (github.com/lantern-os)" };
+
+async function _get(url) {
+  const r = await fetch(url, { headers: UA });
+  if (!r.ok) throw new Error(`IEM HTTP ${r.status} for ${url}`);
+  return r.text();
 }
 
-module.exports = { ensembleToBucketDist, climatologyDist, oracleDist, gradeSeries, backtestG1, fetchEnsembleProxy };
+// km.localDayOf returns { key: "2025-7-3", ... } — UNPADDED, so its key can't be string-sorted.
+// Canonicalize to zero-padded "YYYY-MM-DD" so date comparisons and joins are correct.
+function _dayKey(ts, offsetH) {
+  const ld = km.localDayOf(ts, offsetH);
+  return ld ? `${ld.y}-${String(ld.m).padStart(2, "0")}-${String(ld.day).padStart(2, "0")}` : null;
+}
+
+/** Fetch NBS(NBM) MOS rows for a station over [stsUtcISO, etsUtcISO]. Returns parsed CSV rows. */
+async function fetchMosRows(station, stsUtcISO, etsUtcISO, model = "NBS") {
+  const url = `${IEM_MOS}?station=${encodeURIComponent(station)}&model=${model}&sts=${stsUtcISO}&ets=${etsUtcISO}&format=csv`;
+  return km.parseCsv(await _get(url));
+}
+
+/** Time-lagged ensemble for one target local day: each RUN's max hourly tmp over that day = a
+ *  member. `runDayFilter(runDayKey, targetDayKey)` selects which runs count (default: the day
+ *  before — a clean ~1-day-lead ensemble). */
+function timeLaggedEnsemble(rows, targetDayKey, { offsetH = -4, runDayFilter } = {}) {
+  const keep = runDayFilter || ((runDay) => runDay < targetDayKey); // any run BEFORE the target day
+  const byRun = new Map();
+  for (const r of rows) {
+    const t = parseFloat(r.tmp);
+    if (!Number.isFinite(t)) continue;
+    if (_dayKey(r.ftime, offsetH) !== targetDayKey) continue;     // forecast valid on target day
+    const runDay = _dayKey(r.runtime, offsetH);
+    if (!keep(runDay, targetDayKey)) continue;
+    const key = r.runtime;
+    const cur = byRun.get(key);
+    if (cur == null || t > cur.tmp) byRun.set(key, { tmp: t, runDay });
+  }
+  const runs = [...byRun.values()].sort((a, b) => (a.runDay < b.runDay ? -1 : 1));
+  return { members: runs.map((r) => r.tmp), runCount: runs.length };
+}
+
+/** ASOS hourly-max settled daily highs {localDayKey -> high °F} over a window (UTC year/month/day). */
+async function fetchSettledHighs(asosStation, network, s, e, offsetH = -4) {
+  const url = `${IEM_ASOS}?station=${encodeURIComponent(asosStation)}&network=${encodeURIComponent(network)}`
+    + `&data=tmpf&year1=${s.y}&month1=${s.m}&day1=${s.d}&year2=${e.y}&month2=${e.m}&day2=${e.d}`
+    + `&tz=Etc/UTC&format=onlycomma&missing=empty`;
+  const rows = km.parseCsv(await _get(url));
+  const byDay = new Map();
+  for (const r of rows) {
+    const t = parseFloat(r.tmpf);
+    if (!Number.isFinite(t)) continue;
+    const day = _dayKey(r.valid, offsetH);
+    if (!day) continue;
+    const cur = byDay.get(day);
+    if (cur == null || t > cur) byDay.set(day, t);
+  }
+  return byDay;
+}
+
+/** Single-day convenience wrapper: fetch the day-ahead MOS window and return the ensemble members. */
+async function fetchEnsembleProxy(station, targetDayKey, { model = "NBS", offsetH = -4 } = {}) {
+  const sts = `${targetDayKey}T00:00Z`;               // 2 days back → day after, to capture prior runs
+  const back = new Date(Date.parse(sts) - 2 * 86400000).toISOString().slice(0, 16) + "Z";
+  const fwd = new Date(Date.parse(sts) + 1 * 86400000).toISOString().slice(0, 16) + "Z";
+  const rows = await fetchMosRows(station, back, fwd, model);
+  return timeLaggedEnsemble(rows, targetDayKey, { offsetH });
+}
+
+module.exports = {
+  ensembleToBucketDist, climatologyDist, oracleDist, gradeSeries, backtestG1,
+  fetchMosRows, timeLaggedEnsemble, fetchSettledHighs, fetchEnsembleProxy,
+};

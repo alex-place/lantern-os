@@ -69,8 +69,18 @@ check("oracleDist reuses the fitted calibratedDistribution (sums to 1)", () => {
   assert.ok(Math.abs(Object.values(d).reduce((s, x) => s + x, 0) - 1) < 1e-6);
 });
 
-check("fetchEnsembleProxy is an unwired stub (never a silent placeholder)", () => {
-  assert.throws(() => efc.fetchEnsembleProxy("KNYC", "2026-07-03"), /not wired/);
+check("timeLaggedEnsemble: each prior-day run's max-over-day = one member", () => {
+  const rows = [
+    // two runs (D-1) forecasting target day 2025-07-03; max over day per run
+    { runtime: "2025-07-02 12:00:00", ftime: "2025-07-03 18:00:00", tmp: "95" },
+    { runtime: "2025-07-02 12:00:00", ftime: "2025-07-03 21:00:00", tmp: "97" }, // run A max=97
+    { runtime: "2025-07-02 18:00:00", ftime: "2025-07-03 20:00:00", tmp: "96" }, // run B max=96
+    { runtime: "2025-07-03 06:00:00", ftime: "2025-07-03 20:00:00", tmp: "99" }, // same-day run → excluded
+    { runtime: "2025-07-02 12:00:00", ftime: "2025-07-04 18:00:00", tmp: "88" }, // wrong day → excluded
+  ];
+  const e = efc.timeLaggedEnsemble(rows, "2025-07-03", { offsetH: -4 });
+  assert.strictEqual(e.runCount, 2, "two prior-day runs");
+  assert.deepStrictEqual(e.members.sort(), [96, 97]);
 });
 
 if (failures) { console.error(`\n${failures} test(s) failed`); process.exit(1); }
