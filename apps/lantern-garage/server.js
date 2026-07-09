@@ -240,6 +240,7 @@ const routes = [
   tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
   aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
+  require("./routes/v1"),               // OpenAI-compatible /v1/chat/completions shim (before auth: API clients use bearer keys, not sessions)
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)
