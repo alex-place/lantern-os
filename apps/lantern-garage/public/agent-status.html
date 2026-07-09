@@ -55,7 +55,10 @@
 
     .table-wrap {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 12px; overflow: hidden;
+      /* overflow-x:auto (not hidden) so wide tables scroll on mobile instead of clipping
+         their rightmost columns under the global overflow-x safety net (#2255). */
+      border-radius: 12px; overflow-x: auto; overflow-y: hidden;
+      -webkit-overflow-scrolling: touch;
     }
     table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
     th, td { padding: 11px 16px; text-align: left; border-bottom: 1px solid var(--border); }
