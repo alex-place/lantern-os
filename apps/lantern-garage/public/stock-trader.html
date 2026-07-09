@@ -320,6 +320,18 @@
   body.ot-open .footer{ padding-right: 356px; }
   @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
+  /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
+     right dock. A tinted backdrop covers the app (tap it to close); the panel slides
+     up from the bottom and is height-capped so the header + view tabs stay visible. */
+  @media (max-width:580px){
+    .ot-bg{ top:0; left:0; background:rgba(0,0,0,.5); pointer-events:auto;
+            align-items:flex-end; justify-content:stretch; }
+    .ot-modal{ width:100%; max-width:100%; height:auto; max-height:82vh;
+               border-left:none; border-top:1px solid var(--border);
+               border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45);
+               animation:otSlideUp .2s ease; }
+  }
+  @keyframes otSlideUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
@@ -1613,6 +1625,13 @@ function setOrderSymbol(ticker){
   });
   renderOrderTicket();
 }
+// Phone layout (≤580px) shows ONE of {charts, ticker list} at a time behind the
+// mobile view tabs. The order ticket is a full-screen bottom sheet there, so it must
+// NOT auto-open on load / on symbol-focus (it would bury the chart the user just
+// opened). It only opens on an explicit BUY/SELL tap. Desktop keeps the docked panel.
+function isNarrowTrader(){
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width:580px)').matches;
+}
 function openOrderPanel(){
   otUserClosed = false;
   document.getElementById('otBg').classList.remove('hidden');
@@ -1867,7 +1886,9 @@ function focusTicker(t){
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-    if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+    // Desktop: keep the docked panel open unless the user X'd it. Phone: don't auto-open —
+    // it's a bottom sheet that would cover the chart we're about to show.
+    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
   }
   openFullscreenChart(t);
 }
@@ -2146,7 +2167,9 @@ document.addEventListener('mouseup', function(e){
   // order panel to that chart's symbol, so BUY/SELL targets what you clicked.
   if(Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) < 6 && drag.dataTicker){
     setOrderSymbol(drag.dataTicker);
-    openOrderPanel();
+    // Phone: a chart tap just retargets the (closed) ticket — don't pop the bottom
+    // sheet over the chart. The BUY/SELL buttons open it explicitly.
+    if(!isNarrowTrader()) openOrderPanel();
   }
 });
 
@@ -2759,7 +2782,7 @@ function startDashboard(){
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+    if(!window.GUEST && !otUserClosed && !isNarrowTrader() && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
   }, 1600);
   // Restore the saved chart-grid layout (#1628).
   const ls = document.getElementById('chartLayoutSelect');
