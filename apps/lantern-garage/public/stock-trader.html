@@ -2589,11 +2589,12 @@ let barsLoading = false;
 const BARS_CACHE_TTL = 12*3600*1000;   // 12h
 function _saveBarsCache(){
   try{
-    // Trim to the last ~220 bars/ticker — plenty for the instant paint (visible
-    // window is ~78), and keeps the cache small across timeframes. loadBars still
-    // fetches the full history a beat later.
+    // Keep enough history for the deepest range (5Y/All ≈ 1300 daily bars). A shallow
+    // cache (the old 220) capped the instant-paint AND the timeframe-switch paint at
+    // ~10 months, so 1Y/5Y showed short until loadBars refreshed. Quota overflow is
+    // caught below (caching just skips; loadBars still supplies full history live).
     const trimmed = {};
-    for(const k in barsData){ const a = barsData[k] || []; trimmed[k] = a.length > 220 ? a.slice(-220) : a; }
+    for(const k in barsData){ const a = barsData[k] || []; trimmed[k] = a.length > 1300 ? a.slice(-1300) : a; }
     localStorage.setItem('trader.bars.'+chartTimeframe, JSON.stringify({ts:Date.now(), bars:trimmed}));
   }catch(e){ /* quota exceeded → skip caching, no harm */ }
 }
