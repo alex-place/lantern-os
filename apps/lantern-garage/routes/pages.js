@@ -46,6 +46,8 @@ const PROTECTED_PAGES = {
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
+  // Account repair table for admins and tech support only.
+  "/accounts.html":       { file: "accounts.html",          role: "tech_support" },
 };
 
 // A nav page an admin flagged "disabled" is blocked for everyone except admins
