@@ -70,6 +70,7 @@ const EXTENSION = {
   "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
+  "terms.html":                    ["account", null],
   "entry.html":                    ["account", null],
   "profile.html":                  ["account", null],
   "accounts.html":                 ["account", null], // staff account-support console (admin/tech_support): multi-auth + password fixes
@@ -112,7 +113,7 @@ const SUBSYSTEMS = {
 //      exceeds this cap the contract test FAILS: either add core value, or raise the cap
 //      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
 //      instead of letting it accrete silently).
-const MAX_EXTENSION_RATIO = 1.0; // 20:20 = 1.0 — added accounts.html (staff account-support console) under the always-on account module.
+const MAX_EXTENSION_RATIO = 1.05; // 21:20 = 1.05 — accounts.html (staff console) + terms.html (legally-required ToS+EULA shell surface), both always-on account module.
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always

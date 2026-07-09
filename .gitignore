@@ -501,3 +501,7 @@ data/csf_memory/raw/trace/
 # SWE-bench / agentic harness dumps written to repo root
 /agentic*.json
 /agentic-testout-*.txt
+
+# Machine-generated flat-RAG dumps (issue #2313) — rebuild with `npm run regen:rag` / `make regen-rag`
+skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md
+data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md
