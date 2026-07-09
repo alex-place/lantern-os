@@ -1,2 +1,0 @@
-### Fixed
-- **Live Kalshi orders no longer fail with HTTP 410.** The API client pointed at the legacy `external-api.kalshi.com` host, which still proxies reads but has **retired its order-placement endpoint** — every `POST /portfolio/orders` returned `410 Gone`, so every live swipe failed ("LIVE · FAILED … status 410"). Point the client at Kalshi's consolidated `api.elections.kalshi.com` host (reads + orders), overridable via `KALSHI_API_HOST`. The request signature is host-agnostic (timestamp+method+path), so auth is unaffected.

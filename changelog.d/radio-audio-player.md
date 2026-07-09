@@ -1,4 +1,0 @@
-### Keystone Radio is now a true audio player (custom transport + real VU)
-
-- `/fallout-radio.html` upgraded from the Internet Archive embed engine to a real `<audio>` player: custom play/pause, prev/next, seek bar, volume, auto-advance, and a **Web-Audio VU meter** that reacts to the waveform. Songs are public-domain mp3s served locally from `/radio/` (Ink Spots "I Don't Want to Set the World on Fire", "Civilization") — add a track by dropping an mp3 in `public/radio/` and adding a row to `STATIONS`.
-- Fix (`lib/http-utils.js`): `sendFile` had no audio/video MIME types, so `.mp3` served as `application/octet-stream` + `nosniff` and browsers refused to decode it. Added `audio/mpeg` (+ ogg/m4a/wav/flac/mp4/webm). Radio audio is served from `/radio/` rather than `/media/` because `routes/media.js` owns the `/media/*` prefix.

@@ -1,6 +1,0 @@
-### Explore: inline open-archive embeds in the single ranked feed
-
-- The Explore feed gains an **`embed` card type** — open-archive games and listening, rendered **inline as sandboxed iframes** instead of links you leave for: the Chrome **T-Rex** runner (local), **Prince of Persia** and **The Oregon Trail** (Internet Archive MS-DOS emulator), and public-domain **Frank Sinatra** radio + **Mozart** (Musopen) audio players. Curated, data-driven from `data/explore/embeds.json` — adding content is a JSON edit, no code change.
-- Each embed earns its slot the same way every other card does: **engagement or discarded**. A new `IntersectionObserver` records a `dwell` success when a panel sits ≥50% on-screen for 4s; scroll past and it never scores, so it sinks. Per-embed leaderboard key (`source:embed:<slug>`) so panels rank independently, not lumped by source.
-- The page is now genuinely **single-pane**: the old static panel grid (`.all-tools`) is replaced by one slim quick-links row, so nothing's orphaned but nothing competes with the feed.
-- A **Play** filter chip surfaces the embeds; every card still carries its `[why, source]` line per the Σ₀ Verify rule. Embeds lead the editorial cold-start order in `data/pcsf/explore.pcsf.json`.

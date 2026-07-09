@@ -1,2 +1,0 @@
-### Added
-- Σ₀ council reviews now carry a stable `id` and a real `outcome`: an execution check that ran is stamped `passed`/`failed` at record time, and `labelCouncilOutcome(id, outcome)` / `foldCouncilOutcomes()` let a later signal (revert, operator action) resolve text-only reviews. Turns the append-only council log from 368 unlabeled rows into measurable verification-recall (#2109). Strengthens **Verify**.
