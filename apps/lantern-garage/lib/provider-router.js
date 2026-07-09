@@ -507,6 +507,7 @@ module.exports = {
   recordProviderFailure,
   getProviderStatus,
   selectKernelProvider,
+  providerHasKey,
   PROVIDER_CHAINS,
   loadPcsfRouting,
   orderChainByPcsf,
