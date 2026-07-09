@@ -90,7 +90,9 @@ function httpsGetJson(url) {
 
 async function fetchChart(ticker, interval, range) {
   const sym = encodeURIComponent(tickerToYahoo(ticker));
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}`;
+  // includePrePost=true adds pre-market (04:00–09:30) and after-hours (16:00–20:00)
+  // bars to intraday charts. It's a no-op for daily+ intervals (no intraday sessions).
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=${interval}&range=${range}&includePrePost=true`;
   const j = await httpsGetJson(url);
   const result = j && j.chart && Array.isArray(j.chart.result) && j.chart.result[0];
   if (!result) throw new Error('no chart result');
