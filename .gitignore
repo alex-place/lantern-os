@@ -192,6 +192,9 @@ data/dream_journal/csf/*.csf
 data/status/agent-monitor-latest.json
 data/conversations/garage-conversations.jsonl
 apps/data/conversations/garage-conversations.jsonl
+# Per-user conversation logs (per-profile chat history) — runtime state, never committed.
+data/conversations/users/
+apps/data/conversations/users/
 
 # Runtime memoization / local tool artifacts
 .memos/

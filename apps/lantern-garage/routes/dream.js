@@ -378,8 +378,11 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
       const provLatency = Date.now() - provStart;
       try {
-        await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-journal", role: "operator", text: message.slice(0, maxConversationTextLength) });
-        await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-journal", role: "lantern", text: String(result.reply || "").slice(0, maxConversationTextLength) });
+        // Per-user persistence: attribute to the owning profile (session-resolved).
+        const userId = require("../lib/session-identity").getEffectiveUserId(req);
+        const sessionId = body.sessionId ? String(body.sessionId).slice(0, 64) : null;
+        await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-journal", role: "operator", text: message.slice(0, maxConversationTextLength), sessionId, userId });
+        await appendConversationEntry({ recordedAt: new Date().toISOString(), surface: "dream-journal", role: "lantern", text: String(result.reply || "").slice(0, maxConversationTextLength), sessionId, userId });
       } catch { /* logging non-critical */ }
       // Convergence IO provenance (AAPF) — lightweight Node-side record
       try {

@@ -1,3 +1,5 @@
+const fs = require("fs");
+const crypto = require("crypto");
 const path = require("path");
 const { appendJsonlQueued, readJsonl, rotateJsonlIfNeeded } = require("./file-queue");
 const { redactPII } = require("./redact");
@@ -8,9 +10,38 @@ const { dataRoot, stateRoot } = require("./app-paths");
 // relative to stateRoot() (not repoRoot) so reads resolve through file-queue's
 // data/-aware anchor in both profiles.
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
+// Per-user conversation storage: a logged-in user's turns live in an isolated
+// per-profile file so history follows the PROFILE (any device), not the client's
+// localStorage sessionId, and one user's chats are never returned to another.
+// Guests (no profile) + legacy untagged turns stay in this shared device-local
+// log, always scoped by sessionId at read time (never dumped wholesale).
 const conversationLogPath = path.join(dataRoot(), "conversations", "garage-conversations.jsonl");
+const usersConversationsRoot = path.join(dataRoot(), "conversations", "users");
 const operatorNotesPath = path.join(dataRoot(), "operator-notes", "notes.jsonl");
 const maxConversationTextLength = 4000;
+
+/**
+ * Normalize a profile id into a filesystem-safe storage key. Profile ids are hex
+ * / numeric / "local-owner" (session-identity.js), so the common path is a no-op;
+ * anything that could escape the directory is hashed to a safe token. Returns null
+ * for guests (no id) → the shared device-local log.
+ */
+function safeUserId(userId) {
+  if (userId == null) return null;
+  const s = String(userId).trim();
+  if (!s) return null;
+  if (/^[A-Za-z0-9_-]{1,80}$/.test(s)) return s;
+  return "u_" + crypto.createHash("sha256").update(s).digest("hex").slice(0, 32);
+}
+
+/** Absolute path to the conversation log for a user (per-profile), or the shared
+ *  guest/legacy log when userId is absent. */
+function conversationFileFor(userId) {
+  const uid = safeUserId(userId);
+  return uid
+    ? path.join(usersConversationsRoot, uid, "conversations.jsonl")
+    : conversationLogPath;
+}
 // #771 — bound the append-only conversation log. Rotate to timestamped archives past the
 // size cap and keep only the most recent N. Tunable via env.
 const conversationLogMaxBytes = Math.max(64 * 1024, Number(process.env.CONV_LOG_MAX_BYTES) || 5 * 1024 * 1024);
@@ -30,6 +61,10 @@ function normalizeConversationEntry(input) {
   const text = String(input.text || "").trim();
   const surface = String(input.surface || "garage").trim().slice(0, 80) || "garage";
   const sessionId = input.sessionId ? String(input.sessionId).trim().slice(0, 64) : null;
+  // Owning profile id (per-user storage). Resolved server-side from the session —
+  // callers must pass the authenticated id, never a client-supplied value. null =
+  // guest (device-local, keyed by sessionId).
+  const userId = safeUserId(input.userId);
 
   if (!allowedRoles.has(role)) {
     throw new Error("invalid_conversation_role");
@@ -77,15 +112,18 @@ function normalizeConversationEntry(input) {
     // #770: redact high-confidence PII / secrets at rest so a log leak exposes far less.
     text: redactPII(text.slice(0, maxConversationTextLength)),
     sessionId,
+    ...(userId ? { userId } : {}),
     ...(meta ? { meta } : {}),
   };
 }
 
 async function appendConversationEntry(entry) {
-  await appendJsonlQueued(conversationLogPath, entry);
+  // Route to the owning profile's file (per-user), or the shared guest/legacy log.
+  const target = conversationFileFor(entry && entry.userId);
+  await appendJsonlQueued(target, entry);
   // #771: keep the file bounded — rotate + prune once it exceeds the cap (serialized
   // behind the append in the same per-path write queue).
-  return rotateJsonlIfNeeded(conversationLogPath, {
+  return rotateJsonlIfNeeded(target, {
     maxBytes: conversationLogMaxBytes,
     keepArchives: conversationLogKeepArchives,
   });
@@ -98,14 +136,79 @@ function rotateConversationLogIfNeeded() {
   });
 }
 
-function readConversationLog(limit = 50, sessionId = null) {
-  // When scoped to a session, read a bounded larger window then filter,
-  // so the last `limit` *session* turns survive interleaving from other sessions.
+function readConversationLog(limit = 50, sessionId = null, userId = null) {
+  // Read one identity's log: the per-user file when userId is given, else the
+  // shared guest/legacy log. When scoped to a session, read a bounded larger
+  // window then filter, so the last `limit` *session* turns survive interleaving.
+  const target = conversationFileFor(userId);
   const window = sessionId ? 2000 : limit;
-  const all = readJsonl(path.relative(stateRoot(), conversationLogPath), window)
+  const all = readJsonl(path.relative(stateRoot(), target), window)
     .filter((entry) => !entry.parseError);
   if (!sessionId) return all;
   return all.filter((entry) => entry.sessionId === sessionId).slice(-limit);
+}
+
+/** Every per-user conversation file plus the shared guest/legacy log. */
+function allConversationFiles() {
+  const files = [conversationLogPath];
+  try {
+    for (const uid of fs.readdirSync(usersConversationsRoot)) {
+      const p = path.join(usersConversationsRoot, uid, "conversations.jsonl");
+      if (fs.existsSync(p)) files.push(p);
+    }
+  } catch { /* no per-user dir yet */ }
+  return files;
+}
+
+/**
+ * Operator-only cross-user read: merge the guest/legacy log with every per-user
+ * file, newest-last by recordedAt. NEVER expose to a non-operator caller — this is
+ * the whole-instance view.
+ */
+function readAllConversations(limit = 2000) {
+  const rows = [];
+  for (const file of allConversationFiles()) {
+    const part = readJsonl(path.relative(stateRoot(), file), limit).filter((e) => !e.parseError);
+    for (const r of part) rows.push(r);
+  }
+  rows.sort((a, b) => String(a.recordedAt || "").localeCompare(String(b.recordedAt || "")));
+  return rows.slice(-limit);
+}
+
+/**
+ * Clear conversation history, archiving the touched file(s) first.
+ *   { userId, sessionId } → that user's file (one session, or all their sessions)
+ *   { sessionId }         → the guest/legacy log, that session only
+ *   { all: true }         → every file (operator admin reset)
+ * Returns { removed, scope }.
+ */
+function clearConversations({ userId = null, sessionId = null, all = false } = {}) {
+  const targets = all ? allConversationFiles() : [conversationFileFor(userId)];
+  let removed = 0;
+  for (const file of targets) {
+    let lines = [];
+    try { lines = fs.readFileSync(file, "utf8").split(/\r?\n/).filter(Boolean); }
+    catch { continue; /* missing == already empty */ }
+    if (!lines.length) continue;
+    // Archive before mutating (matches the pre-per-user DELETE behaviour).
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    try { fs.copyFileSync(file, path.join(path.dirname(file), `garage-conversations.cleared-${stamp}.jsonl.bak`)); }
+    catch { /* best-effort archive */ }
+    if (sessionId && !all) {
+      const kept = [];
+      for (const line of lines) {
+        let obj = null;
+        try { obj = JSON.parse(line); } catch { kept.push(line); continue; }
+        if (obj && obj.sessionId === sessionId) removed += 1;
+        else kept.push(line);
+      }
+      fs.writeFileSync(file, kept.length ? kept.join("\n") + "\n" : "");
+    } else {
+      removed += lines.length;
+      fs.writeFileSync(file, "");
+    }
+  }
+  return { removed, scope: all ? "all" : sessionId ? "session" : "user" };
 }
 
 function normalizeRagCacheItem(input) {
@@ -164,6 +267,10 @@ module.exports = {
   appendConversationEntry,
   rotateConversationLogIfNeeded,
   readConversationLog,
+  readAllConversations,
+  clearConversations,
+  conversationFileFor,
+  safeUserId,
   normalizeRagCacheItem,
   appendExternalRagItem,
   readOperatorQueue,

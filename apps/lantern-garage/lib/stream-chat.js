@@ -13,6 +13,7 @@ const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyRespon
 const { modelFor: defaultModelFor, isAllowedModel } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
+const { getEffectiveUserId } = require("./session-identity");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
@@ -391,7 +392,11 @@ async function handleStreamChat(req, url, res) {
   // Session scoping: stamp every recorded turn with the caller's session so history
   // reads back per-conversation instead of one global flat log (issue: session mgmt).
   const sessionId = parsed.sessionId || null;
-  const logConversation = (entry) => appendConversationEntry({ ...entry, sessionId });
+  // Per-user persistence: resolve the owning profile from the SESSION (never the
+  // request body), so a logged-in user's turns are stored under their profile and
+  // read back on any device. Guests (null) fall back to device-local sessionId.
+  const userId = getEffectiveUserId(req);
+  const logConversation = (entry) => appendConversationEntry({ ...entry, sessionId, userId });
 
   // Handle bang commands
   let cmd = parseBangCommand(message);
@@ -1260,6 +1265,7 @@ async function handleStreamChat(req, url, res) {
   try {
     const budgeted = assembleSessionContext({
       sessionId: parsed.sessionId,
+      userId,
       clientHistory: history,
       currentMessage: message,
       requestedProvider,

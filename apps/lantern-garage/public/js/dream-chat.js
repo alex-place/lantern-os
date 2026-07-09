@@ -340,7 +340,10 @@
     if (!listEl) return;
     listEl.innerHTML = '<div class="sessions-empty">Loading…</div>';
     try {
-      const r = await fetch(`${serverBase}/api/conversations/sessions`, { signal: AbortSignal.timeout(4000) });
+      // Pass the device sessionId so a logged-OUT guest gets their own device-local
+      // session scoped back (the server returns a logged-IN user's full list from
+      // their profile and ignores this param). Fixes the cross-user session leak.
+      const r = await fetch(`${serverBase}/api/conversations/sessions?sessionId=${encodeURIComponent(chatSessionId)}`, { signal: AbortSignal.timeout(4000) });
       const data = r.ok ? await r.json() : { sessions: [] };
       renderSessions(data.sessions || []);
     } catch {

@@ -60,12 +60,14 @@ function normalizeClientHistory(history) {
 
 // Reconstruct a session's prior turns (oldest → newest) from the conversation
 // log. operator → user, lantern → assistant; system/note rows are skipped.
-function sessionTurnsFromLog(sessionId) {
+function sessionTurnsFromLog(sessionId, userId = null) {
   if (!sessionId) return [];
   let rows = [];
   try {
     const { readConversationLog } = require("./conversation-store");
-    rows = readConversationLog(SESSION_LOG_READ_LIMIT, sessionId) || [];
+    // Read from the owning profile's file when known, so a logged-in user's full
+    // prior history reconstructs (it lives under their profile, not the guest log).
+    rows = readConversationLog(SESSION_LOG_READ_LIMIT, sessionId, userId) || [];
   } catch {
     return [];
   }
@@ -120,11 +122,11 @@ function readSessionSummary(sessionId) {
 // Returns { compacted, meta }. `compacted` is a drop-in for the old
 // compactHistory(history) output. Synchronous: the log read is sync and the
 // summary persist is fire-and-forget.
-function assembleSessionContext({ sessionId, clientHistory, currentMessage, requestedProvider, surfaceMode } = {}) {
+function assembleSessionContext({ sessionId, userId = null, clientHistory, currentMessage, requestedProvider, surfaceMode } = {}) {
   const maxOutputTokens = surfaceMode === "three-doors" ? 1536 : 1024;
   const contextWindow = contextWindowFor({ requestedProvider });
 
-  const logTurns = sessionTurnsFromLog(sessionId);
+  const logTurns = sessionTurnsFromLog(sessionId, userId);
   const cliTurns = normalizeClientHistory(clientHistory);
   // Prefer whichever source carries more context. A freshly-migrated session has
   // untagged (unfindable) log rows → fall back to the client's recent turns;

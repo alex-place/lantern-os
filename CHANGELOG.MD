@@ -1,3 +1,7 @@
+## [1.8.119] - 2026-07-09
+### Added
+- **Per-user conversation persistence + cross-user session-leak fix.** Chat history is now stored per PROFILE (`data/conversations/users/<userId>/`), resolved server-side via `getEffectiveUserId`, so a logged-in user's conversations follow their account across devices instead of the client's `localStorage` sessionId. `/api/conversations/sessions`, per-session read, and clear are now scoped to the session-resolved profile id — closing a leak where every caller received every other user's session titles/previews. Guests fall back to the shared device-local log scoped by sessionId; operators keep the whole-instance view; identity is never trusted from the request body. Adds `test/conversation-per-user.test.js`. Improves **Remember**.
+
 ## [1.8.118] - 2026-07-09
 
 ### Fixed
