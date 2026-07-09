@@ -428,6 +428,55 @@ const REGISTRY = {
     },
   },
 
+  // Generate an image from a text prompt via the OSS-first image-model-registry (Act stage,
+  // #1847). This REPLACES the old client-side "draw me X" keyword intercept: the model calls
+  // this tool natively, and the returned Markdown image auto-embeds in chat. Never fabricates
+  // a URL — returns a clear error the model must relay if generation is unavailable.
+  generate_image: {
+    policy: "read",
+    guest_safe: true,
+    desc: "Generate an image from a text description and return a Markdown image link that renders inline in the chat. Use this whenever the user asks you to draw, paint, sketch, illustrate, or generate a picture/image of something — decide on your own initiative, don't wait to be told to 'use a tool'. Pass the subject to depict as `prompt`. On success you MUST include the returned ![...](url) Markdown in your reply so the user actually sees the image. If it reports generation is unavailable, tell the user plainly — never invent an image URL.",
+    schema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "What to depict, e.g. 'a lighthouse at dusk, watercolor style'" },
+      },
+      required: ["prompt"],
+    },
+    async run(i) {
+      const prompt = String(i.prompt || "").trim();
+      if (!prompt) return "[generate_image error: a prompt describing the image is required]";
+      let registry, openaiImage;
+      try {
+        registry = require("./image-model-registry");
+        openaiImage = require("./openai-image");
+      } catch (e) {
+        return `[generate_image error: image backend unavailable (${e.message})]`;
+      }
+      // Same provider chain + drivers the /api/image/ai-generate route uses (OSS-first).
+      const drivers = {
+        openai: (p) => openaiImage.generateImage(p),
+        comfyui: async () => ({ ok: false, error: "comfyui provider not yet implemented" }),
+        pollinations: async () => ({ ok: false, error: "pollinations is client-side only" }),
+      };
+      let chain = [];
+      try { chain = registry.resolveImageChain("scene"); } catch { chain = []; }
+      let result = { ok: false, error: "no image provider available" };
+      for (const provider of chain) {
+        const driver = drivers[provider.kind];
+        if (!driver) continue;
+        try { result = await driver(prompt); } catch (e) { result = { ok: false, error: e.message }; }
+        if (result && result.ok) { result.provider = provider.id; break; }
+      }
+      if (!result || !result.ok) {
+        return `[generate_image: image generation is unavailable right now (${(result && result.error) || "no provider reachable"}) — tell the user you couldn't generate the image. Do NOT invent an image URL.]`;
+      }
+      const label = prompt.length > 80 ? prompt.slice(0, 80) + "…" : prompt;
+      return `generate_image ok — provider ${result.provider || result.model || "image"}.\n` +
+        `Include this Markdown in your reply so the image renders inline for the user:\n\n![${label}](${result.url})`;
+    },
+  },
+
   // #1344: a first-class issue/PR lookup. Before this, "find issue #1342" had no tool —
   // the model fell back to Grep on repo files (issues don't live in the repo), found
   // nothing, and gave up, even though the live-context block already injects the top-8

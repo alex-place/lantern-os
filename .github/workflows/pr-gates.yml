@@ -134,6 +134,27 @@ jobs:
       - name: Run sprawl tripwire
         run: node scripts/sprawl-tripwire.mjs --base origin/master
 
+  # ── No deterministic keyword intent-routing ─────────────────────────────────
+  # The chat routes capabilities through the model's native tool calls, not pre-LLM
+  # keyword/regex intercepts (which once turned "world news" into "Now playing —
+  # Super Mario World"). This gate fails a PR that re-adds a keyword classifier
+  # (classifyIntent / INTENT_PATTERNS / triggers-array) or a pre-LLM message
+  # intercept. Model-based / measured routers are allowlisted in the guard.
+  no-keyword-intent-routing:
+    name: No deterministic keyword intent-routing
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Fetch base branch
+        run: git fetch origin master
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Run keyword-intent-routing guard
+        run: node scripts/no-keyword-intent-routing.mjs --base origin/master
+
   # ── Surface Boundary Contract ───────────────────────────────────────────────
   # ADR-0023 declares the Σ₀ surface boundary merge-enforced. This job makes that
   # true: every public/*.html must be classified core|extension in

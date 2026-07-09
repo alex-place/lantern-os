@@ -84,6 +84,30 @@ if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_SPRAWL_CHECK" != "1" ]; then
   fi
 fi
 
+# ── 2d. No deterministic keyword intent-routing in the chat surface ──────────
+# The chat routes capabilities through the model's native tool calls, not pre-LLM
+# keyword/regex intercepts (which once turned "world news" into "Now playing — Super
+# Mario World"). This SAME check runs in CI; enforcing it at push time catches a
+# reintroduced keyword classifier / intercept locally instead of in PR review.
+# Bypass: SKIP_INTENT_ROUTING_CHECK=1 (or SKIP_MONOWORKSTREAM=1) git push ...
+if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_INTENT_ROUTING_CHECK" != "1" ]; then
+  _root=$(git rev-parse --show-toplevel 2>/dev/null)
+  _guard="$_root/scripts/no-keyword-intent-routing.mjs"
+  if [ -f "$_guard" ]; then
+    _node=$(command -v node 2>/dev/null)
+    if [ -n "$_node" ]; then
+      if ! "$_node" "$_guard" --base origin/master; then
+        echo ""
+        echo "Bypass: SKIP_INTENT_ROUTING_CHECK=1 (or SKIP_MONOWORKSTREAM=1) git push ..."
+        echo ""
+        exit 1
+      fi
+    else
+      echo "[prepush] node not found on PATH — skipping keyword-intent-routing guard."
+    fi
+  fi
+fi
+
 # ── 3. Per-agent workstream gate ─────────────────────────────────────────────
 if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
 if ! command -v gh >/dev/null 2>&1; then exit 0; fi
