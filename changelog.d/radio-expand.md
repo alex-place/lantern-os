@@ -1,5 +1,0 @@
-### Keystone Radio: 6 songs, working seek, and a panel on Explore
-
-- The radio now spins **six** public-domain Fallout-era recordings (was two): Ink Spots "I Don't Want to Set the World on Fire", Danny Kaye "Civilization", Bing Crosby "Pistol Packin' Mama", Ink Spots & Ella "Into Each Life Some Rain Must Fall", "(I've Got Spurs That) Jingle Jangle Jingle", and Louis Prima "Rum and Coca-Cola". All served locally from `/radio/`.
-- **Seek slider fixed two ways:** (1) a scrubbing flag stops `timeupdate` from yanking the thumb back mid-drag; (2) `lib/http-utils.js` `sendFile` now sets `Content-Length`/`Accept-Ranges` and honors HTTP **Range** requests (206) so `<audio>`/`<video>` are actually seekable — previously the element reported the file as non-seekable. `routes/surfaces.js` passes `req` through so the static catch-all can range-serve media; HEAD requests now return headers only.
-- **Radio is now a panel in the Explore feed** (`data/explore/embeds.json` → `keystone-radio`), framed inline like the games, in addition to the quick-link.

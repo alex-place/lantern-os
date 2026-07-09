@@ -1,5 +1,0 @@
-### Dream-chat: file-upload work tool, cross-session memory, and oracle on the live path
-
-- **The `+` is now a generic file-upload work tool.** Upload *any* file type → it's extracted in-process (`/api/files/extract`, reusing `document-extractor`, no python) and attached to the current turn as a chip, so the chat can summarize / answer / act on it — grounded with the file as evidence. PDFs/Docs still route to the Knowledge Center as before; unsupported/binary files fail loud, never blank.
-- **Chat sessions now remember across sessions.** Relevant past turns are recalled by relevance from the one conversation log (`queryConversationMemory` → `formatCSFContextForPrompt`) and injected into the prompt — no new memory store. The model references real recalled turns instead of disowning them.
-- **The Convergence Oracle now grounds the LIVE streaming chat.** The earlier wiring only reached the non-stream `/api/dream/chat`; `stream-chat.js` (what the UI actually uses) now injects the time-banded observer slice into every turn's prompt, fail-safe.

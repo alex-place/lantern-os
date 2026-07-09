@@ -1,1 +1,0 @@
-fix(trader): symbol search no longer blocks on the 45s asset-universe spawn (#1859), and a failed market scan surfaces an honest "market data unavailable — <reason>" state instead of an eternal "warming up" (#1861)
