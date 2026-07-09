@@ -323,12 +323,26 @@
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
+  /* Mobile view switch (chart vs ticker list) — hidden on desktop (both panels show). */
+  .mobile-view-tabs{ display:none; }
+  .mvt-btn{ flex:1; min-height:40px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
+    font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .mvt-btn.active{ background:var(--bg3); color:var(--text0); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
-    .layout{ grid-template-columns:1fr; }
-    .sidebar{ display:none; }              /* watchlist hidden on phone — main gets full width */
-    .main, .footer{ grid-column:1; }
-    .header{ overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
+    /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
+       The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
+    .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
+    .header{ flex:0 0 auto; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
     .header::-webkit-scrollbar{ height:0; }
+    .mobile-view-tabs{ display:flex; flex:0 0 auto; border-bottom:1px solid var(--border); }
+    /* default = chart view: charts + footer visible, ticker list hidden */
+    .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
+    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; }
+    .footer{ flex:0 0 auto; }
+    /* tickers view: show the ticker list, hide charts + footer */
+    .layout.mobile-tickers .sidebar{ display:flex; }
+    .layout.mobile-tickers .main,
+    .layout.mobile-tickers .footer{ display:none; }
     /* Bigger touch targets on phones for the dense toolbar controls (#2255). */
     .nav-link, .chart-ctrl, .range-btn{ min-height:36px; }
     .chart-ctrl, .range-btn{ padding:6px 10px; }
@@ -504,6 +518,13 @@
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
   <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
+</div>
+
+<!-- Mobile-only view switch: the ticker list and the charts can't both fit at phone width,
+     so toggle between them (chart view is the default). Hidden on desktop (both show). -->
+<div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
+  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">📈 Chart</button>
+  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">📋 Tickers</button>
 </div>
 
 <!-- Sidebar -->
@@ -2840,6 +2861,21 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 <!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
      <nav class="site-nav"> at the top of <body>; theme-toggle defines toggleTheme()
      for the ☀/🌙 button; both run before auth-gate (which highlights the active link). -->
+<script>
+  /* Mobile view switch (#2255): toggle between the charts and the ticker list, since both
+     can't fit at phone width. Chart is the default; the tab bar only shows on mobile. */
+  function setMobileView(view) {
+    var layout = document.querySelector('.layout');
+    if (!layout) return;
+    layout.classList.toggle('mobile-tickers', view === 'tickers');
+    document.querySelectorAll('.mvt-btn').forEach(function (b) {
+      var on = b.getAttribute('data-view') === view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+  window.setMobileView = setMobileView;
+</script>
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
