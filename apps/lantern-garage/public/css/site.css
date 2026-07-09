@@ -135,7 +135,10 @@ html, body {
     -ms-overflow-style: none;
   }
   .nav-links::-webkit-scrollbar { display: none; }
-  .nav-links a { padding: 6px 8px; font-size: 12.5px; }
+  /* Bigger touch targets on mobile (#2255): taller nav links + larger icon buttons.
+     .site-nav prefix out-specifies the base .nav-btn rule that follows this block. */
+  .nav-links a { padding: 10px 9px; font-size: 12.5px; }
+  .site-nav .nav-btn { width: 40px; height: 40px; }
 }
 .nav-actions {
   margin-left: auto;
