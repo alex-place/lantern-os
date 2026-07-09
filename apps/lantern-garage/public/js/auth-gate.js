@@ -166,9 +166,20 @@
       // When an admin disables the Patreon gate (server reports authRequired:false),
       // guests browse freely — don't bounce them to /auth.html.
       const gateOff = session && session.authRequired === false;
-      if (!isPublic && !gateOff && (!session || !session.authenticated)) {
+      const authed = !!(session && session.authenticated);
+      // First-visit gate: a not-signed-in visitor who hasn't made an entry choice yet is
+      // sent to /auth.html ONCE to decide. Signing in creates a session; "Continue without
+      // an account" sets ln_guest=1. Either way they're not prompted again — so the default
+      // is signed-OUT-and-asked, never silently signed in.
+      const guestChoice = document.cookie.split(/;\s*/).some((c) => c === 'ln_guest=1');
+      const onAuthPage = pathname === '/auth.html' || pathname === '/auth';
+      if (!gateOff && !authed && !guestChoice && !onAuthPage) {
         location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
-      } else if (TRADE_PAGES.includes(pathname) && session && session.authenticated && !canTrade) {
+        return;
+      }
+      if (!isPublic && !gateOff && !authed) {
+        location.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
+      } else if (TRADE_PAGES.includes(pathname) && authed && !canTrade) {
         // Direct navigation to a trade page without entitlement → bounce home.
         location.href = '/';
       }
