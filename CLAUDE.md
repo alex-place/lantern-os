@@ -331,6 +331,18 @@ Each test run logs:
 }
 ```
 
+### Running a chat capability / benchmark test manually
+
+To drive `dream-chat.html` through a prompt suite (golden benchmark or freeform
+capability list) by hand and score it, follow **[docs/CHAT-EVAL-RECIPE.md](docs/CHAT-EVAL-RECIPE.md)**.
+It captures the fast path (warm the provider, plain turns, pace off the disk log,
+grade with the real HumanEval sandbox) and the gotchas that otherwise cost a
+re-run: cold-start provider errors (#2128), the `coding_change` stall (#2321), the
+30s `preview_eval` cap, mid-run server crashes recoverable from
+`data/conversations/garage-conversations.jsonl` (#2320), and noisy groundedness
+bands on closed-context tasks (#2322). For the automated 164-problem headline,
+use `scripts/eval_humaneval_chat.py`.
+
 ## Per-Lane Workstream Rule (Critical)
 
 Each **lane** may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default
