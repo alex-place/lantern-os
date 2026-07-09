@@ -7,13 +7,17 @@
  * tech_support: granting/removing the admin role, and unlinking a provider (both
  * are privilege- or lockout-sensitive).
  *
- *   GET  /api/accounts                  → { accounts[], viewer }
- *   POST /api/accounts/role             → { id, role }         set a role
- *   POST /api/accounts/reconcile        → { id }               re-apply owner/admin override monotonically
- *   POST /api/accounts/reset-password   → { id }               set a temp password, return it for the operator to relay
- *   POST /api/accounts/unlink           → { id, provider }     (admin only) remove a linked identity
+ *   GET  /api/accounts                  → { accounts[], archived[], viewer }
+ *   POST /api/accounts/role             → { id, role }              set a role
+ *   POST /api/accounts/reconcile        → { id }                    re-apply owner/admin override monotonically
+ *   POST /api/accounts/update           → { id, name?, email? }     edit name / email (email change ⇒ admin)
+ *   POST /api/accounts/set-password     → { id, password?, email? } set a password, optionally email the user
+ *   POST /api/accounts/reset-password   → { id }                    set a temp password, return it for the operator to relay
+ *   POST /api/accounts/delete           → { id }                    (admin only) archive a read-only copy, then tombstone
+ *   POST /api/accounts/unlink           → { id, provider }          (admin only) remove a linked identity
  *
  * Every mutation appends a line to data/profiles/account-admin-audit.jsonl.
+ * Deleted accounts are snapshotted to data/profiles/archive.jsonl first.
  */
 
 "use strict";
@@ -28,13 +32,24 @@ const {
   setUserRole,
   unlinkIdentity,
   setLocalPassword,
+  updateProfile,
+  deleteProfile,
+  getProfileByEmail,
+  publicProfile,
 } = require("../lib/user-profiles");
 const { profileHasAdminOverride } = require("../lib/auth-providers");
 const { higherRole, isStaffRole, ROLE_HIERARCHY } = require("../lib/role-hierarchy");
 const { isStaff, isAdmin } = require("../lib/auth-middleware");
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
+const { sendMail, smtpConfigured } = require("../lib/mailer");
 
 const AUDIT_LOG = path.join(process.cwd(), "data", "profiles", "account-admin-audit.jsonl");
+// Read-only archive of deleted accounts — a durable snapshot appended before the
+// profile is tombstoned, so a "delete" is recoverable/auditable, never data loss.
+const ARCHIVE_LOG = path.join(process.cwd(), "data", "profiles", "archive.jsonl");
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIN_PASSWORD = 8;
 
 // Roles an operator may assign from the console. `founder` is a legacy alias and is
 // intentionally omitted from the picker (deep_dreamer is its canonical name).
@@ -111,6 +126,8 @@ function toAccountView(p) {
     role: p.role || "guest",
     tier: p.tier || null,
     hasPassword,
+    archived: p.deleted === true,
+    archivedAt: p.deletedAt || null,
     createdAt: (p.metadata && p.metadata.createdAt) || null,
   };
   view.providers = providersOf({ ...p, hasPassword });
@@ -140,13 +157,14 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
     assignableRoles: ASSIGNABLE_ROLES,
   };
 
-  // GET /api/accounts — the whole table.
+  // GET /api/accounts — the whole table. `archived` carries the read-only deleted
+  // accounts so the UI can show them behind a "Show archived" toggle.
   if (method === "GET" && pathname === "/api/accounts") {
-    const accounts = listProfiles()
-      .filter((p) => !p.deleted)
-      .map(toAccountView)
-      .sort((a, b) => (a.email || a.id).localeCompare(b.email || b.id));
-    sendJson(res, { accounts, viewer });
+    const all = listProfiles();
+    const byEmail = (a, b) => (a.email || a.id).localeCompare(b.email || b.id);
+    const accounts = all.filter((p) => !p.deleted).map(toAccountView).sort(byEmail);
+    const archived = all.filter((p) => p.deleted).map(toAccountView).sort(byEmail);
+    sendJson(res, { accounts, archived, viewer });
     return true;
   }
 
@@ -157,7 +175,10 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
     catch { sendJson(res, { error: "invalid_json" }, 400); return true; }
   }
   const target = body.id ? getProfile(body.id) : null;
-  const targetNeeded = ["/api/accounts/role", "/api/accounts/reconcile", "/api/accounts/reset-password", "/api/accounts/unlink"];
+  const targetNeeded = [
+    "/api/accounts/role", "/api/accounts/reconcile", "/api/accounts/reset-password",
+    "/api/accounts/unlink", "/api/accounts/update", "/api/accounts/set-password", "/api/accounts/delete",
+  ];
   if (targetNeeded.includes(pathname)) {
     if (!body.id) { sendJson(res, { error: "id is required" }, 400); return true; }
     if (!target) { sendJson(res, { error: "account_not_found", id: body.id }, 404); return true; }
@@ -210,6 +231,86 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
     setLocalPassword(target.id, pw);
     audit(req, "reset_password", target.id, { method: "temp_password" });
     sendJson(res, { ok: true, tempPassword: pw, account: toAccountView(getProfile(target.id)) });
+    return true;
+  }
+
+  // POST /api/accounts/update — edit the account's display name and/or email.
+  // Changing the email or touching an ADMIN account requires admin (identity-
+  // sensitive). A new email is marked unverified until the user re-confirms.
+  if (method === "POST" && pathname === "/api/accounts/update") {
+    const updates = {};
+    if (typeof body.name === "string") updates.name = body.name.trim().slice(0, 120);
+    const emailChanging = typeof body.email === "string" && body.email.trim().toLowerCase() !== (target.email || "").toLowerCase();
+    if (emailChanging) {
+      const email = body.email.trim();
+      if (!EMAIL_RE.test(email)) { sendJson(res, { error: "invalid_email" }, 400); return true; }
+      const clash = getProfileByEmail(email);
+      if (clash && clash.id !== target.id) { sendJson(res, { error: "email_taken" }, 409); return true; }
+      updates.email = email;
+      updates.emailVerified = false; // a changed address is unverified until reconfirmed
+    }
+    // Editing an admin account, or changing an email, is admin-only.
+    if ((target.role === "admin" || emailChanging) && !viewerAdmin) {
+      sendJson(res, { error: "edit_requires_admin", detail: "Editing an admin account or changing an email requires admin." }, 403);
+      return true;
+    }
+    if (!Object.keys(updates).length) { sendJson(res, { error: "nothing_to_update" }, 400); return true; }
+    const updated = updateProfile(target.id, updates);
+    audit(req, "update_profile", target.id, { fields: Object.keys(updates), email: updates.email || undefined });
+    sendJson(res, { ok: true, account: toAccountView(updated) });
+    return true;
+  }
+
+  // POST /api/accounts/set-password — set a password (provided or generated) and,
+  // optionally, email it to the user. Setting a password on an admin account
+  // requires admin. { id, password?, email?:bool }
+  if (method === "POST" && pathname === "/api/accounts/set-password") {
+    if (target.role === "admin" && !viewerAdmin) {
+      sendJson(res, { error: "set_password_requires_admin" }, 403);
+      return true;
+    }
+    let pw = typeof body.password === "string" && body.password ? body.password : null;
+    const generated = !pw;
+    if (pw && pw.length < MIN_PASSWORD) {
+      sendJson(res, { error: "weak_password", detail: `min ${MIN_PASSWORD} chars` }, 400);
+      return true;
+    }
+    if (!pw) pw = tempPassword();
+    setLocalPassword(target.id, pw);
+    let emailed = false, emailTransport = null;
+    if (body.email === true) {
+      if (!target.email) { sendJson(res, { error: "no_email_on_account" }, 400); return true; }
+      const html =
+        `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">` +
+        `<h2 style="color:#06b6d4">unisona.ai</h2><h3>Your password was set by an administrator</h3>` +
+        `<p>Hi ${target.name || "there"}, an administrator set a new password for your unisona.ai account.</p>` +
+        `<p>Temporary password: <code style="background:#f1f5f9;padding:4px 8px;border-radius:6px;font-size:15px">${pw}</code></p>` +
+        `<p><strong>Please sign in and change it right away.</strong></p></div>`;
+      const r = await sendMail({ to: target.email, subject: "Your unisona.ai password was reset", html, text: `Your new temporary password: ${pw}. Please sign in and change it.` });
+      emailed = !!(r && r.ok);
+      emailTransport = r && r.transport;
+    }
+    audit(req, "set_password", target.id, { generated, emailed });
+    // Return the plaintext ONLY when generated (operator needs to relay it); when the
+    // operator typed it, they already have it.
+    sendJson(res, { ok: true, tempPassword: generated ? pw : undefined, emailed, emailTransport, smtp: smtpConfigured(), account: toAccountView(getProfile(target.id)) });
+    return true;
+  }
+
+  // POST /api/accounts/delete — archive a read-only copy, then tombstone (ADMIN ONLY).
+  if (method === "POST" && pathname === "/api/accounts/delete") {
+    if (!viewerAdmin) { sendJson(res, { error: "delete_requires_admin" }, 403); return true; }
+    if (target.id === getSessionUserId(req)) { sendJson(res, { error: "cannot_delete_self" }, 400); return true; }
+    // Durable read-only snapshot BEFORE tombstoning (credential stripped).
+    try {
+      fs.appendFileSync(
+        ARCHIVE_LOG,
+        JSON.stringify({ archivedAt: new Date().toISOString(), archivedBy: actorOf(req), profile: publicProfile(target) }) + "\n"
+      );
+    } catch (_) { /* best-effort archive; deletion still proceeds via tombstone */ }
+    deleteProfile(target.id); // tombstone: { deleted:true, deletedAt } appended to index
+    audit(req, "delete_account", target.id, { email: target.email || null, archived: true });
+    sendJson(res, { ok: true, id: target.id });
     return true;
   }
 
