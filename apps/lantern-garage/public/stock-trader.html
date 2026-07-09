@@ -765,7 +765,8 @@ let chartSlots = (()=>{ try{ return JSON.parse(localStorage.getItem('trader.char
 const SLOT_COLS = {1:1,2:2,3:3,4:2,6:3,10:5,20:5};
 let activeTicker   = null;
 let barsData       = {};
-let chartType      = 'line';
+// Persisted chart type. Candles are the default the first time a user visits.
+let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
 let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
 let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
@@ -816,7 +817,7 @@ const RANGES = {
   '5Y':  { tf: '1d', bars: 1260 },
   'All': { tf: '1d', bars: 99999 },  // clamped to whatever daily history is available
 };
-let activeRange = '1D';
+let activeRange = (()=>{ try{ return localStorage.getItem('trader.range') || '1D'; }catch(e){ return '1D'; } })();
 // Approximate trading days elapsed this calendar year (~5 sessions per 7 days).
 function ytdTradingBars(){
   const now = new Date();
@@ -1249,8 +1250,15 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     // timeframe (1D≈78×5m, 5D≈35×1h, 1M≈22 daily trading days) instead of a flat
     // 70 — so the candle count matches the selected range. Pan to see more history.
     const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22 };
+    // Honor the saved/active RANGE window when it matches the current timeframe, so a
+    // chart re-opens at the same zoom the user left it (e.g. 1Y stays 1Y across reloads)
+    // instead of snapping back to the timeframe's default window.
+    const rangeBars = (RANGES[activeRange] && RANGES[activeRange].tf === chartTimeframe)
+      ? (RANGES[activeRange].bars == null ? ytdTradingBars() : RANGES[activeRange].bars)
+      : null;
     const base = DEFAULT_VIS[chartTimeframe] || 70;
-    view.visibleBars = Math.min(bars.length, isFs ? Math.round(base * 2.2) : base);
+    const want = rangeBars != null ? rangeBars : (isFs ? Math.round(base * 2.2) : base);
+    view.visibleBars = Math.min(bars.length, want);
     view.barOffset = 0;
   }
 
@@ -1945,6 +1953,7 @@ function renderSymbolInfo(ticker){
 
 function focusTicker(t){
   activeTicker = t;
+  try{ localStorage.setItem('trader.ticker', t); }catch(e){}   // remember the selected symbol
   renderWatchlist();
   renderSymbolInfo(t);
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
@@ -2548,6 +2557,7 @@ async function loadBars(){
 
 function changeChartType(type){
   chartType = type;
+  try{ localStorage.setItem('trader.chartType', type); }catch(e){}   // remember for next visit
   document.getElementById('chartTypeSelect').value = type;
   document.getElementById('fsChartTypeSelect').value = type;
   wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
@@ -2573,6 +2583,7 @@ function changeTimeframe(tf, winBars){
 function changeRange(range){
   const r = RANGES[range]; if(!r) return;
   activeRange = range;
+  try{ localStorage.setItem('trader.range', range); }catch(e){}   // remember for next visit
   const want = (r.bars == null) ? ytdTradingBars() : r.bars;
   changeTimeframe(r.tf, want);
 }
@@ -2889,7 +2900,10 @@ function startDashboard(){
     // Info-only: sets the active ticker + renders the panel, but does NOT open the
     // order panel or zoom a chart (so it works for read-only users too).
     if(wlPrices.length && !activeTicker){
-      activeTicker = wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      // Prefer the symbol the user was last on (if still in the watchlist), else SPY.
+      let saved=null; try{ saved=localStorage.getItem('trader.ticker'); }catch(e){}
+      activeTicker = (saved && wlPrices.some(w=>w.ticker===saved)) ? saved
+                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
@@ -2898,6 +2912,12 @@ function startDashboard(){
   // Restore the saved chart-grid layout (#1628).
   const ls = document.getElementById('chartLayoutSelect');
   if(ls){ ls.value = String(slotCount); }
+  // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
+  // toolbar matches what the charts render. The values themselves are restored above from
+  // localStorage (chartType/chartTimeframe/activeRange); this just syncs the <select>s.
+  ['chartTypeSelect','fsChartTypeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartType; });
+  ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s && activeRange) s.value=activeRange; });
   applyGridCols();
   // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
   // switch between the desktop tiling and the single-column phone stack.
