@@ -205,9 +205,16 @@ function CiState($sha) {
 # =================== main ===================
 if (-not (AcquireLock)) { exit 0 }
 try {
-  & git -C $STABLE fetch origin master --quiet 2>&1 | Out-Null
+  # Track UPSTREAM master (alex-place, the source of truth) rather than the fork's
+  # origin/master, which drifts behind upstream after every merge and would otherwise
+  # leave 4177/lantern-os.net serving stale code until someone re-synced the fork.
+  $upstreamUrl = 'https://github.com/alex-place/lantern-os.git'
+  if (-not ((& git -C $STABLE remote) -contains 'upstream')) {
+    & git -C $STABLE remote add upstream $upstreamUrl 2>&1 | Out-Null
+  }
+  & git -C $STABLE fetch upstream master --quiet 2>&1 | Out-Null
   $local  = (& git -C $STABLE rev-parse HEAD).Trim()
-  $remote = (& git -C $STABLE rev-parse origin/master).Trim()
+  $remote = (& git -C $STABLE rev-parse upstream/master).Trim()
 
   if (($local -eq $remote) -and -not $Force) {
     # Self-heal (2026-06-26): code is current, but if the server has DIED, restart it
@@ -279,7 +286,7 @@ try {
   # reset complete (writing the LFS pointer) instead of wedging on a dead endpoint.
   & git -C $STABLE config --local filter.lfs.required false 2>&1 | Out-Null
 
-  & git -C $STABLE reset --hard origin/master --quiet 2>&1 | Out-Null
+  & git -C $STABLE reset --hard upstream/master --quiet 2>&1 | Out-Null
 
   # restore preserved runtime data (master did not change these this deploy)
   foreach ($f in $preserve) {
