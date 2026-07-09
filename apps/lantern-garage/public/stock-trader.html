@@ -370,6 +370,9 @@
     .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
     .main{ flex:1 1 auto; min-height:0; overflow-y:auto; }
     .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; }
+    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols); let the
+       grid grow past the viewport and scroll inside .main instead of squishing to fit. */
+    .cards-grid.grid-fixed{ height:auto; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -1484,10 +1487,14 @@ function applyGridCols(){
   if(!grid) return;
   const main = document.querySelector('.main');
   if(slotCount){
-    const cols = SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount));
+    // Phones only have vertical room — a 2×1 / 2×2 tiling squeezes each chart into a
+    // tiny sliver. Stack ALL fixed-grid charts in a single column and give each a real
+    // min-height so they use the vertical space and scroll. Desktop keeps the tiling.
+    const narrow = isNarrowTrader();
+    const cols = narrow ? 1 : (SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount)));
     const rows = Math.ceil(slotCount / cols);
     grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    grid.style.gridTemplateRows    = `repeat(${rows},1fr)`;   // rows fill the height equally
+    grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(260px,1fr))` : `repeat(${rows},1fr)`;
     grid.classList.add('grid-fixed');
     grid.classList.toggle('grid-single', slotCount === 1);
     if(main) main.classList.add('main-fixed');
@@ -2842,6 +2849,13 @@ function startDashboard(){
   const ls = document.getElementById('chartLayoutSelect');
   if(ls){ ls.value = String(slotCount); }
   applyGridCols();
+  // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
+  // switch between the desktop tiling and the single-column phone stack.
+  let _lastNarrow = isNarrowTrader();
+  window.addEventListener('resize', function(){
+    const n = isNarrowTrader();
+    if(n !== _lastNarrow){ _lastNarrow = n; applyGridCols(); renderCards(); }
+  });
   fullRefresh();
   loadBars();
   loadOrders();
