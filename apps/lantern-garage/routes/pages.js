@@ -12,6 +12,9 @@ const { isPageDisabled } = require("../lib/feature-flags");
 const PUBLIC_PAGES = {
   "/auth.html":           "auth.html",
   "/auth":                "auth.html",
+  // Terms of Service + EULA — MUST be public so a signed-out user can read it
+  // before agreeing during account creation (linked from auth.html).
+  "/terms.html":          "terms.html",
   "/reset-password.html": "reset-password.html",
   "/":                    "index.html",
   "/index.html":          "index.html",
