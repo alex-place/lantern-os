@@ -399,6 +399,20 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
       if (ibkrAccount) {
         const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        // Reconcile the header's Unrealized P&L with the positions the user actually
+        // sees. `ibkrAccount.unrealized` comes from IBKR's /pnl/partitioned `upl`, a
+        // real-time subscription that lags on CPAPI (it returned a stale, rounded
+        // 6480 while the 10 live positions summed to 1895.84 — the exact mismatch a
+        // user reported). The per-position unrealized_pl is derived from the same
+        // live marks shown in each row ((current − avg) × qty), so summing it makes
+        // the summary reconcile with the table by construction. Day P&L (`pnl_today`,
+        // IBKR `dpl`) and Realized (`realized_today`, `rpl`) are genuinely distinct
+        // broker metrics and are left untouched.
+        if (Array.isArray(ibkrPositions) && ibkrPositions.length) {
+          const sumUpl = ibkrPositions.reduce(
+            (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
+          ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
+        }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
