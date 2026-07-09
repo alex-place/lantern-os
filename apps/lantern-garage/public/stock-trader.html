@@ -1263,7 +1263,10 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
       : null;
     const base = DEFAULT_VIS[chartTimeframe] || 70;
     const want = rangeBars != null ? rangeBars : (isFs ? Math.round(base * 2.2) : base);
-    view.visibleBars = Math.min(bars.length, want);
+    // Keep the INTENDED window even if the current bars array is short (e.g. a trimmed
+    // cache paint before full history loads) — the display slice below clamps to what's
+    // available, so the window expands once the real data arrives instead of locking small.
+    view.visibleBars = want;
     view.barOffset = 0;
   }
 
@@ -1275,7 +1278,10 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const vbF = Math.max(MIN_VISIBLE_BARS, Math.min(view.visibleBars, bars.length));
     const maxOffset = Math.max(0, bars.length - vbF);
     const offF = Math.min(Math.max(0, view.barOffset||0), maxOffset);
-    view.visibleBars = vbF;
+    // Only persist the clamp when it's the user's zoom bounding the window, NOT when the
+    // bars array is just temporarily short (trimmed cache paint). Otherwise a 220-bar
+    // cache locks the window to 220 and 1Y/5Y/All never fill once full history loads.
+    if(view.visibleBars <= bars.length) view.visibleBars = vbF;
     view.barOffset   = offF;
     const vb  = Math.round(vbF);
     const off = Math.round(offF);
