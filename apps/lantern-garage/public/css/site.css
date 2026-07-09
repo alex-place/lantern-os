@@ -140,6 +140,23 @@ html, body {
   .nav-links a { padding: 10px 9px; font-size: 12.5px; }
   .site-nav .nav-btn { width: 40px; height: 40px; }
 }
+/* Mobile hamburger (#2255): the canonical nav's 5 links don't fit beside brand + actions,
+   so site-chrome.js tags it `has-menu` and collapses them into a ☰ dropdown. Bespoke app
+   navs (no has-menu) are untouched and keep their scroll row. */
+.site-nav .nav-menu-toggle { display: none; } /* out-specify the base .nav-btn display */
+@media (max-width: 580px) {
+  .site-nav.has-menu .nav-menu-toggle { display: flex; order: -1; }
+  .site-nav.has-menu .nav-links {
+    position: fixed; top: 52px; left: 0; right: 0;
+    flex-direction: column; align-items: stretch;
+    gap: 2px; padding: 8px; overflow: visible;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); z-index: 1100;
+    display: none;
+  }
+  .site-nav.has-menu.menu-open .nav-links { display: flex; }
+  .site-nav.has-menu .nav-links a { padding: 12px 14px; font-size: 15px; border-radius: 8px; }
+}
 .nav-actions {
   margin-left: auto;
   display: flex;
