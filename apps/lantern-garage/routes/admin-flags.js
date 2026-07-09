@@ -10,6 +10,9 @@
  *   PUT    /api/admin/flags      → upsert a flag { key, label, description, enabled }
  *   DELETE /api/admin/flags/:key → remove a flag
  *   PUT    /api/admin/nav        → set nav override { path, hidden, disabled }
+ *
+ * Support/admin account repair (gated inside lib/admin-accounts-api.js):
+ *   GET/PATCH/POST /api/admin/accounts...
  */
 
 "use strict";
@@ -25,6 +28,7 @@ const {
 } = require("../lib/feature-flags");
 const { isAdmin } = require("../lib/auth-middleware");
 const { getSessionUserId } = require("../lib/session-identity");
+const adminAccountsApi = require("../lib/admin-accounts-api");
 
 function actorOf(req) {
   return getSessionUserId(req) || "local-admin";
@@ -44,6 +48,13 @@ module.exports = async function adminFlagsRoutes(req, res, url, deps) {
   if (method === "GET" && pathname === "/api/nav-config") {
     sendJson(res, { navigation: getNavMap() });
     return true;
+  }
+
+  // ── Support/admin account repair ──────────────────────────────────────────
+  // This route is intentionally delegated before the admin-only flag gate because
+  // `tech_support` may use account repair without receiving full admin access.
+  if (pathname === "/api/admin/accounts" || pathname.startsWith("/api/admin/accounts/")) {
+    return adminAccountsApi(req, res, url, deps);
   }
 
   // ── Admin surface ─────────────────────────────────────────────────────────
