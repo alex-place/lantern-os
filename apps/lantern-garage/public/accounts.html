@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    /* Theme bootstrap — set before first paint to avoid a flash of the wrong theme */
+    (function () {
+      try {
+        var s = localStorage.getItem('lantern-theme');
+        var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Account Support — unisona.ai</title>
+  <style>
+    .acct-shell { max-width: 1200px; margin: 0 auto; padding: 24px 20px 96px; }
+    .acct-head { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+    .acct-head img { width: 40px; height: 40px; flex-shrink: 0; }
+    .acct-head h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+    .acct-head p { color: var(--muted); margin: 4px 0 0; font-size: 0.9rem; }
+
+    /* Toolbar: search + filters + viewer badge */
+    .toolbar {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+      margin: 20px 0 14px;
+    }
+    .toolbar .search {
+      flex: 1 1 260px; min-width: 200px;
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 10px; padding: 8px 12px;
+    }
+    .toolbar .search:focus-within { border-color: var(--accent); }
+    .toolbar .search input { flex: 1; border: none; background: transparent; color: var(--text); font-size: 0.9rem; outline: none; }
+    .toolbar .search svg { width: 15px; height: 15px; color: var(--muted); flex-shrink: 0; }
+    .toolbar select, .toolbar .tbtn {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 10px; padding: 8px 11px; font-size: 0.88rem; cursor: pointer; font-family: inherit;
+    }
+    .toolbar select:focus, .toolbar .tbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .toolbar .tbtn:hover { border-color: var(--accent); }
+    .toolbar .grow { flex: 1; }
+    .viewer-badge {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 4px 10px;
+    }
+    .count { color: var(--muted); font-size: 0.82rem; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    table.accts { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    table.accts th, table.accts td { text-align: left; padding: 11px 14px; vertical-align: top; }
+    table.accts thead th {
+      position: sticky; top: 0; background: var(--surface2); z-index: 1;
+      font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 700;
+      border-bottom: 1px solid var(--border);
+    }
+    table.accts tbody tr { border-bottom: 1px solid var(--border); }
+    table.accts tbody tr:last-child { border-bottom: none; }
+    table.accts tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+    .acct-name { font-weight: 600; }
+    .acct-email { color: var(--muted); font-size: 0.82rem; word-break: break-all; }
+    .acct-id { color: var(--muted); font-size: 0.7rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; margin-top: 2px; }
+    .verified-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-left: 6px; vertical-align: middle; }
+    .verified-dot.yes { background: var(--success, #16a34a); }
+    .verified-dot.no  { background: var(--muted); }
+
+    /* Provider pills */
+    .providers { display: flex; flex-wrap: wrap; gap: 5px; max-width: 240px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
+      padding: 3px 8px; font-size: 0.74rem; color: var(--text); white-space: nowrap;
+    }
+    .pill .pdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .pill.discord .pdot { background: #5865F2; }
+    .pill.google  .pdot { background: #EA4335; }
+    .pill.patreon .pdot { background: #FF424D; }
+    .pill.local   .pdot { background: var(--muted); }
+    .pill .unlink { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 12px; line-height: 1; padding: 0 0 0 2px; }
+    .pill .unlink:hover { color: var(--danger); }
+    .providers .none { color: var(--muted); font-size: 0.78rem; }
+
+    /* Role dropdown cell */
+    select.role-select {
+      background: var(--bg); border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 6px 8px; font-size: 0.84rem; font-family: inherit; cursor: pointer; min-width: 132px;
+    }
+    select.role-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    select.role-select:disabled { opacity: 0.55; cursor: not-allowed; }
+    select.role-select.saving { border-color: var(--accent); }
+
+    /* Password cell */
+    .pw-state { font-size: 0.8rem; color: var(--muted); }
+    .pw-state.set { color: var(--text); }
+
+    /* Issues */
+    .issues { display: flex; flex-direction: column; gap: 4px; max-width: 200px; }
+    .issue {
+      display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem;
+      border-radius: 6px; padding: 2px 7px; width: fit-content;
+    }
+    .issue.high { color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border)); }
+    .issue.low  { color: var(--muted); border: 1px solid var(--border); }
+    .issues .clean { color: var(--success, #16a34a); font-size: 0.76rem; }
+
+    /* Action buttons */
+    .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .btn {
+      background: var(--accent); color: #fff; border: none; border-radius: 8px;
+      padding: 6px 10px; font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn.ghost:hover { color: var(--text); border-color: var(--accent); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.pulse { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); animation: pulse 1.6s infinite; }
+    @keyframes pulse { 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+    /* Toast + modal */
+    #toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+      background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 10px 16px; border-radius: 10px; font-size: 0.88rem; opacity: 0;
+      transition: 0.2s; pointer-events: none; z-index: 60; max-width: 90vw;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .modal-back {
+      position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none;
+      align-items: center; justify-content: center; z-index: 70; padding: 20px;
+    }
+    .modal-back.show { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 22px; max-width: 420px; width: 100%;
+    }
+    .modal h2 { margin: 0 0 6px; font-size: 1.1rem; }
+    .modal p { color: var(--muted); font-size: 0.88rem; margin: 0 0 14px; }
+    .modal .pw-box {
+      display: flex; align-items: center; gap: 8px; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px;
+    }
+    .modal .pw-box code { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95rem; color: var(--text); }
+    .modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+    .gate-msg { text-align: center; color: var(--muted); padding: 70px 20px; }
+    .gate-msg a { color: var(--accent); }
+    .loading { text-align: center; color: var(--muted); padding: 50px 20px; font-size: 0.9rem; }
+
+    @media (max-width: 640px) {
+      .acct-head h1 { font-size: 1.25rem; }
+      table.accts { font-size: 0.82rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="acct-shell">
+    <div class="acct-head">
+      <img src="/mandala.svg" alt="" aria-hidden="true" width="40" height="40">
+      <div>
+        <h1>Account Support</h1>
+        <p>View, configure, and repair accounts — multi-auth links, roles, and password issues.</p>
+      </div>
+    </div>
+
+    <!-- Access-denied fallback (server also gates the page + API server-side) -->
+    <div id="gate" class="gate-msg" style="display:none">
+      <p>This console is restricted to <strong>admin</strong> and <strong>tech support</strong> staff.</p>
+      <p><a href="/auth.html?returnTo=%2Faccounts.html">Sign in</a> with a staff account.</p>
+    </div>
+
+    <div id="content" style="display:none">
+      <div class="toolbar">
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="q" type="search" placeholder="Search name, email, id…" autocomplete="off" aria-label="Search accounts">
+        </label>
+        <select id="filter-role" aria-label="Filter by role">
+          <option value="">All roles</option>
+        </select>
+        <button class="tbtn" id="filter-issues" type="button" aria-pressed="false">Issues only</button>
+        <button class="tbtn" id="refresh" type="button">Refresh</button>
+        <span class="grow"></span>
+        <span class="count" id="count"></span>
+        <span class="viewer-badge" id="viewer-badge">—</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="accts">
+          <thead>
+            <tr>
+              <th>Account</th>
+              <th>Providers (multi-auth)</th>
+              <th>Role</th>
+              <th>Password</th>
+              <th>Issues</th>
+              <th>Fixes</th>
+            </tr>
+          </thead>
+          <tbody id="rows">
+            <tr><td colspan="6" class="loading">Loading accounts…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <!-- Temp-password reveal modal -->
+  <div class="modal-back" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-modal-title">
+    <div class="modal">
+      <h2 id="pw-modal-title">Temporary password set</h2>
+      <p>Relay this to the account holder over a trusted channel. Ask them to sign in and change it immediately.</p>
+      <div class="pw-box"><code id="pw-value">—</code><button class="btn ghost" id="pw-copy" type="button">Copy</button></div>
+      <div class="modal-actions"><button class="btn" id="pw-done" type="button">Done</button></div>
+    </div>
+  </div>
+
+  <!-- Site nav + footer injected by /js/site-chrome.js -->
+  <script src="/js/theme-toggle.js"></script>
+  <script src="/js/site-chrome.js" defer></script>
+  <script src="/js/auth-gate.js" defer></script>
+
+  <script>
+    const $ = (s) => document.querySelector(s);
+    const ROLE_LABELS = {
+      guest: 'Free', supporter: 'Supporter', deep_dreamer: 'Deep Dreamer ($20)',
+      founder: 'Deep Dreamer ($20)', tech_support: 'Tech Support', admin: 'Admin',
+    };
+
+    let toastTimer = null;
+    function toast(msg) {
+      const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+      clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    }
+    async function api(method, path, body) {
+      const opts = { method, headers: { 'Content-Type': 'application/json' }, cache: 'no-store', credentials: 'include' };
+      if (body !== undefined) opts.body = JSON.stringify(body);
+      const r = await fetch(path, opts);
+      let data = {}; try { data = await r.json(); } catch (e) {}
+      return { ok: r.ok, status: r.status, data };
+    }
+
+    let ALL = [];      // full account list from the server
+    let VIEWER = { isAdmin: false, canUnlink: false, canGrantAdmin: false, assignableRoles: [], role: '' };
+    let issuesOnly = false;
+
+    function matchesFilter(a) {
+      const q = $('#q').value.trim().toLowerCase();
+      const roleF = $('#filter-role').value;
+      if (roleF && a.role !== roleF) return false;
+      if (issuesOnly && !(a.issues && a.issues.length)) return false;
+      if (q) {
+        const hay = (a.name + ' ' + a.email + ' ' + a.id + ' ' + a.role).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    }
+
+    function providerPill(acc, p) {
+      const cls = ['discord', 'google', 'patreon', 'local'].includes(p.provider) ? p.provider : 'local';
+      const label = p.provider === 'local' ? 'Email/PW' : (p.provider[0].toUpperCase() + p.provider.slice(1));
+      const unlink = (VIEWER.canUnlink && p.provider !== 'local')
+        ? `<button class="unlink" title="Unlink ${esc(label)}" data-unlink="${esc(p.provider)}" data-id="${esc(acc.id)}" aria-label="Unlink ${esc(label)}">✕</button>` : '';
+      return `<span class="pill ${cls}"><span class="pdot"></span>${esc(label)}${unlink}</span>`;
+    }
+
+    function roleCell(acc) {
+      const opts = VIEWER.assignableRoles.map((r) => {
+        // Admin option is disabled for tech_support; the whole select is disabled when
+        // editing an existing admin without admin rights (mirrors the server gate).
+        const disabledOpt = (r === 'admin' && !VIEWER.canGrantAdmin) ? ' disabled' : '';
+        const sel = r === acc.role ? ' selected' : '';
+        return `<option value="${r}"${sel}${disabledOpt}>${esc(ROLE_LABELS[r] || r)}</option>`;
+      }).join('');
+      // If the stored role isn't in the assignable list (e.g. legacy 'founder'), show it too.
+      const extra = VIEWER.assignableRoles.includes(acc.role) ? '' :
+        `<option value="${esc(acc.role)}" selected>${esc(ROLE_LABELS[acc.role] || acc.role)}</option>`;
+      const lockAdmin = (acc.role === 'admin' && !VIEWER.canGrantAdmin) ? ' disabled' : '';
+      return `<select class="role-select" data-id="${esc(acc.id)}" data-prev="${esc(acc.role)}"${lockAdmin}>${extra}${opts}</select>`;
+    }
+
+    function issuesCell(acc) {
+      if (!acc.issues || !acc.issues.length) return '<div class="issues"><span class="clean">✓ Healthy</span></div>';
+      return '<div class="issues">' + acc.issues.map((i) =>
+        `<span class="issue ${i.severity === 'high' ? 'high' : 'low'}">${esc(i.label)}</span>`).join('') + '</div>';
+    }
+
+    function fixesCell(acc) {
+      const needsReconcile = (acc.issues || []).some((i) => i.fix === 'reconcile');
+      const btns = [];
+      btns.push(`<button class="btn ghost" data-reset="${esc(acc.id)}">Reset password</button>`);
+      btns.push(`<button class="btn${needsReconcile ? ' pulse' : ' ghost'}" data-reconcile="${esc(acc.id)}">Reconcile</button>`);
+      return `<div class="actions">${btns.join('')}</div>`;
+    }
+
+    function rowHtml(acc) {
+      const providers = (acc.providers && acc.providers.length)
+        ? acc.providers.map((p) => providerPill(acc, p)).join('')
+        : '<span class="none">none</span>';
+      const vdot = acc.emailVerified ? '<span class="verified-dot yes" title="Email verified"></span>' : '<span class="verified-dot no" title="Email unverified"></span>';
+      return `<tr data-id="${esc(acc.id)}">
+        <td>
+          <div class="acct-name">${esc(acc.name || '(no name)')}${vdot}</div>
+          <div class="acct-email">${esc(acc.email || '—')}</div>
+          <div class="acct-id">${esc(acc.id)}</div>
+        </td>
+        <td><div class="providers">${providers}</div></td>
+        <td>${roleCell(acc)}</td>
+        <td><span class="pw-state ${acc.hasPassword ? 'set' : ''}">${acc.hasPassword ? 'Set' : 'Not set'}</span></td>
+        <td>${issuesCell(acc)}</td>
+        <td>${fixesCell(acc)}</td>
+      </tr>`;
+    }
+
+    function render() {
+      const shown = ALL.filter(matchesFilter);
+      const tbody = $('#rows');
+      if (!shown.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="loading">No accounts match.</td></tr>';
+      } else {
+        tbody.innerHTML = shown.map(rowHtml).join('');
+      }
+      $('#count').textContent = `${shown.length} of ${ALL.length} account${ALL.length === 1 ? '' : 's'}`;
+    }
+
+    function replaceAccount(updated) {
+      const i = ALL.findIndex((a) => a.id === updated.id);
+      if (i >= 0) ALL[i] = updated; else ALL.push(updated);
+      render();
+    }
+
+    // ── Event delegation for all row controls ────────────────────────────────
+    $('#rows').addEventListener('change', async (e) => {
+      const sel = e.target.closest('select.role-select');
+      if (!sel) return;
+      const id = sel.dataset.id, role = sel.value, prev = sel.dataset.prev;
+      if (role === prev) return;
+      sel.classList.add('saving'); sel.disabled = true;
+      const res = await api('POST', '/api/accounts/role', { id, role });
+      sel.classList.remove('saving'); sel.disabled = false;
+      if (res.ok) { replaceAccount(res.data.account); toast(`Role → ${ROLE_LABELS[role] || role}`); }
+      else { sel.value = prev; toast(res.data.error || 'Could not change role'); }
+    });
+
+    $('#rows').addEventListener('click', async (e) => {
+      const reset = e.target.closest('[data-reset]');
+      const reconcile = e.target.closest('[data-reconcile]');
+      const unlink = e.target.closest('[data-unlink]');
+
+      if (reset) {
+        const id = reset.dataset.reset;
+        if (!confirm('Set a NEW temporary password for this account? Their current password (if any) stops working.')) return;
+        reset.disabled = true;
+        const res = await api('POST', '/api/accounts/reset-password', { id });
+        reset.disabled = false;
+        if (res.ok) { replaceAccount(res.data.account); showPassword(res.data.tempPassword); }
+        else toast(res.data.error || 'Reset failed');
+        return;
+      }
+      if (reconcile) {
+        const id = reconcile.dataset.reconcile;
+        reconcile.disabled = true;
+        const res = await api('POST', '/api/accounts/reconcile', { id });
+        reconcile.disabled = false;
+        if (res.ok) {
+          replaceAccount(res.data.account);
+          toast(res.data.changed ? `Reconciled → ${ROLE_LABELS[res.data.account.role] || res.data.account.role}` : 'Already consistent — no change');
+        } else toast(res.data.error || 'Reconcile failed');
+        return;
+      }
+      if (unlink) {
+        const id = unlink.dataset.id, provider = unlink.dataset.unlink;
+        if (!confirm(`Unlink the ${provider} sign-in from this account? They can re-link it later.`)) return;
+        const res = await api('POST', '/api/accounts/unlink', { id, provider });
+        if (res.ok) { replaceAccount(res.data.account); toast(`Unlinked ${provider}`); }
+        else toast(res.data.error === 'last_login_method' ? "Can't unlink the only sign-in method" : (res.data.error || 'Unlink failed'));
+      }
+    });
+
+    // ── Temp-password modal ──────────────────────────────────────────────────
+    function showPassword(pw) {
+      $('#pw-value').textContent = pw;
+      $('#pw-modal').classList.add('show');
+    }
+    $('#pw-copy').addEventListener('click', () => {
+      navigator.clipboard?.writeText($('#pw-value').textContent).then(() => toast('Copied')).catch(() => {});
+    });
+    function closePw() { $('#pw-modal').classList.remove('show'); }
+    $('#pw-done').addEventListener('click', closePw);
+    $('#pw-modal').addEventListener('click', (e) => { if (e.target === $('#pw-modal')) closePw(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePw(); });
+
+    // ── Filters ──────────────────────────────────────────────────────────────
+    $('#q').addEventListener('input', render);
+    $('#filter-role').addEventListener('change', render);
+    $('#filter-issues').addEventListener('click', () => {
+      issuesOnly = !issuesOnly;
+      $('#filter-issues').setAttribute('aria-pressed', String(issuesOnly));
+      $('#filter-issues').style.borderColor = issuesOnly ? 'var(--accent)' : '';
+      $('#filter-issues').style.color = issuesOnly ? 'var(--accent)' : '';
+      render();
+    });
+    $('#refresh').addEventListener('click', load);
+    // '/' focuses search (unless already typing in a field)
+    document.addEventListener('keydown', (e) => {
+      if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+        e.preventDefault(); $('#q').focus();
+      }
+    });
+
+    async function load() {
+      const res = await api('GET', '/api/accounts');
+      if (res.status === 403 || res.status === 302) {
+        $('#gate').style.display = ''; $('#content').style.display = 'none'; return;
+      }
+      if (!res.ok) { toast(res.data.error || 'Failed to load'); return; }
+      $('#gate').style.display = 'none'; $('#content').style.display = '';
+      ALL = res.data.accounts || [];
+      VIEWER = res.data.viewer || VIEWER;
+      $('#viewer-badge').textContent = VIEWER.isAdmin ? 'Admin' : 'Tech Support';
+      // Populate the role filter from the roles actually present.
+      const roles = [...new Set(ALL.map((a) => a.role))];
+      $('#filter-role').innerHTML = '<option value="">All roles</option>' +
+        roles.map((r) => `<option value="${esc(r)}">${esc(ROLE_LABELS[r] || r)}</option>`).join('');
+      render();
+    }
+
+    load();
+  </script>
+</body>
+</html>

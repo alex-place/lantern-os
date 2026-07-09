@@ -13,12 +13,14 @@
 
 const crypto = require("crypto");
 const querystring = require("querystring");
-const { getProvider, resolveRole } = require("./auth-providers");
+const { getProvider, resolveRole, profileHasAdminOverride } = require("./auth-providers");
+const { higherRole } = require("./role-hierarchy");
 const {
   getOrCreateFromIdentity,
   getProfileByIdentity,
   getProfile,
   linkIdentity,
+  updateProfile,
   publicProfile,
 } = require("./user-profiles");
 const { sendNewSignInEmail } = require("./mailer");
@@ -254,8 +256,20 @@ async function handleOAuthCallback(providerId, req, res, query) {
         return res.end();
       }
       linkIdentity(linkTo, providerId, user.providerId, user.email, user.emailVerified === true);
+      // Connecting a provider must carry its role over (link mode previously dropped
+      // it): linking a $200 Patreon should grant that tier, and linking the owner's
+      // Patreon should grant admin. Monotonic — linking never downgrades, only raises.
+      // #auth-link-role
+      let acct = getProfile(linkTo);
+      if (acct) {
+        let nextRole = higherRole(acct.role || "guest", role || "guest");
+        if (profileHasAdminOverride(acct)) nextRole = "admin";
+        const nextTier = user.tier != null ? user.tier : acct.tier;
+        if (nextRole !== acct.role || nextTier !== acct.tier) {
+          acct = updateProfile(linkTo, { role: nextRole, tier: nextTier });
+        }
+      }
       // Security notice: a new sign-in method was added to the account.
-      const acct = getProfile(linkTo);
       if (acct && acct.email) {
         sendNewSignInEmail(acct.email, acct.name, provider.displayName || providerId).catch(() => {});
       }
@@ -266,7 +280,14 @@ async function handleOAuthCallback(providerId, req, res, query) {
       return res.end();
     }
 
-    const { profile, linked, created } = getOrCreateFromIdentity(providerId, user, role);
+    let { profile, linked, created } = getOrCreateFromIdentity(providerId, user, role);
+    // Admin override travels with the ACCOUNT, not the provider you logged in with:
+    // if any linked identity is an owner/admin id, the profile is admin even when
+    // this login was via a guest-mapping provider (Google/Discord). Fixes the owner
+    // showing as Free after signing in with Google. #auth-owner-role
+    if (profileHasAdminOverride(profile) && profile.role !== "admin") {
+      profile = updateProfile(profile.id, { role: "admin" });
+    }
     // Auto-linked into an existing account (verified-email match) = a new sign-in
     // method on an existing account → notify the owner.
     if (linked && profile && profile.email) {

@@ -1,4 +1,0 @@
-### Added
-- **Claude-Code-style commands in Keystone chat.** Typing `!` or `/` in the composer now opens an autocomplete **command palette** (arrow keys + Enter/Tab to pick, Esc to dismiss) listing every working command with its usage and description. New `!help` prints the same grouped list, and **slash parity** means `/work`, `/convergence`, `/issues`, etc. are accepted as aliases for the `!` form (matching Claude Code's `/` convention).
-- **`!issues` backlog browser.** Lists the open GitHub issues inline, each with a one-click **"Work this →"** button that fires the existing keystone autowork pipeline (issue → linked PR). Backed by a new shell-free `GET /api/dream/issues` route (#873-compliant; fails soft to a GitHub link when `gh` is absent/unauthenticated, e.g. on cloud).
-- The palette is driven by a single `COMMANDS` registry so it never advertises a command that isn't wired in the live path.

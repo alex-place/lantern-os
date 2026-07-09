@@ -23,8 +23,19 @@ const ROLE_HIERARCHY = Object.freeze({
   supporter: 1,
   deep_dreamer: 2,
   founder: 2, // legacy alias for deep_dreamer (#698)
+  // Staff support role: can operate the account-support surface (accounts.html) to
+  // fix multi-auth / password issues, but is NOT admin — level 2 keeps admin-only
+  // surfaces (level 3: feature flags, nav, real-money switches) closed. The support
+  // page gates on an EXPLICIT {admin, tech_support} set, not this level, so paid
+  // tiers at the same level never reach it. See auth-middleware.isStaff.
+  tech_support: 2,
   admin: 3,
 });
+
+// The staff roles allowed on the account-support surface. Membership is exact —
+// NOT a hierarchy-level check — so a paid tier sharing tech_support's level can't
+// slip into account administration.
+const STAFF_ROLES = Object.freeze(["admin", "tech_support"]);
 
 /** Numeric level for a role name (unknown → 0, the guest floor). */
 function roleLevel(role) {
@@ -36,4 +47,19 @@ function roleMeets(role, required) {
   return roleLevel(role) >= roleLevel(required);
 }
 
-module.exports = { ROLE_HIERARCHY, roleLevel, roleMeets };
+/**
+ * The higher-privilege of two role names (by hierarchy level). Ties keep `a`.
+ * Used to make role resolution monotonic across a profile's linked sign-in
+ * methods: logging in with a guest-mapping provider (Google/Discord) must never
+ * downgrade a role already earned via Patreon.
+ */
+function higherRole(a, b) {
+  return roleLevel(b) > roleLevel(a) ? b : a;
+}
+
+/** True iff `role` is a staff support role (exact membership, not a level check). */
+function isStaffRole(role) {
+  return STAFF_ROLES.includes(role);
+}
+
+module.exports = { ROLE_HIERARCHY, STAFF_ROLES, roleLevel, roleMeets, higherRole, isStaffRole };

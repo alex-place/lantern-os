@@ -1,3 +1,0 @@
-### Question Machine: corroborated grounding (≥2-source channels)
-
-- New `CorroboratedChannel` (src/cio_sde/question_loop.py) grounds a question through MULTIPLE independent channels and fuses them — the External-Reality Rule as a channel. Agreement (spread ≤ tol) earns confidence → 1.0; disagreement is surfaced as "divergent" with falling confidence rather than silently averaged away. Brings the multi-source corroboration discipline (flourishing feeds, deep-research 3-vote verify) inside the grounded loop. `Observation`/`LoopRecord` now carry confidence/agreement/n_sources. 3 new tests; 12/12 loop+machine tests green.

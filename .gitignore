@@ -493,3 +493,10 @@ data/boot-health.jsonl
 
 # Indeed connector: registered OAuth client + per-user encrypted tokens (secrets)
 data/indeed/
+
+# ─── Volatile agent/eval outputs (repo-slim #2307) ───────────────────────────
+# CSF memory execution traces — runtime telemetry, regenerated per run
+data/csf_memory/raw/trace/
+# SWE-bench / agentic harness dumps written to repo root
+/agentic*.json
+/agentic-testout-*.txt

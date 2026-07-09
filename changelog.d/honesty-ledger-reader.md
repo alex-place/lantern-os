@@ -1,2 +1,0 @@
-### Added
-- `scripts/honesty_ledger.read_accuracy()` — tolerant reader that normalizes the `epistemic/` (`class_ok`+`verified_ok`) and `halueval-local/` (`ok`) ledger schemas to one correctness bool, returns None for unlabelable rows (so an unscored file can't read as 0%), and surfaces an `unscored` count. Fixes the misread that made the `/benchmarks` skill refuse to quote adapter honesty numbers (#2110). Strengthens **Converge**.

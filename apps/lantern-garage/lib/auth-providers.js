@@ -38,6 +38,25 @@ function isAdminOverride(provider, providerId) {
   return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
 }
 
+/**
+ * True when ANY sign-in method linked to this profile is an admin override —
+ * checking the generic `identities[]` plus the legacy denormalized
+ * `patreonId`/`discordId` mirrors. This is what keeps the owner an admin no matter
+ * which provider they happen to sign in with: logging in via Google resolves
+ * "guest" for the Google identity, but the profile still carries the linked
+ * Patreon-owner identity, so the override applies. Never downgrades — it only
+ * elevates to admin when an override id is present.
+ */
+function profileHasAdminOverride(profile) {
+  if (!profile) return false;
+  for (const i of profile.identities || []) {
+    if (isAdminOverride(i.provider, String(i.providerId))) return true;
+  }
+  if (profile.patreonId && isAdminOverride("patreon", String(profile.patreonId))) return true;
+  if (profile.discordId && isAdminOverride("discord", String(profile.discordId))) return true;
+  return false;
+}
+
 const PROVIDERS = {
   google: {
     id: "google",
@@ -181,6 +200,7 @@ module.exports = {
   isConfigured,
   resolveRole,
   isAdminOverride,
+  profileHasAdminOverride,
   listEnabledProviders,
   PATREON_TIER_TO_ROLE,
 };

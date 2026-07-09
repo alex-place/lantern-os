@@ -1,5 +1,0 @@
-### Global header + working light/dark toggle on the stock trader
-
-- The stock trader now carries the shared global header (Chat / Trader / Create / Explore / Help / Admin / Patreon + profile + theme toggle) via `js/site-chrome.js`, instead of being the one app page without it. The bespoke trader status strip (equity / VIX / positions / chart controls) stays directly below it. (#1579)
-- The light/dark toggle now works on the trader page (#1577). The terminal was hard-locked to dark; a `html[data-theme="light"]` palette plus targeted overrides for the few hardcoded-dark surfaces (cards, footer panels, dividers, range buttons) make the whole terminal genuinely light-mode-aware. The price-chart axes/grid read the `--tv-*` vars so they follow the theme too. The choice persists in `localStorage` and matches the rest of the site.
-- Layout: the injected 52px global nav reclaims its height from the `100vh` grid (`calc(100vh - 52px)`), and the redundant injected site-footer is suppressed (the trader has its own footer), so there is no page overflow.
