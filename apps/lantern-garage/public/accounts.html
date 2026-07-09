@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Accounts · Unisona Admin</title>
+  <link rel="stylesheet" href="/css/site.css" />
+  <style>
+    :root{color-scheme:dark;--bg:#070b13;--panel:rgba(15,23,42,.92);--line:rgba(148,163,184,.22);--text:#e5e7eb;--muted:#94a3b8;--accent:#38bdf8;--bad:#fb7185;--warn:#fbbf24;--ok:#34d399}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at top left,rgba(56,189,248,.18),transparent 32rem),radial-gradient(circle at bottom right,rgba(168,85,247,.14),transparent 30rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .shell{max-width:1500px;margin:0 auto;padding:28px}.top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;margin-bottom:18px}.eyebrow{color:var(--accent);font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:6px 0 8px;font-size:clamp(2rem,3vw,3.4rem);line-height:1}.lede{max-width:760px;color:var(--muted);line-height:1.5;margin:0}.nav{display:flex;gap:8px;flex-wrap:wrap}.nav a,button,input,select{border:1px solid var(--line);background:rgba(15,23,42,.9);color:var(--text);border-radius:12px;padding:10px 12px;font:inherit}.nav a{text-decoration:none}button{cursor:pointer}button.primary{background:linear-gradient(135deg,rgba(14,165,233,.92),rgba(79,70,229,.92));border-color:transparent}button:disabled,select:disabled,input:disabled{opacity:.55;cursor:not-allowed}.stats{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px;margin:22px 0}.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:0 22px 60px rgba(0,0,0,.22)}.stat-label{color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}.stat-value{font-size:1.8rem;font-weight:800;margin-top:6px}.controls{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:10px;align-items:center;margin:16px 0}.controls input,.controls select{width:100%;box-sizing:border-box}.wrap{overflow:auto;border:1px solid var(--line);border-radius:18px;background:rgba(2,6,23,.52)}table{width:100%;min-width:1180px;border-collapse:collapse}th,td{padding:12px;border-bottom:1px solid rgba(148,163,184,.14);vertical-align:top;text-align:left}th{position:sticky;top:0;background:rgba(15,23,42,.98);color:#cbd5e1;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase}.name{font-weight:800}.sub{color:var(--muted);font-size:.82rem;margin-top:4px;word-break:break-all}.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:4px 8px;background:rgba(30,41,59,.64);font-size:.78rem;white-space:nowrap}.ok{color:#bbf7d0;border-color:rgba(52,211,153,.36)}.warn{color:#fde68a;border-color:rgba(251,191,36,.42)}.bad{color:#fecdd3;border-color:rgba(251,113,133,.42)}.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{padding:7px 9px;border-radius:10px;font-size:.82rem}.drawer{display:none;margin-top:16px;background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}.drawer.open{display:block}.drawer-head{display:flex;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}.drawer-body{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px}.fields{display:grid;gap:10px}.field{display:grid;gap:6px}label{color:#cbd5e1;font-size:.82rem;font-weight:800}pre{margin:0;white-space:pre-wrap;word-break:break-word;background:rgba(2,6,23,.7);border:1px solid var(--line);border-radius:14px;padding:14px;max-height:430px;overflow:auto}.toast{position:fixed;right:20px;bottom:20px;max-width:420px;border:1px solid var(--line);background:rgba(15,23,42,.96);border-radius:14px;padding:12px 14px;box-shadow:0 20px 50px rgba(0,0,0,.35);display:none}.toast.show{display:block}.empty{padding:28px;text-align:center;color:var(--muted)}.locked{margin-top:8px;color:#fef3c7;font-size:.84rem}@media(max-width:900px){.shell{padding:18px}.top{display:block}.nav{margin-top:14px}.stats{grid-template-columns:repeat(2,1fr)}.controls,.drawer-body{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="top">
+      <div>
+        <div class="eyebrow">Admin · Account repair</div>
+        <h1>Accounts</h1>
+        <p class="lede">View and repair accounts, linked providers, email verification, password reset paths, Patreon/Discord mirrors, and tier/role configuration from one protected support console.</p>
+        <p id="lockedNote" class="locked" hidden>Tech-support mode: role, tier, and entitlement edits are admin-only. Repair actions remain available.</p>
+      </div>
+      <nav class="nav"><a href="/profile.html">Profile</a><a href="/admin-flags.html">Feature flags</a><a href="/">Home</a></nav>
+    </section>
+
+    <section class="stats">
+      <div class="card"><div class="stat-label">Accounts</div><div id="statTotal" class="stat-value">—</div></div>
+      <div class="card"><div class="stat-label">Needs repair</div><div id="statIssues" class="stat-value">—</div></div>
+      <div class="card"><div class="stat-label">Password enabled</div><div id="statPasswords" class="stat-value">—</div></div>
+      <div class="card"><div class="stat-label">Admin / support</div><div id="statOps" class="stat-value">—</div></div>
+    </section>
+
+    <section class="card">
+      <div class="controls">
+        <input id="search" type="search" placeholder="Search name, email, account id, provider id…" />
+        <select id="roleFilter"><option value="">All roles</option></select>
+        <select id="providerFilter"><option value="">All providers</option><option value="local">Email/password</option><option value="google">Google</option><option value="discord">Discord</option><option value="patreon">Patreon</option></select>
+        <select id="issueFilter"><option value="">All account states</option><option value="no_login_method">No login method</option><option value="duplicate_identity">Duplicate identity</option><option value="credential_without_local_identity">Password missing local row</option><option value="patreon_mirror_missing_identity">Patreon mirror mismatch</option><option value="discord_mirror_missing_identity">Discord mirror mismatch</option><option value="email_collision">Email collision</option><option value="unverified_email">Unverified email</option><option value="pending_email">Pending email</option></select>
+        <button id="refresh" class="primary">Refresh</button>
+      </div>
+      <div class="wrap"><table><thead><tr><th>Account</th><th>Role / tier</th><th>Providers</th><th>Email</th><th>Password</th><th>Issues</th><th>Actions</th></tr></thead><tbody id="rows"><tr><td colspan="7" class="empty">Loading accounts…</td></tr></tbody></table></div>
+    </section>
+
+    <section id="drawer" class="drawer">
+      <div class="drawer-head"><div><strong id="drawerTitle">Account detail</strong><div id="drawerSub" class="sub"></div></div><button id="closeDrawer">Close</button></div>
+      <div class="drawer-body">
+        <div class="fields">
+          <div class="field"><label for="detailEmailVerified">Email verified</label><select id="detailEmailVerified"><option value="true">Verified</option><option value="false">Not verified</option></select></div>
+          <div class="field"><label for="detailPendingEmail">Pending email</label><input id="detailPendingEmail" placeholder="clear or set pending email" /></div>
+          <div class="field admin-field"><label for="detailTier">Tier label / id</label><input id="detailTier" placeholder="Patreon tier id or label" /></div>
+          <label class="admin-field"><input id="detailTrade" type="checkbox" /> Trade entitlement override</label>
+          <div class="actions"><button id="saveDetail" class="primary">Save</button><button id="normalizeDetail">Normalize identities</button><button id="resetDetail">Send reset</button><button id="verifyDetail">Send verification</button></div>
+        </div>
+        <pre id="detailJson">{}</pre>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { accounts: [], roles: [], canAdmin: false, selected: null };
+    function esc(v){return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
+    function toast(msg,bad=false){const t=$("toast");t.textContent=msg;t.style.borderColor=bad?"rgba(251,113,133,.55)":"rgba(56,189,248,.45)";t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),5500);}
+    async function api(path,opts={}){const res=await fetch(path,{headers:{"Content-Type":"application/json"},...opts});const text=await res.text();let body={};try{body=text?JSON.parse(text):{};}catch{body={error:text||res.statusText};}if(!res.ok)throw new Error(body.detail||body.error||res.statusText);return body;}
+    function filters(){const p=new URLSearchParams();if($("search").value.trim())p.set("search",$("search").value.trim());if($("roleFilter").value)p.set("role",$("roleFilter").value);if($("providerFilter").value)p.set("provider",$("providerFilter").value);if($("issueFilter").value)p.set("issue",$("issueFilter").value);return p.toString()?`?${p}`:"";}
+    function issueChip(i){const cls=["no_login_method","email_collision","duplicate_identity"].includes(i)?"bad":"warn";return `<span class="chip ${cls}">${esc(i.replaceAll("_"," "))}</span>`;}
+    function providers(a){const e=Object.entries(a.providers||{});if(!e.length)return `<span class="chip bad">no providers</span>`;return `<div class="chips">${e.map(([p,rows])=>`<span class="chip ok">${esc(p)}${rows.length>1?` ×${rows.length}`:""}</span>`).join("")}</div><div class="sub">${e.flatMap(([p,rows])=>rows.map(r=>`${p}:${r.providerId||"—"}`)).map(esc).join("<br>")}</div>`;}
+    function email(a){return `<span class="chip ${a.emailVerified?"ok":"warn"}">${a.emailVerified?"verified":"not verified"}</span><div class="sub">${esc(a.email||"No email")}</div>${a.pendingEmail?`<div class="sub">Pending: ${esc(a.pendingEmail)}</div>`:""}`;}
+    function roleCell(a){const opts=state.roles.map(r=>`<option value="${esc(r)}" ${r===a.role?"selected":""}>${esc(r)}</option>`).join("");return `<select data-role="${esc(a.id)}" ${state.canAdmin?"":"disabled"}>${opts}</select><div class="sub">${esc(a.tier||"No tier label")}</div>`;}
+    function render(){
+      $("statTotal").textContent=state.accounts.length;$("statIssues").textContent=state.accounts.filter(a=>a.issues.length).length;$("statPasswords").textContent=state.accounts.filter(a=>a.hasPassword).length;$("statOps").textContent=state.accounts.filter(a=>["admin","tech_support"].includes(a.role)).length;$("lockedNote").hidden=state.canAdmin;
+      const rows=$("rows");if(!state.accounts.length){rows.innerHTML=`<tr><td colspan="7" class="empty">No matching accounts.</td></tr>`;return;}
+      rows.innerHTML=state.accounts.map(a=>`<tr><td><div class="name">${esc(a.name||"Unnamed account")}</div><div class="sub">${esc(a.id)}</div></td><td>${roleCell(a)}</td><td>${providers(a)}</td><td>${email(a)}</td><td><span class="chip ${a.hasPassword?"ok":"warn"}">${a.hasPassword?"set":"OAuth only"}</span></td><td><div class="chips">${a.issues.length?a.issues.map(issueChip).join(""):`<span class="chip ok">clean</span>`}</div></td><td><div class="actions"><button data-view="${esc(a.id)}">View / edit</button><button data-normalize="${esc(a.id)}">Normalize</button><button data-reset="${esc(a.id)}">Reset</button><button data-verify="${esc(a.id)}">Verify</button></div></td></tr>`).join("");
+      rows.querySelectorAll("[data-role]").forEach(el=>el.addEventListener("change",async()=>{try{await api(`/api/admin/accounts/${encodeURIComponent(el.dataset.role)}`,{method:"PATCH",body:JSON.stringify({role:el.value})});toast("Role updated.");await load();}catch(e){toast(e.message,true);await load();}}));
+      rows.querySelectorAll("[data-view]").forEach(el=>el.addEventListener("click",()=>openDetail(el.dataset.view)));rows.querySelectorAll("[data-normalize]").forEach(el=>el.addEventListener("click",()=>normalize(el.dataset.normalize)));rows.querySelectorAll("[data-reset]").forEach(el=>el.addEventListener("click",()=>sendReset(el.dataset.reset)));rows.querySelectorAll("[data-verify]").forEach(el=>el.addEventListener("click",()=>sendVerification(el.dataset.verify)));
+    }
+    function hydrateRoles(){const el=$("roleFilter"),cur=el.value;el.innerHTML=`<option value="">All roles</option>`+state.roles.map(r=>`<option value="${esc(r)}">${esc(r)}</option>`).join("");el.value=cur;}
+    async function load(){$("rows").innerHTML=`<tr><td colspan="7" class="empty">Loading accounts…</td></tr>`;try{const d=await api(`/api/admin/accounts${filters()}`);state.accounts=d.accounts||[];state.roles=d.roles||["guest","supporter","deep_dreamer","founder","tech_support","admin"];state.canAdmin=d.canAdmin===true;hydrateRoles();render();}catch(e){$("rows").innerHTML=`<tr><td colspan="7" class="empty">Unable to load accounts: ${esc(e.message)}</td></tr>`;}}
+    async function openDetail(id){try{const a=await api(`/api/admin/accounts/${encodeURIComponent(id)}`);state.selected=a;$("drawerTitle").textContent=a.name||"Unnamed account";$("drawerSub").textContent=`${a.email||"No email"} · ${a.id}`;$("detailEmailVerified").value=String(a.emailVerified===true);$("detailPendingEmail").value=a.pendingEmail||"";$("detailTier").value=a.tier||"";$("detailTier").disabled=!state.canAdmin;$("detailTrade").checked=!!(a.entitlements&&a.entitlements.trade===true);$("detailTrade").disabled=!state.canAdmin;document.querySelectorAll(".admin-field").forEach(el=>el.style.opacity=state.canAdmin?"1":".55");$("detailJson").textContent=JSON.stringify(a,null,2);$("drawer").classList.add("open");}catch(e){toast(e.message,true);}}
+    async function save(){if(!state.selected)return;const body={emailVerified:$("detailEmailVerified").value==="true",pendingEmail:$("detailPendingEmail").value.trim()};if(state.canAdmin){body.tier=$("detailTier").value.trim()||null;body.entitlements={trade:$("detailTrade").checked};}try{const a=await api(`/api/admin/accounts/${encodeURIComponent(state.selected.id)}`,{method:"PATCH",body:JSON.stringify(body)});toast("Account saved.");state.selected=a;$("detailJson").textContent=JSON.stringify(a,null,2);await load();}catch(e){toast(e.message,true);}}
+    async function normalize(id){try{await api(`/api/admin/accounts/${encodeURIComponent(id)}/normalize`,{method:"POST",body:"{}"});toast("Identities normalized.");await load();if(state.selected&&state.selected.id===id)openDetail(id);}catch(e){toast(e.message,true);}}
+    async function sendReset(id){try{const b=await api(`/api/admin/accounts/${encodeURIComponent(id)}/password-reset`,{method:"POST",body:"{}"});toast(b.devResetLink?`Reset link created: ${b.devResetLink}`:"Password reset email requested.");}catch(e){toast(e.message,true);}}
+    async function sendVerification(id){try{const b=await api(`/api/admin/accounts/${encodeURIComponent(id)}/resend-verification`,{method:"POST",body:"{}"});toast(b.devVerifyLink?`Verification link created: ${b.devVerifyLink}`:"Verification email requested.");}catch(e){toast(e.message,true);}}
+    $("refresh").addEventListener("click",load);$("search").addEventListener("keydown",e=>{if(e.key==="Enter")load();});["roleFilter","providerFilter","issueFilter"].forEach(id=>$(id).addEventListener("change",load));$("closeDrawer").addEventListener("click",()=>$("drawer").classList.remove("open"));$("saveDetail").addEventListener("click",save);$("normalizeDetail").addEventListener("click",()=>state.selected&&normalize(state.selected.id));$("resetDetail").addEventListener("click",()=>state.selected&&sendReset(state.selected.id));$("verifyDetail").addEventListener("click",()=>state.selected&&sendVerification(state.selected.id));load();
+  </script>
+</body>
+</html>
