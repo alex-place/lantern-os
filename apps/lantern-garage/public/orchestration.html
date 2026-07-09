@@ -289,6 +289,10 @@
     #broker .bfile-btn:hover{background:color-mix(in srgb,var(--accent) 20%,transparent)}
     #broker .bfile-btn.done{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#bbf7d0;cursor:default}
     #broker .bgen-adv{margin-top:11px}#broker .bgen-adv summary{font-size:.74rem;color:var(--text2);cursor:pointer}
+    #broker .bsteps{margin:12px 0 6px;padding-left:20px;font-size:.8rem;color:var(--text1);line-height:1.65}
+    #broker .bsteps li{margin-bottom:7px}
+    #broker .bfile{font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:5px;background:var(--bg0);border:1px solid var(--border);color:var(--text0);white-space:nowrap}
+    #broker a.bgo{display:inline-block;text-decoration:none;margin:4px 0 2px}
   </style>
   <section class="panel" id="broker">
     <h2>🔗 Broker Connection <span class="section-meta">Interactive Brokers · your account</span></h2>
@@ -296,10 +300,10 @@
     <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
     <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/lanterndreamjournal" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
 
-    <!-- Step 1: no command line — generate keys in the browser -->
+    <!-- Step 1: generate keys in the browser (no command line) -->
     <div class="bgen">
       <div class="bgen-head"><strong>Step 1 · Get your keys</strong> <span class="bgen-sub">no command line needed</span></div>
-      <p class="bgen-p">Click below and unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll upload those to IBKR in step 2. The secret parts stay in this form — they never leave your computer except into unisona.</p>
+      <p class="bgen-p">Click below — unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll hand those to IBKR in Step 2; the secret half stays in this page (Step 3 fills it in for you) and never leaves your computer except into unisona.</p>
       <button type="button" class="btn-primary" id="bgenerate">🔑 Generate my keys</button>
       <span id="bgenmsg" class="bgen-msg"></span>
       <div id="bgenfiles" class="bgen-files" hidden></div>
@@ -313,23 +317,46 @@ openssl dhparam -out dhparam.pem 2048</pre>
       </details>
     </div>
 
+    <!-- Step 2: register the keys on IBKR's site (was missing — only lived in the separate guide) -->
+    <div class="bgen">
+      <div class="bgen-head"><strong>Step 2 · Register with IBKR</strong> <span class="bgen-sub">one-time, on IBKR's website</span></div>
+      <p class="bgen-p">Sign in to Interactive Brokers and open their OAuth page, then register the 3 files from Step 1:</p>
+      <a class="btn-primary bgo" href="https://ndcdyn.interactivebrokers.com/sso/Login?action=OAUTH&amp;RL=1" target="_blank" rel="noopener">↗ Open the IBKR OAuth page</a>
+      <ol class="bsteps">
+        <li>Pick a <strong>Consumer Key</strong> — make up a <strong>9-letter</strong> word, letters only (e.g. <code>UNISONAAB</code>). Write it down; you'll paste it in Step 3.</li>
+        <li>Upload <span class="bfile">public_signature.pem</span> as the <strong>Public Signing Key</strong>.</li>
+        <li>Upload <span class="bfile">public_encryption.pem</span> as the <strong>Public Encryption Key</strong>.</li>
+        <li>Upload <span class="bfile">dhparam.pem</span> as the <strong>Diffie-Hellman Parameters</strong>.</li>
+        <li>Click <strong>Generate Token</strong>. IBKR shows an <strong>Access Token</strong> and an <strong>Access Token Secret</strong> — copy <em>both</em> right away (they disappear if you refresh), then switch <strong>Enable OAuth Access</strong> on.</li>
+      </ol>
+      <p class="bhint">Prefer pictures? Full walkthrough with screenshots: <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
+    </div>
+
+    <!-- Step 3: paste what IBKR gave you + connect -->
     <form id="brokerForm">
+      <div class="bgen-head" style="margin-bottom:9px"><strong>Step 3 · Connect</strong> <span class="bgen-sub">paste what IBKR gave you in Step 2</span></div>
       <div class="bbanner" id="bbanner"></div>
       <div class="bsaved-note" id="bsavednote" hidden>✓ Your credentials are <strong>saved on file</strong> (encrypted). You don't need to re-enter them — refreshing is safe. Use <strong>Recheck connection</strong> to test again. Fill a field only to <em>replace</em> it.</div>
       <div class="brow">
-        <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"></div>
+        <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"><div class="bhint">the 9-letter word you made up in Step 2</div></div>
         <div class="bfield"><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="bhint">DU… = paper · U… = live</div></div>
       </div>
       <div class="brow">
-        <div class="bfield"><label>Access token</label><input id="accessToken" autocomplete="off"></div>
-        <div class="bfield"><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"></div>
+        <div class="bfield"><label>Access token</label><input id="accessToken" autocomplete="off"><div class="bhint">from IBKR's Generate Token</div></div>
+        <div class="bfield"><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"><div class="bhint">shown next to the token — copy both</div></div>
       </div>
-      <div class="bfield"><label>Signature private key (PEM)</label><textarea id="signaturePem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
-      <div class="bfield"><label>Encryption private key (PEM)</label><textarea id="encryptionPem" placeholder="-----BEGIN RSA PRIVATE KEY-----…" spellcheck="false"></textarea></div>
-      <div class="brow">
-        <div class="bfield"><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" autocomplete="off"></div>
-        <div class="bfield"><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
-      </div>
+      <!-- The security keys below are FILLED IN AUTOMATICALLY by "Generate my keys" in
+           Step 1 — a normal IBKR setup never needs to touch them, so they're collapsed
+           to keep this a 4-field form instead of a wall of crypto. Still submitted. -->
+      <details class="bgen-adv" id="badvfields" style="margin:4px 0 6px">
+        <summary>Security keys — auto-filled in Step 1, you don't need to touch these</summary>
+        <div class="bfield" style="margin-top:10px"><label>Signature private key (PEM)</label><textarea id="signaturePem" placeholder="auto-filled by Generate my keys" spellcheck="false"></textarea></div>
+        <div class="bfield"><label>Encryption private key (PEM)</label><textarea id="encryptionPem" placeholder="auto-filled by Generate my keys" spellcheck="false"></textarea></div>
+        <div class="brow">
+          <div class="bfield"><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" placeholder="auto-filled" autocomplete="off"></div>
+          <div class="bfield"><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
+        </div>
+      </details>
       <div class="bactions">
         <button type="submit" class="btn-primary" id="bconnect">Connect &amp; test</button>
         <button type="button" class="btn-secondary" id="brecheck" hidden>Recheck connection</button>
