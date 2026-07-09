@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole, requireStaff, requireEntitlement, isAdmin } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireStaff, requireEntitlement, hasEntitlement, meetsRole, isAdmin } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 
 // Public pages — no auth required
@@ -76,6 +76,30 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 <p><a href="/">Return home</a></p></div></body></html>`;
 }
 
+// A signed-in user who lacks the tier/entitlement for a page gets a friendly HTML
+// "unlock" page instead of a raw JSON 403 filling the browser (a first-time-user
+// papercut). Unauthenticated users are still redirected to login upstream.
+const TIER_LABEL = { supporter: "Wanderer", deep_dreamer: "Deep Dreamer", admin: "Synthesasia Guild" };
+function renderUpgradePage(page) {
+  const need = page.entitlement === "trade" ? "the Deep Dreamer tier"
+    : page.role ? `the ${TIER_LABEL[page.role] || page.role} tier` : "a higher tier";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/css/site.css"><title>Unlock this feature — unisona.ai</title>
+<style>body{display:flex;min-height:90vh;align-items:center;justify-content:center;
+font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#0a0e17)}
+.box{text-align:center;max-width:440px;padding:32px}.box h1{font-size:1.4rem;margin:0 0 8px}
+.box p{color:var(--muted,#9ca3af);line-height:1.55;margin:0 0 20px}
+.row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.btn{display:inline-block;padding:10px 18px;border-radius:10px;font-weight:600;text-decoration:none}
+.btn.primary{background:var(--accent,#06b6d4);color:#fff}
+.btn.ghost{border:1px solid var(--border,#374151);color:var(--text,#e5e7eb)}</style>
+</head><body><div class="box"><h1>This feature needs an upgrade</h1>
+<p>Unlocking this feature requires <strong>${need}</strong>. Your current plan doesn't include it yet.</p>
+<div class="row"><a class="btn primary" href="/pricing.html">See plans</a><a class="btn ghost" href="/">Return home</a></div>
+</div></body></html>`;
+}
+
 module.exports = async function pagesRoute(req, res, url, deps) {
   const pathname = url.pathname;
 
@@ -114,11 +138,16 @@ module.exports = async function pagesRoute(req, res, url, deps) {
       // 302 a signed-in non-staff user to login instead of returning a clean 403).
       if (!requireStaff(req, res)) return true;
     } else if (!requireAuth(req, res)) {
-      return true;
-    } else if (page.entitlement) {
-      if (!requireEntitlement(req, res, page.entitlement)) return true;
-    } else if (!requireRole(req, res, page.role)) {
-      return true;
+      return true; // unauthenticated → 302 to login (handled by requireAuth)
+    } else {
+      // Authenticated but possibly under-tier: check WITHOUT emitting a raw JSON 403,
+      // and render a friendly "unlock" page instead when access is short.
+      const allowed = page.entitlement ? hasEntitlement(req, page.entitlement) : meetsRole(req, page.role);
+      if (!allowed) {
+        res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(renderUpgradePage(page));
+        return true;
+      }
     }
 
     const filePath = path.join(deps.publicRoot, page.file);
