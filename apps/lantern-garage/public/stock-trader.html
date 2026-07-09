@@ -382,10 +382,10 @@
        strip instead of being butted right up against it. */
     .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
     .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
-    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols). Fill the
-       viewport when there's room (1–2 charts each take a full row via the 1fr rows) but
-       grow past it and scroll inside .main when there are many. */
-    .cards-grid.grid-fixed{ height:auto; min-height:100%; }
+    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols) and FILL
+       the available height — the 1–2 rows split .main so the charts resize to the screen
+       (like desktop) instead of a fixed height that overflows and cuts off on small phones. */
+    .cards-grid.grid-fixed{ height:100%; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -1551,13 +1551,15 @@ function applyGridCols(){
   const main = document.querySelector('.main');
   if(slotCount){
     // Phones only have vertical room — a 2×1 / 2×2 tiling squeezes each chart into a
-    // tiny sliver. Stack ALL fixed-grid charts in a single column and give each a real
-    // min-height so they use the vertical space and scroll. Desktop keeps the tiling.
+    // tiny sliver. Stack fixed-grid charts in a single column; the rows SPLIT the
+    // available height (minmax(0,1fr)) so the charts adapt to the phone — exactly like
+    // the desktop grid — instead of a fixed height that overflows and cuts on small
+    // screens. Mobile is capped at 1–2 charts, so each still gets real room.
     const narrow = isNarrowTrader();
     const cols = narrow ? 1 : (SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount)));
     const rows = Math.ceil(slotCount / cols);
     grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(260px,1fr))` : `repeat(${rows},1fr)`;
+    grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(0,1fr))` : `repeat(${rows},1fr)`;
     grid.classList.add('grid-fixed');
     grid.classList.toggle('grid-single', slotCount === 1);
     if(main) main.classList.add('main-fixed');
