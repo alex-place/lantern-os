@@ -1,3 +1,8 @@
+## [1.8.123] - 2026-07-09
+
+### Changed
+- **Untracked two large machine-generated flat-RAG dumps; rebuild on demand (#2313).** `data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md` (1,765 lines, read at runtime as the MCP resource `rag://house`) and `skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md` (16,142 lines, no runtime consumer) are now `.gitignore`d instead of tracked — removing ~17.9k lines of generated churn from the tracked surface. New cross-platform generator `scripts/regen-flat-rag.mjs` (Windows dev + Linux deploy + CI, no PowerShell dependency) rebuilds both, wired as `npm run regen:rag` and `make regen-rag`; the internal-house rebuild is a faithful port of `scripts/Update-InternalHouseRag.ps1` (hash-only mode), the dollhouse rebuild is best-effort from current `reports/*.md` + `applications/*.md` (its original `Sync-RagAndPdf.ps1` generator and most of its 90 source files are already gone from the repo). Verified: regen recreates both files, `rag://house` still reads the internal-house dump via the fallback path, and `tests/test_routes.js` passes 11/11. Improves **Remember** (context hygiene).
+
 ## [1.8.122] - 2026-07-09
 
 ### Fixed
