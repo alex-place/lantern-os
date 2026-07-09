@@ -63,6 +63,7 @@ const EXTENSION = {
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
   "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
+  "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // game — playable surface beside the loop (linked from Explore as a game card)
