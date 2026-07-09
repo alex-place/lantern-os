@@ -29,6 +29,7 @@ private/**
 *.pdf
 *.zip
 *.mp4
+*.mp3
 
 # Dreamer notebooks — private user data (local only)
 data/dreamer/notebooks/*.jsonl
