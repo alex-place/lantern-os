@@ -10,7 +10,9 @@ RAG file, all literal COMET LEAP PDFs/images, or cross-repo dollhouse intake.
 
 ## Core Files
 
-- Flat RAG file: `references/LANTERN-OS-RAG-DOLLHOUSE.flat.md`
+- Flat RAG file: `references/LANTERN-OS-RAG-DOLLHOUSE.flat.md` (gitignored,
+  machine-generated — rebuild with `npm run regen:rag` / `make regen-rag`; see
+  issue #2313)
 - Asset manifest: `assets/ASSET-MANIFEST.sha256`
 - PDFs: `assets/pdfs/`
 - COMET LEAPER operating narrative: `assets/pdfs/COMET-LEAPER-OPERATING-NARRATIVE-v1.pdf`
