@@ -300,6 +300,7 @@ const routes = [
   require("./routes/docmode"), // Document Mode — versioned collaborative doc editor
   require("./routes/features"),
   require("./routes/admin-flags"),     // Admin feature flags + per-page nav visibility
+  require("./routes/accounts"),        // Staff account-support console (admin/tech_support): multi-auth + password fixes
   require("./routes/personal-cube"),
   require("./routes/grounding"),       // Mesh grounding resolver: /api/grounding/resolve + /api/mesh/ground (gated by MESH_GROUNDING=1)
   require("./routes/pr-review"),

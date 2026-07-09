@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole, requireEntitlement, isAdmin } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireStaff, requireEntitlement, isAdmin } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 
 // Public pages — no auth required
@@ -46,6 +46,11 @@ const PROTECTED_PAGES = {
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
+  // Account-support console: view/configure/fix multi-auth + password issues.
+  // Restricted to STAFF (admin OR tech_support) via an explicit set check, not a
+  // hierarchy level — see auth-middleware.requireStaff.
+  "/accounts.html":       { file: "accounts.html",          staff: true },
+  "/accounts":            { file: "accounts.html",          staff: true },
 };
 
 // A nav page an admin flagged "disabled" is blocked for everyone except admins
@@ -104,8 +109,13 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   // Explicitly protected pages (role-specific)
   const page = PROTECTED_PAGES[pathname];
   if (page) {
-    if (!requireAuth(req, res)) return true;
-    if (page.entitlement) {
+    if (page.staff) {
+      // Staff gate writes its own 302/403 — do NOT run requireAuth first (that would
+      // 302 a signed-in non-staff user to login instead of returning a clean 403).
+      if (!requireStaff(req, res)) return true;
+    } else if (!requireAuth(req, res)) {
+      return true;
+    } else if (page.entitlement) {
       if (!requireEntitlement(req, res, page.entitlement)) return true;
     } else if (!requireRole(req, res, page.role)) {
       return true;
