@@ -1,13 +1,17 @@
 // Vision (image understanding) — analyze an image with a provider-native vision model.
-// Both Claude, GPT-4o-mini, and Gemini are multimodal. Claude is primary here, with gpt-4o-mini
-// as the first fallback, and gemini-2.5-flash as the second fallback.
+// Claude, GPT-4o-mini, and Gemini are all multimodal. Providers are tried in the order
+// the live PCSF leaderboard ranks them (lib/provider-router.orderChainByPcsf), chaining
+// to the next on any failure so one depleted/down provider never kills image analysis.
 // Node fetch, key stays server-side, fail-safe by contract: { ok:false, error } on any failure.
+//
+// Gemini goes over the SAME transport as the chat (lib/gemini-transport): when Vertex is
+// configured (GEMINI_USE_VERTEX=1 / VERTEX_PROJECT), it bills the funded Cloud project via
+// ADC and NEVER touches the AI-Studio key — so vision spends only the Vertex credits (#1232).
 //
 // Pairs with the file-upload work tool: an image attachment routes here so the chat can SEE it.
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const GEMINI_MODEL = process.env.GEMINI_VISION_MODEL || "gemini-2.5-flash";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const DEFAULT_PROMPT = "Describe this image in detail. If it contains text, transcribe it. If it's a chart, screenshot, diagram, or error, explain what it shows.";
 
 // Accept a data: URL or raw base64 → { data, mediaType }.
@@ -65,12 +69,18 @@ async function _openaiVision(prompt, data, mediaType, apiKey, signal) {
   return String(text).trim();
 }
 
-async function _geminiVision(prompt, data, mediaType, apiKey, signal) {
-  const res = await fetch(GEMINI_URL, {
+async function _geminiVision(prompt, data, mediaType, signal) {
+  // Resolve the wire (Vertex ADC when configured — the funded path — else AI-Studio key).
+  const { geminiTransport } = require("./gemini-transport");
+  const t = await geminiTransport({ model: GEMINI_MODEL, method: "generateContent", streaming: false });
+  const url = `https://${t.hostname}${t.path}`;
+  const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    headers: t.headers,
     body: JSON.stringify({
+      // Vertex requires an explicit role on each content (AI-Studio tolerated its absence).
       contents: [{
+        role: "user",
         parts: [
           { text: prompt || DEFAULT_PROMPT },
           { inline_data: { mime_type: mediaType || "image/png", data } },
@@ -92,42 +102,47 @@ async function analyzeImage(prompt, image, opts = {}) {
   const { data, mediaType } = _split(image);
   if (!data) return { ok: false, error: "no image data" };
   const mt = opts.mimeType || mediaType || "image/png";
+
   const anthropicKey = process.env.ANTHROPIC_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (!anthropicKey && !openaiKey && !geminiKey) return { ok: false, error: "no vision provider key configured" };
+  // Gemini counts as available when it has an AI-Studio key OR a Vertex wire (ADC).
+  const { providerHasKey, orderChainByPcsf } = require("./provider-router");
+  const geminiAvailable = providerHasKey("gemini");
+
+  // Candidate providers, keyed by the same provider names the PCSF leaderboard ranks.
+  const candidates = [
+    { provider: "anthropic", model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5",
+      available: !!anthropicKey, call: (s) => _claudeVision(prompt, data, mt, anthropicKey, s) },
+    { provider: "openai", model: "gpt-4o-mini",
+      available: !!openaiKey, call: (s) => _openaiVision(prompt, data, mt, openaiKey, s) },
+    { provider: "gemini", model: GEMINI_MODEL,
+      available: geminiAvailable, call: (s) => _geminiVision(prompt, data, mt, s) },
+  ].filter((c) => c.available);
+
+  if (!candidates.length) return { ok: false, error: "no vision provider configured (set ANTHROPIC_API_KEY, OPENAI_API_KEY, or a Vertex/GEMINI key)" };
+
+  // Order by the live PCSF ranking (same source of truth as chat routing); providers the
+  // leaderboard doesn't rank keep their listed order after ranked ones. So when one
+  // provider is depleted/down, the chain falls back to whoever the leaderboard trusts next.
+  const chain = orderChainByPcsf(
+    candidates.map((c) => ({ provider: c.provider })), "default"
+  ).chain;
+  const byProvider = new Map(candidates.map((c) => [c.provider, c]));
+  const ordered = chain.map((s) => byProvider.get(s.provider)).filter(Boolean);
 
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), opts.timeoutMs || 60000);
-  // Try each configured provider in turn; fall through to the next on failure so a
-  // single provider being down/over-quota (OpenAI billing was the #1484 blank-report
-  // cause) doesn't kill image analysis. Gemini is included because its key is the one
-  // reliably funded here — without it screenshot reports file with no description.
   const errors = [];
   try {
-    if (anthropicKey) {
+    for (const c of ordered) {
       try {
-        const text = await _claudeVision(prompt, data, mt, anthropicKey, ctrl.signal);
-        return { ok: true, text, model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5" };
+        const text = await c.call(ctrl.signal);
+        return { ok: true, text, model: c.model, provider: c.provider };
       } catch (e) {
         if (e.name === "AbortError") throw e;
-        errors.push(`claude: ${e.message}`);
-        console.warn(`[vision] claude failed (${e.message}); trying next provider`);
+        errors.push(`${c.provider}: ${e.message}`);
+        console.warn(`[vision] ${c.provider} failed (${e.message}); trying next provider`);
       }
-    }
-    if (openaiKey) {
-      try {
-        const text = await _openaiVision(prompt, data, mt, openaiKey, ctrl.signal);
-        return { ok: true, text, model: "gpt-4o-mini" };
-      } catch (e) {
-        if (e.name === "AbortError") throw e;
-        errors.push(`openai: ${e.message}`);
-        console.warn(`[vision] openai failed (${e.message}); trying gemini`);
-      }
-    }
-    if (geminiKey) {
-      const text = await _geminiVision(prompt, data, mt, geminiKey, ctrl.signal);
-      return { ok: true, text, model: GEMINI_MODEL };
     }
     return { ok: false, error: errors.length ? `all vision providers failed — ${errors.join("; ")}` : "vision provider failed" };
   } catch (e) {

@@ -2492,7 +2492,9 @@ async function handleStreamChat(req, url, res) {
 
   // Provider: Gemini (streaming)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-  if (_p === "gemini" && geminiKey) {
+  // Reachable via the AI-Studio key OR a Vertex wire (ADC, funded) — so a Vertex-only
+  // config (no GEMINI_API_KEY) still routes gemini instead of skipping it entirely.
+  if (_p === "gemini" && (geminiKey || require("./gemini-transport").useVertex())) {
     // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Gemini function-calling
     // over the same registry/executor. When active we use our functionDeclarations
     // (which include web_search) instead of the googleSearch builtin. Off by default →
