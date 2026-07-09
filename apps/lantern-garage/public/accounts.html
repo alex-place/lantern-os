@@ -120,8 +120,35 @@
     .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn.ghost:hover { color: var(--text); border-color: var(--accent); }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .btn.pulse { box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 60%, transparent); animation: pulse 1.6s infinite; }
-    @keyframes pulse { 70% { box-shadow: 0 0 0 6px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+    .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--border); }
+    .btn.danger:hover { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+
+    /* Inline-editable name / email */
+    .editable { cursor: text; border-bottom: 1px dashed transparent; }
+    .editable:hover { border-bottom-color: var(--border); }
+    .cell-input {
+      width: 100%; box-sizing: border-box; background: var(--bg);
+      border: 1px solid var(--accent); border-radius: 6px; padding: 3px 6px;
+      color: var(--text); font-size: inherit; font-family: inherit;
+    }
+    /* Archived (deleted) rows — read-only */
+    tr.archived { opacity: 0.55; }
+    tr.archived td { font-style: italic; }
+    .archived-tag {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--muted); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; margin-left: 6px; font-style: normal;
+    }
+
+    /* Set-password modal fields */
+    .field { margin-bottom: 12px; }
+    .field label { display: block; font-size: 0.78rem; color: var(--muted); margin-bottom: 5px; }
+    .field input[type=text] {
+      width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 9px; padding: 9px 11px; color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9rem;
+    }
+    .field input:focus { outline: none; border-color: var(--accent); }
+    .field .row-inline { display: flex; gap: 8px; align-items: center; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; color: var(--text); cursor: pointer; }
 
     /* Toast + modal */
     #toast {
@@ -185,6 +212,7 @@
           <option value="">All roles</option>
         </select>
         <button class="tbtn" id="filter-issues" type="button" aria-pressed="false">Issues only</button>
+        <button class="tbtn" id="toggle-archived" type="button" aria-pressed="false">Show archived</button>
         <button class="tbtn" id="refresh" type="button">Refresh</button>
         <span class="grow"></span>
         <span class="count" id="count"></span>
@@ -217,9 +245,31 @@
   <div class="modal-back" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-modal-title">
     <div class="modal">
       <h2 id="pw-modal-title">Temporary password set</h2>
-      <p>Relay this to the account holder over a trusted channel. Ask them to sign in and change it immediately.</p>
+      <p id="pw-modal-sub">Relay this to the account holder over a trusted channel. Ask them to sign in and change it immediately.</p>
       <div class="pw-box"><code id="pw-value">—</code><button class="btn ghost" id="pw-copy" type="button">Copy</button></div>
       <div class="modal-actions"><button class="btn" id="pw-done" type="button">Done</button></div>
+    </div>
+  </div>
+
+  <!-- Set-password modal — type or generate a password, optionally email the user -->
+  <div class="modal-back" id="setpw-modal" role="dialog" aria-modal="true" aria-labelledby="setpw-title">
+    <div class="modal">
+      <h2 id="setpw-title">Set password</h2>
+      <p id="setpw-sub">Set a new password for this account. It replaces any existing password.</p>
+      <div class="field">
+        <label for="setpw-input">Password (leave blank to auto-generate)</label>
+        <div class="row-inline">
+          <input type="text" id="setpw-input" autocomplete="off" spellcheck="false" placeholder="auto-generate a temporary password">
+          <button class="btn ghost" id="setpw-gen" type="button">Generate</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="check"><input type="checkbox" id="setpw-email"> Email the new password to the user</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="setpw-cancel" type="button">Cancel</button>
+        <button class="btn" id="setpw-save" type="button">Set password</button>
+      </div>
     </div>
   </div>
 
@@ -251,9 +301,12 @@
       return { ok: r.ok, status: r.status, data };
     }
 
-    let ALL = [];      // full account list from the server
+    let ALL = [];        // active accounts from the server
+    let ARCHIVED = [];   // deleted (read-only) accounts
     let VIEWER = { isAdmin: false, canUnlink: false, canGrantAdmin: false, assignableRoles: [], role: '' };
     let issuesOnly = false;
+    let showArchived = false;
+    const accById = (id) => ALL.find((a) => a.id === id) || ARCHIVED.find((a) => a.id === id);
 
     function matchesFilter(a) {
       const q = $('#q').value.trim().toLowerCase();
@@ -297,22 +350,24 @@
     }
 
     function fixesCell(acc) {
-      const needsReconcile = (acc.issues || []).some((i) => i.fix === 'reconcile');
       const btns = [];
-      btns.push(`<button class="btn ghost" data-reset="${esc(acc.id)}">Reset password</button>`);
-      btns.push(`<button class="btn${needsReconcile ? ' pulse' : ' ghost'}" data-reconcile="${esc(acc.id)}">Reconcile</button>`);
+      btns.push(`<button class="btn ghost" data-setpw="${esc(acc.id)}">Set password</button>`);
+      if (VIEWER.isAdmin) btns.push(`<button class="btn danger" data-delete="${esc(acc.id)}">Delete</button>`);
       return `<div class="actions">${btns.join('')}</div>`;
     }
 
     function rowHtml(acc) {
+      if (acc.archived) return archivedRowHtml(acc);
       const providers = (acc.providers && acc.providers.length)
         ? acc.providers.map((p) => providerPill(acc, p)).join('')
         : '<span class="none">none</span>';
       const vdot = acc.emailVerified ? '<span class="verified-dot yes" title="Email verified"></span>' : '<span class="verified-dot no" title="Email unverified"></span>';
+      const nameEd = `<span class="editable" data-edit="name" tabindex="0" role="button" title="Click to edit name">${esc(acc.name || '(no name)')}</span>`;
+      const emailEd = `<span class="editable" data-edit="email" tabindex="0" role="button" title="Click to edit email">${esc(acc.email || '—')}</span>`;
       return `<tr data-id="${esc(acc.id)}">
         <td>
-          <div class="acct-name">${esc(acc.name || '(no name)')}${vdot}</div>
-          <div class="acct-email">${esc(acc.email || '—')}</div>
+          <div class="acct-name">${nameEd}${vdot}</div>
+          <div class="acct-email">${emailEd}</div>
           <div class="acct-id">${esc(acc.id)}</div>
         </td>
         <td><div class="providers">${providers}</div></td>
@@ -323,15 +378,40 @@
       </tr>`;
     }
 
+    // Deleted accounts render read-only (no controls) — the archived snapshot is kept
+    // server-side in data/profiles/archive.jsonl.
+    function archivedRowHtml(acc) {
+      const when = acc.archivedAt ? new Date(acc.archivedAt).toLocaleDateString() : '';
+      const provs = (acc.providers || []).map((p) => {
+        const cls = ['discord', 'google', 'patreon', 'local'].includes(p.provider) ? p.provider : 'local';
+        return `<span class="pill ${cls}"><span class="pdot"></span>${esc(p.provider)}</span>`;
+      }).join('') || '<span class="none">none</span>';
+      return `<tr class="archived" data-id="${esc(acc.id)}">
+        <td>
+          <div class="acct-name">${esc(acc.name || '(no name)')}<span class="archived-tag">archived</span></div>
+          <div class="acct-email">${esc(acc.email || '—')}</div>
+          <div class="acct-id">${esc(acc.id)}</div>
+        </td>
+        <td><div class="providers">${provs}</div></td>
+        <td>${esc(ROLE_LABELS[acc.role] || acc.role)}</td>
+        <td><span class="pw-state">${acc.hasPassword ? 'Set' : 'Not set'}</span></td>
+        <td>${when ? 'Deleted ' + esc(when) : 'Deleted'}</td>
+        <td>—</td>
+      </tr>`;
+    }
+
     function render() {
-      const shown = ALL.filter(matchesFilter);
+      const active = ALL.filter(matchesFilter);
+      const arch = showArchived ? ARCHIVED.filter(matchesFilter) : [];
+      const shown = active.concat(arch);
       const tbody = $('#rows');
       if (!shown.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="loading">No accounts match.</td></tr>';
       } else {
         tbody.innerHTML = shown.map(rowHtml).join('');
       }
-      $('#count').textContent = `${shown.length} of ${ALL.length} account${ALL.length === 1 ? '' : 's'}`;
+      $('#count').textContent = `${active.length} of ${ALL.length} account${ALL.length === 1 ? '' : 's'}`
+        + (showArchived && ARCHIVED.length ? ` · ${arch.length} archived` : '');
     }
 
     function replaceAccount(updated) {
@@ -354,31 +434,26 @@
     });
 
     $('#rows').addEventListener('click', async (e) => {
-      const reset = e.target.closest('[data-reset]');
-      const reconcile = e.target.closest('[data-reconcile]');
+      const setpw = e.target.closest('[data-setpw]');
+      const del = e.target.closest('[data-delete]');
       const unlink = e.target.closest('[data-unlink]');
 
-      if (reset) {
-        const id = reset.dataset.reset;
-        if (!confirm('Set a NEW temporary password for this account? Their current password (if any) stops working.')) return;
-        reset.disabled = true;
-        const res = await api('POST', '/api/accounts/reset-password', { id });
-        reset.disabled = false;
-        if (res.ok) { replaceAccount(res.data.account); showPassword(res.data.tempPassword); }
-        else toast(res.data.error || 'Reset failed');
-        return;
-      }
-      if (reconcile) {
-        const id = reconcile.dataset.reconcile;
-        reconcile.disabled = true;
-        const res = await api('POST', '/api/accounts/reconcile', { id });
-        reconcile.disabled = false;
+      if (setpw) { openSetPw(setpw.dataset.setpw); return; }
+
+      if (del) {
+        const id = del.dataset.delete, acc = accById(id);
+        if (!confirm(`Delete ${acc ? (acc.email || acc.name || id) : 'this account'}?\n\nA read-only copy is archived first (recoverable by an admin). The account can no longer sign in.`)) return;
+        del.disabled = true;
+        const res = await api('POST', '/api/accounts/delete', { id });
+        del.disabled = false;
         if (res.ok) {
-          replaceAccount(res.data.account);
-          toast(res.data.changed ? `Reconciled → ${ROLE_LABELS[res.data.account.role] || res.data.account.role}` : 'Already consistent — no change');
-        } else toast(res.data.error || 'Reconcile failed');
+          const i = ALL.findIndex((a) => a.id === id);
+          if (i >= 0) { const a = ALL.splice(i, 1)[0]; a.archived = true; a.archivedAt = new Date().toISOString(); ARCHIVED.push(a); }
+          render(); toast('Account archived');
+        } else toast(res.data.error === 'cannot_delete_self' ? "You can't delete your own account" : (res.data.error || 'Delete failed'));
         return;
       }
+
       if (unlink) {
         const id = unlink.dataset.id, provider = unlink.dataset.unlink;
         if (!confirm(`Unlink the ${provider} sign-in from this account? They can re-link it later.`)) return;
@@ -388,9 +463,90 @@
       }
     });
 
-    // ── Temp-password modal ──────────────────────────────────────────────────
-    function showPassword(pw) {
+    // ── Inline edit of name / email ──────────────────────────────────────────
+    $('#rows').addEventListener('click', (e) => {
+      const span = e.target.closest('.editable');
+      if (!span) return;
+      const tr = span.closest('tr');
+      if (!tr || tr.classList.contains('archived')) return;
+      startInlineEdit(span, tr.dataset.id);
+    });
+
+    function startInlineEdit(span, id) {
+      const field = span.dataset.edit; // 'name' | 'email'
+      const acc = accById(id);
+      const orig = acc ? (field === 'name' ? (acc.name || '') : (acc.email || '')) : '';
+      const input = document.createElement('input');
+      input.className = 'cell-input'; input.type = 'text'; input.value = orig;
+      input.setAttribute('aria-label', field === 'name' ? 'Edit name' : 'Edit email');
+      span.replaceWith(input); input.focus(); input.select();
+      let done = false;
+      const commit = async (save) => {
+        if (done) return; done = true;
+        const val = input.value.trim();
+        if (!save || val === orig) { render(); return; }
+        const res = await api('POST', '/api/accounts/update', { id, [field]: val });
+        if (res.ok) { replaceAccount(res.data.account); toast(field === 'email' ? 'Email updated' : 'Name updated'); }
+        else {
+          const m = { email_taken: 'Email already in use', invalid_email: 'Invalid email',
+            edit_requires_admin: 'Editing this account requires admin' };
+          toast(m[res.data.error] || res.data.error || 'Update failed'); render();
+        }
+      };
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); commit(true); }
+        else if (ev.key === 'Escape') { ev.preventDefault(); commit(false); }
+      });
+      input.addEventListener('blur', () => commit(true));
+    }
+
+    // ── Set-password modal ───────────────────────────────────────────────────
+    let setpwTargetId = null;
+    function genTempPw() {
+      const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+      const arr = new Uint8Array(14); crypto.getRandomValues(arr);
+      let s = ''; for (let i = 0; i < 14; i++) s += a[arr[i] % a.length];
+      return s.slice(0, 5) + '-' + s.slice(5, 10) + '-' + s.slice(10);
+    }
+    function openSetPw(id) {
+      setpwTargetId = id;
+      const acc = accById(id);
+      $('#setpw-input').value = '';
+      $('#setpw-email').checked = false;
+      $('#setpw-email').disabled = !(acc && acc.email);
+      $('#setpw-sub').textContent = acc
+        ? `Set a new password for ${acc.email || acc.name || acc.id}. Replaces any existing password.`
+        : 'Set a new password. Replaces any existing password.';
+      $('#setpw-modal').classList.add('show');
+      $('#setpw-input').focus();
+    }
+    function closeSetPw() { $('#setpw-modal').classList.remove('show'); setpwTargetId = null; }
+    $('#setpw-gen').addEventListener('click', () => { $('#setpw-input').value = genTempPw(); $('#setpw-input').focus(); });
+    $('#setpw-cancel').addEventListener('click', closeSetPw);
+    $('#setpw-modal').addEventListener('click', (e) => { if (e.target === $('#setpw-modal')) closeSetPw(); });
+    $('#setpw-save').addEventListener('click', async () => {
+      const id = setpwTargetId; if (!id) return;
+      const pw = $('#setpw-input').value.trim();
+      const email = $('#setpw-email').checked;
+      if (pw && pw.length < 8) { toast('Password must be at least 8 characters'); return; }
+      $('#setpw-save').disabled = true;
+      const res = await api('POST', '/api/accounts/set-password', { id, password: pw || undefined, email });
+      $('#setpw-save').disabled = false;
+      if (!res.ok) { toast(res.data.error === 'weak_password' ? 'Password too short (min 8)' : (res.data.error || 'Failed to set password')); return; }
+      replaceAccount(res.data.account);
+      closeSetPw();
+      const emailedMsg = email
+        ? (res.data.emailed ? (res.data.smtp ? ' · emailed to user' : ' · email logged (no SMTP in dev)') : ' · email failed')
+        : '';
+      if (res.data.tempPassword) showPassword(res.data.tempPassword, emailedMsg);
+      else toast('Password set' + emailedMsg);
+    });
+
+    // ── Temp-password reveal modal ───────────────────────────────────────────
+    function showPassword(pw, note) {
       $('#pw-value').textContent = pw;
+      $('#pw-modal-sub').textContent =
+        'Relay this to the account holder over a trusted channel. Ask them to sign in and change it immediately.' + (note || '');
       $('#pw-modal').classList.add('show');
     }
     $('#pw-copy').addEventListener('click', () => {
@@ -399,7 +555,7 @@
     function closePw() { $('#pw-modal').classList.remove('show'); }
     $('#pw-done').addEventListener('click', closePw);
     $('#pw-modal').addEventListener('click', (e) => { if (e.target === $('#pw-modal')) closePw(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePw(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closePw(); closeSetPw(); } });
 
     // ── Filters ──────────────────────────────────────────────────────────────
     $('#q').addEventListener('input', render);
@@ -409,6 +565,15 @@
       $('#filter-issues').setAttribute('aria-pressed', String(issuesOnly));
       $('#filter-issues').style.borderColor = issuesOnly ? 'var(--accent)' : '';
       $('#filter-issues').style.color = issuesOnly ? 'var(--accent)' : '';
+      render();
+    });
+    $('#toggle-archived').addEventListener('click', () => {
+      showArchived = !showArchived;
+      const b = $('#toggle-archived');
+      b.setAttribute('aria-pressed', String(showArchived));
+      b.style.borderColor = showArchived ? 'var(--accent)' : '';
+      b.style.color = showArchived ? 'var(--accent)' : '';
+      b.textContent = showArchived ? 'Hide archived' : 'Show archived';
       render();
     });
     $('#refresh').addEventListener('click', load);
@@ -427,6 +592,7 @@
       if (!res.ok) { toast(res.data.error || 'Failed to load'); return; }
       $('#gate').style.display = 'none'; $('#content').style.display = '';
       ALL = res.data.accounts || [];
+      ARCHIVED = res.data.archived || [];
       VIEWER = res.data.viewer || VIEWER;
       $('#viewer-badge').textContent = VIEWER.isAdmin ? 'Admin' : 'Tech Support';
       // Populate the role filter from the roles actually present.
