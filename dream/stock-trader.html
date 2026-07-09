@@ -320,6 +320,16 @@
   body.ot-open .footer{ padding-right: 356px; }
   @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
+  /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
+     On phones collapse to one column (main gets the room) and let the dense header scroll
+     horizontally so no control is clipped off-screen / unreachable. ── */
+  @media (max-width:580px){
+    .layout{ grid-template-columns:1fr; }
+    .sidebar{ display:none; }              /* watchlist hidden on phone — main gets full width */
+    .main, .footer{ grid-column:1; }
+    .header{ overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
+    .header::-webkit-scrollbar{ height:0; }
+  }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
   .ot-close{cursor:pointer;font-size:11px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
