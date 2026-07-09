@@ -345,9 +345,9 @@
   /* Mobile view switch (chart vs ticker list) — a compact centered segmented control,
      hidden on desktop (both panels show). */
   .mobile-view-tabs{ display:none; }
-  .mvt-btn{ flex:0 1 150px; min-height:34px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
-    border-radius:8px; font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer;
-    display:flex; align-items:center; justify-content:center; gap:6px; transition:background .15s,border-color .15s; }
+  .mvt-btn{ flex:0 1 104px; min-height:28px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
+    border-radius:7px; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.02em; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:background .15s,border-color .15s; }
   .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
@@ -362,14 +362,16 @@
     .header .logo,
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
-    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:8px; padding:8px 12px;
+    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
       background:var(--bg1); border-bottom:1px solid var(--border); }
     /* default = chart view: charts get the room; the account panel is a resizable strip
        at the bottom (drag its grabber). Override the desktop grid's height:100% (which made
        the account panel swallow the whole phone screen). */
     .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
-    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; }
-    .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; }
+    /* Breathing room at the bottom of the scroll so the last chart clears the account
+       strip instead of being butted right up against it. */
+    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
+    .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
     /* Fixed multi-chart grids stack in one column on phones (see applyGridCols); let the
        grid grow past the viewport and scroll inside .main instead of squishing to fit. */
     .cards-grid.grid-fixed{ height:auto; }
@@ -563,8 +565,8 @@
 <!-- Mobile-only view switch: the ticker list and the charts can't both fit at phone width,
      so toggle between them (chart view is the default). Hidden on desktop (both show). -->
 <div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
-  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">📈 Chart</button>
-  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">📋 Tickers</button>
+  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">Chart</button>
+  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">Tickers</button>
 </div>
 
 <!-- Sidebar -->
