@@ -208,6 +208,13 @@ html[data-theme="dark"] .hero-tagline { text-shadow: 0 1px 3px rgba(0, 0, 0, .55
     max-width: 86vw;
   }
   .chat-sidebar.open { transform: translateX(0); }
+  /* Dim + capture taps behind the open drawer so tapping outside closes it. */
+  .chat-sidebar-backdrop {
+    position: fixed; inset: 0; z-index: 1199;
+    background: rgba(0, 0, 0, .45);
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+  }
+  .chat-sidebar-backdrop.show { opacity: 1; pointer-events: auto; }
   .sidebar-toggle { display: flex; }
   .app-main { margin-left: 0; }
   .site-nav { padding: 0 12px; }

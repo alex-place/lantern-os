@@ -511,17 +511,40 @@
 
   // The sidebar is permanently visible on desktop; on narrow screens it's an
   // off-canvas drawer toggled by the ☰ button (CSS: .chat-sidebar.open).
+  // Backdrop behind the mobile drawer — tap it (or press Esc) to close. Without this the
+  // open drawer covers the ☰ toggle, leaving no way to dismiss it. Created lazily; it's
+  // display:none on desktop (where the sidebar is a permanent column, not a drawer).
+  function sidebarBackdrop() {
+    let bd = document.getElementById("chat-sidebar-backdrop");
+    if (!bd) {
+      bd = document.createElement("div");
+      bd.id = "chat-sidebar-backdrop";
+      bd.className = "chat-sidebar-backdrop";
+      bd.addEventListener("click", closeSessions);
+      document.body.appendChild(bd);
+    }
+    return bd;
+  }
   function openSessions() {
     const sb = document.getElementById("chat-sidebar");
     if (sb) sb.classList.add("open");
+    sidebarBackdrop().classList.add("show");
     loadSessions();
   }
   function closeSessions() {
     const sb = document.getElementById("chat-sidebar");
     if (sb) sb.classList.remove("open");
+    const bd = document.getElementById("chat-sidebar-backdrop");
+    if (bd) bd.classList.remove("show");
   }
   window.openSessions = openSessions;
   window.closeSessions = closeSessions;
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const sb = document.getElementById("chat-sidebar");
+      if (sb && sb.classList.contains("open")) closeSessions();
+    }
+  });
   const sidebarToggleBtn = document.getElementById("sidebar-toggle-btn");
   if (sidebarToggleBtn) {
     sidebarToggleBtn.addEventListener("click", () => {
