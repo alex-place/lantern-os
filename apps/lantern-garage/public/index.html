@@ -83,6 +83,14 @@
       font-weight: 700;
     }
     .hero .motto { font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 14px; }
+    /* Each loop stage links into its Knowledge-Center explainer (they cross-link to
+       each other to describe the whole convergence process). */
+    .hero .motto a {
+      color: inherit; text-decoration: none;
+      border-bottom: 1px dotted color-mix(in srgb, var(--muted) 55%, transparent);
+      transition: color .15s, border-color .15s;
+    }
+    .hero .motto a:hover, .hero .motto a:focus-visible { color: var(--accent); border-bottom-color: var(--accent); outline: none; }
     .hero .tagline { color: var(--text); max-width: 560px; margin: 0 auto 20px; font-size: 1rem; line-height: 1.55; }
     html[data-theme="dark"] .hero h1 { text-shadow: 0 2px 26px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4); }
     html[data-theme="dark"] .hero .tagline { text-shadow: 0 1px 3px rgba(0,0,0,.55); }
@@ -274,7 +282,14 @@
     <div class="hero">
       <img class="hero__mandala" src="/mandala.svg" alt="" aria-hidden="true" width="148" height="148">
       <h1>unisona.ai</h1>
-      <p class="motto">Observe · Remember · Reason · Act · Verify · Converge</p>
+      <p class="motto" aria-label="The convergence loop — select a stage to learn how it works">
+        <a href="/repo/docs/loop/observe.md" title="Observe — take in the world">Observe</a> ·
+        <a href="/repo/docs/loop/remember.md" title="Remember — recall what matters">Remember</a> ·
+        <a href="/repo/docs/loop/reason.md" title="Reason — decide what to do">Reason</a> ·
+        <a href="/repo/docs/loop/act.md" title="Act — do it with real tools">Act</a> ·
+        <a href="/repo/docs/loop/verify.md" title="Verify — check it against reality">Verify</a> ·
+        <a href="/repo/docs/loop/converge.md" title="Converge — record the outcome and improve">Converge</a>
+      </p>
     </div>
   </div>
 

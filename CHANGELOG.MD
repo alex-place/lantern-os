@@ -1,3 +1,8 @@
+## [1.8.126] - 2026-07-09
+
+### Added
+- **The home hero loop mantra now links into the Knowledge Center, and the six stages cross-link into one explanation of convergence.** Each word of `Observe · Remember · Reason · Act · Verify · Converge` on the home page is now a link to a plain-language Knowledge-Center explainer for that stage (`docs/loop/{observe,remember,reason,act,verify,converge}.md`). Every stage doc ends with the full loop nav and cross-links to the other five plus the North-Star briefing, so a first-time visitor can click any word and walk the whole Observe→Remember→Reason→Act→Verify→Converge→Observe process. The six docs are registered in `data/knowledge/doc-catalog.json` (category: guides, grounded/living) and surface as cards in the Knowledge Center library (rebuilt via `scripts/build_doc_library.js`). Addresses the "hero motto is developer-speak" finding (#2333) by explaining the loop rather than hiding it. Verified in a dev preview: all six motto links resolve, each doc renders and its cross-links navigate between stages. Improves **Remember** (discoverable, grounded self-documentation).
+
 ## [1.8.125] - 2026-07-09
 
 ### Changed
