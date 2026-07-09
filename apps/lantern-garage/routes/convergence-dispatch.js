@@ -193,11 +193,12 @@ module.exports = async (req, res, url, deps) => {
         }
 
         const result = await convergenceAgent.respond(message);
-        // Persist both sides so history reload shows the full exchange
+        // Persist both sides so history reload shows the full exchange (per-user).
         const now = new Date().toISOString();
-        appendConversationEntry({ recordedAt: now, surface: "convergence-agent", role: "operator", text: message.slice(0, maxConversationTextLength) }).catch(() => {});
+        const userId = require("../lib/session-identity").getEffectiveUserId(req);
+        appendConversationEntry({ recordedAt: now, surface: "convergence-agent", role: "operator", text: message.slice(0, maxConversationTextLength), userId }).catch(() => {});
         if (result.answer) {
-          appendConversationEntry({ recordedAt: now, surface: "convergence-agent", role: "lantern", text: String(result.answer).slice(0, maxConversationTextLength) }).catch(() => {});
+          appendConversationEntry({ recordedAt: now, surface: "convergence-agent", role: "lantern", text: String(result.answer).slice(0, maxConversationTextLength), userId }).catch(() => {});
         }
         sendJson(res, {
           success: true,
