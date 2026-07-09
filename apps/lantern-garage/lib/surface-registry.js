@@ -72,6 +72,7 @@ const EXTENSION = {
   "auth.html":                     ["account", null],
   "entry.html":                    ["account", null],
   "profile.html":                  ["account", null],
+  "accounts.html":                 ["account", null],
   "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],
   "upgrade-lab.html":              ["account", null],
@@ -111,7 +112,7 @@ const SUBSYSTEMS = {
 //      exceeds this cap the contract test FAILS: either add core value, or raise the cap
 //      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
 //      instead of letting it accrete silently).
-const MAX_EXTENSION_RATIO = 0.95; // 18:19 ≈ 0.95 — ibkr-setup-guide classified under trading; ibkr-connect redirect stub removed (not a surface).
+const MAX_EXTENSION_RATIO = 1.0; // 19:19 exactly after the protected account-repair surface.
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always
