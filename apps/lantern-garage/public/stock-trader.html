@@ -353,15 +353,19 @@
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
     .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
-    .header{ flex:0 0 auto; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
-    .header::-webkit-scrollbar{ height:0; }
+    /* Wrap the toolbar onto multiple rows instead of one horizontal-scroll strip that
+       clipped VIX / the chart controls off the right edge with no obvious way to reach
+       them. Everything is now visible and left-aligned; the range buttons wrap too. */
+    .header{ flex:0 0 auto; flex-wrap:wrap; align-items:center; align-content:flex-start;
+      gap:6px 10px; padding:8px 12px; }
     /* The toolbar's brand + account readouts (Equity, Day P&L, Positions) duplicate the
-       account panel below, and on phones they're the ONLY thing visible — pushing the
-       useful controls off-screen. Hide the duplicates so what's left is what ISN'T shown
+       account panel below — hide the duplicates so what's left is what ISN'T shown
        elsewhere: VIX, market trend, and the chart customization controls. */
     .header .logo,
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
+    .header .hstat{ min-width:0; }
+    .header .range-group{ flex-wrap:wrap; }
     .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
       background:var(--bg1); border-bottom:1px solid var(--border); }
     /* default = chart view: charts get the room; the account panel is a resizable strip
