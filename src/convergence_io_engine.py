@@ -701,11 +701,14 @@ class ValidationRing:
         }
 
 
-class TesseractEngine:
+class HealthGradeEngine:
     """
-    The Tesseract I/O Engine orchestrates the flow of information through the
-    four layers of the hypercube (Surface, Interface, Convergence, Core) and
-    manages the 12-step convergence loop.
+    Grade-card / health engine over the four hypercube layers (Surface,
+    Interface, Convergence, Core). Renamed from a duplicate `TesseractEngine`
+    definition that was silently shadowed by the live convergence-loop engine
+    below (#2122) — same anti-pattern as GradeCardRecord vs ConvergenceRecord.
+    The live `TesseractEngine` (converge()/health_check()) is defined later in
+    this module and is the one every importer receives.
     """
 
     def __init__(self, data_dir: Optional[str] = None):
@@ -840,7 +843,7 @@ class TesseractEngine:
             overall_grade=overall_grade,
             evidence_paths=evidence_paths,
             confidence=1.0, # Confidence in the record itself, not the scores
-            source="TesseractEngine.grade",
+            source="HealthGradeEngine.grade",
             metadata=metadata,
         )
 
