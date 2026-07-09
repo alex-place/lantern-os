@@ -27,6 +27,8 @@ const TF = {
   '1h':  { interval: '60m', range: '6mo', agg: 1 },
   '4h':  { interval: '60m', range: '1y',  agg: 4 },
   '1d':  { interval: '1d',  range: '10y', agg: 1 },  // deep enough for the 5Y range and a real "All"
+  '1w':  { interval: '1wk', range: '10y', agg: 1 },  // weekly candles for multi-year views
+  '1mo': { interval: '1mo', range: 'max', agg: 1 },  // monthly candles across full history
 };
 // Deep history for zoom/pan (the client windows it). 2600 covers ~10y of daily bars so
 // the "All" range shows a decade of history (Yahoo drops daily→monthly past ~10y, so 10y

@@ -74,7 +74,7 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:180px 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   /* Draggable divider to resize the bottom panel section (#1630) */
   .footer-resize{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:30}
   .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
@@ -553,6 +553,8 @@
     <option value="1h">1h</option>
     <option value="4h">4h</option>
     <option value="1d">1d</option>
+    <option value="1w">1W</option>
+    <option value="1mo">1Mo</option>
   </select>
   <select id="chartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
     <option value="1D">1D</option>
@@ -633,6 +635,8 @@
         <option value="1h">1h</option>
         <option value="4h">4h</option>
         <option value="1d">1d</option>
+        <option value="1w">1W</option>
+        <option value="1mo">1Mo</option>
       </select>
       <select id="fsChartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
         <option value="1D">1D</option>
@@ -1254,7 +1258,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     // #1699: default the visible window to ~one range-label's worth of candles per
     // timeframe (1D≈78×5m, 5D≈35×1h, 1M≈22 daily trading days) instead of a flat
     // 70 — so the candle count matches the selected range. Pan to see more history.
-    const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22 };
+    const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22, '1w': 52, '1mo': 60 };
     // Honor the saved/active RANGE window when it matches the current timeframe, so a
     // chart re-opens at the same zoom the user left it (e.g. 1Y stays 1Y across reloads)
     // instead of snapping back to the timeframe's default window.
@@ -1531,11 +1535,13 @@ function visibleTickers(){
     const order={open:0,watching:1,quiet:2};
     return all.slice().sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})]);
   }
-  // Seed/extend slots from the watchlist until we have slotCount of them.
+  // Drop any duplicates/blanks a previous wrap-fill may have persisted.
+  chartSlots = chartSlots.filter((t,i)=> t && chartSlots.indexOf(t) === i);
+  // Seed slots from UNIQUE watchlist symbols. If there aren't enough distinct tickers to
+  // fill the grid, leave the remaining cells empty instead of duplicating a symbol.
   if(chartSlots.length < slotCount){
     const seed = all.filter(t=>!chartSlots.includes(t));
     while(chartSlots.length < slotCount && seed.length) chartSlots.push(seed.shift());
-    while(chartSlots.length < slotCount) chartSlots.push(all[chartSlots.length % Math.max(1,all.length)] || 'SPY');
     persistSlots();
   }
   return chartSlots.slice(0, slotCount);
