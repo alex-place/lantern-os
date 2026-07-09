@@ -289,8 +289,9 @@
   .xh-time{bottom:0;transform:translateX(-50%)}
   /* Mobile scrubber dot — rides the price line where the vertical crosshair meets it.
      Only the phone crosshair uses it (desktop keeps the full dashed crosshair). */
-  .xh-dot{position:absolute;pointer-events:none;z-index:8;display:none;width:10px;height:10px;
-    margin:-5px 0 0 -5px;border-radius:50%;background:var(--accent,#3b9eff);box-shadow:0 0 0 2px var(--bg1,#111)}
+  .xh-dot{position:absolute;pointer-events:none;z-index:8;display:none;width:8px;height:8px;
+    margin:-4px 0 0 -4px;border-radius:50%;background:transparent;border:2px solid var(--accent,#3b9eff);
+    box-shadow:0 0 0 1.5px var(--bg1,#111)}
   /* Header chart controls */
   .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
