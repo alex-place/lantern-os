@@ -376,7 +376,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
       sendJson(res, { bars: {} }, 503);
       return true;
     }
-    const ALLOWED_TIMEFRAMES = new Set(['1m', '5m', '15m', '1h', '4h', '1d']);
+    const ALLOWED_TIMEFRAMES = new Set(['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1mo']);
     const timeframeParam = url.searchParams.get('timeframe') || '5m';
     const timeframe = ALLOWED_TIMEFRAMES.has(timeframeParam) ? timeframeParam : '5m';
     try {

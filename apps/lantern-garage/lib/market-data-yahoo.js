@@ -26,12 +26,15 @@ const TF = {
   '15m': { interval: '15m', range: '1mo', agg: 1 },
   '1h':  { interval: '60m', range: '6mo', agg: 1 },
   '4h':  { interval: '60m', range: '1y',  agg: 4 },
-  '1d':  { interval: '1d',  range: '5y',  agg: 1 },  // deep enough for the 5Y / All ranges
+  '1d':  { interval: '1d',  range: '10y', agg: 1 },  // deep enough for the 5Y range and a real "All"
+  '1w':  { interval: '1wk', range: '10y', agg: 1 },  // weekly candles for multi-year views
+  '1mo': { interval: '1mo', range: 'max', agg: 1 },  // monthly candles across full history
 };
-// Deep history for zoom/pan (the client windows it). 1300 covers ~5y of daily bars for
-// the 5Y/All ranges; each timeframe is still bounded by its own Yahoo `range` above, so
-// intraday frames don't balloon.
-const MAX_BARS = 1300;
+// Deep history for zoom/pan (the client windows it). 2600 covers ~10y of daily bars so
+// the "All" range shows a decade of history (Yahoo drops daily→monthly past ~10y, so 10y
+// is the deepest useful daily window). Each timeframe is still bounded by its own Yahoo
+// `range` above, so intraday frames don't balloon.
+const MAX_BARS = 2600;
 const QUOTE_TTL = 20000;       // 20s — card prices
 const BARS_TTL = 45000;        // 45s — chart bars
 const FETCH_CONCURRENCY = 6;
