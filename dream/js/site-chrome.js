@@ -41,6 +41,7 @@
       "\n" +
       "  </div>\n" +
       '  <div class="nav-actions">\n' +
+      '    <button class="nav-btn nav-menu-toggle" id="nav-menu-toggle" type="button" aria-label="Menu" aria-expanded="false" title="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>\n' +
       '    <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>\n' +
       '    <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode"><svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>\n' +
       '    <button class="nav-btn" id="screenshot-btn" type="button" onclick="if(window.issueReporter)window.issueReporter.open()" title="Report an issue (screenshot → GitHub)" aria-label="Report an issue with a screenshot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button>\n' +
@@ -108,6 +109,25 @@
         a.setAttribute("aria-current", "page"); // expose the active page to AT
       }
     });
+
+    // Mobile hamburger: on narrow screens the 5 nav links don't fit beside the brand +
+    // action buttons (they clipped mid-word). Collapse them into a dropdown behind the ☰.
+    // Gated by the `has-menu` class so ONLY this canonical nav gets the dropdown CSS —
+    // bespoke app navs (kalshi-terminal, trading, …) keep their own behavior.
+    var navEl = document.querySelector("nav.site-nav");
+    var menuToggle = document.getElementById("nav-menu-toggle");
+    if (navEl && menuToggle && !navEl.classList.contains("has-menu")) {
+      navEl.classList.add("has-menu");
+      var closeMenu = function () { navEl.classList.remove("menu-open"); menuToggle.setAttribute("aria-expanded", "false"); };
+      menuToggle.addEventListener("click", function (e) {
+        e.stopPropagation();
+        var open = navEl.classList.toggle("menu-open");
+        menuToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+      navEl.querySelectorAll(".nav-links a").forEach(function (a) { a.addEventListener("click", closeMenu); });
+      document.addEventListener("click", function (e) { if (navEl.classList.contains("menu-open") && !navEl.contains(e.target)) closeMenu(); });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+    }
 
     // theme-toggle.js may have run before this nav existed; sync the glyph.
     // Skip when the button uses SVG icons — CSS drives sun/moon via data-theme.

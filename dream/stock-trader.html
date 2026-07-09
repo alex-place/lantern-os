@@ -329,6 +329,9 @@
     .main, .footer{ grid-column:1; }
     .header{ overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
     .header::-webkit-scrollbar{ height:0; }
+    /* Bigger touch targets on phones for the dense toolbar controls (#2255). */
+    .nav-link, .chart-ctrl, .range-btn{ min-height:36px; }
+    .chart-ctrl, .range-btn{ padding:6px 10px; }
   }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
