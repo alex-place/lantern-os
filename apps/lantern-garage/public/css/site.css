@@ -156,6 +156,13 @@ html, body {
   }
   .site-nav.has-menu.menu-open .nav-links { display: flex; }
   .site-nav.has-menu .nav-links a { padding: 12px 14px; font-size: 15px; border-radius: 8px; }
+  /* App navs carry more action buttons than the canonical 3 (kalshi-terminal has 5), which
+     crowded over the wordmark. Keep the FULL brand (name + logo) and make the buttons fit
+     instead: slightly smaller icons, tighter gaps, and drop the redundant "Open Chat" CTA
+     (Chat is already in the hamburger dropdown). Scoped to .nav-appbar. */
+  .site-nav.nav-appbar .nav-btn { width: 36px; height: 36px; }
+  .site-nav.nav-appbar .nav-actions { gap: 5px; }
+  .site-nav.nav-appbar .nav-cta { display: none; }
 }
 .nav-actions {
   margin-left: auto;
