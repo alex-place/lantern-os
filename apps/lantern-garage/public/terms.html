@@ -1,0 +1,334 @@
+<!doctype html>
+<!--
+  DRAFT TEMPLATE — NOT LEGAL ADVICE.
+  This Terms of Service + EULA is a good-faith starting point tailored to this app.
+  Before you rely on it in production, have a qualified attorney review it and fill in
+  every [BRACKETED] placeholder: [LEGAL ENTITY], [JURISDICTION], [CONTACT EMAIL],
+  [EFFECTIVE DATE]. Bump TOS_VERSION in auth.html whenever the substance changes so
+  existing users are asked to re-agree.
+-->
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <title>Terms of Service & EULA — unisona.ai</title>
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .legal-main {
+      max-width: 820px; margin: 0 auto; padding: 28px 20px 80px;
+      color: var(--text); line-height: 1.65;
+    }
+    .legal-main h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); letter-spacing: -0.02em; margin: 0 0 6px; }
+    .legal-main .eff { color: var(--muted); font-size: 13.5px; margin: 0 0 22px; }
+    .legal-main h2 {
+      font-size: 1.15rem; margin: 30px 0 8px; padding-top: 10px;
+      border-top: 1px solid var(--border); color: var(--text);
+    }
+    .legal-main h2:first-of-type { border-top: none; }
+    .legal-main h3 { font-size: 1rem; margin: 18px 0 6px; color: var(--text); }
+    .legal-main p, .legal-main li { font-size: 14.5px; color: var(--text); }
+    .legal-main ul { padding-left: 22px; margin: 8px 0; }
+    .legal-main li { margin: 4px 0; }
+    .legal-main a { color: var(--accent); }
+    .legal-toc {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 18px; margin: 0 0 26px; font-size: 13.5px;
+    }
+    .legal-toc strong { display: block; margin-bottom: 6px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-size: 11px; }
+    .legal-toc a { display: inline-block; margin: 2px 10px 2px 0; }
+    .legal-callout {
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+      border-radius: 12px; padding: 12px 16px; margin: 16px 0; font-size: 13.5px;
+    }
+    .legal-callout.warn {
+      background: color-mix(in srgb, #f59e0b 12%, transparent);
+      border-color: color-mix(in srgb, #f59e0b 45%, transparent);
+    }
+    .legal-back { display: inline-block; margin-bottom: 18px; color: var(--accent); font-size: 14px; text-decoration: none; }
+    .legal-back:hover { text-decoration: underline; }
+    .legal-cap { text-transform: uppercase; font-weight: 700; }
+  </style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
+  </a>
+</nav>
+
+<main class="legal-main">
+  <a class="legal-back" href="/auth.html">← Back to sign in</a>
+  <h1>Terms of Service &amp; End-User License Agreement</h1>
+  <p class="eff">Effective date: [EFFECTIVE DATE] · Last updated: [EFFECTIVE DATE] · Version 1.0</p>
+
+  <div class="legal-callout">
+    Plain-language summary (not a substitute for the full terms below): unisona.ai is a
+    personal, local-first AI assistant. Its answers can be wrong — <strong>always verify
+    anything important</strong>. Nothing here is financial, legal, medical, or other
+    professional advice. You own your data; we and the AI providers we use process it only
+    to run the service. The service is provided <span class="legal-cap">as is</span>, with
+    no warranty. Use it lawfully and at your own risk.
+  </div>
+
+  <div class="legal-toc">
+    <strong>Contents</strong>
+    <a href="#accept">1. Acceptance</a>
+    <a href="#eligibility">2. Eligibility</a>
+    <a href="#service">3. The Service</a>
+    <a href="#ai">4. AI Output</a>
+    <a href="#nofa">5. No Professional Advice</a>
+    <a href="#accounts">6. Accounts</a>
+    <a href="#use">7. Acceptable Use</a>
+    <a href="#content">8. Your Content &amp; Data</a>
+    <a href="#privacy">9. Privacy &amp; Telemetry</a>
+    <a href="#thirdparty">10. Third-Party Services</a>
+    <a href="#payments">11. Payments</a>
+    <a href="#license">12. License (EULA)</a>
+    <a href="#oss">13. Open-Source</a>
+    <a href="#ip">14. Intellectual Property</a>
+    <a href="#warranty">15. No Warranty</a>
+    <a href="#liability">16. Liability</a>
+    <a href="#indemnity">17. Indemnification</a>
+    <a href="#termination">18. Termination</a>
+    <a href="#changes">19. Changes</a>
+    <a href="#law">20. Governing Law</a>
+    <a href="#contact">21. Contact</a>
+  </div>
+
+  <p>
+    These Terms of Service and End-User License Agreement (together, the <strong>"Terms"</strong>)
+    are a binding agreement between you (<strong>"you"</strong>) and [LEGAL ENTITY] (<strong>"we,"
+    "us," "unisona.ai"</strong>) governing your access to and use of the unisona.ai application,
+    websites, and related software and services (the <strong>"Service"</strong>). Please read them
+    carefully. If you do not agree, do not use the Service.
+  </p>
+
+  <h2 id="accept">1. Acceptance of Terms</h2>
+  <p>
+    By checking the agreement box, creating an account, signing in, or otherwise using the
+    Service, you acknowledge that you have read, understood, and agree to be bound by these
+    Terms and by our privacy practices described in Section 9. If you use the Service on
+    behalf of an organization, you represent that you are authorized to bind that organization.
+  </p>
+
+  <h2 id="eligibility">2. Eligibility</h2>
+  <p>
+    You must be at least 18 years old, or the age of legal majority in your jurisdiction, to
+    use the Service — in particular any trading, markets, or financial features. If you are
+    between 13 and 18, you may use only the general assistant features and only with the
+    consent and supervision of a parent or legal guardian. The Service is not directed to
+    children under 13, and we do not knowingly collect their information.
+  </p>
+
+  <h2 id="service">3. The Service</h2>
+  <p>
+    unisona.ai is a personal, local-first reasoning and assistant application. It can, among
+    other things, answer questions, draft and process documents, search and summarize
+    information, help with job-search and resume tasks, surface market and trading
+    information, and generate media. Features vary by platform, plan, and configuration, and
+    may change, be added, or be removed at any time. Some features are experimental or
+    "beta" and may be unstable or discontinued without notice.
+  </p>
+
+  <h2 id="ai">4. Artificial-Intelligence Output</h2>
+  <p>
+    The Service uses large language models and other AI systems, some operated by third
+    parties. AI output is generated probabilistically and <strong>may be inaccurate,
+    incomplete, outdated, biased, or entirely fabricated</strong> ("hallucinated"), even when
+    it appears confident or cites sources. You are solely responsible for evaluating output
+    and for any reliance on it. Do not treat AI output as a statement of fact without
+    independent verification, and do not use it as the sole basis for any decision that
+    could affect your health, finances, safety, legal rights, or property.
+  </p>
+
+  <h2 id="nofa">5. No Professional Advice</h2>
+  <div class="legal-callout warn">
+    The Service is for general informational purposes only and is <span class="legal-cap">not</span>
+    professional advice.
+  </div>
+  <p>
+    Nothing provided through the Service constitutes financial, investment, trading, tax,
+    accounting, legal, medical, mental-health, or other professional advice, and no
+    fiduciary, advisory, or brokerage relationship is created. Any market data, prices,
+    signals, suggestions, or trading-related features are informational and often delayed,
+    estimated, "paper," or simulated; they are not a recommendation, solicitation, or offer
+    to buy or sell any security, contract, or asset. We are not a broker-dealer, investment
+    adviser, or financial institution. Trading and investing involve substantial risk of
+    loss. You are solely responsible for your own decisions and should consult a licensed
+    professional before acting. Consult a qualified professional for medical, legal, or
+    financial matters.
+  </p>
+
+  <h2 id="accounts">6. Accounts &amp; Security</h2>
+  <ul>
+    <li>You must provide accurate registration information and keep it current.</li>
+    <li>You are responsible for safeguarding your credentials and for all activity under your account.</li>
+    <li>Notify us promptly of any unauthorized use or security breach.</li>
+    <li>You may sign in through third-party providers (e.g., Google, Discord, Patreon); their terms and privacy policies also apply.</li>
+  </ul>
+
+  <h2 id="use">7. Acceptable Use</h2>
+  <p>You agree not to, and not to help others:</p>
+  <ul>
+    <li>use the Service to break any law or infringe anyone's rights;</li>
+    <li>generate or distribute content that is unlawful, harmful, harassing, hateful, sexually exploitative of minors, or that facilitates violence or serious harm;</li>
+    <li>attempt to create weapons, malware, or instructions for serious physical, biological, or cyber harm;</li>
+    <li>probe, attack, disrupt, overload, reverse-engineer for circumvention, or gain unauthorized access to the Service or its providers;</li>
+    <li>scrape or harvest data at scale, resell or sublicense the Service, or use it to build a competing product except as expressly permitted by an applicable open-source license;</li>
+    <li>misrepresent AI output as human-generated where doing so is deceptive or unlawful, or impersonate any person or entity.</li>
+  </ul>
+  <p>We may suspend or terminate access for conduct that violates these Terms or that we reasonably believe is harmful.</p>
+
+  <h2 id="content">8. Your Content &amp; Data</h2>
+  <p>
+    <strong>You retain ownership</strong> of the prompts, files, notes, memories, and other
+    content you provide or generate ("Your Content"). The Service is designed to be
+    local-first, meaning Your Content is primarily stored on the device or environment you
+    control. You grant us a limited, non-exclusive license to host, process, transmit, and
+    display Your Content solely to operate and improve the Service for you — including sending
+    it to the third-party AI providers you invoke (Section 10). You are responsible for
+    keeping your own backups and for the legality of Your Content. We may remove content that
+    violates these Terms.
+  </p>
+
+  <h2 id="privacy">9. Privacy &amp; Telemetry</h2>
+  <p>
+    We collect the minimum needed to run and improve the Service. This includes basic usage
+    and activation events (for example, that a chat workflow completed and when an account
+    first became active) tied to your account identifier, and operational logs. We do
+    <strong>not</strong> sell your personal information, and we do not embed third-party
+    advertising or cross-site tracking. When you use an AI feature, your prompt and relevant
+    context are sent to the AI provider you invoke, which processes it under its own terms.
+    Where the law gives you rights over your data (such as access, correction, deletion, or
+    opting out of non-essential telemetry), we will honor valid requests. A separate Privacy
+    Policy, if published, is incorporated into these Terms by reference.
+  </p>
+
+  <h2 id="thirdparty">10. Third-Party Services</h2>
+  <p>
+    The Service integrates third-party providers, which may include AI model providers (such
+    as Anthropic, OpenAI, and Google), authentication providers, payment/membership platforms
+    (such as Patreon), and market-data or brokerage connections. Your use of those features is
+    also governed by the respective third party's terms and privacy policies, and we are not
+    responsible for third-party acts, omissions, availability, pricing, or data practices.
+  </p>
+
+  <h2 id="payments">11. Payments, Plans &amp; Subscriptions</h2>
+  <p>
+    Some features may require a paid plan or membership, which may be billed through a
+    third-party platform such as Patreon under its terms. Prices, tiers, and benefits may
+    change. Except where required by law or expressly stated, payments and memberships are
+    non-refundable. You are responsible for any taxes and for cancelling recurring
+    memberships through the platform that bills you.
+  </p>
+
+  <h2 id="license">12. License Grant &amp; Restrictions (EULA)</h2>
+  <p>
+    Subject to these Terms, we grant you a personal, limited, non-exclusive,
+    non-transferable, non-sublicensable, revocable license to install and use the Service
+    software for your own lawful, personal or internal use. Except to the extent an
+    applicable open-source license (Section 13) grants you broader rights, you may not:
+    (a) copy, modify, or create derivative works of the proprietary portions of the Service;
+    (b) sell, rent, lease, sublicense, or distribute it; (c) remove or alter proprietary
+    notices; or (d) reverse-engineer, decompile, or disassemble it except where such
+    restriction is prohibited by law. We reserve all rights not expressly granted. This
+    license terminates automatically if you breach these Terms.
+  </p>
+
+  <h2 id="oss">13. Open-Source Components</h2>
+  <p>
+    The Service includes open-source software provided under its own licenses. To the extent
+    an open-source license applies to a component, that license governs your use of that
+    component and, in case of conflict, controls over Section 12 for that component. Nothing
+    in these Terms limits your rights under an applicable open-source license.
+  </p>
+
+  <h2 id="ip">14. Intellectual Property</h2>
+  <p>
+    Except for Your Content and open-source components, the Service — including its software,
+    design, text, graphics, logos, and the "unisona.ai" name and marks — is owned by us or our
+    licensors and protected by intellectual-property laws. Feedback you send us may be used
+    without restriction or obligation to you.
+  </p>
+
+  <h2 id="warranty">15. Disclaimer of Warranties</h2>
+  <p class="legal-cap" style="font-size:13.5px">
+    The service and all output are provided "as is" and "as available," without warranties of
+    any kind, whether express, implied, or statutory, including any implied warranties of
+    merchantability, fitness for a particular purpose, title, accuracy, and non-infringement.
+    We do not warrant that the service will be uninterrupted, secure, error-free, or that any
+    output will be accurate or reliable. You use the service at your own risk.
+  </p>
+
+  <h2 id="liability">16. Limitation of Liability</h2>
+  <p class="legal-cap" style="font-size:13.5px">
+    To the maximum extent permitted by law, in no event will [LEGAL ENTITY] or its
+    contributors, officers, or licensors be liable for any indirect, incidental, special,
+    consequential, exemplary, or punitive damages, or for any loss of profits, data, goodwill,
+    trading or investment losses, arising out of or relating to the service or these terms,
+    even if advised of the possibility. Our total aggregate liability for all claims will not
+    exceed the greater of the amounts you paid us for the service in the 12 months before the
+    claim, or one hundred U.S. dollars (US$100). Some jurisdictions do not allow certain
+    limitations, so some of the above may not apply to you.
+  </p>
+
+  <h2 id="indemnity">17. Indemnification</h2>
+  <p>
+    You agree to indemnify and hold harmless [LEGAL ENTITY] and its contributors from any
+    claims, damages, liabilities, and expenses (including reasonable legal fees) arising from
+    your use of the Service, Your Content, or your violation of these Terms or of any law or
+    third-party right.
+  </p>
+
+  <h2 id="termination">18. Termination</h2>
+  <p>
+    You may stop using the Service at any time. We may suspend or terminate your access at any
+    time, with or without notice, including for violation of these Terms or to comply with law.
+    Sections that by their nature should survive termination (including 8–17 and 19–21) will
+    survive.
+  </p>
+
+  <h2 id="changes">19. Changes to the Terms</h2>
+  <p>
+    We may update these Terms from time to time. When we make material changes, we will update
+    the version and effective date and, where appropriate, ask you to agree again. Your
+    continued use after changes take effect constitutes acceptance.
+  </p>
+
+  <h2 id="law">20. Governing Law &amp; Disputes</h2>
+  <p>
+    These Terms are governed by the laws of [JURISDICTION], without regard to its
+    conflict-of-laws rules. You and we agree to the exclusive jurisdiction of the courts
+    located in [JURISDICTION] for any dispute not subject to binding arbitration, and you waive
+    any objection to that venue. [If you add an arbitration clause and/or class-action waiver,
+    have counsel draft it for your jurisdiction and insert it here.]
+  </p>
+
+  <h2 id="contact">21. Contact</h2>
+  <p>
+    Questions about these Terms? Contact us at <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a>.
+  </p>
+
+  <p class="eff" style="margin-top:26px">
+    By using unisona.ai you acknowledge that you have read and agree to these Terms.
+  </p>
+  <a class="legal-back" href="/auth.html">← Back to sign in</a>
+</main>
+
+<script src="/js/theme-toggle.js"></script>
+</body>
+</html>

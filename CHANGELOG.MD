@@ -1,3 +1,7 @@
+## [1.8.123] - 2026-07-09
+### Added
+- **Terms of Service + EULA with a signup consent gate.** New public `/terms.html` (21-section ToS+EULA: AI-output disclaimer, "not financial/legal/medical advice", data ownership + local-first, telemetry, third-party AI providers, EULA license grant, no-warranty, liability). An affirmative "I agree to the Terms of Service & EULA" checkbox now appears **only** in account-creation mode, immediately above the Create-account button, and gates registration client-side; normal sign-in, OAuth, and guest entry are unaffected. Served publicly via `routes/pages.js` + `deployment-profile.js`; registered in `surface-registry.js` (account cluster, `MAX_EXTENSION_RATIO` 1.0→1.05). Terms text ships with bracketed placeholders (`[LEGAL ENTITY]`, `[JURISDICTION]`, `[CONTACT EMAIL]`, `[EFFECTIVE DATE]`) pending legal review. Strengthens the account shell / consent posture.
+
 ## [1.8.122] - 2026-07-09
 
 ### Fixed

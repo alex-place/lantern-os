@@ -29,6 +29,7 @@ const HOSTED_SURFACES = new Set([
   "explore.html", // explore — loop demo (logged-out) / own memory (logged-in)
   "faq.html", // help / FAQ / getting-started (+ "download the desktop app")
   "auth.html", // login
+  "terms.html", // terms of service + EULA (linked from signup; must be public everywhere)
   "entry.html", // post-login entry
   "profile.html", // account
   "pricing.html", // plans
