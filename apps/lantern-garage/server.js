@@ -713,6 +713,30 @@ server.listen(port, host, () => {
     }
   }, 8000);
 
+  // ── Boot-time rag://house regen (#2339) ──
+  // The internal-house flat file is machine-generated and gitignored (#2313), so
+  // a fresh clone / GCE deploy ships an empty `rag://house` MCP resource until
+  // it is rebuilt. Regenerate it here if missing or stale (>RAG_HOUSE_MAX_AGE_HOURS,
+  // default 24). Deferred off the critical boot path; the regen walks the repo
+  // and never blocks the listener. Non-fatal: on failure `rag://house` degrades
+  // to its graceful null path. Skipped when RAG_HOUSE_BOOT_REGEN=0.
+  if (process.env.RAG_HOUSE_BOOT_REGEN !== "0") {
+    setTimeout(async () => {
+      try {
+        const { ensureInternalHouse } = await import("../../scripts/regen-flat-rag.mjs");
+        const maxAge = parseFloat(process.env.RAG_HOUSE_MAX_AGE_HOURS || "24");
+        const r = ensureInternalHouse(maxAge);
+        if (r.regenerated) {
+          console.log(`[rag-house] regenerated LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md (${r.reason}, ${r.count} sources)`);
+        } else if (r.reason === "error") {
+          console.error("[rag-house] boot regen failed (non-fatal):", r.error);
+        }
+      } catch (e) {
+        console.error("[rag-house] boot regen failed (non-fatal):", e && e.message);
+      }
+    }, 9000);
+  }
+
   // ── Market/trading background loops ─────────────────────────────────────────
   // These 24/7 collectors + convergence loops start on every boot. The desktop
   // launcher (docs/adr/0014) runs the Core purely for chat and sets

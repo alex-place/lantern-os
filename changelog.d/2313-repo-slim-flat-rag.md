@@ -15,3 +15,8 @@ of `scripts/Update-InternalHouseRag.ps1` (hash-only mode); the dollhouse rebuild
 is best-effort from whatever `reports/*.md` + `applications/*.md` currently
 exist. Verified: regen recreates both files and `rag://house` still reads the
 internal-house dump via the fallback path.
+
+Follow-up #2339: the server now also rebuilds the internal-house dump at boot
+when missing or stale (`RAG_HOUSE_MAX_AGE_HOURS`, default 24; disable with
+`RAG_HOUSE_BOOT_REGEN=0`), so a fresh clone / GCE deploy serves a populated
+`rag://house` with no manual step.

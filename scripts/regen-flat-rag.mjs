@@ -27,9 +27,16 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+export const INTERNAL_HOUSE_PATH = path.join(
+  REPO_ROOT,
+  "data",
+  "internal-rag-house",
+  "LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md",
+);
 
 // ---------------------------------------------------------------------------
 // internal-house: hash-only source index
@@ -101,7 +108,7 @@ function sha256(file) {
   return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 }
 
-function buildInternalHouse() {
+export function buildInternalHouse() {
   const files = walk(REPO_ROOT, []).sort((a, b) => a.rel.localeCompare(b.rel));
   const lines = [
     "# Lantern OS Internal House RAG",
@@ -129,7 +136,7 @@ function buildInternalHouse() {
     lines.push(`- modifiedUtc: ${st.mtime.toISOString()}`);
     lines.push("");
   }
-  const out = path.join(REPO_ROOT, "data", "internal-rag-house", "LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md");
+  const out = INTERNAL_HOUSE_PATH;
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, lines.join("\n") + "\n", "utf8");
   return { out, count: files.length };
@@ -153,7 +160,7 @@ function collectMarkdown(dirRel) {
     .map((n) => ({ rel: `${dirRel}/${n}`, full: path.join(dir, n) }));
 }
 
-function buildDollhouse() {
+export function buildDollhouse() {
   const files = [...collectMarkdown("reports"), ...collectMarkdown("applications")];
   const parts = [
     "# Lantern OS RAG Flat File",
@@ -179,23 +186,51 @@ function buildDollhouse() {
   return { out, count: files.length };
 }
 
-// ---------------------------------------------------------------------------
-// CLI
-// ---------------------------------------------------------------------------
-
-const args = new Set(process.argv.slice(2));
-const doCheck = args.has("--check");
-const only = args.has("--internal") ? "internal" : args.has("--dollhouse") ? "dollhouse" : "both";
-
-const results = [];
-if (only === "both" || only === "internal") results.push(["internal-house", buildInternalHouse()]);
-if (only === "both" || only === "dollhouse") results.push(["dollhouse", buildDollhouse()]);
-
-for (const [label, { out, count }] of results) {
-  const relOut = path.relative(REPO_ROOT, out).split(path.sep).join("/");
-  console.log(`[regen-flat-rag] ${label}: ${count} source(s) -> ${relOut}`);
-  if (doCheck && !fs.existsSync(out)) {
-    console.error(`[regen-flat-rag] CHECK FAILED: ${relOut} was not created`);
-    process.exit(1);
+/**
+ * Rebuild the internal-house dump only when it is missing or older than
+ * `maxAgeHours` (default 24). Used by the server boot path (#2339) so the
+ * `rag://house` MCP resource is populated on a fresh deploy without a manual
+ * step. Returns {regenerated, count?, ageHours?, reason} and never throws —
+ * a rebuild failure degrades to the graceful `rag://house` → null path.
+ */
+export function ensureInternalHouse(maxAgeHours = 24) {
+  try {
+    let reason = "missing";
+    if (fs.existsSync(INTERNAL_HOUSE_PATH)) {
+      const ageHours = (Date.now() - fs.statSync(INTERNAL_HOUSE_PATH).mtimeMs) / 3.6e6;
+      if (ageHours <= maxAgeHours) return { regenerated: false, ageHours, reason: "fresh" };
+      reason = "stale";
+    }
+    const { count } = buildInternalHouse();
+    return { regenerated: true, count, reason };
+  } catch (err) {
+    return { regenerated: false, reason: "error", error: err && err.message };
   }
+}
+
+// ---------------------------------------------------------------------------
+// CLI (only when run directly, not when imported)
+// ---------------------------------------------------------------------------
+
+function runCli() {
+  const args = new Set(process.argv.slice(2));
+  const doCheck = args.has("--check");
+  const only = args.has("--internal") ? "internal" : args.has("--dollhouse") ? "dollhouse" : "both";
+
+  const results = [];
+  if (only === "both" || only === "internal") results.push(["internal-house", buildInternalHouse()]);
+  if (only === "both" || only === "dollhouse") results.push(["dollhouse", buildDollhouse()]);
+
+  for (const [label, { out, count }] of results) {
+    const relOut = path.relative(REPO_ROOT, out).split(path.sep).join("/");
+    console.log(`[regen-flat-rag] ${label}: ${count} source(s) -> ${relOut}`);
+    if (doCheck && !fs.existsSync(out)) {
+      console.error(`[regen-flat-rag] CHECK FAILED: ${relOut} was not created`);
+      process.exit(1);
+    }
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runCli();
 }

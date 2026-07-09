@@ -23,6 +23,13 @@ npm run regen:rag      # or: make regen-rag  /  node scripts/regen-flat-rag.mjs
 Linux deploy host, and CI). The hash-only manifest (`RAG-HOUSE-MANIFEST.json` /
 `.sha256`) is still produced by `scripts/Update-InternalHouseRag.ps1` on Windows.
 
+The Lantern Garage server also rebuilds this file automatically at boot when it
+is missing or stale (issue #2339), so a fresh clone / GCE deploy serves a
+populated `rag://house` without a manual step:
+
+- `RAG_HOUSE_MAX_AGE_HOURS` (default `24`) — rebuild if older than this.
+- `RAG_HOUSE_BOOT_REGEN=0` — disable the boot-time rebuild.
+
 ## Storage Rules
 
 - Store paths, hashes, evidence classes, and selected file bodies.

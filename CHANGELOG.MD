@@ -1,3 +1,8 @@
+## [1.8.126] - 2026-07-09
+
+### Added
+- **Boot-time `rag://house` regeneration so a fresh deploy is never silently empty (#2339, follow-up to #2313).** Now that `data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md` is gitignored, a fresh clone / GCE deploy would serve an empty `rag://house` MCP resource until someone ran the manual regen. The Lantern Garage server (`server.js`, also the cloud entrypoint via `cloud-server.js`) now rebuilds that dump at boot when it is **missing or stale** — deferred off the critical boot path, non-fatal (on failure `rag://house` keeps its graceful null fallback). Tunable via `RAG_HOUSE_MAX_AGE_HOURS` (default 24) and `RAG_HOUSE_BOOT_REGEN=0` to disable. `scripts/regen-flat-rag.mjs` now exports `ensureInternalHouse()`/`buildInternalHouse()`/`buildDollhouse()` and only runs its CLI when invoked directly. Verified: missing→regen, fresh→skip, stale→regen; `rag://house` reads the rebuilt dump; `tests/test_routes.js` 11/11. Improves **Remember**.
+
 ## [1.8.125] - 2026-07-09
 
 ### Changed
