@@ -297,10 +297,8 @@
     }
 
     function fixesCell(acc) {
-      const needsReconcile = (acc.issues || []).some((i) => i.fix === 'reconcile');
       const btns = [];
       btns.push(`<button class="btn ghost" data-reset="${esc(acc.id)}">Reset password</button>`);
-      btns.push(`<button class="btn${needsReconcile ? ' pulse' : ' ghost'}" data-reconcile="${esc(acc.id)}">Reconcile</button>`);
       return `<div class="actions">${btns.join('')}</div>`;
     }
 
@@ -355,7 +353,6 @@
 
     $('#rows').addEventListener('click', async (e) => {
       const reset = e.target.closest('[data-reset]');
-      const reconcile = e.target.closest('[data-reconcile]');
       const unlink = e.target.closest('[data-unlink]');
 
       if (reset) {
@@ -366,17 +363,6 @@
         reset.disabled = false;
         if (res.ok) { replaceAccount(res.data.account); showPassword(res.data.tempPassword); }
         else toast(res.data.error || 'Reset failed');
-        return;
-      }
-      if (reconcile) {
-        const id = reconcile.dataset.reconcile;
-        reconcile.disabled = true;
-        const res = await api('POST', '/api/accounts/reconcile', { id });
-        reconcile.disabled = false;
-        if (res.ok) {
-          replaceAccount(res.data.account);
-          toast(res.data.changed ? `Reconciled → ${ROLE_LABELS[res.data.account.role] || res.data.account.role}` : 'Already consistent — no change');
-        } else toast(res.data.error || 'Reconcile failed');
         return;
       }
       if (unlink) {
