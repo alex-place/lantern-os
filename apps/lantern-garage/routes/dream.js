@@ -56,7 +56,6 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     unifiedAgentGreet, unifiedAgentHealth, unifiedAgentInspect,
     handleStreamChat } = deps;
   const { handleConvergenceCommand, selectAgent, verifyResponse, isVerifyEnabled } = require("../lib/dream-chat");
-  const { classifyIntent, CAPABILITY_REGISTRY } = require("../lib/intent-router");
 
   if (url.pathname === "/api/dream/tools" && req.method === "GET") {
     const { capabilityManifest } = require("../lib/tool-runner");

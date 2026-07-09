@@ -1,3 +1,7 @@
+## [1.8.114] - 2026-07-09
+### Changed
+- **Chat is pure LLM + native tools — all deterministic keyword pathing removed.** The chat no longer catches keywords/regex before the model runs (the bug that turned "show me all of todays world news headlines" into "Now playing — Super Mario World"). Removed the 12 pre-LLM client intercepts + command palette in `dream-chat-ui.js`, and the server keyword classifiers (`classifyIntent`/`intent-router.js`, `converganceRoute`/`model-router.js`, keyword `detectTaskType`/`task-detector.js`, and the dead `CONVERGENCE_CHAT` divert). Every message now flows to the LLM, which decides capabilities via native tool calls. The model-based Ouro router + measured PCSF ordering are kept (frontier-style model separation). Added a `generate_image` tool, plus a guard (`scripts/no-keyword-intent-routing.mjs`) wired into the pre-push hook + CI + a contract test. Improves **Reason** + **Act**.
+
 ## [1.8.113] - 2026-07-07
 - research(sigma0): incremental-validity experiment (cert §8.6-5) — deployed Σ₀ decode canary vs external exec gate on planted bad checkpoints; CPU self-test + CI tests; L4 launcher.
 
