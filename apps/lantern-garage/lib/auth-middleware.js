@@ -295,6 +295,19 @@ function isAdmin(req) {
 }
 
 /**
+ * Non-writing check: does this request meet a minimum role? True for the local
+ * bypass, or a session whose role level is at least `requiredRole`. Never writes to
+ * the response — use it to branch (e.g. render a friendly page) instead of letting
+ * requireRole emit a raw JSON 403.
+ */
+function meetsRole(req, requiredRole) {
+  if (isLocalBypass(req)) return true;
+  const session = getSessionUser(req);
+  if (!session?.id) return false;
+  return roleLevel(session.role) >= roleLevel(requiredRole);
+}
+
+/**
  * Attach user profile to request for downstream handlers.
  */
 function attachProfile(req) {
@@ -314,6 +327,7 @@ module.exports = {
   requireEntitlement,
   isAdmin,
   isLocalBypass,
+  meetsRole,
   SIGNOUT_COOKIE,
   protectStaticPage,
   attachProfile,
