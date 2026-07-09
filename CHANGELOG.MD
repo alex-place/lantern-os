@@ -1,3 +1,8 @@
+## [1.8.122] - 2026-07-09
+
+### Fixed
+- **Under-tier users get a friendly "unlock" page instead of a raw JSON 403.** A signed-in Free user who opened a tier- or entitlement-gated page (e.g. the footer **Create** link, or `trading.html` without the trade entitlement) was shown a raw JSON body — `{"error":"Insufficient permissions",...}` — filling the browser window (found in a first-time-user walkthrough). Gated **pages** in `routes/pages.js` now render a friendly HTML *"This feature needs an upgrade"* page with **See plans** / **Return home**, using the new non-writing `meetsRole()` (auth-middleware) and existing `hasEntitlement()` checks; API routes keep their JSON 403. Gating is unchanged — unauthenticated users still redirect to login and authorized users still get the page; only the denial response for an authenticated, under-tier user changed. Verified in a dev preview: Free user → friendly page on `/create.html` and `/trading.html`, anonymous user still 302s to login. Improves **Act**.
+
 ## [1.8.121] - 2026-07-09
 
 ### Added
