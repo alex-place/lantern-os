@@ -540,7 +540,6 @@
     <option value="4">4 charts</option>
     <option value="6">6 charts</option>
     <option value="10">10 charts</option>
-    <option value="20">20 charts</option>
   </select>
   <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
     <option value="line">Line</option>
@@ -771,7 +770,7 @@ const _lastCardPrice = {};   // last seen price per ticker, for the tick-flash (
 // re-assignable by typing a symbol. Persisted across reloads.
 let slotCount  = parseInt(localStorage.getItem('trader.slotCount')||'0',10) || 0;
 let chartSlots = (()=>{ try{ return JSON.parse(localStorage.getItem('trader.chartSlots'))||[]; }catch(e){ return []; } })();
-const SLOT_COLS = {1:1,2:2,3:3,4:2,6:3,10:5,20:5};
+const SLOT_COLS = {1:1,2:2,3:3,4:2,6:3,10:5};
 let activeTicker   = null;
 let barsData       = {};
 // Persisted chart type. Candles are the default the first time a user visits.
@@ -1585,7 +1584,7 @@ function setSlotCount(v){
 // Phones only offer single / double chart layouts — 3+ tiles are unreadable at phone
 // width. Rebuild the layout <select> for the current viewport and clamp the count when
 // crossing into mobile with a bigger grid selected.
-const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[4,'4 charts'],[6,'6 charts'],[10,'10 charts'],[20,'20 charts']];
+const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[4,'4 charts'],[6,'6 charts'],[10,'10 charts']];
 function buildLayoutOptions(){
   const sel = document.getElementById('chartLayoutSelect');
   if(!sel) return;
@@ -1593,6 +1592,7 @@ function buildLayoutOptions(){
   const opts = narrow ? LAYOUT_OPTS.filter(([v])=> v===1 || v===2) : LAYOUT_OPTS;
   sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
   if(narrow && !(slotCount===1 || slotCount===2)) setSlotCount(2);   // clamp to a mobile layout
+  else if(!opts.some(([v])=> v===slotCount)) setSlotCount(10);       // drop a retired layout (e.g. old 20-chart) to the max available
   sel.value = String(slotCount);
 }
 
