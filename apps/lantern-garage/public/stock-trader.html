@@ -355,6 +355,13 @@
     .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
     .header{ flex:0 0 auto; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
     .header::-webkit-scrollbar{ height:0; }
+    /* The toolbar's brand + account readouts (Equity, Day P&L, Positions) duplicate the
+       account panel below, and on phones they're the ONLY thing visible — pushing the
+       useful controls off-screen. Hide the duplicates so what's left is what ISN'T shown
+       elsewhere: VIX, market trend, and the chart customization controls. */
+    .header .logo,
+    .header .badge-paper,
+    .header .hstat.acct{ display:none; }
     .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:8px; padding:8px 12px;
       background:var(--bg1); border-bottom:1px solid var(--border); }
     /* default = chart view: charts get the room; the account panel is a resizable strip
