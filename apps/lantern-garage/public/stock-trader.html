@@ -2171,6 +2171,10 @@ document.addEventListener('wheel', function(e){
 let _chartDrag = null;
 document.addEventListener('mousedown', function(e){
   if(e.button !== 0) return;
+  // On phones the chart is locked to the selected range — dragging scrubs the crosshair
+  // (see the touch handlers below), it never pans or zooms. Disable the drag entirely on
+  // narrow screens so the window stays strictly at the chosen timeframe/range.
+  if(isNarrowTrader()) return;
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
   const target = _ladderTarget(ladder);
