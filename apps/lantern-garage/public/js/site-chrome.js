@@ -100,6 +100,22 @@
       body.appendChild(nodeFrom(footerHtml()));
     }
 
+    // Per-page extra action buttons (e.g. trading's settings, the terminal's skin toggle):
+    // a page declares them in <template id="nav-extra-actions">; we clone them into the nav's
+    // actions (before the theme toggle) so app pages can use the ONE global header and still
+    // keep their app-specific controls. A nav with extras also gets `nav-appbar` (compact
+    // mobile buttons) since it carries more than the canonical three.
+    var extraTpl = document.getElementById("nav-extra-actions");
+    var injectedNav = document.querySelector("nav.site-nav");
+    if (extraTpl && extraTpl.content && injectedNav) {
+      var actions = injectedNav.querySelector(".nav-actions");
+      if (actions) {
+        injectedNav.classList.add("nav-appbar");
+        var anchor = actions.querySelector("#theme-toggle");
+        actions.insertBefore(extraTpl.content.cloneNode(true), anchor || null);
+      }
+    }
+
     // Highlight the current page's nav link (auth-gate.js doesn't do this).
     var here = location.pathname.replace(/\/index\.html$/, "/");
     document.querySelectorAll("nav.site-nav .nav-links a").forEach(function (a) {
