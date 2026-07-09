@@ -26,9 +26,12 @@ const TF = {
   '15m': { interval: '15m', range: '1mo', agg: 1 },
   '1h':  { interval: '60m', range: '6mo', agg: 1 },
   '4h':  { interval: '60m', range: '1y',  agg: 4 },
-  '1d':  { interval: '1d',  range: '2y',  agg: 1 },
+  '1d':  { interval: '1d',  range: '5y',  agg: 1 },  // deep enough for the 5Y / All ranges
 };
-const MAX_BARS = 500;          // deep history for zoom/pan (client windows it)
+// Deep history for zoom/pan (the client windows it). 1300 covers ~5y of daily bars for
+// the 5Y/All ranges; each timeframe is still bounded by its own Yahoo `range` above, so
+// intraday frames don't balloon.
+const MAX_BARS = 1300;
 const QUOTE_TTL = 20000;       // 20s — card prices
 const BARS_TTL = 45000;        // 45s — chart bars
 const FETCH_CONCURRENCY = 6;

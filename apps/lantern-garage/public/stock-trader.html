@@ -545,6 +545,12 @@
     <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
     <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
     <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
+    <button class="range-btn" data-range="3M" onclick="changeRange('3M')">3M</button>
+    <button class="range-btn" data-range="6M" onclick="changeRange('6M')">6M</button>
+    <button class="range-btn" data-range="YTD" onclick="changeRange('YTD')">YTD</button>
+    <button class="range-btn" data-range="1Y" onclick="changeRange('1Y')">1Y</button>
+    <button class="range-btn" data-range="5Y" onclick="changeRange('5Y')">5Y</button>
+    <button class="range-btn" data-range="All" onclick="changeRange('All')">All</button>
   </div>
   <div class="pulse"></div>
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
@@ -619,6 +625,12 @@
         <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
         <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
         <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
+        <button class="range-btn" data-range="3M" onclick="changeRange('3M')">3M</button>
+        <button class="range-btn" data-range="6M" onclick="changeRange('6M')">6M</button>
+        <button class="range-btn" data-range="YTD" onclick="changeRange('YTD')">YTD</button>
+        <button class="range-btn" data-range="1Y" onclick="changeRange('1Y')">1Y</button>
+        <button class="range-btn" data-range="5Y" onclick="changeRange('5Y')">5Y</button>
+        <button class="range-btn" data-range="All" onclick="changeRange('All')">All</button>
       </div>
       <div class="order-ticket fs-order-ticket">
         <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')">BUY</button>
@@ -781,9 +793,28 @@ function getChartView(key){
   return chartView[key];
 }
 
-// Range presets map onto the existing bar-resolution timeframes: 1D shows
-// today's session at 5m bars, 5D at hourly bars, 1M at daily bars.
-const RANGE_TIMEFRAMES = { '1D': '5m', '5D': '1h', '1M': '1d' };
+// Range presets map onto the bar-resolution timeframes AND a default visible-bar
+// window (~one range-label's worth of candles). Several ranges share the daily
+// timeframe — they differ only in how wide a window they open. `activeRange` tracks
+// which button is lit (a plain tf→range reverse-map can't, now that ranges collide).
+const RANGES = {
+  '1D':  { tf: '5m', bars: 78   },   // ~one 5m session
+  '5D':  { tf: '1h', bars: 35   },   // ~5 days of hourly
+  '1M':  { tf: '1d', bars: 22   },   // ~22 trading days
+  '3M':  { tf: '1d', bars: 64   },
+  '6M':  { tf: '1d', bars: 128  },
+  'YTD': { tf: '1d', bars: null },   // computed from the calendar (below)
+  '1Y':  { tf: '1d', bars: 252  },
+  '5Y':  { tf: '1d', bars: 1260 },
+  'All': { tf: '1d', bars: 99999 },  // clamped to whatever daily history is available
+};
+let activeRange = '1D';
+// Approximate trading days elapsed this calendar year (~5 sessions per 7 days).
+function ytdTradingBars(){
+  const now = new Date();
+  const days = Math.floor((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
+  return Math.max(5, Math.round(days * 5 / 7));
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt(n, d=2){ return n == null ? '—' : Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
@@ -2515,28 +2546,38 @@ function changeChartType(type){
   renderFullscreenChart();
 }
 
-function changeTimeframe(tf){
+function changeTimeframe(tf, winBars){
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
   document.getElementById('chartTfSelect').value = tf;
   document.getElementById('fsChartTfSelect').value = tf;
-  // #1699: reset every chart's visible window so the new timeframe's default
-  // (one range-label's worth of candles) takes effect instead of carrying over.
-  Object.values(chartView).forEach(v=>{ v.visibleBars=null; v.barOffset=0; v.gVis=null; v.gOff=null; });
+  // Reset every chart's visible window. When a range preset supplies an explicit bar
+  // count (winBars), use it so ranges that share a timeframe (3M/6M/1Y/5Y on daily)
+  // open different windows; otherwise null → the timeframe's default window (#1699).
+  const vb = (winBars != null) ? winBars : null;
+  Object.values(chartView).forEach(v=>{ v.visibleBars=vb; v.barOffset=0; v.gVis=null; v.gOff=null; });
   if(_restoreBarsCache()) _paintFromCache();    // instant paint from cache; loadBars refreshes
   syncRangeButtons(tf);
   loadBars();
 }
 
-// ── Chart range presets (1D/5D/1M) ───────────────────────────────────────────
+// ── Chart range presets ───────────────────────────────────────────────────────
 function changeRange(range){
-  changeTimeframe(RANGE_TIMEFRAMES[range]);
+  const r = RANGES[range]; if(!r) return;
+  activeRange = range;
+  const want = (r.bars == null) ? ytdTradingBars() : r.bars;
+  changeTimeframe(r.tf, want);
 }
 
 function syncRangeButtons(tf){
-  const range = Object.keys(RANGE_TIMEFRAMES).find(r => RANGE_TIMEFRAMES[r] === tf) || null;
+  // Keep the lit button in sync. If the timeframe changed OUT from under the active
+  // range (e.g. the user picked a raw timeframe from the select), fall back to the
+  // first range that uses this timeframe; otherwise keep the active range lit.
+  if(tf !== undefined && !(RANGES[activeRange] && RANGES[activeRange].tf === tf)){
+    activeRange = Object.keys(RANGES).find(k => RANGES[k].tf === tf) || null;
+  }
   document.querySelectorAll('.range-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.range === range);
+    b.classList.toggle('active', b.dataset.range === activeRange);
   });
 }
 
