@@ -519,6 +519,38 @@ const REGISTRY = {
     },
   },
 
+  list_pull_requests: {
+    policy: "read",
+    guest_safe: true,
+    desc: "List the project's open GitHub pull requests (number, title, draft state, branch). Use this whenever the user asks to show, list, browse, or review the open PRs / pull requests (e.g. \"show me prs\", \"what PRs are open\", \"list pull requests\"). This is the correct tool for listing PRs — github_issue only looks up ONE issue/PR by number.",
+    schema: {
+      type: "object",
+      properties: {
+        limit: { type: "integer", description: "Max PRs to return (default 20, max 50)" },
+      },
+    },
+    async run(i) {
+      const limit = Math.min(50, Math.max(1, parseInt(i && i.limit, 10) || 20));
+      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      let out;
+      try {
+        out = safeExec(
+          ["gh", "pr", "list", "--repo", repo, "--state", "open",
+            "--limit", String(limit), "--json", "number,title,isDraft,headRefName"],
+          { timeout: 15000 }
+        );
+      } catch (e) {
+        return `[list_pull_requests: gh CLI unavailable or not authenticated — ${(e && e.message) || e}]`;
+      }
+      let prs;
+      try { prs = JSON.parse(out); } catch { return "[list_pull_requests: could not parse gh output]"; }
+      if (!prs.length) return `No open pull requests in ${repo}.`;
+      const lines = prs.map((p) =>
+        `#${p.number} — ${p.title}${p.isDraft ? " [draft]" : ""} (${p.headRefName || "?"})`);
+      return `Open pull requests in ${repo} (${prs.length}):\n${lines.join("\n")}`;
+    },
+  },
+
   web_fetch: {
     policy: "read",
     guest_safe: true, // web-only (SSRF-guarded): safe for non-operators on the public server (#1213)

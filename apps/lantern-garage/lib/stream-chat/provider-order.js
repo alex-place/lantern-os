@@ -14,7 +14,9 @@ function _dispatchHasKey(p) {
   const e = process.env;
   switch (p) {
     case "anthropic": return !!e.ANTHROPIC_API_KEY;
-    case "gemini": return !!(e.GEMINI_API_KEY || e.GOOGLE_API_KEY);
+    // Gemini is also reachable keyless via Vertex ADC (the funded path) — see
+    // lib/gemini-transport.useVertex(). Mirror provider-router.providerHasKey.
+    case "gemini": return !!(e.GEMINI_API_KEY || e.GOOGLE_API_KEY || e.GEMINI_USE_VERTEX === "1" || e.VERTEX_PROJECT);
     case "openai": return !!e.OPENAI_API_KEY;
     case "xai": return !!e.XAI_API_KEY;
     case "cohere": return !!e.COHERE_API_KEY;
