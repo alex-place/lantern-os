@@ -50,6 +50,13 @@
   .none{color:var(--text2);opacity:.6}
   .empty{padding:40px;text-align:center;color:var(--text2)}
   a.back{color:var(--accent);text-decoration:none;font-size:12px}
+  /* Mobile (#2255): the 8-column board is wider than a phone — let the TABLE scroll
+     horizontally in place instead of widening the whole page. (This surface doesn't load
+     site.css, so it needs its own overflow guard.) */
+  @media (max-width:720px){
+    table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    thead th{white-space:nowrap}
+  }
 </style>
 </head>
 <body>
