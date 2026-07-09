@@ -147,9 +147,16 @@
   .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
   .wl-signal{font-family:var(--mono);font-size:8px}
-  /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal. */
-  .wl-info{display:none;flex:0 0 auto;max-height:58%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
+     Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
+  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
   .wl-info.show{display:block}
+  /* Drag handle to resize the symbol-info panel — only visible while the panel is shown. */
+  .wl-resize{display:none;position:relative;flex:0 0 auto;height:11px;cursor:ns-resize;background:var(--bg1);touch-action:none}
+  .wl-resize::before{content:"";position:absolute;left:50%;top:4px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
+  .wl-resize:hover::before{background:var(--tv-text-secondary)}
+  .sidebar:has(.wl-info.show) .wl-resize{display:block}
+  body.resizing-wlinfo{user-select:none;cursor:ns-resize}
   .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
   .wi-name{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wi-px{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:5px}
@@ -335,22 +342,27 @@
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
-  /* Mobile view switch (chart vs ticker list) — hidden on desktop (both panels show). */
+  /* Mobile view switch (chart vs ticker list) — a compact centered segmented control,
+     hidden on desktop (both panels show). */
   .mobile-view-tabs{ display:none; }
-  .mvt-btn{ flex:1; min-height:40px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
-    font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
-  .mvt-btn.active{ background:var(--bg3); color:var(--text0); box-shadow:inset 0 -2px 0 var(--accent); }
+  .mvt-btn{ flex:0 1 150px; min-height:34px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
+    border-radius:8px; font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px; transition:background .15s,border-color .15s; }
+  .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
     .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
     .header{ flex:0 0 auto; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
     .header::-webkit-scrollbar{ height:0; }
-    .mobile-view-tabs{ display:flex; flex:0 0 auto; border-bottom:1px solid var(--border); }
-    /* default = chart view: charts + footer visible, ticker list hidden */
+    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:8px; padding:8px 12px;
+      background:var(--bg1); border-bottom:1px solid var(--border); }
+    /* default = chart view: charts get the room; the account panel is a resizable strip
+       at the bottom (drag its grabber). Override the desktop grid's height:100% (which made
+       the account panel swallow the whole phone screen). */
     .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
     .main{ flex:1 1 auto; min-height:0; overflow-y:auto; }
-    .footer{ flex:0 0 auto; }
+    .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -545,6 +557,7 @@
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
   </div>
   <div id="wlList"></div>
+  <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
   <div id="wlInfo" class="wl-info"></div>
 </div>
 
@@ -2703,6 +2716,39 @@ function initFooterResize(){
   handle.addEventListener('touchstart',start,{passive:false});
 }
 
+// Drag-to-resize the symbol-info panel at the bottom of the watchlist sidebar. Height
+// is a CSS var on .sidebar; the grabber drags it between 96px and (sidebar − 120px),
+// and it persists. Works on desktop and mobile (touch), per user request.
+function initWlInfoResize(){
+  const handle = document.getElementById('wlResize');
+  const sidebar = document.querySelector('.sidebar');
+  if(!handle || !sidebar) return;
+  const saved = parseInt(localStorage.getItem('trader.wlInfoH')||'',10);
+  if(saved>0) sidebar.style.setProperty('--wlinfo-h', saved+'px');
+  let dragging=false;
+  const onMove=(e)=>{
+    if(!dragging) return;
+    if(e.cancelable) e.preventDefault();
+    const y = (e.touches&&e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    const rect = sidebar.getBoundingClientRect();
+    const h = Math.max(96, Math.min(rect.height-120, rect.bottom - y));
+    sidebar.style.setProperty('--wlinfo-h', h+'px');
+  };
+  const onUp=()=>{
+    if(!dragging) return;
+    dragging=false; document.body.classList.remove('resizing-wlinfo');
+    const px = parseInt(sidebar.style.getPropertyValue('--wlinfo-h'),10);
+    if(px>0){ try{ localStorage.setItem('trader.wlInfoH', String(px)); }catch(e){} }
+    window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchmove',onMove); window.removeEventListener('touchend',onUp);
+  };
+  const start=(e)=>{ e.preventDefault(); dragging=true; document.body.classList.add('resizing-wlinfo');
+    window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchmove',onMove,{passive:false}); window.addEventListener('touchend',onUp); };
+  handle.addEventListener('mousedown',start);
+  handle.addEventListener('touchstart',start,{passive:false});
+}
+
 // Drag-to-reorder chart slots in fixed layouts. Delegated on the grid (survives
 // re-renders); only the ⠿ handle initiates a drag, so chart pan/zoom still works.
 let _dragWlTk = null;   // a watchlist symbol being dragged onto a chart (#1700)
@@ -2769,6 +2815,7 @@ function startDashboard(){
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   syncRangeButtons(chartTimeframe);
   initFooterResize();
+  initWlInfoResize();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
