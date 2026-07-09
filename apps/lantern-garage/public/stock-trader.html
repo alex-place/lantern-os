@@ -147,9 +147,16 @@
   .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
   .wl-signal{font-family:var(--mono);font-size:8px}
-  /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal. */
-  .wl-info{display:none;flex:0 0 auto;max-height:58%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
+     Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
+  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
   .wl-info.show{display:block}
+  /* Drag handle to resize the symbol-info panel — only visible while the panel is shown. */
+  .wl-resize{display:none;position:relative;flex:0 0 auto;height:11px;cursor:ns-resize;background:var(--bg1);touch-action:none}
+  .wl-resize::before{content:"";position:absolute;left:50%;top:4px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
+  .wl-resize:hover::before{background:var(--tv-text-secondary)}
+  .sidebar:has(.wl-info.show) .wl-resize{display:block}
+  body.resizing-wlinfo{user-select:none;cursor:ns-resize}
   .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
   .wi-name{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wi-px{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:5px}
@@ -280,6 +287,11 @@
   .xh-lbl{position:absolute;pointer-events:none;z-index:8;display:none;font-family:var(--mono);font-size:9px;line-height:1;padding:2px 4px;border-radius:2px;background:var(--bg3,#2a2e39);color:var(--text0,#e8eaed);white-space:nowrap}
   .xh-price{right:0;transform:translateY(-50%)}
   .xh-time{bottom:0;transform:translateX(-50%)}
+  /* Mobile scrubber dot — rides the price line where the vertical crosshair meets it.
+     Only the phone crosshair uses it (desktop keeps the full dashed crosshair). */
+  .xh-dot{position:absolute;pointer-events:none;z-index:8;display:none;width:8px;height:8px;
+    margin:-4px 0 0 -4px;border-radius:50%;background:transparent;border:1.3px solid var(--accent,#3b9eff);
+    box-shadow:0 0 0 1px var(--bg1,#111)}
   /* Header chart controls */
   .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
@@ -320,25 +332,60 @@
   body.ot-open .footer{ padding-right: 356px; }
   @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
+  /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
+     right dock. A tinted backdrop covers the app (tap it to close); the panel slides
+     up from the bottom and is height-capped so the header + view tabs stay visible. */
+  @media (max-width:580px){
+    .ot-bg{ top:0; left:0; background:rgba(0,0,0,.5); pointer-events:auto;
+            align-items:flex-end; justify-content:stretch; }
+    .ot-modal{ width:100%; max-width:100%; height:auto; max-height:82vh;
+               border-left:none; border-top:1px solid var(--border);
+               border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45);
+               animation:otSlideUp .2s ease; }
+  }
+  @keyframes otSlideUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
-  /* Mobile view switch (chart vs ticker list) — hidden on desktop (both panels show). */
+  /* Mobile view switch (chart vs ticker list) — a compact centered segmented control,
+     hidden on desktop (both panels show). */
   .mobile-view-tabs{ display:none; }
-  .mvt-btn{ flex:1; min-height:40px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
-    font-family:var(--mono); font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px; }
-  .mvt-btn.active{ background:var(--bg3); color:var(--text0); box-shadow:inset 0 -2px 0 var(--accent); }
+  .mvt-btn{ flex:0 1 104px; min-height:28px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
+    border-radius:7px; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.02em; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:background .15s,border-color .15s; }
+  .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
     .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
-    .header{ flex:0 0 auto; overflow-x:auto; -webkit-overflow-scrolling:touch; gap:10px; }
+    /* One compact, horizontally-scrollable row. The range picker is a dropdown (not 9
+       buttons) so the row is short — VIX, market, and the chart selects sit on a single
+       aligned line; swipe sideways for the action links. */
+    .header{ flex:0 0 auto; align-items:center; gap:10px; padding:8px 12px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .header::-webkit-scrollbar{ height:0; }
-    .mobile-view-tabs{ display:flex; flex:0 0 auto; border-bottom:1px solid var(--border); }
-    /* default = chart view: charts + footer visible, ticker list hidden */
+    .header > *{ flex:0 0 auto; }
+    /* The toolbar's brand + account readouts (Equity, Day P&L, Positions) duplicate the
+       account panel below — hide the duplicates so what's left is what ISN'T shown
+       elsewhere: VIX, market trend, and the chart customization controls. */
+    .header .logo,
+    .header .badge-paper,
+    .header .hstat.acct{ display:none; }
+    .header .hstat{ min-width:0; }
+    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
+      background:var(--bg1); border-bottom:1px solid var(--border); }
+    /* default = chart view: charts get the room; the account panel is a resizable strip
+       at the bottom (drag its grabber). Override the desktop grid's height:100% (which made
+       the account panel swallow the whole phone screen). */
     .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
-    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; }
-    .footer{ flex:0 0 auto; }
+    /* Breathing room at the bottom of the scroll so the last chart clears the account
+       strip instead of being butted right up against it. */
+    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
+    .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
+    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols). Fill the
+       viewport when there's room (1–2 charts each take a full row via the 1fr rows) but
+       grow past it and scroll inside .main when there are many. */
+    .cards-grid.grid-fixed{ height:auto; min-height:100%; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -507,11 +554,17 @@
     <option value="4h">4h</option>
     <option value="1d">1d</option>
   </select>
-  <div class="range-group">
-    <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
-    <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
-    <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
-  </div>
+  <select id="chartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
+    <option value="1D">1D</option>
+    <option value="5D">5D</option>
+    <option value="1M">1M</option>
+    <option value="3M">3M</option>
+    <option value="6M">6M</option>
+    <option value="YTD">YTD</option>
+    <option value="1Y">1Y</option>
+    <option value="5Y">5Y</option>
+    <option value="All">All</option>
+  </select>
   <div class="pulse"></div>
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
@@ -523,8 +576,8 @@
 <!-- Mobile-only view switch: the ticker list and the charts can't both fit at phone width,
      so toggle between them (chart view is the default). Hidden on desktop (both show). -->
 <div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
-  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">📈 Chart</button>
-  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">📋 Tickers</button>
+  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">Chart</button>
+  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">Tickers</button>
 </div>
 
 <!-- Sidebar -->
@@ -533,6 +586,7 @@
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
   </div>
   <div id="wlList"></div>
+  <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
   <div id="wlInfo" class="wl-info"></div>
 </div>
 
@@ -580,11 +634,17 @@
         <option value="4h">4h</option>
         <option value="1d">1d</option>
       </select>
-      <div class="range-group">
-        <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
-        <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
-        <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
-      </div>
+      <select id="fsChartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
+        <option value="1D">1D</option>
+        <option value="5D">5D</option>
+        <option value="1M">1M</option>
+        <option value="3M">3M</option>
+        <option value="6M">6M</option>
+        <option value="YTD">YTD</option>
+        <option value="1Y">1Y</option>
+        <option value="5Y">5Y</option>
+        <option value="All">All</option>
+      </select>
       <div class="order-ticket fs-order-ticket">
         <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')">BUY</button>
         <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')">SELL</button>
@@ -710,7 +770,8 @@ let chartSlots = (()=>{ try{ return JSON.parse(localStorage.getItem('trader.char
 const SLOT_COLS = {1:1,2:2,3:3,4:2,6:3,10:5,20:5};
 let activeTicker   = null;
 let barsData       = {};
-let chartType      = 'line';
+// Persisted chart type. Candles are the default the first time a user visits.
+let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
 let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
 let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
@@ -746,9 +807,28 @@ function getChartView(key){
   return chartView[key];
 }
 
-// Range presets map onto the existing bar-resolution timeframes: 1D shows
-// today's session at 5m bars, 5D at hourly bars, 1M at daily bars.
-const RANGE_TIMEFRAMES = { '1D': '5m', '5D': '1h', '1M': '1d' };
+// Range presets map onto the bar-resolution timeframes AND a default visible-bar
+// window (~one range-label's worth of candles). Several ranges share the daily
+// timeframe — they differ only in how wide a window they open. `activeRange` tracks
+// which button is lit (a plain tf→range reverse-map can't, now that ranges collide).
+const RANGES = {
+  '1D':  { tf: '5m', bars: 78   },   // ~one 5m session
+  '5D':  { tf: '1h', bars: 35   },   // ~5 days of hourly
+  '1M':  { tf: '1d', bars: 22   },   // ~22 trading days
+  '3M':  { tf: '1d', bars: 64   },
+  '6M':  { tf: '1d', bars: 128  },
+  'YTD': { tf: '1d', bars: null },   // computed from the calendar (below)
+  '1Y':  { tf: '1d', bars: 252  },
+  '5Y':  { tf: '1d', bars: 1260 },
+  'All': { tf: '1d', bars: 99999 },  // clamped to whatever daily history is available
+};
+let activeRange = (()=>{ try{ return localStorage.getItem('trader.range') || '1D'; }catch(e){ return '1D'; } })();
+// Approximate trading days elapsed this calendar year (~5 sessions per 7 days).
+function ytdTradingBars(){
+  const now = new Date();
+  const days = Math.floor((now - new Date(now.getFullYear(), 0, 1)) / 86400000);
+  return Math.max(5, Math.round(days * 5 / 7));
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function fmt(n, d=2){ return n == null ? '—' : Number(n).toLocaleString(undefined,{minimumFractionDigits:d,maximumFractionDigits:d}); }
@@ -1175,8 +1255,15 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     // timeframe (1D≈78×5m, 5D≈35×1h, 1M≈22 daily trading days) instead of a flat
     // 70 — so the candle count matches the selected range. Pan to see more history.
     const DEFAULT_VIS = { '1m': 78, '5m': 78, '15m': 52, '1h': 35, '4h': 30, '1d': 22 };
+    // Honor the saved/active RANGE window when it matches the current timeframe, so a
+    // chart re-opens at the same zoom the user left it (e.g. 1Y stays 1Y across reloads)
+    // instead of snapping back to the timeframe's default window.
+    const rangeBars = (RANGES[activeRange] && RANGES[activeRange].tf === chartTimeframe)
+      ? (RANGES[activeRange].bars == null ? ytdTradingBars() : RANGES[activeRange].bars)
+      : null;
     const base = DEFAULT_VIS[chartTimeframe] || 70;
-    view.visibleBars = Math.min(bars.length, isFs ? Math.round(base * 2.2) : base);
+    const want = rangeBars != null ? rangeBars : (isFs ? Math.round(base * 2.2) : base);
+    view.visibleBars = Math.min(bars.length, want);
     view.barOffset = 0;
   }
 
@@ -1452,10 +1539,14 @@ function applyGridCols(){
   if(!grid) return;
   const main = document.querySelector('.main');
   if(slotCount){
-    const cols = SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount));
+    // Phones only have vertical room — a 2×1 / 2×2 tiling squeezes each chart into a
+    // tiny sliver. Stack ALL fixed-grid charts in a single column and give each a real
+    // min-height so they use the vertical space and scroll. Desktop keeps the tiling.
+    const narrow = isNarrowTrader();
+    const cols = narrow ? 1 : (SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount)));
     const rows = Math.ceil(slotCount / cols);
     grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    grid.style.gridTemplateRows    = `repeat(${rows},1fr)`;   // rows fill the height equally
+    grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(260px,1fr))` : `repeat(${rows},1fr)`;
     grid.classList.add('grid-fixed');
     grid.classList.toggle('grid-single', slotCount === 1);
     if(main) main.classList.add('main-fixed');
@@ -1477,6 +1568,20 @@ function setSlotCount(v){
   lastCardOrder = '';            // force a full rebuild
   applyGridCols();
   renderCards();
+}
+
+// Phones only offer single / double chart layouts — 3+ tiles are unreadable at phone
+// width. Rebuild the layout <select> for the current viewport and clamp the count when
+// crossing into mobile with a bigger grid selected.
+const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[4,'4 charts'],[6,'6 charts'],[10,'10 charts'],[20,'20 charts']];
+function buildLayoutOptions(){
+  const sel = document.getElementById('chartLayoutSelect');
+  if(!sel) return;
+  const narrow = isNarrowTrader();
+  const opts = narrow ? LAYOUT_OPTS.filter(([v])=> v===1 || v===2) : LAYOUT_OPTS;
+  sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  if(narrow && !(slotCount===1 || slotCount===2)) setSlotCount(2);   // clamp to a mobile layout
+  sel.value = String(slotCount);
 }
 
 function renderCards(){
@@ -1612,6 +1717,13 @@ function setOrderSymbol(ticker){
     document.getElementById('ot'+kind+'Ticks').disabled = true;
   });
   renderOrderTicket();
+}
+// Phone layout (≤580px) shows ONE of {charts, ticker list} at a time behind the
+// mobile view tabs. The order ticket is a full-screen bottom sheet there, so it must
+// NOT auto-open on load / on symbol-focus (it would bury the chart the user just
+// opened). It only opens on an explicit BUY/SELL tap. Desktop keeps the docked panel.
+function isNarrowTrader(){
+  return typeof window.matchMedia === 'function' && window.matchMedia('(max-width:580px)').matches;
 }
 function openOrderPanel(){
   otUserClosed = false;
@@ -1860,6 +1972,7 @@ function renderSymbolInfo(ticker){
 
 function focusTicker(t){
   activeTicker = t;
+  try{ localStorage.setItem('trader.ticker', t); }catch(e){}   // remember the selected symbol
   renderWatchlist();
   renderSymbolInfo(t);
   // Read-only guests can't trade, so skip the order panel entirely — otherwise
@@ -1867,7 +1980,9 @@ function focusTicker(t){
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-    if(!otUserClosed) openOrderPanel();   // keep it open unless the user X'd it
+    // Desktop: keep the docked panel open unless the user X'd it. Phone: don't auto-open —
+    // it's a bottom sheet that would cover the chart we're about to show.
+    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
   }
   openFullscreenChart(t);
 }
@@ -1927,13 +2042,13 @@ function _ladderTarget(ladderEl){
 function _ensureXh(ladder){
   if(ladder._xh) return ladder._xh;
   const mk = (cls) => { const el=document.createElement('div'); el.className=cls; ladder.appendChild(el); return el; };
-  const xh = { v: mk('xh-v'), h: mk('xh-h'), price: mk('xh-lbl xh-price'), time: mk('xh-lbl xh-time') };
+  const xh = { v: mk('xh-v'), h: mk('xh-h'), dot: mk('xh-dot'), price: mk('xh-lbl xh-price'), time: mk('xh-lbl xh-time') };
   ladder._xh = xh;
   return xh;
 }
 function _hideXh(ladder){
   const xh = ladder && ladder._xh; if(!xh) return;
-  for(const el of [xh.v, xh.h, xh.price, xh.time]) el.style.display='none';
+  for(const el of [xh.v, xh.h, xh.dot, xh.price, xh.time]) el.style.display='none';
 }
 function _fmtCrossTime(ts){
   const d = new Date(String(ts).replace(' ','T'));
@@ -1946,8 +2061,28 @@ function _updateXh(ladder, canvasId, x, y, w, h){
   const pw = w - AXIS_W, ph = h - AXIS_H;
   if(!data || x < 0 || x > pw || y < 0 || y > ph){ _hideXh(ladder); return; }
   const xh = _ensureXh(ladder);
-  const price = data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y
   const n = (data.bars || []).length;
+  // Mobile: a phone-style scrubber — vertical line SNAPPED to the nearest bar, a dot
+  // riding the price line, and the price read from the bar (not the free touch-Y). No
+  // horizontal line. Deliberately different from the desktop mouse crosshair.
+  if(isNarrowTrader() && n >= 1){
+    const slotW = pw / n;
+    const idx = Math.max(0, Math.min(n-1, Math.floor(x / slotW)));
+    const b = data.bars[idx];
+    const bx = (idx + 0.5) * slotW;
+    const bp = (b && b.close != null) ? b.close : (data.rMax - (y/ph)*(data.rMax - data.rMin));
+    const by = ph * (1 - (bp - data.rMin) / (data.rMax - data.rMin));
+    const bdec = bp >= 100 ? 2 : bp >= 1 ? 3 : 4;
+    xh.h.style.display = 'none';
+    xh.v.style.left = bx+'px'; xh.v.style.display = 'block';
+    xh.dot.style.left = bx+'px'; xh.dot.style.top = by+'px'; xh.dot.style.display = 'block';
+    xh.price.style.top = by+'px'; xh.price.textContent = fmt(bp, bdec); xh.price.style.display = 'block';
+    xh.time.style.left = bx+'px';
+    xh.time.textContent = (b && b.timestamp) ? _fmtCrossTime(b.timestamp) : '';
+    xh.time.style.display = xh.time.textContent ? 'block' : 'none';
+    return;
+  }
+  const price = data.rMax - (y/ph)*(data.rMax - data.rMin);   // invert price→y
   let timeLabel = '';
   if(n >= 1){
     const slotW = pw/n;
@@ -2050,6 +2185,10 @@ document.addEventListener('wheel', function(e){
 let _chartDrag = null;
 document.addEventListener('mousedown', function(e){
   if(e.button !== 0) return;
+  // On phones the chart is locked to the selected range — dragging scrubs the crosshair
+  // (see the touch handlers below), it never pans or zooms. Disable the drag entirely on
+  // narrow screens so the window stays strictly at the chosen timeframe/range.
+  if(isNarrowTrader()) return;
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
   const target = _ladderTarget(ladder);
@@ -2146,9 +2285,41 @@ document.addEventListener('mouseup', function(e){
   // order panel to that chart's symbol, so BUY/SELL targets what you clicked.
   if(Math.abs(e.clientX - drag.startX) + Math.abs(e.clientY - drag.startY) < 6 && drag.dataTicker){
     setOrderSymbol(drag.dataTicker);
-    openOrderPanel();
+    // Phone: a chart tap just retargets the (closed) ticket — don't pop the bottom
+    // sheet over the chart. The BUY/SELL buttons open it explicitly.
+    if(!isNarrowTrader()) openOrderPanel();
   }
 });
+
+// ── Mobile touch scrubbing ────────────────────────────────────────────────────
+// Phones have no mouse, so the desktop mousemove crosshair never fires. Here a touch
+// drag ACROSS a chart scrubs the phone-style crosshair (vertical line + price dot). A
+// mostly-vertical drag is left alone so the page can still scroll; history is navigated
+// with the range buttons, not by panning.
+let _xhTouch = null;
+function _scrubTouch(e){
+  const t = e.touches && e.touches[0]; if(!t){ return; }
+  if(_xhTouch.sx == null){ _xhTouch.sx = t.clientX; _xhTouch.sy = t.clientY; }
+  const dx = Math.abs(t.clientX - _xhTouch.sx), dy = Math.abs(t.clientY - _xhTouch.sy);
+  if(!_xhTouch.decided && (dx > 6 || dy > 6)){ _xhTouch.decided = true; _xhTouch.scrub = dx >= dy; }
+  if(_xhTouch.decided && !_xhTouch.scrub){ _hideXh(_xhTouch.ladder); return; } // vertical → allow scroll
+  const rect = _xhTouch.canvas.getBoundingClientRect();
+  const x = t.clientX - rect.left, y = t.clientY - rect.top;
+  if(x < 0 || x > rect.width || y < 0 || y > rect.height){ _hideXh(_xhTouch.ladder); return; }
+  if(_xhTouch.decided && _xhTouch.scrub && e.cancelable) e.preventDefault(); // stop page scroll while scrubbing
+  _updateXh(_xhTouch.ladder, _xhTouch.canvasId, x, y, rect.width, rect.height);
+}
+document.addEventListener('touchstart', function(e){
+  if(!isNarrowTrader()) return;
+  const ladder = e.target.closest && e.target.closest('.zone-ladder'); if(!ladder) return;
+  const target = _ladderTarget(ladder); if(!target) return;
+  _xhTouch = { ladder, canvas: target.canvas, canvasId: target.canvas.id, sx:null, sy:null, decided:false, scrub:false };
+  _scrubTouch(e);
+}, { passive:false });
+document.addEventListener('touchmove', function(e){ if(_xhTouch) _scrubTouch(e); }, { passive:false });
+function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null; } }
+document.addEventListener('touchend', _endXhTouch);
+document.addEventListener('touchcancel', _endXhTouch);
 
 // Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
 document.addEventListener('dblclick', function(e){
@@ -2459,34 +2630,47 @@ async function loadBars(){
 
 function changeChartType(type){
   chartType = type;
+  try{ localStorage.setItem('trader.chartType', type); }catch(e){}   // remember for next visit
   document.getElementById('chartTypeSelect').value = type;
   document.getElementById('fsChartTypeSelect').value = type;
   wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
   renderFullscreenChart();
 }
 
-function changeTimeframe(tf){
+function changeTimeframe(tf, winBars){
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
   document.getElementById('chartTfSelect').value = tf;
   document.getElementById('fsChartTfSelect').value = tf;
-  // #1699: reset every chart's visible window so the new timeframe's default
-  // (one range-label's worth of candles) takes effect instead of carrying over.
-  Object.values(chartView).forEach(v=>{ v.visibleBars=null; v.barOffset=0; v.gVis=null; v.gOff=null; });
+  // Reset every chart's visible window. When a range preset supplies an explicit bar
+  // count (winBars), use it so ranges that share a timeframe (3M/6M/1Y/5Y on daily)
+  // open different windows; otherwise null → the timeframe's default window (#1699).
+  const vb = (winBars != null) ? winBars : null;
+  Object.values(chartView).forEach(v=>{ v.visibleBars=vb; v.barOffset=0; v.gVis=null; v.gOff=null; });
   if(_restoreBarsCache()) _paintFromCache();    // instant paint from cache; loadBars refreshes
   syncRangeButtons(tf);
   loadBars();
 }
 
-// ── Chart range presets (1D/5D/1M) ───────────────────────────────────────────
+// ── Chart range presets ───────────────────────────────────────────────────────
 function changeRange(range){
-  changeTimeframe(RANGE_TIMEFRAMES[range]);
+  const r = RANGES[range]; if(!r) return;
+  activeRange = range;
+  try{ localStorage.setItem('trader.range', range); }catch(e){}   // remember for next visit
+  const want = (r.bars == null) ? ytdTradingBars() : r.bars;
+  changeTimeframe(r.tf, want);
 }
 
 function syncRangeButtons(tf){
-  const range = Object.keys(RANGE_TIMEFRAMES).find(r => RANGE_TIMEFRAMES[r] === tf) || null;
-  document.querySelectorAll('.range-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.range === range);
+  // Keep the lit button in sync. If the timeframe changed OUT from under the active
+  // range (e.g. the user picked a raw timeframe from the select), fall back to the
+  // first range that uses this timeframe; otherwise keep the active range lit.
+  if(tf !== undefined && !(RANGES[activeRange] && RANGES[activeRange].tf === tf)){
+    activeRange = Object.keys(RANGES).find(k => RANGES[k].tf === tf) || null;
+  }
+  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{
+    const s = document.getElementById(id);
+    if(s && activeRange) s.value = activeRange;
   });
 }
 
@@ -2680,6 +2864,39 @@ function initFooterResize(){
   handle.addEventListener('touchstart',start,{passive:false});
 }
 
+// Drag-to-resize the symbol-info panel at the bottom of the watchlist sidebar. Height
+// is a CSS var on .sidebar; the grabber drags it between 96px and (sidebar − 120px),
+// and it persists. Works on desktop and mobile (touch), per user request.
+function initWlInfoResize(){
+  const handle = document.getElementById('wlResize');
+  const sidebar = document.querySelector('.sidebar');
+  if(!handle || !sidebar) return;
+  const saved = parseInt(localStorage.getItem('trader.wlInfoH')||'',10);
+  if(saved>0) sidebar.style.setProperty('--wlinfo-h', saved+'px');
+  let dragging=false;
+  const onMove=(e)=>{
+    if(!dragging) return;
+    if(e.cancelable) e.preventDefault();
+    const y = (e.touches&&e.touches[0]) ? e.touches[0].clientY : e.clientY;
+    const rect = sidebar.getBoundingClientRect();
+    const h = Math.max(96, Math.min(rect.height-120, rect.bottom - y));
+    sidebar.style.setProperty('--wlinfo-h', h+'px');
+  };
+  const onUp=()=>{
+    if(!dragging) return;
+    dragging=false; document.body.classList.remove('resizing-wlinfo');
+    const px = parseInt(sidebar.style.getPropertyValue('--wlinfo-h'),10);
+    if(px>0){ try{ localStorage.setItem('trader.wlInfoH', String(px)); }catch(e){} }
+    window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+    window.removeEventListener('touchmove',onMove); window.removeEventListener('touchend',onUp);
+  };
+  const start=(e)=>{ e.preventDefault(); dragging=true; document.body.classList.add('resizing-wlinfo');
+    window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+    window.addEventListener('touchmove',onMove,{passive:false}); window.addEventListener('touchend',onUp); };
+  handle.addEventListener('mousedown',start);
+  handle.addEventListener('touchstart',start,{passive:false});
+}
+
 // Drag-to-reorder chart slots in fixed layouts. Delegated on the grid (survives
 // re-renders); only the ⠿ handle initiates a drag, so chart pan/zoom still works.
 let _dragWlTk = null;   // a watchlist symbol being dragged onto a chart (#1700)
@@ -2746,6 +2963,7 @@ function startDashboard(){
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   syncRangeButtons(chartTimeframe);
   initFooterResize();
+  initWlInfoResize();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
@@ -2755,16 +2973,32 @@ function startDashboard(){
     // Info-only: sets the active ticker + renders the panel, but does NOT open the
     // order panel or zoom a chart (so it works for read-only users too).
     if(wlPrices.length && !activeTicker){
-      activeTicker = wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
+      // Prefer the symbol the user was last on (if still in the watchlist), else SPY.
+      let saved=null; try{ saved=localStorage.getItem('trader.ticker'); }catch(e){}
+      activeTicker = (saved && wlPrices.some(w=>w.ticker===saved)) ? saved
+                   : wlPrices.some(w=>w.ticker==='SPY') ? 'SPY' : wlPrices[0].ticker;
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && !otUserClosed && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+    if(!window.GUEST && !otUserClosed && !isNarrowTrader() && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
   }, 1600);
-  // Restore the saved chart-grid layout (#1628).
-  const ls = document.getElementById('chartLayoutSelect');
-  if(ls){ ls.value = String(slotCount); }
+  // Restore the saved chart-grid layout (#1628), limiting the options to single/double
+  // on phones.
+  buildLayoutOptions();
+  // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
+  // toolbar matches what the charts render. The values themselves are restored above from
+  // localStorage (chartType/chartTimeframe/activeRange); this just syncs the <select>s.
+  ['chartTypeSelect','fsChartTypeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartType; });
+  ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{ const s=document.getElementById(id); if(s && activeRange) s.value=activeRange; });
   applyGridCols();
+  // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
+  // switch between the desktop tiling and the single-column phone stack.
+  let _lastNarrow = isNarrowTrader();
+  window.addEventListener('resize', function(){
+    const n = isNarrowTrader();
+    if(n !== _lastNarrow){ _lastNarrow = n; buildLayoutOptions(); applyGridCols(); renderCards(); }
+  });
   fullRefresh();
   loadBars();
   loadOrders();
