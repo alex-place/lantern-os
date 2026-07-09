@@ -353,11 +353,13 @@
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
     .layout{ display:flex; flex-direction:column; height:calc(100vh - 52px); }
-    /* Wrap the toolbar onto multiple rows instead of one horizontal-scroll strip that
-       clipped VIX / the chart controls off the right edge with no obvious way to reach
-       them. Everything is now visible and left-aligned; the range buttons wrap too. */
-    .header{ flex:0 0 auto; flex-wrap:wrap; align-items:center; align-content:flex-start;
-      gap:6px 10px; padding:8px 12px; }
+    /* One compact, horizontally-scrollable row. The range picker is a dropdown (not 9
+       buttons) so the row is short — VIX, market, and the chart selects sit on a single
+       aligned line; swipe sideways for the action links. */
+    .header{ flex:0 0 auto; align-items:center; gap:10px; padding:8px 12px;
+      overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .header::-webkit-scrollbar{ height:0; }
+    .header > *{ flex:0 0 auto; }
     /* The toolbar's brand + account readouts (Equity, Day P&L, Positions) duplicate the
        account panel below — hide the duplicates so what's left is what ISN'T shown
        elsewhere: VIX, market trend, and the chart customization controls. */
@@ -365,7 +367,6 @@
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
     .header .hstat{ min-width:0; }
-    .header .range-group{ flex-wrap:wrap; }
     .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
       background:var(--bg1); border-bottom:1px solid var(--border); }
     /* default = chart view: charts get the room; the account panel is a resizable strip
@@ -376,9 +377,10 @@
        strip instead of being butted right up against it. */
     .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
     .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
-    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols); let the
-       grid grow past the viewport and scroll inside .main instead of squishing to fit. */
-    .cards-grid.grid-fixed{ height:auto; }
+    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols). Fill the
+       viewport when there's room (1–2 charts each take a full row via the 1fr rows) but
+       grow past it and scroll inside .main when there are many. */
+    .cards-grid.grid-fixed{ height:auto; min-height:100%; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -547,17 +549,17 @@
     <option value="4h">4h</option>
     <option value="1d">1d</option>
   </select>
-  <div class="range-group">
-    <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
-    <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
-    <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
-    <button class="range-btn" data-range="3M" onclick="changeRange('3M')">3M</button>
-    <button class="range-btn" data-range="6M" onclick="changeRange('6M')">6M</button>
-    <button class="range-btn" data-range="YTD" onclick="changeRange('YTD')">YTD</button>
-    <button class="range-btn" data-range="1Y" onclick="changeRange('1Y')">1Y</button>
-    <button class="range-btn" data-range="5Y" onclick="changeRange('5Y')">5Y</button>
-    <button class="range-btn" data-range="All" onclick="changeRange('All')">All</button>
-  </div>
+  <select id="chartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
+    <option value="1D">1D</option>
+    <option value="5D">5D</option>
+    <option value="1M">1M</option>
+    <option value="3M">3M</option>
+    <option value="6M">6M</option>
+    <option value="YTD">YTD</option>
+    <option value="1Y">1Y</option>
+    <option value="5Y">5Y</option>
+    <option value="All">All</option>
+  </select>
   <div class="pulse"></div>
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
@@ -627,17 +629,17 @@
         <option value="4h">4h</option>
         <option value="1d">1d</option>
       </select>
-      <div class="range-group">
-        <button class="range-btn" data-range="1D" onclick="changeRange('1D')">1D</button>
-        <button class="range-btn" data-range="5D" onclick="changeRange('5D')">5D</button>
-        <button class="range-btn" data-range="1M" onclick="changeRange('1M')">1M</button>
-        <button class="range-btn" data-range="3M" onclick="changeRange('3M')">3M</button>
-        <button class="range-btn" data-range="6M" onclick="changeRange('6M')">6M</button>
-        <button class="range-btn" data-range="YTD" onclick="changeRange('YTD')">YTD</button>
-        <button class="range-btn" data-range="1Y" onclick="changeRange('1Y')">1Y</button>
-        <button class="range-btn" data-range="5Y" onclick="changeRange('5Y')">5Y</button>
-        <button class="range-btn" data-range="All" onclick="changeRange('All')">All</button>
-      </div>
+      <select id="fsChartRangeSelect" class="chart-ctrl" aria-label="Chart range" onchange="changeRange(this.value)" title="How much history to show">
+        <option value="1D">1D</option>
+        <option value="5D">5D</option>
+        <option value="1M">1M</option>
+        <option value="3M">3M</option>
+        <option value="6M">6M</option>
+        <option value="YTD">YTD</option>
+        <option value="1Y">1Y</option>
+        <option value="5Y">5Y</option>
+        <option value="All">All</option>
+      </select>
       <div class="order-ticket fs-order-ticket">
         <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')">BUY</button>
         <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')">SELL</button>
@@ -2582,8 +2584,9 @@ function syncRangeButtons(tf){
   if(tf !== undefined && !(RANGES[activeRange] && RANGES[activeRange].tf === tf)){
     activeRange = Object.keys(RANGES).find(k => RANGES[k].tf === tf) || null;
   }
-  document.querySelectorAll('.range-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.range === activeRange);
+  ['chartRangeSelect','fsChartRangeSelect'].forEach(id=>{
+    const s = document.getElementById(id);
+    if(s && activeRange) s.value = activeRange;
   });
 }
 
