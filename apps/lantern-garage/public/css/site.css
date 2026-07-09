@@ -156,6 +156,15 @@ html, body {
   }
   .site-nav.has-menu.menu-open .nav-links { display: flex; }
   .site-nav.has-menu .nav-links a { padding: 12px 14px; font-size: 15px; border-radius: 8px; }
+  /* App navs (kalshi-terminal/trading/orchestration) carry more action buttons than the
+     canonical 3, which crowded over the wordmark. Icon-only brand on mobile keeps them
+     clear. font-size:0 hides the text regardless of markup (span or bare text node); the
+     icons (img / .brand-icon) are restored. Scoped to .nav-appbar so the canonical nav
+     keeps its wordmark. */
+  .site-nav.nav-appbar .nav-brand { font-size: 0; gap: 4px; }              /* hides bare-text wordmark (trading) */
+  .site-nav.nav-appbar .nav-brand > span:not(.brand-icon) { display: none; } /* hides inline-sized wordmark span (kalshi/orch) */
+  .site-nav.nav-appbar .nav-brand .brand-icon,
+  .site-nav.nav-appbar .nav-brand .brand-icon * { font-size: 16px; }        /* keep the CSS-drawn mandala sized */
 }
 .nav-actions {
   margin-left: auto;
