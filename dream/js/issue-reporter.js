@@ -13,7 +13,7 @@
 (function () {
   "use strict";
 
-  var state = { dataUrl: null, blob: null, pasteBound: false, title: "", body: "", describing: false, repo: "", describeFailed: false, describeReason: "" };
+  var state = { dataUrl: null, blob: null, pasteBound: false, title: "", body: "", describing: false, repo: "", describeFailed: false, describeReason: "", userAuthored: false };
 
   // ── DOM / console error capture ─────────────────────────────────────────────
   // Buffer recent JS errors so the filed report includes them (url + dom errors).
@@ -155,13 +155,15 @@
     btn.style.opacity = ready ? "1" : ".5";
   }
   function resetReport() {
-    state.title = ""; state.body = ""; state.describeFailed = false; state.describeReason = "";
+    state.title = ""; state.body = ""; state.describeFailed = false; state.describeReason = ""; state.userAuthored = false;
     var g = $("issue-summary-group");
     if (g) g.style.display = "none";
     var ud = $("issue-userdesc-group");
     if (ud) ud.style.display = "none";
     var ta = $("issue-user-desc");
     if (ta) ta.value = "";
+    var ra = $("issue-report-actions");
+    if (ra) ra.style.display = "none";
     setReady(false);
   }
   // Lazily insert an editable description field. Shown only when AI auto-description
@@ -186,9 +188,59 @@
     ta.addEventListener("input", function () {
       var v = ta.value.trim();
       state.body = v;
+      state.userAuthored = true;   // typed text is the report, whether or not AI ran
       setReady(!!v);
+      renderSummary();
     });
     return ta;
+  }
+
+  // The two report actions that sit under the summary — always available once a shot is
+  // attached: re-run Unisona's AI report, or write the report yourself. Injected in JS so
+  // both modal sources (dream-chat.html's copy and the one injected elsewhere) get them.
+  function ensureReportActions() {
+    var existing = $("issue-report-actions");
+    if (existing) return existing;
+    var anchor = $("issue-status");
+    if (!anchor || !anchor.parentNode) return null;
+    var row = document.createElement("div");
+    row.id = "issue-report-actions";
+    row.style.cssText = "display:none;gap:8px;flex-wrap:wrap";
+    row.innerHTML =
+      '<button type="button" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:6px 12px" onclick="window.issueReporter.retryAi()">↻ Try AI again</button>' +
+      '<button type="button" id="issue-edit-btn" class="form-input" style="width:auto;cursor:pointer;background:var(--surface2);font-size:12px;padding:6px 12px" onclick="window.issueReporter.editReport()">✎ Write it myself</button>';
+    anchor.parentNode.insertBefore(row, anchor);
+    return row;
+  }
+  function showReportActions() {
+    var r = ensureReportActions();
+    if (r) r.style.display = "flex";
+  }
+  // Re-run the AI report on the current screenshot (the "Try AI again" button).
+  function retryAi() {
+    if (!state.dataUrl) { setStatus("Attach a screenshot first — Unisona writes the report from it.", true); return; }
+    state.describing = false;   // clear any stale in-flight guard so the re-run proceeds
+    autoDescribe();
+  }
+  // Reveal the editable description so the user can write / replace the report themselves —
+  // available even when the AI report succeeded (the "Write it myself" button).
+  function editReport() {
+    var ta = ensureUserDescField();
+    var grp = $("issue-userdesc-group");
+    if (grp) {
+      var lbl = grp.querySelector(".form-label");
+      if (lbl && !state.describeFailed) {
+        lbl.innerHTML = 'Your description <span style="text-transform:none;font-weight:400;color:var(--muted)">— edit or replace Unisona\'s report</span>';
+      }
+      grp.style.display = "";
+    }
+    if (ta) {
+      if (!ta.value) ta.value = state.body || "";
+      state.body = ta.value.trim();
+      state.userAuthored = true;
+      setReady(!!state.body);
+      try { ta.focus(); } catch (e) { /* best-effort */ }
+    }
   }
   function renderSummary() {
     var g = $("issue-summary-group"), t = $("issue-summary-title"), b = $("issue-summary-body");
@@ -240,7 +292,8 @@
           state.body = parsed.body || "";
           renderSummary();
           setReady(true);
-          setStatus("Report ready — review it and click File issue.");
+          showReportActions();   // offer "Try AI again" / "Write it myself"
+          setStatus("Report ready — review it, edit it, or click File issue.");
         } else {
           fallbackReport((d && d.error) || "vision unavailable");
         }
@@ -267,7 +320,8 @@
     if (grp) grp.style.display = "";
     if (ta) { ta.value = ""; try { ta.focus(); } catch (e) { /* focus best-effort */ } }
     setReady(false);   // stays disabled until the user types a description
-    setStatus("Unisona couldn't read the screenshot (" + state.describeReason + "). Add a short description, then file.");
+    showReportActions();   // still offer "Try AI again" (e.g. after a transient provider blip)
+    setStatus("Unisona couldn't read the screenshot (" + state.describeReason + "). Add a short description or try again, then file.");
   }
 
   function blobToDataUrl(blob) {
@@ -547,6 +601,6 @@
 
   window.issueReporter = {
     open: open, close: close, retake: autoCapturePage, submit: submit,
-    pickFile: pickFile, clearShot: clearShot
+    pickFile: pickFile, clearShot: clearShot, retryAi: retryAi, editReport: editReport
   };
 })();
