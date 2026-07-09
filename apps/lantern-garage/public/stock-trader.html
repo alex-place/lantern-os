@@ -1570,6 +1570,20 @@ function setSlotCount(v){
   renderCards();
 }
 
+// Phones only offer single / double chart layouts — 3+ tiles are unreadable at phone
+// width. Rebuild the layout <select> for the current viewport and clamp the count when
+// crossing into mobile with a bigger grid selected.
+const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[4,'4 charts'],[6,'6 charts'],[10,'10 charts'],[20,'20 charts']];
+function buildLayoutOptions(){
+  const sel = document.getElementById('chartLayoutSelect');
+  if(!sel) return;
+  const narrow = isNarrowTrader();
+  const opts = narrow ? LAYOUT_OPTS.filter(([v])=> v===1 || v===2) : LAYOUT_OPTS;
+  sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  if(narrow && !(slotCount===1 || slotCount===2)) setSlotCount(2);   // clamp to a mobile layout
+  sel.value = String(slotCount);
+}
+
 function renderCards(){
   const grid = document.getElementById('cardsGrid');
   const list = visibleTickers();
@@ -2968,9 +2982,9 @@ function startDashboard(){
     }
     if(!window.GUEST && !otUserClosed && !isNarrowTrader() && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
   }, 1600);
-  // Restore the saved chart-grid layout (#1628).
-  const ls = document.getElementById('chartLayoutSelect');
-  if(ls){ ls.value = String(slotCount); }
+  // Restore the saved chart-grid layout (#1628), limiting the options to single/double
+  // on phones.
+  buildLayoutOptions();
   // Reflect the saved chart preferences (type / timeframe / range) in the controls so the
   // toolbar matches what the charts render. The values themselves are restored above from
   // localStorage (chartType/chartTimeframe/activeRange); this just syncs the <select>s.
@@ -2983,7 +2997,7 @@ function startDashboard(){
   let _lastNarrow = isNarrowTrader();
   window.addEventListener('resize', function(){
     const n = isNarrowTrader();
-    if(n !== _lastNarrow){ _lastNarrow = n; applyGridCols(); renderCards(); }
+    if(n !== _lastNarrow){ _lastNarrow = n; buildLayoutOptions(); applyGridCols(); renderCards(); }
   });
   fullRefresh();
   loadBars();
