@@ -109,7 +109,10 @@
     }
     @media (max-width: 1100px) { .feed-stream.is-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
     @media (max-width: 820px)  { .feed-stream.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 560px)  { .feed-stream.is-grid { grid-template-columns: 1fr; } }
+    /* Phones: grid = 2-up (single view stays 1-up). */
+    @media (max-width: 560px) {
+      .feed-stream.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     .feed-stream.is-grid .feed-card { padding: 14px 14px 13px; }
     .feed-stream.is-grid .feed-card .fc-thumb,
     .feed-stream.is-grid .feed-card .fc-thumb-ph {
@@ -120,6 +123,14 @@
     .feed-stream.is-grid .feed-card.is-embed,
     .feed-stream.is-grid .feed-card.is-video,
     .feed-stream.is-grid .feed-card.is-art { grid-column: 1 / -1; }
+    /* …except on phones, where watch/play (video/embed/art) tile 2-up like everything else
+       so they can be shown smaller too (single view still shows them big). Placed AFTER the
+       rule above so it wins on ≤560px. */
+    @media (max-width: 560px) {
+      .feed-stream.is-grid .feed-card.is-embed,
+      .feed-stream.is-grid .feed-card.is-video,
+      .feed-stream.is-grid .feed-card.is-art { grid-column: auto; }
+    }
 
     /* ── Share control (per card) — parallel to the dismiss ✕ ── */
     .feed-card .fc-share {
@@ -1104,7 +1115,7 @@
     <div class="feed-toolbar">
       <div class="feed-layout" id="feedLayout" role="group" aria-label="Feed layout">
         <button type="button" class="feed-layout-btn active" data-layout="single" aria-pressed="true" aria-label="Single column" title="Single column"><span aria-hidden="true">▤</span></button>
-        <button type="button" class="feed-layout-btn" data-layout="grid" aria-pressed="false" aria-label="Grid layout" title="Grid (4-up)"><span aria-hidden="true">▦</span></button>
+        <button type="button" class="feed-layout-btn" data-layout="grid" aria-pressed="false" aria-label="Grid layout" title="Grid"><span aria-hidden="true">▦</span></button>
       </div>
     </div>
     <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
