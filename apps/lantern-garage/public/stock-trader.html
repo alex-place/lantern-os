@@ -182,8 +182,13 @@
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s;display:flex;flex-direction:column;min-height:0}
+  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
   .card:hover{border-color:rgba(255,255,255,.12)}
+  /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
+     border so the clicked chart reads as the active one the rest of the screen
+     tracks. Theme-aware. */
+  .card.active{background:rgba(32,38,52,.98);border-color:rgba(255,255,255,.22)}
+  html[data-theme="light"] .card.active{background:#e5eaf2;border-color:#9aa6b8}
   .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
   .card.state-watching{border-color:rgba(74,158,255,.25)}
   .card.state-quiet{opacity:.75}
@@ -223,7 +228,9 @@
   .card-state.regime-volatile{background:rgba(245,166,35,.12);color:var(--amber)}
   .card-state.regime-trending{background:rgba(74,158,255,.12);color:var(--blue)}
   /* Confidence badge */
-  .conf-badge{font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:3px;display:flex;gap:6px;flex-wrap:wrap;margin:0 14px 6px}
+  /* Signal chip (#2301): a compact inline pill hugging its text, not a loud
+     full-width bar. Sits inline in the card meta row, out of the chart's way. */
+  .conf-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .conf-badge.bull{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--green)}
   .conf-badge.bear{background:rgba(255,95,109,.1);border:1px solid rgba(255,95,109,.3);color:var(--red)}
   .conf-badge.neut{background:rgba(92,99,112,.15);border:1px solid var(--border);color:var(--text2)}
@@ -238,17 +245,27 @@
   .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
   /* #1696: always-vibrant BUY/SELL — bold fill + bright text (no longer relies on
      Σ₀ highlighting to stand out). */
-  .btn-buy{background:rgba(0,212,170,.32);color:#7df5d6;border-color:var(--green);font-weight:700}
-  .btn-buy:hover{background:rgba(0,212,170,.5);color:#defff6}
-  .btn-sell{background:rgba(255,95,109,.32);color:#ffb3ba;border-color:var(--red);font-weight:700}
-  .btn-sell:hover{background:rgba(255,95,109,.5);color:#ffe1e4}
+  /* BUY/SELL are SECONDARY affordances here, not primary CTAs (#2301): the viewer
+     is browsing read-only signals, often with an empty account, so the chart +
+     signal are the content. Small, neutral, ghost buttons with only a faint
+     directional tint on hover; theme-agnostic (var(--text1)). sig-on still lifts
+     the side the grounded Σ₀ signal favors, but restrained. */
+  .btn-buy{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:11px}
+  .btn-buy:hover{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.45)}
+  .btn-sell{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:11px}
+  .btn-sell:hover{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.45)}
+  /* beat .order-ticket button{font-size:10px;border:1px solid transparent} */
+  .order-ticket .btn-buy, .order-ticket .btn-sell{font-size:11px;border-color:var(--border)}
   /* Σ₀-grounded signal emphasis (#1578): a side is highlighted only when the
      card's dir matches AND conf ≥ the kalshi-suggest MIN_CONVICTION floor (65%).
      Otherwise (flat / quiet / low-confidence) BOTH buttons mute — no emphasis
      without a grounded suggestion (External Reality Rule). */
   .order-ticket button.sig-on{transition:background .15s,box-shadow .15s}
-  .btn-buy.sig-on{background:rgba(0,212,170,.30);border-color:var(--green);box-shadow:0 0 0 1px var(--green) inset,0 0 10px rgba(0,212,170,.25)}
-  .btn-sell.sig-on{background:rgba(255,95,109,.30);border-color:var(--red);box-shadow:0 0 0 1px var(--red) inset,0 0 10px rgba(255,95,109,.25)}
+  /* Restrained signal emphasis (#2301): the ▼ SHORT/▲ LONG chip already conveys
+     direction, so the favored side gets only a faint colored border + text — no
+     loud fill or glow. Keeps buy/sell neutral in the read-only/empty view. */
+  .btn-buy.sig-on{background:transparent;border-color:rgba(0,212,170,.55);color:var(--green);box-shadow:none}
+  .btn-sell.sig-on{background:transparent;border-color:rgba(255,95,109,.55);color:var(--red);box-shadow:none}
   /* #1696: buttons stay vibrant — Σ₀ no longer mutes them (sig-off is a no-op). */
   .order-ticket button.sig-off{opacity:1;filter:none}
   /* ── Symbol-search popup (#1692) ── */
@@ -386,6 +403,10 @@
        the available height — the 1–2 rows split .main so the charts resize to the screen
        (like desktop) instead of a fixed height that overflows and cuts off on small phones. */
     .cards-grid.grid-fixed{ height:100%; }
+    /* Never let the chart body collapse to a sliver on a short phone (#2301):
+       floor the ladder height and let .main scroll if a card runs tall. Overrides
+       the .grid-fixed min-height:0 that allowed the 22px collapse. */
+    .cards-grid.grid-fixed .card .zone-ladder{ min-height:180px; }
     /* tickers view: show the ticker list, hide charts + footer */
     .layout.mobile-tickers .sidebar{ display:flex; }
     .layout.mobile-tickers .main,
@@ -515,6 +536,20 @@
   .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue) }
   .signin-cta:hover{ filter:brightness(1.08);color:#04121a;background:var(--blue) }
   .guest-badge{ background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3) }
+  /* Empty logged-in account (#2301): balance/positions/orders/history hold nothing,
+     so collapse the footer to just its tab strip and dim the duplicate header
+     readouts — the charts + signals get the space. Toggled by loadPositions();
+     re-expands automatically once the account has equity or an open position. */
+  body.acct-empty .footer{ height:auto!important; min-height:0!important; max-height:none!important; flex:0 0 auto; box-shadow:none; }
+  body.acct-empty .tp-body{ display:none; }
+  body.acct-empty .footer-resize{ display:none; }
+  body.acct-empty .tp-tabs{ border-bottom:0; opacity:.8; }
+  body.acct-empty .hstat.acct{ opacity:.45; }
+  /* Desktop/tablet use a GRID layout where the footer is a fixed row sized by
+     --footer-h — collapsing the footer element isn't enough, so shrink the row
+     itself to just the tab strip (auto). Mobile (≤580) is flex, unaffected by
+     grid-template-rows, and already collapses via the footer rule above. */
+  body.acct-empty .layout{ grid-template-rows:52px minmax(0,1fr) auto !important; }
 </style>
 </head>
 <body>
@@ -1455,7 +1490,7 @@ function buildCard(ticker, d){
   const emph = emphasisAttrs(dir, conf);
 
   return `
-<div class="card state-${state}" id="card-${ticker}" data-ticker="${ticker}">
+<div class="card state-${state}${activeTicker===ticker?' active':''}" id="card-${ticker}" data-ticker="${ticker}" onclick="selectChart('${ticker}', event)">
   <div class="card-header">
     <div style="display:flex;align-items:center;gap:8px">
       ${slotCount ? `<span class="drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder ${ticker}">⠿</span>` : ''}<span class="card-ticker" role="button" tabindex="0" aria-label="Change symbol, currently ${ticker}" onclick="editSlot('${ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editSlot('${ticker}')}" title="Click to change symbol">${ticker}</span><span id="pnl-${ticker}">${pnlHtml}</span>
@@ -1530,38 +1565,46 @@ let lastCardOrder = null;
 // >0 → the chartSlots, seeded from the watchlist first-N but kept in user order.
 function visibleTickers(){
   const all = wlPrices.map(t=>t.ticker);
+  const cap = maxChartsForViewport();               // #2301: never render more than the viewport can show readably
   if(!slotCount){
     const order={open:0,watching:1,quiet:2};
-    return all.slice().sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})]);
+    return all.slice()
+      .sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})])
+      .slice(0, cap);                               // ⊞ All still respects the small-screen cap
   }
   // Drop any duplicates/blanks a previous wrap-fill may have persisted.
   chartSlots = chartSlots.filter((t,i)=> t && chartSlots.indexOf(t) === i);
+  const effective = Math.min(slotCount, cap);       // clamp the chosen count to the viewport
   // Seed slots from UNIQUE watchlist symbols. If there aren't enough distinct tickers to
   // fill the grid, leave the remaining cells empty instead of duplicating a symbol.
-  if(chartSlots.length < slotCount){
+  if(chartSlots.length < effective){
     const seed = all.filter(t=>!chartSlots.includes(t));
-    while(chartSlots.length < slotCount && seed.length) chartSlots.push(seed.shift());
+    while(chartSlots.length < effective && seed.length) chartSlots.push(seed.shift());
     persistSlots();
   }
-  return chartSlots.slice(0, slotCount);
+  return chartSlots.slice(0, effective);
 }
 function applyGridCols(){
   const grid = document.getElementById('cardsGrid');
   if(!grid) return;
   const main = document.querySelector('.main');
-  if(slotCount){
+  // Lay the grid out for the EFFECTIVE (viewport-capped) count so the rows match
+  // the cards actually rendered — otherwise a capped slot leaves an empty cell
+  // and a collapsed (22px) chart (#2301).
+  const shown = Math.min(slotCount, maxChartsForViewport());
+  if(shown){
     // Phones only have vertical room — a 2×1 / 2×2 tiling squeezes each chart into a
     // tiny sliver. Stack fixed-grid charts in a single column; the rows SPLIT the
     // available height (minmax(0,1fr)) so the charts adapt to the phone — exactly like
     // the desktop grid — instead of a fixed height that overflows and cuts on small
-    // screens. Mobile is capped at 1–2 charts, so each still gets real room.
+    // screens. Mobile is capped at 1 chart, so each still gets real room.
     const narrow = isNarrowTrader();
-    const cols = narrow ? 1 : (SLOT_COLS[slotCount] || Math.ceil(Math.sqrt(slotCount)));
-    const rows = Math.ceil(slotCount / cols);
+    const cols = narrow ? 1 : (SLOT_COLS[shown] || Math.ceil(Math.sqrt(shown)));
+    const rows = Math.ceil(shown / cols);
     grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
     grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(0,1fr))` : `repeat(${rows},1fr)`;
     grid.classList.add('grid-fixed');
-    grid.classList.toggle('grid-single', slotCount === 1);
+    grid.classList.toggle('grid-single', shown === 1);
     if(main) main.classList.add('main-fixed');
   } else {
     grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(340px,1fr))';
@@ -1590,11 +1633,13 @@ const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[
 function buildLayoutOptions(){
   const sel = document.getElementById('chartLayoutSelect');
   if(!sel) return;
-  const narrow = isNarrowTrader();
-  const opts = narrow ? LAYOUT_OPTS.filter(([v])=> v===1 || v===2) : LAYOUT_OPTS;
+  // Offer ⊞ All + every count that fits the current viewport cap (#2301). A
+  // phone gets [All, 1]; a small monitor [All, 1, 2]; a large desktop everything.
+  const cap = maxChartsForViewport();
+  const opts = LAYOUT_OPTS.filter(([v])=> v===0 || v<=cap);
   sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
-  if(narrow && !(slotCount===1 || slotCount===2)) setSlotCount(2);   // clamp to a mobile layout
-  else if(!opts.some(([v])=> v===slotCount)) setSlotCount(10);       // drop a retired layout (e.g. old 20-chart) to the max available
+  if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
+  else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
   sel.value = String(slotCount);
 }
 
@@ -1738,6 +1783,17 @@ function setOrderSymbol(ticker){
 // opened). It only opens on an explicit BUY/SELL tap. Desktop keeps the docked panel.
 function isNarrowTrader(){
   return typeof window.matchMedia === 'function' && window.matchMedia('(max-width:580px)').matches;
+}
+// Viewport-tiered cap on how many charts render at once (#2301). On mobile /
+// smaller monitors, tiling many charts squeezes each into an unreadable sliver —
+// so cap the total to behave like "auto" (fewer, bigger). Applies to fixed
+// counts AND ⊞ All; large desktops are uncapped.
+function maxChartsForViewport(){
+  const w = window.innerWidth || 1400;
+  if (w <= 580)  return 1;   // phone: one full-size chart
+  if (w <= 1024) return 2;   // small monitor / tablet
+  if (w <= 1440) return 4;   // mid desktop
+  return Infinity;           // large desktop: no cap
 }
 function openOrderPanel(){
   otUserClosed = false;
@@ -1999,6 +2055,36 @@ function focusTicker(t){
     if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
   }
   openFullscreenChart(t);
+}
+
+// Click a chart in the grid to FOCUS it (#focus-chart): mark that card selected
+// (a slightly darker grey) and point the rest of the screen — symbol details,
+// order panel, watchlist highlight — at it, WITHOUT going fullscreen (that's what
+// the watchlist click / expand control do). Desktop-oriented; harmless on mobile
+// (single chart, order panel stays closed via the isNarrowTrader guard).
+function selectChart(t, ev){
+  if(!t) return;
+  // Clicks that land on a control inside the card (buy/sell, change-symbol, drag
+  // handle) do their own thing — never focus or fullscreen from those.
+  if(ev && ev.target && ev.target.closest &&
+     ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
+  const card = document.getElementById('card-'+t);
+  // Second click on the ALREADY-focused chart → open it fullscreen.
+  if(card && activeTicker === t && card.classList.contains('active')){
+    openFullscreenChart(t);
+    return;
+  }
+  // First click → focus it in the grid (darker grey) + point the peripherals at it.
+  activeTicker = t;
+  try{ localStorage.setItem('trader.ticker', t); }catch(e){}
+  document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
+  if(card) card.classList.add('active');
+  renderWatchlist();                       // sidebar highlight follows the selection
+  renderSymbolInfo(t);                      // detail panel follows the selection
+  if(!document.body.classList.contains('guest')){
+    setOrderSymbol(t);                       // order ticket follows the selection
+    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
+  }
 }
 
 // ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
@@ -2772,6 +2858,11 @@ async function loadPortfolio(){
     renderSigma0Signals();
     renderTpSummary(a);                     // #1712
     renderPositionsTable(d.positions||[]);
+    // Empty logged-in account: no equity and no open positions → the balance +
+    // positions/orders/history panel carries no value, so collapse it and give the
+    // height back to the charts (#2301). Re-expands the moment there's equity or a
+    // position. Trade actions stay available; they just stop dominating.
+    document.body.classList.toggle('acct-empty', !(a.equity>0) && (d.positions||[]).length===0);
   }catch(e){}
 }
 
