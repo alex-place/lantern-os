@@ -271,7 +271,7 @@
     </a>
 
     <div class="auth-divider">or</div>
-    <a href="/" class="btn-ghost">Continue without an account</a>
+    <button type="button" id="continue-guest" class="btn-ghost">Continue without an account</button>
     </div><!-- /#signin-view -->
 
     <!-- ── Confirm-email view — replaces the whole sign-in view until the address
@@ -371,6 +371,18 @@
   function startOAuth(provider) {
     location.href = `/api/auth/${provider}/start?returnTo=${encodeURIComponent(safeReturnTo())}`;
   }
+
+  // "Continue without an account": record the choice (ln_guest cookie, 1yr) so the
+  // first-visit gate in auth-gate.js won't send them back here, then go where they came
+  // from. They stay a signed-OUT guest — this only remembers that they've decided.
+  (function wireGuest() {
+    const btn = document.getElementById("continue-guest");
+    if (!btn) return;
+    btn.addEventListener("click", () => {
+      document.cookie = "ln_guest=1; path=/; max-age=" + 60 * 60 * 24 * 365 + "; samesite=lax";
+      location.href = safeReturnTo();
+    });
+  })();
 
   function renderProviders(providers) {
     const wrap = document.getElementById("provider-buttons");
