@@ -1278,6 +1278,19 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
       priceLabel = 'live';
     }
   }
+  // No bar history for this symbol (a feed gap, or a symbol the bars feed doesn't
+  // cover) — but we DO have a price, so the "Waiting for price data" branch above
+  // didn't catch it. Draw a clean "no chart data" state instead of a half-empty
+  // chart (the guest-mode "broken charts" report: the default watchlist can carry
+  // symbols the bars feed hasn't populated). Only once bars have loaded at least
+  // once, so this never flashes over charts that simply haven't fetched yet.
+  if(barsLoadedOnce && !bars.length){
+    overlay.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
+      + 'height:100%;font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:var(--text2)'
+      + '">Chart data unavailable</div>';
+    if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
+    return;
+  }
   const pos   = d.position;
   const zones = (d.zones||[]).slice(0,12);
   const view  = getChartView(viewKey);
@@ -2680,6 +2693,10 @@ async function loadWatchlistPrices(){
 }
 
 let barsLoading = false;
+// True once loadBars() (or the warm cache) has populated barsData at least once,
+// so a chart with zero bars can be told apart from one that simply hasn't loaded
+// yet — the former shows a clean "no data" state, the latter stays blank silently.
+let barsLoadedOnce = false;
 // ── Chart bar cache: stale-while-revalidate ──────────────────────────────────
 // Charts paint instantly from the last fetch (localStorage), then loadBars()
 // replaces it with live data. Keyed per timeframe — purely a paint speed-up, the
@@ -2702,6 +2719,7 @@ function _restoreBarsCache(){
     const c = JSON.parse(localStorage.getItem('trader.bars.'+chartTimeframe)||'null');
     if(!c || !c.bars || (Date.now()-(c.ts||0)) > BARS_CACHE_TTL) return false;
     barsData = c.bars;
+    barsLoadedOnce = true;
     return true;
   }catch(e){ return false; }
 }
@@ -2720,6 +2738,7 @@ async function loadBars(){
     for(const ticker of Object.keys(bars)){
       barsData[ticker] = bars[ticker].bars || [];
     }
+    barsLoadedOnce = true;                   // bars have been fetched at least once
     _saveBarsCache();                       // persist for instant paint next time
     wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
     updateRegimeBadges();

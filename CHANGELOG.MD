@@ -1,3 +1,7 @@
+## [1.8.127] - 2026-07-09
+### Fixed
+- **Guest-mode charts: symbols with no bar history now show a clean "Chart data unavailable" state instead of a half-empty/broken chart (`stock-trader.html`).** A charted symbol that has a live price but zero OHLC bars (a feed gap, or a default-watchlist symbol the bars feed hasn't populated) fell through the `_renderLadder()` "Waiting for price data" guard — that only catches a *missing price* — and drew a broken, dataless chart. It now renders a clean centered "Chart data unavailable" placeholder and clears the canvas. Gated on a new `barsLoadedOnce` flag (set by `loadBars()` and the warm bars cache) so the message never flashes over charts that simply haven't fetched yet. Verified in a guest (logged-out) preview: normal charts render unchanged (no false empties), and a symbol forced to zero bars shows the clean state with the canvas cleared. Improves **Observe** (honest empty state over broken output).
+
 ## [1.8.126] - 2026-07-09
 
 ### Added
