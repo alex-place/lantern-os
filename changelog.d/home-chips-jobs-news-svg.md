@@ -1,1 +1,0 @@
-- **fix(home):** home suggestion chips are now Resume builder / Job search / Check the news with feather-style SVG icons (no emoji)

@@ -1,3 +1,0 @@
-### Convergence Oracle wired into every chat question
-
-- Every dream-chat question is now grounded in-process by the Convergence Oracle (Node port `apps/lantern-garage/lib/convergence-oracle.js` of `src/convergence/oracle.py` — the server cannot spawn python). Each question gets its time-banded observer slice: the KNOWNs (with sources) are injected as evidence, the UNKNOWNs as honest caveats, and the boundary pins (the singularity, the ultimate fate) are never bluffed. Prepended to the user prompt for every provider; fail-safe (any error → no grounding, chat unchanged). Broadened the oracle's keyword matching ("fate of the universe" → heat-death slice).

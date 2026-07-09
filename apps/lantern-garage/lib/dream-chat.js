@@ -9,7 +9,6 @@ const { extractFact, categorize, keywordsFromFact } = require("./life-memory");
 const { webSearchMcp, webSearch, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { safeExec } = require("./safe-exec");
 const { selectProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
-const { detectTaskType } = require("./task-detector");
 const { TokenAudit } = require("./token-audit");
 const serving = require("./serving-modes");
 const { formatGrounding: _oracleGrounding } = require("./convergence-oracle");
@@ -628,7 +627,9 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   // ── Keystone: Task-aware provider selection using performance leaderboard ──
   let primaryProviderHint = null;
   try {
-    let taskType = detectTaskType(text);
+    // No keyword task classifier — default bucket; measured PCSF ordering + the optional
+    // ROUTER_GATE (below) pick the provider. (detectTaskType removed with the keyword routers.)
+    let taskType = "default";
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────
     // Conversation-dynamics escalation: if this turn breaks genuinely new ground

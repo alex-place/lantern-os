@@ -1,2 +1,0 @@
-### Added
-- `scripts/eval_longmemeval_js.js` — scores the **live JS chat retriever** (`csf-memory.js::searchConversation`, keyword, last-1200-turn window) on LongMemEval, writing a separate `runs.jsonl` row so the product number isn't conflated with the Python MemoryEngine's. Measured on `longmemeval_s` (n=500, k=5): session-level recall@5 0.884 / MRR 0.80, 0 window-truncated. Flags `truncated_gold` when a haystack exceeds the window. `--semantic` attempts the nomic-embed rerank with graceful fallback when the embeddings service is down. (#2111) Strengthens **Remember**.

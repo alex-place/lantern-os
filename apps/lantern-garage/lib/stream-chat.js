@@ -32,7 +32,6 @@ const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoic
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
 const { resolveGrounding, formatGroundingForPrompt, generateXpDoorImagePrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
-const { route: converganceRoute, buildBehaviorPreamble } = require("./convergance-os/model-router");
 const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
 const { generateDoorSceneImage } = require("./image-generation");
 const { analyzeImage } = require("./vision");
@@ -47,11 +46,8 @@ const discoverFeeds = require("../routes/discover-feeds");
 let _lastGroundingTickMs = 0;
 const { generatePlan, generatePatch } = require("./self-edit-engine");
 const { selectProvider, selectKernelProvider, recordProviderSuccess: recordProviderSuccessRouter, recordProviderFailure: recordProviderFailureRouter } = require("./provider-router");
-const { detectTaskType } = require("./task-detector");
-const { classifyIntent } = require("./intent-router");
 const { classifyIntentOuro } = require("./ouro-router");
 const serving = require("./serving-modes");
-const { convergeMessage } = require("./convergence-adapter");
 const { keystoneRun, KEYSTONE_SYSTEM_PROMPT } = require("./keystone-runtime");
 const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing): 
@@ -589,10 +585,6 @@ async function handleStreamChat(req, url, res) {
         "X-Accel-Buffering": "no",
       });
 
-      const preamble = buildBehaviorPreamble(requestedAgent, message, history, {
-        surfaceMode,
-        threeDoorsPreamble: THREE_DOORS_PREAMBLE,
-      });
       const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
       const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
 
@@ -1473,16 +1465,9 @@ async function handleStreamChat(req, url, res) {
     attachmentBlock = `\n\nAttached files for this turn (the user uploaded these — treat them as the primary evidence; quote/summarize/act on them and cite the filename):\n${blocks}`;
   }
 
-  // ── Convergance OS routing (runs before systemPrompt so intent drives prompt + label) ──
-  let converganceDecision = null;
-  try {
-    converganceDecision = await converganceRoute(message, {
-      requestedProvider,
-      forceProfile: surfaceMode === "three-doors" ? "lantern-csf-dream" : undefined,
-    });
-  } catch (e) {
-    console.error("[Convergance] Router error (non-fatal):", e.message);
-  }
+  // Keyword intent classification was removed (no message-keyword → behavior mapping).
+  // Capabilities come from the model's native tool calls; task-type / provider routing
+  // comes from the model-based Ouro router (below) + measured PCSF ordering.
 
   // ── RP lives in the Three Doors game only. Dream Chat is always plain Keystone;
   // roleplay requests in chat get pointed at /three-doors-game.html instead.
@@ -1497,8 +1482,8 @@ async function handleStreamChat(req, url, res) {
   // In AUTO mode (no explicit model) the local Ouro model classifies the message
   // into a task type, which then drives isCodingIntent (→ cloud-first) and taskType
   // (→ provider selection). Ouro never writes the answer — it only triages. Any
-  // failure returns null → we fall back to the keyword detectTaskType/convergance
-  // signals below. Explicit model picks skip Ouro entirely (no added latency).
+  // failure returns null → taskType defaults to "default" (NO keyword fallback) and
+  // measured PCSF ordering picks the provider. Explicit model picks skip Ouro entirely.
   let ouroRoute = null;
   if (process.env.OURO_ROUTER === "1" && !requestedProvider && message) {
     try { ouroRoute = await classifyIntentOuro(message); } catch { ouroRoute = null; }
@@ -1507,12 +1492,12 @@ async function handleStreamChat(req, url, res) {
       : "[ouro-router] unavailable → keyword fallback");
   }
 
-  const isCodingIntent = ouroRoute ? ouroRoute.isCoding : CODING_INTENTS.has(converganceDecision?.intent);
-
-  const routeDecision = classifyIntent(message);
+  // Coding intent comes ONLY from the model-based Ouro router (never keyword). When Ouro
+  // is unavailable it stays false and provider order falls to the measured PCSF default.
+  const isCodingIntent = ouroRoute ? ouroRoute.isCoding : false;
 
   // ── Route label (sent in every done event; shown below each assistant bubble) ─
-  const converganceIntent = converganceDecision?.intent || routeIntent || routeDecision.intent || "general";
+  const converganceIntent = routeIntent || "general";
   // Leaderboard recording key. The PCSF leaderboard / chain ordering query by
   // detectTaskType ("coding"/"reasoning"/"default"...), but outcomes used to be
   // recorded under `intent` ("dream_chat"/"technical_debug"), so per-task ranking
@@ -1548,7 +1533,7 @@ async function handleStreamChat(req, url, res) {
   // cloud providers are unavailable) a correct, concrete answer to "what is this?" so new
   // users get an orientation instead of improvised dream-journal filler. The journal block
   // is explicitly labelled background so the model does not narrate it as if it were the app.
-  const ROUTER_PROMPT = `You are Keystone Σ₀ — the grounded reasoning and engineering agent for Keystone OS, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Web search: you have \`web_search\` and \`web_fetch\` tools — use them the way a competent assistant does, on your own initiative. Do NOT answer from memory when the answer depends on current, recent, or fast-changing information (news, prices, weather, sports scores, releases/versions, anything phrased as "latest / current / today / this week", or the present status/role of a person, company, or project), or when you are not confident your training knowledge is complete and up to date — search first. Prefer one or two targeted queries over guessing, and open the most relevant result with \`web_fetch\` when a snippet is not enough to answer well. Cite whatever you actually used as clickable Markdown links. If search is unavailable or you still cannot verify a claim, say so plainly and give your confidence — never invent a fact or a source. How you work: you are ONE assistant for every kind of task — everyday help, documents and writing, research, engineering — and you behave like a first-class AI assistant (Claude, ChatGPT, Gemini), not a scripted workflow. Deliver substance in your FIRST reply from whatever is already available (the message, attachments, history, memory, tool results). Never reply with a form and never demand a checklist of fields: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and refine after delivering something useful. Ask at most one clarifying question per reply, only when the answer genuinely changes the work, and put it after the useful content. Attachments are first-class input: they arrive pre-extracted as plain text (docx, pdf, xlsx, pptx and images are parsed for you), so NEVER claim you cannot open or read an attached file type — use its content, and never re-ask for information it already contains. Beyond web search you may have more real tools (document generation via \`generate_document\` — produces a real, submit-ready .docx by default and returns a download link you must repeat in your reply as a Markdown link; workspace files; market data via \`trader_market_status\`/\`trader_quote\`/\`trader_positions\`; repo and GitHub tools): use whatever is advertised to you on your own initiative, and treat a tool's input schema as what it ACCEPTS, not a list to collect from the user — e.g. "help with my resume" means give concrete feedback or a tailored draft from what you already know (attachments included), then offer \`generate_document\` to produce the file; every template field is optional, so never recite a field list to the user. Never fabricate user facts (experience, credentials, numbers): assumptions are fine when marked, fabrications never. Report only actions you actually performed: NEVER say you drafted, generated, saved, or updated a file unless the tool call ran in THIS turn and returned a result — either actually call the tool now, show the work inline in your reply, or say what you WILL do next; no imaginary artifacts. Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of Keystone OS. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
+  const ROUTER_PROMPT = `You are Keystone Σ₀ — the grounded reasoning and engineering agent for Keystone OS, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Web search: you have \`web_search\` and \`web_fetch\` tools — use them the way a competent assistant does, on your own initiative. Do NOT answer from memory when the answer depends on current, recent, or fast-changing information (news, prices, weather, sports scores, releases/versions, anything phrased as "latest / current / today / this week", or the present status/role of a person, company, or project), or when you are not confident your training knowledge is complete and up to date — search first. Prefer one or two targeted queries over guessing, and open the most relevant result with \`web_fetch\` when a snippet is not enough to answer well. Cite whatever you actually used as clickable Markdown links. If search is unavailable or you still cannot verify a claim, say so plainly and give your confidence — never invent a fact or a source. How you work: you are ONE assistant for every kind of task — everyday help, documents and writing, research, engineering — and you behave like a first-class AI assistant (Claude, ChatGPT, Gemini), not a scripted workflow. Deliver substance in your FIRST reply from whatever is already available (the message, attachments, history, memory, tool results). Never reply with a form and never demand a checklist of fields: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and refine after delivering something useful. Ask at most one clarifying question per reply, only when the answer genuinely changes the work, and put it after the useful content. Attachments are first-class input: they arrive pre-extracted as plain text (docx, pdf, xlsx, pptx and images are parsed for you), so NEVER claim you cannot open or read an attached file type — use its content, and never re-ask for information it already contains. Beyond web search you may have more real tools (document generation via \`generate_document\` — produces a real, submit-ready .docx by default and returns a download link you must repeat in your reply as a Markdown link; image generation via \`generate_image\` — when the user asks you to draw/paint/sketch/illustrate or make a picture of something, call it and include the returned \`![...](url)\` Markdown in your reply so the image renders inline; workspace files; market data via \`trader_market_status\`/\`trader_quote\`/\`trader_positions\`; repo and GitHub tools): use whatever is advertised to you on your own initiative, and treat a tool's input schema as what it ACCEPTS, not a list to collect from the user — e.g. "help with my resume" means give concrete feedback or a tailored draft from what you already know (attachments included), then offer \`generate_document\` to produce the file; every template field is optional, so never recite a field list to the user. Never fabricate user facts (experience, credentials, numbers): assumptions are fine when marked, fabrications never. Report only actions you actually performed: NEVER say you drafted, generated, saved, or updated a file unless the tool call ran in THIS turn and returned a result — either actually call the tool now, show the work inline in your reply, or say what you WILL do next; no imaginary artifacts. Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of Keystone OS. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
 
   // Grounded identity (#1242). The underlying foundation model (Gemini/Claude/
   // OpenAI/xAI/Ouro) must never leak its vendor identity through the Keystone
@@ -1617,8 +1602,8 @@ async function handleStreamChat(req, url, res) {
       timestamp: new Date().toISOString(),
       surface: surfaceMode,
       intent: converganceIntent,
-      convergenceId: routeDecision.convergence_id || null,
-      requiresConvergence: routeDecision.requires_convergence || false,
+      convergenceId: null,
+      requiresConvergence: false,
     };
     // Surface the capability-gated local-model swap (lib/local-model-registry.js):
     // when a LOCAL model answered, tell the UI which model LED and WHY (VRAM-gated
@@ -1789,7 +1774,7 @@ async function handleStreamChat(req, url, res) {
     agentName: agent.name || "Keystone",
     intent: converganceIntent,
     surface: surfaceMode,
-    requiresConvergence: routeDecision.requires_convergence || false,
+    requiresConvergence: false,
     label: routeLabel,
   });
 
@@ -1808,8 +1793,8 @@ async function handleStreamChat(req, url, res) {
       claimBoundary: "live",
       surface: surfaceMode,
       intent: converganceIntent,
-      convergenceId: routeDecision.convergence_id || null,
-      requiresConvergence: routeDecision.requires_convergence || false,
+      convergenceId: null,
+      requiresConvergence: false,
     };
     return signature;
   };
@@ -1830,7 +1815,7 @@ async function handleStreamChat(req, url, res) {
           outputLength: text?.length || 0,
           success,
         },
-        convergenceId: routeDecision.convergence_id || null,
+        convergenceId: null,
       };
       const { appendJsonlQueued } = require("./file-queue");
       const convergencePath = path.resolve(repoRoot, "data/convergence/chat-responses.jsonl");
@@ -1988,44 +1973,11 @@ async function handleStreamChat(req, url, res) {
   // catch cascades to the next brain pick — mirroring the local/ollama path.
   const isEmptyReply = (s) => !String(s || "").replace(/\s+/g, "").length;
 
-  // converganceDecision already computed above (before systemPrompt)
-
-  // ── Dream persona deleted (2026-06-26): chat NEVER routes through the convergence/persona engine ──
-  // classifyIntent flags coding (and other intents) as requires_convergence →
-  // convergeMessage() ran the Python convergence engine with a persona, which served
-  // chat in a dream voice ("…carries a wish. What are you protecting?") and reported
-  // provider:"unknown". All chat now goes to the direct provider dispatch below with the
-  // technical ROUTER_PROMPT (cloud coders lead; local is the offline backstop). This
-  // supersedes the narrower coding-only bypass from PR #1265. Re-enable with CONVERGENCE_CHAT=1.
-  const _useConvergenceChat = process.env.CONVERGENCE_CHAT === "1";
-  if (_useConvergenceChat && routeDecision.requires_convergence && !isKeystoneDebug && surfaceMode !== "three-doors") {
-    const convResult = await convergeMessage(message, routeDecision.agent, requestedProvider || null, {
-      timeoutMs: Number(process.env.CONVERGENCE_ROUTE_TIMEOUT_MS || 20000),
-    });
-    if (convResult.reply && !convResult.error) {
-      await logConversation({
-        recordedAt: new Date().toISOString(),
-        surface: "dream-chat-stream",
-        role: "lantern",
-        text: String(convResult.reply).slice(0, maxConversationTextLength),
-        meta: { provider: "convergence", agent: convResult.agent || routeDecision.agent },
-      }).catch(() => {});
-      sendToken(convResult.reply);
-      sendDone("convergence", {
-        agent: convResult.agent || routeDecision.agent,
-        online: true,
-        route: routeDecision,
-      });
-      return;
-    }
-    // Convergence unavailable or timed out — fall through to direct LLM providers.
-    // Surface WHY (don't swallow it) so the failure is diagnosable — Σ₀ #919/#941.
-    console.error(
-      `[Convergance] unavailable (non-fatal): ${convResult.error || "no reply"}` +
-      (convResult.reply ? ` — ${String(convResult.reply).slice(0, 200)}` : "")
-    );
-    sendToken("(Convergence unavailable — answering directly)\n\n");
-  }
+  // ── No convergence/persona divert ───────────────────────────────────────────
+  // The keyword `classifyIntent` → `convergeMessage` (Python persona engine) divert was
+  // removed. Every chat turn goes straight to the direct provider dispatch below with the
+  // technical ROUTER_PROMPT (cloud coders lead; local is the offline backstop). The model
+  // decides capabilities via native tool calls — nothing is routed on message keywords.
 
   // ── Keystone: Task-aware provider selection using performance leaderboard ──
   let primaryProviderHint = null;
@@ -2037,10 +1989,10 @@ async function handleStreamChat(req, url, res) {
     // leads with ollama, which is always "healthy" — so cloud was never reached for
     // any message on the main chat surface. Use the real per-message intent instead:
     // only the dream/journal-flavored intent gets the creative (local-first) chain.
-    // Ouro router (Auto mode) owns taskType when it classified; else the dynamic
-    // desk agent's task lens (summarize/plan/research); else keyword detect.
-    let taskType = ouroRoute ? ouroRoute.taskType
-      : (agent && agent.taskType) || detectTaskType(message, { isCreative: converganceDecision?.intent === "dream_chat" && isRpMode });
+    // Ouro router (Auto mode, model-based) owns taskType when it classified; otherwise
+    // it defaults to "default" — NO keyword classifier. Measured PCSF ordering then picks
+    // the provider from the "default" candidate chain.
+    let taskType = ouroRoute ? ouroRoute.taskType : "default";
     leaderboardTaskType = taskType; // align leaderboard recording with routing taxonomy (#1236)
 
     // ── Router gate (opt-in via ROUTER_GATE=1) ────────────────────────────────
@@ -2164,7 +2116,9 @@ async function handleStreamChat(req, url, res) {
   // leaderboard (PCSF-preferred): the best-performing local model for this task
   // is tried first, and the continually-trained model (OLLAMA_MODEL) is always
   // a candidate for work. Falls back to the static chain when there's no signal.
-  const intent = converganceDecision?.intent || "default";
+  // Local model-chain bucket: model-based Ouro taskType when available, else "default"
+  // (never a keyword classifier). Leaderboard/capability ordering does the rest.
+  const intent = (ouroRoute && ouroRoute.taskType) || "default";
   const { orderChainByLeaderboard, recordModelOutcome } = require("./model-leaderboard");
   let staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
   // Keystone chat (non-RP) is a technical/tool assistant — never fall back to the

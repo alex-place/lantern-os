@@ -1,1 +1,0 @@
-Dream-chat now uses the shared site header + footer (site-chrome.js). New hero: "unisona.ai — Your local AI that remembers you." with three quick-start choices (Summarize notes / Plan my week / Research a topic). The sidebar's bottom-left buttons (theme, skin, narrate, profile) moved to the top-right nav actions.
