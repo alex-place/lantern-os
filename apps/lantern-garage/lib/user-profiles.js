@@ -7,6 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { higherRole } = require("./role-hierarchy");
 
 // Data directory for user profiles
 const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
@@ -125,7 +126,7 @@ function updateProfile(userId, updates) {
 function setUserRole(userId, newRole) {
   // deep_dreamer is the $20 web tier (renamed from "founder", #698); "founder"
   // stays accepted as a legacy alias so older callers/profiles don't break.
-  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "admin"];
+  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "tech_support", "admin"];
   if (!validRoles.includes(newRole)) {
     throw new Error(`Invalid role: ${newRole}`);
   }
@@ -495,7 +496,14 @@ function getOrCreateFromIdentity(provider, u, role) {
   // 1. Same identity logging in again.
   const existing = getProfileByIdentity(provider, providerId);
   if (existing) {
-    const updates = { role, tier: u.tier != null ? u.tier : existing.tier };
+    // Role resolution is MONOTONIC across a profile's linked sign-in methods: a
+    // login never downgrades the role already earned on this account. Without
+    // this, signing in with a guest-mapping provider (Google/Discord both map to
+    // "guest") clobbered a Patreon-earned tier back down to Free on every login.
+    // Tier authority (Patreon) still RAISES the role via `role`; explicit
+    // downgrades are an admin action (setUserRole), not a silent login side effect.
+    const nextRole = higherRole(existing.role || "guest", role || "guest");
+    const updates = { role: nextRole, tier: u.tier != null ? u.tier : existing.tier };
     if (u.name && !existing.name) updates.name = u.name;
     if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
     if (emailVerified && u.email) {

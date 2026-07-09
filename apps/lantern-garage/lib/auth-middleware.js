@@ -7,7 +7,7 @@
 const { getProfile } = require("./user-profiles");
 const { isFlagEnabledOr } = require("./feature-flags");
 const { getSessionUser } = require("./session-identity");
-const { roleLevel } = require("./role-hierarchy");
+const { roleLevel, isStaffRole } = require("./role-hierarchy");
 
 /**
  * Is the Patreon login gate active? Controlled by the admin-toggleable
@@ -248,6 +248,42 @@ function requireEntitlement(req, res, key) {
 }
 
 /**
+ * Non-writing check: is this request from a staff member (admin OR tech_support)?
+ * True for the local bypass or a session whose role is in STAFF_ROLES. Gates the
+ * account-support surface (accounts.html + /api/accounts/*). Membership is EXACT —
+ * a paid tier at the same hierarchy level as tech_support does not qualify. Never
+ * writes to the response.
+ */
+function isStaff(req) {
+  if (isLocalBypass(req)) return true;
+  return isStaffRole(getSessionUser(req)?.role);
+}
+
+/**
+ * Require a staff member (admin or tech_support). Returns true if allowed; otherwise
+ * sends a 302 to /auth.html when unauthenticated, or a 403 when signed in without a
+ * staff role, and returns false. Mirrors requireRole's response contract.
+ */
+function requireStaff(req, res) {
+  if (isLocalBypass(req)) return true;
+  const session = getSessionUser(req);
+  if (!session?.id) {
+    if (!patreonAuthEnabled()) {
+      res.writeHead(403, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Staff access required." }));
+      return false;
+    }
+    res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(req.url || "/accounts.html") });
+    res.end();
+    return false;
+  }
+  if (isStaffRole(session.role)) return true;
+  res.writeHead(403, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "Staff access required", required: "admin or tech_support", current: session.role }));
+  return false;
+}
+
+/**
  * Non-writing check: does this request belong to an admin?
  * True for the local bypass (dev port 4178 / LANTERN_LOCAL_ADMIN on loopback)
  * or a session whose role is "admin". Never touches the response — use this
@@ -272,6 +308,8 @@ function attachProfile(req) {
 module.exports = {
   requireAuth,
   requireRole,
+  requireStaff,
+  isStaff,
   hasEntitlement,
   requireEntitlement,
   isAdmin,
