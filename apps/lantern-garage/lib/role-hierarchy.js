@@ -9,6 +9,10 @@
  * `deep_dreamer` is the $20 web tier; `founder` is kept as a legacy alias at the
  * same level so sessions/profiles persisted before the #698 rename still resolve.
  *
+ * `tech_support` is an internal operator role. It can access account-repair tools
+ * but remains below `admin`, so support users do not automatically gain every
+ * admin-only control surface.
+ *
  * NOTE on `guest` (#1879): the `guest` level (0) is the *authenticated free tier*
  * — a signed-in user on no paid plan — NOT an anonymous visitor. "Can this page
  * load without a login?" is a separate question answered upstream by whether the
@@ -23,6 +27,7 @@ const ROLE_HIERARCHY = Object.freeze({
   supporter: 1,
   deep_dreamer: 2,
   founder: 2, // legacy alias for deep_dreamer (#698)
+  tech_support: 2.5,
   admin: 3,
 });
 
@@ -36,4 +41,9 @@ function roleMeets(role, required) {
   return roleLevel(role) >= roleLevel(required);
 }
 
-module.exports = { ROLE_HIERARCHY, roleLevel, roleMeets };
+/** Return whichever role is higher in the hierarchy. Unknown roles fall to guest. */
+function higherRole(a, b) {
+  return roleLevel(a) >= roleLevel(b) ? (a || "guest") : (b || "guest");
+}
+
+module.exports = { ROLE_HIERARCHY, roleLevel, roleMeets, higherRole };
