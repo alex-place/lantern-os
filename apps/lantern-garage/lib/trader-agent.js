@@ -49,16 +49,22 @@ class TraderAgent {
   }
 
   _loadWatchlist() {
-    try {
-      const raw = fs.readFileSync(this.watchlistPath, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.tickers) && parsed.tickers.length > 0) {
-        return parsed.tickers;
-      }
-    } catch {
-      // file missing or invalid — fall back to env/default
-    }
-    return this._parseWatchlist(process.env.TRADER_WATCHLIST);
+    const readList = (p) => {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(p, 'utf8'));
+        if (Array.isArray(parsed.tickers) && parsed.tickers.length > 0) return parsed.tickers;
+      } catch { /* missing/invalid */ }
+      return null;
+    };
+    // The LIVE watchlist is untracked runtime state (data/.../watchlist.json) so a
+    // deploy / `git reset --hard` can't wipe the user's added tickers. Read it first.
+    const live = readList(this.watchlistPath);
+    if (live) return live;
+    // Fresh checkout with no live file yet → seed from the tracked default, then the
+    // env override, then the hardcoded starter list. The first add/remove writes the
+    // live file, and from then on user edits persist across deploys.
+    const seed = readList(path.join(path.dirname(this.watchlistPath), 'watchlist.seed.json'));
+    return seed || this._parseWatchlist(process.env.TRADER_WATCHLIST);
   }
 
   _saveWatchlist() {
