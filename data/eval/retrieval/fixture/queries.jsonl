@@ -1,0 +1,15 @@
+{"query": "what port does the dev server listen on", "gold_id": "conv-01"}
+{"query": "quarterly earnings call semiconductor guidance", "gold_id": "conv-02"}
+{"query": "reciprocal rank fusion needs no score normalization", "gold_id": "arxiv-01"}
+{"query": "cross-encoder reranker precision over bi-encoder cosine", "gold_id": "arxiv-02"}
+{"query": "static token embeddings run faster on CPU", "gold_id": "arxiv-03"}
+{"query": "BM25 wins on rare identifiers tickers and error codes", "gold_id": "arxiv-05"}
+{"query": "why did we buy KXHIGHNY fade the New York high", "gold_id": "trade-01"}
+{"query": "tightband-suggest KNYC contract confidence", "gold_id": "trade-02"}
+{"query": "National Weather Service revised the New York City high", "gold_id": "trade-03"}
+{"query": "the convergence loop stages Observe Remember Reason", "gold_id": "misc-01"}
+{"query": "which network socket number is used for the in-progress build", "gold_id": "conv-01"}
+{"query": "how quickly can I book my trip to Portugal for the family celebration", "gold_id": "conv-03"}
+{"query": "the boss wants short replies about results not code internals", "gold_id": "life-01"}
+{"query": "per-token vectors beat squashing a passage into a single point", "gold_id": "arxiv-04"}
+{"query": "the dependable temperature-ceiling bet on the NYC weather station", "gold_id": "trade-05"}

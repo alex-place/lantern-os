@@ -8,10 +8,10 @@
  * where `id` is the local PROFILE id (stable across linked providers), NOT any
  * one provider's id.
  *
- * Backward compatibility: the Patreon path historically wrote `req.session.patreon`
- * and several tests construct `{ session: { patreon: {...} } }` directly. We fall
- * back to it so nothing breaks during the migration window. Remove the fallback one
- * release after rollout (see ADR-0016 follow-ups).
+ * The legacy `req.session.patreon` compat shim (read fallback + write mirror) was
+ * removed after the ADR-0016 rollout window: every login now writes `session.user`
+ * and every gate reads it, so nothing else references the Patreon-shaped session
+ * (ADR-0016 follow-up #1947 item 2).
  */
 
 /**
@@ -21,18 +21,6 @@
 function getSessionUser(req) {
   const s = req && req.session;
   if (s && s.user && s.user.id) return s.user;
-  // Compat: legacy Patreon-shaped session.
-  if (s && s.patreon && s.patreon.id) {
-    const p = s.patreon;
-    return {
-      id: p.id,
-      name: p.name,
-      email: p.email,
-      role: p.role,
-      tier: p.tier,
-      provider: "patreon",
-    };
-  }
   // Test-auth fallback (OFF unless LANTERN_TEST_AUTH_TOKEN is set, direct hits only).
   // This is the ONE seam the whole test-auth mechanism plugs into: every gate reads
   // identity through getSessionUser, so honoring the emulated role here makes
@@ -70,24 +58,12 @@ function getSessionRole(req) {
 }
 
 /**
- * Write the canonical identity onto a session. Also mirrors the legacy
- * `session.patreon` shape when the provider is patreon, so any not-yet-migrated
- * reader (or the Discord-link path that still keys on a Patreon id) keeps working.
+ * Write the canonical identity onto a session. Provider-agnostic: every provider
+ * (patreon / google / discord / local) writes the same `session.user` shape.
  */
 function setSessionUser(req, user) {
   req.session.user = user;
   req.session.authenticated = true;
-  if (user && user.provider === "patreon") {
-    req.session.patreon = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      tier: user.tier,
-      role: user.role,
-      token: user.token,
-      expiresAt: user.expiresAt,
-    };
-  }
   // #2041: an authenticated session start is a daily-active retention signal.
   // Recorded at most once per actor per UTC day. Fire-and-forget + non-fatal —
   // telemetry must never break login.

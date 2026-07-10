@@ -372,7 +372,7 @@ When committing to an agent branch, update AGENTS.md with:
 How this agent operates...
 
 ### Constraints
-- Max 1 open PR per lane
+- No open-PR cap (lanes may keep many concurrent PRs)
 - Focus area: [describe]
 ```
 
@@ -430,32 +430,31 @@ their branches with their own name gets their own concurrent lane:
 - `alex/…`, `kriskin/…`, `mookman11/…` are the current human lanes — and **any new
   `<name>/…` prefix becomes a new lane automatically** (no code change, no roster edit).
   This supports more than one and more than three humans working at once.
-- Each lane may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default **3**),
-  so one contributor can run several concurrent sessions in parallel: `alex/` can have a
-  few PRs open while `kriskin/` and `mookman11/` each have their own — they never block
-  each other. Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore strict one-PR-per-lane focus.
+- **There is no open-PR cap.** A lane may keep any number of concurrent open PRs, so a
+  contributor can run as many parallel sessions as they like — lanes never block each
+  other. (The former `WORKSTREAM_MAX_OPEN_PRS` cap and the CI "Single-workstream check"
+  gate were removed; the git hooks no longer count open PRs.)
 - A branch with **no `/`** (ad-hoc, unprefixed) falls back to a single shared `human`
   lane, so stray branches can't spawn unlimited free lanes.
 
-### Assigned-issue merge gate (Verify → Converge)
-A PR that **closes a human-assigned GitHub issue** cannot be auto-merged into `master`
-until the work is grounded with **both**:
-1. a **convergence record** (`!convergance` — hypothesis + evidence + confidence), and
-2. **autowork verification** (`!work` / `!autowork` ran the loop end-to-end).
+### Auto-merge (green + review-APPROVE)
+The single merger (`apps/lantern-garage/lib/pr-watcher.js`) auto-merges a PR once it is
+**green** (all CI checks pass, minus deploy-preview/base-red self-heal), **conflict-free**,
+**not a draft**, and its **fleet auto-review returned `VERDICT: APPROVE`** — except PRs
+touching a **protected path** (auth / money / `.github/workflows/` / secrets / migrations),
+which still need a human. One merge per tick. Auto-merge is ON by default on the fleet host
+(`PR_WATCHER_ENABLED=1`); `PR_WATCHER_AUTOMERGE=0` makes it review-only.
 
-The single merger (`apps/lantern-garage/lib/pr-watcher.js`) enforces this: it reads the
-PR's `convergance-record` + `autowork-verified` labels **or** the fleet host's autowork
-run log (`data/autowork-runs/*.jsonl`). A successful autowork run satisfies both and
-applies the labels automatically. Until then the PR is held with reason
-`needs_convergance_record:#N` / `needs_autowork_verification:#N`. Unassigned issues and
-PRs that close no issue are unaffected. Issues are routed to a lane + assignee via
-`/refinement`.
+**Assigned-issue convergence gate — now OFF by default.** The former requirement that a PR
+closing a human-assigned issue carry a `convergance-record` + `autowork-verified` signal
+before merging is **no longer applied** (removed so green PRs land). The logic is retained
+and re-enable-able per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
 
 ### Rules
-- **Commits and pushes to a branch that already has an open PR are always allowed.**
-- **No new branches while your lane has an open PR.** The pre-push hook enforces this via GitHub CLI.
+- **Commits and pushes to any lane branch are always allowed.**
+- **No open-PR cap** — a lane may open as many concurrent PRs as it wants (cap removed).
 - **Exempt branches:** `gh-pages` (static site deploy) and `master` are long-lived branches and never count as a workstream.
-- **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...`
+- **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...` (skips the slop / secret / change-record gates)
 
 **Note:** Multiple agents running concurrently via `.claude/agent-slots.json` is a core design feature, not a workstream violation. The rule applies to Git branches / PRs, not to active agent slots.
 

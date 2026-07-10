@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unisona native desktop shell.
+    A real Windows app window (own process, taskbar entry, title bar, no browser)
+    that hosts the local cockpit via WebView2. It boots the ONE Convergence Core by
+    re-using the launcher in embed mode (ADR-0014 G1) and points the WebView2 at the
+    tokened loopback endpoint the launcher hands back on stdout.
+    Renders with the OS WebView2 runtime (Edge engine), NOT the Edge browser.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Unisona.Shell</RootNamespace>
+    <AssemblyName>Unisona</AssemblyName>
+    <Product>Unisona</Product>
+    <AssemblyTitle>Unisona — local reasoning cockpit</AssemblyTitle>
+    <Company>Unisona</Company>
+    <Version>0.2.0</Version>
+    <ApplicationIcon>..\unisona.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Self-contained single-file publish targets; RID set on the publish command. -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Floating patch so restore always resolves the latest shipped 1.0.x WebView2. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
+  </ItemGroup>
+
+</Project>

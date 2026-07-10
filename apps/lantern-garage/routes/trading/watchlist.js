@@ -7,17 +7,16 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+const watchlistStore = require('../../lib/watchlist-store');
+const { getEffectiveUserId } = require('../../lib/session-identity');
+
 module.exports = async function watchlistRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent } = ctx;
+  const uid = getEffectiveUserId(req); // per-user watchlist (the signed-in user's own list)
 
-
-  // GET /api/trading/watchlist
+  // GET /api/trading/watchlist — this user's own list
   if (url.pathname === '/api/trading/watchlist' && req.method === 'GET') {
-    if (!traderAgent) {
-      sendJson(res, { watchlist: [] }, 503);
-      return true;
-    }
-    sendJson(res, { watchlist: traderAgent.watchlist }, 200);
+    sendJson(res, { watchlist: watchlistStore.getWatchlist(uid) }, 200);
     return true;
   }
 
@@ -43,7 +42,8 @@ module.exports = async function watchlistRoutes(req, res, url, ctx) {
         sendJson(res, { error: `"${sym}" isn't a tradable symbol${v.reason ? ' — ' + v.reason : ''}`, valid: false }, 400);
         return true;
       }
-      const watchlist = traderAgent.addTicker((v && v.symbol) || sym);
+      const watchlist = watchlistStore.addTicker(uid, (v && v.symbol) || sym);
+      if (traderAgent) traderAgent.clearCache();
       sendJson(res, { watchlist, resolved: v || null }, 200);
     } catch (error) {
       sendJson(res, { error: error.message }, 400);
@@ -55,11 +55,8 @@ module.exports = async function watchlistRoutes(req, res, url, ctx) {
   if (req.method === 'DELETE') {
     const watchlistMatch = url.pathname.match(/^\/api\/trading\/watchlist\/([A-Za-z]{1,10})$/);
     if (watchlistMatch) {
-      if (!traderAgent) {
-        sendJson(res, { watchlist: [], error: 'TraderAgent not initialized' }, 503);
-        return true;
-      }
-      const watchlist = traderAgent.removeTicker(watchlistMatch[1]);
+      const watchlist = watchlistStore.removeTicker(uid, watchlistMatch[1]);
+      if (traderAgent) traderAgent.clearCache();
       sendJson(res, { watchlist }, 200);
       return true;
     }

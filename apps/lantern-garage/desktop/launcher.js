@@ -89,7 +89,12 @@ const appProfileDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unison
 const args = parseArgs(process.argv.slice(2));
 const host = "127.0.0.1"; // loopback only — never exposed
 const landingPage = args.page || process.env.UNISONA_LANDING_PAGE || "/";
-const openBrowser = !args["no-open"] && process.env.UNISONA_NO_OPEN !== "1";
+// Embedded mode: a native host shell (the .NET WebView2 window) owns the UI. We boot
+// the Core and hand the host the tokened endpoint on stdout instead of opening Edge.
+// See apps/lantern-garage/desktop/shell/ (ADR-0014: the shell replaces ONLY the window;
+// the Core boot / hardening / token / auto-update all stay here — one Core, one brain).
+const embed = args.embed || process.env.UNISONA_EMBED === "1";
+const openBrowser = !embed && !args["no-open"] && process.env.UNISONA_NO_OPEN !== "1";
 const readyTimeoutMs = Number(process.env.UNISONA_READY_TIMEOUT_MS || 45_000);
 
 // Auto-update (packaged app only): keep the on-disk Core code in sync with GitHub
@@ -169,7 +174,24 @@ let coreReady = false;
   // EventSource, assets). Without this, UNISONA_LOCAL_TOKEN would lock the UI out of
   // all operator actions. The token rotates each launch; the durable carrier is the cookie.
   const openUrl = `${url}${url.includes("?") ? "&" : "?"}__lt=${localToken}`;
-  if (openBrowser) {
+  if (embed) {
+    // A native host shell (the .NET WebView2 window) owns the UI. Hand it the tokened
+    // endpoint two ways and do NOT open Edge:
+    //   1. stdout — works in dev (`node launcher.js`, console subsystem).
+    //   2. a file — the packaged Core exe is GUI-subsystem (no console), so a captured
+    //      stdout pipe may not be wired; the file is the reliable channel. The host
+    //      deletes it before spawn and polls for a fresh write (matched by pid).
+    // The served page's heartbeat still drives Core shutdown when the host window closes.
+    try { process.stdout.write(`UNISONA_READY ${openUrl}\n`); } catch { /* host gone */ }
+    try {
+      const epDir = path.join(process.env.LOCALAPPDATA || os.tmpdir(), "unisona");
+      fs.mkdirSync(epDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(epDir, "endpoint.json"),
+        JSON.stringify({ url: openUrl, pid: process.pid, port, ts: Date.now() })
+      );
+    } catch (e) { console.warn(`[unisona] endpoint file write failed: ${e.message}`); }
+  } else if (openBrowser) {
     const appProc = openAppWindow(openUrl);
     if (appProc) {
       // The window's lifecycle is tracked by the Core, not by this spawned process
@@ -383,6 +405,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--no-open") out["no-open"] = true;
+    else if (a === "--embed") out.embed = true;
     else if (a === "--port") out.port = argv[++i];
     else if (a === "--page") out.page = argv[++i];
     else if (a.startsWith("--port=")) out.port = a.slice(7);

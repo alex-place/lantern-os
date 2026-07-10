@@ -139,6 +139,7 @@ jobs:
         run: |
           node tests/test_session_secret.js
           node tests/test_auth_tokens_failclosed.js
+          node tests/test_local_auth_flow.js
 
       - name: Start server
         run: node apps/lantern-garage/server.js &

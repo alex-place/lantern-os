@@ -90,6 +90,7 @@ async function _autoscanTick() {
       // Runs sequentially; every order still passes the per-account hard guard, and
       // `extended` routes pre/post-market fills through LMT + outsideRTH orders.
       const ibkrCreds = require('../lib/ibkr-credentials');
+      const watchlistStore = require('../lib/watchlist-store');
       const users = process.env.TRADER_AUTO_USER ? [process.env.TRADER_AUTO_USER] : ibkrCreds.listUsers();
       const _seenAccts = new Set();
       for (const uid of users) {
@@ -97,7 +98,12 @@ async function _autoscanTick() {
         if (!acct || !acct.account_id) continue;                 // not connected/authenticated
         if (_seenAccts.has(acct.account_id)) continue;            // alias → same account, skip
         _seenAccts.add(acct.account_id);
-        const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: uid, extended: !marketHours });
+        // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
+        // so entries/signal-exits only touch names they curated. Held-position exits
+        // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
+        const wl = new Set(watchlistStore.getWatchlist(uid).map((s) => String(s).toUpperCase()));
+        const userScan = { ...scan, signals: (scan.signals || []).filter((s) => wl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
+        const at = await runAutoTrade(userScan, { bridge: _autoBridge, userId: uid, extended: !marketHours });
         for (const e of (at.executed || [])) {
           console.log(`[AutoTrader:${acct.account_id}] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
         }
