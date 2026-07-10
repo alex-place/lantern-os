@@ -182,7 +182,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       const uid = getEffectiveUserId(req);
       const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
       if (ibkrAccount) {
-        const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        // IBKR keeps just-closed names in the portfolio snapshot as qty:0 rows; they're
+        // not positions anymore (a $0 "Long" line the user reads as clutter/loss). Drop them.
+        const ibkrPositions = (await bridge.getIBKRPositions(uid).catch(() => []))
+          .filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
         // Reconcile the header's Unrealized P&L with the positions the user actually
         // sees. `ibkrAccount.unrealized` comes from IBKR's /pnl/partitioned `upl`, a
         // real-time subscription that lags on CPAPI (it returned a stale, rounded
