@@ -40,6 +40,25 @@ catalog, verify the local source of truth:
 - Rotate any secret that appears in Git history, logs, screenshots, or public
   surfaces.
 
+## Auth Bypass — IP bypass removed, token-gated test-auth (2026-07-09)
+
+**Status:** ✅ CHANGED
+
+The IP-based local-admin bypass (`isLocalBypass`: loopback socket / dev port 4178 /
+`LANTERN_LOCAL_ADMIN`) was **removed**. A socket address is not proof of the owner
+behind a reverse proxy/tunnel, and it silently made `localhost` look logged-in as
+admin. Dev/test access now uses an explicit, token-gated path
+([`lib/test-auth.js`](apps/lantern-garage/lib/test-auth.js)):
+
+- Inert unless `LANTERN_TEST_AUTH_TOKEN` is set (never set in production).
+- Refused on any proxied/tunnelled request even when the token matches — it can never
+  be used from the public internet.
+- One seeded test account, per-request emulated role via `X-Test-Auth` (+ `X-Test-Role`).
+
+See [docs/TEST-AUTH.md](docs/TEST-AUTH.md). Regression coverage:
+`tests/test_admin_local_bypass.js`, `tests/test_patreon_auth_flag.js`, and the
+`npm run test:auth` Playwright suite.
+
 ## Critical Security Fixes (2026-06-08)
 
 ### File Serving Path Traversal (routes/files.js)

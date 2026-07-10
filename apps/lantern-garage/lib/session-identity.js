@@ -20,10 +20,9 @@
  */
 function getSessionUser(req) {
   const s = req && req.session;
-  if (!s) return null;
-  if (s.user && s.user.id) return s.user;
+  if (s && s.user && s.user.id) return s.user;
   // Compat: legacy Patreon-shaped session.
-  if (s.patreon && s.patreon.id) {
+  if (s && s.patreon && s.patreon.id) {
     const p = s.patreon;
     return {
       id: p.id,
@@ -34,6 +33,16 @@ function getSessionUser(req) {
       provider: "patreon",
     };
   }
+  // Test-auth fallback (OFF unless LANTERN_TEST_AUTH_TOKEN is set, direct hits only).
+  // This is the ONE seam the whole test-auth mechanism plugs into: every gate reads
+  // identity through getSessionUser, so honoring the emulated role here makes
+  // requireAuth / requireRole / hasEntitlement / isAdmin / getSessionInfo all work
+  // without a per-gate bypass. Lazy-require avoids a load-order cycle.
+  try {
+    const { resolveTestUser } = require("./test-auth");
+    const t = resolveTestUser(req);
+    if (t) return t;
+  } catch (_) { /* test-auth unavailable → no fallback */ }
   return null;
 }
 
@@ -44,20 +53,14 @@ function getSessionUserId(req) {
 }
 
 /**
- * The user id to key per-user state (IBKR creds, etc.) on. Normally the session
- * profile id; on the owner's own machine (local-admin bypass, which is OFF for any
- * proxied/production request) it resolves to a stable "local-owner" so the operator
- * can connect + test on the dev port without a full login. Never "local-owner" on
- * the deployed multi-user site. Lazy-require avoids a circular dep with auth-middleware.
+ * The user id to key per-user state (IBKR creds, etc.) on — the session profile id,
+ * or null for a guest. Under test-auth this is the seeded test account's id (so the
+ * operator can connect + test per-user features locally without a full login),
+ * because getSessionUser() already resolves the emulated identity. The old
+ * IP-based "local-owner" bypass is gone — nothing is trusted by socket address.
  */
 function getEffectiveUserId(req) {
-  const id = getSessionUserId(req);
-  if (id) return id;
-  try {
-    const { isLocalBypass } = require("./auth-middleware");
-    if (isLocalBypass(req)) return "local-owner";
-  } catch (_) {}
-  return null;
+  return getSessionUserId(req);
 }
 
 /** Convenience: the resolved role for a request, or "guest". */

@@ -293,6 +293,16 @@
 
     <div class="auth-divider">or</div>
     <button type="button" id="continue-guest" class="btn-ghost">Continue without an account</button>
+
+    <!-- ── Dev/test role picker — shown ONLY when the server reports testMode
+         (LANTERN_TEST_AUTH_TOKEN set + direct, un-proxied hit). Signs in as the one
+         seeded test account with the chosen role. Never present in production. -->
+    <div id="test-login" hidden>
+      <div class="auth-divider">🔧 test sign-in</div>
+      <p class="sub" style="margin-top:0">Dev only — pick a role to sign in as the test account.</p>
+      <div class="auth-actions" id="test-role-buttons"></div>
+      <div class="field-error" id="test-login-error"></div>
+    </div>
     </div><!-- /#signin-view -->
 
     <!-- ── Confirm-email view — replaces the whole sign-in view until the address
@@ -654,6 +664,7 @@
         }
       }
       renderProviders(session.providers);
+      renderTestPanel(session);
     } catch (err) {
       // Session endpoint unreachable — fall back to fetching the provider list.
       try {
@@ -663,6 +674,49 @@
       } catch (_) {
         renderProviders([]);
       }
+    }
+  }
+
+  // Dev/test role picker: render one button per emulatable role. Clicking signs in
+  // as the seeded test account with that role via /api/auth/test-login, then lands
+  // on returnTo. Only ever rendered when the SERVER reports testMode.
+  const TEST_ROLE_LABELS = {
+    supporter: "Supporter", deep_dreamer: "Deep Dreamer", founder: "Founder",
+    admin: "Admin", tech_support: "Tech Support",
+  };
+  function renderTestPanel(session) {
+    if (!session || !session.testMode) return;
+    const panel = document.getElementById("test-login");
+    const wrap = document.getElementById("test-role-buttons");
+    if (!panel || !wrap) return;
+    wrap.innerHTML = "";
+    (session.testRoles || ["admin"]).forEach((role) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "provider-btn";
+      btn.style.background = "var(--surface, #1f2430)";
+      btn.style.color = "var(--fg, #e5e7eb)";
+      btn.textContent = "Sign in as " + (TEST_ROLE_LABELS[role] || role);
+      btn.addEventListener("click", () => testLogin(role));
+      wrap.appendChild(btn);
+    });
+    panel.hidden = false;
+  }
+
+  async function testLogin(role) {
+    const errEl = document.getElementById("test-login-error");
+    if (errEl) errEl.textContent = "";
+    try {
+      const res = await fetch("/api/auth/test-login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) throw new Error("test-login failed (" + res.status + ")");
+      location.href = safeReturnTo();
+    } catch (e) {
+      if (errEl) errEl.textContent = String(e && e.message ? e.message : e);
     }
   }
 

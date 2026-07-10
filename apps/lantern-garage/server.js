@@ -190,7 +190,7 @@ function tradeApiGuard(req, res, url) {
 // status panels only). Its CONTROL endpoints — save provider/GPU keys, dispatch
 // training, toggle the autonomous fleet, run autowork — carry NO auth of their
 // own, so making the page public would otherwise let anyone POST to them. We gate
-// them here to admin (the local owner passes via isLocalBypass; real admin
+// them here to admin (a dev/test session via test-auth passes; real admin
 // sessions pass). The key GETs are gated too: even masked, they leak which
 // providers are configured. Everything else (Work Board, PR Lanes, Agent Slots,
 // reliance, calibration, rollover) stays public read-only. Order matters: this
@@ -221,7 +221,7 @@ function orchestrationControlGuard(req, res, url) {
 // /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
 // system records/executes trades on the user's behalf — is a $200 capability, so
 // its execution endpoint requires admin (the $200 Synthesasia Guild role; the
-// local owner passes via isLocalBypass, keeping the server-side autonomous loop
+// a dev/test session via test-auth passes, keeping the server-side autonomous loop
 // working). Runs after tradeApiGuard, so $20 users are already past the trade gate
 // and only get stopped here for autonomous execution.
 const AI_TRADER_ADMIN = {

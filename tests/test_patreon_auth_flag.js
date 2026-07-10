@@ -6,7 +6,8 @@
  *   gate ON  (default / flag absent) → requireAuth/Role/Entitlement redirect 302 → /auth.html
  *   gate OFF (flag created+disabled)  → requireAuth ok; requireRole("guest") ok;
  *                                       requireRole("admin") 403; requireEntitlement 403
- *   local bypass (dev port 4178)      → always allowed, regardless of the flag
+ *   test-auth (X-Test-Auth token)     → always allowed, regardless of the flag
+ *                                       (the IP/dev-port bypass was removed)
  *
  * Run: node tests/test_patreon_auth_flag.js
  */
@@ -30,14 +31,16 @@ function restore() {
   ff._resetCache();
 }
 
-// A request that is NOT the local-admin bypass: real (non-4178) port, no proxy
-// headers, no LANTERN_LOCAL_ADMIN, and no Patreon session.
+const TEST_TOKEN = "flag-test-token-abcdef";
+
+// A plain guest: no proxy headers, no session, no test-auth token.
 function guestReq() {
-  return { headers: {}, socket: { localPort: 4177, remoteAddress: "203.0.113.7" }, session: undefined };
+  return { headers: {}, socket: { localPort: 4177, remoteAddress: "203.0.113.7" }, session: undefined, url: "/", method: "GET" };
 }
-// The dev-server local bypass (port 4178 → admin).
-function localReq() {
-  return { headers: {}, socket: { localPort: 4178, remoteAddress: "127.0.0.1" }, session: undefined };
+// A dev/test request via the token-gated test-auth path (direct hit, valid token →
+// emulated admin). Replaces the removed IP/dev-port bypass.
+function testAuthReq() {
+  return { headers: { "x-test-auth": TEST_TOKEN }, socket: { localPort: 4177, remoteAddress: "127.0.0.1" }, session: undefined, url: "/", method: "GET" };
 }
 // Capture what a guard writes to the response.
 function mockRes() {
@@ -54,8 +57,11 @@ function check(name, fn) {
   catch (e) { failures++; console.error(`  FAIL ${name}: ${e.message}`); }
 }
 
+const PREV_TOKEN = process.env.LANTERN_TEST_AUTH_TOKEN;
+
 try {
   delete process.env.LANTERN_LOCAL_ADMIN;
+  process.env.LANTERN_TEST_AUTH_TOKEN = TEST_TOKEN;
 
   // ── Gate ON (flag absent → default on) ────────────────────────────────────
   ff.deleteFlag("patreon_auth"); ff._resetCache();
@@ -102,16 +108,18 @@ try {
     assert.notStrictEqual(res.statusCode, 302);
   });
 
-  // ── Local bypass beats the flag in both directions ────────────────────────
-  check("local bypass (4178): admin allowed even with gate OFF", () => {
-    assert.strictEqual(auth.requireRole(localReq(), mockRes(), "admin"), true);
-    assert.strictEqual(auth.requireEntitlement(localReq(), mockRes(), "trade"), true);
+  // ── test-auth beats the flag in both directions ───────────────────────────
+  check("test-auth: admin allowed even with gate OFF", () => {
+    assert.strictEqual(auth.requireRole(testAuthReq(), mockRes(), "admin"), true);
+    assert.strictEqual(auth.requireEntitlement(testAuthReq(), mockRes(), "trade"), true);
   });
   ff.deleteFlag("patreon_auth"); ff._resetCache(); // back to gate ON
-  check("local bypass (4178): allowed with gate ON too", () => {
-    assert.strictEqual(auth.requireAuth(localReq(), mockRes()), true);
+  check("test-auth: allowed with gate ON too", () => {
+    assert.strictEqual(auth.requireAuth(testAuthReq(), mockRes()), true);
   });
 } finally {
+  if (PREV_TOKEN === undefined) delete process.env.LANTERN_TEST_AUTH_TOKEN;
+  else process.env.LANTERN_TEST_AUTH_TOKEN = PREV_TOKEN;
   restore();
 }
 
