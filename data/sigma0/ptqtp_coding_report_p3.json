@@ -1,0 +1,23 @@
+{
+  "task": "PTQTP coding-capability check: HumanEval FP16 vs PTQTP (#2206)",
+  "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "n": 20,
+  "planes": 3,
+  "effective_bits_per_weight": 5.13,
+  "approx_compression_vs_fp16": 3.12,
+  "fp16_pass_at_1": 0.95,
+  "fp16_passed": 19,
+  "fp16_fails": {
+    "AssertionError": 1
+  },
+  "ptqtp_pass_at_1": 0.9,
+  "ptqtp_passed": 18,
+  "ptqtp_fails": {
+    "AssertionError": 1,
+    "KeyError: 3": 1
+  },
+  "delta_pass_at_1": -0.05,
+  "verdict": "coding capability PRESERVED under PTQTP (delta small vs FP16)",
+  "evidence_class": "MEASURED",
+  "caveats": "n=20 (binomial noise), greedy, chat-format extraction; PTQTP weights are stored DEQUANTIZED (fp16) so this measures quality only \u2014 the paper's 4.63x speed needs a packed-ternary kernel (out of scope, see T-SAR #2207)."
+}

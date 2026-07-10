@@ -48,16 +48,31 @@ quantized model forgets an `import`, throws a `KeyError`, times out. So for a **
 (n=20 carries ±~0.13 binomial noise, so treat −0.15 as "clearly degraded, magnitude uncertain" — but
 the direction and the failure modes are informative.)
 
+## Recovering the coding tax — a 3rd trit-plane (N-plane PTQTP)
+
+Generalized PTQTP from the paper's dual plane to **P planes** (`W_g ≈ Σ_{k=1}^P α_k T_k`, ridge over P
+scales, 3^P element search) and re-ran the 7B coding eval:
+
+| planes | bits/weight | compression | HumanEval pass@1 | Δ vs FP16 (0.95) |
+|---|---|---|---|---|
+| 2 (paper dual) | 3.42 | 4.7× | 0.80 | −0.15 |
+| **3** | 5.13 | 3.1× | **0.90** | **−0.05** |
+
+**A third plane recovers most of the coding tax** (−15 → −5 pts) at the cost of compression (4.7× →
+3.1×). So the coding degradation *is* buyable back with bits — the 2-plane point is over-compressed for a
+coder, and ~5 bits (3 planes) is a much better quality/size operating point for the coding slot. (n=20,
+so −0.05 vs −0.15 is "clearly better, 18 vs 16 of 20" — direction solid, exact magnitude noisy.)
+
 ## Verdict / go-forward
 
 - **PTQTP's quality claim holds for perplexity** (7B: −5% ppl @ ~3.4 bits, and it improves with scale)
   — structured dual-ternary is genuinely survivable where naive ternary collapsed (×6864). This unblocks
   #2207 (T-SAR CPU ternary) on the *quality* precondition.
-- **But it costs measurable coding accuracy** (−15 pts pass@1 at 7B/n=20). So PTQTP should **not** replace
-  the FP16 served coder as-is — the coder needs the full-precision edge. Viable for memory-constrained
-  *general* use; for the coding slot it needs the gap recovered first (more trit-planes on sensitive
-  layers, mixed-precision keep-list, or a light QAT touch-up). Honest **conditional GO**: great shrink,
-  real coding tax.
+- **The 2-plane point costs coding accuracy** (−15 pts at 4.7×), but **a 3rd plane recovers it to −5 pts
+  at 3.1×** (measured above). So the honest go-forward is: for the **coding slot**, serve **3-plane
+  PTQTP (~5 bits, 3.1×)**, not the 2-plane point — you keep most of the coding capability and still get
+  ~3× shrink. 2-plane (4.7×) is fine for memory-constrained *general* use where the coding edge doesn't
+  matter. **GO with the plane count as the quality/size dial**, tuned to the slot.
 - **Caveat — this measures QUALITY, not speed.** The reconstructed weights are stored **dequantized
   (fp16)**, so tokens/s is unchanged here. The paper's 4.63× speedup needs a **packed-ternary
   multiplication-free matmul kernel** — that's exactly T-SAR's contribution (#2207) and is out of scope

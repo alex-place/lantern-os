@@ -39,14 +39,19 @@ try:
 except Exception:
     pass
 
-# 9 ternary pairs (t1, t2)
-_PAIRS = torch.tensor([(a, b) for a in (-1., 0., 1.) for b in (-1., 0., 1.)])  # [9,2]
+import itertools as _it
+
+
+def _combos(n_planes, dev):
+    return torch.tensor(list(_it.product((-1., 0., 1.), repeat=n_planes)), device=dev)  # [3^P, P]
 
 
 @torch.no_grad()
-def ptqtp_matrix(W, group=128, iters=8, eps=1e-4, lam0=1e-3, chunk=4096):
-    """Quantize a 2-D weight W [out,in] with dual trit-planes; return dequantized reconstruction Ŵ
-    (same shape/dtype) and the mean relative Frobenius error. Group-wise along the flattened weight."""
+def ptqtp_matrix(W, group=128, iters=8, eps=1e-4, lam0=1e-3, chunk=4096, n_planes=2):
+    """Quantize a 2-D weight W [out,in] with P trit-planes (W_g ≈ Σ_k α_k T_k); return dequantized
+    reconstruction Ŵ (same shape/dtype) and the mean relative Frobenius error. Group-wise; P=2 is the
+    paper's dual trit-plane, P=3 trades ~1.6 more bits/weight for a closer fit."""
+    P = n_planes
     dev = W.device
     dtype = W.dtype
     flat = W.reshape(-1).float()
@@ -56,43 +61,36 @@ def ptqtp_matrix(W, group=128, iters=8, eps=1e-4, lam0=1e-3, chunk=4096):
         flat = torch.cat([flat, torch.zeros(pad, device=dev)])
     Wg = flat.reshape(-1, group)                      # [ngroups, G]
     ng = Wg.shape[0]
-    pairs = _PAIRS.to(dev)                            # [9,2]
+    combos = _combos(P, dev)                          # [3^P, P]
     out = torch.empty_like(Wg)
-    # process groups in chunks to bound the [chunk, G, 9] tensor
     for s in range(0, ng, chunk):
         w = Wg[s:s + chunk]                          # [c, G]
         c = w.shape[0]
-        # init planes = sign(w) (0 -> +1)
-        T1 = torch.sign(w); T1[T1 == 0] = 1.0
-        T2 = T1.clone()
-        alpha = torch.ones(c, 2, device=dev)
+        T = torch.sign(w); T[T == 0] = 1.0            # [c, G]
+        planes = [T.clone() for _ in range(P)]        # init all planes = sign(w)
+        alpha = torch.ones(c, P, device=dev)
         prev = alpha.clone()
+        eye = torch.eye(P, device=dev).expand(c, P, P)
         for _ in range(iters):
-            # (a) ridge scales, closed form per group
-            S = torch.stack([T1, T2], dim=-1)        # [c, G, 2]
-            A = torch.einsum('cgk,cgl->ckl', S, S)   # [c,2,2]
-            b = torch.einsum('cgk,cg->ck', S, w)     # [c,2]
-            # adaptive lambda by condition number
-            eye = torch.eye(2, device=dev).expand(c, 2, 2)
+            S = torch.stack(planes, dim=-1)          # [c, G, P]
+            A = torch.einsum('cgk,cgl->ckl', S, S)   # [c,P,P]
+            b = torch.einsum('cgk,cg->ck', S, w)     # [c,P]
             Al = A + lam0 * eye
-            # (κ check, vectorized) — bump λ where ill-conditioned
             Ainv = torch.linalg.pinv(Al)
             kappa = torch.linalg.matrix_norm(Al, 'fro') * torch.linalg.matrix_norm(Ainv, 'fro')
             bump = torch.clamp(lam0 * torch.sqrt(torch.clamp(kappa / 1e12, min=1.0)), max=1.0)
-            need = kappa > 1e12
-            lam = torch.where(need, bump, torch.full_like(bump, lam0))
+            lam = torch.where(kappa > 1e12, bump, torch.full_like(bump, lam0))
             Al = A + lam.view(c, 1, 1) * eye
-            alpha = torch.linalg.solve(Al, b.unsqueeze(-1)).squeeze(-1)   # [c,2]
-            # (b) 9-way element search: cand[c,9] = α1·t1 + α2·t2
-            cand = alpha @ pairs.t()                  # [c,9]
-            d = (w.unsqueeze(-1) - cand.unsqueeze(1)) ** 2   # [c,G,9]
-            best = d.argmin(dim=-1)                   # [c,G]
-            tt = pairs[best]                          # [c,G,2]
-            T1, T2 = tt[..., 0], tt[..., 1]
+            alpha = torch.linalg.solve(Al, b.unsqueeze(-1)).squeeze(-1)   # [c,P]
+            cand = alpha @ combos.t()                 # [c, 3^P]
+            d = (w.unsqueeze(-1) - cand.unsqueeze(1)) ** 2   # [c, G, 3^P]
+            best = d.argmin(dim=-1)                   # [c, G]
+            tt = combos[best]                         # [c, G, P]
+            planes = [tt[..., k] for k in range(P)]
             if (alpha - prev).norm() < eps:
-                prev = alpha; break
+                break
             prev = alpha
-        out[s:s + chunk] = alpha[:, 0:1] * T1 + alpha[:, 1:2] * T2
+        out[s:s + chunk] = sum(alpha[:, k:k + 1] * planes[k] for k in range(P))
     rec = out.reshape(-1)[:n].reshape(W.shape)
     err = float((rec - W.float()).norm() / (W.float().norm() + 1e-9))
     return rec.to(dtype), err

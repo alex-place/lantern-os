@@ -79,6 +79,7 @@ def main():
     ap.add_argument("--model", default="Qwen/Qwen2.5-Coder-7B-Instruct")
     ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--iters", type=int, default=8)
+    ap.add_argument("--planes", type=int, default=2, help="trit-planes (2=paper dual ~3.4b, 3~5.1b)")
     a = ap.parse_args()
 
     print(f"[ptqtp-code] loading {a.model} ...", flush=True)
@@ -99,7 +100,7 @@ def main():
     tq = time.time()
     for name, mod in model.named_modules():
         if isinstance(mod, nn.Linear) and "lm_head" not in name:
-            rec, _ = ptqtp_matrix(mod.weight.data, 128, a.iters)
+            rec, _ = ptqtp_matrix(mod.weight.data, 128, a.iters, n_planes=a.planes)
             mod.weight.data.copy_(rec)
     print(f"  quantized in {time.time()-tq:.0f}s", flush=True)
 
@@ -109,9 +110,12 @@ def main():
     pq_s = time.time() - t1
     print(f"  PTQTP pass@1 = {pq_pass}/{a.n} ({pq_pass/a.n:.3f})  fails={pq_fails}  {pq_s:.0f}s", flush=True)
 
+    import math as _m
+    bits = a.planes * (_m.log2(3)) + (a.planes * 16) / 128
     report = {
         "task": "PTQTP coding-capability check: HumanEval FP16 vs PTQTP (#2206)",
-        "model": a.model, "n": a.n,
+        "model": a.model, "n": a.n, "planes": a.planes,
+        "effective_bits_per_weight": round(bits, 2), "approx_compression_vs_fp16": round(16 / bits, 2),
         "fp16_pass_at_1": round(fp16_pass / a.n, 3), "fp16_passed": fp16_pass, "fp16_fails": fp16_fails,
         "ptqtp_pass_at_1": round(pq_pass / a.n, 3), "ptqtp_passed": pq_pass, "ptqtp_fails": pq_fails,
         "delta_pass_at_1": round((pq_pass - fp16_pass) / a.n, 3),
@@ -123,7 +127,7 @@ def main():
                     "DEQUANTIZED (fp16) so this measures quality only — the paper's 4.63x speed needs a "
                     "packed-ternary kernel (out of scope, see T-SAR #2207)."),
     }
-    OUT = REPO / "data" / "sigma0" / "ptqtp_coding_report.json"
+    OUT = REPO / "data" / "sigma0" / f"ptqtp_coding_report_p{a.planes}.json"
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("\n[ptqtp-code] ===== RESULT =====")
     print(f"  FP16 {report['fp16_pass_at_1']} -> PTQTP {report['ptqtp_pass_at_1']} (delta {report['delta_pass_at_1']})")
