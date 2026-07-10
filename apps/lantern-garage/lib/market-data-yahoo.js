@@ -250,7 +250,10 @@ async function getQuotes(tickers) {
 
   const rows = await pmap(list, FETCH_CONCURRENCY, async (ticker) => {
     try {
-      const result = await fetchChart(ticker, '1d', '5d');
+      // Range '1d' (not '5d') so chartPreviousClose is YESTERDAY's close → a true DAY %
+      // change. With '5d', chartPreviousClose was the close ~5 sessions back, so the
+      // watchlist showed a multi-day move (AAPL "+7.42%") mislabeled as the day's %.
+      const result = await fetchChart(ticker, '1d', '1d');
       const meta = result.meta || {};
       const price = Number(meta.regularMarketPrice) || 0;
       const prev = Number(meta.chartPreviousClose || meta.previousClose) || 0;
