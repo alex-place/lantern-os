@@ -1,3 +1,7 @@
+## [1.8.135] - 2026-07-10
+### Changed
+- **Removed the legacy `req.session.patreon` compat shim (ADR-0016 follow-up, #1947 item 2).** The provider-agnostic auth migration (ADR-0016) left a back-compat shim in `lib/session-identity.js`: `getSessionUser()` fell back to reading a Patreon-shaped `req.session.patreon`, and `setSessionUser()` mirrored `session.user` back into `session.patreon` for `provider === "patreon"`. That migration window is long closed — every login has written the canonical `session.user` for 100+ patch releases, and a repo-wide grep confirms no route, gate, or test still reads `session.patreon` (only OAuth URLs / `PATREON_*` env references remain). Removed both halves of the shim; every provider (patreon / google / discord / local) now writes and reads the single `session.user` shape. Also marked ADR-0016 follow-ups 1 (password reset + email verify — already shipped via the SMTP mailer + `auth-tokens.js`) and 2 done, and refreshed the stale `docs/USER-PROFILES.md` session-creation step. Item 3 (Discord guild-role → Keystone-role mapping) remains open. Verified: `node --check` on the module, `tests/test_admin_local_bypass.js` passes, and no lingering `session.patreon` reader exists. Improves **Verify** (one identity shape, less auth surface).
+
 ## [1.8.134] - 2026-07-10
 ### Changed
 - **CI/CD consolidation: drop Netlify, remove the per-lane PR cap, and auto-merge green + reviewed PRs.** A CI/CD repair pass:
