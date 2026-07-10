@@ -182,7 +182,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       const uid = getEffectiveUserId(req);
       const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
       if (ibkrAccount) {
-        const ibkrPositions = await bridge.getIBKRPositions(uid).catch(() => []);
+        // IBKR keeps just-closed names in the portfolio snapshot as qty:0 rows; they're
+        // not positions anymore (a $0 "Long" line the user reads as clutter/loss). Drop them.
+        const ibkrPositions = (await bridge.getIBKRPositions(uid).catch(() => []))
+          .filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
         // Reconcile the header's Unrealized P&L with the positions the user actually
         // sees. `ibkrAccount.unrealized` comes from IBKR's /pnl/partitioned `upl`, a
         // real-time subscription that lags on CPAPI (it returned a stale, rounded
@@ -196,6 +199,49 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
+          // Realized today: IBKR reports $0 on the paper CPAPI (both `rpl` and the portfolio
+          // summary), so tally it from the autopilot ledger — the P&L of positions that
+          // ACTUALLY closed today (symbol now flat). One value per symbol (its LAST exit row;
+          // earlier rows were phantom re-attempts on the still-open position, now prevented by
+          // the exit-reattempt cooldown). Positions still open are skipped (their exits didn't
+          // fill). Cheap: the ledger is a small append-only file.
+          try {
+            const fs = require('fs'), path = require('path');
+            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+            const openSyms = new Set(ibkrPositions.map((p) => p.symbol));
+            const today = new Date().toISOString().slice(0, 10);
+            const lastBySym = {};
+            for (const line of fs.readFileSync(logPath, 'utf8').split('\n')) {
+              if (!line.trim()) continue;
+              let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+              if (r && r.event === 'exit' && String(r.ts || '').slice(0, 10) === today && r.pnl != null) lastBySym[r.symbol] = Number(r.pnl);
+            }
+            let realized = 0, any = false;
+            for (const [sym, pnl] of Object.entries(lastBySym)) if (!openSyms.has(sym) && Number.isFinite(pnl)) { realized += pnl; any = true; }
+            if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
+          } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
+          // Reconcile Day P&L the same way. IBKR's `dpl` lags/rounds on the paper CPAPI
+          // (it read −2310 while Realized stayed $0 despite closes today), so derive each
+          // position's day change from the cached watchlist chg_pct — prevClose =
+          // price/(1+chg%) — and sum. Reuses the 30s price cache (no extra fetch); only
+          // overrides when EVERY held symbol has a fresh %, else keeps the broker figure.
+          try {
+            const wlp = await traderAgent.getWatchlistPrices().catch(() => []);
+            const chgBy = {};
+            for (const w of (wlp || [])) if (w && w.ticker) chgBy[w.ticker] = Number(w.chg_pct);
+            let dayPnl = 0, haveAll = true;
+            for (const p of ibkrPositions) {
+              const chg = chgBy[p.symbol];
+              const cur = Number(p.current_price) || 0;
+              if (chg == null || Number.isNaN(chg) || !cur) { haveAll = false; break; }
+              const prev = cur / (1 + chg / 100);
+              dayPnl += (Number(p.qty) || 0) * (cur - prev);
+            }
+            if (haveAll) {
+              ibkrAccount.pnl_today = Math.round((dayPnl + (Number(ibkrAccount.realized_today) || 0)) * 100) / 100;
+              ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
+            }
+          } catch (_e) { /* keep the broker dpl if the price cache isn't ready */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;

@@ -62,6 +62,21 @@ function validatePageExists(pagePath) {
     return fs.existsSync(path.join(PUBLIC_DIR, 'index.html'));
   }
 
+  // Repo-file reader routes: `/view?path=<rel>` (formatted markdown reader) and
+  // `/repo/<rel>` (raw file) both serve a file from the REPO ROOT via
+  // routes/files.js — not from PUBLIC_DIR. Validate the underlying repo file
+  // exists rather than treating the URL as a literal public path.
+  if (pagePath.startsWith('/view') || pagePath.startsWith('/repo/')) {
+    let rel = null;
+    const qIdx = pagePath.indexOf('?');
+    if (pagePath.startsWith('/view') && qIdx !== -1) {
+      rel = new URLSearchParams(pagePath.slice(qIdx + 1)).get('path');
+    } else if (pagePath.startsWith('/repo/')) {
+      rel = decodeURIComponent(pagePath.slice('/repo/'.length).split('?')[0]);
+    }
+    if (rel) return fs.existsSync(path.join(REPO_ROOT, rel));
+  }
+
   // Try as direct file
   let filePath = path.join(PUBLIC_DIR, pagePath);
   if (fs.existsSync(filePath)) return true;

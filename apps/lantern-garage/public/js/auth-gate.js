@@ -110,15 +110,31 @@
     const signinBtn = document.getElementById('signin-btn');
 
     if (session && session.authenticated) {
-      if (profileBtn) profileBtn.style.display = '';
+      // Restore the profile button to its canonical destination in case a prior
+      // guest render repurposed it into a sign-in link (SPA-style re-check).
+      if (profileBtn) {
+        profileBtn.style.display = '';
+        profileBtn.href = '/profile.html';
+        profileBtn.title = 'Your profile';
+        profileBtn.setAttribute('aria-label', 'View your profile');
+        profileBtn.classList.remove('nav-signin');
+      }
       if (logoutBtn) logoutBtn.style.display = '';
       if (signinBtn) signinBtn.style.display = 'none';
     } else {
-      if (profileBtn) profileBtn.style.display = 'none';
       if (logoutBtn) logoutBtn.style.display = 'none';
       if (signinBtn) signinBtn.style.display = '';
-      // Inject sign-in button into nav-actions if neither profile-btn nor signin-btn exist
-      if (!profileBtn && !signinBtn) {
+      // Guests get a login icon in the SAME slot as the profile icon. The nav
+      // (injected by site-chrome.js) always ships a #profile-btn, so rather than
+      // hiding it and leaving no affordance, repurpose it into a sign-in link.
+      if (profileBtn) {
+        profileBtn.style.display = '';
+        profileBtn.href = '/auth.html?returnTo=' + encodeURIComponent(pathname);
+        profileBtn.title = 'Sign in';
+        profileBtn.setAttribute('aria-label', 'Sign in');
+        profileBtn.classList.add('nav-signin');
+      } else if (!signinBtn) {
+        // Fallback for pages that ship neither a profile button nor a sign-in button.
         const navActions = document.querySelector('.nav-actions');
         if (navActions && !navActions.querySelector('.nav-signin')) {
           const btn = document.createElement('a');

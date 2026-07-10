@@ -1,6 +1,7 @@
 ; unisona.iss — Inno Setup script for the unisona.ai desktop app (direct-download
-; / SignPath channel). Produces a per-user installer (no admin, no UAC) that lays
-; unisona.exe + the app tree into %LOCALAPPDATA%\unisona. See ADR-0014 and
+; / SignPath channel). Produces a per-user installer (no admin, no UAC) that lays the
+; native shell (Unisona.exe), the Core SEA (unisona-core.exe) and the app tree into
+; %LOCALAPPDATA%\unisona. See ADR-0014 and
 ; scripts/build-desktop-installer.mjs (which stages the payload and invokes ISCC
 ; with the /D defines below).
 ;
@@ -42,7 +43,7 @@ WizardStyle=modern
 ; taskbar entry get their icon from unisona.exe (embedded via rcedit at build time),
 ; and the app window itself from the served favicon. Path is relative to this .iss.
 SetupIconFile=unisona.ico
-UninstallDisplayIcon={app}\unisona.exe
+UninstallDisplayIcon={app}\Unisona.exe
 UninstallDisplayName={#AppName}
 
 [Tasks]
@@ -54,12 +55,14 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "{#StagingDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion
 
 [Icons]
-Name: "{group}\Unisona"; Filename: "{app}\unisona.exe"
+; Shortcuts launch the native shell (Unisona.exe); it spawns unisona-core.exe (the
+; Node SEA) in embed mode and hosts the cockpit in a WebView2 window.
+Name: "{group}\Unisona"; Filename: "{app}\Unisona.exe"
 Name: "{group}\Uninstall Unisona"; Filename: "{uninstallexe}"
-Name: "{userdesktop}\Unisona"; Filename: "{app}\unisona.exe"; Tasks: desktopicon
+Name: "{userdesktop}\Unisona"; Filename: "{app}\Unisona.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\unisona.exe"; Description: "Launch Unisona now"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Unisona.exe"; Description: "Launch Unisona now"; Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
 ; Runtime state lives in %APPDATA%\unisona (UNISONA_DESKTOP), left in place on

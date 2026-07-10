@@ -65,13 +65,18 @@ This document covers the local and cloud runtime behavior, deployment gates, and
 
 ---
 
-### Netlify Static Surface
+### Netlify — DEPRECATED / removed from CI
 
-**URL:** `https://lantern-os-cloud.netlify.app`
+Netlify is **no longer part of CI/CD.** The static site is published to **GitHub Pages**
+(`deploy.yml` → `gh-pages`) and the app runs on GCE; Netlify was only a stale
+deploy-preview left over from an earlier host. There is **no Netlify config in this repo**
+(no `netlify.toml`), and the merger (`pr-watcher.js`) already pattern-ignores every
+`netlify/*` and generic deploy-preview status check, so a Netlify outage can never wedge a
+PR merge.
 
-**Purpose:** Static dashboard mirror (HTML/CSS/JS only; no backend API)
-
-**Fallback:** If cloud API unreachable, static mirror remains operational.
+**To finish removal (dashboard action, one-time):** disconnect the Netlify GitHub App /
+site for this repo in the Netlify dashboard (and GitHub → Settings → Integrations) so it
+stops posting `netlify/…` PR checks. Nothing in-repo depends on it.
 
 ---
 

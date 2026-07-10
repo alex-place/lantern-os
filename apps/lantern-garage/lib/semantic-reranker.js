@@ -108,4 +108,9 @@ async function semanticRerank(query, candidates, { topK = 3, textField = "text",
 // uses. Returns null when Ollama/the embed model is unavailable (harness skips the arm).
 async function embedText(text) { return _embed(String(text || "").slice(0, 512)); }
 
-module.exports = { semanticRerank, embedText, _cosine };
+// Embedding + cosine are exported so other retrieval layers (e.g. the source-code
+// index in code-index.js) reuse the SAME nomic-embed/Ollama path instead of
+// duplicating the client — one embedding provider, per the convergence constraint.
+// Both name pairs are kept: `embed`/`cosine` (code-index.js) and the harness's
+// `embedText`/`_cosine` (scripts/eval_retrieval_ab.js).
+module.exports = { semanticRerank, embed: _embed, cosine: _cosine, embedText, _cosine };

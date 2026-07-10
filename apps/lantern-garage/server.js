@@ -109,12 +109,15 @@ jobWorker.start(2000); // Poll every 2 seconds for new jobs
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
 require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
-// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
-// PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
+// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and auto-merges
+// reviewed(APPROVE) + green + conflict-free PRs. Auto-merge is ON by default on the
+// single designated fleet host (PR_WATCHER_ENABLED=1); set PR_WATCHER_AUTOMERGE=0 to
+// review-only. Merge bar: green CI checks + a fleet-review APPROVE verdict, minus the
+// protected-path carve-out (auth/money/CI/secrets still need a human).
 const prWatcher = new PrWatcher({
   repoRoot, port,
   idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000),
-  autoMerge: process.env.PR_WATCHER_AUTOMERGE === "1",
+  autoMerge: process.env.PR_WATCHER_AUTOMERGE !== "0",
   mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
     ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
     : null,
@@ -123,6 +126,11 @@ const prWatcher = new PrWatcher({
     : null,
   // CI must run + go green before auto-merge. Opt out only for CI-less repos.
   requireChecks: process.env.PR_WATCHER_REQUIRE_CHECKS !== "0",
+  // The assigned-issue convergence gate (needs convergance-record + autowork-verified
+  // labels before a PR closing a human-assigned issue may land) is OFF by default —
+  // green + review-APPROVE is the merge bar. Re-enable with
+  // PR_WATCHER_ASSIGNED_ISSUE_GATE=1.
+  assignedIssueGate: process.env.PR_WATCHER_ASSIGNED_ISSUE_GATE === "1",
 });
 
 // Shared dependency bundle passed to every route module
@@ -190,7 +198,7 @@ function tradeApiGuard(req, res, url) {
 // status panels only). Its CONTROL endpoints — save provider/GPU keys, dispatch
 // training, toggle the autonomous fleet, run autowork — carry NO auth of their
 // own, so making the page public would otherwise let anyone POST to them. We gate
-// them here to admin (the local owner passes via isLocalBypass; real admin
+// them here to admin (a dev/test session via test-auth passes; real admin
 // sessions pass). The key GETs are gated too: even masked, they leak which
 // providers are configured. Everything else (Work Board, PR Lanes, Agent Slots,
 // reliance, calibration, rollover) stays public read-only. Order matters: this
@@ -221,7 +229,7 @@ function orchestrationControlGuard(req, res, url) {
 // /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
 // system records/executes trades on the user's behalf — is a $200 capability, so
 // its execution endpoint requires admin (the $200 Synthesasia Guild role; the
-// local owner passes via isLocalBypass, keeping the server-side autonomous loop
+// a dev/test session via test-auth passes, keeping the server-side autonomous loop
 // working). Runs after tradeApiGuard, so $20 users are already past the trade gate
 // and only get stopped here for autonomous execution.
 const AI_TRADER_ADMIN = {
@@ -240,6 +248,7 @@ const routes = [
   tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
   aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
+  require("./routes/v1"),               // OpenAI-compatible /v1/chat/completions shim (before auth: API clients use bearer keys, not sessions)
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)
@@ -322,8 +331,13 @@ try {
   console.error("[FATAL] " + err.message);
   process.exit(1);
 }
+// Persist sessions to disk so a restart doesn't sign everyone out (the default
+// in-memory store dropped every session on each deploy — the ":4178 signs me out on
+// reload" report). data/sessions is gitignored, so it survives resets too.
+const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
+  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -862,8 +876,9 @@ server.listen(port, host, () => {
   // accounts multiplies auto-review comments (each comment also re-triggers the
   // others). Enable PR_WATCHER_ENABLED=1 on exactly ONE machine.
   if (process.env.PR_WATCHER_ENABLED === "1") {
+    // Auto-merge default is ON (green + review-APPROVE); PR_WATCHER_AUTOMERGE=0 for
+    // review-only. Current mode is exposed via prWatcher.getStatus().autoMerge.
     prWatcher.start();
-    console.log(`[PR Watcher] auto-merge ${process.env.PR_WATCHER_AUTOMERGE === "1" ? "ENABLED" : "off (set PR_WATCHER_AUTOMERGE=1 to land ready PRs)"}`);
   } else {
     console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
   }

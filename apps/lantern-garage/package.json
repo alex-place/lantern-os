@@ -24,6 +24,7 @@
     "test:ui": "npx playwright test ../../tests/test_dream_journal_ui.spec.js",
     "test:ui:headed": "npx playwright test ../../tests/test_dream_journal_ui.spec.js --headed",
     "test:dream-chat-ui": "npx playwright test ../../tests/test_dream_chat_ux.spec.js",
+    "test:auth": "npm --prefix ../.. run test:auth",
     "test:three-doors": "node ../../tests/test_three_doors_integration.spec.js",
     "test:showcase": "node test/static-mime.test.js && node test/showcase-manifest.test.js && node test/showcase-gallery-ui.test.js",
     "test:boundary": "node test/surface-boundary.test.js",

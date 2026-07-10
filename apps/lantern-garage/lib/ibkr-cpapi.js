@@ -386,7 +386,7 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
     // Prefer the caller-supplied equity; else read the account so the guard's
@@ -433,6 +433,10 @@ class IbkrCpapi {
     // LMT needs a limit price; STP (protective stop) needs a trigger price — both
     // ride the `price` field in IBKR's ticket. MKT carries none.
     if ((orderType === 'LMT' || orderType === 'STP') && order.price != null) ticket.price = order.price;
+    // Extended-hours (pre-market / after-hours) fills require outsideRTH=true AND a LMT
+    // order — IBKR rejects a market order outside RTH. The caller sets this when trading
+    // pre/post market; regular-hours orders leave it off.
+    if (outsideRth) ticket.outsideRTH = true;
 
     // Body must be { orders: [ticket, …] }. IBKR's Web API rejects a bare array
     // with 400 "Missing order parameters" — verified live against a paper account

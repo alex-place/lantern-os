@@ -70,24 +70,10 @@ function getSessionInfo(req) {
     };
   }
 
-  // Local-only admin bypass. Delegate to the SINGLE hardened check in
-  // auth-middleware (isLocalBypass) — it additionally denies the bypass whenever
-  // the request carries any proxy/tunnel header (cf-ray, x-forwarded-for, …), so
-  // public traffic reaching the local server through the Cloudflare tunnel is
-  // NOT auto-authenticated as admin. This previously had its own un-hardened copy
-  // that only checked the loopback socket, which made every unisona.ai visitor
-  // "Dev/admin" and made /auth.html redirect away before anyone could sign in.
-  // Lazy-required to avoid any module load-order cycle.
-  const { isLocalBypass } = require("./auth-middleware");
-  if (isLocalBypass(req)) {
-    return {
-      authenticated: true,
-      role: "admin",
-      provider: "local-bypass",
-      entitlements: { trade: true },
-      user: { id: "dev", name: "Dev", email: "", tier: "dev", provider: "local-bypass" },
-    };
-  }
+  // No IP-based bypass. A dev/test session is established via test-auth
+  // (lib/test-auth.js), which getSessionUser() resolves above — so an emulated
+  // identity takes the authenticated branch just like a real one. A genuine guest
+  // (no session, no valid test token) is reported as such and sent to /auth.html.
   return { authenticated: false, role: "guest" };
 }
 

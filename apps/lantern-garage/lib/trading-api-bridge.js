@@ -108,12 +108,15 @@ class TradingAPIBridge {
     if (!status.connected) return null;
     const summary = await client.getAccountSummary(status.accountId);
     if (!summary) return null;
-    const { equity, cash, buyingPower, unrealizedPnl } = summary;
+    const { equity, cash, buyingPower, unrealizedPnl, realizedPnl: summaryRpl } = summary;
     // Broker-authoritative P&L (dpl/upl/rpl) so the footer's Realized/Unrealized/Day
     // fields populate (they were "—" because these keys were never returned).
     const pnl = await client.getPnl(status.accountId).catch(() => null);
     const unrealized = pnl && pnl.unrealizedPnl != null ? pnl.unrealizedPnl : (unrealizedPnl != null ? unrealizedPnl : 0);
-    const realized = pnl && pnl.realizedPnl != null ? pnl.realizedPnl : 0;
+    // Realized today: the partitioned `rpl` reads $0 on the paper CPAPI even after closes,
+    // so prefer the portfolio-summary realizedpnl (already fetched); fall back to rpl, then 0.
+    const realized = summaryRpl != null ? summaryRpl
+                   : (pnl && pnl.realizedPnl != null ? pnl.realizedPnl : 0);
     const day = pnl && pnl.dailyPnl != null ? pnl.dailyPnl : unrealized;
     return {
       account_id: status.accountId,
@@ -137,7 +140,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -165,6 +168,7 @@ class TradingAPIBridge {
       price: orderType === 'STP' ? stopPrice : limitPrice,
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
       equity: eq,
+      outsideRth: !!outsideRth,   // pre/post-market fills (LMT + outsideRTH)
     });
     const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read

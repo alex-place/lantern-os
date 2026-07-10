@@ -263,11 +263,12 @@ When a user logs in via Patreon OAuth:
 
 1. **Token exchange** → Get Patreon identity
 2. **Profile lookup** → `getOrCreateFromPatreon()`
-3. **Session creation** → Store in `req.session.patreon`
+3. **Session creation** → `setSessionUser(req, ...)` writes the provider-agnostic
+   `req.session.user` shape (the legacy `req.session.patreon` mirror was removed — ADR-0016 #1947)
 4. **JSONL append** → Log the profile creation/update
 5. **Cache update** → In-memory cache for fast lookups
 
-The session still contains the user info for backward compatibility, but the **source of truth is the profile database**.
+Every provider (patreon / google / discord / local) writes the same `req.session.user`, and the **source of truth is the profile database**.
 
 ## Offline Mode
 

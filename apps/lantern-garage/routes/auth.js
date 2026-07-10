@@ -13,7 +13,14 @@
 
 const { getSessionInfo, handleLogout } = require("../lib/patreon-auth");
 const { handleOAuthStart, handleOAuthCallback } = require("../lib/oauth-core");
-const { getSessionUser } = require("../lib/session-identity");
+const { getSessionUser, establishSession } = require("../lib/session-identity");
+const {
+  testAuthEnabled,
+  ensureTestProfile,
+  normalizeRole,
+  isDirect: isDirectTestReq,
+  TEST_ROLES,
+} = require("../lib/test-auth");
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
@@ -52,6 +59,12 @@ const MIN_PASSWORD = 8;
 const START_RE = /^\/api\/auth\/([a-z]+)\/start$/;
 const CALLBACK_RE = /^\/api\/auth\/([a-z]+)\/callback$/;
 
+// Seed the test account up-front when test-auth is enabled, so the real
+// /api/auth/local/login path and the role picker work immediately. No-op in prod.
+if (testAuthEnabled()) {
+  try { ensureTestProfile(); } catch (_) { /* seeding is best-effort */ }
+}
+
 module.exports = async function authRoutes(req, res, url, deps) {
   const path = url.pathname;
   const method = req.method;
@@ -66,8 +79,57 @@ module.exports = async function authRoutes(req, res, url, deps) {
     info.authRequired = patreonAuthEnabled();
     // Advertise which login methods are actually usable (configured OAuth + local).
     info.providers = listEnabledProviders();
+    // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied
+    // hit while the mechanism is enabled (never advertised on public/proxied traffic).
+    if (testAuthEnabled() && isDirectTestReq(req)) {
+      info.testMode = true;
+      info.testRoles = TEST_ROLES;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(info));
+  }
+
+  // POST /api/auth/test-login { role, provider } — establish a cookie session as the
+  // seeded test account with a chosen role (the browser role picker uses this). Gated
+  // to a direct, un-proxied hit while LANTERN_TEST_AUTH_TOKEN is set; 404 otherwise so
+  // the endpoint is invisible in production. Emulates an SSO login when `provider` is
+  // set (google/discord/patreon), without the OAuth round-trip.
+  if (method === "POST" && path === "/api/auth/test-login") {
+    if (!testAuthEnabled() || !isDirectTestReq(req)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "not_found" }));
+    }
+    const b = (await readJsonBody(req)) || {};
+    const profile = ensureTestProfile();
+    if (!profile) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "seed_failed" }));
+    }
+    const role = normalizeRole(b.role);
+    const provider = String(b.provider || "local");
+    establishSession(
+      req,
+      {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email,
+        emailVerified: true,
+        role,
+        tier: profile.tier || "dev",
+        provider,
+        entitlements: { trade: true },
+        isTest: true,
+      },
+      (err) => {
+        if (err) {
+          res.writeHead(500, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ error: "session_save_failed" }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, role, provider }));
+      }
+    );
+    return true;
   }
 
   // GET /api/auth/providers — configured login methods for the login page.
