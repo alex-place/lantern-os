@@ -59,11 +59,34 @@ claims for Mistral/Gemma/Llama. This is model-agnostic on our stack, not a per-m
 Verify-stage hallucination signal measured so far on Ouro, and the paper's causal tie to
 over-compliance maps onto the Σ₀ collapse canary — worth the follow-up to test that causal handle.
 
+## Causal test (ablation) — predictive, but NOT shown causal on this test
+
+`experiments/sigma0_hneurons_causal.py` zeros the top-50 honesty neurons (by |L1 coef|, spanning 12
+layers) in every `down_proj` input and measures the model's output-level true>false preference vs a
+random-neuron control (same count):
+
+| condition | accuracy (prefers true) | margin (logprob true−false) |
+|---|---|---|
+| baseline | 0.675 | 0.663 |
+| honesty-ablated (K=50) | 0.663 | 0.658 |
+| random-ablated (K=50) | 0.675 | 0.654 |
+
+**Ablating the honesty neurons barely moves the output** (−0.0125 accuracy) — and **not distinctly more
+than random ablation.** So on this test the H-Neurons are strongly **predictive** (0.97 AUROC) but their
+causal effect on the output true/false margin is **not demonstrated**. Honest reading: *predictive ≠
+causal here.* Likely reasons — the residual stream is redundant (zeroing 50 of 135k neurons is buffered
+downstream); the output margin is a weak target (baseline accuracy only 0.675 — the model barely knows
+many of these facts parametrically); K=50 or activation-zeroing may be too blunt vs the paper's setup.
+
+**Consequence for gate-wiring:** treat H-Neurons as a strong **monitoring probe** (which it clearly is),
+**not** as a causal over-compliance lever — that claim needs a more thorough causal test (more neurons,
+mean-substitution, a compliance-specific behavior) before it's load-bearing.
+
 ## Still open
 
-- **Causal test** (ablate the ~30/~25 neurons → does over-compliance rise?) is the paper's headline
-  mechanism and the natural next experiment before gate-wiring — the causal handle maps onto the Σ₀
-  collapse canary.
+- **A stronger causal test** (larger K, mean-substitution, a compliance/instruction-following behavior
+  rather than the factual logprob margin) to settle whether the causal-over-compliance claim holds on
+  Ouro/Qwen — this test says predictive-yes, causal-not-shown.
 - **HaluEval-scale confirmation** — these numbers are on 80 matched facts; a larger hallucination
   benchmark (with a real backend) would firm up the absolute AUROC before shipping the gate.
 
