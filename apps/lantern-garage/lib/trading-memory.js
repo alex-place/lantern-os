@@ -49,6 +49,39 @@ function _shortHash(str) {
   return crypto.createHash("sha256").update(String(str)).digest("hex").slice(0, 12);
 }
 
+// One-line natural-language narration for a trading event (#2354). Trading records
+// are otherwise serialized JSON blobs with no `content.text`, so the shared CSF
+// recall path (queryMemories / queryMemoriesSemantic in csf-memory.js scores
+// content.text and the semantic reranker embeds it) sees only bare tags — the
+// trader's own history is unretrievable in dream-chat, and BM25/embeddings are
+// near-noise on JSON. A short prose gloss makes each event a first-class,
+// relevance-gated memory: it surfaces when a chat query overlaps, stays quiet
+// otherwise. Dependency-free; every field is null-safe.
+function _narrateOrder(order) {
+  const side = String(order.side || "").toUpperCase();
+  const qty = order.qty != null ? order.qty : "";
+  const symbol = order.symbol || "?";
+  const price = order.price || order.filled_avg_price;
+  const status = order.status || "submitted";
+  const parts = [side, qty, symbol].filter((p) => p !== "" && p != null).join(" ");
+  let text = `Order: ${parts || symbol}`;
+  if (price != null && price !== "") text += ` @ ${price}`;
+  text += ` — ${status}`;
+  if (order.filled_at) text += `, filled ${order.filled_at}`;
+  return text;
+}
+
+function _narrateSignal(signal) {
+  const agent = signal.agent || signal.agent_type || signal.type || "agent";
+  const action = signal.action || signal.signal || signal.body || "";
+  const symbol = signal.symbol || "";
+  const confidence = signal.confidence;
+  let text = `Signal (${agent}): ${action || "—"}`;
+  if (symbol) text += ` [${symbol}]`;
+  if (confidence != null) text += ` confidence ${confidence}`;
+  return text;
+}
+
 function _csfRecord(tier, content, tags, keywords, memoryId) {
   const now = _now();
   const base = {
@@ -109,6 +142,7 @@ async function recordOrder(order) {
   const rec = _csfRecord(
     "trace",
     {
+      text: _narrateOrder(order),   // #2354 — NL gloss so the event is retrievable prose
       order_id: key,
       symbol: order.symbol,
       side: order.side,
@@ -140,6 +174,7 @@ async function recordSignal(signal) {
   const rec = _csfRecord(
     "trace",
     {
+      text: _narrateSignal(signal),   // #2354 — NL gloss so the event is retrievable prose
       signal_id: key,
       agent: signal.agent || signal.agent_type || signal.type || "",
       action: signal.action || signal.signal || signal.body || "",
@@ -257,6 +292,8 @@ async function ingestTradingData({ orders = [], signals = [] } = {}) {
 
 module.exports = {
   _toArray,
+  _narrateOrder,
+  _narrateSignal,
   recordOrder,
   recordSignal,
   recordNewOrders,

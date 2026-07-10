@@ -85,6 +85,21 @@ function load(userId) {
 function has(userId) { return fs.existsSync(_readFile(userId)); }
 function remove(userId) { try { fs.unlinkSync(_file(userId)); return true; } catch { return false; } }
 
+/** Every user with saved IBKR credentials (canonical + legacy dirs), deduped. The
+ *  autopilot iterates these so it trades EVERY connected account, not just one. */
+function listUsers() {
+  const out = new Set();
+  for (const dir of [DIR, LEGACY_DIR]) {
+    let files = [];
+    try { files = fs.readdirSync(dir); } catch (_e) { continue; }
+    for (const f of files) {
+      if (!f.endsWith('.enc.json')) continue;
+      try { out.add(decodeURIComponent(f.slice(0, -'.enc.json'.length))); } catch (_e) { /* skip bad name */ }
+    }
+  }
+  return [...out];
+}
+
 /** Build an IbkrOAuth1 signer for a user, or null if not connected / unreadable. */
 function buildSigner(userId) {
   const c = load(userId);
@@ -105,4 +120,4 @@ function publicStatus(userId) {
   };
 }
 
-module.exports = { normalize, save, load, has, remove, buildSigner, publicStatus, _file, REQUIRED };
+module.exports = { normalize, save, load, has, remove, listUsers, buildSigner, publicStatus, _file, REQUIRED };

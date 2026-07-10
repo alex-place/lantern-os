@@ -142,6 +142,12 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # The native desktop shell (apps/lantern-garage/desktop/shell) is a .NET WPF +
+      # WebView2 app; the installer build runs `dotnet publish` for it.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Install root deps (src/ + win32 native modules)
         run: npm ci
 
@@ -152,7 +158,7 @@ jobs:
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
 
-      - name: Build installer (builds unisona.exe, then packages)
+      - name: Build installer (Core SEA + native shell, then package)
         run: node scripts/build-desktop-installer.mjs
 
       - name: Attach installer to the release

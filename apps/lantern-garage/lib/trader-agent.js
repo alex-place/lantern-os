@@ -10,6 +10,10 @@
 
 const path = require('path');
 const fs = require('fs');
+// Per-user watchlists (each user curates their own; the autopilot trades each user's own
+// list). `this.watchlist` is the UNION across users so the scan + price/bar collectors
+// cover every watched symbol; per-user filtering happens in the autopilot loop.
+const watchlistStore = require('./watchlist-store');
 // Keyless Node-native price/bar source. Replaces the per-call Python→Alpaca
 // subprocess for charts/prices, which paid ~8.7s of import cost per call (and
 // failed entirely without Alpaca keys), so the charts never loaded. Order
@@ -33,11 +37,14 @@ class TraderAgent {
     // broken backend isn't re-scanning on every GET.
     this._scanFailTtl = config.scanFailTtl || 30000; // 30s
     this.watchlistPath = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'watchlist.json');
-    this.watchlist = this._loadWatchlist();
     // Broker (IBKR Client Portal gateway) — fail-soft; reads return an honest
     // "not connected" when the gateway is down. Order placement is hard-gated.
     this.ibkr = new IbkrCpapi();
   }
+
+  // The scan + collectors read the UNION of every user's watchlist so all watched
+  // symbols have data. Per-user lists live in watchlist-store; edit them there.
+  get watchlist() { return watchlistStore.allTickers(); }
 
   _parseWatchlist(envString) {
     if (!envString) return ['SPY', 'AAPL', 'TSLA', 'NVDA', 'AMD'];
@@ -75,31 +82,24 @@ class TraderAgent {
   /**
    * Add a ticker to the persisted watchlist
    */
-  addTicker(ticker) {
+  addTicker(ticker, userId = 'default') {
     const t = String(ticker || '').trim().toUpperCase();
     if (!/^[A-Z]{1,10}$/.test(t)) {
       throw new Error('ticker must be 1-10 letters');
     }
-    if (!this.watchlist.includes(t)) {
-      this.watchlist.push(t);
-      this._saveWatchlist();
-      this.clearCache();
-    }
-    return this.watchlist;
+    const list = watchlistStore.addTicker(userId, t);
+    this.clearCache();
+    return list;
   }
 
   /**
    * Remove a ticker from the persisted watchlist
    */
-  removeTicker(ticker) {
+  removeTicker(ticker, userId = 'default') {
     const t = String(ticker || '').trim().toUpperCase();
-    const next = this.watchlist.filter((x) => x !== t);
-    if (next.length !== this.watchlist.length) {
-      this.watchlist = next;
-      this._saveWatchlist();
-      this.clearCache();
-    }
-    return this.watchlist;
+    const list = watchlistStore.removeTicker(userId, t);
+    this.clearCache();
+    return list;
   }
 
   /**
