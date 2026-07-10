@@ -16,18 +16,26 @@
  * `detectTaskType`. Gated by OURO_ROUTER=1 at the call site; off → never invoked.
  *
  * Output task types match task-detector.js exactly so it's a drop-in:
- *   "coding" | "reasoning" | "creative" | "trading" | "default"
+ *   "coding" | "reasoning" | "creative" | "trading" | "numeric" | "default"
+ *
+ * "numeric" is the time-series-forecasting route: the local lead for it is the
+ * registry's TSFM specialist (keystone-tsfm), not a chat/coder model. It is kept
+ * DISTINCT from "trading" on purpose — "forecast the price series" is a numeric
+ * estimation subtask (TSFM), whereas "should I buy / what's my position" is a
+ * trading DECISION handled by the reasoner. See docs + memory
+ * time-series-foundation-models-for-trading.
  */
 
 const http = require("http");
 
-const TASK_TYPES = ["coding", "reasoning", "creative", "trading", "default"];
+const TASK_TYPES = ["coding", "reasoning", "creative", "trading", "numeric", "default"];
 
 const CLASSIFY_PROMPT = (message) =>
   `You are an intent classifier. Read the user's message and output the single best category from this list:\n` +
   `- coding: writing, fixing, reviewing, or explaining code, software, APIs, repos, errors\n` +
   `- reasoning: analysis, explanation, research, comparison, planning, math, "why" questions\n` +
-  `- trading: markets, prices, positions, portfolio, buy/sell, Kalshi/Alpaca\n` +
+  `- trading: buy/sell decisions, positions, portfolio, "should I trade", Kalshi/Alpaca orders\n` +
+  `- numeric: forecasting/predicting future values of a numeric time series (prices, metrics, demand) — "what will X be", trend/pattern extrapolation over a sequence\n` +
   `- creative: stories, poems, art, music, imaginative writing\n` +
   `- default: greetings, small talk, or anything that fits none of the above\n\n` +
   `Output ONLY the category word, nothing else.\n\nUser message: ${message}\n\nCategory:`;
