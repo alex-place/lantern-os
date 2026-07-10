@@ -22,7 +22,7 @@
     let detail = sha ? `<code>${sha}</code>` : "";
     if (date) detail += ` &middot; ${date}`;
     if (msg)  detail += ` &middot; ${msg}`;
-    return `Unisona OS update available on <code>master</code>${detail ? " — " + detail : ""}`;
+    return `unisona.ai update available on <code>master</code>${detail ? " — " + detail : ""}`;
   }
 
   function createBanner() {

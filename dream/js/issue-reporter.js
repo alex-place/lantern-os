@@ -273,7 +273,7 @@
     resetReport();
     setStatus("Unisona is reading the screenshot and writing the report…");
     var prompt =
-      "You are Unisona, an AI assistant filing a GitHub bug report for a user, based on a screenshot of the Unisona OS web app. " +
+      "You are Unisona, an AI assistant filing a GitHub bug report for a user, based on a screenshot of the unisona.ai web app. " +
       "Page: " + (location.href || "unknown") + ". " +
       "Look at the screenshot and write a concise developer-facing bug report. " +
       "Respond in EXACTLY this format, nothing else:\n" +
