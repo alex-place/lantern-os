@@ -15,7 +15,7 @@ symbolic character interaction.
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 
 class BayesianFallacyDetector:
@@ -187,6 +187,18 @@ class CognitiveJournal:
                         print(f"[warn] Could not read {file}: {e}")
         all_dreams.sort(key=lambda d: d.get("timestamp", ""), reverse=True)
         return all_dreams[:limit]
+
+    def get_entry(self, entry_id) -> Optional[Dict]:
+        """Return a single normalized dream entry by id (string-compared), or None.
+
+        Ids are compared as strings because entries may carry a caller-supplied id
+        or a synthesized ``<file>-<n>`` id; there is no separate primary key.
+        """
+        target = str(entry_id)
+        for entry in self.get_recent(limit=10000):
+            if str(entry.get("id")) == target:
+                return entry
+        return None
 
 # Global instance for bot import
 _cognitive_journal: CognitiveJournal | None = None
