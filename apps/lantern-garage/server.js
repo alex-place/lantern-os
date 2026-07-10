@@ -323,8 +323,13 @@ try {
   console.error("[FATAL] " + err.message);
   process.exit(1);
 }
+// Persist sessions to disk so a restart doesn't sign everyone out (the default
+// in-memory store dropped every session on each deploy — the ":4178 signs me out on
+// reload" report). data/sessions is gitignored, so it survives resets too.
+const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
+  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
