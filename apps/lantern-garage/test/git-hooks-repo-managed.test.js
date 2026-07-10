@@ -28,16 +28,17 @@ check("pre-push invokes the sprawl tripwire", () => {
   assert.ok(/SKIP_SPRAWL_CHECK/.test(h), "pre-push must honour a SKIP_SPRAWL_CHECK bypass");
 });
 
-check("sprawl check runs BEFORE the workstream gate's early exit", () => {
+check("sprawl tripwire is not gated behind a blanket workstream early-exit", () => {
   const h = read("scripts/hooks/pre-push");
   const sprawlAt = h.indexOf("sprawl-tripwire.mjs");
-  // The workstream gate early-exits on `SKIP_MONOWORKSTREAM=1` / missing gh; if the
-  // sprawl block sat after it, those common cases would skip the surface check. Anchor
-  // on the exact early-exit statement (the words "workstream gate" also appear in the
-  // file's top comment, which would match too early).
-  const earlyExitAt = h.indexOf('= "1" ]; then exit 0; fi');
-  assert.ok(sprawlAt > 0 && earlyExitAt > 0, "expected sprawl call and the workstream early-exit");
-  assert.ok(sprawlAt < earlyExitAt, "sprawl tripwire must precede the workstream early-exit");
+  assert.ok(sprawlAt > 0, "pre-push must call the sprawl tripwire");
+  // The per-lane workstream cap — and its blanket `SKIP_MONOWORKSTREAM=1 → exit 0`
+  // early-exit — was removed. Ensure no such blanket early-exit precedes the sprawl
+  // tripwire, or the common bypass would silently skip the surface check. (The sprawl
+  // block has its own scoped `SKIP_SPRAWL_CHECK` guard; that is fine.)
+  const blanketExit = h.indexOf('= "1" ]; then exit 0; fi');
+  assert.ok(blanketExit === -1 || blanketExit > sprawlAt,
+    "no blanket workstream early-exit may precede the sprawl tripwire");
 });
 
 // ── Wiring: git is pointed at the tracked hooks, auto-installed ───────────────

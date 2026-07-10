@@ -108,66 +108,12 @@ if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_INTENT_ROUTING_CHECK" != "1" ];
   fi
 fi
 
-# ── 3. Per-agent workstream gate ─────────────────────────────────────────────
-if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
-if ! command -v gh >/dev/null 2>&1; then exit 0; fi
-
-# Re-read refs (stdin was consumed above; get branch from git)
-branch=$(git symbolic-ref --short HEAD 2>/dev/null)
-[ -z "$branch" ] && exit 0
-case "$branch" in gh-pages|master|dev) exit 0 ;; esac
-
-# Lane key = branch's first path segment. Agent prefixes are their own lanes;
-# every other prefix is a DYNAMIC HUMAN LANE (alex/, kriskin/, mookman11/, or any
-# future <name>/) so humans run concurrently, each capped at one open PR. A
-# no-'/' branch collapses to the shared "human" lane. (Mirrors pre-commit.)
-first=$(echo "$branch" | cut -d'/' -f1)
-case "$first" in
-  claude|gemini|codex|devin|grok|openai) lane="$first"; lane_kind="agent" ;;
-  *)
-    case "$branch" in
-      */*) lane="$first"; lane_kind="human" ;;
-      *)   lane="human";  lane_kind="human" ;;
-    esac
-    ;;
-esac
-
-# Allow push if this branch already has an open PR
-branch_pr=$(gh pr list --repo alex-place/lantern-os --state open \
-  --json headRefName \
-  --jq "map(select(.headRefName == \"$branch\")) | length" 2>/dev/null)
-[ "${branch_pr:-0}" -gt 0 ] && exit 0
-
-# jq filter for OTHER open PRs in this lane (shared "human" = unprefixed branches).
-if [ "$lane" = "human" ] && [ "$lane_kind" = "human" ]; then
-  lane_match='select(.headRefName | contains("/") | not)'
-else
-  lane_match="select((.headRefName | split(\"/\")[0]) == \"$lane\")"
-fi
-
-conflict=$(gh pr list --repo alex-place/lantern-os --state open \
-  --json headRefName \
-  --jq "[.[] | $lane_match] | length" 2>/dev/null)
-
-# Concurrent-session cap: a lane (one user or agent) may keep up to
-# WORKSTREAM_MAX_OPEN_PRS open PRs at once, so a user can run several sessions in
-# parallel. `conflict` counts OTHER open PRs in the lane (this branch has no PR yet
-# — it exited above if it did), so opening one more is allowed while that total is
-# below the cap. Set the cap to 1 to restore the old one-PR-per-lane rule.
-max_open=${WORKSTREAM_MAX_OPEN_PRS:-3}
-if [ "${conflict:-0}" -ge "$max_open" ]; then
-  echo ""
-  echo "WORKSTREAM BLOCK: $lane_kind lane '$lane' already has $conflict open PRs (cap $max_open)."
-  gh pr list --repo alex-place/lantern-os --state open \
-    --json number,title,headRefName \
-    --jq "[.[] | $lane_match] | .[] | \"  #\\(.number) \\(.title) [\\(.headRefName)]\"" \
-    2>/dev/null
-  echo ""
-  echo "Raise the cap for more concurrent sessions: WORKSTREAM_MAX_OPEN_PRS=$((max_open+1)) git push ..."
-  echo "Or bypass entirely: SKIP_MONOWORKSTREAM=1 git push ..."
-  echo ""
-  exit 1
-fi
+# ── 3. Per-agent workstream / per-lane PR cap: REMOVED ───────────────────────
+# The concurrent open-PR cap per lane was removed intentionally — a lane may keep
+# any number of open PRs at once. Merge-time serialisation is handled by the single
+# in-process merger (apps/lantern-garage/lib/pr-watcher.js), which lands one
+# green + reviewed PR per tick. The slop / secret / change-record gates above still
+# apply; SKIP_MONOWORKSTREAM=1 still bypasses those.
 
 # ── 4. Staleness guard: block pushes on branches far behind master ────────────
 _branch=$(git symbolic-ref --short HEAD 2>/dev/null)
