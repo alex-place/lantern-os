@@ -135,6 +135,9 @@ jobs:
     name: Build & attach desktop installer (Windows)
     runs-on: windows-latest
     needs: [build, github-release]
+    env:
+      # Signing is a no-op unless a code-signing cert is configured (see the sign step).
+      HAS_SIGNING_CERT: ${{ secrets.CODE_SIGN_PFX_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -160,6 +163,30 @@ jobs:
 
       - name: Build installer (Core SEA + native shell, then package)
         run: node scripts/build-desktop-installer.mjs
+
+      # Optional code signing — cert-agnostic (any OV/EV code-signing cert). NOT SignPath:
+      # a proprietary-licensed repo isn't eligible for SignPath Foundation's free OSS
+      # signing (verified 2026-07-10, signpath.org/terms). No-op until the secrets are
+      # set. The Microsoft Store channel re-signs for free and needs none of this.
+      # Setup: base64-encode a .pfx → repo secret CODE_SIGN_PFX_BASE64, its password →
+      # CODE_SIGN_PFX_PASSWORD. (protected path: .github/workflows → human-merge only.)
+      - name: Sign installer (optional, any OV/EV cert)
+        if: env.HAS_SIGNING_CERT == 'true'
+        shell: pwsh
+        env:
+          CODE_SIGN_PFX_BASE64: ${{ secrets.CODE_SIGN_PFX_BASE64 }}
+          CODE_SIGN_PFX_PASSWORD: ${{ secrets.CODE_SIGN_PFX_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP 'codesign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CODE_SIGN_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName | Select-Object -Last 1 -ExpandProperty FullName
+          $exe = Get-ChildItem apps/lantern-garage/desktop/dist/Unisona-Setup-*.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /f $pfx /p $env:CODE_SIGN_PFX_PASSWORD /fd SHA256 `
+            /tr http://timestamp.digicert.com /td SHA256 $exe
+          Remove-Item $pfx -Force
+          Write-Host "Signed $exe"
 
       - name: Attach installer to the release
         uses: softprops/action-gh-release@v3

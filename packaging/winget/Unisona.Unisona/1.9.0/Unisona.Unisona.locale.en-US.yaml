@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+PackageIdentifier: Unisona.Unisona
+PackageVersion: 1.9.0
+PackageLocale: en-US
+Publisher: Alex Place
+PublisherUrl: https://unisona.ai
+PublisherSupportUrl: https://github.com/alex-place/lantern-os/issues
+PackageName: Unisona
+PackageUrl: https://unisona.ai
+License: Proprietary
+Copyright: Copyright (c) 2026 Alex Place
+ShortDescription: Local-first reasoning cockpit — your memory, your keys, your machine.
+Description: >-
+  Unisona is a local-first reasoning cockpit that remembers, reasons, acts, and
+  verifies. It runs as a native desktop app that boots a local reasoning Core and
+  hosts the chat cockpit in its own window — your memory and API keys stay on your
+  machine. Real tools (documents, web search, market data, repo/GitHub), persistent
+  memory, and a trading terminal.
+Moniker: unisona
+Tags:
+  - ai
+  - assistant
+  - chat
+  - local-first
+  - productivity
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

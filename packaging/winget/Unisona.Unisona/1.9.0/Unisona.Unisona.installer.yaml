@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+PackageIdentifier: Unisona.Unisona
+PackageVersion: 1.9.0
+InstallerLocale: en-US
+InstallerType: inno
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/alex-place/lantern-os/releases/download/v1.9.0/Unisona-Setup-1.9.0.exe
+    InstallerSha256: 168657496F606983B18659853AFA9840599766A1CD33CE5FB1443651F31A5916
+    ProductCode: '{8F3A2C1E-5B9D-4E7A-9C21-6D4F0A8B3E52}_is1'
+ManifestType: installer
+ManifestVersion: 1.6.0
