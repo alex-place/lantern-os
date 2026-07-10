@@ -250,6 +250,24 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "convergence_inspect",
+      "description": "Inspect the convergence orchestrator's live state — registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Read-only; grounds Observe with real engine state instead of guessing.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "propose_coding_change",
       "description": "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
       "input_schema": {

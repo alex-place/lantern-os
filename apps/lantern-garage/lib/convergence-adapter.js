@@ -233,4 +233,74 @@ function getCircuitState() {
   return { ...circuit };
 }
 
-module.exports = { convergeMessage, healthCheck, resetCircuit, getCircuitState };
+// ── Read-only engine subcommands (inspect | health) ───────────────────────────
+
+const READ_COMMANDS = new Set(['inspect', 'health']);
+
+/**
+ * Run a read-only orchestrator subcommand and return its parsed JSON.
+ *
+ * This is the single seam onto `convergence_io_engine.py` for observe-style
+ * calls (state inspection, health probe) — it reuses the same circuit breaker,
+ * UTF-8 spawn env, and timeout plumbing as runConverge() so callers (the native
+ * `convergence_inspect` tool, the operator HTTP route, the MCP tool) all share
+ * one guarded path instead of spawning the engine ad hoc.
+ *
+ * Never throws into the chat path: on any failure it resolves to `{ error }`.
+ *
+ * @param {'inspect'|'health'} command
+ * @param {{ timeoutMs?: number }} [options]
+ * @returns {Promise<object>}  parsed engine JSON, or `{ error: <kind> }`
+ */
+function runEngineCommand(command, options = {}) {
+  if (!READ_COMMANDS.has(command)) {
+    return Promise.resolve({ error: 'unsupported_command' });
+  }
+  if (circuitOpen()) {
+    return Promise.resolve({ error: 'circuit_open' });
+  }
+
+  const timeoutMs = options.timeoutMs || 15_000;
+
+  return new Promise((resolve) => {
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+
+    const proc = spawn(PYTHON_PATH, [ENGINE_SCRIPT, command], {
+      cwd: REPO_ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      // See runConverge() for why PYTHONIOENCODING=utf-8 is required (#1605).
+      env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },
+    });
+
+    const timer = setTimeout(() => { timedOut = true; proc.kill('SIGTERM'); }, timeoutMs);
+
+    proc.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    proc.stderr.on('data', chunk => { stderr += chunk.toString(); });
+
+    proc.on('error', () => {
+      clearTimeout(timer);
+      recordFailure();
+      resolve({ error: 'spawn_failed' });
+    });
+
+    proc.on('exit', code => {
+      clearTimeout(timer);
+      if (timedOut) { recordFailure(); return resolve({ error: 'timeout' }); }
+      if (code !== 0 && code !== null) { recordFailure(); return resolve({ error: `exit_${code}` }); }
+
+      const raw = stdout.trim();
+      if (!raw) { recordFailure(); return resolve({ error: 'empty_output' }); }
+
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch { recordFailure(); return resolve({ error: 'invalid_json' }); }
+
+      recordSuccess();
+      resolve(parsed);
+    });
+  });
+}
+
+module.exports = { convergeMessage, healthCheck, runEngineCommand, resetCircuit, getCircuitState };

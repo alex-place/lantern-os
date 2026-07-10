@@ -346,6 +346,39 @@ const REGISTRY = {
     },
   },
 
+  // ── Convergence orchestrator (observe) ──────────────────────────────────────
+  // Wires the assistant directly onto convergence_io_engine.py via the guarded
+  // convergence-adapter seam (circuit breaker + timeout), instead of the old
+  // loose subprocess spawns. Read-only: reports the orchestrator's live state.
+  convergence_inspect: {
+    policy: "read",
+    guest_safe: false, // exposes internal fleet/orchestrator state — operator only
+    desc: "Inspect the convergence orchestrator's live state — registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Read-only; grounds Observe with real engine state instead of guessing.",
+    schema: { type: "object", properties: {}, additionalProperties: false },
+    async run() {
+      const { runEngineCommand } = require("./convergence-adapter");
+      const s = await runEngineCommand("inspect");
+      if (s.error) {
+        return `[convergence_inspect unavailable: ${s.error} — the orchestrator (convergence_io_engine.py) could not be reached; say so rather than inventing state]`;
+      }
+      const circuits = s.circuits && Object.keys(s.circuits).length
+        ? JSON.stringify(s.circuits)
+        : "none tripped";
+      const lines = [
+        `convergence orchestrator state (as of ${s.timestamp || "now"}):`,
+        `  cells: ${s.cells ?? "?"}`,
+        `  active slots: ${s.slots_active ?? "?"} (dream-journal: ${s.dream_journal_slots_active ?? "?"})`,
+        `  circuits: ${circuits}`,
+        `  pending CSF specs: ${s.csf_agent?.pending_specs ?? "?"} (${s.csf_agent?.status || "?"})`,
+      ];
+      if (s.target_latencies) {
+        lines.push(`  target latencies (ms): ${Object.entries(s.target_latencies).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+      }
+      if (s.last_log) lines.push(`  last log: ${s.last_log}`);
+      return lines.join("\n");
+    },
+  },
+
   // ── Coding control plane (#2185): propose → verify → HOLD for approval ──────
   // The idiomatic seam onto the coding backend (routes/coding.js is the HTTP twin).
   // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
