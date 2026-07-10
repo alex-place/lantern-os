@@ -140,8 +140,14 @@ const _peak = new Map();        // sym -> highest price seen since entry (traili
 
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
-async function closeLong(bridge, userId, sym, qty, hp, reason, out, now) {
-  const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
+  // Regular hours: a market SELL closes instantly. Pre/post market: IBKR rejects market
+  // orders outside RTH, so use a marketable LIMIT (≈0.2% below the last print, to cross
+  // the wider extended-hours spread) with outsideRTH=true so the exit still fills.
+  const order = (extended && refPrice > 0)
+    ? { ticker: sym, side: 'sell', qty, type: 'limit', limitPrice: Math.round(refPrice * 0.998 * 100) / 100, outsideRth: true }
+    : { ticker: sym, side: 'sell', qty, type: 'market' };
+  const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   await cancelRestingStops(bridge, userId, sym);
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now);
   logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
@@ -159,7 +165,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now) {
  *      momentum is dying / about to die" before the full bearish signal would fire.
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
-async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }) {
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false }) {
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
   if (!longs.length) return;
 
@@ -187,12 +193,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }
 
     // 1) Hard take-profit.
     if (c.takeProfitPct > 0 && pnlPct >= c.takeProfitPct) {
-      await closeLong(bridge, userId, sym, qty, p, `take_profit (+${pnlPct.toFixed(1)}%)`, out, now);
+      await closeLong(bridge, userId, sym, qty, p, `take_profit (+${pnlPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
     }
     // 2) Trailing stop — only after the position has run up (locks GAINS, not losses).
     if (c.trailPct > 0 && peakGainPct >= c.trailArmPct && dropFromPeakPct >= c.trailPct) {
-      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%)`, out, now);
+      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
     }
     // 3) Momentum death — fading winner: MACD histogram negative + below short EMA.
@@ -205,7 +211,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }
         const last = closes[closes.length - 1];
         const r = rsi(closes);
         if (m && m.histogram < 0 && last < e9 && (r == null || r < 55)) {
-          await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now);
+          await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
           delete heldQty[sym]; continue;
         }
       }
@@ -219,7 +225,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }
  * @param {object} deps   { bridge, userId, now?, caps? }
  * @returns {Promise<{executed:Array, skipped:Array, enabled:boolean, reason?:string}>}
  */
-async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} } = {}) {
+async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false } = {}) {
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
@@ -264,7 +270,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }); } catch (_e) { /* fail-soft */ }
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended }); } catch (_e) { /* fail-soft */ }
 
   // Entries require the full autopilot arm; exits-only mode stops here.
   if (!c.enabled) { out.reason = 'exit-management only (TRADER_MANAGE_EXITS) — entries off'; return out; }
@@ -314,7 +320,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
-        const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+        const exOrder = (extended && price > 0)
+          ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true }
+          : { ticker: sym, side: 'sell', qty: held, type: 'market' };
+        const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
         _entryAt.delete(sym);
         const hp = heldPos[sym] || {};
@@ -342,7 +351,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
-    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
+    const enOrder = (extended && price > 0)
+      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity }
+      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity };
+    const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.

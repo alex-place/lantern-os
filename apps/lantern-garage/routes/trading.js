@@ -55,41 +55,47 @@ function _isUsMarketHours() {
   const mins = et.getHours() * 60 + et.getMinutes();
   return mins >= 570 && mins < 960;              // 09:30 (570) .. 16:00 (960) ET
 }
+// Pre-market (04:00–09:30) and after-hours (16:00–20:00) ET, Mon–Fri — the extended
+// session where IBKR accepts LMT + outsideRTH orders.
+function _isUsExtendedHours() {
+  const et = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const day = et.getDay();
+  if (day === 0 || day === 6) return false;
+  const mins = et.getHours() * 60 + et.getMinutes();
+  return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
+}
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
-// Overnight (market-closed) scanning is OFF by default — off-hours the only thing
-// to scan is crypto, and the user mostly wants it idle overnight. Flip on via the
-// 🌙 toggle for after-hours crypto testing; it auto-resets at the next market open
-// so a forgotten toggle can't quietly burn tokens later. (#1714)
-let _scanWhenClosed = process.env.TRADER_SCAN_CLOSED === '1';
+// Extended-hours (pre-market / after-hours) trading — OFF by default. When on (⏰ toggle
+// or TRADER_EXTENDED_HOURS=1) the trader also scans + acts during the extended session,
+// placing marketable-limit + outsideRTH orders (regular hours use market orders as before).
+let _extendedTrading = process.env.TRADER_EXTENDED_HOURS === '1';
 async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
   const marketHours = _isUsMarketHours();
-  if (marketHours && _scanWhenClosed) _scanWhenClosed = false;      // auto-reset at open
-  // Off-hours with overnight scanning off → skip the scan entirely: no Python
-  // spawn, no model call, zero tokens. The price collectors keep polling (free).
-  if (marketHours || _scanWhenClosed) {
+  const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
+  // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
+  // (no Python spawn / model call — the price collectors keep polling for free).
+  if (marketHours || extNow) {
     try {
       traderAgent.cache && (traderAgent.cache['market_scan'] = null); // force fresh each minute
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
-      if (n) console.log(`[Trading] autoscan — ${n} signal(s)`);
-      // Act stage: autonomously execute the ENTER verdicts on the owner's IBKR
-      // account. No-op unless TRADER_AUTO_EXECUTE=1 (separate from manual arming);
-      // every order still passes the hard guard. Stocks only during market hours.
-      if (marketHours) {
-        const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: process.env.TRADER_AUTO_USER || 'local-owner' });
-        for (const e of (at.executed || [])) {
-          console.log(`[AutoTrader] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status} (p_win=${e.p_win})`);
-        }
-        if (at.enabled && !(at.executed || []).length && at.reason) console.log(`[AutoTrader] no action — ${at.reason}`);
+      if (n) console.log(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
+      // Act stage: execute on the owner's IBKR account. No-op unless armed
+      // (TRADER_AUTO_EXECUTE / TRADER_MANAGE_EXITS); every order still passes the hard
+      // guard. `extended` routes pre/post-market fills through LMT + outsideRTH orders.
+      const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: process.env.TRADER_AUTO_USER || 'local-owner', extended: !marketHours });
+      for (const e of (at.executed || [])) {
+        console.log(`[AutoTrader] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
       }
+      if ((at.enabled || at.manageExits) && !(at.executed || []).length && at.reason) console.log(`[AutoTrader] no action — ${at.reason}`);
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
   }
-  if (!_autoscanStopped) setTimeout(_autoscanTick, marketHours ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
+  if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
@@ -252,15 +258,16 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   };
 
 
-  // GET/POST /api/trading/overnight-scan — read or flip overnight (market-closed)
-  // crypto scanning. ?set=on|off|toggle changes it; GET with no param just reads.
-  // Off = no off-hours model calls (0 tokens); auto-resets to off at market open. (#1714)
-  if (url.pathname === '/api/trading/overnight-scan') {
+  // GET/POST /api/trading/extended-hours — read or flip pre-market / after-hours trading.
+  // ?set=on|off|toggle changes it; GET with no param just reads. When on, the trader also
+  // scans + acts during the extended session (04:00–09:30 / 16:00–20:00 ET) via LMT +
+  // outsideRTH orders. Regular-hours trading is unaffected either way.
+  if (url.pathname === '/api/trading/extended-hours' || url.pathname === '/api/trading/overnight-scan') {
     const set = (url.searchParams.get('set') || '').toLowerCase();
-    if (set === 'on') _scanWhenClosed = true;
-    else if (set === 'off') _scanWhenClosed = false;
-    else if (set === 'toggle') _scanWhenClosed = !_scanWhenClosed;
-    sendJson(res, { enabled: _scanWhenClosed, marketHours: _isUsMarketHours() }, 200);
+    if (set === 'on') _extendedTrading = true;
+    else if (set === 'off') _extendedTrading = false;
+    else if (set === 'toggle') _extendedTrading = !_extendedTrading;
+    sendJson(res, { enabled: _extendedTrading, marketHours: _isUsMarketHours(), extendedHours: _isUsExtendedHours() }, 200);
     return true;
   }
 
