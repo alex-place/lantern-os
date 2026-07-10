@@ -1,5 +1,6 @@
-fix(ci): make releases one-click. auto-tag.yml pushes the version tag with GITHUB_TOKEN,
-and GitHub's recursion guard means a GITHUB_TOKEN-authored tag never triggers release.yml
-— so the Release build (zips + desktop installer + GitHub Release) had to be dispatched by
-hand. auto-tag now dispatches release.yml itself via workflow_dispatch (the documented
-exception to the guard), with `actions: write`. No new secret.
+fix(ci): make releases fully hands-free and keep the deployed version label correct.
+(1) auto-tag.yml now dispatches release.yml via workflow_dispatch — a GITHUB_TOKEN-pushed
+tag never triggers release.yml (recursion guard), so the Release build never auto-fired
+before. (2) assemble-changelog.js now also refreshes the SERVED
+apps/lantern-garage/public/version.json (not just the root version.json), so the footer
+stops showing a stale version after a release rolls (the v1.8.0 "shows old build" report).

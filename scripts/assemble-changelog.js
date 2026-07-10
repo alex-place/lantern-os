@@ -168,7 +168,11 @@ function main() {
   updatePackageVersion(PKG_MAIN, newVersion);
   updatePackageVersion(PKG_APP, newVersion);
 
-  // Refresh version.json for client display (best-effort).
+  // Refresh version.json for client display (best-effort). TWO files: the root
+  // apps/lantern-garage/version.json (full build metadata) AND the SERVED static
+  // apps/lantern-garage/public/version.json that /version.json returns to the browser
+  // footer. Only bumping the root one left the deployed footer stuck at an old version
+  // even after a release rolled (the v1.8.0 "shows old build" report, 2026-07-10).
   try {
     const now = new Date().toISOString();
     fs.writeFileSync(
@@ -179,6 +183,8 @@ function main() {
         2,
       ) + '\n',
     );
+    const PUBLIC_VERSION_JSON = path.join(ROOT, 'apps/lantern-garage/public/version.json');
+    fs.writeFileSync(PUBLIC_VERSION_JSON, JSON.stringify({ version: newVersion }) + '\n');
   } catch { /* non-fatal */ }
 
   // Delete consumed fragments.
