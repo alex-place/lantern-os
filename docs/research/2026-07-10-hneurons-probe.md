@@ -78,9 +78,18 @@ causal here.* Likely reasons — the residual stream is redundant (zeroing 50 of
 downstream); the output margin is a weak target (baseline accuracy only 0.675 — the model barely knows
 many of these facts parametrically); K=50 or activation-zeroing may be too blunt vs the paper's setup.
 
+**K-sweep + mean-substitution (robustness) — `sigma0_hneurons_causal_sweep.py`:** swept K ∈ {50, 200,
+500, 1000} with mean-substitution (replace neuron with its dataset-mean, a more faithful intervention
+than zeroing), honesty vs random at each K. The honesty-minus-random accuracy drop stays tiny and
+**non-monotonic** (K=50: −0.025, K=200: +0.05, K=500: 0.0, K=1000: +0.0375; max **0.05**, below any
+sane threshold and within n=80 noise). So the null is **robust** — ablation does not collapse the
+output preference distinctly beyond random even at K=1000.
+
 **Consequence for gate-wiring:** treat H-Neurons as a strong **monitoring probe** (which it clearly is),
-**not** as a causal over-compliance lever — that claim needs a more thorough causal test (more neurons,
-mean-substitution, a compliance-specific behavior) before it's load-bearing.
+**not** as a demonstrated causal over-compliance lever — the causal claim does not reproduce on Ouro's
+output margin at any K up to 1000. (The output margin is a weak target — baseline acc only 0.675, the
+model barely knows many facts parametrically — so a compliance/instruction-following behavior might
+still show causality the factual margin can't; that's the remaining open test, not a claim we can make.)
 
 ## Still open
 
