@@ -109,12 +109,15 @@ jobWorker.start(2000); // Poll every 2 seconds for new jobs
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
 require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
-// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
-// PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
+// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and auto-merges
+// reviewed(APPROVE) + green + conflict-free PRs. Auto-merge is ON by default on the
+// single designated fleet host (PR_WATCHER_ENABLED=1); set PR_WATCHER_AUTOMERGE=0 to
+// review-only. Merge bar: green CI checks + a fleet-review APPROVE verdict, minus the
+// protected-path carve-out (auth/money/CI/secrets still need a human).
 const prWatcher = new PrWatcher({
   repoRoot, port,
   idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000),
-  autoMerge: process.env.PR_WATCHER_AUTOMERGE === "1",
+  autoMerge: process.env.PR_WATCHER_AUTOMERGE !== "0",
   mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
     ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
     : null,
@@ -123,6 +126,11 @@ const prWatcher = new PrWatcher({
     : null,
   // CI must run + go green before auto-merge. Opt out only for CI-less repos.
   requireChecks: process.env.PR_WATCHER_REQUIRE_CHECKS !== "0",
+  // The assigned-issue convergence gate (needs convergance-record + autowork-verified
+  // labels before a PR closing a human-assigned issue may land) is OFF by default —
+  // green + review-APPROVE is the merge bar. Re-enable with
+  // PR_WATCHER_ASSIGNED_ISSUE_GATE=1.
+  assignedIssueGate: process.env.PR_WATCHER_ASSIGNED_ISSUE_GATE === "1",
 });
 
 // Shared dependency bundle passed to every route module
@@ -863,8 +871,9 @@ server.listen(port, host, () => {
   // accounts multiplies auto-review comments (each comment also re-triggers the
   // others). Enable PR_WATCHER_ENABLED=1 on exactly ONE machine.
   if (process.env.PR_WATCHER_ENABLED === "1") {
+    // Auto-merge default is ON (green + review-APPROVE); PR_WATCHER_AUTOMERGE=0 for
+    // review-only. Current mode is exposed via prWatcher.getStatus().autoMerge.
     prWatcher.start();
-    console.log(`[PR Watcher] auto-merge ${process.env.PR_WATCHER_AUTOMERGE === "1" ? "ENABLED" : "off (set PR_WATCHER_AUTOMERGE=1 to land ready PRs)"}`);
   } else {
     console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
   }
