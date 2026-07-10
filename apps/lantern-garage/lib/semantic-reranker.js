@@ -103,4 +103,7 @@ async function semanticRerank(query, candidates, { topK = 3, textField = "text",
   }
 }
 
-module.exports = { semanticRerank };
+// Embedding + cosine are exported so other retrieval layers (e.g. the source-code
+// index in code-index.js) reuse the SAME nomic-embed/Ollama path instead of
+// duplicating the client — one embedding provider, per the convergence constraint.
+module.exports = { semanticRerank, embed: _embed, cosine: _cosine };
