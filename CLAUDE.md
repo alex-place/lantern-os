@@ -148,6 +148,10 @@ make check-node        # runs node --check on server.js + cloud-server.js
 npm run test:api --prefix apps/lantern-garage
 npm run test:chat --prefix apps/lantern-garage
 npm run test:ui --prefix apps/lantern-garage   # requires Playwright
+
+# Auth E2E (Playwright): guest → role-picker → authed → logout, header/SSO emulation,
+# email+password login. Boots the real server with a test-auth token. See docs/TEST-AUTH.md.
+npm run test:auth                              # from repo ROOT (specs are repo-level e2e)
 ```
 
 ### Python services

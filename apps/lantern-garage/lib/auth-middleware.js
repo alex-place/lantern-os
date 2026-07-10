@@ -24,55 +24,18 @@ function patreonAuthEnabled() {
   return isFlagEnabledOr("patreon_auth", true);
 }
 
-// Headers that only ever appear on traffic relayed through a reverse proxy or
-// tunnel (Cloudflare in front of lantern-os.net, nginx, Railway, etc.). A
-// genuine same-machine request from the owner's browser to 127.0.0.1 carries
-// none of these.
-const PROXY_HEADERS = [
-  "x-forwarded-for",
-  "x-forwarded-host",
-  "x-forwarded-proto",
-  "x-real-ip",
-  "forwarded",
-  "cf-connecting-ip",
-  "cf-ray",
-  "true-client-ip",
-];
-
-/**
- * Local-only access bypass (grants admin).
- * Two triggers, both intended for the owner's own machine only:
- *   1. Dev server on port 4178 (existing behavior).
- *   2. LANTERN_LOCAL_ADMIN=1 AND the request arrives on a loopback address.
- *
- * SECURITY: the loopback socket address is NOT proof of a local owner when the
- * server sits behind a reverse proxy or tunnel. lantern-os.net is fronted by
- * Cloudflare, so every visitor reaches Node from a loopback/proxy socket — the
- * old check handed admin (read + write of feature flags and nav) to the entire
- * internet. We therefore deny the bypass outright whenever the request carries
- * any proxy/forwarding header; only a direct, un-proxied local hit qualifies.
- */
+// The IP-based local-admin bypass (isLocalBypass: loopback socket / dev port 4178 /
+// LANTERN_LOCAL_ADMIN) was REMOVED. Trusting a socket address as "the owner" is
+// unsound behind a reverse proxy/tunnel and made localhost silently look logged-in.
+// All dev/test access now flows through the explicit, token-gated test-auth path
+// (lib/test-auth.js), which getSessionUser() resolves — so every gate below simply
+// evaluates the resulting role, with no bypass short-circuit. Set
+// LANTERN_TEST_AUTH_TOKEN and present X-Test-Auth (see lib/test-auth.js).
+//
+// SIGNOUT_COOKIE is retained: local-auth clears it on successful login. It no longer
+// gates any bypass (there is none), but keeping the constant avoids breaking that
+// import and lets a future flow reuse the marker.
 const SIGNOUT_COOKIE = "ln_signout";
-
-/** True when the request carries the explicit-signout marker cookie. */
-function hasSignoutMarker(req) {
-  const raw = (req.headers && req.headers.cookie) || "";
-  return raw.split(/;\s*/).some((c) => c === `${SIGNOUT_COOKIE}=1`);
-}
-
-function isLocalBypass(req) {
-  const headers = req.headers || {};
-  for (const h of PROXY_HEADERS) {
-    if (headers[h]) return false; // came through a proxy/tunnel → never "local"
-  }
-  // Owner explicitly signed out → suppress the dev/loopback bypass so "Sign out"
-  // actually yields a logged-out session (else port-4178 re-logs-in "Dev").
-  if (hasSignoutMarker(req)) return false;
-  if (req.socket?.localPort === 4178) return true;
-  if (process.env.LANTERN_LOCAL_ADMIN !== "1") return false;
-  const ip = req.socket?.remoteAddress || "";
-  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1";
-}
 
 /**
  * Require authentication for a route.
@@ -80,8 +43,6 @@ function isLocalBypass(req) {
  * Sends appropriate redirect (to /auth.html if not logged in).
  */
 function requireAuth(req, res) {
-  // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
-  if (isLocalBypass(req)) return true;
   // Auth gate disabled by an admin → treat everyone as an allowed guest.
   if (!patreonAuthEnabled()) return true;
 
@@ -102,9 +63,6 @@ function requireAuth(req, res) {
  * Sends 403 Forbidden if insufficient role.
  */
 function requireRole(req, res, requiredRole = "supporter") {
-  // Local-only bypass: dev port 4178, or LANTERN_LOCAL_ADMIN on loopback
-  if (isLocalBypass(req)) return true;
-
   // Role ordering comes from the one canonical hierarchy (role-hierarchy.js).
   const requiredLevel = roleLevel(requiredRole);
 
@@ -182,14 +140,11 @@ function protectStaticPage(requiredRole = "supporter") {
 /**
  * Check whether the current request has a per-feature entitlement (e.g. "trade").
  * Rules:
- *   - Local bypass (dev port 4178 / LANTERN_LOCAL_ADMIN on loopback) → granted.
  *   - role "admin" → granted (admins hold all entitlements implicitly).
  *   - otherwise → only if the user's profile has entitlements[key] === true.
  * Returns a boolean and never writes to the response.
  */
 function hasEntitlement(req, key) {
-  if (isLocalBypass(req)) return true;
-
   const session = getSessionUser(req);
   if (!session?.id) return false;
   if (session.role === "admin") return true;
@@ -212,8 +167,6 @@ function hasEntitlement(req, key) {
  * 403 (or 302 to login when unauthenticated) and returns false.
  */
 function requireEntitlement(req, res, key) {
-  if (isLocalBypass(req)) return true;
-
   const session = getSessionUser(req);
   if (!session?.id) {
     // Gate disabled → no login to redirect to; the entitlement still isn't
@@ -249,13 +202,12 @@ function requireEntitlement(req, res, key) {
 
 /**
  * Non-writing check: is this request from a staff member (admin OR tech_support)?
- * True for the local bypass or a session whose role is in STAFF_ROLES. Gates the
+ * True for a session whose role is in STAFF_ROLES. Gates the
  * account-support surface (accounts.html + /api/accounts/*). Membership is EXACT —
  * a paid tier at the same hierarchy level as tech_support does not qualify. Never
  * writes to the response.
  */
 function isStaff(req) {
-  if (isLocalBypass(req)) return true;
   return isStaffRole(getSessionUser(req)?.role);
 }
 
@@ -265,7 +217,6 @@ function isStaff(req) {
  * staff role, and returns false. Mirrors requireRole's response contract.
  */
 function requireStaff(req, res) {
-  if (isLocalBypass(req)) return true;
   const session = getSessionUser(req);
   if (!session?.id) {
     if (!patreonAuthEnabled()) {
@@ -285,23 +236,20 @@ function requireStaff(req, res) {
 
 /**
  * Non-writing check: does this request belong to an admin?
- * True for the local bypass (dev port 4178 / LANTERN_LOCAL_ADMIN on loopback)
- * or a session whose role is "admin". Never touches the response — use this
- * when you need to branch on admin status without sending a 403.
+ * True for a session (real or test-auth emulated) whose role is "admin". Never
+ * touches the response — use this to branch on admin status without sending a 403.
  */
 function isAdmin(req) {
-  if (isLocalBypass(req)) return true;
   return getSessionUser(req)?.role === "admin";
 }
 
 /**
- * Non-writing check: does this request meet a minimum role? True for the local
- * bypass, or a session whose role level is at least `requiredRole`. Never writes to
- * the response — use it to branch (e.g. render a friendly page) instead of letting
- * requireRole emit a raw JSON 403.
+ * Non-writing check: does this request meet a minimum role? True for a session
+ * whose role level is at least `requiredRole`. Never writes to the response — use
+ * it to branch (e.g. render a friendly page) instead of letting requireRole emit a
+ * raw JSON 403.
  */
 function meetsRole(req, requiredRole) {
-  if (isLocalBypass(req)) return true;
   const session = getSessionUser(req);
   if (!session?.id) return false;
   return roleLevel(session.role) >= roleLevel(requiredRole);
@@ -326,7 +274,6 @@ module.exports = {
   hasEntitlement,
   requireEntitlement,
   isAdmin,
-  isLocalBypass,
   meetsRole,
   SIGNOUT_COOKIE,
   protectStaticPage,
