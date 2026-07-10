@@ -1,0 +1,2327 @@
+{
+  "generatedAt": "2026-07-10T23:52:52.768Z",
+  "product": "UHLGA",
+  "from": "2026-02-03",
+  "to": "2026-07-09",
+  "lead": 1,
+  "params": {
+    "source": "fitted 2026-07-10 (n=1825)",
+    "hasFittedCeiling": false
+  },
+  "assumptions": {
+    "fill": "cards fill AT the D-1 EOD close print (no spread/slippage/size) — the only public prices; overstates fillable P&L",
+    "feeCentsFlat": 1,
+    "minEdgeCents": 5,
+    "forecast": "NBS MOS run from D-1 only (lead 1), rounded °F — matches the live kalshi-mos serve path"
+  },
+  "coverage": {
+    "days": 157,
+    "board": 68,
+    "mos": 157,
+    "settled": 68,
+    "clean": 55,
+    "scored": 55,
+    "priceFiles": 159,
+    "priceFilesMissing": 0
+  },
+  "calibration": {
+    "n": 55,
+    "oracle": {
+      "meanRPS": 0.153,
+      "pitChi2": 1.7879,
+      "pitHistogram": [
+        7,
+        5,
+        9,
+        8,
+        0,
+        7,
+        5,
+        0,
+        7,
+        7
+      ]
+    },
+    "market": {
+      "meanRPS": 0.36,
+      "pitChi2": 22.1515
+    },
+    "climatologyMeanRPS": 0.168,
+    "oracleBeatsMarketDays": "39/55",
+    "grid70to110": {
+      "n": 55,
+      "meanRPS": 0.4612,
+      "pitChi2": 12.2525,
+      "fitOOSReference": {
+        "fitted": 0.0356,
+        "default": 0.0508
+      }
+    }
+  },
+  "edges": {
+    "daysWithActionable": 64,
+    "cardsTotal": 234,
+    "cardsSettled": 224,
+    "cardsUndeterminable": 10,
+    "cardsAwaitingSettlement": 0,
+    "hitRate": 0.3393,
+    "netPnlCents": 6441,
+    "meanPnlCentsPerCard": 28.8,
+    "byMonth": {
+      "2026-02": {
+        "n": 41,
+        "pnl_c": 1804
+      },
+      "2026-03": {
+        "n": 104,
+        "pnl_c": 2416
+      },
+      "2026-04": {
+        "n": 79,
+        "pnl_c": 2221
+      }
+    },
+    "cards": [
+      {
+        "bucket": "<=32",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-12"
+      },
+      {
+        "bucket": "34",
+        "side": "no",
+        "ask": 0.93,
+        "worst_c": 71.7,
+        "fair": 0.1205,
+        "outcome": 0,
+        "pnl_c": 92,
+        "date": "2026-02-12"
+      },
+      {
+        "bucket": "35",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-12"
+      },
+      {
+        "bucket": "39",
+        "side": "no",
+        "ask": 0.19,
+        "worst_c": 8.2,
+        "fair": 0.0731,
+        "outcome": 0,
+        "pnl_c": 18,
+        "date": "2026-02-12"
+      },
+      {
+        "bucket": "<=31",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-13"
+      },
+      {
+        "bucket": "36",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-13"
+      },
+      {
+        "bucket": "37",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-13"
+      },
+      {
+        "bucket": "38",
+        "side": "no",
+        "ask": 0.42,
+        "worst_c": 14,
+        "fair": 0.1508,
+        "outcome": 1,
+        "pnl_c": -59,
+        "date": "2026-02-13"
+      },
+      {
+        "bucket": "<=38",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-14"
+      },
+      {
+        "bucket": "42",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-14"
+      },
+      {
+        "bucket": "43",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-14"
+      },
+      {
+        "bucket": "44",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-14"
+      },
+      {
+        "bucket": "<=35",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-15"
+      },
+      {
+        "bucket": "39",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-02-15"
+      },
+      {
+        "bucket": "40",
+        "side": "yes",
+        "ask": 0.06,
+        "worst_c": 5.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -7,
+        "date": "2026-02-15"
+      },
+      {
+        "bucket": "42",
+        "side": "no",
+        "ask": 0.6,
+        "worst_c": 40.3,
+        "fair": 0.1146,
+        "outcome": 0,
+        "pnl_c": 59,
+        "date": "2026-02-15"
+      },
+      {
+        "bucket": ">=44",
+        "side": "no",
+        "ask": 0.33,
+        "worst_c": 13.5,
+        "fair": 0.0663,
+        "outcome": 0,
+        "pnl_c": 32,
+        "date": "2026-02-15"
+      },
+      {
+        "bucket": "<=35",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-16"
+      },
+      {
+        "bucket": "38",
+        "side": "no",
+        "ask": 0.86,
+        "worst_c": 64.7,
+        "fair": 0.1205,
+        "outcome": 1,
+        "pnl_c": -15,
+        "date": "2026-02-16"
+      },
+      {
+        "bucket": "39",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-16"
+      },
+      {
+        "bucket": "<=41",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-17"
+      },
+      {
+        "bucket": "45",
+        "side": "no",
+        "ask": 0.27,
+        "worst_c": 5.7,
+        "fair": 0.1205,
+        "outcome": 0,
+        "pnl_c": 26,
+        "date": "2026-02-17"
+      },
+      {
+        "bucket": "47",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-02-17"
+      },
+      {
+        "bucket": "48",
+        "side": "no",
+        "ask": 0.37,
+        "worst_c": 9,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": 36,
+        "date": "2026-02-17"
+      },
+      {
+        "bucket": "<=37",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-18"
+      },
+      {
+        "bucket": "<=36",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-20"
+      },
+      {
+        "bucket": "42",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-20"
+      },
+      {
+        "bucket": "43",
+        "side": "no",
+        "ask": 0.4,
+        "worst_c": 20.3,
+        "fair": 0.1146,
+        "outcome": 0,
+        "pnl_c": 39,
+        "date": "2026-02-20"
+      },
+      {
+        "bucket": "39",
+        "side": "no",
+        "ask": 0.41,
+        "worst_c": 12.7,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": 40,
+        "date": "2026-02-22"
+      },
+      {
+        "bucket": "<=31",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-23"
+      },
+      {
+        "bucket": "36",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-02-23"
+      },
+      {
+        "bucket": "37",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-23"
+      },
+      {
+        "bucket": "38",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-23"
+      },
+      {
+        "bucket": "<=27",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-24"
+      },
+      {
+        "bucket": "40",
+        "side": "no",
+        "ask": 0.5,
+        "worst_c": 22,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": 49,
+        "date": "2026-02-26"
+      },
+      {
+        "bucket": "43",
+        "side": "no",
+        "ask": 0.24,
+        "worst_c": 15.6,
+        "fair": 0.0392,
+        "outcome": 0,
+        "pnl_c": 23,
+        "date": "2026-02-26"
+      },
+      {
+        "bucket": "44",
+        "side": "no",
+        "ask": 0.17,
+        "worst_c": 6.2,
+        "fair": 0.0731,
+        "outcome": 0,
+        "pnl_c": 16,
+        "date": "2026-02-27"
+      },
+      {
+        "bucket": ">=45",
+        "side": "no",
+        "ask": 0.26,
+        "worst_c": 6.5,
+        "fair": 0.0663,
+        "outcome": 0,
+        "pnl_c": 25,
+        "date": "2026-02-27"
+      },
+      {
+        "bucket": "<=42",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-02-28"
+      },
+      {
+        "bucket": "46",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-02-28"
+      },
+      {
+        "bucket": "49",
+        "side": "no",
+        "ask": 0.56,
+        "worst_c": 36.3,
+        "fair": 0.1146,
+        "outcome": 0,
+        "pnl_c": 55,
+        "date": "2026-02-28"
+      },
+      {
+        "bucket": "<=27",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-02"
+      },
+      {
+        "bucket": "42",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-03"
+      },
+      {
+        "bucket": "43",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-03"
+      },
+      {
+        "bucket": "44",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-03"
+      },
+      {
+        "bucket": "<=45",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-04"
+      },
+      {
+        "bucket": "48",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-04"
+      },
+      {
+        "bucket": "49",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-04"
+      },
+      {
+        "bucket": "50",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-03-04"
+      },
+      {
+        "bucket": "<=39",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-05"
+      },
+      {
+        "bucket": "41",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-05"
+      },
+      {
+        "bucket": "42",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-05"
+      },
+      {
+        "bucket": "43",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-05"
+      },
+      {
+        "bucket": "<=38",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-06"
+      },
+      {
+        "bucket": "42",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-06"
+      },
+      {
+        "bucket": "43",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-06"
+      },
+      {
+        "bucket": "44",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-06"
+      },
+      {
+        "bucket": "46",
+        "side": "no",
+        "ask": 0.2,
+        "worst_c": 9.2,
+        "fair": 0.0731,
+        "outcome": 0,
+        "pnl_c": 19,
+        "date": "2026-03-06"
+      },
+      {
+        "bucket": "<=59",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-08"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-08"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-08"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-08"
+      },
+      {
+        "bucket": "<=60",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-09"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-09"
+      },
+      {
+        "bucket": "65",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-09"
+      },
+      {
+        "bucket": "66",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-09"
+      },
+      {
+        "bucket": "<=60",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-10"
+      },
+      {
+        "bucket": "65",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-10"
+      },
+      {
+        "bucket": "66",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-10"
+      },
+      {
+        "bucket": "67",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-10"
+      },
+      {
+        "bucket": "<=58",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-11"
+      },
+      {
+        "bucket": "61",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-11"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-11"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-11"
+      },
+      {
+        "bucket": "<=50",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 98.9,
+        "fair": 0,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-12"
+      },
+      {
+        "bucket": ">=59",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 69.1,
+        "fair": 0.8467,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-12"
+      },
+      {
+        "bucket": "46",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-13"
+      },
+      {
+        "bucket": "47",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-13"
+      },
+      {
+        "bucket": "48",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-13"
+      },
+      {
+        "bucket": "<=47",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-14"
+      },
+      {
+        "bucket": "50",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-14"
+      },
+      {
+        "bucket": "51",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-14"
+      },
+      {
+        "bucket": "52",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-14"
+      },
+      {
+        "bucket": "<=44",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-15"
+      },
+      {
+        "bucket": "47",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-15"
+      },
+      {
+        "bucket": "48",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-15"
+      },
+      {
+        "bucket": "49",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-15"
+      },
+      {
+        "bucket": "59",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-16"
+      },
+      {
+        "bucket": "60",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-16"
+      },
+      {
+        "bucket": "61",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-16"
+      },
+      {
+        "bucket": "<=35",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-18"
+      },
+      {
+        "bucket": "38",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-18"
+      },
+      {
+        "bucket": "39",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-18"
+      },
+      {
+        "bucket": "40",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-18"
+      },
+      {
+        "bucket": "<=39",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-19"
+      },
+      {
+        "bucket": "44",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-19"
+      },
+      {
+        "bucket": "45",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-19"
+      },
+      {
+        "bucket": "46",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-19"
+      },
+      {
+        "bucket": "<=51",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-20"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-20"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-20"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-20"
+      },
+      {
+        "bucket": "<=53",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-21"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-21"
+      },
+      {
+        "bucket": "57",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-03-21"
+      },
+      {
+        "bucket": "58",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-21"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-22"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-22"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-22"
+      },
+      {
+        "bucket": "<=51",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 1,
+        "pnl_c": -1,
+        "date": "2026-03-23"
+      },
+      {
+        "bucket": "53",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-23"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-23"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-23"
+      },
+      {
+        "bucket": "<=43",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-24"
+      },
+      {
+        "bucket": "47",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-24"
+      },
+      {
+        "bucket": "48",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-03-24"
+      },
+      {
+        "bucket": "49",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-24"
+      },
+      {
+        "bucket": "<=51",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 57.1,
+        "fair": 0.2738,
+        "outcome": 1,
+        "pnl_c": -1,
+        "date": "2026-03-25"
+      },
+      {
+        "bucket": "52",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-25"
+      },
+      {
+        "bucket": "53",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-25"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-25"
+      },
+      {
+        "bucket": "<=63",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-26"
+      },
+      {
+        "bucket": "68",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-26"
+      },
+      {
+        "bucket": "69",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-26"
+      },
+      {
+        "bucket": "70",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-26"
+      },
+      {
+        "bucket": "<=58",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-27"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-27"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-27"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-27"
+      },
+      {
+        "bucket": "<=39",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-28"
+      },
+      {
+        "bucket": "44",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-28"
+      },
+      {
+        "bucket": "45",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-28"
+      },
+      {
+        "bucket": "46",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-28"
+      },
+      {
+        "bucket": "<=50",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-29"
+      },
+      {
+        "bucket": "53",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-29"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-29"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-29"
+      },
+      {
+        "bucket": "<=60",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-30"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-30"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-30"
+      },
+      {
+        "bucket": "65",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-30"
+      },
+      {
+        "bucket": "<=71",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-03-31"
+      },
+      {
+        "bucket": "74",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-31"
+      },
+      {
+        "bucket": "75",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-31"
+      },
+      {
+        "bucket": "76",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-03-31"
+      },
+      {
+        "bucket": "<=71",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-01"
+      },
+      {
+        "bucket": "73",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-01"
+      },
+      {
+        "bucket": "74",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-01"
+      },
+      {
+        "bucket": "75",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-01"
+      },
+      {
+        "bucket": "<=52",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 1,
+        "pnl_c": -1,
+        "date": "2026-04-02"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-02"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-02"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-02"
+      },
+      {
+        "bucket": "<=62",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-03"
+      },
+      {
+        "bucket": "66",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-03"
+      },
+      {
+        "bucket": "67",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-03"
+      },
+      {
+        "bucket": "68",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-03"
+      },
+      {
+        "bucket": "<=62",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-04"
+      },
+      {
+        "bucket": "67",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-04"
+      },
+      {
+        "bucket": "68",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-04"
+      },
+      {
+        "bucket": "69",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-04"
+      },
+      {
+        "bucket": "<=60",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 1,
+        "pnl_c": -1,
+        "date": "2026-04-05"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-05"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-05"
+      },
+      {
+        "bucket": "64",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-05"
+      },
+      {
+        "bucket": "<=52",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-06"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-06"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-06"
+      },
+      {
+        "bucket": "57",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-06"
+      },
+      {
+        "bucket": "<=48",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-07"
+      },
+      {
+        "bucket": "50",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-07"
+      },
+      {
+        "bucket": "51",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-07"
+      },
+      {
+        "bucket": "52",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-07"
+      },
+      {
+        "bucket": "<=45",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-08"
+      },
+      {
+        "bucket": "47",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-08"
+      },
+      {
+        "bucket": "48",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-08"
+      },
+      {
+        "bucket": "49",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-08"
+      },
+      {
+        "bucket": "<=49",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 1,
+        "pnl_c": -1,
+        "date": "2026-04-09"
+      },
+      {
+        "bucket": "51",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-09"
+      },
+      {
+        "bucket": "52",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-09"
+      },
+      {
+        "bucket": "53",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-09"
+      },
+      {
+        "bucket": "<=57",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-10"
+      },
+      {
+        "bucket": "61",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-10"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-10"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-10"
+      },
+      {
+        "bucket": "<=58",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-11"
+      },
+      {
+        "bucket": "61",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-11"
+      },
+      {
+        "bucket": "62",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-11"
+      },
+      {
+        "bucket": "63",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-11"
+      },
+      {
+        "bucket": "<=53",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-12"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-12"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-12"
+      },
+      {
+        "bucket": "57",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-12"
+      },
+      {
+        "bucket": "<=73",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 79.3,
+        "fair": 0.0745,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-13"
+      },
+      {
+        "bucket": "76",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-13"
+      },
+      {
+        "bucket": "77",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-13"
+      },
+      {
+        "bucket": "78",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-13"
+      },
+      {
+        "bucket": "<=79",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 57.1,
+        "fair": 0.2738,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-14"
+      },
+      {
+        "bucket": "80",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-14"
+      },
+      {
+        "bucket": "81",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-14"
+      },
+      {
+        "bucket": "82",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-14"
+      },
+      {
+        "bucket": "<=81",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-15"
+      },
+      {
+        "bucket": "85",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-15"
+      },
+      {
+        "bucket": "86",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-15"
+      },
+      {
+        "bucket": "87",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-15"
+      },
+      {
+        "bucket": "<=80",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 92.3,
+        "fair": 0.0111,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-16"
+      },
+      {
+        "bucket": "85",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-16"
+      },
+      {
+        "bucket": "86",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-16"
+      },
+      {
+        "bucket": "87",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-16"
+      },
+      {
+        "bucket": "<=73",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 87,
+        "fair": 0.0311,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-17"
+      },
+      {
+        "bucket": "77",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-17"
+      },
+      {
+        "bucket": "78",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-17"
+      },
+      {
+        "bucket": "79",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-17"
+      },
+      {
+        "bucket": "65",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-18"
+      },
+      {
+        "bucket": "66",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-18"
+      },
+      {
+        "bucket": "67",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-18"
+      },
+      {
+        "bucket": "<=52",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 69.1,
+        "fair": 0.1533,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-19"
+      },
+      {
+        "bucket": "54",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-19"
+      },
+      {
+        "bucket": "55",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-19"
+      },
+      {
+        "bucket": "56",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-19"
+      },
+      {
+        "bucket": "<=49",
+        "side": "no",
+        "ask": 1,
+        "worst_c": 57.1,
+        "fair": 0.2738,
+        "outcome": 0,
+        "pnl_c": 99,
+        "date": "2026-04-20"
+      },
+      {
+        "bucket": "50",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 10,
+        "fair": 0.1547,
+        "outcome": 1,
+        "pnl_c": 99,
+        "date": "2026-04-20"
+      },
+      {
+        "bucket": "51",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 11.4,
+        "fair": 0.1667,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-20"
+      },
+      {
+        "bucket": "52",
+        "side": "yes",
+        "ask": 0,
+        "worst_c": 9.7,
+        "fair": 0.1508,
+        "outcome": 0,
+        "pnl_c": -1,
+        "date": "2026-04-20"
+      }
+    ]
+  }
+}
