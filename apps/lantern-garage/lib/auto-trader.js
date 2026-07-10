@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const yahoo = require('./market-data-yahoo');
+const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
 
 // Per-trade outcome log (append-only JSONL) — the honest record that lets us
 // MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
@@ -50,6 +52,11 @@ const DEFAULTS = {
   exitMinPwin: 0.6,        // only exit on a STRONG bearish signal (p_win ≥ this)
   persistScans: 2,         // act only after the same direction holds N consecutive scans
   persistWindowMs: 200000, // …seen within this window (≈3 scans) — else it's stale
+  // ── Momentum / trailing exits — capture the peak instead of round-tripping it ──
+  trailPct: 3,             // trailing stop: exit a long if price falls this % from its PEAK
+  trailArmPct: 1.5,        // …but arm the trail only once the position has gained ≥ this %
+                           //    (so it locks GAINS; the entry−stopPct broker stop covers losses)
+  takeProfitPct: 0,        // hard take-profit % (0 = off — let the trailing stop run)
 };
 
 function cfg() {
@@ -71,6 +78,14 @@ function cfg() {
     requirePersist: process.env.TRADER_REQUIRE_PERSIST !== '0',          // on by default
     allowShorts: process.env.TRADER_ALLOW_SHORTS === '1',
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
+    // ── Exit management (trailing stop / take-profit / momentum death) ──────────
+    trailPct: n('TRADER_TRAIL_PCT', DEFAULTS.trailPct),
+    trailArmPct: n('TRADER_TRAIL_ARM_PCT', DEFAULTS.trailArmPct),
+    takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
+    momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
+    // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
+    // Lets the user protect open positions without arming full autopilot entries.
+    manageExits: process.env.TRADER_MANAGE_EXITS === '1',
   };
 }
 
@@ -121,6 +136,82 @@ function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.posi
 const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
 const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
+const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
+
+/** Close a held long at market: cancel its resting stop, clear per-symbol state,
+ *  log the realized outcome, and record it on `out`. Shared by every exit path. */
+async function closeLong(bridge, userId, sym, qty, hp, reason, out, now) {
+  const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+  await cancelRestingStops(bridge, userId, sym);
+  _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now);
+  logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
+  out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
+  return r;
+}
+
+/**
+ * Exit held LONGS on their own merits every scan — independent of whether a new
+ * scan signal fired — so a winner that peaks and fades doesn't round-trip:
+ *   1. take-profit  — close at a hard +% target (off by default).
+ *   2. trailing stop — once up ≥ trailArmPct, close if price falls trailPct from the PEAK.
+ *   3. momentum death — while in profit, close when the trend rolls over: MACD histogram
+ *      negative AND price below its short EMA (and RSI no longer strong). Catches "the
+ *      momentum is dying / about to die" before the full bearish signal would fire.
+ * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
+ */
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }) {
+  const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
+  if (!longs.length) return;
+
+  // Recent 15m bars for momentum — one batched fetch for all held longs (fail-soft).
+  let bars = {};
+  if (c.momentumExit) {
+    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), '15m'); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
+  }
+
+  for (const [sym, p] of longs) {
+    const qty = Number(p.qty) || 0;
+    const cur = Number(p.current_price) || 0;
+    const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;
+    if (!(qty > 0) || !(cur > 0) || !(entry > 0)) continue;
+
+    // Min-hold: never churn a just-opened long — the broker stop still protects it.
+    const entryAt = _entryAt.get(sym) || 0;
+    if (entryAt && (now - entryAt) < c.minHoldMs) continue;
+
+    const pnlPct = ((cur - entry) / entry) * 100;
+    const peak = Math.max(_peak.get(sym) || 0, cur, entry);   // running high-water mark
+    _peak.set(sym, peak);
+    const peakGainPct = ((peak - entry) / entry) * 100;         // best gain reached
+    const dropFromPeakPct = peak > 0 ? ((peak - cur) / peak) * 100 : 0;
+
+    // 1) Hard take-profit.
+    if (c.takeProfitPct > 0 && pnlPct >= c.takeProfitPct) {
+      await closeLong(bridge, userId, sym, qty, p, `take_profit (+${pnlPct.toFixed(1)}%)`, out, now);
+      delete heldQty[sym]; continue;
+    }
+    // 2) Trailing stop — only after the position has run up (locks GAINS, not losses).
+    if (c.trailPct > 0 && peakGainPct >= c.trailArmPct && dropFromPeakPct >= c.trailPct) {
+      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%)`, out, now);
+      delete heldQty[sym]; continue;
+    }
+    // 3) Momentum death — fading winner: MACD histogram negative + below short EMA.
+    if (c.momentumExit && pnlPct > 0) {
+      const closes = ((bars[sym] && bars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
+      if (closes.length >= 30) {
+        const m = macd(closes);
+        const ema9 = emaSeries(closes, 9);
+        const e9 = ema9[ema9.length - 1];
+        const last = closes[closes.length - 1];
+        const r = rsi(closes);
+        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55)) {
+          await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now);
+          delete heldQty[sym]; continue;
+        }
+      }
+    }
+  }
+}
 
 /**
  * Execute the ENTER verdicts from a scan against the user's IBKR account.
@@ -130,8 +221,9 @@ const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence
  */
 async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} } = {}) {
   const c = cfg();
-  const out = { executed: [], skipped: [], enabled: c.enabled };
-  if (!c.enabled) { out.reason = 'TRADER_AUTO_EXECUTE!=1 — autopilot off'; return out; }
+  const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
+  // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
+  if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
 
   const signals = (scan && Array.isArray(scan.signals)) ? scan.signals : [];
@@ -168,6 +260,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
       }
     }
   } catch (_e) { /* fail-soft — the daily-loss breaker still guards the account */ }
+
+  // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
+  //    death) — runs every scan, independent of new ENTER signals. This is what stops
+  //    a winner from peaking and giving it all back. ──
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out }); } catch (_e) { /* fail-soft */ }
+
+  // Entries require the full autopilot arm; exits-only mode stops here.
+  if (!c.enabled) { out.reason = 'exit-management only (TRADER_MANAGE_EXITS) — entries off'; return out; }
 
   if (!enters.length) { out.reason = 'no ENTER signals'; return out; }
 
