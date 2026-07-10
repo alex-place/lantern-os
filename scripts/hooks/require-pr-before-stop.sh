@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stop hook — DON'T STOP until finished work is on a PR. ("like Keystone would.")
+# Stop hook — DON'T STOP until finished work is on a PR. ("like unisona.ai would.")
 #
 # WHY: The repo rule is that work lands as a PR on the remote — not as local commits or
 # pushed-but-PR-less branches. At stop time this gate blocks (decision:block) on the two

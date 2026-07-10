@@ -6,7 +6,7 @@ updated: 2026-06-20
 
 # ALEX ASI Architecture
 
-**ALEX** - Artificial Learning EXtension, a three-layer ASI architecture for Keystone OS.
+**ALEX** - Artificial Learning EXtension, a three-layer ASI architecture for unisona.ai.
 
 ## Architecture Overview
 

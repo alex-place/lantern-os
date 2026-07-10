@@ -13,7 +13,7 @@ updated: 2026-07-03
 > doc now describes the real connectivity model. See
 > [ADR-0019](adr/0019-ibkr-connectivity-client-portal-gateway.md) for the decision.
 
-Keystone talks to Interactive Brokers over the **Client Portal Web API (CPAPI)**, served
+unisona.ai talks to Interactive Brokers over the **Client Portal Web API (CPAPI)**, served
 by a **gateway you run locally**. It reads your account summary and open positions, and
 (as of [ADR-0020](adr/0020-ibkr-live-order-placement.md)) can also **place orders — but
 those are DRY by default and hard-gated**: no real order is sent unless the kill-switch is
@@ -33,7 +33,7 @@ fabricated.
 Browser dashboard
    │  GET /api/trading/ibkr/status | /account | /positions
    ▼
-Keystone server (routes/trading.js → lib/trading-api-bridge.js)
+unisona.ai server (routes/trading.js → lib/trading-api-bridge.js)
    ▼
 lib/ibkr-cpapi.js  ── HTTPS ──▶  Client Portal Gateway  (https://localhost:5000/v1/api)
                                        │  authenticated browser SSO session
@@ -41,8 +41,8 @@ lib/ibkr-cpapi.js  ── HTTPS ──▶  Client Portal Gateway  (https://local
                                  Interactive Brokers
 ```
 
-The gateway holds an **authenticated session**. Keystone keeps it warm with `POST /tickle`
-and checks `iserver.authStatus` before every read. No session ⇒ Keystone honestly reports
+The gateway holds an **authenticated session**. unisona.ai keeps it warm with `POST /tickle`
+and checks `iserver.authStatus` before every read. No session ⇒ unisona.ai honestly reports
 **disconnected** (it never fabricates numbers).
 
 ---
@@ -67,9 +67,9 @@ Open **https://localhost:5000** in a browser and log in with your IBKR username/
 local gateway; proceed. Once you see "Client login succeeds", the session is live.
 
 > **Paper trading:** log in with your paper credentials. Paper accounts have ids beginning
-> `DU`; live accounts begin `U`. Keystone infers and reports `mode: paper|live` from the id.
+> `DU`; live accounts begin `U`. unisona.ai infers and reports `mode: paper|live` from the id.
 
-### 3. (Optional) Configure Keystone
+### 3. (Optional) Configure unisona.ai
 
 All optional — the defaults work for a standard local gateway. Add to `.env` at repo root:
 
@@ -138,7 +138,7 @@ is wrong). Start the Client Portal Gateway / IBeam and retry. On loopback this f
 in (or it expired — CPAPI sessions time out after inactivity). Re-open https://localhost:5000
 and log in again, or let IBeam re-auth.
 
-**Certificate errors on a remote gateway** — the gateway's cert is self-signed. Keystone skips
+**Certificate errors on a remote gateway** — the gateway's cert is self-signed. unisona.ai skips
 verification only for loopback hosts. For a non-loopback gateway you trust, set
 `IBKR_TLS_INSECURE=1` (understand the risk) or install the gateway cert.
 
@@ -150,7 +150,7 @@ verification only for loopback hosts. For a non-loopback gateway you trust, set
   real order unless every gate in `lib/trading-guard.js` passes (kill-switch absent,
   `TRADER_LIVE=1`, within `MAX_ORDER_QTY`/`MAX_ORDER_NOTIONAL`, live account opt-in) — see
   [ADR-0020](adr/0020-ibkr-live-order-placement.md).
-- No secrets in code or logs; the account id is the only IBKR value Keystone stores (in `.env`).
+- No secrets in code or logs; the account id is the only IBKR value unisona.ai stores (in `.env`).
 - TLS verification is skipped **only** for loopback (the gateway's self-signed cert); remote
   hosts are verified unless you explicitly opt out.
 - `.env` must stay in `.gitignore`.

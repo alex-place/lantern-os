@@ -8,7 +8,7 @@ symbol tracking, and edge cases.
 Test Scenarios:
 1. Seeker + Lantern (default combo) — all 7 stages
 2. Healer + Xenon (archetype swap) — different door ordering
-3. Explorer + Keystone (fox trigger + agent ordering)
+3. Explorer + unisona.ai (fox trigger + agent ordering)
 4. Symbol Unlock Testing (2 loops for hidden door unlocks)
 5. Edge Cases (narration length, concatenation, no truncation)
 """
@@ -230,7 +230,7 @@ class TestP4HealerXenonArchetypeSwap:
 
 
 class TestP4ExplorerKeystoneAgentOrdering:
-    """Test Scenario 3: Explorer + Keystone (fox at even stages + agent ordering)"""
+    """Test Scenario 3: Explorer + unisona.ai (fox at even stages + agent ordering)"""
 
     @pytest.fixture
     def temp_data_dir(self):
@@ -264,7 +264,7 @@ class TestP4ExplorerKeystoneAgentOrdering:
                 f"Explorer should have fox_present=true at stage {stage_idx}"
 
     def test_keystone_orders_doors_by_affinity(self, engine):
-        """Test Scenario 3, Part B: Keystone agent orders doors by agent_affinity."""
+        """Test Scenario 3, Part B: unisona.ai agent orders doors by agent_affinity."""
         state = engine._load_state()
         state.archetype = "explorer"
         state.agent = "keystone"
@@ -273,7 +273,7 @@ class TestP4ExplorerKeystoneAgentOrdering:
         engine.start_game()
         scene = engine.choose_door("A")
 
-        # Keystone uses agent_affinity sorting
+        # unisona.ai uses agent_affinity sorting
         doors = scene["doors"]
         assert len(doors) >= 3, "Should have at least 3 doors"
 
@@ -282,7 +282,7 @@ class TestP4ExplorerKeystoneAgentOrdering:
         assert "A" in labels and "B" in labels and "C" in labels
 
     def test_explorer_keystone_full_loop_with_symbol_tracking(self, engine):
-        """Test Scenario 3, Part C: Explorer/Keystone full loop with symbol increment."""
+        """Test Scenario 3, Part C: Explorer/unisona.ai full loop with symbol increment."""
         state = engine._load_state()
         state.archetype = "explorer"
         state.agent = "keystone"
@@ -668,7 +668,7 @@ class TestP4FullIntegrationReport:
             "doors_sampled": len(set(scenario2_doors)),
         }
 
-        # Scenario 3: Explorer + Keystone
+        # Scenario 3: Explorer + unisona.ai
         engine3 = ThreeDoorsEngine("scenario3")
         engine3.data_dir = Path(temp_data_dir) / "scenario3"
         engine3.data_dir.mkdir(exist_ok=True)

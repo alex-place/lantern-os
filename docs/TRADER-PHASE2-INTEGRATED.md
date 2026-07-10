@@ -22,7 +22,7 @@ updated: 2026-06-20
 **New approach:** Integrated capability (within Lantern)
 - Single Node.js process (4177/4178)
 - Single dashboard, single memory model
-- "Keystone OS IS the cockpit" — trader is just another capability
+- "unisona.ai IS the cockpit" — trader is just another capability
 
 ---
 

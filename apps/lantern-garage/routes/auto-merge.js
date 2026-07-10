@@ -47,7 +47,7 @@ module.exports = async function autoMergeRoutes(req, res, url, deps) {
     return true;
   }
 
-  // POST /api/merge/apply-improvements — Apply Keystone recommendations
+  // POST /api/merge/apply-improvements — Apply unisona.ai recommendations
   if (req.method === 'POST' && url.pathname === '/api/merge/apply-improvements') {
     try {
       const body = await collectRequestBody(req);
@@ -60,7 +60,7 @@ module.exports = async function autoMergeRoutes(req, res, url, deps) {
     return true;
   }
 
-  // POST /api/merge/keystone-response — Process Keystone training response
+  // POST /api/merge/keystone-response — Process unisona.ai training response
   if (req.method === 'POST' && url.pathname === '/api/merge/keystone-response') {
     try {
       const body = await collectRequestBody(req);

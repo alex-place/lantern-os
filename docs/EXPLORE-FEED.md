@@ -40,7 +40,7 @@ fetching infrastructure:
 | `watch`  | [`routes/youtube.js`](../apps/lantern-garage/routes/youtube.js) `load()` | lanternYT channel |
 | `build`  | [`routes/github-activity.js`](../apps/lantern-garage/routes/github-activity.js) `load()` | repo releases + commits |
 | `belief` | [`lib/flourishing-feeds.js`](../apps/lantern-garage/lib/flourishing-feeds.js) `panel()` | fused world-model beliefs |
-| `doc`    | `data/knowledge/index.meta.json` | Keystone knowledge index |
+| `doc`    | `data/knowledge/index.meta.json` | unisona.ai knowledge index |
 
 Each producer runs under an 8 s timeout; a source that fails or times out drops **only its own
 cards** (`Promise.allSettled` + per-producer `.catch(() => [])`). The page never blanks.

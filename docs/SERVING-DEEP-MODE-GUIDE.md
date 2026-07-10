@@ -25,7 +25,7 @@ and are locked by `tests/test_serving_modes.py`.)
 ## How to choose
 
 **Use FAST (the default) for:**
-- Interactive dream-chat / Keystone Desk replies — anything a human is waiting on.
+- Interactive dream-chat / unisona.ai Desk replies — anything a human is waiting on.
 - UX feedback loops, real-time systems, high-volume requests.
 - Tasks where a sub-2s response matters more than maximal reasoning depth.
 

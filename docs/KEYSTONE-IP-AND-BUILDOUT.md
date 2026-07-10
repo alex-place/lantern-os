@@ -4,13 +4,13 @@ created: 2026-06-22
 updated: 2026-06-22
 ---
 
-# Keystone OS — IP Register & 2-Year Buildout Plan
+# unisona.ai — IP Register & 2-Year Buildout Plan
 
-> **One line:** the high-signal inventions inside Keystone OS, the protection vehicle
+> **One line:** the high-signal inventions inside unisona.ai, the protection vehicle
 > chosen for each, and the 24-month plan that builds and ships them — every claim tagged
 > by the External Reality Rule.
 
-> **Reading contract.** This document follows Keystone's own **External Reality Rule**:
+> **Reading contract.** This document follows unisona.ai's own **External Reality Rule**:
 > every material claim carries evidence (a file, a measured number, a citation) and is
 > tagged **[implemented]** (code exists and runs), **[measured]** (a number was produced
 > by a run), **[grounded]** (external peer literature supports it), or
@@ -27,8 +27,8 @@ not accidental:
 
 1. **Publishing establishes a priority / prior-art date.** Once this article is public, the
    inventions described below are timestamped public knowledge. That **blocks others from
-   patenting them** and protects Keystone's freedom to operate.
-2. **Publishing forecloses Keystone's own patents on the disclosed specs** — strictly
+   patenting them** and protects unisona.ai's freedom to operate.
+2. **Publishing forecloses unisona.ai's own patents on the disclosed specs** — strictly
    outside the US (most jurisdictions have an *absolute novelty* bar: any enabling public
    disclosure before filing kills the patent), and in the US after a **12-month grace
    period** from first disclosure.
@@ -37,7 +37,7 @@ not accidental:
    project: it secures freedom-to-operate, authorship, and brand for ~$1k of trademark
    filings instead of $40k+ of patent prosecution with examination risk.
 
-**False-marking note.** Nothing in Keystone is currently *patent pending* — no provisional
+**False-marking note.** Nothing in unisona.ai is currently *patent pending* — no provisional
 or non-provisional application has been filed. In the US, marking an unfiled invention
 "patent pending" is improper. The register below uses honest status labels
 (*Defensive publication* / *Trademark — to file* / *Copyright*), and reserves a
@@ -75,7 +75,7 @@ roadmaps: the [Progress Report](KEYSTONE-PROGRESS-REPORT-2026-06-19.md) §6, the
 
 | Milestone | Loop stage | IP action | Source / status |
 |---|---|---|---|
-| **File trademarks** for "Keystone OS" + "CSF" (clearance search first) | — | Trademark — file | §3.2 · [planned] |
+| **File trademarks** for "unisona.ai" + "CSF" (clearance search first) | — | Trademark — file | §3.2 · [planned] |
 | **Publish this IP register** + arXiv the collapse certificate | — | Defensive publication | §4.5 · [planned] |
 | **Gate Act with the grounding throttle**; attach the **Σ₀ decode canary** to the live loop | Act, Verify | Defensive pub (§4.2) | Progress Report §6 · [design] |
 | **Fix Σ₀ routing** (`ouro:latest` reachable on default+coding intents) + ship client contract (`SIGMA0_BASE_URL`) | Reason→Act | — | Portfolio §6 P0 · [design] |
@@ -139,13 +139,13 @@ to pull from publication and patent instead (see §6).
 
 | Mark | Type | Strength | Status | Note |
 |---|---|---|---|---|
-| **Keystone OS** / **Keystone** | Word mark | Strong (arbitrary in context) | **File first** | Clearance search needed — "Keystone" is a common word; check for prior software marks |
+| **unisona.ai** / **unisona.ai** | Word mark | Strong (arbitrary in context) | **File first** | Clearance search needed — "unisona.ai" is a common word; check for prior software marks |
 | **CSF** / **Convergence-Fitted Searchable Format** | Word mark | Strong (coined) | File | The format name; clean coinage |
 | **Σ₀ Collapse Certificate** | Word mark | Moderate (Σ₀ is stylized) | File w/ brand | Protect the compound, not the glyph alone |
 | **Convergence Core** | Word mark | Moderate (descriptive-leaning) | File w/ brand | Core architecture name |
 | **Convergence Lattice** · **Status Cube** · **Observer Mesh Cube** | Word marks | Weaker (descriptive) | Optional | Register as part of the brand family if budget allows |
 | **Convergence-IO** | Word mark | Moderate | Optional | Primitive-stack name |
-| ⚠️ **"Ouro" / "Ouro Coder"** | — | **Do NOT claim** | **Avoid** | "Ouro" is **ByteDance's** model name (Apache-2.0). Brand the coder as **"Σ₀ Coder"** or **"Keystone Coder"** to avoid riding a third party's mark. Describe the integration ("the Σ₀ coder runs on Ouro"), don't trademark it. |
+| ⚠️ **"Ouro" / "Ouro Coder"** | — | **Do NOT claim** | **Avoid** | "Ouro" is **ByteDance's** model name (Apache-2.0). Brand the coder as **"Σ₀ Coder"** or **"unisona.ai Coder"** to avoid riding a third party's mark. Describe the integration ("the Σ₀ coder runs on Ouro"), don't trademark it. |
 
 ### 3.3 Copyright
 
@@ -264,7 +264,7 @@ stay on the *minimal-wavefront + unified store/move* mechanism.
 
 ### 4.4 CSF-Omni format
 
-**What it is.** Keystone's one lossless binary container, with a **deterministic best-fit
+**What it is.** unisona.ai's one lossless binary container, with a **deterministic best-fit
 compression** stage and built-in integrity (SHA-256 + CRC), reporting **422×** on the memory
 log (up from 14× with the old zlib path) — matching the best-in-field coder while strictly
 beating every other tested codec.
@@ -442,7 +442,7 @@ publication is strictly the better vehicle for those.
 - Several specs (§4.3, §4.4, §4.7) have **high prior-art exposure** and are deliberately
   routed to defensive publication, not patent — the repo's own falsification work is cited
   rather than hidden.
-- Trademark strength varies; "Keystone" needs clearance and "Ouro" must **not** be claimed
+- Trademark strength varies; "unisona.ai" needs clearance and "Ouro" must **not** be claimed
   (it is ByteDance's mark).
 - Publication value is real but contingent: it secures freedom-to-operate, priority, and
   authorship — it does **not** by itself create licensing revenue.

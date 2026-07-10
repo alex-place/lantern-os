@@ -1,5 +1,5 @@
 /**
- * Repo Context — File search and grounding for Keystone Kernel
+ * Repo Context — File search and grounding for unisona.ai Kernel
  *
  * Provides:
  * - searchRepoFiles(query) — find relevant files

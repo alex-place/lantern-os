@@ -17,7 +17,7 @@ Proposed — awaiting approval from Alex Place.
 
 ## Context
 
-Keystone OS is built and maintained by one developer plus a fleet of concurrent agents. The
+unisona.ai is built and maintained by one developer plus a fleet of concurrent agents. The
 gravitational pull on such a system is **sprawl**: each agent, asked to "add a feature," tends
 to add a *new top-level subsystem* (a dream engine, a swarm framework, a second planner). Left
 unchecked, this produces a coordination nightmare and dilutes the thesis.

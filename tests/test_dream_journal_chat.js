@@ -89,7 +89,7 @@ async function run() {
     const agentName = r.body.agent;
     assert.ok(agentName, "should have agent name");
     assert.ok(
-      agentName.includes("Keystone") || agentName.includes("Founder") || agentName.includes("Blinkbug"),
+      agentName.includes("unisona.ai") || agentName.includes("Founder") || agentName.includes("Blinkbug"),
       `anchor/memory should select keystone-ish agent, got: ${agentName}`
     );
   });

@@ -4,9 +4,9 @@ created: 2026-06-02
 updated: 2026-06-20
 ---
 
-# Contributing to Keystone OS
+# Contributing to unisona.ai
 
-Thank you for your interest in contributing to Keystone OS! This document provides guidelines and instructions for contributing to the project.
+Thank you for your interest in contributing to unisona.ai! This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct
 

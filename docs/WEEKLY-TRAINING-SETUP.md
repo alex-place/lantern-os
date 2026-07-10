@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Keystone OS now has a **weekly self-improvement loop** that:
+The unisona.ai now has a **weekly self-improvement loop** that:
 
 1. **Dispatches training jobs** to free GPU providers (Kaggle + Lightning = 52 h/week)
 2. **Runs HumanEval benchmarks** on the trained Ouro model

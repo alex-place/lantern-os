@@ -1,6 +1,6 @@
-# Keystone-Σ₀: self-converging local kernel + chat harness for sustained autonomous work
+# unisona.ai-Σ₀: self-converging local kernel + chat harness for sustained autonomous work
 
-> **Status:** Internal design document (design-only; proposes no merge by itself). Solo developer (Alex Place), Keystone OS.
+> **Status:** Internal design document (design-only; proposes no merge by itself). Solo developer (Alex Place), unisona.ai.
 > **Method & integrity rule.** Follows the same discipline as [FRONTIER-DIRECTIONS-2026-H2.md](FRONTIER-DIRECTIONS-2026-H2.md): every important claim carries `[claim, evidence, confidence, source]`, and where an earlier "ahead" framing was refuted this document adopts the corrected verdict. Nothing here auto-promotes a model or opens a valve — each step is evidence-gated.
 > **Governing ADRs:** [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) (own the Σ₀ base, Proposed), [ADR-0010](adr/0010-verify-gated-continual-learning-last-resort.md) (adapter-only, frozen base, Proposed), [ADR-0005](adr/0005-interchangeable-model-providers.md) (models interchangeable), [ADR-0009](adr/0009-one-routing-contract-cloud-primary-coding.md) (cloud-primary coding contract).
 
@@ -8,7 +8,7 @@
 
 ## 0. One paragraph
 
-The three things asked for — **Keystone chat**, the **new Σ₀ model**, and the **adapter based on loopcoder** — are not three independent builds. They are one move: make the local kernel *self-converging* (it knows its own depth, when it has halted, and how uncertain it was), and then **wire those signals all the way up** through serving → registry → chat → canaries → the autonomous-work loop. The payoff is *sustained* work, because a long-running loop only stays alive if its pump (Reason) spends compute adaptively and its leak (Verify) actually drains uncertainty. Today the kernel already emits these signals for Ouro (`src/sigma0/loop_lm.py`, `src/sigma0/decode_canary.py`, `ouro_serve.py`'s `x-ouro-depth` header) — but the owned PLT base can't yet (Stage 0 parity unproven). On the Verify side the surprise leak is **already wired and fed on master** (#1678 valve + #1673/#1676/#1681 calibration) — it now only awaits the *local serving emit* of per-token logprobs (Track M). What remains genuinely open for sustained work is the **Converge** side: the loop has **no way to recover from a wedge or notice its own decay** (this session adds the first — the wedge-recovery ceiling; the drift monitor is next). This design closes those three gaps without adding a subsystem.
+The three things asked for — **unisona.ai chat**, the **new Σ₀ model**, and the **adapter based on loopcoder** — are not three independent builds. They are one move: make the local kernel *self-converging* (it knows its own depth, when it has halted, and how uncertain it was), and then **wire those signals all the way up** through serving → registry → chat → canaries → the autonomous-work loop. The payoff is *sustained* work, because a long-running loop only stays alive if its pump (Reason) spends compute adaptively and its leak (Verify) actually drains uncertainty. Today the kernel already emits these signals for Ouro (`src/sigma0/loop_lm.py`, `src/sigma0/decode_canary.py`, `ouro_serve.py`'s `x-ouro-depth` header) — but the owned PLT base can't yet (Stage 0 parity unproven). On the Verify side the surprise leak is **already wired and fed on master** (#1678 valve + #1673/#1676/#1681 calibration) — it now only awaits the *local serving emit* of per-token logprobs (Track M). What remains genuinely open for sustained work is the **Converge** side: the loop has **no way to recover from a wedge or notice its own decay** (this session adds the first — the wedge-recovery ceiling; the drift monitor is next). This design closes those three gaps without adding a subsystem.
 
 ---
 
@@ -25,9 +25,9 @@ The three asks map onto this cleanly:
 
 | Asked for | What it is | Loop stage(s) | The sustained-work failure it removes |
 |---|---|---|---|
-| **New Σ₀ model** | Keystone-Σ₀ PLT — own the LoopCoder-V2 forward, frozen base (ADR-0011) | **Reason** | A rented kernel whose forward we can't change → can't add a halt signal or fit the 8 GB box |
+| **New Σ₀ model** | unisona.ai-Σ₀ PLT — own the LoopCoder-V2 forward, frozen base (ADR-0011) | **Reason** | A rented kernel whose forward we can't change → can't add a halt signal or fit the 8 GB box |
 | **Adapter based on loopcoder** | **Adaptive Loop Gate (ALG)** — trained halt head + loop gate over the frozen PLT base | **Reason + Converge** | Fixed depth 2 burns compute on easy tokens and has *no native "I'm done" signal* |
-| **Keystone chat** | The harness that *consumes* depth + halt + surprise + canary telemetry to route / escalate / abstain | **Verify** | The surprise-leak valve is installed but never fed → uncertainty never drains; the loop can't notice its own decay or recover from a wedge |
+| **unisona.ai chat** | The harness that *consumes* depth + halt + surprise + canary telemetry to route / escalate / abstain | **Verify** | The surprise-leak valve is installed but never fed → uncertainty never drains; the loop can't notice its own decay or recover from a wedge |
 
 ---
 
@@ -93,7 +93,7 @@ Every local-kernel response carries a small, typed envelope — an **extension**
 
 It flows: **serving endpoint** (`ouro_serve.py` / the PLT serve stage) → **Node adapter** (a thin reader in `serving-modes.js` / the registry call site) → **chat** (`stream-chat.js`) → **canaries + council** → **autowork**. This is the spine of the whole design; each artifact below either *produces* or *consumes* it.
 
-### 3.1 The Σ₀ model — Keystone-Σ₀ PLT (own the Reason substrate)
+### 3.1 The Σ₀ model — unisona.ai-Σ₀ PLT (own the Reason substrate)
 
 No change to ADR-0011's plan; this design depends on it and sequences behind it.
 
@@ -117,7 +117,7 @@ This is the heart of the ask: the "adapter based on loopcoder" is the [Adaptive 
 
 **Loop stage:** Reason (adaptive depth) + Converge (halt = native convergence certificate). **Sprawl check:** an additive `nn.Module` on the existing PLT port; adapter-only per ADR-0010; no new serving path (reuses `ouro_serve.py`/bridge pattern).
 
-### 3.3 Keystone chat — the harness that consumes the certificate
+### 3.3 unisona.ai chat — the harness that consumes the certificate
 
 Chat stops being a dumb pipe to a provider and becomes the **resonator controller**. It reads `Σ₀Telemetry` and applies deterministic policies. All of these are *extensions* of code that exists.
 

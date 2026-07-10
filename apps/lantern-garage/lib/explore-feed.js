@@ -147,10 +147,10 @@ async function buildCards() {
     type: "build",
     title: (r.name || r.tag) + " released",
     url: r.url,
-    source: "Keystone Build",
+    source: "unisona.ai Build",
     published: r.date || null,
     topics: ["keystone", "building"],
-    image: genThumb("build", (r.name || r.tag) + " released", "Keystone Build"),
+    image: genThumb("build", (r.name || r.tag) + " released", "unisona.ai Build"),
     evidence: { why: "New release " + (r.tag || ""), source: repo || "GitHub" },
   }));
   const com = (data.commits || []).map((c) => ({
@@ -158,10 +158,10 @@ async function buildCards() {
     type: "build",
     title: c.msg || "commit " + (c.sha || ""),
     url: c.url,
-    source: "Keystone Build",
+    source: "unisona.ai Build",
     published: c.date || null,
     topics: ["keystone", "building"],
-    image: genThumb("build", c.msg || "commit " + (c.sha || ""), "Keystone Build"),
+    image: genThumb("build", c.msg || "commit " + (c.sha || ""), "unisona.ai Build"),
     evidence: { why: "Recent commit " + (c.sha || ""), source: repo || "GitHub" },
   }));
   return [...rel, ...com].filter((c) => c.url);
@@ -304,7 +304,7 @@ function docCards() {
         topics: (ext && ext.topics) || ["keystone", "research"],
         image: genThumb("doc", base, source),
         evidence: {
-          why: ext ? "Indexed external reference doc" : "Indexed Keystone reference doc",
+          why: ext ? "Indexed external reference doc" : "Indexed unisona.ai reference doc",
           source: (ext && ext.url) || doc,
         },
       };

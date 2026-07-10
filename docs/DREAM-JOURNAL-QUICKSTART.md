@@ -4,7 +4,7 @@ created: 2026-06-05
 updated: 2026-06-20
 ---
 
-# Keystone OS Dream Journal - Lightweight Deployment
+# unisona.ai Dream Journal - Lightweight Deployment
 
 ## Quick Start (Dream Journal Only)
 

@@ -875,7 +875,7 @@ const REGISTRY = {
   // if unavailable. OPERATOR policy (shell execution).
   local_eval_keystone_run: {
     policy: "shell",
-    desc: "Run the Keystone eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
+    desc: "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
     schema: {
       type: "object",
       properties: {

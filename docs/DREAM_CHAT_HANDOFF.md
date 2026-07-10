@@ -324,7 +324,7 @@ open http://127.0.0.1:4177/dream-chat.html
 
 # 3. Test journey:
 #    a. Click "New Chat"
-#    b. Select persona (Lantern, Blinkbug, Keystone, etc.)
+#    b. Select persona (Lantern, Blinkbug, unisona.ai, etc.)
 #    c. Type message: "Hello"
 #    d. Check progress bar (should show 0-100%)
 #    e. Wait for response

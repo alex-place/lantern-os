@@ -1,4 +1,4 @@
-// report-card.js — grounded, letter-grade self-assessment of Keystone OS.
+// report-card.js — grounded, letter-grade self-assessment of unisona.ai.
 //
 // Strengthens the Verify/Converge stage of the loop: an honest scorecard the
 // user can check, where every grade is earned by evidence. The Σ₀ rule here is
@@ -137,7 +137,7 @@ function formatEvidenceForPrompt(ev) {
 // The grading methodology — distilled from the report-card skill. The hard rules:
 // honesty over flattery, spread the grades, cite a real receipt per row, and an
 // honest "couldn't verify" beats an invented grade.
-const REPORT_CARD_SYSTEM_PROMPT = `You are producing an honest, evidence-grounded LETTER-GRADE report card for Keystone OS as it actually is right now.
+const REPORT_CARD_SYSTEM_PROMPT = `You are producing an honest, evidence-grounded LETTER-GRADE report card for unisona.ai as it actually is right now.
 
 This is a Σ₀ artifact: external reality beats internal consistency. A report card graded from vibes is worse than none — it launders feeling into a letter. The user lives inside this project; what they cannot get from themselves is a frank outside read with receipts. That is the deliverable.
 

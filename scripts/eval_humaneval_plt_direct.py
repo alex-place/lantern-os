@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Direct HumanEval runner for the Keystone-Σ₀ PLT coder — no lantern node server.
+"""Direct HumanEval runner for the unisona.ai-Σ₀ PLT coder — no lantern node server.
 
 Why this exists (measured 2026-07-05, issue #2135 follow-up): the PLT model emits
 no stop token, so greedy decode always burns the full `num_predict`. On a 12 GB

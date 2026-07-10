@@ -226,7 +226,7 @@ record = ConvergenceRecord(
 | Component | Status | Notes |
 |-----------|--------|-------|
 | API routes | ✓ Functional | dream, trading, convergence endpoints |
-| Tool execution | ✓ Working | Keystone can spawn agents, place orders |
+| Tool execution | ✓ Working | unisona.ai can spawn agents, place orders |
 | Success reporting | ⚠ Partial | Routes return JSON but no standardized success field |
 
 **Assessment:** ✓ Act stage is functional.

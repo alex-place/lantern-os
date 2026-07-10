@@ -7,7 +7,7 @@ updated: 2026-07-03
 # Architecture Decision Records (ADRs)
 
 This directory holds the **canonical, append-only log of architectural decisions** for
-Keystone OS. An ADR captures *one* decision: the context that forced it, the choice made,
+unisona.ai. An ADR captures *one* decision: the context that forced it, the choice made,
 its status, and the consequences we accept by making it.
 
 ADRs are how we keep architectural knowledge from scattering across ~120 ad-hoc docs and

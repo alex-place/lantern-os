@@ -7,7 +7,7 @@ created: 2026-06-22
 
 # Σ₀ — The Collapse Certificate, Explained
 
-*The math behind why Keystone stays grounded — and what happens when it doesn't.*
+*The math behind why unisona.ai stays grounded — and what happens when it doesn't.*
 
 ---
 
@@ -18,7 +18,7 @@ A self-improving system that only ever looks inward — that optimizes against i
 1. **It freezes.** It settles into a dead, self-agreeing state. Every query gets the same answer. Mirrors agreeing with mirrors.
 2. **It runs away.** With nothing to push back against, it diverges without limit.
 
-The only escape is an **external anchor** — real data, a market price, a new user query, a failing test. Grounding is the safety mechanism. This is why every Keystone conversation loops back through real retrieval, real user input, and real external tools. It is not a design preference; it is what the math requires.
+The only escape is an **external anchor** — real data, a market price, a new user query, a failing test. Grounding is the safety mechanism. This is why every unisona.ai conversation loops back through real retrieval, real user input, and real external tools. It is not a design preference; it is what the math requires.
 
 This result has a name: **model collapse**. Machine learning researchers have documented it empirically — train a model on its own outputs long enough and it degrades. The Collapse Certificate makes the same claim from first principles, with a machine-checkable proof.
 
@@ -93,15 +93,15 @@ Frozen weights means the system never "forgets" its training. But it learns cont
 
 ---
 
-## Why this matters for Keystone
+## Why this matters for unisona.ai
 
-Every conversation in Keystone is a trajectory through a high-dimensional state space. The conversation's encoded state — novelty, self-repetition, echo, context length — evolves over time based on what the model generates next.
+Every conversation in unisona.ai is a trajectory through a high-dimensional state space. The conversation's encoded state — novelty, self-repetition, echo, context length — evolves over time based on what the model generates next.
 
 The Certificate's §6 demonstration runs on a real 2,678-turn conversation log. Without external grounding, the autonomous rollout converges to a **low-dimensional fixed point**: high novelty, low echo, short length. The system settles onto a single self-consistent pattern and cannot escape it. This is the 42-state on real data.
 
 With grounding — real user queries, retrieval from external sources, real tool outputs — the trajectory stays off the manifold. The external anchor is not decorative; it is the mechanism that prevents the freeze.
 
-This is why Keystone:
+This is why unisona.ai:
 - Never trains on its own outputs (no synthetic data loop)
 - Always grounds important claims in external evidence
 - Runs the NIS canary on every generation

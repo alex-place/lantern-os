@@ -7,7 +7,7 @@ const MAX_HISTORY = 10;
 
 // Canonical provider descriptors
 const PROVIDERS = [
-  { id: "keystone-ft", env: ["ANTHROPIC_API_KEY"], managed: true }, // Trained Keystone agent w/ memory store
+  { id: "keystone-ft", env: ["ANTHROPIC_API_KEY"], managed: true }, // Trained unisona.ai agent w/ memory store
   // GEMINI_USE_VERTEX / VERTEX_PROJECT: Gemini is reachable keyless via Vertex AI
   // (ADC, bills the Cloud project — the funded path). Counting them here keeps
   // gemini "available" for PCSF routing when only Vertex credits are configured.

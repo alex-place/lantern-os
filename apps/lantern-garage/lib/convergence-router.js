@@ -1,7 +1,7 @@
 /**
  * Convergence Router — Deterministic Tool Routing
  *
- * Maps tool calls to local MCP endpoints, cached patterns, or Keystone agents.
+ * Maps tool calls to local MCP endpoints, cached patterns, or unisona.ai agents.
  * Avoids external API calls by using convergence IO patterns.
  *
  * Goal: Execute 90% of work locally; Claude/GPT for edge cases only.
@@ -114,7 +114,7 @@ class ConvergenceRouter {
   }
 
   /**
-   * Route intent → Keystone agent (deterministic, 6 personas).
+   * Route intent → unisona.ai agent (deterministic, 6 personas).
    *
    * Map intent_class → agent_id without calling Claude.
    * Uses regex patterns + keyword scoring.
@@ -206,9 +206,9 @@ class ConvergenceRouter {
   }
 
   /**
-   * Route task → local MCP endpoint or Keystone agent.
+   * Route task → local MCP endpoint or unisona.ai agent.
    *
-   * Tasks with known routing go directly to MCP; novel tasks go to Keystone.
+   * Tasks with known routing go directly to MCP; novel tasks go to unisona.ai.
    */
   async routeTask(taskType, payload) {
     const routes = {
@@ -223,7 +223,7 @@ class ConvergenceRouter {
       return this._emit({ endpoint: routes[taskType], method: "GET", source: "deterministic_route" }, "task");
     }
 
-    // Unknown task → route via Keystone for dynamic handling
+    // Unknown task → route via unisona.ai for dynamic handling
     return this._emit({
       handler: "keystone_dispatcher",
       source: "dynamic_route",

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Level the Keystone Radio library — write a per-track `gain` (dB) into the manifest.
+Level the unisona.ai Radio library — write a per-track `gain` (dB) into the manifest.
 
 The 78rpm transfers vary wildly in loudness, so the dial jumps from a whisper to a
 blast as it rolls. This measures each LOCAL mp3 with ffmpeg's EBU R128 loudnorm

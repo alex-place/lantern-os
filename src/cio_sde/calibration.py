@@ -117,7 +117,7 @@ class CalibrationReport:
     scenario_ids: List[str]
     policy_summary: dict
     note: str = (
-        "Simulation-only. Results do not transfer to Keystone Chat, PCSF routing, "
+        "Simulation-only. Results do not transfer to unisona.ai Chat, PCSF routing, "
         "cloud egress, provider switching, or any external system."
     )
 

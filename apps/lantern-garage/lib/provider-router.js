@@ -50,9 +50,9 @@ function orderChainByPcsf(chain, taskType, byTaskOverride) {
 
 // Provider configuration with fallback chains by task type
 const PROVIDER_CHAINS = {
-  // Kernel chain (#894): Keystone/Ouro model first; Claude is explicit last-resort.
+  // Kernel chain (#894): unisona.ai/Ouro model first; Claude is explicit last-resort.
   // Controlled by KEYSTONE_ROLLOVER_MODE: "shadow"(default/unset)=Claude only (Stage 0,
-  // safe); "default"=Keystone/Ouro first, Claude fallback (Stage 1+).
+  // safe); "default"=unisona.ai/Ouro first, Claude fallback (Stage 1+).
   // Anthropic tier uses claude-sonnet-5 — Anthropic's mid-tier model built for
   // long-running, multi-step agentic sessions (self-correction, dynamic
   // replanning) which is exactly the kernel/autowork escalation workload.
@@ -322,7 +322,7 @@ async function callProvider(provider, model, payload, taskType = "default", cont
   if (nextProviderStep && fallbackState.attemptCount < MAX_FALLBACK_ATTEMPTS) {
     console.log(`[provider-router] Fallback: ${provider} failed, trying ${nextProviderStep.provider} (attempt ${fallbackState.attemptCount}/${MAX_FALLBACK_ATTEMPTS})`);
     // #897: record Claude escalation as a convergence event so the rollover dashboard
-    // (#898) can track Keystone win/loss rate without grepping logs.
+    // (#898) can track unisona.ai win/loss rate without grepping logs.
     if (nextProviderStep.provider === "anthropic" && provider !== "anthropic") {
       try {
         const { emitConvergenceRecord } = require("./convergence-records");
@@ -471,9 +471,9 @@ function findProviderChain(providerName) {
 }
 
 /**
- * Select provider for the Keystone kernel path (#894). Independent of chat
+ * Select provider for the unisona.ai kernel path (#894). Independent of chat
  * selectProvider so the kernel never inherits the chat surface's Claude default.
- * KEYSTONE_ROLLOVER_MODE: "default" → Keystone/Ouro first, anthropic last-resort;
+ * KEYSTONE_ROLLOVER_MODE: "default" → unisona.ai/Ouro first, anthropic last-resort;
  * "shadow" (default when unset) → anthropic only (Stage 0, safe).
  * @param {string|null} requestedProvider  explicit override from the request
  * @returns {Promise<{provider:string, model:?string, mode:string}>}
@@ -486,7 +486,7 @@ async function selectKernelProvider(requestedProvider = null) {
   }
 
   if (mode === "default") {
-    // Try Keystone/Ouro first, fall back to Claude only on failure.
+    // Try unisona.ai/Ouro first, fall back to Claude only on failure.
     const kernelChain = PROVIDER_CHAINS.kernel;
     for (const step of kernelChain) {
       if (isProviderHealthy(step.provider)) {

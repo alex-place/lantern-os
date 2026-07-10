@@ -1,4 +1,4 @@
-# Keystone Autonomous Test Fleet — Full Buildout Plan
+# unisona.ai Autonomous Test Fleet — Full Buildout Plan
 
 **Status**: Ready to implement  
 **Phases**: 6 (Setup → Engine → Scoring → Filing → Observability → Optimization)  
@@ -11,7 +11,7 @@
 ## Architecture Overview
 
 ```
-Keystone (agent) 
+unisona.ai (agent) 
   ↓ (chat: "test the app")
 /api/dream/autonomous-work with task_type: "keystone-test"
   ├─ KeystoneTestEngine (Playwright automation)
@@ -47,7 +47,7 @@ Persistent log:
 
 | # | Title | PR branch | Est. scope |
 |---|-------|-----------|-----------|
-| 601 | [EPIC] Keystone Autonomous Test Fleet | (epic, no PR) | — |
+| 601 | [EPIC] unisona.ai Autonomous Test Fleet | (epic, no PR) | — |
 | 602 | [Infra] Create keystone-test-engine.js scaffold | `claude/602-keystone-test-engine-scaffold` | 100 LOC |
 | 603 | [Infra] Create keystone-analyzer.js confidence scorer | `claude/603-keystone-analyzer-scaffold` | 80 LOC |
 | 604 | [Routes] Create /api/keystone/test-run endpoint | `claude/604-keystone-test-route` | 50 LOC |
@@ -83,13 +83,13 @@ Persistent log:
 |---|-------|-----------|-----------|
 | 615 | [Records] Append convergence record for each test run | `claude/615-keystone-convergence-record` | 80 LOC |
 | 616 | [Streaming] Wire keystone-test-engine into /api/dream/autonomous-work | `claude/616-keystone-streaming-integration` | 200 LOC |
-| 617 | [UI] Add Keystone test panel to dream-chat.html | `claude/617-keystone-test-panel-ui` | 300 LOC |
+| 617 | [UI] Add unisona.ai test panel to dream-chat.html | `claude/617-keystone-test-panel-ui` | 300 LOC |
 
 ### PHASE 5: Integration & Auto-Scheduling (3 issues)
 
 | # | Title | PR branch | Est. scope |
 |---|-------|-----------|-----------|
-| 618 | [Integration] Wire Keystone persona to trigger test runs | `claude/618-keystone-persona-routing` | 100 LOC |
+| 618 | [Integration] Wire unisona.ai persona to trigger test runs | `claude/618-keystone-persona-routing` | 100 LOC |
 | 619 | [Scheduling] Auto-schedule daily test runs at startup | `claude/619-keystone-daily-schedule` | 80 LOC |
 | 620 | [Hardening] Error recovery & resilience | `claude/620-keystone-resilience` | 120 LOC |
 
@@ -99,7 +99,7 @@ Persistent log:
 |---|-------|-----------|-----------|
 | 621 | [Perf] Parallelize scenario execution | `claude/621-keystone-parallelization` | 100 LOC |
 | 622 | [Validation] Add self-test: run test harness on test harness | `claude/622-keystone-self-test` | 150 LOC |
-| 623 | [Docs] Update CLAUDE.md with Keystone Testing Charter | `claude/623-keystone-docs` | 50 LOC |
+| 623 | [Docs] Update CLAUDE.md with unisona.ai Testing Charter | `claude/623-keystone-docs` | 50 LOC |
 
 ---
 
@@ -115,9 +115,9 @@ Persistent log:
 
 ### Modified Files
 - `apps/lantern-garage/public/dream-chat.html` — Add test panel
-- `apps/lanterns-garage/lib/dream-chat.js` — Route "test" messages to Keystone
+- `apps/lanterns-garage/lib/dream-chat.js` — Route "test" messages to unisona.ai
 - `apps/lantern-garage/server.js` — Wire routes
-- `CLAUDE.md` — Add Keystone Testing Charter section
+- `CLAUDE.md` — Add unisona.ai Testing Charter section
 - `.env.example` — Add KEYSTONE_AUTO_TEST=true, GITHUB_TEST_ISSUES_LABEL
 
 ---
@@ -133,7 +133,7 @@ Persistent log:
 
 **Integration checkpoint**: After Phase 3 (#614), you should be able to file a test issue to GitHub. Stop and verify.
 
-**Daily validation**: After Phase 5, Keystone test runs automatically at 03:00 UTC. Watch logs, refine findings.
+**Daily validation**: After Phase 5, unisona.ai test runs automatically at 03:00 UTC. Watch logs, refine findings.
 
 ---
 

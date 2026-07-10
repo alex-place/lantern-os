@@ -2,7 +2,7 @@
 /**
  * command-allowlist — the ONE operator command allowlist.
  *
- * Shared by the Keystone operator console (routes/keystone.js) and the dream-chat
+ * Shared by the unisona.ai operator console (routes/keystone.js) and the dream-chat
  * tool registry (lib/tool-runner.js) so shell execution has a single policy, not a
  * per-surface copy. Capture groups are charset-restricted (no shell metacharacters)
  * and every command runs shell-free via safeExec(tokenizeCommand(...)) (#873).

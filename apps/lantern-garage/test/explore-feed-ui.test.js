@@ -43,7 +43,7 @@ const html = fs.readFileSync(HTML_PATH, "utf8");
 const CARDS = [
   {
     id: "embed:t-rex", type: "embed", title: "T-Rex Runner",
-    url: "/t-rex/index.html", source: "Keystone Arcade",
+    url: "/t-rex/index.html", source: "unisona.ai Arcade",
     topics: ["game", "play"], lore: "The offline classic.",
     evidence: { why: "served locally", source: "local" },
     embed: { src: "/t-rex/index.html", height: 320, interactive: true },
@@ -53,7 +53,7 @@ const CARDS = [
     id: "doc:readme", type: "doc", title: "README",
     url: "https://github.com/alex-place/lantern-os/blob/master/README.md",
     source: "Knowledge Center",
-    evidence: { why: "Indexed Keystone reference doc", source: "README.md" },
+    evidence: { why: "Indexed unisona.ai reference doc", source: "README.md" },
     key: "source:Knowledge Center",
   },
   {

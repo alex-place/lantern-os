@@ -1,16 +1,16 @@
 ---
 author: Alex Place
 created: 2026-06-20
-updated: 2026-06-21
+updated: 2026-07-10
 ---
 
-# Keystone Chat — Brand Guidelines
+# unisona.ai Chat — Brand Guidelines
 
 **Status:** Living document · v1 (2026-06-20)
-**Scope:** Keystone Chat and every surface that carries the Keystone OS name (chat, Help/Knowledge Center, Trader, Create, Explore).
+**Scope:** unisona.ai Chat and every surface that carries the unisona.ai name (chat, Help/Knowledge Center, Trader, Create, Explore).
 **Source of truth for tokens:** [`apps/lantern-garage/public/css/site.css`](../apps/lantern-garage/public/css/site.css). This doc *documents* those values — if the two ever disagree, `site.css` wins and this doc should be updated to match.
 
-> One rule above all the rest: **Keystone is local-first, model-agnostic, and honest.** The brand should always feel like a calm tool you own — never a hype product, never tied to one AI vendor, never jargon for its own sake.
+> One rule above all the rest: **unisona.ai is local-first, model-agnostic, and honest.** The brand should always feel like a calm tool you own — never a hype product, never tied to one AI vendor, never jargon for its own sake.
 
 ---
 
@@ -18,16 +18,17 @@ updated: 2026-06-21
 
 | | |
 |---|---|
-| **Name** | **Keystone OS** (product) · **Keystone Chat** (the primary chat surface) |
+| **Name** | **unisona.ai** (product) · **unisona.ai Chat** (the primary chat surface) |
 | **Edition** | "Orion Edition" (current release line) |
 | **Motto** | **Observe. Remember. Reason. Act. Verify. Converge.** |
 | **One-liner** | A local-first reasoning system that remembers you, runs on your machine, and improves from evidence — never locked to a single model. |
 | **Mark** | The mandala / Σ₀ glyph ([`/mandala.svg`](../apps/lantern-garage/public/mandala.svg), [`/sigma0-mandala.svg`](../apps/lantern-garage/public/sigma0-mandala.svg)) |
 
 ### Naming rules
-- **Use "Keystone OS"** for the product and "Keystone Chat" for the chat. ✦ is the chat's wordmark prefix (`✦ Keystone Chat`).
+- **Use "unisona.ai"** for the product and "unisona.ai Chat" for the chat. ✦ is the chat's wordmark prefix (`✦ unisona.ai Chat`).
 - **"Lantern OS" is retired** — do not use it in user-facing copy. Keep `lantern-*` code paths, file names, and the `lantern-theme` storage key as-is (renaming them is out of scope and risky); the retirement is about *what the user reads*, not internal identifiers.
-- Never invent sub-brands. New surfaces are "Keystone <Noun>" (Keystone Chat, Keystone Trader), not standalone names.
+- **"Keystone" / "Keystone OS" are retired the same way** (2026-07 rename) — every prose/user-visible mention is now **unisona.ai**. Keep `keystone-*` code ids, env vars (`KEYSTONE_*`), file names, the `keystone` persona id, and the `keystone-ft` model tag as-is. The in-game Three Doors character "Keystone" (the stone) is fiction, not the brand, and keeps its name.
+- Never invent sub-brands. New surfaces are "unisona.ai <Noun>" (unisona.ai Chat, unisona.ai Trader), not standalone names.
 
 ---
 
@@ -42,7 +43,7 @@ updated: 2026-06-21
 
 ## 3. Color system
 
-Keystone ships **light and dark** themes via `data-theme` on `<html>`. Always consume the CSS custom properties — **never hardcode hex** in a component. Theme is bootstrapped before first paint and toggled with `toggleTheme()` (persisted to `localStorage['lantern-theme']`).
+unisona.ai ships **light and dark** themes via `data-theme` on `<html>`. Always consume the CSS custom properties — **never hardcode hex** in a component. Theme is bootstrapped before first paint and toggled with `toggleTheme()` (persisted to `localStorage['lantern-theme']`).
 
 ### Core tokens
 
@@ -101,7 +102,7 @@ Keep weights to **400 / 600 / 700 / 800**. Don't add italics or decorative faces
 These are the shared building blocks. Reuse them — don't reinvent per page.
 
 ### Navigation (`.site-nav`)
-Sticky, 52px, `--surface` background, bottom hairline. Left: `.nav-brand` (mandala + "Keystone OS"). Middle: `.nav-links` (Chat · Trader · Create · Explore · Help, plus a Patreon support link). Right: `.nav-actions` (profile/logout/theme `.nav-btn`s). The active page link gets `.active` (accent, weight 600). On narrow screens the link row scrolls horizontally — there is no hamburger.
+Sticky, 52px, `--surface` background, bottom hairline. Left: `.nav-brand` (mandala + "unisona.ai"). Middle: `.nav-links` (Chat · Trader · Create · Explore · Help, plus a Patreon support link). Right: `.nav-actions` (profile/logout/theme `.nav-btn`s). The active page link gets `.active` (accent, weight 600). On narrow screens the link row scrolls horizontally — there is no hamburger.
 
 > Every page must include [`/js/auth-gate.js`](../apps/lantern-garage/public/js/auth-gate.js). It wires the profile/logout/sign-in buttons, injects the Admin link for admins, and applies admin nav-visibility flags. Public pages (`/`, chat, explore, knowledge center) never force a login.
 
@@ -126,20 +127,20 @@ Centered brand + nav links + GitHub, `--surface` background, muted text. Consist
 
 ---
 
-## 6. Voice & tone — Keystone Chat
+## 6. Voice & tone — unisona.ai Chat
 
-The chat is where most people meet Keystone, so its voice **is** the brand. The governing principle (from [`docs/KEYSTONE-UX-NORMIE-PLAN.md`](KEYSTONE-UX-NORMIE-PLAN.md)): **a non-technical person must understand every word.**
+The chat is where most people meet unisona.ai, so its voice **is** the brand. The governing principle (from [`docs/KEYSTONE-UX-NORMIE-PLAN.md`](KEYSTONE-UX-NORMIE-PLAN.md)): **a non-technical person must understand every word.**
 
 ### Principles
 1. **Plain English, no jargon.** In user-facing copy, hide the internals. The words **Σ₀, Convergence, CSF, Ouro, tesseract, LoopLM** do not belong on a normie surface. When a technical term is unavoidable, attach a `.gloss` with a one-line definition. (Deep docs live behind an explicit "Under the hood" disclosure — opt-in, never first.)
 2. **Talk like a helpful person, not a manual.** "Just type like you're texting a friend." Short sentences. Second person. No corporate hedging.
 3. **One sentence of help.** Tooltips, empty states, and hints are a single clear sentence — never a paragraph.
 4. **Honest by default (External Reality Rule).** Don't overclaim. If something is a baseline, a prototype, or a hypothesis, say so. Surface evidence, not vibes. Numbers get a source.
-5. **Calm, not hype.** No exclamation-mark marketing, no "revolutionary AI." Keystone is a dependable tool the user owns.
-6. **Encouraging on errors.** Failures are framed with a next step ("Search is unavailable right now — try asking Keystone Chat directly"), never a dead end or a stack trace.
+5. **Calm, not hype.** No exclamation-mark marketing, no "revolutionary AI." unisona.ai is a dependable tool the user owns.
+6. **Encouraging on errors.** Failures are framed with a next step ("Search is unavailable right now — try asking unisona.ai Chat directly"), never a dead end or a stack trace.
 
 ### Naming inside the chat
-- The default assistant persona is **Keystone**. Other personas (Blinkbug, Waterfall, Xenon, Founder, Trader, Claude Code, Keystone Σ₀) are selectable characters — present them as friendly "personas/characters," not "agents" or "models," on normie surfaces.
+- The default assistant persona is **unisona.ai**. Other personas (Blinkbug, Waterfall, Xenon, Founder, Trader, Claude Code, unisona.ai Σ₀) are selectable characters — present them as friendly "personas/characters," not "agents" or "models," on normie surfaces.
 - Call the AI options **Auto / Fast / Smart**, not raw provider names, for non-technical users (providers stay available under advanced settings).
 - Features get plain names: *Remember important things* (not "CSF memory"), *Quick actions* (not "skills"), *Tools* (not "connectors").
 
@@ -147,7 +148,7 @@ The chat is where most people meet Keystone, so its voice **is** the brand. The 
 
 | ✅ Do | ❌ Don't |
 |---|---|
-| "Talk to Keystone — ask anything, no account needed." | "Invoke the Convergence Core via the Σ₀-grounded dispatch." |
+| "Talk to unisona.ai — ask anything, no account needed." | "Invoke the Convergence Core via the Σ₀-grounded dispatch." |
 | "Get smarter replies — add your own API key (optional)." | "Configure ANTHROPIC_API_KEY to enable premium inference." |
 | "No exact match in the guides — just ask in chat." | "Grounding corpus returned null; falling back to full LLM." |
 | "Something's not working? Check Quick Start or report it on GitHub." | "Error 500. Contact the administrator." |

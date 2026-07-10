@@ -46,7 +46,7 @@ function localMemoryRing() {
       for (const c of csfMemory.queryConversationMemory(question, 4)) {
         out.push({
           claim: text120(c.text),
-          evidence: `recalled ${c.role === "lantern" ? "Keystone" : "user"} turn${c.at ? " @ " + c.at : ""}`,
+          evidence: `recalled ${c.role === "lantern" ? "unisona.ai" : "user"} turn${c.at ? " @ " + c.at : ""}`,
           confidence: c.score,
           source: "local-memory",
         });

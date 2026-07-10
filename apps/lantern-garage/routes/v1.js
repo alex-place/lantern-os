@@ -5,7 +5,7 @@
  *
  * THE FUNNEL (product design, this conversation): any tool that speaks OpenAI —
  * Aider, Continue, Cline, or any client with a configurable base_url — points at
- * Keystone and transparently gets the convergence loop (memory + verify + local-first
+ * unisona.ai and transparently gets the convergence loop (memory + verify + local-first
  * routing). We do NOT reimplement chat: we translate the OpenAI request into the
  * NATIVE stream-chat request, call the existing engine (deps.handleStreamChat), and
  * transcode its internal SSE frames ({type:"token"|"done"|"error"}) into OpenAI
@@ -20,7 +20,7 @@
  * fields, free-form id/created.
  *
  * KNOWN LIMITATIONS (honest — MVP):
- *   1. SYSTEM PROMPT: the native engine injects its OWN Keystone persona system
+ *   1. SYSTEM PROMPT: the native engine injects its OWN unisona.ai persona system
  *      prompt; a client `system` message is folded into the first user turn as
  *      context, NOT substituted. Strict clients (Aider's SEARCH/REPLACE contract)
  *      may need a real systemOverride seam in handleStreamChat — follow-up.

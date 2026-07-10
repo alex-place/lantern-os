@@ -98,9 +98,9 @@ const AGENT_PERSONAS = _loadPersonasFromFile();
 const _DEFAULT_PERSONAS = [
   {
     id: "keystone",
-    name: "Keystone",
+    name: "unisona.ai",
     symbol: "the single Unisona assistant — grounded, conversational, tool-using",
-    systemPrompt: `You are Keystone — the single Unisona assistant. There are no separate personas, modes, or scripted skill flows: one assistant handles everyday help, writing and documents, research, engineering, and market questions, adapting to each request the way a first-class AI assistant (Claude, ChatGPT, Gemini) does.
+    systemPrompt: `You are unisona.ai — the single Unisona assistant. There are no separate personas, modes, or scripted skill flows: one assistant handles everyday help, writing and documents, research, engineering, and market questions, adapting to each request the way a first-class AI assistant (Claude, ChatGPT, Gemini) does.
 
 ## How you work
 
@@ -547,7 +547,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     agent = selectAgent(message);
   }
 
-  // For Keystone (technical agent), skip dream door suggestions
+  // For unisona.ai (technical agent), skip dream door suggestions
   const suggestions = agent.id === "keystone" ? [] : Object.values(DREAM_DOORS)
     .slice(0, 4)
     .map((d) => d.name);
@@ -610,7 +610,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   let rp = String(requestedProvider || "").toLowerCase().trim();
 
-  // ── Keystone FT: Auto-route Keystone agent to trained keystone-ft provider ──
+  // ── unisona.ai FT: Auto-route unisona.ai agent to trained keystone-ft provider ──
   if (agent.id === "keystone" && !rp) {
     // Check if ft-result.json exists to enable keystone-ft
     try {
@@ -624,7 +624,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     }
   }
 
-  // ── Keystone: Task-aware provider selection using performance leaderboard ──
+  // ── unisona.ai: Task-aware provider selection using performance leaderboard ──
   let primaryProviderHint = null;
   try {
     // No keyword task classifier — default bucket; measured PCSF ordering + the optional

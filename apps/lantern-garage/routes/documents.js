@@ -1,4 +1,4 @@
-// Document processing for Keystone chat: upload a .docx, have the LLM rewrite it per
+// Document processing for unisona.ai chat: upload a .docx, have the LLM rewrite it per
 // an instruction (e.g. "add my Lantern OS work + polish"), regenerate a styled .docx,
 // and hand back a download link. Read/write of the .docx is done by a python-docx
 // helper (scripts/resume_docx.py); the rewrite is a non-streaming Claude call.

@@ -20,7 +20,7 @@
 # to notice a stale banner.
 $ErrorActionPreference = 'Continue'
 $LOG = 'C:\dev\watchdog-scheduled-tasks.log'
-# Tasks that must always stay enabled for Keystone OS to keep running/deploying
+# Tasks that must always stay enabled for unisona.ai to keep running/deploying
 # itself. Deliberately NOT the full Lantern-* task list -- several of those
 # (LanternBackendWatchdog8766, LanternChatWatchdog, LanternDreamJournal,
 # Lantern-KalshiNightlyAnalysis) were disabled together on 2026-06-21, which

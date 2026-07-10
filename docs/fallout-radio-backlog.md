@@ -1,4 +1,4 @@
-# Keystone Radio — Feature Backlog
+# unisona.ai Radio — Feature Backlog
 
 **Surface:** [`apps/lantern-garage/public/fallout-radio.html`](../apps/lantern-garage/public/fallout-radio.html)
 **Frequency:** `101.5 FM` · "Founder's Frequency"
@@ -95,7 +95,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 ## Backlog (next)
 
 ### P1 — high value, low risk
-- [ ] **Album-art / station-ident artwork** for the Media Session lock screen (generated canvas per station, or a shared Keystone Radio bug).
+- [ ] **Album-art / station-ident artwork** for the Media Session lock screen (generated canvas per station, or a shared unisona.ai Radio bug).
 - [ ] **Crossfade** between tracks (2–3s gain ramp on `ended`) for a continuous-broadcast feel.
 - [ ] **DJ patter / station IDs** — short spoken/synth idents between songs (the Three Dog touch). Could be Web-Speech-API TTS so no extra audio files.
 - [ ] **Buffer-ahead** the next track's `<audio preload>` so auto-advance is gapless.

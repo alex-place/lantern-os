@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LongMemEval retrieval harness for the Keystone CSF MemoryEngine.
+LongMemEval retrieval harness for the unisona.ai CSF MemoryEngine.
 
 WHY (Σ₀ external-reality rule): MemOS publishes LongMemEval / PersonaMem numbers
 (+40% over OpenAI memory). We had *none* — so we could not honestly claim our

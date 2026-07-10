@@ -1,4 +1,4 @@
-"""Keystone-Σ₀ PLT — pure-PyTorch HuggingFace modeling code (STATIC KV-cache decode).
+"""unisona.ai-Σ₀ PLT — pure-PyTorch HuggingFace modeling code (STATIC KV-cache decode).
 
 DROP-IN replacement for `modeling_keystone_plt.py` / `modeling_keystone_plt_cached.py`.
 Same class names, `__all__`, `model_type="keystone_plt"`, and `auto_map` targets, so

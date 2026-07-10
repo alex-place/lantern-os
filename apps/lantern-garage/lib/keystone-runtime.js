@@ -1,5 +1,5 @@
 /**
- * Keystone Kernel Mode — Claude Code Execution Loop
+ * unisona.ai Kernel Mode — Claude Code Execution Loop
  *
  * Embedded execution engine inside Dream Chat.
  * File-grounded, tool-driven, patch-based workflow.
@@ -27,7 +27,7 @@ const { applyPatch, validatePatch, parsePatch, looksLikeSearchReplace, parseSear
 const { appendJsonlQueued } = require("./file-queue");
 const { buildRepoMapEvidence, mergeGroundingResults, computeContextPrecision } = require("./repo-map-grounding");
 
-const KEYSTONE_SYSTEM_PROMPT = `You are Keystone Code Kernel inside Lantern OS.
+const KEYSTONE_SYSTEM_PROMPT = `You are unisona.ai Code Kernel inside Lantern OS.
 You are a repository-first coding agent modeled after Claude Code.
 
 RULES:
@@ -444,7 +444,7 @@ async function emitConvergenceRecord({ issue, result, confidence }) {
 
 function log(verbose, message) {
   // Diagnostics go to stderr so stdout / SSE token output stays clean.
-  if (verbose) process.stderr.write(`[Keystone] ${message}\n`);
+  if (verbose) process.stderr.write(`[unisona.ai] ${message}\n`);
 }
 
 module.exports = {

@@ -3,7 +3,7 @@
 /**
  * safe-exec — run allowlisted commands WITHOUT a shell.
  *
- * The self-edit engine and the Keystone operator console both execute
+ * The self-edit engine and the unisona.ai operator console both execute
  * allowlisted command strings. Running them through `execSync` (a shell) meant a
  * capture group like `git commit -m "(.+)"` or `pytest tests/(.+).py` could carry
  * `;`, `$(…)`, backticks, `|`, `>` etc. and inject arbitrary commands (#873).

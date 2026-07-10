@@ -4,9 +4,9 @@ created: 2026-05-26
 updated: 2026-06-20
 ---
 
-# Keystone OS Convergence Loop
+# unisona.ai Convergence Loop
 
-This is the operating method for Keystone OS. It replaces skeleton-only staging
+This is the operating method for unisona.ai. It replaces skeleton-only staging
 and the legacy Seven smoke check as the release decision path.
 
 ## Rule

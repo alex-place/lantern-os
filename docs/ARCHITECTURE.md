@@ -6,7 +6,7 @@ status: current
 supersedes: docs/ARCHITECTURE-AUDIT-2026-06-13.md
 ---
 
-# Keystone OS — Architecture (Current State)
+# unisona.ai — Architecture (Current State)
 
 **Canonical "what the system *is* today" snapshot.** This document records *what is true now*;
 the [ADRs](adr/README.md) record *why* it became that way. Every important claim below carries
@@ -23,7 +23,7 @@ than papered over.
 
 ## 1. The thesis in one paragraph
 
-Keystone OS is a **persistent, local-first reasoning system** for a single developer (Alex Place).
+unisona.ai is a **persistent, local-first reasoning system** for a single developer (Alex Place).
 The whole product is **one loop** — `Observe → Remember → Reason → Act → Verify → Converge` — over
 **four objects**: Memory, Task, Tool, and Convergence Record. Models are interchangeable plug-ins;
 learning is **retrieval + experience** (append-only memory), never weight modification. A Node.js

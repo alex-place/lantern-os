@@ -4,7 +4,7 @@ created: 2026-06-07
 updated: 2026-06-20
 ---
 
-# Privacy Governance — Keystone OS
+# Privacy Governance — unisona.ai
 
 ## Core Rule
 **Do not showcase private/personal data as marketing proof.**
@@ -48,7 +48,7 @@ Privacy, legality, source rights, repo safety, and user safety take precedence o
 - Google Drive contains the real data; repos contain only sanitized references
 
 ## For Claude Code Sessions
-When demoing or discussing Keystone OS:
+When demoing or discussing unisona.ai:
 1. Reference architecture, not content
 2. Show Three Doors structure, not actual door names or sequences
 3. Discuss PCSF receipt format, not real provider/capacity logs

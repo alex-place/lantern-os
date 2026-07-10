@@ -1,12 +1,12 @@
 "use strict";
 /**
- * Keystone kernel escalation + landed-work attribution (#897, #898).
+ * unisona.ai kernel escalation + landed-work attribution (#897, #898).
  *
  * When a kernel run fails verification, we escalate to the next provider in the
- * #894 kernel chain (Keystone/Ouro → … → Claude) and record EACH escalation as a
+ * #894 kernel chain (unisona.ai/Ouro → … → Claude) and record EACH escalation as a
  * convergence event so the rollover loop has a real, queryable proof artifact —
- * not a silent "Keystone failed". On success we record who landed the work, so the
- * rollover dashboard (#898) can compute the Keystone-vs-Claude landed-work share
+ * not a silent "unisona.ai failed". On success we record who landed the work, so the
+ * rollover dashboard (#898) can compute the unisona.ai-vs-Claude landed-work share
  * from JSONL with no new persistent store.
  *
  * The orchestrator is pure/injectable (runOne + onEscalate are supplied), so the
@@ -124,7 +124,7 @@ async function runKernelWithEscalation({ providers, runOne, onEscalate = async (
 async function recordEscalation({ issue, failedProvider, failedModel, escalatedTo, runId, attempt, error, repoRoot }) {
   const escalatedLabel = escalatedTo ? `${escalatedTo.provider}/${escalatedTo.model}` : "none(exhausted)";
   const rec = await emitConvergenceRecord({
-    hypothesis: `Keystone kernel can land: ${String(issue || "").slice(0, 200)}`,
+    hypothesis: `unisona.ai kernel can land: ${String(issue || "").slice(0, 200)}`,
     result: `escalated-to-${escalatedLabel}`,
     confidence: Math.max(0.1, 0.5 - 0.1 * (attempt || 1)),
     reasoner: KERNEL_REASONER,
@@ -143,7 +143,7 @@ async function recordEscalation({ issue, failedProvider, failedModel, escalatedT
 /** Record who landed the work (for the rollover landed-work share, #898). */
 async function recordLanded({ issue, provider, model, runId, verified, repoRoot }) {
   return emitConvergenceRecord({
-    hypothesis: `Keystone kernel can land: ${String(issue || "").slice(0, 200)}`,
+    hypothesis: `unisona.ai kernel can land: ${String(issue || "").slice(0, 200)}`,
     result: `landed-by-${provider}/${model}`,
     confidence: verified ? 0.85 : 0.6,
     reasoner: KERNEL_REASONER,
@@ -167,7 +167,7 @@ function _isClaudeResult(result) {
 }
 
 /**
- * Aggregate the Keystone-vs-Claude landed-work share + escalation rate from
+ * Aggregate the unisona.ai-vs-Claude landed-work share + escalation rate from
  * convergence records (reasoner === "keystone-kernel"), optionally since a ts (ms).
  */
 function readRolloverShare(records, { sinceTs = 0 } = {}) {
@@ -191,7 +191,7 @@ function readRolloverShare(records, { sinceTs = 0 } = {}) {
   return {
     keystoneLanded, claudeLanded, landed, escalations, exhausted,
     keystoneShare: landed ? round(keystoneLanded / landed) : null,
-    // escalation rate = fraction of kernel attempts that had to escalate off Keystone.
+    // escalation rate = fraction of kernel attempts that had to escalate off unisona.ai.
     escalationRate: (keystoneLanded + escalations)
       ? round(escalations / (keystoneLanded + escalations)) : null,
   };
