@@ -42,12 +42,21 @@ const NORMAL_HIGH_F = {
 const DEFAULT_NORMAL = 84.0;
 const normalFor = (mmdd) => (NORMAL_HIGH_F[mmdd] == null ? DEFAULT_NORMAL : NORMAL_HIGH_F[mmdd]);
 
+/** Build a normalFor(mmdd) for a DIFFERENT station from its own normals table + fallback —
+ *  the KNYC table above must never silently apply to another station (#2217 KLGA fit). */
+function makeNormalFor(normals = {}, defaultNormal = DEFAULT_NORMAL) {
+  return (mmdd) => (normals[mmdd] == null ? defaultNormal : normals[mmdd]);
+}
+
 // CSV/day/MOS parsing lives in the serving lib (kalshi-mos) so fit == serve BY CONSTRUCTION —
 // the fit and the live deck use one identical forecast-high definition.
 const { parseCsv, localDayOf, mosForecastHighs } = require("../apps/lantern-garage/lib/kalshi-mos");
 
-/** ASOS hourly tmpf rows -> {localDayKey -> settledHigh}. Accepts columns station,valid,tmpf. */
-function asosDailyHighs(rows) {
+/** ASOS hourly tmpf rows -> {localDayKey -> settledHigh}. Accepts columns station,valid,tmpf.
+ *  `roundF: true` rounds the daily max to the nearest whole °F — the ForecastEx U-series
+ *  settlement definition (Weather Underground "High Temp" = round(max METAR tmpf); measured
+ *  14/14 vs venue settlement flips, Jun 2026, docs/research/2026-07-10-forecastex-uhlga-*). */
+function asosDailyHighs(rows, { roundF = false } = {}) {
   const byDay = new Map();
   for (const r of rows) {
     const t = parseFloat(r.tmpf);
@@ -57,6 +66,7 @@ function asosDailyHighs(rows) {
     const cur = byDay.get(day.key);
     if (cur == null || t > cur.high) byDay.set(day.key, { day, high: t });
   }
+  if (roundF) for (const rec of byDay.values()) rec.high = Math.round(rec.high);
   return byDay;
 }
 
@@ -76,8 +86,9 @@ function cliSettledHighs(results) {
   return byDay;
 }
 
-/** Join forecasts with settled highs into {forecast, settled, lead, mmdd, anomaly, posAnom}. */
-function pairData(byRun, settledByDay, { months = [6, 7, 8] } = {}) {
+/** Join forecasts with settled highs into {forecast, settled, lead, mmdd, anomaly, posAnom}.
+ *  `normalFor` is injectable so a non-KNYC station pairs against ITS OWN normals. */
+function pairData(byRun, settledByDay, { months = [6, 7, 8], normalFor: nf = normalFor } = {}) {
   const pairs = [];
   for (const { run, days } of byRun.values()) {
     for (const { tgt, high: forecast } of days.values()) {
@@ -87,7 +98,7 @@ function pairData(byRun, settledByDay, { months = [6, 7, 8] } = {}) {
       const settled = settledRec.high;
       const lead = Math.round((Date.UTC(tgt.y, tgt.m - 1, tgt.day) - Date.UTC(run.y, run.m - 1, run.day)) / 86400000);
       if (lead < 0 || lead > 7) continue;
-      const normal = normalFor(tgt.mmdd);
+      const normal = nf(tgt.mmdd);
       const anomaly = forecast - normal;
       pairs.push({ forecast, settled, lead, mmdd: tgt.mmdd, anomaly, posAnom: Math.max(0, anomaly) });
     }
@@ -185,7 +196,7 @@ function fitParams(pairs, opts = {}) {
 
 module.exports = {
   parseCsv, localDayOf, mosForecastHighs, asosDailyHighs, cliSettledHighs, pairData,
-  fitBiasRegression, fitSigmaByLead, fitCeiling, fitParams, normalFor,
+  fitBiasRegression, fitSigmaByLead, fitCeiling, fitParams, normalFor, makeNormalFor,
 };
 
 // ── main (network — run where egress exists) ───────────────────────────────────
