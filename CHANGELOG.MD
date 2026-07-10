@@ -1,3 +1,296 @@
+## [1.9.0] - 2026-07-10
+
+### Added
+- **`convergence_inspect` — the assistant can now read the convergence orchestrator's live state directly, as a first-class tool.** The orchestrator (`src/convergence_io_engine.py`) was only reachable via loose subprocess spawns (`routes/operator.js`), a raw-shell debug allowlist, and CI — never a native tool, and its one circuit-breakered adapter (`lib/convergence-adapter.js`) had gone dead when the keyword→`converge` divert was removed. This wires the engine directly onto the tool surface: a new read-only `runEngineCommand('inspect'|'health')` seam in the adapter (reusing the existing circuit breaker, timeout, and UTF-8 spawn env) backs a `convergence_inspect` tool in `lib/tool-runner.js` that returns registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Because tool-runner.js is the single source of truth and `shared_tool_bridge` re-exposes every registry tool over MCP, the tool is available on **both** the dream-chat and MCP surfaces (golden manifest regenerated). It is **operator-gated** (`guest_safe: false`) — it exposes internal fleet state, so guests are denied and it isn't advertised to them, exactly like `Read`. `GET /api/actions/inspect` now routes through the same seam instead of its own ad-hoc spawn, so there's one guarded path. Verified: operator exec returns real engine state (cells:16, latencies), guest exec is denied (`operator_required`), MCP parity + golden-manifest contract tests pass, plus a new focused suite (`test/convergence-inspect-tool.test.js`, 5 checks). Improves **Observe** (grounds the loop's own state in the real orchestrator instead of guessing).
+
+### Fixed
+- fix(ci): stop the chronic Python-tests + ADR-lint red that blocked every PR
+- Two root causes made `CI / Python tests` and `PR Gates / ADR registry lint`
+- fail on **every** PR (the aggregate "All checks passed" gate inherited both):
+- 1. **Python tests INTERNALERROR at collection.** `tests/test_mcp_mesh_tools.py`
+-    did a module-level `import server`, and `src/mcp_server/server.py` calls
+-    `sys.exit(1)` at import time when fastapi/uvicorn are absent (which they are in
+-    CI's lean Python job). `SystemExit` isn't an `ImportError`, so it crashed
+-    pytest **collection** and failed the whole suite — not just that module. Added
+-    `pytest.importorskip("fastapi")` at the top of the file (the same pattern the
+-    discord suites already use), so it skips cleanly when the server deps aren't
+-    installed instead of taking the run down.
+- 2. **ADR registry lint status mismatch.** `docs/adr/README.md`'s index row for
+-    ADR-0010 said `Accepted (Alex Place, 2026-07-02)` while the ADR file's own
+-    frontmatter says `status: Proposed` (deliberately set in #2142 — agents can't
+-    self-approve and `approved-by` is still pending). Aligned the index row to the
+-    file's `Proposed` state (the non-fabricating direction). If ADR-0010 was in
+-    fact approved, flip both the file frontmatter and this row to `Accepted`.
+- Fixing the collection crash surfaced two more real failures that had been masked
+- by the INTERNALERROR (they never got to run):
+- 3. **`test_dashboard_ux::test_markdown_links_use_formatted_reader`.** The home
+-    loop-mantra (#2335) linked each stage to a **raw** `/repo/docs/loop/*.md` URL;
+-    the test requires doc links to go through the formatted reader. Repointed the
+-    six links to `/view?path=docs/loop/*.md`.
+- 4. **`test_mcp_tool_parity::test_node_bridge_manifest`.** The committed golden
+-    `manifests/tool-capability-manifest-v1.json` had drifted from the live tool
+-    registry (new tools added without regenerating it). Regenerated it via
+-    `node scripts/tool-runner-bridge.js generate-manifest`.
+- 5. **`Site Audit` (a11y-audit workflow).** Fix (3) repointed the loop links to the
+-    `/view?path=…` reader route, but `scripts/audit-site.js` treated the URL as a
+-    literal public path and reported "FILE NOT FOUND" (it also never resolved the
+-    old `/repo/…` form). Taught `validatePageExists()` to resolve both the
+-    `/view?path=<rel>` reader route and `/repo/<rel>` against the repo root, so doc
+-    links validate against the real file.
+- Verified: `node scripts/lint-adr-registry.mjs` → OK; the full pytest suite runs
+- with no INTERNALERROR and the four previously-failing tests now pass (the two
+- collection/skip fixes plus these two). Improves **Verify** (CI reflects real state).
+- fix(ops): unfreeze the unisona.ai cloud VM's release auto-deploy. The systemd oneshot
+- ran with no `HOME`, so `git config --global` died with "fatal: $HOME not set" (exit 128)
+- on every tick — the box was stuck at v1.8.0 (2026-07-04) while releases advanced to
+- v1.8.130. Set `HOME` in both the service (`Environment=HOME=/root`) and the script
+- (`export HOME=${HOME:-/root}`).
+
+### Changed
+- chore(repo): slim tracked surface for agentic context (#2306 #2307 #2309 #2310 #2315)
+- Cut file-count and binary noise that bloats agent Glob/Grep/tree and clones:
+- Untrack committed `apps/lantern-garage/payment-bridge/node_modules/` (174
+-   vendored files; `node_modules/` was already gitignored — force-added copy).
+- Fold 463 `changelog.d/` fragments into CHANGELOG.md (they never folded at
+-   release); `.gitkeep` retained so new fragments keep landing there.
+- Remove `docs/archive/` (38 stale 2026-06-19 docs; git history retains them).
+- Delete dead `src/hff-api/app-legacy.py` — `safe_app:app` is the live WSGI
+-   entrypoint (per `wsgi.py`/`dashboard_app.py`); the legacy file (hyphenated,
+-   not importable) confused which entrypoint is authoritative.
+- Untrack 14 volatile `data/csf_memory/raw/trace/*.json` runtime traces and
+-   gitignore the dir + root `agentic*` harness dumps.
+- Improves Reason/Act (agent context hygiene). Media (mp3/csf), runtime JSONL
+- logs, flat-RAG dumps, monolith splits, and root-md consolidation are tracked
+- separately (#2311-#2314, #2316-#2317) as they need R2 hosting or per-file care.
+- chore(media): move radio mp3s to R2 and untrack from git (#2311)
+- Uploaded the on-disk radio set (35 mp3s) to the keystone-media R2 bucket under
+- radio/ (served from https://media.lantern-os.net/radio/) via wrangler + the
+- machine CLOUDFLARE_API_TOKEN, immutable 1-year cache. Repointed the matching
+- src refs in fallout-radio.html (25) and radio/stations.json (35) to the CDN,
+- git rm --cached the 25 tracked mp3s (66MB), added *.mp3 to .gitignore. Verified
+- the CDN serves audio/mpeg. stations.json stays tracked (text manifest); its
+- ~248 other tracks reference mp3s absent from both repo and CDN — a pre-existing
+- dangling-reference bug, out of scope here. Improves Remember.
+- chore(repo): untrack machine-generated flat-RAG dumps (#2313)
+- Repo-slim (Remember stage). Two large auto-generated concatenations are now
+- gitignored and rebuilt on demand instead of tracked:
+- `data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md` (1,765 lines)
+-   — read at runtime as the MCP resource `rag://house`.
+- `skills/lantern-rag-dollhouse/references/LANTERN-OS-RAG-DOLLHOUSE.flat.md`
+-   (16,142 lines) — no runtime consumer; its old generator (`Sync-RagAndPdf.ps1`)
+-   and most of its 90 source files are already gone from the repo.
+- New cross-platform generator `scripts/regen-flat-rag.mjs` (Windows dev + Linux
+- deploy + CI, no PowerShell dependency) rebuilds both, wired as `npm run
+- regen:rag` and `make regen-rag`. The internal-house rebuild is a faithful port
+- of `scripts/Update-InternalHouseRag.ps1` (hash-only mode); the dollhouse rebuild
+- is best-effort from whatever `reports/*.md` + `applications/*.md` currently
+- exist. Verified: regen recreates both files and `rag://house` still reads the
+- internal-house dump via the fallback path.
+- refactor(trading): split 2725-line routes/trading.js into a dispatcher + 9 endpoint modules (#2316)
+- Behavior-preserving decomposition so agents load focused files instead of a
+- 2.7k-line monolith. All stateful/side-effecting module-level code (imports,
+- the `traderAgent`/`_priceFeed` singletons, the autoscan loop + timers, proxy
+- consts) stays in `trading.js` untouched; the exported `tradingRoutes` builds a
+- `ctx` object and delegates to `routes/trading/{market,orders,watchlist,
+- dashboard,ibkr,kalshi,ai-trader,news,misc}.js`. Endpoint branch bodies moved
+- verbatim. The one branch that mutates module-level `_scanWhenClosed`
+- (overnight-scan) stays inline. trading.js 2725 -> 281 lines.
+- Verified: `node --check` on all 10 files; route-literal invariant identical
+- (107 pathname matchers, empty diff vs pre-split baseline); every lib require
+- resolves at the new depth; ctx carries all 23 module-level bindings the moved
+- branches use. Full live-endpoint runtime verification needs the trading stack
+- (Python subprocess + broker keys) not available in CI. Improves Reason/Act.
+- docs(repo): remove 6 stale root-level .md docs documenting removed subsystems (#2317)
+- Root .md files compete for an agent's first-read attention. These 6 were both
+- orphaned (not linked by any canonical doc) and stale — describing systems that
+- no longer exist, so they actively mislead: KEYSTONE.md + ENGINEERING_MODE.md
+- (keyword task-detector/task-aware routing + keyword "engineering mode" +
+- RP personas, all removed in #2303/#1664), TRAINING_ORCHESTRATION_COMPLETE.md +
+- GPU_TRAINING_PLAN.md + DISPATCH_ISSUES.md (2026-06-23 point-in-time training
+- snapshots), BACKLOG.md (2026-06-14 trading backlog, superseded by GH issues).
+- Git history retains them. Required-reading + standard root files untouched.
+- Improves Remember.
+- feat(memory): NL-gloss trading events so trader history is retrievable in dream-chat (#2354)
+- dream-chat and the trader share ONE CSF memory store (`data/csf_memory/raw.jsonl`),
+- but trading events were persisted as serialized JSON blobs with no `content.text`.
+- The shared recall path (`csf-memory.js::queryMemories` scores `content.text`; the
+- semantic reranker embeds it) therefore saw only bare tags — the trader's own
+- orders/signals/news were effectively unretrievable in chat (only reachable via
+- `queryRecentTradingRecords`, which is recency, not relevance), and the blobs
+- shadowed prose memory (see the readLifeFacts scan-from-end note in csf-memory.js).
+- Deep-research + our prior measurement: BM25 AND embeddings are near-noise on JSON
+- blobs (~0.08-0.11 recall) vs 0.91-0.98 on prose — so no reranker/embedder change
+- fixes this; the fix is to make each event retrievable prose.
+- `trading-memory.js`: `_narrateOrder` / `_narrateSignal` emit a one-line,
+-   dependency-free, null-safe NL gloss; written to `content.text` on every order
+-   and signal CSF record.
+- `trading-news.js`: `_narrateNews` does the same for news entities (direction +
+-   headline + source + impact).
+- Narrations are relevance-gated by the existing recall threshold: they surface
+-   when a chat query overlaps, stay quiet otherwise (no shadowing).
+- Backfill: existing blob records stay read-only; narration applies going forward.
+- Tests: `test/trading-narration.test.js` — unit (field-accurate, null-safe) +
+-   end-to-end (a narrated order surfaces on a relevant query through the real
+-   `queryMemories` path; an off-topic query does NOT, proving the gate holds).
+-   CSF checksum integrity unchanged (`tests/test_csf_memory_integrity.py` green).
+- First of three from the retrieval-SOTA research pass (#2355 local cross-encoder
+- rerank, #2356 our-corpus measurement harness). Loop stage: Remember.
+- feat(eval): retrieval A/B measurement harness on our own corpus (#2356)
+- Gate the reranker decision (#2355) in evidence, not borrowed numbers. The
+- deep-research verdict (+17.2pp MRR@3 from cross-encoder reranking) is one financial
+- domain with a cloud reranker; per the External Reality Rule we measure a LOCAL
+- analog on OUR corpus before wiring anything.
+- `scripts/eval_retrieval_ab.js`: arXiv-2604.01733-style ablation over a known-item
+-   eval set, reusing the REAL production scorers (`csf-memory.relevanceScoreIdf` +
+-   `buildDocFreq`; `semantic-reranker` nomic transport, now exporting `embedText`).
+- Arms: `lexical-idf` + `bm25-okapi` (deterministic, always run); `nomic-dense` +
+-   `hybrid-a<α>` (iff Ollama up); `hybrid+rerank` (skipped-and-logged until #2355's
+-   `$RERANKER_ENDPOINT` exists). No silent caps — every skipped arm prints why.
+- Metrics: Recall@{5,10}, MRR@{3,10}, overall + per lexical-overlap band. Honest
+-   ranking: non-positive score ≠ hit (Infinity), ties pessimistic — so an all-zero
+-   lexical arm can't score a false Recall@5 from a doc's corpus position.
+- Fixture (18 docs / 15 queries incl. trading narrations, CI-safe): lexical-idf R@5
+-   0.867 overall, 0.333 on the low-overlap band vs 1.000 verbatim — isolates the band
+-   where dense/rerank must pay.
+- `docs/BENCHMARKS.md`: 🟡 Partial row. Runs append to `data/eval/retrieval/runs.jsonl`
+-   (git-ignored). Tests: `test/eval-retrieval-ab.test.js` (11 checks, green).
+- Loop stage: Verify. Follows #2354 (trader narration), gates #2355 (rerank).
+- docs(testing): add docs/CHAT-EVAL-RECIPE.md — manual chat capability/benchmark run
+- recipe (warm provider, plain turns, pace off the conversation disk log, grade with
+- the real HumanEval sandbox) plus the gotchas that cost re-runs (#2128 cold-start,
+- #2321 coding_change stall, 30s preview_eval cap, #2320 mid-run crash recovery,
+- #2322 groundedness red-band false-negative). Pointer added from CLAUDE.md.
+- docs(ops): record unisona.ai → GCE tunnel cutover in the deploy runbook. unisona.ai now
+- serves from the VM via a second connector (`cloudflared-unisona`, tunnel `1b1c2acf`,
+- Cloudflare account `ff492ab2…`) instead of the operator's PC, fixing the 502. Documents
+- the two-account/two-tunnel topology, the cross-account CNAME constraint, and the
+- from-scratch recreate steps.
+- fix(nav): restore the profile / sign-in icon on the home page
+- The global nav (site-chrome.js) always ships a `#profile-btn`, but auth-gate.js
+- hid it for guests and only injected a fallback sign-in button when NO profile
+- button existed — so on `/` (and every site-chrome page) a logged-out visitor saw
+- no login affordance at all. Repurpose the existing profile button into a sign-in
+- link for guests (→ `/auth.html?returnTo=…`) instead of hiding it, and restore its
+- `/profile.html` destination for authenticated users on re-check.
+- Improves Act (users can actually reach login from the home page). Verified in the
+- preview: guest branch renders a visible "Sign in" icon; authed branch renders the
+- profile icon.
+- feat(desktop): ship a native desktop app instead of launching the Edge browser. The
+- Windows app is now a .NET WPF + WebView2 shell (Unisona.exe) — a real native window
+- (own title bar, taskbar entry, dark chrome, no address bar, no msedge.exe) that boots
+- the unmodified Core via `unisona-core.exe --embed` and hosts the cockpit in WebView2.
+- The installer builds and packages both (shell + Core SEA); verified end-to-end
+- (install → launch → HTTP 200, zero node.exe). Amends ADR-0014 G5.
+- feat(api,router): OpenAI-compatible /v1 shim + RAM-tiered local model ladder + semantic code index
+- Make Keystone the convergence layer any OpenAI-speaking tool can point at, and
+- harden the local-first model floor.
+- **/v1/chat/completions + /v1/models shim** (`apps/lantern-garage/routes/v1.js`):
+-   translates OpenAI `messages`/`model` into the NATIVE stream-chat request, calls
+-   the existing engine (`deps.handleStreamChat`), and transcodes its `{type:"token"}`
+-   SSE frames into OpenAI `chat.completion.chunk` frames (streaming) or one
+-   `chat.completion` object (non-streaming). No chat reimplemented — one adapter over
+-   the router we already run, so Aider/Continue/Cline set `base_url` and transparently
+-   get the convergence loop. Registered before auth (API clients use a bearer key, not
+-   a session); optional `KEYSTONE_V1_API_KEY` gate. VERIFIED live on :4199 — both
+-   streaming (chunks + role delta + finish_reason stop + `[DONE]`) and non-streaming
+-   return correct OpenAI shapes and the server stays alive.
+- **RAM-tiered escalation ladder** (`data/models/local-registry.json`): five rungs
+-   (qwen2.5-coder 1.5b/3b/14b/32b + gpt-oss:20b), all `verified:false` so they sort
+-   BEHIND the on-box-verified Qwen-7B (External Reality Rule) and never auto-lead until
+-   reproduced on-box. The ladder auto-climbs with `VRAM_BUDGET_GB` (14b@12GB,
+-   gpt-oss@16GB, 32b@24GB) with zero code change; dormant on the 8GB box.
+- **Semantic code index** (`apps/lantern-garage/lib/code-index.js` +
+-   `scripts/build-code-index.js`): declaration-boundary chunk → nomic-embed (REUSES
+-   `semantic-reranker.js`'s embed/cosine, now exported) → cosine query over a flat
+-   `data/code-index/` store, fail-safe to `[]`. Closes the lexical-only code-retrieval
+-   gap. MVP, zero new deps; retrieval-lift measurement pending Ollama.
+- Improves Reason (better local model selection + the funnel endpoint), Remember
+- (semantic code retrieval), and keeps Verify honest (unverified rungs gated).
+- feat(chat): per-user conversation persistence — a logged-in user's chat history is
+- now stored under their PROFILE (data/conversations/users/<userId>/), so it follows
+- the account across devices instead of the client's localStorage sessionId. Fixes a
+- cross-user privacy leak where /api/conversations/sessions returned every user's
+- session titles/previews to everyone: the session list, per-session read, and clear
+- are now scoped by the session-resolved profile id (getEffectiveUserId), operators
+- keep the whole-instance view, and guests fall back to the shared device-local log
+- scoped by sessionId. Identity is resolved server-side, never trusted from the body.
+- feat(tooling): add the `/release` skill — one command to fold the changelog, bump the
+- version, tag it, let CI build + publish the website and the native Windows desktop app
+- (Unisona-Setup .exe), then rewrite the GitHub Release into a launch post with the live
+- URL, the .exe download, features, and current pricing. Orchestrates the existing
+- release.yml / auto-tag.yml pipeline; does not replace it.
+- fix(trader): clean "Chart data unavailable" state for zero-bar symbols in guest mode
+- A charted symbol with a live price but no OHLC bars (feed gap, or a default-
+- watchlist symbol the bars feed hasn't populated — visible to guests, who get the
+- server default watchlist) drew a half-empty/broken chart because `_renderLadder()`
+- only bailed to a placeholder when the *price* was missing. It now renders a clean
+- centered "Chart data unavailable" state and clears the canvas, gated on a new
+- `barsLoadedOnce` flag so it never flashes over charts still loading. Verified in a
+- logged-out preview: normal charts unchanged, a zero-bar symbol shows the clean
+- state. Improves Observe (honest empty state over broken output).
+- feat(auth): Terms of Service + EULA with signup consent gate
+- New public `/terms.html` page — a 21-section Terms of Service + End-User
+- License Agreement tailored to the app (AI-output/hallucination disclaimer,
+- "not financial/legal/medical advice", data ownership + local-first, telemetry,
+- third-party AI providers, EULA license grant, no-warranty, liability). Served
+- publicly (added to `routes/pages.js` PUBLIC_PAGES + `deployment-profile.js`
+- HOSTED_SURFACES) so a signed-out user can read it before agreeing.
+- auth.html now shows an affirmative "I agree to the Terms of Service & EULA"
+- checkbox ONLY in account-creation (register) mode, immediately above the
+- Create-account button. It is unchecked by default and gates registration
+- client-side; normal sign-in, OAuth, and guest entry are unaffected. Registered
+- in `surface-registry.js` under the account cluster (MAX_EXTENSION_RATIO raised
+- 0.95→1.0 deliberately for this legally-required shell surface).
+- Note: the Terms text ships with bracketed placeholders ([LEGAL ENTITY],
+- [JURISDICTION], [CONTACT EMAIL], [EFFECTIVE DATE]) and requires legal review
+- before real launch. Strengthens the account shell; supports the Verify/consent
+- posture. Verified in preview: gate blocks unchecked signup, passes when checked
+- (register POST 202), Terms page loads publicly.
+- feat(router): add the "numeric" time-series-forecasting route (TSFM specialist)
+- Wire a first-class numeric/time-series-forecasting intent into both routers so a
+- "forecast the price series" ask resolves to a dedicated time-series foundation
+- model (Kronos / Chronos-Bolt lineage) instead of a chat/coder model.
+- `ouro-router.js`: add `numeric` to `TASK_TYPES` + a classifier bullet, kept
+-   DISTINCT from `trading` — forecasting a series (numeric) vs a buy/sell decision
+-   (trading).
+- `local-model-registry.js`: register the `keystone-tsfm` specialist
+-   (`taskTypes:["numeric"]`, `selfConverges:true` so it is never wrapped in
+-   loopedReason(), `verified:false`, `vramGB:2`, endpoint `TSFM_ENDPOINT`); mark
+-   `numeric` STRICT so no general coder widens into the forecasting route (the
+-   number-tokenization bottleneck — a text model shreds "$64,201" into noise).
+- Route is DARK until a serving adapter answers at `TSFM_ENDPOINT` (:11436); like
+-   the PLT :11435 shim, if absent the chain resolves but the caller falls back to
+-   cloud rather than routing a wrong model. `provider-router.js` needs no change —
+-   an unknown taskType already falls back to the `default` cloud chain.
+- Grounding: `verified:false` per the External Reality Rule — no bias-mitigated
+-   walk-forward result beating a naive baseline yet (TSFM/LLM "alpha" routinely
+-   vanishes under honest backtests, arXiv 2505.07078). Flip true only on a
+-   reproduced walk-forward win on our Kalshi/KNYC OHLCV.
+- Tests: +6 numeric-route cases in `local-model-registry.test.js` (sole numeric
+-   lead, STRICT no-widening, no leak into coding/reasoning/default, single-pass
+-   contract, resolveLocalLead path, VRAM gate) + a `TASK_TYPES` guard test. All
+-   green. The 10 pre-existing coding-lead failures in that suite are stale #2171
+-   (qwen-is-verified-lead) expectations — present on master (12/22), tracked
+-   separately, not touched here.
+- Follow-on: the TSFM serving adapter + a `forecast_timeseries` native tool, gated
+- on the walk-forward-vs-naive harness. Loop stage: Reason.
+
+### Tests
+- refactor(auth): remove IP local-admin bypass → token-gated test-auth + role picker
+- The loopback/dev-port/LANTERN_LOCAL_ADMIN admin bypass (isLocalBypass) is removed.
+- Dev/test sign-in is now explicit and token-gated (lib/test-auth.js), resolved through
+- the single getSessionUser() seam so every gate honors the emulated role:
+- OFF unless LANTERN_TEST_AUTH_TOKEN is set (never in production); refused on any
+-   proxied/tunnelled request, so it can't be used from the internet.
+- One seeded verified account (test@unisona.local) emulates any role per-request via
+-   X-Test-Auth (+ X-Test-Role/X-Test-Provider), ?__test=, or a role picker on /auth.html;
+-   real email+password login works too.
+- Plain localhost is now a real guest → auth-gate.js repurposes the nav profile button
+-   into a "Sign in" link for guests.
+- Docs: docs/TEST-AUTH.md. Coverage: tests/test_admin_local_bypass.js,
+- tests/test_patreon_auth_flag.js, and Playwright `npm run test:auth`
+- (tests/e2e-auth/auth.spec.js, 11 cases). Improves Verify (honest auth boundaries).
+
 ## [1.8.140] - 2026-07-10
 ### Added
 - **Retrieval A/B measurement harness on our own corpus (`scripts/eval_retrieval_ab.js`), so the reranker decision (#2355) is gated in evidence rather than borrowed numbers.** The deep-research verdict — cross-encoder reranking is worth +17.2pp MRR@3 — comes from one financial domain using a *cloud* reranker, and MTEB positions shift monthly; per the External Reality Rule we do not wire a reranker or swap a store on faith. This harness replicates an arXiv-2604.01733-style ablation on a known-item eval set drawn from our own prose corpus (dream-chat + trading narrations), reusing the REAL production scorers (`csf-memory.relevanceScoreIdf` + `buildDocFreq`; the nomic transport from `semantic-reranker`, which now also exports `embedText`). Arms: `lexical-idf` (the actual production lexical scorer) and `bm25-okapi` (deterministic, always run); `nomic-dense` + `hybrid-a<α>` (run iff Ollama is up); `hybrid+rerank` (the #2355 seam — skipped-and-logged until a `$RERANKER_ENDPOINT` exists). Metrics: Recall@{5,10}, MRR@{3,10}, overall + per lexical-overlap band (low/mid/high), with skipped arms logged (no silent caps). Correctness guards in ranking: a non-positive score is not a hit (Infinity), and ties break pessimistically — so an all-zero lexical arm can't score a false Recall@5 from a doc's arbitrary corpus position. Bundled prose fixture (18 docs / 15 queries incl. trading narrations, CI-safe, no deps): lexical-idf R@5 **0.867** overall, **0.333 on the low-overlap band** vs **1.000** verbatim — cleanly isolating the band where dense/rerank must earn their keep. Registered 🟡 Partial in `docs/BENCHMARKS.md`; run rows append to `data/eval/retrieval/runs.jsonl` (git-ignored machine output). Tested (11 checks) via `test/eval-retrieval-ab.test.js`. Second of three from the retrieval-SOTA research pass (#2356; follows #2354 trader narration, gates #2355 rerank). Improves **Verify**.

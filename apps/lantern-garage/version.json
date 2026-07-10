@@ -1,7 +1,6 @@
 {
-  "version": "1.8.0",
-  "buildId": "1.8.0+2026-06-30.milestone",
-  "timestamp": "2026-06-30T00:00:00.000Z",
-  "branch": "master",
-  "commit": "df56f766"
+  "version": "1.9.0",
+  "buildId": "1.9.0+2026-07-10",
+  "timestamp": "2026-07-10T21:19:59.235Z",
+  "branch": "master"
 }
