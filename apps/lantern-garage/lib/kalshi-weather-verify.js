@@ -144,8 +144,11 @@ function reliability(pairs, bins = 10) {
 /** Join open rows (carrying the stamped predictive `dist` + `ladder`) with their close
  *  rows (carrying the observed outcome) into graded distribution/outcome records. A usable
  *  record needs: a numeric `dist` over a `ladder` on the open, and an observed bucket on the
- *  close — either explicit `settledBucket`, or `settledHigh` resolved through the ladder. */
-function gradedRecords(rows) {
+ *  close — either explicit `settledBucket`, or `settledHigh` resolved through the ladder.
+ *  `prefix` scopes which tickers are graded (default: the Kalshi weather series). The
+ *  ForecastEx forward paper ledger passes its own product prefix (`UHLGA`, #2217) so ONE
+ *  verifier grades every weather venue — never a second scoring implementation. */
+function gradedRecords(rows, { prefix = WEATHER_PREFIX } = {}) {
   const openById = new Map();
   for (const r of rows) if (r && r.event === "open") openById.set(r.id, r);
   const out = [];
@@ -153,7 +156,7 @@ function gradedRecords(rows) {
     if (!r || r.event !== "close") continue;
     const o = openById.get(r.id);
     if (!o) continue;
-    if (!String(o.ticker || "").startsWith(WEATHER_PREFIX)) continue;
+    if (!String(o.ticker || "").startsWith(prefix)) continue;
     const ladder = o.ladder;
     const dist = o.dist;
     if (!Array.isArray(ladder) || !ladder.length || !dist || typeof dist !== "object") continue;

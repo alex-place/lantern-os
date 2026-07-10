@@ -1,0 +1,86 @@
+name: ForecastEx KLGA Day-Ahead Backtest
+
+# #2217 — retrospective day-ahead backtest of the KLGA weather oracle against
+# ForecastEx's public UHLGA board history (scripts/backtest-forecastex-dayahead.js).
+#
+# Manual-dispatch only: it is a measurement, not CI. It exists as a workflow because
+# the script needs egress to forecastex.com + mesonet.agron.iastate.edu, which
+# sandboxed agent sessions don't have (same reason fit-weather-oracle-params.js says
+# "run on a box with network egress"). The runner fetches, scores, and commits the
+# JSONL + summary back to the branch that dispatched it — results land in git, with
+# the artifact upload as a fallback if the push is blocked.
+
+on:
+  workflow_dispatch:
+    inputs:
+      from:
+        description: "First contract date (YYYY-MM-DD)"
+        required: false
+        default: "2026-02-03"
+      to:
+        description: "Last contract date (YYYY-MM-DD)"
+        required: false
+        default: "2026-07-09"
+      min_edge_cents:
+        description: "robustEdgeReport minEdgeCents gate"
+        required: false
+        default: "5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: forecastex-backtest
+  cancel-in-progress: false
+
+jobs:
+  backtest:
+    name: Day-ahead backtest (public board history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "20"
+
+      - name: Unit gate (pure day-ahead logic must be green before measuring)
+        run: |
+          node apps/lantern-garage/test/forecastex-board.test.js
+          node apps/lantern-garage/test/forecastex-weather.test.js
+          node apps/lantern-garage/test/forecastex-dayahead.test.js
+          node apps/lantern-garage/test/forecastex-paper-verify.test.js
+
+      - name: Run backtest
+        run: |
+          node scripts/backtest-forecastex-dayahead.js \
+            --from "${{ github.event.inputs.from }}" \
+            --to "${{ github.event.inputs.to }}" \
+            --min-edge "${{ github.event.inputs.min_edge_cents }}" \
+            --out data/eval/forecastex-klga-dayahead-backtest.jsonl \
+            --summary data/eval/forecastex-klga-dayahead-backtest-summary.json
+
+      - name: Commit results to the dispatching branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/eval/forecastex-klga-dayahead-backtest.jsonl \
+                  data/eval/forecastex-klga-dayahead-backtest-summary.json
+          if git diff --staged --quiet; then
+            echo "No result changes to commit."
+          else
+            git commit -m "data(eval): ForecastEx KLGA day-ahead backtest results (#2217) [skip ci]"
+            git push origin HEAD:${{ github.ref_name }} || echo "::warning::Push blocked; results are in the artifact."
+          fi
+
+      - name: Upload results artifact (fallback)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: forecastex-klga-dayahead-backtest
+          path: |
+            data/eval/forecastex-klga-dayahead-backtest.jsonl
+            data/eval/forecastex-klga-dayahead-backtest-summary.json
+          retention-days: 90
+          if-no-files-found: error

@@ -762,6 +762,20 @@ server.listen(port, host, () => {
     trainModel().catch(e => console.error("[Server] Convergence training failed:", e.message));
     startEnhancing();    // Start continuous convergence improvement loop
     startAnalyzing();    // Start LoRA fine-tuning (proactive, no trades needed)
+
+    // ── ForecastEx UHLGA nightly forward paper-verification (#2217) ──
+    // Opt-in to ONE fleet host (PR-watcher precedent): every enabled boot would try the
+    // same nightly fetch, and dev/CI boots should not hit the venue at all. The job stamps
+    // a day-ahead paper prediction each evening and grades it against the venue's own
+    // settlement flips — the n>=20 forward evidence forecastex-weather's `certified` gate
+    // is waiting on. Paper only; no order code exists on this venue.
+    if (process.env.FORECASTEX_PAPER_VERIFY === "1") {
+      try {
+        require("./lib/forecastex-paper-verify").start();
+      } catch (e) {
+        console.error("[forecastex-paper] failed to arm (non-fatal):", e && e.message);
+      }
+    }
   }
 
   // ── Crypto CIO Live Trader (15-min market observer + paper-trade signal log) ──
