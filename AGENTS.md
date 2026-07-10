@@ -132,8 +132,11 @@ The route architecture is modular. **The authoritative list of what's registered
 | [`apps/lantern-garage/lib/dreamer-store.js`](apps/lantern-garage/lib/dreamer-store.js) | `readRecentDreams()`, notebook storage |
 | [`apps/lantern-garage/lib/conversation-store.js`](apps/lantern-garage/lib/conversation-store.js) | append/read conversation JSONL |
 | [`apps/lantern-garage/lib/csf-memory.js`](apps/lantern-garage/lib/csf-memory.js) | CSF long-term memory reader, door state persistence |
+| [`apps/lantern-garage/lib/convergence-adapter.js`](apps/lantern-garage/lib/convergence-adapter.js) | **The one guarded seam onto `src/convergence_io_engine.py`** (circuit breaker + timeout). `runEngineCommand('inspect'\|'health')` backs the `convergence_inspect` tool and `GET /api/actions/inspect` — don't spawn the engine ad hoc, call this. |
 
 **Rule: If you need a route, grep the `routes[]` array in `server.js` for the module, then read that module. If you need streaming, read `lib/stream-chat.js`. Read `server.js` itself only for startup / child-process / supervisor behavior.**
+
+**Orchestrator is tool-reachable:** the assistant can read live orchestrator state via the `convergence_inspect` native tool (operator-only; defined in `lib/tool-runner.js`, auto-exposed over MCP by `shared_tool_bridge`). Regenerate the golden tool manifest after any registry change: `echo '' | node scripts/tool-runner-bridge.js generate-manifest`.
 
 ### 5. Don't discover what tests exist — run them
 
