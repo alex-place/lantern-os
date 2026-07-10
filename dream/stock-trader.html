@@ -2861,12 +2861,36 @@ function renderOrders(orders){
   if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,500).map(row).join(''));
 }
 
+// Day P&L from the actual per-position day move: Σ (last − prevClose)·qty, where
+// prevClose is derived from the watchlist's chg_pct (the same day % shown per symbol).
+// This reconciles with what the user sees, unlike IBKR's partitioned `dpl`, which
+// arrives as a stale round number (−$4,500 etc.) that matches nothing. Returns null if
+// any held position lacks day data → caller keeps the broker figure rather than a
+// partial sum.
+function computeDayPnl(positions){
+  let sum = 0, held = 0;
+  for(const p of (positions||[])){
+    const q = Number(p.qty) || 0;
+    if(!q) continue;                         // watchlist-only rows (qty 0) don't count
+    held++;
+    const cur = Number(p.current_price) || 0;
+    const wl  = wlPrices.find(t => t.ticker === p.symbol);
+    const chg = wl ? Number(wl.chg_pct) : null;
+    if(!(cur > 0) || chg == null || !isFinite(chg) || (1 + chg/100) === 0) return null;
+    const prev = cur / (1 + chg/100);
+    sum += (cur - prev) * q;
+  }
+  return held > 0 ? Math.round(sum * 100) / 100 : null;
+}
+
 async function loadPortfolio(){
   if(window.GUEST) return;   // account/positions are trade-gated; guest view is charts-only
   try{
     const r  = await fetch('/api/trading/positions');
     const d  = await r.json();
     const a  = d.account||{};
+    const dayPnl = computeDayPnl(d.positions||[]);
+    if(dayPnl != null) a.pnl_today = dayPnl;   // reconcile Day P&L with the visible day moves
     document.getElementById('hEquity').textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
     const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
