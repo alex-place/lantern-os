@@ -51,7 +51,9 @@ def main():
     ap.add_argument("--base", default="ByteDance/Ouro-1.4B")
     ap.add_argument("--adapter", default="")
     ap.add_argument("--max-new", type=int, default=96)
+    ap.add_argument("--holdout", default=str(HOLD), help="holdout jsonl (default v1)")
     a = ap.parse_args()
+    hold_path = Path(a.holdout)
 
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -80,7 +82,7 @@ def main():
                                  repetition_penalty=1.3, pad_token_id=tok.pad_token_id)
         return tok.decode(out[0, ids["input_ids"].shape[1]:], skip_special_tokens=True)
 
-    rows = [json.loads(l) for l in HOLD.read_text(encoding="utf-8").splitlines() if l.strip()]
+    rows = [json.loads(l) for l in hold_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     epi_both = epi_n = abst_ok = abst_n = calib_ok = calib_n = 0
     for r in rows:
         k = kind_of(r)
