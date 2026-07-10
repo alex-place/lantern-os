@@ -1,0 +1,121 @@
+{
+  "task": "Q-exit adaptivity + depth->accuracy vs REAL hardness (measured solve-success), matched base rate",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "trained_depth": 4,
+  "n_items": 160,
+  "per_tier": 40,
+  "tiers": [
+    "t1_1step",
+    "t2_2digit_add",
+    "t3_2x1_mult",
+    "t4_multistep"
+  ],
+  "difficulty_validation_solve_success_by_tier": {
+    "t1_1step": 0.75,
+    "t2_2digit_add": 0.4,
+    "t3_2x1_mult": 0.575,
+    "t4_multistep": 0.325
+  },
+  "difficulty_gradient_real": true,
+  "expected_exit_depth_by_tier": {
+    "t1_1step": 2.582,
+    "t2_2digit_add": 2.622,
+    "t3_2x1_mult": 2.82,
+    "t4_multistep": 3.011
+  },
+  "p_true_by_tier": {
+    "t1_1step": 0.371,
+    "t2_2digit_add": 0.33,
+    "t3_2x1_mult": 0.549,
+    "t4_multistep": 0.414
+  },
+  "adaptivity": {
+    "corr(exit_depth, P_true)": 0.081,
+    "corr(exit_depth, solved)": -0.194,
+    "E[depth] on solved": 2.721,
+    "E[depth] on unsolved": 2.798,
+    "exit_depth_range": 0.807,
+    "corr(exit_depth, solve_success)_per_tier": -0.622,
+    "tier_exit_depth_spread": 0.429,
+    "tier_monotone_harder_deeper": true,
+    "verdict_adaptive": true,
+    "adaptivity_level": "weak",
+    "note": "WEAK adaptivity to REAL difficulty: E[exit depth] rises across tiers as solve-success falls (per-tier corr -0.62, spread 0.43 steps) and per-item corr(E[depth],solved)=-0.19; the effect is real but small \u2014 NOT a strong adaptive-compute story"
+  },
+  "forcedchoice_accuracy_by_tier_by_depth": {
+    "t1_1step": {
+      "1": 0.975,
+      "2": 1.0,
+      "3": 1.0,
+      "4": 1.0,
+      "6": 0.975,
+      "8": 0.925
+    },
+    "t2_2digit_add": {
+      "1": 0.95,
+      "2": 0.95,
+      "3": 0.95,
+      "4": 0.975,
+      "6": 0.975,
+      "8": 0.975
+    },
+    "t3_2x1_mult": {
+      "1": 0.925,
+      "2": 0.925,
+      "3": 0.925,
+      "4": 0.925,
+      "6": 0.9,
+      "8": 0.9
+    },
+    "t4_multistep": {
+      "1": 0.85,
+      "2": 0.925,
+      "3": 0.95,
+      "4": 0.925,
+      "6": 0.9,
+      "8": 0.875
+    }
+  },
+  "depth_helps": {
+    "t1_1step": {
+      "rises_with_depth": false,
+      "collapses_past_trained": true,
+      "at_depth1": 0.975,
+      "at_trained": 1.0,
+      "at_max": 0.925,
+      "best": 1.0,
+      "best_depth": 2
+    },
+    "t2_2digit_add": {
+      "rises_with_depth": false,
+      "collapses_past_trained": false,
+      "at_depth1": 0.95,
+      "at_trained": 0.975,
+      "at_max": 0.975,
+      "best": 0.975,
+      "best_depth": 4
+    },
+    "t3_2x1_mult": {
+      "rises_with_depth": false,
+      "collapses_past_trained": false,
+      "at_depth1": 0.925,
+      "at_trained": 0.925,
+      "at_max": 0.9,
+      "best": 0.925,
+      "best_depth": 1
+    },
+    "t4_multistep": {
+      "rises_with_depth": true,
+      "collapses_past_trained": false,
+      "at_depth1": 0.85,
+      "at_trained": 0.925,
+      "at_max": 0.875,
+      "best": 0.95,
+      "best_depth": 3
+    }
+  },
+  "depth_helps_on_hard_tasks": true,
+  "evidence_class": "MEASURED (data/sigma0/hardness_depth_report.json)",
+  "honest_headline": "Real difficulty gradient confirmed (solve-success 0.75 -> 0.325 across tiers). Q-exit shows WEAK adaptivity to it (corr(E[depth],P_true)=0.08, unsolved E[depth]=2.80 vs solved 2.72). Forced depth HELPS on hard multi-step tiers (t4 0.85@d1 -> 0.93@trained -> 0.88@d8).",
+  "caveats": "fp16, Ouro-1.4B-Thinking, arithmetic-only graded set (clean, checkable, matched-magnitude distractors => base rate 0.5); greedy solve-success uses a 6-token decode + prefix-match; forced-choice isolates readout from generation; depths >4 exceed the trained operating point (gate undefined there, so E[depth] uses trained depth)."
+}
