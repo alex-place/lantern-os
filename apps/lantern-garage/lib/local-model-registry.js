@@ -74,8 +74,11 @@ const REGISTRY_JSON_PATH = path.resolve(__dirname, "..", "..", "..", "data", "mo
 const CACHE_TTL_MS = 60_000;
 
 // Task types that must NOT be widened by "default"-tagged general-fallback models.
-// The kernel is the Σ₀ Convergence Core path — only explicit kernel models qualify.
-const STRICT_TASKS = new Set(["kernel"]);
+// - kernel:  the Σ₀ Convergence Core path — only explicit kernel models qualify.
+// - numeric: time-series forecasting — a general chat/coder must NEVER masquerade as
+//   a forecaster (the number-tokenization bottleneck: a text model shreds "$64,201"
+//   into meaningless sub-tokens). Only an explicit TSFM specialist leads here.
+const STRICT_TASKS = new Set(["kernel", "numeric"]);
 
 // ── Built-in defaults (safety net if the JSON file is absent/broken) ──────────
 const DEFAULTS = [
@@ -169,6 +172,30 @@ const DEFAULTS = [
     rank: 0,
     capabilityScore: 0.3,
     note: "Dream/RP-tuned model — Three Doors surface only (never a tool assistant).",
+  },
+  {
+    // Time-series foundation-model route — the numeric-forecasting SPECIALIST.
+    // This is NOT a chat /api/generate model: it maps a price/OHLCV lookback window to
+    // a forecast distribution (Kronos / Chronos-Bolt lineage — see memory
+    // time-series-foundation-models-for-trading). It is registered so the "numeric"
+    // intent has an authoritative local lead the way "coding" resolves to the PLT coder.
+    // It is the SOLE numeric-tagged model and "numeric" is a STRICT task (no
+    // default-coder widening) so a general model can never be routed as a forecaster.
+    id: "keystone-tsfm",
+    endpoint: process.env.TSFM_ENDPOINT || "http://127.0.0.1:11436",  // dedicated forecast shim
+    selfConverges: true,          // single-pass numeric forecast → NEVER wrapped in loopedReason()
+                                  // (text-CDF refinement is meaningless for a distribution).
+    toolCalling: false,
+    vramGB: 2,                    // small TSFM (Chronos-Bolt ~200M / Kronos-small) fits beside Ouro on the 8GB box
+    ctxTokens: 4096,              // price-patch lookback window, not text tokens
+    taskTypes: ["numeric"],
+    rank: 0,
+    capabilityScore: 0.5,         // placeholder — no measured forecast skill on our data yet
+    verified: false,              // UNVERIFIED per the External Reality Rule: no bias-mitigated
+                                  // walk-forward result beating a naive baseline yet. Financial-return
+                                  // TSFM "edge" routinely vanishes under honest backtests (arXiv 2505.07078);
+                                  // flip true ONLY on a reproduced walk-forward WIN vs naive on our OHLCV.
+    note: "Numeric time-series forecasting route (TSFM specialist). DARK until a serving adapter answers at TSFM_ENDPOINT (default :11436) — like the PLT :11435 shim, if it is down the caller's forecast path / provider chain falls back rather than routing a wrong chat model. Feeds kalshi-suggest favorability() / the card confidence field. Gate to verify:true = a walk-forward-vs-naive win on our Kalshi/KNYC history. Serving adapter + a forecast_timeseries tool are the follow-on.",
   },
 ];
 

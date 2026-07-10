@@ -253,6 +253,59 @@ test("resolveLocalLead: defaults the pin to OLLAMA_MODEL from the env", () => {
   });
 });
 
+// ── numeric / TSFM route: the time-series specialist leads "numeric" ───────────
+
+test("numeric route: the TSFM specialist leads and is the sole numeric model", () => {
+  freshEnv(() => {
+    assert.equal(reg.selectBest("numeric"), "keystone-tsfm", "TSFM leads numeric forecasting");
+    const chain = reg.selectChain("numeric");
+    assert.deepEqual(chain, ["keystone-tsfm"], "exactly one numeric-tagged model");
+  });
+});
+
+test("numeric is STRICT: no general coder/default widens into the forecasting route", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("numeric");
+    assert.ok(!chain.includes("keystone-sigma0-plt"), "the coder is not a forecaster");
+    assert.ok(!chain.includes("qwen2.5-coder:latest"), "no default-coder widening (number-tokenization bottleneck)");
+    assert.ok(!chain.includes("ouro:latest"), "the kernel is not a forecaster");
+  });
+});
+
+test("numeric does NOT pollute general chat: the TSFM never leads coding/reasoning/default", () => {
+  freshEnv(() => {
+    for (const t of ["coding", "reasoning", "default", "creative"]) {
+      assert.ok(!reg.selectChain(t).includes("keystone-tsfm"), `TSFM must not leak into ${t}`);
+    }
+  });
+});
+
+test("numeric TSFM contract: single-pass (selfConverges), no tools, fits the 8GB box, verified:false", () => {
+  freshEnv(() => {
+    assert.equal(reg.selfConverges("keystone-tsfm"), true, "single-pass forecast → not wrapped in loopedReason()");
+    assert.equal(reg.toolCalling("keystone-tsfm"), false, "a forecaster is not a tool caller");
+    assert.equal(reg.isVerified("keystone-tsfm"), false, "honest: no walk-forward-vs-naive win yet");
+    const e = reg.getEntry("keystone-tsfm");
+    assert.ok(e && e.vramGB <= 8, "small TSFM fits beside Ouro on the 8GB box");
+    assert.ok(e.taskTypes.includes("numeric") && e.taskTypes.length === 1, "numeric-only, never a chat model");
+  });
+});
+
+test("numeric route resolves through resolveLocalLead (what chat calls)", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("numeric", { pin: "" });
+    assert.equal(r.lead, "keystone-tsfm", "the TSFM is the authoritative numeric lead");
+    assert.equal(r.chain[0], "keystone-tsfm", "and the chain head");
+  });
+});
+
+test("numeric TSFM still VRAM-gated: a <2GB box drops it → cloud fallback", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("numeric", { vramBudgetGB: 1 });
+    assert.equal(chain.length, 0, "TSFM can't lead a box it doesn't fit → empty → provider chain falls back");
+  });
+});
+
 test("_detectVramGB returns a number or null and is memoized", () => {
   freshEnv(() => {
     const d = reg._detectVramGB();
