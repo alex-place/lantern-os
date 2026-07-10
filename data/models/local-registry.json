@@ -1,5 +1,6 @@
 {
   "_doc": "Σ₀ local-model adapter registry. Operator-editable overlay onto the built-in defaults in apps/lantern-garage/lib/local-model-registry.js (merged by id, TTL-cached ~60s). See docs/SIGMA0-MODEL-ADAPTER.md. DEFAULT LOCAL CODER (OSS-BASELINE 2026-07-06, #2171): the supported Apache-2.0 Qwen2.5-Coder-7B via the standard Ollama :11434 (already pulled) — it leads coding/reasoning/default on the 8GB box. The owned PLT coder (keystone-sigma0-plt, ADR-0011) is kept as a research coder on its :11435 shim but sorts BEHIND Qwen (unverified + shim-dependent) until its on-box HumanEval head-to-head (#2173) flips verified:true. Kernel stays Ouro/keystone-ft on :11434 (Ouro promotion to coding is gated on the loop-value experiment #2178); Three Doors keeps lantern-csf-dream on :11434. Per-model endpoints are honored by endpointFor(). vramGB gates against the box (VRAM_BUDGET_GB, default 8).",
+  "_ladder_doc": "RAM-tiered local-first ESCALATION LADDER (added 2026-07-09). selectChain() is capability-gated by the DETECTED box (VRAM_BUDGET_GB, default 8): among models whose vramGB<=budget it leads with the highest capabilityScore — BUT verified:false rungs always sort BEHIND every reproduced peer (External Reality Rule), so the NEW rungs (1.5b/3b/14b/gpt-oss:20b/32b) never auto-lead over the on-box-verified qwen2.5-coder:latest until each is reproduced here. Effect: the ladder AUTO-CLIMBS with hardware — on the current 8GB RTX 3070 only the <=~6GB rungs fit so Qwen-7B still leads; raise VRAM_BUDGET_GB (bigger box / cloud L4) and the 14B/20B/32B rungs light up with ZERO code change. vramGB values are Q4_K_M GGUF footprints incl. ctx/overhead (VENDOR/PREDICTED); capabilityScore are vendor HumanEval anchors (PREDICTED) — flip verified:true only when a probe/eval log reproduces the number on-box. To activate a rung the operator must `ollama pull` the tag. gpt-oss:20b is MoE (~3.6B active of ~21B) so it is CPU-compute-cheap but still needs all experts RAM-resident.",
   "models": [
     {
       "id": "qwen2.5-coder:latest",
@@ -62,6 +63,71 @@
       "rank": 0,
       "capabilityScore": 0.3,
       "note": "Dream/RP-tuned model — Three Doors surface only (never a tool assistant)."
+    },
+    {
+      "id": "qwen2.5-coder:1.5b",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 2,
+      "ctxTokens": 32768,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 3,
+      "capabilityScore": 0.60,
+      "verified": false,
+      "note": "Potato-box / fast-draft rung. Qwen2.5-Coder-1.5B @ Q4 (~1GB). VENDOR HumanEval ~0.60 (PREDICTED, verified:false → sorts behind the on-box Qwen-7B). Fits sub-8GB / CPU-only boxes. Candidate cheap first-attempt for verify-gated local-first (escalate to a bigger rung / cloud on verify-fail). Requires `ollama pull qwen2.5-coder:1.5b`."
+    },
+    {
+      "id": "qwen2.5-coder:3b",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 3,
+      "ctxTokens": 32768,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 2,
+      "capabilityScore": 0.72,
+      "verified": false,
+      "note": "Fast rung. Qwen2.5-Coder-3B @ Q4 (~2GB). VENDOR HumanEval ~0.72 (PREDICTED, verified:false). Fits 8GB with headroom; the cheap first-attempt rung on constrained boxes. Requires `ollama pull qwen2.5-coder:3b`."
+    },
+    {
+      "id": "qwen2.5-coder:14b",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 11,
+      "ctxTokens": 32768,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 1,
+      "capabilityScore": 0.90,
+      "verified": false,
+      "note": "Mid rung (12-16GB boxes). Qwen2.5-Coder-14B @ Q4 (~9GB). VENDOR HumanEval ~0.90 (PREDICTED, verified:false). Dormant on the 8GB box (11>8); leads once VRAM_BUDGET_GB>=11. Requires `ollama pull qwen2.5-coder:14b`."
+    },
+    {
+      "id": "gpt-oss:20b",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 14,
+      "ctxTokens": 131072,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 1,
+      "capabilityScore": 0.87,
+      "verified": false,
+      "note": "Mid rung (~16GB boxes) — MoE (~3.6B active of ~21B): CPU-compute-cheap but all experts must be RAM-resident (~14GB). Strong native tool-calling → good agent-loop lead when RAM allows. VENDOR-claimed reasoning/coding/tool-use (PREDICTED, verified:false). Dormant on the 8GB box. Requires `ollama pull gpt-oss:20b`."
+    },
+    {
+      "id": "qwen2.5-coder:32b",
+      "endpoint": "http://127.0.0.1:11434",
+      "selfConverges": false,
+      "toolCalling": true,
+      "vramGB": 22,
+      "ctxTokens": 32768,
+      "taskTypes": ["coding", "reasoning", "default"],
+      "rank": 0,
+      "capabilityScore": 0.92,
+      "verified": false,
+      "note": "Top rung (>=24GB box / cloud L4). Qwen2.5-Coder-32B @ Q4 (~20GB). VENDOR HumanEval ~0.92 (PREDICTED, verified:false). Dormant on the 8GB box; leads once VRAM_BUDGET_GB>=22. Requires `ollama pull qwen2.5-coder:32b`."
     }
   ]
 }
