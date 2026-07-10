@@ -281,6 +281,30 @@ curl -X POST http://127.0.0.1:4177/api/dream/chat/stream \
 | **Lantern Garage** | `apps/lantern-garage/server.js` | 4177 | Main web server + API |
 | **MCP Server** | `src/mcp_server/server.py` | 8771 | Tool integration (optional) |
 | **Ollama** | `ollama serve` | 11434 | Local LLM (optional) |
+| **MiniCheck** | `scripts/serve_minicheck.py` | 8799 | Entailment gate for the #2174 verifier (optional) |
+
+---
+
+### MiniCheck entailment endpoint (#2186)
+
+The coding-backend verifier (`apps/lantern-garage/lib/coding-backend/verifiers/entailment.js`) has a
+MiniCheck layer that scores whether a proposed change is actually **grounded** in what the backend
+claims — but it stays `skipped` until a model is served. Turn it into a `decisive` check:
+
+```bash
+# 1. serve MiniCheck-Flan-T5-Large (~770M, CPU-only by default so it never touches the training GPU)
+.venv-train/Scripts/python scripts/serve_minicheck.py           # binds 127.0.0.1:8799
+# 2. point the server at it
+export MINICHECK_ENDPOINT=http://127.0.0.1:8799                  # (Windows: setx MINICHECK_ENDPOINT ...)
+```
+
+- **Contract:** `POST {doc, claim}` → `{prob}` (P(claim supported by doc), threshold 0.5). Verified:
+  a grounded claim scores ~0.94 (`passed`), an ungrounded one ~0.003 (blocked) — both `decisive`.
+- **Env:** `MINICHECK_PORT` (8799), `MINICHECK_MODEL` (`flan-t5-large`), `MINICHECK_DEVICE`
+  (`cpu` default; `cuda` when the GPU is free). Health: `GET /health`.
+- **Note (torch < 2.6):** the model ships only a pickle `pytorch_model.bin`; the serve script
+  neutralizes transformers' torch-load version gate **for this one trusted, self-downloaded model**
+  (weights_only still applies) so we don't have to bump torch and break the Ouro/bnb training stack.
 
 ---
 
