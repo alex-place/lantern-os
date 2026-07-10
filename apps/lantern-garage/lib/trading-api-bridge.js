@@ -137,7 +137,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -165,6 +165,7 @@ class TradingAPIBridge {
       price: orderType === 'STP' ? stopPrice : limitPrice,
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
       equity: eq,
+      outsideRth: !!outsideRth,   // pre/post-market fills (LMT + outsideRTH)
     });
     const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read
