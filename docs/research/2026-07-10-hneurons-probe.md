@@ -28,7 +28,21 @@ so the two are directly comparable. Grouped CV by fact; leave-one-domain-out for
 | OOD transfer (leave-one-domain-out, MEAN) | **0.959** | 0.931 | — |
 | neurons used | **~30 (0.022% of 135k)** | dense 2048-d state | — |
 
-Per-domain LODO: geography 0.934 · science 0.973 · history 0.984 · literature 1.000 · arithmetic 0.906.
+Per-domain LODO (Ouro): geography 0.934 · science 0.973 · history 0.984 · literature 1.000 · arithmetic 0.906.
+
+**Qwen2.5-Coder-7B re-confirm (the signal is NOT Ouro-specific):**
+
+| metric | Ouro-1.4B | Qwen2.5-Coder-7B |
+|---|---|---|
+| detection AUROC (grouped CV) | 0.969 | **0.970** |
+| OOD transfer (LODO MEAN) | 0.959 | **0.959** |
+| neurons used | ~30 (0.022%) | **~25 (0.0047%)** |
+| logprob baseline | 0.712 | 0.732 |
+
+The probe reaches essentially the same 0.97 detection / 0.959 transfer on a different model family (Qwen,
+530k neurons) using an even *sparser* ~25 neurons (0.005%). So the H-Neurons hallucination direction —
+extreme sparsity, OOD-robust, well above logprob — reproduces across Ouro and Qwen, exactly as the paper
+claims for Mistral/Gemma/Llama. This is model-agnostic on our stack, not a per-model artifact.
 
 ## Verdict: GO-candidate
 
@@ -47,11 +61,11 @@ over-compliance maps onto the Σ₀ collapse canary — worth the follow-up to t
 
 ## Still open
 
-- **Qwen not yet run.** The acceptance asks for Ouro *and* Qwen; this is the Ouro (loop-model) result,
-  the load-bearing one. Qwen is a scoped follow-up (same script, `OURO_MODEL=Qwen/...`, different MLP
-  module path may need a tweak) to check the signal isn't Ouro-specific.
-- **Causal test** (ablate the ~30 neurons → does over-compliance rise?) is the paper's headline
-  mechanism and the natural next experiment before gate-wiring.
+- **Causal test** (ablate the ~30/~25 neurons → does over-compliance rise?) is the paper's headline
+  mechanism and the natural next experiment before gate-wiring — the causal handle maps onto the Σ₀
+  collapse canary.
+- **HaluEval-scale confirmation** — these numbers are on 80 matched facts; a larger hallucination
+  benchmark (with a real backend) would firm up the absolute AUROC before shipping the gate.
 
 ## Honest scope
 
