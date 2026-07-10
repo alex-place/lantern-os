@@ -3,7 +3,7 @@ name: ForecastEx KLGA Day-Ahead Backtest
 # #2217 — retrospective day-ahead backtest of the KLGA weather oracle against
 # ForecastEx's public UHLGA board history (scripts/backtest-forecastex-dayahead.js).
 #
-# Manual-dispatch only: it is a measurement, not CI. It exists as a workflow because
+# Dispatch-or-marker triggered: it is a measurement, not CI. It exists as a workflow because
 # the script needs egress to forecastex.com + mesonet.agron.iastate.edu, which
 # sandboxed agent sessions don't have (same reason fit-weather-oracle-params.js says
 # "run on a box with network egress"). The runner fetches, scores, and commits the
@@ -25,6 +25,12 @@ on:
         description: "robustEdgeReport minEdgeCents gate"
         required: false
         default: "5"
+  # One-shot auto-trigger for the authoring session (API-only GitHub access, no way to
+  # click dispatch): the run fires when the marker file below lands on a branch push and
+  # the results commit removes the marker, so the measurement runs exactly once. Manual
+  # re-runs use workflow_dispatch above.
+  push:
+    paths: ["data/eval/.forecastex-backtest-requested"]
 
 permissions:
   contents: write
@@ -47,29 +53,6 @@ jobs:
         with:
           node-version: "20"
 
-      # The sandboxed session that authored this work can only reach GitHub through the
-      # API (no git-push credential, no egress to the venue), so the branch is assembled
-      # here: merge the KLGA-fit base branch (#2398), apply the day-ahead patch shipped
-      # alongside this workflow, and push the complete tree back. Idempotent — a re-run
-      # finds the base merged and no patch file, and just re-measures.
-      - name: Assemble branch (KLGA-fit base + day-ahead patch)
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin claude/forecastex-klga-fit
-          git merge --no-edit origin/claude/forecastex-klga-fit
-          if ls scripts/ci/2217-dayahead.patch.* >/dev/null 2>&1; then
-            cat scripts/ci/2217-dayahead.patch.* > /tmp/2217-dayahead.patch
-            git apply --index /tmp/2217-dayahead.patch
-            git rm -q scripts/ci/2217-dayahead.patch.*
-            git commit \
-              -m "feat(trader): ForecastEx UHLGA day-ahead backtest harness + nightly forward paper-verification (#2217)" \
-              -m "Assembled on the runner: KLGA-fit base (claude/forecastex-klga-fit) merged, day-ahead patch applied. Retrospective leg scores contract date D with the D-1 EOD board + D-1 NBS MOS run (lead 1) — never same-day closes. Forward leg (lib/forecastex-paper-verify.js, opt-in FORECASTEX_PAPER_VERIFY=1) stamps tomorrow's prediction nightly and grades it against the venue's own settlement flips. certifiedEdge stays false without n>=20 net-positive band-robust evidence. See CHANGELOG 1.9.2." \
-              -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>" \
-              -m "Claude-Session: https://claude.ai/code/session_01RZjWsrM5Kx3uDCwaRsTZQ9"
-          fi
-          git push origin HEAD:${{ github.ref_name }}
-
       - name: Unit gate (pure day-ahead logic must be green before measuring)
         run: |
           node apps/lantern-garage/test/forecastex-board.test.js
@@ -80,9 +63,9 @@ jobs:
       - name: Run backtest
         run: |
           node scripts/backtest-forecastex-dayahead.js \
-            --from "${{ github.event.inputs.from }}" \
-            --to "${{ github.event.inputs.to }}" \
-            --min-edge "${{ github.event.inputs.min_edge_cents }}" \
+            --from "${{ github.event.inputs.from || '2026-02-03' }}" \
+            --to "${{ github.event.inputs.to || '2026-07-09' }}" \
+            --min-edge "${{ github.event.inputs.min_edge_cents || '5' }}" \
             --out data/eval/forecastex-klga-dayahead-backtest.jsonl \
             --summary data/eval/forecastex-klga-dayahead-backtest-summary.json
 
@@ -92,6 +75,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/eval/forecastex-klga-dayahead-backtest.jsonl \
                   data/eval/forecastex-klga-dayahead-backtest-summary.json
+          # consume the one-shot trigger marker; [skip ci] below stops a re-trigger loop
+          if [ -f data/eval/.forecastex-backtest-requested ]; then
+            git rm -q data/eval/.forecastex-backtest-requested
+          fi
           if git diff --staged --quiet; then
             echo "No result changes to commit."
           else
