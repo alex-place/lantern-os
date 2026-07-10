@@ -198,3 +198,36 @@ Grounded research corrected two premises and settled the channels; **we ship bot
 | MS Store re-signs MSIX → no first-launch warning; registration now free | learn.microsoft.com/windows/apps/package-and-deploy/code-signing-options; blogs.windows.com (free registration Sep 2025 / May 2026) | High | web |
 | SignPath Foundation = free OSS signing; public repos eligible | signpath.org ; signpath.org/terms.html | High | web |
 | Cloudflare / Google credits don't cover Windows code signing | developers.cloudflare.com/ssl (web certs only); Google CAS = private CA | High | web + product scope |
+
+## Update — 2026-07-10: native WebView2 shell replaces the Edge `--app` window (amends G5)
+
+**Status: Proposed (pending Alex's approval per the ADR gate).** Directed by Alex
+("it should not be edge, I want a native desktop app").
+
+**What changed.** G5 originally said: reuse the user's browser; if a window is ever
+wanted, use Edge/Chrome `--app` mode. In practice that launched **`msedge.exe`** — an
+actual browser process (browser profile, app-mode address bar, an Edge dependency and
+Edge update surface). It read as a browser, not an app.
+
+**Decision.** Keep the principle behind G5 — **no bundled Chromium, no Electron** — but
+render the window with a **native .NET WPF + WebView2 shell** (`Unisona.exe`,
+[`apps/lantern-garage/desktop/shell/`](../../apps/lantern-garage/desktop/shell/)) instead
+of spawning the Edge browser. WebView2 is the Edge *engine* already on Win10/11 (same
+"reuse what's installed" spirit; still no ~150 MB Chromium download), but the window is a
+genuine native app — own process, title bar, taskbar entry, dark immersive chrome, no
+address bar, no `msedge.exe`. This is the same move Microsoft made for new Teams
+(Electron → WebView2). The **one-Core rule (G1) is unchanged**: the shell replaces *only*
+the window; it boots the same unmodified Core via `launcher.js --embed`.
+
+**Architecture.** Two executables now ship (still no `node.exe`, no Chromium):
+`Unisona.exe` (the shell) spawns `unisona-core.exe` (the Node SEA backend) with `--embed`;
+the Core hands back the tokened loopback endpoint via `%LOCALAPPDATA%\unisona\endpoint.json`
+and the shell hosts it in WebView2. Tauri was reconsidered (per the original "reconsider
+Tauri" note) but WebView2-via-.NET builds and verifies on the existing Windows/.NET
+toolchain with no new Rust build system.
+
+| Claim | Evidence | Confidence | Source |
+|---|---|---|---|
+| Native shell boots the packaged Core with **zero `node.exe`** and serves the cockpit | 2026-07-10 install test: `Unisona.exe → unisona-core.exe --embed → unisona-core.exe`, `http://127.0.0.1:*/` → 200, `<title>unisona.ai</title>` | High (measured) | local install run |
+| WebView2 engine is present on Win10/11 (no Chromium download) | WebView2 Evergreen Runtime 150.x on the build box; MS ships it in-box on Win11 | High | local + learn.microsoft.com |
+| New Microsoft Teams moved Electron → WebView2 for a native window | learn.microsoft.com / Teams engineering posts | Medium | web |
