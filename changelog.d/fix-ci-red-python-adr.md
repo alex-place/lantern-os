@@ -32,6 +32,13 @@ by the INTERNALERROR (they never got to run):
    registry (new tools added without regenerating it). Regenerated it via
    `node scripts/tool-runner-bridge.js generate-manifest`.
 
+5. **`Site Audit` (a11y-audit workflow).** Fix (3) repointed the loop links to the
+   `/view?path=…` reader route, but `scripts/audit-site.js` treated the URL as a
+   literal public path and reported "FILE NOT FOUND" (it also never resolved the
+   old `/repo/…` form). Taught `validatePageExists()` to resolve both the
+   `/view?path=<rel>` reader route and `/repo/<rel>` against the repo root, so doc
+   links validate against the real file.
+
 Verified: `node scripts/lint-adr-registry.mjs` → OK; the full pytest suite runs
 with no INTERNALERROR and the four previously-failing tests now pass (the two
 collection/skip fixes plus these two). Improves **Verify** (CI reflects real state).
