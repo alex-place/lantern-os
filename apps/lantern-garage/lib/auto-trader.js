@@ -57,6 +57,10 @@ const DEFAULTS = {
   trailArmPct: 1.5,        // …but arm the trail only once the position has gained ≥ this %
                            //    (so it locks GAINS; the entry−stopPct broker stop covers losses)
   takeProfitPct: 0,        // hard take-profit % (0 = off — let the trailing stop run)
+  // After firing an exit for a symbol, don't re-fire for this long. In extended hours an
+  // exit limit can sit unfilled, and without this the loop re-placed the SAME exit every
+  // scan — 30+ phantom "exit" log rows for one still-open position, and stacked orders.
+  exitReattemptMin: 8,
 };
 
 function cfg() {
@@ -72,6 +76,7 @@ function cfg() {
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
     maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
+    exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
     exitMinPwin: n('TRADER_EXIT_MIN_PWIN', DEFAULTS.exitMinPwin),        // anti-churn: exit only on strong bearish
     persistScans: n('TRADER_PERSIST_SCANS', DEFAULTS.persistScans),      // anti-churn: N consecutive scans
     persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
@@ -137,6 +142,7 @@ const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
 const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
+const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
@@ -149,7 +155,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
     : { ticker: sym, side: 'sell', qty, type: 'market' };
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   await cancelRestingStops(bridge, userId, sym);
-  _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now);
+  _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
@@ -184,6 +190,13 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // Min-hold: never churn a just-opened long — the broker stop still protects it.
     const entryAt = _entryAt.get(sym) || 0;
     if (entryAt && (now - entryAt) < c.minHoldMs) continue;
+
+    // Exit already fired recently for this symbol? Don't re-fire. An extended-hours exit
+    // limit can rest unfilled; without this the loop re-placed the same exit every scan
+    // (dozens of phantom "exit" rows + stacked orders on one still-open position). The
+    // resting order (or the next fill) will close it — give it time before re-attempting.
+    const exitAt = _exitAt.get(sym) || 0;
+    if (exitAt && (now - exitAt) < c.exitReattemptMs) continue;
 
     const pnlPct = ((cur - entry) / entry) * 100;
     const peak = Math.max(_peak.get(sym) || 0, cur, entry);   // running high-water mark
