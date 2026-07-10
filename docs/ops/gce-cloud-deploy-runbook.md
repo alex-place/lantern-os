@@ -17,12 +17,21 @@ Compute Engine, fronted by Cloudflare. This is the first concrete instance of th
 | VM | `lantern-app`, zone `us-central1-a`, `e2-medium`, Debian 12, 30 GB pd-balanced |
 | External IP | `104.197.219.106` (ephemeral — reserve a static IP if it must persist) |
 | App service | systemd `lantern.service` → `node server.js` in `/opt/lantern-os/apps/lantern-garage`, binds `0.0.0.0:8080` |
-| Tunnel service | systemd `cloudflared` → tunnel `lantern-cloud` (`c666a37e-b03f-43a6-ad68-aa0455a7b246`) |
+| Tunnel service (lantern-os.net) | systemd `cloudflared` → tunnel `lantern-cloud` (`c666a37e-b03f-43a6-ad68-aa0455a7b246`), Cloudflare account `967f7517…` |
+| Tunnel service (unisona.ai) | systemd `cloudflared-unisona` → tunnel `unisona.ai` (`1b1c2acf-4af9-45a0-9597-019d4a874a58`), Cloudflare account `ff492ab2…` — added 2026-07-10 (see [unisona.ai cutover](#unisonaai-tunnel-cutover-2026-07-10)) |
 | MCP | `localhost:8771` (spawned by the app; **not** exposed publicly) |
 | LLM | Gemini via **Vertex**, keyless off the VM service account |
 
-Public hostnames (Cloudflare → tunnel → `localhost:8080`): `unisona.ai`,
-`www.unisona.ai`, `cloud.lantern-os.net`.
+Public hostnames all terminate at the VM's `localhost:8080`, but ride **two tunnels in two
+Cloudflare accounts** (a tunnel CNAME only binds inside its own account):
+
+| Hostname | Cloudflare account | Tunnel | VM connector |
+|----------|--------------------|--------|--------------|
+| `unisona.ai`, `www.unisona.ai` | `ff492ab2…` (registrar + live zone, NS `ashley`/`junade`) | `1b1c2acf` | `cloudflared-unisona` |
+| `cloud.lantern-os.net` | `967f7517…` | `c666a37e` (`lantern-cloud`) | `cloudflared` |
+
+`mcp.unisona.ai` resolves but is pinned to `http_status:404` at the tunnel — the port-8771 MCP is
+no-auth and must never be publicly reachable.
 
 ## Driving gcloud
 
@@ -67,18 +76,70 @@ The callback is derived from the request host, so it's always
 Google (project 843848914143 OAuth client), Patreon client, Discord app (OAuth2 →
 Redirects). Discord app id `1523112567386669187`.
 
-## Cloudflare tunnel
+## Cloudflare tunnels
 
-Dedicated named tunnel `lantern-cloud` runs **on the VM** (outbound-only, so 8080
-stays closed to the internet). Config `/etc/cloudflared/config.yml` routes the three
-hostnames to `http://localhost:8080`. It is separate from the operator's PC tunnel
-`lantern-os` (serves `lantern-os.net` → PC:4177) so they don't fight. The tunnel and
-all zones live in Cloudflare account `967f7517df9d7bd043aa9156e37c28ed`.
+Two named tunnels run **on the VM** (both outbound-only, so 8080 stays closed to the
+internet), one per Cloudflare account because a tunnel CNAME only binds inside the
+account that owns the tunnel:
 
-`mcp.unisona.ai` is deliberately **left out** of the ingress (fail-closed 404): the
-port-8771 MCP is no-auth and exposes git-write / dispatch tools, so it must never be
-publicly reachable. Gate with Cloudflare Access or the OAuth MCP (8772) before ever
-exposing it.
+- `cloudflared` → tunnel `lantern-cloud` (`c666a37e…`), account `967f7517…`. Locally
+  managed via `/etc/cloudflared/config.yml`; routes `cloud.lantern-os.net` →
+  `http://localhost:8080`.
+- `cloudflared-unisona` → tunnel `unisona.ai` (`1b1c2acf…`), account `ff492ab2…`
+  (which owns the unisona.ai registration + live zone). **Remotely managed** — its
+  ingress is set in the Cloudflare Zero Trust dashboard / API, not a local config file:
+  `unisona.ai`/`www` → `http://localhost:8080`, `mcp.unisona.ai` → `http_status:404`,
+  catch-all `404`. Runs from the token baked into
+  `/etc/systemd/system/cloudflared-unisona.service` (root, `chmod 600`).
+
+Both are separate from the operator's PC tunnel `lantern-os` (`7045ac00…`, serves
+`lantern-os.net` → PC:4177) so they don't fight.
+
+`mcp.unisona.ai` is deliberately pinned to fail-closed **404**: the port-8771 MCP is
+no-auth and exposes git-write / dispatch tools, so it must never be publicly reachable.
+Gate with Cloudflare Access or the OAuth MCP (8772) before ever exposing it.
+
+> **Cleanup left:** account `967f7517…` still holds a stray, permanently-`pending`
+> duplicate `unisona.ai` zone (`1ee17c77…`, NS `corey`/`june`). It is inert — the
+> registrar delegates to the `ff492ab2…` zone — but delete it to avoid confusion.
+
+### unisona.ai tunnel cutover (2026-07-10)
+
+**Symptom.** `unisona.ai` + `www` returned `502` while `cloud.lantern-os.net` (same VM,
+same origin) served `200`.
+
+**Root cause.** unisona.ai's tunnel (`1b1c2acf`, account `ff492ab2…`) was routed to
+`http://localhost:4177` and its connector ran on the **operator's PC**, not the VM. The
+PC's stable server wasn't answering, so every request dead-ended. GCP, DNS records, and
+the app were all healthy. Repointing the `ff492ab2…` zone at the `967f7517…` tunnel is
+**not** an option — cross-account tunnel CNAMEs don't bind (tested: returns `530`).
+
+**Fix (all inside account `ff492ab2…`).**
+1. Repointed tunnel `1b1c2acf` ingress → `localhost:8080`; sealed `mcp.unisona.ai` → `404`.
+2. Installed `cloudflared-unisona.service` on the VM running that tunnel's token, next to
+   the existing `cloudflared` connector — both to `localhost:8080`.
+3. Stopped + disabled the PC's `Cloudflared-unisona` service so requests can't split-brain.
+4. Verified `unisona.ai` + `www` → `200` (app `<title>unisona.ai</title>`), `mcp` → `404`.
+
+To recreate the unisona connector on a fresh VM:
+
+```bash
+# token comes from the ff492ab2… account (Zero Trust → Networks → Tunnels → unisona.ai),
+# or: cloudflared tunnel token 1b1c2acf  (needs that account's cert.pem)
+sudo tee /etc/systemd/system/cloudflared-unisona.service >/dev/null <<EOF
+[Unit]
+Description=cloudflared unisona (ff49 tunnel 1b1c2acf)
+After=network.target
+[Service]
+ExecStart=/usr/local/bin/cloudflared --no-autoupdate tunnel run --token <FF49_TUNNEL_TOKEN>
+Restart=on-failure
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo chmod 600 /etc/systemd/system/cloudflared-unisona.service
+sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-unisona
+```
 
 ## Updating the running app
 
@@ -106,10 +167,12 @@ If the VM is lost, recreate it: create an `e2-medium` Debian-12 instance with
 `--service-account=843848914143-compute@developer.gserviceaccount.com --scopes=cloud-platform`,
 a startup script that installs Node 20 + git, clones `master`
 (`GIT_LFS_SKIP_SMUDGE=1`), `npm install`, and installs `lantern.service`. Then:
-grant `roles/aiplatform.user` to the SA, recreate the four env drop-ins, install the
-cloudflared connector for tunnel `lantern-cloud` (credentials from the operator's
-`~/.cloudflared/`), and (optionally) `pip install fastapi uvicorn[standard]
-sse-starlette httpx` for the MCP child. Enable APIs: `compute`, `aiplatform`.
+grant `roles/aiplatform.user` to the SA, recreate the four env drop-ins, install **both**
+cloudflared connectors — `cloudflared` for tunnel `lantern-cloud` (credentials from the
+operator's `~/.cloudflared/`) and `cloudflared-unisona` for the `ff492ab2…` unisona.ai
+tunnel (see [the cutover section](#unisonaai-tunnel-cutover-2026-07-10)) — and
+(optionally) `pip install fastapi uvicorn[standard] sse-starlette httpx` for the MCP
+child. Enable APIs: `compute`, `aiplatform`.
 
 ## Cost / lifecycle
 

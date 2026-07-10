@@ -1,0 +1,222 @@
+{
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "hidden_dim": 2048,
+  "trained_depth": 4,
+  "probed_depth": 4,
+  "n_prompts": 6,
+  "power_iter_steps": 60,
+  "rho_J_geomean_all": 8.1704,
+  "rho_J_geomean_trained_steadystate": 10.9726,
+  "rho_J_max": 27.5833,
+  "norm_J_2_geomean_all": 127.3804,
+  "norm_J_2_geomean_trained_steadystate": 93.5284,
+  "norm_J_2_max": 925.3349,
+  "non_normality_geomean": 15.59,
+  "meaning": {
+    "rho_J": "spectral radius of the one-UT-step Jacobian df/dh via autograd power iteration; <1 => the recurrent loop is a local contraction (converges to a fixed point)",
+    "norm_J_2": "top singular value of the same Jacobian; ||J||_2 >> rho(J) signals a non-normal operator whose steps can transiently expand while the loop still contracts asymptotically"
+  },
+  "vs_observed_proxy": "sigma0_loop_jacobian.py gave rho_observed=0.88 (trajectory ratio, a proxy). This is the true Jacobian spectral radius of the loop map, measured by automatic differentiation at real operating points.",
+  "vs_debunked_certificate": "certificate headline rho=1.064 was a linear fit over 4 text-surface features (rho_controls.py); superseded by this measured rho(J).",
+  "per_prompt": [
+    {
+      "prompt": "The capital of France is",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 20.5553,
+          "norm_J_2": 586.5691,
+          "non_normality_ratio": 28.536
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 18.0474,
+          "norm_J_2": 411.6759,
+          "non_normality_ratio": 22.811
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 2.2033,
+          "norm_J_2": 35.5842,
+          "non_normality_ratio": 16.151
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 9.0759,
+          "norm_J_2": 85.9602,
+          "non_normality_ratio": 9.471
+        }
+      ]
+    },
+    {
+      "prompt": "Two plus two equals",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 8.3537,
+          "norm_J_2": 262.9807,
+          "non_normality_ratio": 31.481
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 3.0458,
+          "norm_J_2": 66.3003,
+          "non_normality_ratio": 21.768
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 2.2619,
+          "norm_J_2": 25.5299,
+          "non_normality_ratio": 11.287
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 11.6752,
+          "norm_J_2": 65.8213,
+          "non_normality_ratio": 5.638
+        }
+      ]
+    },
+    {
+      "prompt": "In 1969, humans first landed on the",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 16.9979,
+          "norm_J_2": 589.0168,
+          "non_normality_ratio": 34.652
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 5.6214,
+          "norm_J_2": 61.9697,
+          "non_normality_ratio": 11.024
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 7.658,
+          "norm_J_2": 153.675,
+          "non_normality_ratio": 20.067
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 7.6253,
+          "norm_J_2": 52.713,
+          "non_normality_ratio": 6.913
+        }
+      ]
+    },
+    {
+      "prompt": "def add(a, b):\n    return",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 27.5833,
+          "norm_J_2": 925.3349,
+          "non_normality_ratio": 33.547
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 7.2218,
+          "norm_J_2": 34.5892,
+          "non_normality_ratio": 4.79
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 8.0683,
+          "norm_J_2": 178.9234,
+          "non_normality_ratio": 22.176
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 7.7287,
+          "norm_J_2": 135.6092,
+          "non_normality_ratio": 17.546
+        }
+      ]
+    },
+    {
+      "prompt": "Water is made of hydrogen and",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 11.8408,
+          "norm_J_2": 352.5405,
+          "non_normality_ratio": 29.773
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 11.5436,
+          "norm_J_2": 57.1954,
+          "non_normality_ratio": 4.955
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 4.4151,
+          "norm_J_2": 75.8013,
+          "non_normality_ratio": 17.169
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 12.3994,
+          "norm_J_2": 114.669,
+          "non_normality_ratio": 9.248
+        }
+      ]
+    },
+    {
+      "prompt": "She opened the door and saw",
+      "per_step": [
+        {
+          "step": 0,
+          "current_ut": 0,
+          "rho_J": 14.2075,
+          "norm_J_2": 469.7209,
+          "non_normality_ratio": 33.062
+        },
+        {
+          "step": 1,
+          "current_ut": 1,
+          "rho_J": 6.1617,
+          "norm_J_2": 246.4457,
+          "non_normality_ratio": 39.996
+        },
+        {
+          "step": 2,
+          "current_ut": 2,
+          "rho_J": 1.5354,
+          "norm_J_2": 22.8852,
+          "non_normality_ratio": 14.905
+        },
+        {
+          "step": 3,
+          "current_ut": 3,
+          "rho_J": 22.5397,
+          "norm_J_2": 144.3257,
+          "non_normality_ratio": 6.403
+        }
+      ]
+    }
+  ],
+  "honest_scope": "rho(J) and ||J||_2 are LOCAL (Jacobian at sampled operating points h*), measured with float32 autograd JVP/VJP power iteration. Averaged over prompts and UT steps; the 'trained_steadystate' figure isolates the last trained step, the regime the certificate reasons about. Power iteration returns |dominant eigenvalue|; complex-conjugate pairs are stabilised by geomean over the iteration tail."
+}

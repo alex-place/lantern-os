@@ -174,4 +174,10 @@ ok("gate: null gate -> merges (back-compat)", m._shouldMerge(greenPvBase, review
 // The gate only applies once the normal gates pass — a draft assigned PR still blocks on draft, not the gate.
 ok("gate: draft still blocks before gate", m._shouldMerge({ isDraft: true, mergeable: "MERGEABLE", statusCheckRollup: green }, reviewed, now, null, gNoConv).reason === "draft");
 
+// ── assigned-issue gate is OFF by default (green + review-APPROVE is the merge bar) ──
+ok("flag: assignedIssueGate defaults off",
+  new PrWatcher({ repoRoot: os.tmpdir() }).assignedIssueGate === false);
+ok("flag: assignedIssueGate opt-in respected",
+  new PrWatcher({ repoRoot: os.tmpdir(), assignedIssueGate: true }).assignedIssueGate === true);
+
 console.log(`\n${pass} checks passed`);

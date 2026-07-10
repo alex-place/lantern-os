@@ -2,6 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const yahoo = require('./market-data-yahoo');
+const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
 
 // Per-trade outcome log (append-only JSONL) — the honest record that lets us
 // MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
@@ -50,6 +52,15 @@ const DEFAULTS = {
   exitMinPwin: 0.6,        // only exit on a STRONG bearish signal (p_win ≥ this)
   persistScans: 2,         // act only after the same direction holds N consecutive scans
   persistWindowMs: 200000, // …seen within this window (≈3 scans) — else it's stale
+  // ── Momentum / trailing exits — capture the peak instead of round-tripping it ──
+  trailPct: 3,             // trailing stop: exit a long if price falls this % from its PEAK
+  trailArmPct: 1.5,        // …but arm the trail only once the position has gained ≥ this %
+                           //    (so it locks GAINS; the entry−stopPct broker stop covers losses)
+  takeProfitPct: 0,        // hard take-profit % (0 = off — let the trailing stop run)
+  // After firing an exit for a symbol, don't re-fire for this long. In extended hours an
+  // exit limit can sit unfilled, and without this the loop re-placed the SAME exit every
+  // scan — 30+ phantom "exit" log rows for one still-open position, and stacked orders.
+  exitReattemptMin: 8,
 };
 
 function cfg() {
@@ -65,12 +76,21 @@ function cfg() {
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
     maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
+    exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
     exitMinPwin: n('TRADER_EXIT_MIN_PWIN', DEFAULTS.exitMinPwin),        // anti-churn: exit only on strong bearish
     persistScans: n('TRADER_PERSIST_SCANS', DEFAULTS.persistScans),      // anti-churn: N consecutive scans
     persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
     requirePersist: process.env.TRADER_REQUIRE_PERSIST !== '0',          // on by default
     allowShorts: process.env.TRADER_ALLOW_SHORTS === '1',
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
+    // ── Exit management (trailing stop / take-profit / momentum death) ──────────
+    trailPct: n('TRADER_TRAIL_PCT', DEFAULTS.trailPct),
+    trailArmPct: n('TRADER_TRAIL_ARM_PCT', DEFAULTS.trailArmPct),
+    takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
+    momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
+    // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
+    // Lets the user protect open positions without arming full autopilot entries.
+    manageExits: process.env.TRADER_MANAGE_EXITS === '1',
   };
 }
 
@@ -121,6 +141,99 @@ function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.posi
 const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
 const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
+const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
+const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
+
+/** Close a held long at market: cancel its resting stop, clear per-symbol state,
+ *  log the realized outcome, and record it on `out`. Shared by every exit path. */
+async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
+  // Regular hours: a market SELL closes instantly. Pre/post market: IBKR rejects market
+  // orders outside RTH, so use a marketable LIMIT (≈0.2% below the last print, to cross
+  // the wider extended-hours spread) with outsideRTH=true so the exit still fills.
+  const order = (extended && refPrice > 0)
+    ? { ticker: sym, side: 'sell', qty, type: 'limit', limitPrice: Math.round(refPrice * 0.998 * 100) / 100, outsideRth: true }
+    : { ticker: sym, side: 'sell', qty, type: 'market' };
+  const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
+  await cancelRestingStops(bridge, userId, sym);
+  _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
+  logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
+  out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
+  return r;
+}
+
+/**
+ * Exit held LONGS on their own merits every scan — independent of whether a new
+ * scan signal fired — so a winner that peaks and fades doesn't round-trip:
+ *   1. take-profit  — close at a hard +% target (off by default).
+ *   2. trailing stop — once up ≥ trailArmPct, close if price falls trailPct from the PEAK.
+ *   3. momentum death — while in profit, close when the trend rolls over: MACD histogram
+ *      negative AND price below its short EMA (and RSI no longer strong). Catches "the
+ *      momentum is dying / about to die" before the full bearish signal would fire.
+ * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
+ */
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set() }) {
+  const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
+  if (!longs.length) return;
+
+  // Recent 15m bars for momentum — one batched fetch for all held longs (fail-soft).
+  let bars = {};
+  if (c.momentumExit) {
+    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), '15m'); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
+  }
+
+  for (const [sym, p] of longs) {
+    const qty = Number(p.qty) || 0;
+    const cur = Number(p.current_price) || 0;
+    const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;
+    if (!(qty > 0) || !(cur > 0) || !(entry > 0)) continue;
+
+    // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
+    if (workingSells.has(sym)) continue;
+
+    // Min-hold: never churn a just-opened long — the broker stop still protects it.
+    const entryAt = _entryAt.get(sym) || 0;
+    if (entryAt && (now - entryAt) < c.minHoldMs) continue;
+
+    // Exit already fired recently for this symbol? Don't re-fire. An extended-hours exit
+    // limit can rest unfilled; without this the loop re-placed the same exit every scan
+    // (dozens of phantom "exit" rows + stacked orders on one still-open position). The
+    // resting order (or the next fill) will close it — give it time before re-attempting.
+    const exitAt = _exitAt.get(sym) || 0;
+    if (exitAt && (now - exitAt) < c.exitReattemptMs) continue;
+
+    const pnlPct = ((cur - entry) / entry) * 100;
+    const peak = Math.max(_peak.get(sym) || 0, cur, entry);   // running high-water mark
+    _peak.set(sym, peak);
+    const peakGainPct = ((peak - entry) / entry) * 100;         // best gain reached
+    const dropFromPeakPct = peak > 0 ? ((peak - cur) / peak) * 100 : 0;
+
+    // 1) Hard take-profit.
+    if (c.takeProfitPct > 0 && pnlPct >= c.takeProfitPct) {
+      await closeLong(bridge, userId, sym, qty, p, `take_profit (+${pnlPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
+      delete heldQty[sym]; continue;
+    }
+    // 2) Trailing stop — only after the position has run up (locks GAINS, not losses).
+    if (c.trailPct > 0 && peakGainPct >= c.trailArmPct && dropFromPeakPct >= c.trailPct) {
+      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
+      delete heldQty[sym]; continue;
+    }
+    // 3) Momentum death — fading winner: MACD histogram negative + below short EMA.
+    if (c.momentumExit && pnlPct > 0) {
+      const closes = ((bars[sym] && bars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
+      if (closes.length >= 30) {
+        const m = macd(closes);
+        const ema9 = emaSeries(closes, 9);
+        const e9 = ema9[ema9.length - 1];
+        const last = closes[closes.length - 1];
+        const r = rsi(closes);
+        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55)) {
+          await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
+      }
+    }
+  }
+}
 
 /**
  * Execute the ENTER verdicts from a scan against the user's IBKR account.
@@ -128,10 +241,11 @@ const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence
  * @param {object} deps   { bridge, userId, now?, caps? }
  * @returns {Promise<{executed:Array, skipped:Array, enabled:boolean, reason?:string}>}
  */
-async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} } = {}) {
+async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false } = {}) {
   const c = cfg();
-  const out = { executed: [], skipped: [], enabled: c.enabled };
-  if (!c.enabled) { out.reason = 'TRADER_AUTO_EXECUTE!=1 — autopilot off'; return out; }
+  const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
+  // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
+  if (!c.enabled && !c.manageExits) { out.reason = 'TRADER_AUTO_EXECUTE!=1 and TRADER_MANAGE_EXITS!=1 — nothing to do'; return out; }
   if (!bridge || !userId) { out.reason = 'no bridge/userId'; return out; }
 
   const signals = (scan && Array.isArray(scan.signals)) ? scan.signals : [];
@@ -147,12 +261,22 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
 
+  // Fetch the account's working orders ONCE. Two uses: (1) re-protect naked longs, and
+  // (2) the OVERSELL GUARD — a Set of symbols that already have a resting NON-stop SELL
+  // (an exit/cover order that hasn't filled, common in thin extended hours). We never
+  // stack another sell on those, so a lagging position snapshot can't make the loop sell
+  // `held` again and blow through flat into a short. Survives restarts (broker-side state),
+  // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
+  const _openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const workingSells = new Set((_openOrders || [])
+    .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working/i.test(o.status || ''))
+    .map((o) => String(o.symbol || '').toUpperCase()));
+
   // ── Re-protect naked longs: any held long that's lost its protective stop (the
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
   try {
-    const openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
-    const hasStop = (sym) => (openOrders || []).some((o) =>
+    const hasStop = (sym) => (_openOrders || []).some((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '') &&
       /submit|pending|presubmit/i.test(o.status || ''));
@@ -168,6 +292,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
       }
     }
   } catch (_e) { /* fail-soft — the daily-loss breaker still guards the account */ }
+
+  // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
+  //    death) — runs every scan, independent of new ENTER signals. This is what stops
+  //    a winner from peaking and giving it all back. ──
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells }); } catch (_e) { /* fail-soft */ }
+
+  // Entries require the full autopilot arm; exits-only mode stops here.
+  if (!c.enabled) { out.reason = 'exit-management only (TRADER_MANAGE_EXITS) — entries off'; return out; }
 
   if (!enters.length) { out.reason = 'no ENTER signals'; return out; }
 
@@ -214,9 +346,20 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
-        const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: held, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+        // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
+        if (workingSells.has(sym)) { out.skipped.push({ ...record, why: 'exit sell already resting — not stacking (oversell guard)' }); continue; }
+        // Same exit-reattempt cooldown as the momentum/trailing path: a persistently
+        // bearish name would otherwise re-fire this signal-exit EVERY scan while the
+        // order rests unfilled (NVDA re-exited 179× in one session). Wait for the
+        // resting order / next fill before re-attempting.
+        const exitAt = _exitAt.get(sym) || 0;
+        if (exitAt && (now - exitAt) < c.exitReattemptMs) { out.skipped.push({ ...record, why: `exit already fired ${Math.round((now - exitAt) / 60000)}min ago — waiting for it to fill` }); continue; }
+        const exOrder = (extended && price > 0)
+          ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true }
+          : { ticker: sym, side: 'sell', qty: held, type: 'market' };
+        const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
-        _entryAt.delete(sym);
+        _entryAt.delete(sym); _exitAt.set(sym, now);
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
@@ -242,7 +385,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {} 
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
-    const r = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
+    const enOrder = (extended && price > 0)
+      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity }
+      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity };
+    const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.

@@ -1,0 +1,2 @@
+{"adapter": "D:/lantern-train/ouro-honesty-trackB/final", "n_holdout": 39, "epistemic_both_correct": 0.867, "epistemic_n": 30, "abstention_rate": 1.0, "abstention_n": 5, "calibration_directional": 1.0, "calibration_n": 4}
+{"adapter": null, "n_holdout": 39, "epistemic_both_correct": 0.233, "epistemic_n": 30, "abstention_rate": 0.4, "abstention_n": 5, "calibration_directional": 0.0, "calibration_n": 4}

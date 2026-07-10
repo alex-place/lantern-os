@@ -15,6 +15,15 @@ import inspect
 import sys
 from pathlib import Path
 
+import pytest
+
+# `src/mcp_server/server.py` hard-exits (sys.exit(1)) at import time when fastapi /
+# uvicorn are absent — a SystemExit that ISN'T an ImportError, so it crashes pytest
+# COLLECTION (INTERNALERROR) and fails the whole Python suite, not just this module.
+# CI's Python job intentionally omits fastapi, so skip the module cleanly when the
+# server dependency set isn't installed (matches the discord suites' importorskip).
+pytest.importorskip("fastapi", reason="MCP server tests require the fastapi/uvicorn dependency set")
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 MCP_DIR = REPO_ROOT / "src" / "mcp_server"
 if str(MCP_DIR) not in sys.path:

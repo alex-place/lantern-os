@@ -1,7 +1,7 @@
 ---
 adr: 0010
 title: Distillation is a deferred last resort — verify-gated, benchmark-never-the-target, never removed
-status: Accepted
+status: Proposed   # was erroneously `Accepted` while approved-by is still `pending` and the body reads "Proposed" (#2142); agents can't self-approve, so aligned to the pending state
 date: 2026-06-29
 deciders: Alex Place
 approved-by: pending   # only Alex Place flips this; agents leave it `pending`

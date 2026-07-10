@@ -653,7 +653,11 @@ direction (`data/sigma0/grounding_deadline_report.json`).
 **well-conditioned** basins. In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`)
 the ceiling `B*_∞` is tiny (~0.002), so any realistic anchor escapes at *every* depth —
 the deadline exists but has no practical bite. Ouro's measured loop is in this sliver
-regime (`experiments/sigma0_loop_jacobian.py`: ρ_obs ≈ 0.88, strong non-normality), which
+regime (`experiments/sigma0_loop_jacobian.py`: ρ_obs ≈ 0.88, strong non-normality — here
+ρ_obs is the *observed trajectory* decay rate along the trained path, i.e. exactly the
+transiently-shrinking non-normal subspace; the loop's *Jacobian* spectral radius is
+ρ(J) ≈ 8–11 ≫ 1, see the §6 [#2029] correction, so this is a transient-decay retrodiction,
+not a contraction one), which
 **retro-dicts** the measured anchoring null (`experiments/ouro_canary_vs_logprob.py`:
 grounding stayed cheap at all depths). Supporting evidence, **not** validation — a
 retrodiction of our own null, not a prospective test.
@@ -876,6 +880,37 @@ boundary rather than resting in a deep contracting basin.
 > aggregate still contracts), fp16, the "Thinking" variant, 8 prompts. Evidence class: **MEASURED**
 > (`data/sigma0/loop_jacobian_report.json`) — an observed convergence rate, not a certified Jacobian
 > eigenvalue. This retires the "deferred" status above.
+
+> **⚠️ CORRECTION (2026-07-09, [#2029]) — the *true Jacobian* spectral radius is ρ(J) ≈ 8–11 ≫ 1;
+> the loop map is locally EXPANSIVE, and the 0.88 above was a non-normal transient, not contraction.**
+> The `ρ_observed = 0.88` figure is a *trajectory ratio* `geomean ‖Δh_{t+1}‖/‖Δh_t‖`, a proxy — not
+> the quantity the certificate/STARS reason about (`ρ(J)`, the spectral radius of the one-step map
+> `h → f(h)`). `experiments/sigma0_true_jacobian.py` now measures the real thing: it isolates one
+> universal-transformer step `f(h) = norm(layers(h, current_ut))` as a pure differentiable function
+> (the exact loop body, `modeling_ouro.py:640`) and runs **autograd JVP/VJP power iteration** at real
+> operating points sampled from a forward pass (float32; the math SDPA backend is forced so the
+> second derivative exists). Result over 6 prompts × 4 trained UT steps (`data/sigma0/true_jacobian_report.json`):
+>
+> | Quantity | Value | Meaning |
+> |---|---|---|
+> | `ρ(J)` geomean (all steps) | **8.17** | spectral radius of `df/dh`; **> 1 ⇒ locally expansive** |
+> | `ρ(J)` geomean (last trained step) | **10.97** | the steady-state regime the certificate reasons about |
+> | `ρ(J)` range (all 24 measurements) | **1.5 – 27.6** | **every** (prompt, step) has `ρ(J) > 1` |
+> | `‖J‖₂` geomean | **127.4** | top singular value (transient gain) |
+> | non-normality `‖J‖₂/ρ(J)` | **15.6×** | strongly non-normal operator |
+>
+> **Reconciliation.** Both numbers are correct and *not* contradictory. `ρ(J) ≫ 1` is the asymptotic
+> one-step multiplier; `‖J‖₂/ρ ≈ 16` means the operator is strongly **non-normal**, so a *particular*
+> perturbation (the trained trajectory's own `Δh`) can transiently *shrink* — giving `ρ_observed = 0.88`
+> and the "~34% of steps expand" note — even though the dominant eigendirection *grows* by ~8–11× per
+> step. The honest reading flips: the Ouro loop is **not** a fixed-point contraction; it is a non-normal,
+> expansive map whose trained trajectory rides a transiently-decaying subspace. This is consistent with
+> STARS "peak-then-collapse" (`ρ(J) > 1` predicts divergence when iterated past trained depth) and with
+> §1.2.3's insistence that the **discrete spectral radius `ρ`**, not the abscissa or a trajectory proxy,
+> is the load-bearing invariant. Power iteration converged cleanly (flat tails by ~iter 40; complex
+> dominant pairs stabilised by tail-geomean). Evidence class: **MEASURED** (autograd Jacobian, float32).
+> Honest caveats: LOCAL (Jacobian at sampled `h*`, not a global bound); the "Thinking" variant; 6 prompts;
+> `use_cache=False` self-attention only. Run: `.venv-train/Scripts/python.exe experiments/sigma0_true_jacobian.py`.
 
 > **Now certified in the matching time domain (2026-07-04, [#1988]).** `ρ` is a
 > *discrete-time* quantity — the step map `x_{k+1}=A x_k` contracts iff `ρ(A) < 1` —
