@@ -1,0 +1,68 @@
+{
+  "task": "Ouro hidden-state truth probe: sub-ceiling (data-defined hardness) + cross-domain transfer",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_facts": 80,
+  "n_examples": 160,
+  "n_domains": 5,
+  "domains": [
+    "geography",
+    "science",
+    "history",
+    "literature",
+    "arithmetic"
+  ],
+  "base_rate_positive": 0.5,
+  "length_confound_auroc": 0.5147,
+  "answer_logprob_auroc": 0.7117,
+  "full_set_probe_auroc_per_ut_step": {
+    "0": 0.6434,
+    "1": 0.8769,
+    "2": 0.9278,
+    "3": 0.9217
+  },
+  "full_set_probe_auroc_best": 0.9278,
+  "best_ut_step": 2,
+  "hardness_terciles_by_logprob_margin": {
+    "hard_uncertain": {
+      "n_facts": 27,
+      "n_examples": 54,
+      "mean_abs_logprob_margin": 0.099,
+      "probe_auroc_best_step": 0.8848,
+      "logprob_auroc": 0.5281
+    },
+    "medium": {
+      "n_facts": 27,
+      "n_examples": 54,
+      "mean_abs_logprob_margin": 0.533,
+      "probe_auroc_best_step": 0.9287,
+      "logprob_auroc": 0.5652
+    },
+    "easy_confident": {
+      "n_facts": 26,
+      "n_examples": 52,
+      "mean_abs_logprob_margin": 2.489,
+      "probe_auroc_best_step": 0.9675,
+      "logprob_auroc": 0.895
+    }
+  },
+  "cross_domain_transfer_LODO_best_step": {
+    "geography": 0.9258,
+    "science": 0.9023,
+    "history": 0.9688,
+    "literature": 0.9844,
+    "arithmetic": 0.8711,
+    "MEAN": 0.9305
+  },
+  "cross_domain_transfer_LODO_shuffled_control": {
+    "geography": 0.6367,
+    "science": 0.5703,
+    "history": 0.6367,
+    "literature": 0.7188,
+    "arithmetic": 0.543,
+    "MEAN": 0.6211
+  },
+  "evidence_class": "MEASURED (data/sigma0/probe_transfer_report.json)",
+  "honest_headline": "Full-set probe AUROC 0.9278 (step 2) is near ceiling on easy facts. On the model-UNCERTAIN tercile (low |logprob margin|, mean 0.099) it is 0.8848 vs logprob 0.5281 \u2014 the informative sub-ceiling number. Leave-one-domain-out transfer AUROC = 0.9305 (shuffled floor 0.6211) => the direction is domain-general, not per-fact memorization.",
+  "confounds_controlled": "minimal pairs (length AUROC 0.515); balanced labels (base rate 0.5, the #2028 confound); grouped/held-out splits so a fact's true+false never straddle train/test; hardness is the model's own logprob margin, not hand-labeled.",
+  "caveats": "fp16, Ouro-1.4B (small), self-authored matched facts, per-UT-step (not intra-step layers), ~16 facts/domain so per-domain transfer AUROC has variance (see MEAN)."
+}
