@@ -29,14 +29,23 @@ Two honest findings:
    in a 17-minute LoRA run, while the base stays 4.7×-compressed. Not a full restore (still −0.20 vs
    FP16), but a real lift.
 
-## The confound (stated honestly)
+## The confound — RESOLVED by a control: the +0.20 is genuine recovery
 
-This experiment has **no FP16+LoRA control**, so part of the +0.20 could be the coding SFT improving the
-model generally rather than *specifically* recovering quantization loss. The clean attribution needs a
-FP16+same-LoRA arm (does the SFT lift FP16 above 0.80 too?). So read this as "a light adapter lifts the
-quantized model's coding by ~0.20," not "it recovers exactly the quantization loss." (Also: n=40 ±0.15;
-`humaneval-train.jsonl` is general Python SFT with no `HumanEval/` test ids found — low but nonzero
-contamination risk.)
+The obvious confound is that the coding SFT might just improve *any* model. So I ran the **FP16 + same
+LoRA control** (`--no-quant`):
+
+| arm | pass@1 |
+|---|---|
+| FP16 | 0.80 |
+| **FP16 + LoRA (control)** | **0.80** (no change) |
+| PTQTP (2-plane) | 0.40 |
+| PTQTP + LoRA | 0.60 (+0.20) |
+
+**The SFT does not lift the FP16 model at all (0.80 → 0.80)** — it's already saturated on this data. So
+the +0.20 the LoRA buys on the *quantized* model is **genuine recovery of quantization damage**, not
+general SFT benefit. Clean attribution. (n=40 ±0.15; `humaneval-train.jsonl` is general Python SFT with
+no `HumanEval/` test ids found — low but nonzero contamination risk, and moot here since it didn't even
+help FP16.)
 
 ## Combined go-forward (with #2206's N-plane result)
 

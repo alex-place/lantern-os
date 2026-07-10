@@ -48,6 +48,7 @@ def main():
     ap.add_argument("--steps", type=int, default=300)
     ap.add_argument("--planes", type=int, default=2)
     ap.add_argument("--seq", type=int, default=640)
+    ap.add_argument("--no-quant", action="store_true", help="CONTROL: skip PTQTP, just FP16+LoRA (isolates SFT benefit from recovery)")
     a = ap.parse_args()
 
     tok = AutoTokenizer.from_pretrained(a.model, trust_remote_code=True)
@@ -67,16 +68,20 @@ def main():
     print("[recovery] 1) FP16 baseline", flush=True)
     fp16 = he("FP16")
 
-    print(f"[recovery] 2) PTQTP {a.planes}-plane quantize in place", flush=True)
-    t0 = time.time()
-    for name, mod in model.named_modules():
-        if isinstance(mod, nn.Linear) and "lm_head" not in name:
-            rec, _ = ptqtp_matrix(mod.weight.data, 128, 8, n_planes=a.planes)
-            mod.weight.data.copy_(rec)
-            del rec
-    torch.cuda.empty_cache()
-    print(f"  quantized in {time.time()-t0:.0f}s", flush=True)
-    ptqtp = he("PTQTP")
+    if a.no_quant:
+        print("[recovery] 2) CONTROL: no quantization (FP16 base kept)", flush=True)
+        ptqtp = fp16
+    else:
+        print(f"[recovery] 2) PTQTP {a.planes}-plane quantize in place", flush=True)
+        t0 = time.time()
+        for name, mod in model.named_modules():
+            if isinstance(mod, nn.Linear) and "lm_head" not in name:
+                rec, _ = ptqtp_matrix(mod.weight.data, 128, 8, n_planes=a.planes)
+                mod.weight.data.copy_(rec)
+                del rec
+        torch.cuda.empty_cache()
+        print(f"  quantized in {time.time()-t0:.0f}s", flush=True)
+        ptqtp = he("PTQTP")
 
     print(f"[recovery] 3) LoRA fine-tune on {a.train_rows} coding rows / {a.steps} steps", flush=True)
     rows = [json.loads(l) for l in
