@@ -199,6 +199,27 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
+          // Realized today: IBKR reports $0 on the paper CPAPI (both `rpl` and the portfolio
+          // summary), so tally it from the autopilot ledger — the P&L of positions that
+          // ACTUALLY closed today (symbol now flat). One value per symbol (its LAST exit row;
+          // earlier rows were phantom re-attempts on the still-open position, now prevented by
+          // the exit-reattempt cooldown). Positions still open are skipped (their exits didn't
+          // fill). Cheap: the ledger is a small append-only file.
+          try {
+            const fs = require('fs'), path = require('path');
+            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+            const openSyms = new Set(ibkrPositions.map((p) => p.symbol));
+            const today = new Date().toISOString().slice(0, 10);
+            const lastBySym = {};
+            for (const line of fs.readFileSync(logPath, 'utf8').split('\n')) {
+              if (!line.trim()) continue;
+              let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+              if (r && r.event === 'exit' && String(r.ts || '').slice(0, 10) === today && r.pnl != null) lastBySym[r.symbol] = Number(r.pnl);
+            }
+            let realized = 0, any = false;
+            for (const [sym, pnl] of Object.entries(lastBySym)) if (!openSyms.has(sym) && Number.isFinite(pnl)) { realized += pnl; any = true; }
+            if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
+          } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
           // Reconcile Day P&L the same way. IBKR's `dpl` lags/rounds on the paper CPAPI
           // (it read −2310 while Realized stayed $0 despite closes today), so derive each
           // position's day change from the cached watchlist chg_pct — prevClose =
