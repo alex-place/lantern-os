@@ -52,7 +52,6 @@ const { makeNormalFor } = require("./fit-weather-oracle-params");
 const { forwardProbs } = require("./validate-weather-oracle-fit");
 
 const PRODUCT = NYC_LGA.product; // UHLGA
-const GRID_LO = 70; // forwardProbs' fixed scoring grid (must match validate's BUCKET_LO)
 
 // ── date helpers (UTC-based calendar walking; contract dates are plain calendar days) ──
 const pad = (n) => String(n).padStart(2, "0");
