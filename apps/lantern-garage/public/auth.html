@@ -40,16 +40,16 @@
     .auth-main {
       flex: 1 1 auto;
       min-height: 0;              /* let the flex child shrink instead of forcing overflow */
-      overflow: hidden;
+      overflow-y: auto;           /* tall cards (e.g. the dev role picker) scroll instead of clipping */
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: clamp(8px, 1.2vh, 13px);
+      justify-content: safe center; /* center when it fits; anchor to top (no clipped top) when it overflows */
+      gap: clamp(5px, 0.7vh, 9px);
       width: 100%;
       max-width: 440px;
       margin: 0 auto;
-      padding: clamp(10px, 1.6vh, 18px) 18px;
+      padding: clamp(8px, 1.1vh, 14px) 18px;
     }
 
     /* Escape hatch — the page is locked to one screen (no scroll) wherever it fits.
@@ -65,9 +65,9 @@
     .auth-hero { text-align: center; }
     .auth-hero__mandala {
       display: block;
-      width: clamp(56px, 8vh, 84px);
+      width: clamp(48px, 6.5vh, 72px);
       height: auto; aspect-ratio: 1;
-      margin: 0 auto clamp(6px, 1.2vh, 12px);
+      margin: 0 auto clamp(4px, 0.8vh, 8px);
       pointer-events: none; user-select: none;
       filter: drop-shadow(0 6px 20px color-mix(in srgb, var(--accent) 22%, transparent));
     }
@@ -87,7 +87,7 @@
     /* ── Sign-in card — surface panel like the home widgets ── */
     .auth-card {
       width: 100%;
-      padding: clamp(16px, 3vw, 22px);
+      padding: clamp(13px, 2.2vw, 17px);
       border: 1px solid var(--border);
       border-radius: 18px;
       background: var(--surface);
@@ -97,7 +97,7 @@
     .auth-card h2 {
       margin: 0 0 4px; font-size: 20px; font-weight: 700; color: var(--text);
     }
-    .auth-card .sub { margin: 0 0 16px; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+    .auth-card .sub { margin: 0 0 10px; font-size: 13.5px; color: var(--muted); line-height: 1.4; }
 
     /* Error banner. Text colour defaults to a dark shade that reads on the light
        tint; the dark-theme overrides below swap in the pale shades. */
@@ -134,15 +134,22 @@
       accent-color: var(--accent); cursor: pointer;
     }
     .tos-consent a { color: var(--accent); text-decoration: underline; }
+    /* display:flex above defeats the [hidden] attribute (UA display:none), so the
+       consent row leaked into sign-in mode as a squished sliver. Honor [hidden]. */
+    .tos-consent[hidden] { display: none; }
     #tos-error { min-height: 0; margin: -8px 0 8px; transition: min-height .1s; }
     #tos-error.show { min-height: 15px; }
+    /* Dev role picker: pack the roles into a compact 2-up grid so the card still fits
+       one screen instead of stacking five full-width buttons. */
+    #test-role-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    #test-role-buttons .test-role-btn { padding: 8px 10px; font-size: 12.5px; border-radius: 10px; }
 
     /* Provider (OAuth) buttons */
     .auth-actions { display: flex; flex-direction: column; gap: 7px; }
     .provider-btn {
       display: flex; align-items: center; justify-content: center; gap: 10px;
       width: 100%; border: 1px solid var(--border); border-radius: 12px;
-      padding: 10px 16px; font-size: 14.5px; font-weight: 600; cursor: pointer;
+      padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
       color: #fff; text-decoration: none; transition: transform .15s, filter .15s;
     }
     .provider-btn:hover { transform: translateY(-1px); filter: brightness(1.02); box-shadow: 0 6px 18px rgba(0,0,0,.12); }
@@ -153,9 +160,9 @@
     .provider-btn .pi svg { width: 100%; height: 100%; display: block; }
 
     /* Local email + password */
-    .local-form { display: flex; flex-direction: column; gap: 7px; }
+    .local-form { display: flex; flex-direction: column; gap: 6px; }
     .local-form input {
-      width: 100%; box-sizing: border-box; padding: 10px 14px;
+      width: 100%; box-sizing: border-box; padding: 8px 14px;
       border: 1px solid var(--border); border-radius: 12px;
       background: var(--bg); color: var(--text); font-size: 16px; /* ≥16px: stops iOS zoom-on-focus */
       transition: border-color .15s, box-shadow .15s;
@@ -165,21 +172,21 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
     }
     .btn-local {
-      border: none; border-radius: 12px; padding: 11px 20px; font-size: 15px;
+      border: none; border-radius: 12px; padding: 9px 20px; font-size: 15px;
       font-weight: 700; cursor: pointer; color: #fff;
       background: var(--accent); transition: background .15s, transform .12s;
     }
     .btn-local:hover { background: var(--accent-hover); transform: translateY(-1px); }
     .btn-local:active { transform: translateY(0); }
     .btn-local { margin-top: 2px; }
-    .local-toggle { text-align: center; font-size: 13px; color: var(--muted); margin-top: 6px; }
+    .local-toggle { text-align: center; font-size: 13px; color: var(--muted); margin-top: 3px; }
     .local-toggle a { color: var(--accent); cursor: pointer; text-decoration: underline; }
 
     /* Secondary / ghost button (Patreon support, continue as guest) */
     .btn-ghost {
       display: flex; align-items: center; justify-content: center;
       width: 100%; border: 1px solid var(--border); border-radius: 12px;
-      padding: 10px 18px; background: transparent; color: var(--text);
+      padding: 8px 18px; background: transparent; color: var(--text);
       font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
       transition: border-color .15s, background .15s;
     }
@@ -189,7 +196,7 @@
     .auth-divider {
       text-align: center; color: var(--muted); font-size: 11px;
       letter-spacing: .1em; text-transform: uppercase;
-      margin: 10px 0 8px; position: relative;
+      margin: 5px 0 4px; position: relative;
     }
     .auth-divider::before, .auth-divider::after {
       content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border);
@@ -693,10 +700,10 @@
     (session.testRoles || ["admin"]).forEach((role) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "provider-btn";
+      btn.className = "provider-btn test-role-btn";
       btn.style.background = "var(--surface, #1f2430)";
       btn.style.color = "var(--fg, #e5e7eb)";
-      btn.textContent = "Sign in as " + (TEST_ROLE_LABELS[role] || role);
+      btn.textContent = TEST_ROLE_LABELS[role] || role;
       btn.addEventListener("click", () => testLogin(role));
       wrap.appendChild(btn);
     });
