@@ -171,7 +171,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
  *      momentum is dying / about to die" before the full bearish signal would fire.
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
-async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false }) {
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set() }) {
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
   if (!longs.length) return;
 
@@ -186,6 +186,9 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     const cur = Number(p.current_price) || 0;
     const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;
     if (!(qty > 0) || !(cur > 0) || !(entry > 0)) continue;
+
+    // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
+    if (workingSells.has(sym)) continue;
 
     // Min-hold: never churn a just-opened long — the broker stop still protects it.
     const entryAt = _entryAt.get(sym) || 0;
@@ -258,12 +261,22 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
 
+  // Fetch the account's working orders ONCE. Two uses: (1) re-protect naked longs, and
+  // (2) the OVERSELL GUARD — a Set of symbols that already have a resting NON-stop SELL
+  // (an exit/cover order that hasn't filled, common in thin extended hours). We never
+  // stack another sell on those, so a lagging position snapshot can't make the loop sell
+  // `held` again and blow through flat into a short. Survives restarts (broker-side state),
+  // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
+  const _openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const workingSells = new Set((_openOrders || [])
+    .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working/i.test(o.status || ''))
+    .map((o) => String(o.symbol || '').toUpperCase()));
+
   // ── Re-protect naked longs: any held long that's lost its protective stop (the
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
   try {
-    const openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
-    const hasStop = (sym) => (openOrders || []).some((o) =>
+    const hasStop = (sym) => (_openOrders || []).some((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '') &&
       /submit|pending|presubmit/i.test(o.status || ''));
@@ -283,7 +296,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended }); } catch (_e) { /* fail-soft */ }
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells }); } catch (_e) { /* fail-soft */ }
 
   // Entries require the full autopilot arm; exits-only mode stops here.
   if (!c.enabled) { out.reason = 'exit-management only (TRADER_MANAGE_EXITS) — entries off'; return out; }
@@ -333,6 +346,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
+        // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
+        if (workingSells.has(sym)) { out.skipped.push({ ...record, why: 'exit sell already resting — not stacking (oversell guard)' }); continue; }
         // Same exit-reattempt cooldown as the momentum/trailing path: a persistently
         // bearish name would otherwise re-fire this signal-exit EVERY scan while the
         // order rests unfilled (NVDA re-exited 179× in one session). Wait for the
