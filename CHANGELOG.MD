@@ -1,3 +1,8 @@
+## [1.9.1] - 2026-07-10
+
+### Added
+- **ForecastEx NYC port grounded (#2217): KLGA oracle fit + public board reader.** Settlement PROVEN from primary sources — the only live ForecastEx NYC daily-high is U-series  (CFTC product code U[H][LGA]) settling on Weather Underground's LaGuardia daily high, measured ≡ round(max METAR tmpf) 14/14 vs the venue's published settlement flips; the NWS CLI disagrees 6/13 days (up to 4°F), and the DH/Central-Park series is delisted — so Kalshi↔ForecastEx NYC is a station-BASIS pair, not an arb. New  reads the venue's public EOD CSVs (prices incl. settlements, ≥2026-02-03, no auth) — the Observe leg no longer needs the IBKR EC entitlement that blocked #2216. The fit/validate scripts are now station-generic (KNYC default byte-identical), and the KLGA fit is committed (: n=1825, OOS RPS 0.0356 vs 0.0508 default = 30% gain, PIT χ² 81.75→21.25, promotion gate passed). Honest negative:  — no measurable ≥100°F ceiling on LGA in five summers, so the Kalshi fade edge does NOT transfer as fitted;  forces a non-binding ceiling when the station fit carries none and stays . 16 new tests. Research note: . Improves **Observe + Reason + Verify**; no order code.
+
 ## [1.9.0] - 2026-07-10
 
 ### Added
