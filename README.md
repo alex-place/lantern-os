@@ -1,10 +1,10 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-07-07
+updated: 2026-07-10
 ---
 
-# Keystone OS
+# Keystone OS (product: **Unisona**)
 
 <!-- Core CI / quality gates -->
 [![CI](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml)
@@ -31,11 +31,11 @@ updated: 2026-07-07
 [![Release provenance](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml)
 [![MCP Tunnel Canary](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml)
 
-**Keystone OS** (formerly Lantern OS) is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
+**Keystone OS** is the internal/architecture name; the **user-facing product is [Unisona](https://unisona.ai)** (primary domain **unisona.ai**; the older `lantern-os.net` still resolves). "Lantern OS" is dead branding — repo/app paths (`lantern-os`, `lantern-garage`) and code identifiers keep the legacy name, but no user-facing surface should say Lantern. It is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
 
 It combines a web app, local memory systems, MCP tooling, multi-provider routing, and a structured convergence loop so work moves from raw context → validated artifacts → archived evidence with clear receipts and ground-truth verification.
 
-**Current state:** Σ₀ (Sigma-Zero) verification framework live (2026-06-14) · 1.6 dashboards shipped (2026-06-16) · Keystone serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`, 2026-06-18) · native Σ₀ LoopLM + standing benchmark landed (#756) · **WCAG AA accessibility compliance** on all surfaces (2026-06-24) · **non-destructive auto-deploy** with `git merge --ff-only` (2026-06-24). The product surface is **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of Keystone OS.
+**Current state (v1.8.x, 2026-07):** **Unisona 1.8 — "one front door"** shipped 2026-06-30 (see [docs/UNISONA-1.8.md](docs/UNISONA-1.8.md)): every stage of the loop now has a user-facing cockpit surface. Since then the 1.8.1xx line added accounts/auth (email-confirm hard gate, Terms of Service + EULA consent, tiered entitlements), a Windows desktop app (thin launcher, ADR-0014), and continued grounding/vision work. Foundations still standing: Σ₀ (Sigma-Zero) verification framework · serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`) · **WCAG AA accessibility** on all surfaces · **non-destructive auto-deploy** with `git merge --ff-only`. The product surface is **[Unisona / Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of the system.
 
 ---
 
@@ -52,7 +52,7 @@ It combines a web app, local memory systems, MCP tooling, multi-provider routing
 
 1. [What is Keystone OS?](#what-is-keystone-os)
 2. [Current Capabilities](#current-capabilities)
-3. [Release Status: v1.6](#release-status-v16)
+3. [Release Status: v1.8](#release-status-v18)
 4. [Σ₀ (Sigma-Zero) Architecture](#σ₀-sigma-zero-architecture)
 5. [Getting Started](#getting-started)
 6. [Development Workflow](#development-workflow)
@@ -102,9 +102,9 @@ Observe → Remember → Reason → Act → Verify → Converge
 | **Σ₀ Story Mode** | ✅ Live | Narrative routing through convergence loop |
 | **Σ₀ Teach Mode** | ✅ Live | Knowledge base verification with ground-truth validation |
 | **Autonomous Repair** | ✅ Live | Memory leak detection, graceful recovery, health monitoring |
-| **Auto-Deployment** | ✅ Live | Hourly master branch pulls, pre-deploy tests, automatic rollback |
-| **Convergence Routing** | ✅ Live | 120+ Keystone intent routes, >70% cache hit rate, deterministic local routing |
-| **Multi-Provider Fallback** | ✅ Live | Claude → OpenAI → Gemini → Grok → Local Ollama, with capacity gates |
+| **Auto-Deployment** | ✅ Live | Master branch pulls every 5 min (non-destructive `merge --ff-only`), health check + automatic rollback |
+| **Convergence Routing** | ✅ Live | 120+ deterministic intent routes, >70% cache hit rate, local-first (falls back to providers only on cache miss) |
+| **Multi-Provider Fallback** | ✅ Live | Gemini → Claude → OpenAI → Grok → local Ollama, **reordered live by the PCSF leaderboard** (`provider.pcsf.json`) with capacity/privacy gates |
 | **Local coding engine — Qwen2.5-Coder** | ✅ Live (#2171) | Qwen2.5-Coder served via Ollama `:11434` is the local-first coder (VRAM-gated registry). Graded on HumanEval — see [BENCHMARKS.md](docs/BENCHMARKS.md). **Ouro-1.4B is the Σ₀ kernel/research base + adapter host, not the coding engine** — its recurrent-depth "Ouro Coder" looping tested **NEGATIVE** (adds no accuracy, ~15× slower; #2178). |
 | **CSF Memory Archive** | ✅ Live | Symbolic searchable format, tiered promotion (trace → skill) |
 | **MCP Server** | ✅ Live | Local tool surface, agent registration, OAuth2 protected endpoint |
@@ -114,19 +114,21 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ---
 
-## Release Status: v1.6
+## Release Status: v1.8
 
-**1.6 Dashboard Sprint** completed (2026-06-16):
-- ✅ Trader Dashboard MVP (real-time data, position management, win-rate metrics)
-- ✅ Creator Dashboard MVP (markdown editor, Dream Journal publishing, templates)
-- ✅ Σ₀ modes fully integrated (game, story, teach with evidence chains)
-- ✅ Autonomous repair system deployed (health monitoring + auto-rollback)
-- ✅ 5 stalled PRs merged to master (consolidated in commit 2b2b4950)
+**Unisona 1.8 — "one front door"** shipped 2026-06-30 (`1.8.0`); the repo is on the **1.8.1xx** line as of 2026-07 (current `1.8.127`). 1.8 was a consolidation milestone: the one loop finally has a user-facing cockpit at every stage. See [docs/UNISONA-1.8.md](docs/UNISONA-1.8.md) for the full by-loop-stage writeup.
 
-**Remaining 1.6 work:**
-- Testing & verification (#619)
-- Local Ollama coder agent rebuild with Σ₀ grounding (#628-#632)
-- Monoworkstream enforcement in CI (#637-#640)
+**Landed in / since 1.8:**
+- ✅ **Observe** — Explore feed (`/explore.html`), single ranked PCSF content stream
+- ✅ **Remember** — confidence-decay memory (facts fade unless reinforced)
+- ✅ **Reason** — personal cockpits (financial reasoning, preference model, learn-anything tutor)
+- ✅ **Act** — in-chat Approve / Rework / Discard for autowork draft PRs, Σ₀ council wired into self-coding
+- ✅ **Verify** — fact-check button, grounding-diff viewer, drift canaries, council exec-verify (defaults ON)
+- ✅ **Converge** — decision journal + calibration scoring
+- ✅ **Accounts & auth** (1.8.1xx) — email-confirm hard gate, Terms of Service + EULA consent gate, tiered entitlements, account-support console
+- ✅ **Windows desktop app** — thin single-`exe` launcher over one Core (ADR-0014), Inno Setup installer
+
+**In flight:** v1.9 (see [docs/v1.9-issue-list.md](docs/v1.9-issue-list.md)).
 
 ---
 
@@ -205,10 +207,10 @@ Per WCAG 2.1 Success Criterion 2.4.7 (Focus Visible), all keyboard-operable elem
 
 Open in browser:
 ```text
-https://lantern-os.net
+https://unisona.ai
 ```
 
-(Requires internet; no local setup needed)
+(Requires internet; no local setup needed. The legacy `lantern-os.net` still resolves.)
 
 ### Local Development (2 minutes)
 
@@ -250,37 +252,32 @@ See [QUICKSTART.md](QUICKSTART.md) for autostart and full configuration.
 
 ## Development Workflow
 
-### Monoworkstream Rule (Critical)
+### Per-Lane Workstream Rule (Critical)
 
-**Each agent gets ONE open PR lane at a time.**
+**Each lane may keep up to `WORKSTREAM_MAX_OPEN_PRS` open PRs at once (default 3).** The lane key is the branch's **first path segment**. Below the cap, concurrent session-branches are allowed, so one user or agent can run several sessions in parallel. Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore the old strict one-PR-per-lane behaviour.
 
-```
-# CORRECT: Wait for PR #1 to merge before opening PR #2
-git checkout -b auto/issue-505  # First PR
-# ... make changes, open PR #505 ...
-# WAIT: PR #505 merges to master
-git checkout -b auto/issue-506  # Second PR
-# ... make changes, open PR #506 ...
+- **Agent lanes are fixed:** `claude/`, `gemini/`, `codex/`, `devin/`, `grok/`, `openai/`.
+- **Human lanes are dynamic:** any other `<name>/…` prefix (`alex/`, `kriskin/`, `mookman11/`, …) becomes its own concurrent lane automatically — no roster edit. `alex/`, `kriskin/`, `mookman11/` no longer block each other, and more than three humans can work at once.
+- A branch with **no `/`** falls back to a single shared `human` lane.
+- `master`, `gh-pages`, `dev` are exempt and never count as a lane.
 
-# WRONG: Open PR #505, then immediately open PR #506
-# (Creates merge conflicts, violates monoworkstream)
-```
-
-**Why?** Each agent lane is guaranteed to have one open change at a time. This prevents cascading merge conflicts and keeps CI feedback clear.
+**Why?** Bounding open PRs per lane keeps merge conflicts and CI feedback manageable without forcing strictly serial work.
 
 **Enforcement:**
-- Git hooks warn if you violate the rule locally
-- CI will block PR merge if another PR from the same agent is open
-- See [AGENTS.md](AGENTS.md) for lane assignments
+- Repo-managed git hooks (`scripts/hooks/`, `core.hooksPath`) block a **new** PR once a lane is at the cap; commits/pushes to a branch that already has an open PR are always allowed.
+- CI re-runs the same gates at PR time.
+- Bypass: `SKIP_MONOWORKSTREAM=1 git commit/push`.
+- See [AGENTS.md](AGENTS.md) for the full lane table and the assigned-issue merge gate.
 
 ### PR Lane Assignments
 
-| Agent | Lane | Example Branch |
-|-------|------|-----------------|
-| Claude (you) | `claude/` | `claude/home-redesign` |
-| Gemini | `gemini/` | `gemini/add-features` |
-| Auto-issues | `auto/` | `auto/issue-505` |
-| Human | anything else | `main-branch-fix`, `hotfix/...` |
+| Lane | Kind | Example Branch |
+|------|------|-----------------|
+| `claude/` | agent | `claude/home-redesign` |
+| `gemini/`, `codex/`, `devin/`, `grok/`, `openai/` | agent | `gemini/add-features` |
+| `auto/` | automation (autowork per-issue) | `auto/issue-505` |
+| `alex/`, `kriskin/`, `mookman11/`, any `<name>/` | human (dynamic) | `kriskin/trade-fix` |
+| unprefixed (no `/`) | shared `human` lane | `hotfix-typo` |
 
 ### PR Workflow
 
@@ -317,18 +314,17 @@ git checkout -b auto/issue-506  # Second PR
 
 ### Auto-Merge System
 
-**PRs merge automatically when:**
+A **single merger** (`apps/lantern-garage/lib/pr-watcher.js`) polls GitHub and squash-merges PRs automatically when:
 - ✅ All CI checks pass (lint, type, tests)
-- ✅ No merge conflicts
-- ✅ Branch up-to-date with master
-- ✅ No other open PRs from same agent
+- ✅ No merge conflicts, branch up-to-date with master
+- ✅ The lane is within its `WORKSTREAM_MAX_OPEN_PRS` cap
+
+**Assigned-issue merge gate (Verify → Converge):** a PR that closes a **human-assigned** issue is held until it carries **both** a convergence record (`convergance-record` label / `!convergance`) **and** autowork verification (`autowork-verified` label / a `data/autowork-runs/*.jsonl` receipt). A successful autowork run satisfies both. Unassigned issues and PRs that close no issue are unaffected.
 
 **If auto-merge fails:**
 - Resolve merge conflicts: `git rebase origin/master`
 - Rerun tests: `npm run test:api --prefix apps/lantern-garage`
-- Force-push: `git push -f origin <branch>`
-
-See [#637](https://github.com/alex-place/lantern-os/issues/637) for resolution procedures.
+- Push the update to the same PR branch (never force-push over a merged head).
 
 ---
 
@@ -360,7 +356,7 @@ See [#637](https://github.com/alex-place/lantern-os/issues/637) for resolution p
 | Convergence Engine | Python | — | Loop orchestration + health |
 | Discord Bot | Python | — | Chat bridge + convergence |
 | Auto-Repair | Node.js | 4177 | Health monitoring + graceful recovery |
-| Auto-Deploy | Node.js | 4177 | Hourly master pulls + rollback |
+| Auto-Deploy | Windows task | — | 5-min master pulls (`merge --ff-only`) + rollback |
 
 ---
 
@@ -406,25 +402,23 @@ curl http://localhost:4177/status/orchestrator
 
 ### 2. Autonomous Deployment (Auto-Deploy)
 
-**File:** `apps/lantern-garage/lib/auto-deploy.js`
+**Script:** `C:\dev\deploy-stable-from-master.ps1` (Windows scheduled task `KeystoneAutoDeployStable`)
 
-Runs hourly and:
+Runs every 5 minutes and:
 1. Checks for new commits on origin/master
-2. Runs pre-deploy tests
-3. Verifies health post-deployment
-4. Auto-rolls back if tests fail
-5. Logs all decisions to `data/deploy-history.jsonl`
+2. Merges non-destructively with `git merge --ff-only` (preserves uncommitted runtime data)
+3. Restarts only if server-side code changed
+4. Verifies `/api/convergence/health`; auto-rolls back to the last known-good commit if unhealthy
+5. Logs the full deploy to `C:\dev\auto-deploy-stable.log`
 
-**Configuration:**
-- `LANTERN_AUTO_DEPLOY=true` (default) — enable auto-deploy
-- `LANTERN_UPDATE_CHECK_MS=3600000` (default: 1 hour)
+See the [Auto-Deploy Infrastructure](#auto-deploy-infrastructure-2026-06-24) section above for details.
 
 ### 3. Convergence Routing (Deterministic Pattern Cache)
 
 **File:** `apps/lantern-garage/lib/convergence-router.js`
 
 Caches routing decisions and patterns to avoid external API calls:
-- 120+ Keystone intent routes (6 agents × 20+ intents each)
+- 120+ deterministic intent routes (the chat is now **one assistant** — no keyword persona routing; personas removed in #1664)
 - >70% cache hit rate from day 1
 - Deterministic: same input → same output (testable)
 - Falls back to external providers only when no cache match
@@ -628,7 +622,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for contributor guidelines.
 ## Quick Links
 
 - **GitHub:** https://github.com/alex-place/lantern-os
-- **Live Demo:** https://lantern-os.net
+- **Live product (Unisona):** https://unisona.ai (legacy: https://lantern-os.net)
 - **MCP Server:** https://mcp.lantern-os.net
 - **Issues:** [github.com/alex-place/lantern-os/issues](https://github.com/alex-place/lantern-os/issues)
 - **Contact:** open a GitHub issue
