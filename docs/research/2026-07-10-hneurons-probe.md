@@ -91,6 +91,23 @@ output margin at any K up to 1000. (The output margin is a weak target — basel
 model barely knows many facts parametrically — so a compliance/instruction-following behavior might
 still show causality the factual margin can't; that's the remaining open test, not a claim we can make.)
 
+## Shippable operating points (turning 0.97 AUROC into a gate)
+
+`experiments/hneurons_gate_operating_point.py` converts the curve into decisions a Verify-stage gate
+can use (grouped-CV out-of-fold, i.e. unseen-fact numbers; hallucination AUROC 0.969):
+
+| operating point | threshold P(hallucination) | recall (catch rate) | false-positive rate |
+|---|---|---|---|
+| high-precision | 0.498 | **0.863** | 0.05 |
+| balanced (Youden J) | 0.43 | **0.912** | 0.075 |
+
+So at a conservative **5% false-flag rate the gate catches 86% of hallucinations**; at the balanced
+point, **91% at 7.5% FPR** — far past the free-logprob gate it augments (0.71 AUROC). To wire it: fit
+the probe once (persist the SelectKBest indices + LR weights), then at serve time capture the
+last-token `down_proj` neuron activations, score `P(hallucination)`, and route to abstention /
+extra-verification when it exceeds the chosen threshold. And it **survives quantization**
+(2026-07-10-honesty-under-quantization.md), so it works on the compressed served model too.
+
 ## Still open
 
 - **A stronger causal test** (larger K, mean-substitution, a compliance/instruction-following behavior
