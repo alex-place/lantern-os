@@ -22,9 +22,9 @@
   const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/trading.html', '/kalshi-terminal.html'];
-  // Operator surfaces hidden from the header tabs for the guest role — the pages
-  // themselves stay reachable by URL (orchestration is public read-only, work is
-  // server-gated); this only trims the tabs guests can't meaningfully use.
+  // Operator surfaces hidden from the header tabs + footer links for the guest
+  // role — the pages themselves stay reachable by URL (orchestration is public
+  // read-only, work is server-gated); this only trims links guests can't use.
   const GUEST_HIDDEN_PAGES = ['/orchestration.html', '/work.html'];
   const pathname = window.location.pathname;
   const isPublic = PUBLIC.includes(pathname);
@@ -38,11 +38,11 @@
     });
   }
 
-  // Hide the Settings (orchestration) + Work tabs in the header nav for guests.
-  // Scoped to <nav> so the footer's full sitemap is untouched; covers both the
-  // site-chrome.js header and any page's inline .site-nav.
+  // Hide the Settings (orchestration) + Work links for guests — header tabs AND
+  // the footer sitemap (same nav+footer coverage as applyNavVisibility), across
+  // both the site-chrome.js chrome and any page's inline .site-nav/footer.
   function hideGuestNav() {
-    document.querySelectorAll('nav a[href]').forEach((a) => {
+    document.querySelectorAll('nav a[href], .site-footer a[href]').forEach((a) => {
       const href = (a.getAttribute('href') || '').split('?')[0];
       if (GUEST_HIDDEN_PAGES.includes(href)) a.style.display = 'none';
     });
