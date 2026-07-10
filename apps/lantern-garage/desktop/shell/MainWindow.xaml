@@ -1,0 +1,63 @@
+<Window x:Class="Unisona.Shell.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Unisona"
+        Width="1280" Height="860" MinWidth="720" MinHeight="540"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Ground}"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+  <Grid>
+    <!-- The cockpit. Hidden until the first navigation completes so users never see a
+         blank white flash before the app paints. -->
+    <wv2:WebView2 x:Name="Web" Visibility="Collapsed" />
+
+    <!-- Boot splash: the app's own face while the Core spins up. -->
+    <Border x:Name="Splash" Background="{StaticResource Ground}">
+      <Border.Resources>
+        <Storyboard x:Key="Pulse" RepeatBehavior="Forever" AutoReverse="True">
+          <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="Opacity"
+                           From="0.25" To="0.75" Duration="0:0:1.4" />
+          <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                           From="0.9" To="1.15" Duration="0:0:1.4" />
+          <DoubleAnimation Storyboard.TargetName="Halo" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                           From="0.9" To="1.15" Duration="0:0:1.4" />
+        </Storyboard>
+      </Border.Resources>
+      <Border.Triggers>
+        <EventTrigger RoutedEvent="Border.Loaded">
+          <BeginStoryboard Storyboard="{StaticResource Pulse}" />
+        </EventTrigger>
+      </Border.Triggers>
+
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320">
+        <Grid Width="72" Height="72" Margin="0,0,0,26" HorizontalAlignment="Center">
+          <Ellipse x:Name="Halo" Width="72" Height="72" Fill="{StaticResource Accent}" Opacity="0.4"
+                   RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform><ScaleTransform ScaleX="1" ScaleY="1" /></Ellipse.RenderTransform>
+          </Ellipse>
+          <Ellipse Width="20" Height="20" Fill="{StaticResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Grid>
+
+        <TextBlock Text="unisona" HorizontalAlignment="Center"
+                   FontSize="30" FontWeight="SemiBold" Foreground="{StaticResource Ink}"
+                   FontFamily="Segoe UI Variable Display, Segoe UI" />
+        <TextBlock Text="your memory · your keys · your machine" HorizontalAlignment="Center"
+                   Margin="0,6,0,28" FontSize="12.5" Foreground="{StaticResource InkSoft}"
+                   FontFamily="Cascadia Code, Consolas, Segoe UI" />
+
+        <ProgressBar x:Name="Bar" IsIndeterminate="True" Height="3" Width="220"
+                     Background="#22344152" Foreground="{StaticResource Accent}" BorderThickness="0" />
+        <TextBlock x:Name="Status" Text="Starting the Core…" HorizontalAlignment="Center"
+                   Margin="0,16,0,0" FontSize="12.5" Foreground="{StaticResource InkSoft}"
+                   FontFamily="Cascadia Code, Consolas, Segoe UI" TextWrapping="Wrap" TextAlignment="Center" />
+
+        <TextBlock x:Name="RetryHint" Visibility="Collapsed" HorizontalAlignment="Center"
+                   Margin="0,18,0,0" FontSize="12" Foreground="{StaticResource InkSoft}"
+                   TextWrapping="Wrap" TextAlignment="Center" MaxWidth="300" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</Window>
