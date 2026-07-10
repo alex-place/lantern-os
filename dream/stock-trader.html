@@ -602,7 +602,7 @@
     <option value="All">All</option>
   </select>
   <div class="pulse"></div>
-  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleOvernightScan()" title="Scan crypto while the US market is closed. OFF = no overnight model calls (0 tokens). Auto-resets to OFF at market open.">🌙 Overnight —</button>
+  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()" title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
   <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
@@ -3150,25 +3150,26 @@ function startDashboard(){
   fullRefresh();
   loadBars();
   loadOrders();
-  refreshOvernightScan();
+  refreshExtendedHours();
   setInterval(fullRefresh,         30000);
   setInterval(loadWatchlistPrices,  3000);   // #1627: tighter so the tick-flash is responsive
   setInterval(loadBars,            15000);
   setInterval(loadOrders,          60000);
-  setInterval(refreshOvernightScan, 60000);  // reflect the auto-reset at market open
+  setInterval(refreshExtendedHours, 60000);  // keep the ⏰ Pre/After toggle state in sync
 }
-// 🌙 Overnight (market-closed) crypto scanning toggle (#1714)
+// ⏰ Pre-market / after-hours trading toggle — when ON, the autopilot also scans + acts
+// during the extended session (04:00–09:30 / 16:00–20:00 ET) via limit + outside-RTH orders.
 function _setOvnBtn(on){
   const b=document.getElementById('ovnToggle'); if(!b) return;
-  b.textContent='🌙 Overnight '+(on?'ON':'OFF');
+  b.textContent='⏰ Pre/After '+(on?'ON':'OFF');
   b.classList.toggle('ovn-on', !!on);
 }
-async function refreshOvernightScan(){
-  if(window.GUEST) return;   // overnight-scan toggle is trade-gated
-  try{ const j=await (await fetch('/api/trading/overnight-scan')).json(); _setOvnBtn(j.enabled); }catch(e){}
+async function refreshExtendedHours(){
+  if(window.GUEST) return;   // trade-gated
+  try{ const j=await (await fetch('/api/trading/extended-hours')).json(); _setOvnBtn(j.enabled); }catch(e){}
 }
-async function toggleOvernightScan(){
-  try{ const j=await (await fetch('/api/trading/overnight-scan?set=toggle',{method:'POST'})).json(); _setOvnBtn(j.enabled); }catch(e){}
+async function toggleExtendedHours(){
+  try{ const j=await (await fetch('/api/trading/extended-hours?set=toggle',{method:'POST'})).json(); _setOvnBtn(j.enabled); }catch(e){}
 }
 // Guest (logged-out) detection. A visitor without the "trade" entitlement gets
 // the SAME terminal in read-only mode: charts + watchlist + market data, with the
