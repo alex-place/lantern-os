@@ -1,5 +1,5 @@
 """
-unisona.ai chat — standing performance benchmark.
+Keystone chat — standing performance benchmark.
 
 "Model performance is key" → make it measured, not asserted. This scores ANY
 backend that speaks the Ollama /api/chat API (Ouro fast, Ouro deep/native loop,

@@ -617,10 +617,10 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       const ftPath = require("path").resolve(__dirname, "../../data/training/ft-result.json");
       if (require("fs").existsSync(ftPath)) {
         rp = "keystone-ft";
-        console.log("[dream-chat] unisona.ai agent → auto-routing to keystone-ft (LoRA-tuned)");
+        console.log("[dream-chat] Keystone agent → auto-routing to keystone-ft (LoRA-tuned)");
       }
     } catch (e) {
-      console.log("[dream-chat] ft-result.json not found, using normal provider chain for unisona.ai");
+      console.log("[dream-chat] ft-result.json not found, using normal provider chain for Keystone");
     }
   }
 
