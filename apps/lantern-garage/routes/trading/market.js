@@ -196,6 +196,28 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
+          // Reconcile Day P&L the same way. IBKR's `dpl` lags/rounds on the paper CPAPI
+          // (it read −2310 while Realized stayed $0 despite closes today), so derive each
+          // position's day change from the cached watchlist chg_pct — prevClose =
+          // price/(1+chg%) — and sum. Reuses the 30s price cache (no extra fetch); only
+          // overrides when EVERY held symbol has a fresh %, else keeps the broker figure.
+          try {
+            const wlp = await traderAgent.getWatchlistPrices().catch(() => []);
+            const chgBy = {};
+            for (const w of (wlp || [])) if (w && w.ticker) chgBy[w.ticker] = Number(w.chg_pct);
+            let dayPnl = 0, haveAll = true;
+            for (const p of ibkrPositions) {
+              const chg = chgBy[p.symbol];
+              const cur = Number(p.current_price) || 0;
+              if (chg == null || Number.isNaN(chg) || !cur) { haveAll = false; break; }
+              const prev = cur / (1 + chg / 100);
+              dayPnl += (Number(p.qty) || 0) * (cur - prev);
+            }
+            if (haveAll) {
+              ibkrAccount.pnl_today = Math.round((dayPnl + (Number(ibkrAccount.realized_today) || 0)) * 100) / 100;
+              ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
+            }
+          } catch (_e) { /* keep the broker dpl if the price cache isn't ready */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
