@@ -333,12 +333,18 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
+        // Same exit-reattempt cooldown as the momentum/trailing path: a persistently
+        // bearish name would otherwise re-fire this signal-exit EVERY scan while the
+        // order rests unfilled (NVDA re-exited 179× in one session). Wait for the
+        // resting order / next fill before re-attempting.
+        const exitAt = _exitAt.get(sym) || 0;
+        if (exitAt && (now - exitAt) < c.exitReattemptMs) { out.skipped.push({ ...record, why: `exit already fired ${Math.round((now - exitAt) / 60000)}min ago — waiting for it to fill` }); continue; }
         const exOrder = (extended && price > 0)
           ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true }
           : { ticker: sym, side: 'sell', qty: held, type: 'market' };
         const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
-        _entryAt.delete(sym);
+        _entryAt.delete(sym); _exitAt.set(sym, now);
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
