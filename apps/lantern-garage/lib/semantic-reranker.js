@@ -103,4 +103,9 @@ async function semanticRerank(query, candidates, { topK = 3, textField = "text",
   }
 }
 
-module.exports = { semanticRerank };
+// Exposed for the retrieval A/B harness (#2356): the raw embedding + cosine, so the
+// harness can measure the dense arm directly against the SAME nomic transport chat
+// uses. Returns null when Ollama/the embed model is unavailable (harness skips the arm).
+async function embedText(text) { return _embed(String(text || "").slice(0, 512)); }
+
+module.exports = { semanticRerank, embedText, _cosine };
