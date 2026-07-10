@@ -19,6 +19,19 @@ fail on **every** PR (the aggregate "All checks passed" gate inherited both):
    file's `Proposed` state (the non-fabricating direction). If ADR-0010 was in
    fact approved, flip both the file frontmatter and this row to `Accepted`.
 
-Verified: `node scripts/lint-adr-registry.mjs` → OK; pytest collects all four MCP
-test files with no INTERNALERROR; `tests/test_mcp_mesh_tools.py` still runs (3
-passed) when fastapi is present. Improves **Verify** (CI reflects real state).
+Fixing the collection crash surfaced two more real failures that had been masked
+by the INTERNALERROR (they never got to run):
+
+3. **`test_dashboard_ux::test_markdown_links_use_formatted_reader`.** The home
+   loop-mantra (#2335) linked each stage to a **raw** `/repo/docs/loop/*.md` URL;
+   the test requires doc links to go through the formatted reader. Repointed the
+   six links to `/view?path=docs/loop/*.md`.
+
+4. **`test_mcp_tool_parity::test_node_bridge_manifest`.** The committed golden
+   `manifests/tool-capability-manifest-v1.json` had drifted from the live tool
+   registry (new tools added without regenerating it). Regenerated it via
+   `node scripts/tool-runner-bridge.js generate-manifest`.
+
+Verified: `node scripts/lint-adr-registry.mjs` → OK; the full pytest suite runs
+with no INTERNALERROR and the four previously-failing tests now pass (the two
+collection/skip fixes plus these two). Improves **Verify** (CI reflects real state).
