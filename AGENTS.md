@@ -417,10 +417,9 @@ SKIP_ALL_CHECKS=1 git commit -m "EMERGENCY: critical hotfix"
 
 This repo supports **multiple humans working in parallel** while maintaining quality gates.
 
-### AI Agents: up to `WORKSTREAM_MAX_OPEN_PRS` per lane (default 3)
+### AI Agents: no open-PR cap
 - Agent lanes are fixed: `claude/`, `gemini/`, `codex/`, `devin/`, `grok/`, `openai/`.
-- Each lane may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default **3**), so one agent can run several concurrent sessions. A lane is blocked from opening a **new** PR only once it is already at the cap; commits/pushes to a branch with an open PR are always allowed.
-- Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore strict one-PR-per-lane focus.
+- **There is no open-PR cap.** A lane may keep any number of concurrent open PRs at once, so one agent can run as many parallel sessions as it likes; commits/pushes to a branch with an open PR are always allowed. (The former `WORKSTREAM_MAX_OPEN_PRS` cap and the CI "Single-workstream check" gate were removed in #2367; the git hooks no longer count open PRs.)
 
 ### Humans: Dynamic per-contributor lanes
 Human lanes are **dynamic** — there is no fixed roster and no shared "all humans" lane.
@@ -629,4 +628,4 @@ python src/convergence_io_engine.py inspect
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 
-**Last Updated:** 2026-07-10 — reconciled the AI-agent workstream cap (up to `WORKSTREAM_MAX_OPEN_PRS`, default 3 — was still stated as strict one-PR-per-lane, contradicting the multi-contributor section below). Prior (2026-07-01): entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.
+**Last Updated:** 2026-07-10 — removed the per-lane open-PR cap for both AI-agent and human lanes (the `WORKSTREAM_MAX_OPEN_PRS` cap + CI "Single-workstream check" were removed in #2367; auto-merge now lands green + review-APPROVE PRs). Prior (2026-07-01): entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.

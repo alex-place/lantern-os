@@ -254,7 +254,7 @@ See [QUICKSTART.md](QUICKSTART.md) for autostart and full configuration.
 
 ### Per-Lane Workstream Rule (Critical)
 
-**Each lane may keep up to `WORKSTREAM_MAX_OPEN_PRS` open PRs at once (default 3).** The lane key is the branch's **first path segment**. Below the cap, concurrent session-branches are allowed, so one user or agent can run several sessions in parallel. Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore the old strict one-PR-per-lane behaviour.
+**There is no open-PR cap — a lane may keep any number of concurrent open PRs.** The lane key is the branch's **first path segment**, used for attribution/grouping (not a limit), so one user or agent can run as many sessions in parallel as they like. (The old `WORKSTREAM_MAX_OPEN_PRS` cap + CI "Single-workstream check" were removed in #2367; merge-time serialisation is handled by the single in-process merger, which lands one green + reviewed PR per tick.)
 
 - **Agent lanes are fixed:** `claude/`, `gemini/`, `codex/`, `devin/`, `grok/`, `openai/`.
 - **Human lanes are dynamic:** any other `<name>/…` prefix (`alex/`, `kriskin/`, `mookman11/`, …) becomes its own concurrent lane automatically — no roster edit. `alex/`, `kriskin/`, `mookman11/` no longer block each other, and more than three humans can work at once.
@@ -315,11 +315,12 @@ See [QUICKSTART.md](QUICKSTART.md) for autostart and full configuration.
 ### Auto-Merge System
 
 A **single merger** (`apps/lantern-garage/lib/pr-watcher.js`) polls GitHub and squash-merges PRs automatically when:
-- ✅ All CI checks pass (lint, type, tests)
-- ✅ No merge conflicts, branch up-to-date with master
-- ✅ The lane is within its `WORKSTREAM_MAX_OPEN_PRS` cap
+- ✅ All CI checks pass (lint, type, tests) — minus deploy-preview / base-red self-heal
+- ✅ No merge conflicts, not a draft, branch up-to-date with master
+- ✅ Its fleet auto-review returned `VERDICT: APPROVE`
+- ✅ It touches no **protected path** (auth / money / `.github/workflows/` / secrets / migrations still need a human)
 
-**Assigned-issue merge gate (Verify → Converge):** a PR that closes a **human-assigned** issue is held until it carries **both** a convergence record (`convergance-record` label / `!convergance`) **and** autowork verification (`autowork-verified` label / a `data/autowork-runs/*.jsonl` receipt). A successful autowork run satisfies both. Unassigned issues and PRs that close no issue are unaffected.
+There is **no lane cap**. The **assigned-issue convergence gate** (a PR closing a human-assigned issue needing `convergance-record` + `autowork-verified`) is **off by default** — re-enable per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
 
 **If auto-merge fails:**
 - Resolve merge conflicts: `git rebase origin/master`
