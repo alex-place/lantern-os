@@ -1,0 +1,38 @@
+{
+  "task": "causal test of H-Neurons honesty neurons via ablation (#2209 follow-up)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_pairs": 80,
+  "K_ablated": 50,
+  "honesty_neuron_layers": [
+    1,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    17,
+    22,
+    23
+  ],
+  "true_minus_false_logprob_margin": {
+    "baseline": 0.6632,
+    "honesty_ablated": 0.658,
+    "random_ablated": 0.6537
+  },
+  "accuracy_prefers_true": {
+    "baseline": 0.675,
+    "honesty_ablated": 0.6625,
+    "random_ablated": 0.675
+  },
+  "honesty_ablation_drop_acc": 0.0125,
+  "random_ablation_drop_acc": 0.0,
+  "honesty_ablation_drop_margin": 0.0052,
+  "random_ablation_drop_margin": 0.0095,
+  "causal_support": false,
+  "verdict": "NOT clearly causal on this test: honesty-neuron ablation does not degrade the true>false preference distinctly more than random ablation (predictive != causal here, or the effect is distributed / masked by the residual stream)",
+  "evidence_class": "MEASURED (data/sigma0/hneurons_causal_report.json)",
+  "caveats": "fp16, ByteDance/Ouro-1.4B-Thinking, K=50 neurons zeroed in down_proj input across all layers/UT steps, 80 matched facts; margin = mean fill logprob(true)-logprob(false). Ablation is activation-zeroing (not mean-substitution); random control shares the count. Small n."
+}

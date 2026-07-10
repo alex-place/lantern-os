@@ -1,0 +1,55 @@
+{
+  "task": "H-Neurons causal ablation K-sweep with mean-substitution (#2209)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_pairs": 80,
+  "ablation": "mean-substitution",
+  "baseline_acc": 0.675,
+  "baseline_margin": 0.6632,
+  "sweep": [
+    {
+      "K": 50,
+      "honesty_acc": 0.6875,
+      "random_acc": 0.6625,
+      "honesty_margin": 0.6511,
+      "random_margin": 0.6526,
+      "honesty_acc_drop": -0.0125,
+      "random_acc_drop": 0.0125,
+      "honesty_minus_random_acc_drop": -0.025
+    },
+    {
+      "K": 200,
+      "honesty_acc": 0.6375,
+      "random_acc": 0.6875,
+      "honesty_margin": 0.5638,
+      "random_margin": 0.6205,
+      "honesty_acc_drop": 0.0375,
+      "random_acc_drop": -0.0125,
+      "honesty_minus_random_acc_drop": 0.05
+    },
+    {
+      "K": 500,
+      "honesty_acc": 0.65,
+      "random_acc": 0.65,
+      "honesty_margin": 0.5664,
+      "random_margin": 0.5184,
+      "honesty_acc_drop": 0.025,
+      "random_acc_drop": 0.025,
+      "honesty_minus_random_acc_drop": 0.0
+    },
+    {
+      "K": 1000,
+      "honesty_acc": 0.65,
+      "random_acc": 0.6875,
+      "honesty_margin": 0.56,
+      "random_margin": 0.6349,
+      "honesty_acc_drop": 0.025,
+      "random_acc_drop": -0.0125,
+      "honesty_minus_random_acc_drop": 0.0375
+    }
+  ],
+  "max_honesty_minus_random_acc_drop": 0.05,
+  "causal_support": false,
+  "verdict": "NOT causal even up to K=1000 with mean-substitution: honesty-neuron ablation never degrades the output preference distinctly beyond a random control. The H-Neurons are a strong DETECTOR (0.97 AUROC) but not a causal over-compliance lever here \u2014 predictive != causal on Ouro's output margin. Robust null.",
+  "evidence_class": "MEASURED (data/sigma0/hneurons_causal_sweep_report.json)",
+  "caveats": "fp16 ByteDance/Ouro-1.4B-Thinking, mean-substitution ablation across all layers/UT, 80 matched facts; the output margin is a weak target (baseline acc ~0.68 \u2014 the model barely knows many facts parametrically). A compliance/instruction-following behavior may show causality the factual margin doesn't."
+}

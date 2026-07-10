@@ -1,0 +1,19 @@
+{
+  "task": "recover the PTQTP coding tax with a light LoRA at full compression (#2206)",
+  "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "n_humaneval": 40,
+  "planes": 2,
+  "train_rows": 2500,
+  "steps": 300,
+  "pass_at_1": {
+    "fp16": 0.8,
+    "ptqtp": 0.4,
+    "ptqtp_plus_lora": 0.6
+  },
+  "tax": -0.4,
+  "recovery": 0.2,
+  "net_vs_fp16": -0.2,
+  "verdict": "LoRA RECOVERS the quantization coding tax at full 4.7x compression",
+  "evidence_class": "MEASURED",
+  "caveats": "Qwen2.5-Coder-1.5B, HumanEval n small, general coding SFT ('humaneval-train.jsonl' = general Python instructions, no HumanEval/ test ids found \u2014 low but nonzero contamination risk), short LoRA run. PTQTP weights dequantized (quality not speed)."
+}

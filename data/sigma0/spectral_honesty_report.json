@@ -1,0 +1,37 @@
+{
+  "task": "spectral/stability loop signal as a FACTUAL-honesty signal, closed-book vs grounded",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_facts": 80,
+  "n_examples": 320,
+  "n_ut_steps": 4,
+  "conditions": {
+    "closed": {
+      "n": 160,
+      "spectral_rho_obs_AUROC": 0.7217,
+      "spectral_final_delta_AUROC": 0.6952,
+      "spectral_total_move_AUROC": 0.5217,
+      "surprise_logprob_AUROC": 0.7047,
+      "hidden_probe_AUROC": 0.9269,
+      "shuffled_control_AUROC": 0.5925
+    },
+    "grounded": {
+      "n": 160,
+      "spectral_rho_obs_AUROC": 0.6597,
+      "spectral_final_delta_AUROC": 0.6148,
+      "spectral_total_move_AUROC": 0.5977,
+      "surprise_logprob_AUROC": 0.6538,
+      "hidden_probe_AUROC": 1.0,
+      "shuffled_control_AUROC": 0.5039
+    }
+  },
+  "thesis": {
+    "spectral_best_closed": 0.7217,
+    "spectral_best_grounded": 0.6597,
+    "spectral_grounding_gain": -0.062,
+    "hidden_probe_closed": 0.9269,
+    "hidden_probe_grounded": 1.0,
+    "verdict": "spectral grounding-gain is small/absent on this model \u2014 thesis NOT supported here (honest null)"
+  },
+  "evidence_class": "MEASURED (data/sigma0/spectral_honesty_report.json)",
+  "caveats": "fp16, Ouro-1.4B-Thinking, matched self-authored facts, cheap per-generation spectral read (trajectory contraction, not the full autograd rho(J) of #2029 \u2014 that is the operator's asymptotic radius; here we want a per-token stability read). n per condition = 2*n_facts. Grounding = true-fact context; label is statement truth."
+}

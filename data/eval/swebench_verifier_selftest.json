@@ -1,0 +1,29 @@
+{
+  "mode": "selftest (synthetic instance through the real tests-run.js verifier)",
+  "gold_verdict": {
+    "name": "tests-run",
+    "decisive": true,
+    "skipped": false,
+    "passed": true,
+    "evidence": {
+      "cmd": "\"C:/Users/micah/lanternos/.venv-train/Scripts/python.exe\" -m pytest test_calc.py -q -p no:cacheprovider",
+      "exitCode": 0,
+      "tail": ".                                                                        [100%]\r\n============================== warnings summary ===============================\r\n..\\..\\..\\..\\lanternos\\.venv-train\\Lib\\site-packages\\_pytest\\config\\__init__.py:1464\r\n  C:\\Users\\micah\\lanternos\\.venv-train\\Lib\\site-packages\\_pytest\\config\\__init__.py:1464: PytestConfigWarning: Unknown config option: asyncio_mode\r\n  \r\n    self._warn_or_fail_if_strict(f\"Unknown config option: {key}\\n\")\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n1 passed, 1 warning in 0.56s\r\n"
+    }
+  },
+  "base_verdict": {
+    "name": "tests-run",
+    "decisive": true,
+    "skipped": false,
+    "passed": false,
+    "evidence": {
+      "cmd": "\"C:/Users/micah/lanternos/.venv-train/Scripts/python.exe\" -m pytest test_calc.py -q -p no:cacheprovider",
+      "exitCode": 1,
+      "timedOut": false,
+      "tail": "F                                                                        [100%]\r\n================================== FAILURES ===================================\r\n__________________________________ test_add ___________________________________\r\n\r\n    def test_add():\r\n>       assert add(2, 3) == 5\r\nE       assert -1 == 5\r\nE        +  where -1 = add(2, 3)\r\n\r\ntest_calc.py:4: AssertionError\r\n============================== warnings summary ===============================\r\n..\\..\\..\\..\\lanternos\\.venv-train\\Lib\\site-packages\\_pytest\\config\\__init__.py:1464\r\n  C:\\Users\\micah\\lanternos\\.venv-train\\Lib\\site-packages\\_pytest\\config\\__init__.py:1464: PytestConfigWarning: Unknown config option: asyncio_mode\r\n  \r\n    self._warn_or_fail_if_strict(f\"Unknown config option: {key}\\n\")\r\n\r\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\r\n=========================== short test summary info ===========================\r\nFAILED test_calc.py::test_add - assert -1 == 5\r\n +  where -1 = add(2, 3)\r\n1 failed, 1 warning in 0.64s\r\n"
+    }
+  },
+  "gold_passes_as_expected": true,
+  "base_fails_as_expected": true,
+  "gate_correct": true
+}

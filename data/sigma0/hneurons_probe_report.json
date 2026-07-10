@@ -1,0 +1,26 @@
+{
+  "task": "H-Neurons sparse FFN-neuron hallucination probe on Ouro-1.4B (#2209)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_facts": 80,
+  "n_examples": 160,
+  "neuron_dim_total": 135168,
+  "layers": 24,
+  "intermediate_per_layer": 5632,
+  "select_k": 2000,
+  "detection_auroc_grouped_cv": 0.968,
+  "mean_nonzero_neurons_in_probe": 30,
+  "pct_neurons_used": 0.0222,
+  "ood_transfer_LODO": {
+    "geography": 0.9336,
+    "science": 0.9727,
+    "history": 0.9844,
+    "literature": 1.0,
+    "arithmetic": 0.9062,
+    "MEAN": 0.9594
+  },
+  "logprob_baseline_auroc": 0.7117,
+  "reference_residual_probe_2030": "0.928 full / 0.885 model-uncertain tercile / 0.931 LODO (sigma0_probe_transfer)",
+  "verdict_note": "GO-candidate: sparse neuron probe detects at 0.968 (LODO 0.9594) using ~0.0222% of neurons, vs logprob 0.7117. On these facts the residual-state probe (#2030) is the incumbent; wire H-Neurons into the gate only if it beats it on transfer or adds causal over-compliance control the residual probe lacks.",
+  "evidence_class": "MEASURED (data/sigma0/hneurons_probe_report.json)",
+  "caveats": "fp16, Ouro-1.4B-Thinking, matched self-authored true/false facts, last-token last-UT-step neuron acts across all 24 layers, SelectKBest+L1 (a sparse but not single-neuron probe), n small so LODO carries variance. Compares to logprob and to the #2030 residual-state probe on the SAME facts."
+}

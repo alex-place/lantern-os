@@ -1,0 +1,27 @@
+{
+  "task": "H-Neurons hallucination gate \u2014 operating points for the Verify stage (#2209)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_examples": 160,
+  "auroc_hallucination": 0.9688,
+  "operating_points": {
+    "high_precision_5pct_fpr": {
+      "threshold": 0.498,
+      "recall_tpr": 0.863,
+      "fpr": 0.05
+    },
+    "balanced_youden_J": {
+      "threshold": 0.43,
+      "recall_tpr": 0.912,
+      "fpr": 0.075
+    },
+    "high_recall_90pct": {
+      "threshold": 0.43,
+      "recall_tpr": 0.912,
+      "fpr": 0.075
+    }
+  },
+  "reading": "At the high-precision point the gate flags a generation as a likely hallucination with ~5% false-positive rate, catching the listed recall of true hallucinations; at the high-recall point it catches ~90% at a higher false-flag cost. Pick per the product's tolerance: abstain/verify-more when P(hallucination) > threshold.",
+  "how_to_wire": "fit this probe once (persist SelectKBest indices + LR weights), then at serve time capture the last-token down_proj neuron activations, score P(hallucination), and route to the abstention/extra-verification path when it exceeds the chosen threshold \u2014 a stronger signal than the free-logprob gate (0.71) it augments.",
+  "evidence_class": "MEASURED",
+  "caveats": "80 matched facts (n=160), grouped-CV OOF; small n."
+}

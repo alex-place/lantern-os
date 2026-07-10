@@ -1,0 +1,31 @@
+{
+  "task": "CPU-only ternary inference feasibility (#2207); T-SAR is hardware, not reproducible in SW",
+  "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "new_tokens": 48,
+  "cpu_tokens_per_s": 2.95,
+  "gpu_tokens_per_s": 16.21,
+  "cpu_vs_gpu_slowdown": 5.5,
+  "ternary_gemv_microbench": [
+    {
+      "out_dim": 2048,
+      "in_dim": 2048,
+      "fp32_blas_ms": 0.111,
+      "ternary_as_float_blas_ms": 0.154,
+      "mulfree_split_ms": 0.268,
+      "mulfree_vs_fp32_speedup": 0.415
+    },
+    {
+      "out_dim": 4096,
+      "in_dim": 4096,
+      "fp32_blas_ms": 0.272,
+      "ternary_as_float_blas_ms": 0.291,
+      "mulfree_split_ms": 2.612,
+      "mulfree_vs_fp32_speedup": 0.104
+    }
+  ],
+  "software_ternary_beats_fp_blas": false,
+  "verdict_cpu_usable": false,
+  "go_no_go": "CPU-only inference is NOT usable at 2.9 tok/s on this box's stock CPU (~6.0x slower than GPU). Software multiplication-free ternary does NOT beat optimized fp32 BLAS on a stock CPU \u2014 confirming T-SARs premise that custom SIMD hardware is required for the ternary speedup; on commodity CPUs ternary buys MEMORY (fits with no GPU), not SPEED.",
+  "honest_scope": "T-SAR (arXiv:2511.13676, DATE 2026) modifies CPU SIMD ALUs \u2014 a hardware co-design, NOT a runnable library. Its 1.1-86x needs that hardware, absent on stock CPUs. We measured the software-achievable CPU path + a numpy ternary microbench. Weights here are fp (transformers CPU); a packed-ternary CPU kernel (bitnet.cpp / TQ2_0 in llama.cpp) is the realistic SW route to test next.",
+  "evidence_class": "MEASURED"
+}

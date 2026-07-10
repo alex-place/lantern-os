@@ -1,0 +1,17 @@
+{
+  "method": "PTQTP dual trit-plane (arXiv:2509.16989), weight-only, no calibration",
+  "model": "Qwen/Qwen2.5-Coder-7B-Instruct",
+  "group": 128,
+  "iters": 8,
+  "n_linear_layers_quantized": 196,
+  "n_params_quantized": 6525288448,
+  "quantize_seconds": 287.8,
+  "mean_relative_frobenius_error": 0.1902,
+  "perplexity_fp16": 1.221,
+  "perplexity_ptqtp": 1.284,
+  "ppl_ratio": 1.052,
+  "effective_bits_per_weight": 3.42,
+  "approx_compression_vs_fp16": 4.68,
+  "verdict": "QUALITY PRESERVED: dual trit-plane PTQTP keeps perplexity within a small factor of FP16 \u2014 structured ternary does NOT collapse (contrast the naive-ternary x6864).",
+  "evidence_class": "MEASURED"
+}

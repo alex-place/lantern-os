@@ -1,0 +1,46 @@
+{
+  "adapter": "D:/lantern-train/ouro-grounding-v2-repro/final",
+  "base": "ByteDance/Ouro-1.4B",
+  "key": "corpus-v2 (de-glossed)",
+  "split": "heldout",
+  "n_items": 34,
+  "answered": 34,
+  "unparsed": 0,
+  "golden_score": 0.824,
+  "confabulation_rate": 0.176,
+  "confab_count": "6/34",
+  "over_abstention": null,
+  "confabulated": [
+    [
+      "gold-pf-fermat-little",
+      "PROVEN",
+      true
+    ],
+    [
+      "gold-pf-sum-odds",
+      "PROVEN",
+      true
+    ],
+    [
+      "gold-pf-extreme-value",
+      "PROVEN",
+      true
+    ],
+    [
+      "gold-fic-halvorsen",
+      "PROVEN",
+      true
+    ],
+    [
+      "gold-v2-n-rays",
+      "MEASURED",
+      true
+    ],
+    [
+      "gold-v2-neutrino-mass",
+      "MEASURED",
+      true
+    ]
+  ],
+  "unparsed_ids": []
+}
