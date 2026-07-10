@@ -89,7 +89,7 @@ Reject architectural sprawl. Prefer extension over addition. Maintain a single C
 
 ## Project Overview
 
-Keystone OS is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
+unisona.ai is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
 
 ## Quickstart (Read QUICKSTART.md First)
 
@@ -217,7 +217,7 @@ Key runtime components:
 | `kalshi-api.js` | Kalshi REST client (auth, order placement, market data) |
 | `kalshi-collector.js` | 6s polling loop; 429 backoff with `Retry-After`; exposes `getStatus()` |
 | `kalshi-suggest.js` | Tight-band entry suggestion engine |
-| `convergence-router.js` | Deterministic routing cache — 120 Keystone routes, >70% hit rate |
+| `convergence-router.js` | Deterministic routing cache — 120 unisona.ai routes, >70% hit rate |
 | `trading-history-logger.js` | Trade/signal history JSONL persistence |
 
 Live data flow: `kalshi-collector` → server snapshot → UI polls `/api/trading/kalshi/decisive-deck` (no UI-direct Kalshi calls).
@@ -261,7 +261,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 
 `pytest.ini` sets `pythonpath = apps src` so tests can import from both trees without install.
 
-## Keystone Testing Charter
+## unisona.ai Testing Charter
 
 **Autonomous test agent** using Agentic QE principles for continuous self-improvement.
 
@@ -297,7 +297,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 ### Triggering Autonomous Tests
 **In dream-chat.html:**
 - Type: `"test the app"` or `"scan for issues"` or `"audit the system"`
-- Keystone agent will autonomously:
+- unisona.ai agent will autonomously:
   1. **Observe**: Fetch list of issues needing validation
   2. **Research**: Analyze codebase for test coverage gaps
   3. **Reason**: Generate test plan using Playwright scenarios

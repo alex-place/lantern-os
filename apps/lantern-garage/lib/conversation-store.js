@@ -74,7 +74,7 @@ function normalizeConversationEntry(input) {
   }
 
   // #1268: optional PCSF signature (provider/model/agent) so a *replayed* turn can show
-  // the same "Keystone · provider/model" signature the live SSE 'done' event carries.
+  // the same "unisona.ai · provider/model" signature the live SSE 'done' event carries.
   // Entirely additive — entries without it (the vast majority, today) replay exactly as
   // before; omitted/non-string fields are simply dropped rather than rejecting the entry.
   let meta;

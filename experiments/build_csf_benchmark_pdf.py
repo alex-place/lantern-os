@@ -207,7 +207,7 @@ def build():
     grouped = make_grouped_chart()
     doc = SimpleDocTemplate(str(PDF_PATH), pagesize=letter, leftMargin=0.7 * inch, rightMargin=0.7 * inch,
                             topMargin=0.62 * inch, bottomMargin=0.6 * inch,
-                            title="CSF Compression Benchmark — Review v3", author="Lantern OS / Keystone")
+                            title="CSF Compression Benchmark — Review v3", author="Lantern OS / unisona.ai")
     E = []
 
     def rule(space=6):

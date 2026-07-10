@@ -1,4 +1,4 @@
-// docmode-store.js — versioned document workspace for Keystone "Document Mode".
+// docmode-store.js — versioned document workspace for unisona.ai "Document Mode".
 //
 // A document is a small persisted object with an ordered list of REVISIONS (text
 // snapshots). Each accepted chat turn appends a revision; `current` points at the

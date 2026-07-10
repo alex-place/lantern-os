@@ -102,7 +102,7 @@ IMAGNIVERSE_SYMBOLS = {
     },
     "agents-love-mural": {
         "definition": "The agent fleet rendered as an infinity mural of love — "
-                      "Lantern, Blinkbug, Keystone, Waterfall, Xenon, Founder.",
+                      "Lantern, Blinkbug, unisona.ai, Waterfall, Xenon, Founder.",
         "domain": "companions", "observer": "founder",
         "strength": 0.8, "evidence": "lantern-os-infinity-mural-agents-love + matrix mural art",
     },

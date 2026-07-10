@@ -130,7 +130,7 @@ Current engine generates same doors for all players. Phase 3 adds:
 2. **Agent Persona Filtering** (6 agents × 7 stages)
    - Lantern: Heroic, aspirational doors
    - Blinkbug: Playful, glitchy doors  
-   - Keystone: Routing, decision-point doors
+   - unisona.ai: Routing, decision-point doors
    - Waterfall: Flowing, natural doors
    - Xenon: Alien, convergence doors
    - Founder: Foundational, origin doors

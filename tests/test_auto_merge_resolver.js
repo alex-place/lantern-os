@@ -250,7 +250,7 @@ describe('ConverganceMergeTrainer', () => {
     expect(status.topPatterns).toBeDefined();
   });
 
-  test('processes Keystone response', () => {
+  test('processes unisona.ai response', () => {
     const keystoneAnalysis = {
       approved: [
         {

@@ -59,7 +59,7 @@
       '  <div class="footer-inner">\n' +
       '    <span class="footer-brand">\n' +
       '      <span class="dot online" id="status-dot" title="Server status"></span>\n' +
-      "      Unisona OS\n" +
+      "      unisona.ai\n" +
       "    </span>\n" +
       '    <span class="sep">·</span>\n' +
       '    <a href="/">Home</a>\n    ' +

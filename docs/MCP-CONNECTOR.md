@@ -4,11 +4,11 @@ created: 2026-05-27
 updated: 2026-06-20
 ---
 
-# Keystone OS MCP Connector
+# unisona.ai MCP Connector
 
 Status: candidate connector scaffold
 
-This document defines the local-first MCP connector path for Keystone OS and the safe route into internal house RAG storage.
+This document defines the local-first MCP connector path for unisona.ai and the safe route into internal house RAG storage.
 
 ## Purpose
 
@@ -88,7 +88,7 @@ Default policy:
 
 Safe meaning:
 
-1. Copy/promote selected code or docs into Keystone OS.
+1. Copy/promote selected code or docs into unisona.ai.
 2. Record source path, hash, evidence class, and boundary status.
 3. Build the internal RAG-house flat index and manifest.
 4. Validate the promoted surface.

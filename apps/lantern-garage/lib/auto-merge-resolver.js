@@ -2,7 +2,7 @@
  * Auto Merge Resolver — Self-training via !convergance patterns
  *
  * System that learns from PR routing decisions, branch patterns, and merge outcomes
- * to continuously improve merge decision-making. Integrates with Keystone technical
+ * to continuously improve merge decision-making. Integrates with unisona.ai technical
  * coordinator via !convergance workflow for pattern analysis.
  *
  * Tracks:
@@ -511,7 +511,7 @@ class AutoMergeResolver {
 
   /**
    * Generate !convergance query for system improvement
-   * Returns a prompt suitable for Keystone technical coordinator
+   * Returns a prompt suitable for unisona.ai technical coordinator
    */
   generateConverganceQuery() {
     const stats = this.patterns.successMetrics;

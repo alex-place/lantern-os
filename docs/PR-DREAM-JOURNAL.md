@@ -8,7 +8,7 @@ updated: 2026-06-20
 
 ## Summary
 
-Refactored Keystone OS to run a **lightweight, single-service Dream Journal container** instead of the bloated multi-service unified stack. This reduces Docker resource footprint by **88%** (1.8GB → 229MB), startup time from 30-45s to 2-3s, and memory usage from ~300MB to ~45MB idle.
+Refactored unisona.ai to run a **lightweight, single-service Dream Journal container** instead of the bloated multi-service unified stack. This reduces Docker resource footprint by **88%** (1.8GB → 229MB), startup time from 30-45s to 2-3s, and memory usage from ~300MB to ~45MB idle.
 
 Includes comprehensive performance benchmarks with response time and memory usage metrics for all endpoints and agent interactions.
 
@@ -373,7 +373,7 @@ If you were using the unified container:
 ## Related Issues
 
 - Closes: Dream Journal containerization
-- Related: Keystone OS resource optimization
+- Related: unisona.ai resource optimization
 - Depends on: Nothing new
 
 ---

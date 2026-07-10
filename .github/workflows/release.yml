@@ -118,7 +118,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.build.outputs.version }}
-          name: "Keystone OS ${{ needs.build.outputs.version }}"
+          name: "unisona.ai ${{ needs.build.outputs.version }}"
           draft: false
           prerelease: ${{ contains(needs.build.outputs.version, '-') }}
           generate_release_notes: false

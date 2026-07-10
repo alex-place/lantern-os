@@ -682,7 +682,7 @@ function createIssueFromTask(repoRoot, task) {
   if (!text) throw new Error("task_required");
   const title = taskTitle(text);
   const body =
-    `${text}\n\n---\n_Filed automatically from Keystone OS chat (autowork “run as task”). ` +
+    `${text}\n\n---\n_Filed automatically from unisona.ai chat (autowork “run as task”). ` +
     `A linked draft PR follows._`;
   const env = { ...process.env, GIT_TERMINAL_PROMPT: "0", SKIP_MONOWORKSTREAM: "1" };
   // `gh issue create` prints the new issue URL on stdout; parse the number from it.

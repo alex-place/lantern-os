@@ -143,7 +143,7 @@ Source: 📋 Example | AI Analysis (depending on mode)
 
 ### Header Navigation (Unchanged)
 ```
-Keystone OS | Journal | Trading | News | Dashboard | Help
+unisona.ai | Journal | Trading | News | Dashboard | Help
 ```
 
 ### New Header Actions

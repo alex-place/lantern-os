@@ -125,7 +125,7 @@ async function demo() {
   const completedItems = await qm.listByStatus("completed");
 
   console.log(`\n  When user asks: "What work is being done?"\n`);
-  console.log(`  Keystone responds:\n`);
+  console.log(`  unisona.ai responds:\n`);
   console.log(`  Claude lane: Ready for work`);
   console.log(`  Gemini lane: Idle`);
   console.log(`  Codex lane: Idle`);

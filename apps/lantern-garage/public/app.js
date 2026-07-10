@@ -314,7 +314,7 @@ function renderFlatHouse(house) {
   $("flatSources").textContent = String(sources.length || 0);
   $("flatRecords").textContent = String(house.ragRecordCount || 0);
   $("archiveMode").textContent = "manifest only; no repo deletion";
-  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, Unisona OS app";
+  $("windowsHost").textContent = house.windowsSurface?.host || "Windows host, unisona.ai app";
   $("bootMutation").textContent = house.windowsSurface?.defaultBootMutation || "blocked";
 
   const list = $("flatSourceList");

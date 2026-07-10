@@ -19,25 +19,25 @@ Investigation of Claude Code's multi-agent spawning capabilities for autonomous 
 - Workaround: `SKIP_MONOWORKSTREAM=1 git commit` (documented in CLAUDE.md)
 
 #### 3. Autonomous Execution Flow
-**Validated path:** Keystone technical coordinator can spawn sub-agents for parallel work:
+**Validated path:** unisona.ai technical coordinator can spawn sub-agents for parallel work:
 
 ```
-User submits task → Keystone receives via /dream-chat
+User submits task → unisona.ai receives via /dream-chat
   ↓
-Keystone parses task scope + lane assignments
+unisona.ai parses task scope + lane assignments
   ↓
-Keystone spawns 5 agents (claude/, codex/, gemini/, devin/, openai/) via Agent tool
+unisona.ai spawns 5 agents (claude/, codex/, gemini/, devin/, openai/) via Agent tool
   ↓
 Each agent works independently (parallel, no barriers)
   ↓
-Keystone aggregates results, posts to EPIC #509
+unisona.ai aggregates results, posts to EPIC #509
   ↓
 User monitors via `/api/convergance/daily-report`
 ```
 
 #### 4. Tool Access & Allowlists
 - Agent tool can reach: git, npm, pytest, node, curl, gh (via subagent's native tools)
-- **Keystone-specific allowlist** (POST `/api/keystone/exec`):
+- **unisona.ai-specific allowlist** (POST `/api/keystone/exec`):
   - ✓ `git add/commit/push`, `npm test`, `pytest`, `gh pr list/create/view`
   - ✗ `gh pr merge` (not allowlisted; use `git merge --no-edit` instead)
   - ✗ Direct master push (use `OVERRIDE_MERGE=1` flag)
@@ -61,13 +61,13 @@ User monitors via `/api/convergance/daily-report`
 
 1. **Multi-agent spawning works**: 5 lanes (claude/, codex/, gemini/, devin/, openai/) executed in parallel 2026-06-15; 4 of 5 completed successfully
 2. **Monoworkstream enforced at git level**: hooks prevent lane conflicts; no code-level intervention needed
-3. **Keystone as orchestrator is viable**: can spawn agents, aggregate results, track via API
+3. **unisona.ai as orchestrator is viable**: can spawn agents, aggregate results, track via API
 4. **PR creation needs manual intervention**: `gh pr create` fails on Windows due to `git merge` PATH issue; push branches successfully, open PRs via web UI
 
 ### Recommendations
 
 1. **For 7-day sprint**: Unblock codex (#516 merged 2026-06-15); all 5 lanes now ready
-2. **For autonomous loops**: Use Keystone coordination + agent spawning + daily status reports
+2. **For autonomous loops**: Use unisona.ai coordination + agent spawning + daily status reports
 3. **For Windows compatibility**: Keep git merge command in native shell, avoid subprocess wrapping
 4. **For future research**: Test with 10+ parallel agents to validate concurrency scaling
 

@@ -1,14 +1,14 @@
-# Keystone UX Simplification Plan — Make It Work for Normies
+# unisona.ai UX Simplification Plan — Make It Work for Normies
 
 ## The Problem
 
-Current Keystone chat requires users to understand:
+Current unisona.ai chat requires users to understand:
 - "Skills" (what are they? when do I use them?)
 - "Σ₀" (no idea what this means)
 - "CSF Memory" (jargon)
 - "Convergence" (abstract concept)
 - "Context Modes" (overwhelming list)
-- Multiple AI providers (Auto, Claude, ChatGPT, Gemini, Grok, Local, Keystone FT)
+- Multiple AI providers (Auto, Claude, ChatGPT, Gemini, Grok, Local, unisona.ai FT)
 
 **Result:** Non-technical users feel lost immediately. UI assumes programming knowledge.
 
@@ -231,7 +231,7 @@ No message for 2 min?
 Single "?" button in nav → simplified help overlay:
 
 ```
-What is Keystone?
+What is unisona.ai?
   → An AI assistant that remembers you
 
 How do I use it?
@@ -333,7 +333,7 @@ Access advanced via "More Settings" button.
 ## Related Issues
 
 - #641 — Dark mode (✅ DONE)
-- #642 — This epic (Keystone UX simplification)
+- #642 — This epic (unisona.ai UX simplification)
 - Future: Onboarding modal
 - Future: Settings redesign
 - Future: Mobile optimization

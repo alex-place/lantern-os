@@ -109,7 +109,7 @@ jobWorker.start(2000); // Poll every 2 seconds for new jobs
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
 require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
-// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and auto-merges
+// PR Watcher — auto-reviews PRs idle for 3min via unisona.ai fleet, and auto-merges
 // reviewed(APPROVE) + green + conflict-free PRs. Auto-merge is ON by default on the
 // single designated fleet host (PR_WATCHER_ENABLED=1); set PR_WATCHER_AUTOMERGE=0 to
 // review-only. Merge bar: green CI checks + a fleet-review APPROVE verdict, minus the
@@ -266,7 +266,7 @@ const routes = [
   require("./routes/dream"),
   require("./routes/dreams"),
   require("./routes/keystone"),
-  require("./routes/rollover"), // #898: Keystone-vs-Claude landed-work share
+  require("./routes/rollover"), // #898: unisona.ai-vs-Claude landed-work share
   require("./routes/image"),
   require("./routes/web-images"),
   require("./routes/youtube"),

@@ -4,9 +4,9 @@ created: 2026-06-06
 updated: 2026-06-21
 ---
 
-# Keystone OS — Quick Start
+# unisona.ai — Quick Start
 
-Keystone OS is an AI assistant that runs on your own computer, remembers what matters to you, and isn't locked to a single AI company. This guide gets you up and running.
+unisona.ai is an AI assistant that runs on your own computer, remembers what matters to you, and isn't locked to a single AI company. This guide gets you up and running.
 
 > **In a hurry?** Pick the path that sounds like you:
 >
@@ -27,7 +27,7 @@ This is the right choice for most people. The rest of this guide is only if you 
 
 Running your own copy means you fully own your data and it works offline-first. You'll copy and paste a few commands into a terminal — you don't need to understand them, just run them in order.
 
-> **A terminal** is the text window where you type commands: **PowerShell** on Windows, **Terminal** on Mac/Linux. Open it, then `cd` into the folder where you want Keystone to live.
+> **A terminal** is the text window where you type commands: **PowerShell** on Windows, **Terminal** on Mac/Linux. Open it, then `cd` into the folder where you want unisona.ai to live.
 
 ### What you need first
 
@@ -67,7 +67,7 @@ python -m pip install -r requirements.txt
 
 ### Step 3 — Add one AI key
 
-Keystone talks to an AI provider on your behalf. You need **one** key. It tries them in order and automatically switches to a backup if one is down, so a single key is plenty to start.
+unisona.ai talks to an AI provider on your behalf. You need **one** key. It tries them in order and automatically switches to a backup if one is down, so a single key is plenty to start.
 
 First, make your own settings file from the example:
 
@@ -100,7 +100,7 @@ npm run dev --prefix apps/lantern-garage
 
 Now open **[http://127.0.0.1:4177](http://127.0.0.1:4177)** in your browser.
 
-You'll land on the Keystone home page. Click **Chat** and type anything to start a conversation. 🎉
+You'll land on the unisona.ai home page. Click **Chat** and type anything to start a conversation. 🎉
 
 To stop the server, go back to the terminal and press **Ctrl + C**.
 
@@ -113,7 +113,7 @@ Once it's running on `http://127.0.0.1:4177`:
 | Page | Address | What it is |
 |---|---|---|
 | **Home** | `/` | The landing page with links to everything |
-| **Chat** | `/dream-chat.html` | Talk to Keystone — your main way in |
+| **Chat** | `/dream-chat.html` | Talk to unisona.ai — your main way in |
 | **Help** | `/knowledgecenter.html` | Guides, docs, and your saved PDFs |
 | **Trader** | `/trader-dashboard.html` | Markets & prediction-market terminal *(needs an account)* |
 | **Create** | `/create.html` | Image and content tools *(needs an account)* |
@@ -175,7 +175,7 @@ any "a server is down / acting weird" situation — it converges the running sta
 .\scripts\Start-Lantern.ps1 -RegisterAutostart
 ```
 
-After this your computer starts Keystone on its own every time it boots, and restarts it if it ever crashes. Admin is only needed this one time to register the task.
+After this your computer starts unisona.ai on its own every time it boots, and restarts it if it ever crashes. Admin is only needed this one time to register the task.
 
 To undo it later:
 
@@ -238,7 +238,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/Start-DualServers.ps1
 This launches:
 - **Port 8771** — MCP server (shared by both web servers)
 
-The MCP server exposes Keystone's tools over the Model Context Protocol so **external** agents
+The MCP server exposes unisona.ai's tools over the Model Context Protocol so **external** agents
 (the Claude Code IDE extension / web app) can call them. It also backs two things the chat itself
 uses: the live **status/skills** injected into each turn's context, and the `system_status` tool
 (a real `/health` probe) — which is why the launcher keeps it enabled by default.
@@ -255,9 +255,9 @@ python src/mcp_server/server.py
 
 ### Share it on the internet (advanced)
 
-You can expose your local Keystone to the public web with a Cloudflare tunnel. See [`docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md`](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md).
+You can expose your local unisona.ai to the public web with a Cloudflare tunnel. See [`docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md`](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md).
 
-> ⚠️ **Read this first.** Putting Keystone on the public internet means **anyone with the link can reach it**, not just you. Only do this if you understand the risk, keep your keys safe, and don't expose admin/trading features to the public. If you're not sure, don't — the local `127.0.0.1` address is private to your machine and is the safe default.
+> ⚠️ **Read this first.** Putting unisona.ai on the public internet means **anyone with the link can reach it**, not just you. Only do this if you understand the risk, keep your keys safe, and don't expose admin/trading features to the public. If you're not sure, don't — the local `127.0.0.1` address is private to your machine and is the safe default.
 
 ---
 
@@ -265,7 +265,7 @@ You can expose your local Keystone to the public web with a Cloudflare tunnel. S
 
 | Problem | Fix |
 |---|---|
-| **"Port 4177 already in use"** | Keystone (or something else) is already running on it. On Windows, find it in **Task Manager** and end it; on Mac/Linux run `lsof -i :4177` then stop that process. |
+| **"Port 4177 already in use"** | unisona.ai (or something else) is already running on it. On Windows, find it in **Task Manager** and end it; on Mac/Linux run `lsof -i :4177` then stop that process. |
 | **No replies in chat** | Open `.env` and double-check at least one AI key is filled in and correct (no extra spaces, no quotes). |
 | **It won't start** | Look at `logs\lantern-autostart.log` for the error message. |
 | **Voice doesn't work** | Use Chrome or Edge; other browsers may not support browser voice. |
@@ -294,4 +294,4 @@ npm run test:api --prefix apps/lantern-garage
 - **[PROVIDERS.md](PROVIDERS.md)** — all the AI providers and how to configure them
 - **[AGENTS.md](AGENTS.md)** — how the AI agent workflow and contribution lanes work
 - **[SECURITY.md](SECURITY.md)** — the security model and how to report a problem
-- **[docs/CONVERGENCE-LOOP.md](docs/CONVERGENCE-LOOP.md)** — how Keystone reasons under the hood
+- **[docs/CONVERGENCE-LOOP.md](docs/CONVERGENCE-LOOP.md)** — how unisona.ai reasons under the hood

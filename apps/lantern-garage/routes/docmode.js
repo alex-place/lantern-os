@@ -1,4 +1,4 @@
-// docmode.js — Keystone "Document Mode": a versioned document workspace edited
+// docmode.js — unisona.ai "Document Mode": a versioned document workspace edited
 // turn-by-turn from chat. Each /propose call returns a revised text + explanation
 // WITHOUT saving; the client shows a diff and the user clicks Apply (/apply) to commit
 // a revision. Undo/rollback = /revert. Export rebuilds a .docx from the current text.
@@ -34,7 +34,7 @@ function proposeEdit({ apiKey, model, docText, instruction, selection }) {
     ? `\n\nThe user has SELECTED this passage — apply the change to it specifically (you may still return the whole document):\n<<<SELECTION\n${selection}\nSELECTION>>>`
     : "";
   const system = [
-    "You are Keystone, a careful collaborative document editor (like editing a shared doc).",
+    "You are unisona.ai, a careful collaborative document editor (like editing a shared doc).",
     "Apply ONLY the change the user asks for. Reproduce everything else of the document VERBATIM — same wording, same order, same markdown formatting (headings #, lists -, blank lines). Do not silently rewrite, reorder, or 'improve' untouched parts. Minimal diffs.",
     "Preserve the author's meaning unless they explicitly ask to change it. Never invent facts.",
     "Return ONLY a JSON object: {\"explanation\": string, \"newText\": string}. `explanation` is 1-3 short sentences describing what you changed and where. `newText` is the FULL updated document as markdown.",

@@ -1,7 +1,7 @@
 """
-Keystone personal cockpit — the human-in-the-loop spine.
+unisona.ai personal cockpit — the human-in-the-loop spine.
 
-    You ask Keystone
+    You ask unisona.ai
     → it identifies the task and the evidence it needs
     → it gathers from local files / web / email / calendar / MCP / an approved model
     → it shows what it found and what it plans to do
@@ -76,7 +76,7 @@ class TaskSpec:
 
 @dataclass
 class PendingAction:
-    """An action Keystone wants to take. Mutating kinds are held until approved."""
+    """An action unisona.ai wants to take. Mutating kinds are held until approved."""
     id: int
     kind: str
     summary: str                 # the FINAL action, shown to the user before it runs
@@ -118,7 +118,7 @@ class Profile:
     # -- writes (the human-in-the-loop) --
     def propose(self, key: str, value: str, source: str = "keystone",
                 confidence: float = 0.6) -> Fact:
-        """Hold a fact Keystone gathered/inferred. NOT durable until you approve it."""
+        """Hold a fact unisona.ai gathered/inferred. NOT durable until you approve it."""
         f = Fact(key=key, value=value, confidence=min(confidence, 0.7), source=source,
                  approved=False, updated=_now())
         self._facts[key] = f

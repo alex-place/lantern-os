@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Ollama-compatible serving wrapper for keystone-sigma0-plt.
 
-Exposes `GET /api/tags` and `POST /api/chat` so the Keystone chat (which calls
+Exposes `GET /api/tags` and `POST /api/chat` so the unisona.ai chat (which calls
 `OLLAMA_BASE_URL/api/chat`, see apps/lantern-garage/lib/dream-chat.js) can reach
 the PLT model as a drop-in local backend. It is a BLACK BOX over
 `from_pretrained` + `generate` — robust to any forward-internal change Colab

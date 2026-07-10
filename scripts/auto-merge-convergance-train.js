@@ -7,7 +7,7 @@
  * 2. Analyze current resolver performance
  * 3. Identify performance gaps
  * 4. Generate improvement recommendations
- * 5. Simulate Keystone approval + apply improvements
+ * 5. Simulate unisona.ai approval + apply improvements
  * 6. Export training history
  *
  * Usage: node scripts/auto-merge-convergance-train.js
@@ -92,8 +92,8 @@ async function runTrainingCycle() {
       console.log(`      → ${rec.detail}`);
     });
 
-    // Step 5: Simulate Keystone approval
-    console.log('\n🤖 Step 5: Simulating Keystone Analysis & Approval...');
+    // Step 5: Simulate unisona.ai approval
+    console.log('\n🤖 Step 5: Simulating unisona.ai Analysis & Approval...');
     const approveCount = Math.ceil(recommendations.length / 2);
     const keystoneApproval = {
       approved: recommendations.slice(0, approveCount),
@@ -105,10 +105,10 @@ async function runTrainingCycle() {
       ],
     };
 
-    console.log(`   ✓ Keystone approved ${keystoneApproval.approved.length} recommendation(s)`);
+    console.log(`   ✓ unisona.ai approved ${keystoneApproval.approved.length} recommendation(s)`);
     if (keystoneApproval.rejected.length > 0) {
       console.log(
-        `   ✗ Keystone rejected ${keystoneApproval.rejected.length} (too risky)`
+        `   ✗ unisona.ai rejected ${keystoneApproval.rejected.length} (too risky)`
       );
     }
 
@@ -121,7 +121,7 @@ async function runTrainingCycle() {
     });
 
     if (applyResult.newInsights && applyResult.newInsights.length > 0) {
-      console.log(`\n   🔍 Keystone Insights:`);
+      console.log(`\n   🔍 unisona.ai Insights:`);
       applyResult.newInsights.forEach(insight => {
         console.log(`      • ${insight}`);
       });

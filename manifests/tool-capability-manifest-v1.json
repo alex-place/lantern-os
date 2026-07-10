@@ -688,7 +688,7 @@
     },
     {
       "name": "local_eval_keystone_run",
-      "description": "Run the Keystone eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
+      "description": "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
       "input_schema": {
         "type": "object",
         "properties": {

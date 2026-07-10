@@ -18,7 +18,7 @@ establishes applies to this ADR).
 
 ## Context
 
-Keystone OS is a solo-developer, local-first reasoning system worked by a fleet of
+unisona.ai is a solo-developer, local-first reasoning system worked by a fleet of
 concurrent agents (`claude/`, `gemini/`, `codex/`, … lanes). Architectural knowledge today
 is spread across ~120 `docs/*.md` files, dated audits
 ([ARCHITECTURE-AUDIT-2026-06-13.md](../ARCHITECTURE-AUDIT-2026-06-13.md)), mapping docs

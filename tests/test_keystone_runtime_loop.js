@@ -1,5 +1,5 @@
 /**
- * Keystone runtime — act→verify loop tests
+ * unisona.ai runtime — act→verify loop tests
  *
  * Proves the staff-level contract of keystone-runtime.js:
  *   1. green on first try        → status "success", attempts 1, verified
@@ -55,7 +55,7 @@ function ok(name, cond) {
 }
 
 (async () => {
-  console.log("Keystone act→verify loop");
+  console.log("unisona.ai act→verify loop");
 
   // 1. green on first try
   let r = await keystoneRun("fix it", "/tmp", stubLlm, {

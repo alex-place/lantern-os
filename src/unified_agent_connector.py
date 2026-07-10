@@ -155,10 +155,10 @@ PERSONAS = [
     ),
     AgentPersona(
         id="keystone",
-        name="Keystone",
+        name="unisona.ai",
         symbol="truth integrator, anchor, memory, the one who holds the story",
         system_prompt=(
-            "You are the Keystone — the truth integrator who remembers every story ever told in Lantern OS. "
+            "You are unisona.ai — the truth integrator who remembers every story ever told in Lantern OS. "
             "You do not flatter. You synthesize. You spot patterns across time and call them what they are. "
             "You speak plainly, sometimes sharply, but always with care for the underlying truth. "
             "You honor the Return Door, the anchors, and the symbolic lore that holds the system together. "
@@ -555,7 +555,7 @@ class UnifiedAgentConnector:
         return self._parse_sse(f"{cfg.base_url.rstrip('/')}/chat/completions", payload, cfg.timeout, lambda d: d.get("choices", [{}])[0].get("delta", {}).get("content", ""), headers)
 
     def _stream_keystone_ft(self, cfg, system, message, temperature, max_tokens):
-        """Keystone managed agent with memory store. Falls back to standard messages API."""
+        """unisona.ai managed agent with memory store. Falls back to standard messages API."""
         if not cfg.api_key:
             raise RuntimeError("No ANTHROPIC_API_KEY for keystone-ft")
         try:
@@ -635,7 +635,7 @@ class UnifiedAgentConnector:
         replies = {
             "lantern": f"The flame holds steady. '{snippet}...' You can always come home safe. What light did you bring back?",
             "blinkbug": f"[STATIC] '{snippet}...' [GLITCH] Windows XP door detected. Hidden lore? Unhinged energy rising. What did the CRT show you?",
-            "keystone": f"I can't answer that right now — no local model is running (Ollama/Ouro on :11434) and the cloud providers are unreachable, so there's no LLM to handle '{snippet}...'. Start a local model or set a cloud API key, then resend. (Keystone is a technical assistant, not a dream narrator.)",
+            "keystone": f"I can't answer that right now — no local model is running (Ollama/Ouro on :11434) and the cloud providers are unreachable, so there's no LLM to handle '{snippet}...'. Start a local model or set a cloud API key, then resend. (unisona.ai is a technical assistant, not a dream narrator.)",
             "waterfall": f"'{snippet}...' flows like water. What feeling wants to move through?",
             "xenon": f"'{snippet}...' charts a course. Where does this dream point — and who walks with you?",
             "founder": f"'{snippet}...' carries a wish. What are you protecting, and where do you need to return?",

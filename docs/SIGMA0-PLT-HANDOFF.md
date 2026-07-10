@@ -1,4 +1,4 @@
-# Keystone-Σ₀ PLT — Handoff (2026-07-01)
+# unisona.ai-Σ₀ PLT — Handoff (2026-07-01)
 
 **What this is:** the pick-up sheet for the "loopcoder swap" — bootstrapping our own
 proprietary Σ₀ coder ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md))

@@ -1,12 +1,12 @@
 /**
- * Keystone OS home (root page) Playwright tests
+ * unisona.ai home (root page) Playwright tests
  * Run after starting lantern-garage: node apps/lantern-garage/server.js
  *
  * Usage:
  *   npx playwright test tests/test_dream_journal_ui.spec.js
  *   npx playwright test --ui
  *
- * Note: the root page was rebranded from "Dream Journal" to "Keystone OS" and is
+ * Note: the root page was rebranded from "Dream Journal" to "unisona.ai" and is
  * now a landing page (hero + navigation tiles). It no longer hosts a stat-card
  * dashboard, an entry-creation form, or a recent-entries list — those tests were
  * updated to the current surfaces (or removed). Dream-chat behaviour is covered
@@ -16,14 +16,14 @@
 const { test, expect } = require("@playwright/test");
 const { baseUrl: BASE_URL } = require("./lantern-test-base");
 
-test.describe("Keystone OS Home UI", () => {
-  test("home page loads and shows Keystone OS branding", async ({ page }) => {
+test.describe("unisona.ai Home UI", () => {
+  test("home page loads and shows unisona.ai branding", async ({ page }) => {
     await page.goto(BASE_URL);
-    await expect(page).toHaveTitle(/Keystone OS/);
-    await expect(page.locator(".nav-brand")).toContainText("Keystone OS");
-    await expect(page.locator("h1")).toContainText("Keystone");
+    await expect(page).toHaveTitle(/unisona.ai/);
+    await expect(page.locator(".nav-brand")).toContainText("unisona.ai");
+    await expect(page.locator("h1")).toContainText("unisona.ai");
     // Static hero tagline (not overwritten by the live-state loader)
-    await expect(page.locator("#hero-tagline")).toContainText("Keystone OS");
+    await expect(page.locator("#hero-tagline")).toContainText("unisona.ai");
   });
 
   test("home navigation tiles render", async ({ page }) => {
@@ -31,15 +31,15 @@ test.describe("Keystone OS Home UI", () => {
     const tiles = page.locator(".home-tiles .panel");
     await expect(tiles.first()).toBeVisible();
     expect(await tiles.count()).toBeGreaterThanOrEqual(3);
-    await expect(page.locator(".home-tiles")).toContainText("Keystone Trader");
+    await expect(page.locator(".home-tiles")).toContainText("unisona.ai Trader");
   });
 
-  test("hero CTA links to Keystone Chat", async ({ page }) => {
+  test("hero CTA links to unisona.ai Chat", async ({ page }) => {
     await page.goto(BASE_URL);
     const cta = page.locator(".hero-cta-row a.btn-primary").first();
     await expect(cta).toBeVisible();
     await expect(cta).toHaveAttribute("href", /dream-chat\.html/);
-    await expect(cta).toContainText("Keystone Chat");
+    await expect(cta).toContainText("unisona.ai Chat");
   });
 
   test("chat input accepts text and triggers agent response", async ({ page }) => {
@@ -116,7 +116,7 @@ test.describe("Keystone OS Home UI", () => {
 
   // REMOVED: "recent entries list updates after creating entry" — the root page no
   // longer hosts an entry-creation form or a recent-entries list (both moved off the
-  // landing page in the Keystone OS rebrand). There is no equivalent surface to test.
+  // landing page in the unisona.ai rebrand). There is no equivalent surface to test.
 });
 
 test.describe("Dream Journal Chat Agents", () => {
@@ -138,6 +138,6 @@ test.describe("Dream Journal Chat Agents", () => {
   });
 
   // NOTE: The legacy "#agent-select" debug affordance was removed when Dream Chat
-  // became Keystone-only. Comprehensive dream-chat coverage now lives in
+  // became unisona.ai-only. Comprehensive dream-chat coverage now lives in
   // tests/test_dream_chat_ux.spec.js (streaming, routing, settings, sessions).
 });

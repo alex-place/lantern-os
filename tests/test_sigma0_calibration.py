@@ -165,7 +165,7 @@ def test_report_note_disclaims_product_level():
         {"x0": x0, "sigma0": s0, "steps": 3, "base_seed": 0, "scenario_id": "note-test"}
     ])
     assert "Simulation-only" in report.note or "simulation" in report.note.lower()
-    assert "Keystone" in report.note or "product" in report.note.lower()
+    assert "unisona.ai" in report.note or "product" in report.note.lower()
 
 
 # ── 9. claim registry JSON is valid ──────────────────────────────────────────

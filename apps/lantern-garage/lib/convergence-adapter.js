@@ -114,7 +114,7 @@ function runConverge(message, persona, provider, timeoutMs) {
       stdio: ['ignore', 'pipe', 'pipe'],
       // PYTHONIOENCODING=utf-8: without it, Python's stdout defaults to the OS locale
       // encoding (cp1252 on Windows), so non-ASCII in a reply — e.g. the em-dash in the
-      // Keystone offline message — is emitted as a cp1252 byte (0x97) that Node then
+      // unisona.ai offline message — is emitted as a cp1252 byte (0x97) that Node then
       // decodes as invalid UTF-8 and renders as the replacement char "�" (#1605).
       // Matches the convention already used in routes/operator.js.
       env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1', PYTHONUNBUFFERED: '1', PYTHONIOENCODING: 'utf-8' },

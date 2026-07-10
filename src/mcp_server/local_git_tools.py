@@ -273,9 +273,9 @@ def local_git_commit(message: str, dry_run: str = "true") -> Dict[str, Any]:
         return {"dry_run": True, "plan": plan, "note": "Pass dry_run='false' to commit."}
     try:
         env = os.environ.copy()
-        env.setdefault("GIT_AUTHOR_NAME", "Keystone MCP")
+        env.setdefault("GIT_AUTHOR_NAME", "unisona.ai MCP")
         env.setdefault("GIT_AUTHOR_EMAIL", "mcp@keystone.local")
-        env.setdefault("GIT_COMMITTER_NAME", "Keystone MCP")
+        env.setdefault("GIT_COMMITTER_NAME", "unisona.ai MCP")
         env.setdefault("GIT_COMMITTER_EMAIL", "mcp@keystone.local")
         proc = subprocess.run(
             ["git", "commit", "-m", message],
@@ -362,7 +362,7 @@ def local_git_open_pr(title: str, body: str = "", base: str = "master",
 # ─────────────────────── Service & Health ────────────────────────────────────
 
 def local_server_status() -> Dict[str, Any]:
-    """Check which local Keystone servers are up (ports 4177, 4178, 8771)
+    """Check which local unisona.ai servers are up (ports 4177, 4178, 8771)
     and return the MCP server's own uptime."""
     import socket
     import time

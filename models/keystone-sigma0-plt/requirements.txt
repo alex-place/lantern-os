@@ -1,4 +1,4 @@
-# Keystone-Σ₀ PLT — training-box dependencies.
+# unisona.ai-Σ₀ PLT — training-box dependencies.
 # Install torch separately for your CUDA (e.g. cu121):
 #   pip install torch --index-url https://download.pytorch.org/whl/cu121
 # transformers is pinned to the version the upstream config targets.

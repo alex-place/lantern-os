@@ -1,6 +1,6 @@
 """
 Build a compact BM25 retrieval index over the harvested arXiv corpus so the
-Keystone chat assistant can pull the most relevant recent papers per question
+unisona.ai chat assistant can pull the most relevant recent papers per question
 without a linear scan of the whole corpus.
 
 Reads   $ARXIV_CORPUS_DIR\\raw\\*.jsonl   (produced by arxiv_harvest.py)

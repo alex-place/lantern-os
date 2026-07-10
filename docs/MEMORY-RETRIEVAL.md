@@ -1,6 +1,6 @@
-# How Keystone Remembers — The CSF Memory & Retrieval System
+# How unisona.ai Remembers — The CSF Memory & Retrieval System
 
-This is the **Remember** stage of the Keystone loop (*Observe → Remember → Reason
+This is the **Remember** stage of the unisona.ai loop (*Observe → Remember → Reason
 → Act → Verify → Converge*). It is one append-only, local-first memory — not a
 pile of databases. This article explains how memories are written, how they are
 recalled, how recall is ranked, and how the store stays fast as it grows forever.
