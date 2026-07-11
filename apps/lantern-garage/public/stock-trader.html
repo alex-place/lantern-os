@@ -82,7 +82,18 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w,210px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
+     A thin ew-resize strip with a centred grip; min/max are enforced in
+     initColumnResizers() and the chosen widths persist. #trader-cols */
+  .col-resize{width:7px;cursor:ew-resize;z-index:35;touch-action:none;background:transparent;pointer-events:auto}
+  .col-resize::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:42px;border-radius:3px;background:var(--border);transition:background .15s}
+  .col-resize:hover::before,.col-resize:focus-visible::before{background:var(--accent)}
+  .col-resize:focus-visible{outline:none}
+  .col-resize-left{position:absolute;top:0;bottom:0;right:0;height:auto}      /* on the sidebar's right edge */
+  .col-resize-ticket{position:relative;flex:0 0 auto}                          /* flex sibling left of the order panel */
+  body.resizing-col{cursor:ew-resize;user-select:none}
+  body.resizing-col .col-resize::before{background:var(--accent)}
   /* Draggable divider to resize the bottom panel section (#1630) */
   .footer-resize{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:30}
   .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
@@ -94,7 +105,7 @@
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
      run all the way to the bottom; the footer trading panel sits under the charts. */
-  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
   .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
@@ -372,15 +383,15 @@
   .ot-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .ot-bg.hidden{display:none}
   .ot-modal{pointer-events:auto;background:var(--bg1);border-left:1px solid var(--border);
-    width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
+    width:var(--ticket-w,340px);max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
     box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
   @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
   /* When the ticket is open, REFLOW the deck (and footer) to the left so the cards
      sit BESIDE the panel instead of hidden under it. Gated on body.ot-open, which
      the guest/read-only view never gets (openOrderPanel is !GUEST) — so the guest
      layout never shifts (the old bug: it shifted while the panel stayed invisible). */
-  body.ot-open .main{ padding-right: 356px; }
-  body.ot-open .footer{ padding-right: 356px; }
+  body.ot-open .main{ padding-right: calc(var(--ticket-w,340px) + 16px); }
+  body.ot-open .footer{ padding-right: calc(var(--ticket-w,340px) + 16px); }
   @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
   /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
@@ -655,6 +666,7 @@
 
 <!-- Sidebar -->
 <div class="sidebar" role="complementary" aria-label="Watchlist">
+  <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
   </div>
@@ -757,6 +769,7 @@
 </div>
 
 <div class="ot-bg hidden" id="otBg" onclick="if(event.target===this)closeOrderTicket()">
+  <div class="col-resize col-resize-ticket" id="ticketResize" role="separator" aria-orientation="vertical" aria-label="Resize the order panel" tabindex="0" title="Drag to resize the order panel"></div>
   <div class="ot-modal">
     <div class="ot-header">
       <span class="ot-ticker" id="otTickerLabel">—</span>
@@ -1101,12 +1114,17 @@ const TIME_LEVELS = [
   { id:'year', key:d=>d.getFullYear(),                 kind:'year' },
 ];
 const _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// US market timezone for all chart time labels — the axis reads in Eastern clock time,
+// 12-hour (AM/PM), regardless of the viewer's own timezone or locale. #trader-timescale
+const _ET = 'America/New_York';
+function _etTime(d){ return d.toLocaleTimeString('en-US',{timeZone:_ET,hour:'numeric',minute:'2-digit',hour12:true}); } // "9:30 AM"
+function _etDayNum(d){ return d.toLocaleDateString('en-US',{timeZone:_ET,day:'numeric'}); }                            // "28"
 function _fmtTick(d, kind, showDate){
-  if(kind === 'year')  return String(d.getFullYear());
-  if(kind === 'month') return _MONTHS[d.getMonth()] + (d.getMonth()===0 ? " '"+String(d.getFullYear()).slice(2) : '');
-  if(kind === 'day')   return String(d.getDate());           // #1698: day number only (28, not 6/28)
-  const hhmm = d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
-  return showDate ? d.getDate()+' '+hhmm : hhmm;             // month is carried by the 'month' tick
+  if(kind === 'year')  return d.toLocaleDateString('en-US',{timeZone:_ET,year:'numeric'});
+  if(kind === 'month'){ const m=d.toLocaleDateString('en-US',{timeZone:_ET,month:'short'}); const isJan=d.toLocaleDateString('en-US',{timeZone:_ET,month:'numeric'})==='1'; return m + (isJan ? " '"+d.toLocaleDateString('en-US',{timeZone:_ET,year:'2-digit'}) : ''); }
+  if(kind === 'day')   return _etDayNum(d);                   // #1698: day number only (28, not 6/28)
+  const hhmm = _etTime(d);
+  return showDate ? _etDayNum(d)+' '+hhmm : hhmm;            // month is carried by the 'month' tick
 }
 function timeAxisTicks(bars, maxTicks){
   const n = bars.length;
@@ -1221,10 +1239,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // vertical gridline per tick.
     ctx.fillStyle = CHART_AXIS_COLOR();
     ctx.textBaseline = 'bottom';
-    const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 84)));
+    // Wider slots + gap than the old 24-hour labels, because "9:30 AM" is longer than "09:30".
+    const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 96)));
     const timeTicks = timeAxisTicks(bars, timeMaxTicks);
     let lastLabelX = -1e9;
-    const MIN_LABEL_GAP = 52;   // px — keep labels (e.g. a date + the next hour) from colliding
+    const MIN_LABEL_GAP = 64;   // px — keep 12-hour labels (e.g. "28 9:30 AM") from colliding
     for(const t of timeTicks){
       if(!t.label) continue;
       const cx = t.idx*slotW + slotW/2;
@@ -1240,6 +1259,15 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       else if(cx > pw-24){ tx = pw-2; align = 'right'; }
       ctx.textAlign = align;
       ctx.fillText(t.label, tx, h-2);
+    }
+    // Label the dynamic timescale with its timezone: the intraday axis reads in US
+    // Eastern clock time and the buckets change with zoom, so anchor a small "ET" tag
+    // in the axis corner. Skipped on daily+ scales (date-only, timezone-agnostic). #trader-timescale
+    const _intraday = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
+    if(_intraday){
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = CHART_AXIS_COLOR();
+      ctx.fillText('ET', w-2, h-2);
     }
 
     // Clip price series to the plot box so a zoomed-in price scale can push
@@ -2286,7 +2314,8 @@ function _hideXh(ladder){
 function _fmtCrossTime(ts){
   const d = new Date(String(ts).replace(' ','T'));
   if(isNaN(d)) return '';
-  return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  // US Eastern, 12-hour — same clock the axis reads (#trader-timescale).
+  return d.toLocaleString('en-US', { timeZone:_ET, month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
 }
 // x,y are cursor coords relative to the canvas (CSS px); w,h the canvas size.
 function _updateXh(ladder, canvasId, x, y, w, h){
@@ -3253,6 +3282,50 @@ function initWlInfoResize(){
   handle.addEventListener('touchstart',start,{passive:false});
 }
 
+// Drag-to-resize the LEFT (watchlist) and RIGHT (order ticket) columns. Widths are CSS
+// vars on :root so the grid track, the ticket panel, and the deck's reflow padding all
+// read them; clamped to sane min/max and persisted. Charts re-fit (forced repaint, rAF-
+// throttled) as you drag. Arrow keys nudge the focused divider. #trader-cols
+function initColumnResizers(){
+  const root = document.documentElement;
+  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:160, max:420, def:210 };
+  const TICKET  = { cssVar:'--ticket-w',  key:'trader.ticketW',  min:300, max:560, def:340 };
+  [SIDEBAR, TICKET].forEach(c=>{ const v=parseInt(localStorage.getItem(c.key)||'',10); if(v>0) root.style.setProperty(c.cssVar, Math.max(c.min,Math.min(c.max,v))+'px'); });
+  let raf=0;
+  const repaint=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; try{ (wlPrices||[]).forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price, null, null, true)); renderFullscreenChart(); }catch(e){} }); };
+  const curW=(cfg)=> parseInt(getComputedStyle(root).getPropertyValue(cfg.cssVar),10) || cfg.def;
+  const setW=(cfg,w,save)=>{ const cw=Math.max(cfg.min,Math.min(cfg.max,Math.round(w))); root.style.setProperty(cfg.cssVar, cw+'px'); if(save){ try{ localStorage.setItem(cfg.key,String(cw)); }catch(e){} } repaint(); return cw; };
+  function wire(handleId, cfg, edge){
+    const handle=document.getElementById(handleId); if(!handle) return;
+    let dragging=false;
+    const onMove=(e)=>{ if(!dragging) return; if(e.cancelable) e.preventDefault();
+      const x=(e.touches&&e.touches[0])?e.touches[0].clientX:e.clientX;
+      // left edge: width = distance from the viewport's left; right edge: from its right.
+      setW(cfg, edge==='left' ? x : (window.innerWidth - x), false);
+    };
+    const onUp=()=>{ if(!dragging) return; dragging=false; document.body.classList.remove('resizing-col');
+      setW(cfg, curW(cfg), true);   // persist the final width
+      window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchmove',onMove); window.removeEventListener('touchend',onUp);
+    };
+    const start=(e)=>{ e.preventDefault(); dragging=true; document.body.classList.add('resizing-col');
+      window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+      window.addEventListener('touchmove',onMove,{passive:false}); window.addEventListener('touchend',onUp); };
+    handle.addEventListener('mousedown',start);
+    handle.addEventListener('touchstart',start,{passive:false});
+    handle.addEventListener('keydown',(e)=>{
+      const grow = edge==='left' ? 'ArrowRight' : 'ArrowLeft';   // key that widens this column
+      const shrink = edge==='left' ? 'ArrowLeft' : 'ArrowRight';
+      if(e.key===grow) setW(cfg, curW(cfg)+16, true);
+      else if(e.key===shrink) setW(cfg, curW(cfg)-16, true);
+      else return;
+      e.preventDefault();
+    });
+  }
+  wire('sidebarResize', SIDEBAR, 'left');
+  wire('ticketResize',  TICKET,  'right');
+}
+
 // Drag-to-reorder chart slots in fixed layouts. Delegated on the grid (survives
 // re-renders); only the ⠿ handle initiates a drag, so chart pan/zoom still works.
 let _dragWlTk = null;   // a watchlist symbol being dragged onto a chart (#1700)
@@ -3321,6 +3394,7 @@ function startDashboard(){
   syncRangeButtons(chartTimeframe);
   initFooterResize();
   initWlInfoResize();
+  initColumnResizers();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
