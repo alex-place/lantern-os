@@ -21,6 +21,9 @@ const EASTERN_SUMMER_OFFSET_H = -4; // EDT; the weather-edge series trades summe
 
 const SERIES_MOS = {
   KXHIGHNY: { station: "KNYC" },
+  // ForecastEx U-series NYC daily high — settles on the LaGuardia station, NOT Central
+  // Park (#2217). Fit == serve: weather-oracle-params-klga.json was fit on KLGA NBS MOS.
+  UHLGA: { station: "KLGA" },
 };
 
 const CACHE_MS = 30 * 60 * 1000;

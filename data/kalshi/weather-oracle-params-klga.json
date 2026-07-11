@@ -1,0 +1,45 @@
+{
+  "coolBiasF": -0.928,
+  "regressionK": 0,
+  "n": 1825,
+  "sigmaNowcastF": 2.177,
+  "sigmaBaseF": 2.375,
+  "sigmaPerLeadF": 0.345,
+  "diagnostics": {
+    "perLeadSupport": [
+      [
+        0,
+        460
+      ],
+      [
+        1,
+        460
+      ],
+      [
+        2,
+        455
+      ],
+      [
+        3,
+        450
+      ]
+    ],
+    "ceilingSupport": []
+  },
+  "fittedAt": "2026-07-10",
+  "station": "KLGA",
+  "source": "IEM NBS MOS (forecast, KLGA) + NY_ASOS/LGA round(max METAR tmpf) (settled — ForecastEx U-series/Weather Underground definition), summer",
+  "validation": {
+    "default": {
+      "meanRPS": 0.0508,
+      "pitChi2": 81.75,
+      "n": 730
+    },
+    "fitted": {
+      "meanRPS": 0.0356,
+      "pitChi2": 21.25,
+      "n": 730
+    },
+    "rpsGainPct": 30
+  }
+}

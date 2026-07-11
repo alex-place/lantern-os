@@ -22,6 +22,15 @@
  *
  * Network runs where egress exists. Run:
  *   node scripts/validate-weather-oracle-fit.js --train 2021,2022,2023 --test 2024,2025 [--promote]
+ *
+ * STATION-GENERIC (#2217): every leg is parameterizable, so the SAME gated pipeline fits any
+ * station. The ForecastEx U-series NYC contract (UHLGA) settles on Weather Underground's
+ * daily high — measured to equal round(max METAR tmpf) for LGA, 14/14 days vs the venue's
+ * published settlement flips (Jun 2026) — so its settled leg is `--settled asos` (rounded),
+ * NOT the NWS CLI (CLI disagreed 6/13 days, up to 4°F warmer). KLGA fit:
+ *   node scripts/validate-weather-oracle-fit.js --mos-station KLGA --asos-station LGA \
+ *     --settled asos --normals-cli-year 2025 --train 2021,2022,2023 --test 2024,2025 \
+ *     --out data/kalshi/weather-oracle-params-klga.json --promote
  */
 
 const fs = require("fs");
@@ -53,9 +62,10 @@ function interp(table, x) {
 }
 
 /** Predictive prob vector over integer buckets BUCKET_LO..BUCKET_HI for one (forecast, lead)
- *  under a param set, mirroring kalshi-weather-edge (calibratedMean/sigmaForLead + ceiling). */
-function forwardProbs(forecast, lead, mmdd, params) {
-  const normal = F.normalFor(mmdd);
+ *  under a param set, mirroring kalshi-weather-edge (calibratedMean/sigmaForLead + ceiling).
+ *  `normalFor` is injectable so a non-KNYC station scores against ITS OWN normals. */
+function forwardProbs(forecast, lead, mmdd, params, normalFor = F.normalFor) {
+  const normal = normalFor(mmdd);
   const mean = forecast - params.coolBiasF - params.regressionK * Math.max(0, forecast - normal);
   const sigma = lead <= 0 ? params.sigmaNowcastF : params.sigmaBaseF + params.sigmaPerLeadF * (lead - 1);
   const buckets = [];
@@ -75,10 +85,10 @@ function forwardProbs(forecast, lead, mmdd, params) {
 }
 
 /** Mean RPS + PIT-χ² of a param set over pairs, using kalshi-weather-verify's proper scores. */
-function scoreParams(pairs, params) {
+function scoreParams(pairs, params, normalFor = F.normalFor) {
   const rpss = [], pits = [];
   for (const p of pairs) {
-    const { probs, lo } = forwardProbs(p.forecast, p.lead, p.mmdd, params);
+    const { probs, lo } = forwardProbs(p.forecast, p.lead, p.mmdd, params, normalFor);
     const obsIdx = Math.max(0, Math.min(probs.length - 1, Math.round(p.settled) - lo));
     const r = verify.rps(probs, obsIdx);
     if (r != null) rpss.push(r);
@@ -108,12 +118,14 @@ async function get(url, tries = 5) {
   for (let i = 0; i < tries; i++) {
     try { return await getOnce(url); }
     catch (e) {
-      if (e.code === 429 && i < tries - 1) { await sleep(3000 * (i + 1)); continue; }
+      // 429 = IEM rate limit; socket hang up / reset / timeout = transient on long ASOS pulls.
+      const transient = e.code === 429 || /socket hang up|ECONNRESET|timeout/i.test(e.message || "");
+      if (transient && i < tries - 1) { await sleep(3000 * (i + 1)); continue; }
       throw e;
     }
   }
 }
-async function fetchYear(y, { mosStation = "KNYC", asosStation = "NYC", asosNetwork = "NY_ASOS" } = {}) {
+async function fetchYear(y, { mosStation = "KNYC", asosStation = "NYC", asosNetwork = "NY_ASOS", roundAsos = false, normalFor = F.normalFor } = {}) {
   const sts = `${y}-06-01T00:00Z`, ets = `${y}-09-01T00:00Z`;
   const mosUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py?station=${mosStation}&model=NBS&sts=${sts}&ets=${ets}&format=csv`;
   const asosUrl = `https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=${asosStation}&network=${asosNetwork}&data=tmpf&sts=${sts}&ets=${ets}&tz=Etc/UTC&format=onlycomma&missing=empty`;
@@ -124,12 +136,30 @@ async function fetchYear(y, { mosStation = "KNYC", asosStation = "NYC", asosNetw
   const cliJson = await get(cliUrl); await sleep(1500);
   const byRun = F.mosForecastHighs(F.parseCsv(mosCsv));
   const cli = F.cliSettledHighs(JSON.parse(cliJson).results);
-  const asos = F.asosDailyHighs(F.parseCsv(asosCsv));
+  const asos = F.asosDailyHighs(F.parseCsv(asosCsv), { roundF: roundAsos });
   return {
-    cliPairs: F.pairData(byRun, cli, { months: [6, 7, 8] }),
-    asosPairs: F.pairData(byRun, asos, { months: [6, 7, 8] }),
+    cliPairs: F.pairData(byRun, cli, { months: [6, 7, 8], normalFor }),
+    asosPairs: F.pairData(byRun, asos, { months: [6, 7, 8], normalFor }),
     cli, asos,
   };
+}
+
+/** Station normals from the NWS CLI itself (`high_normal` per day — NCEI 1991-2020 climatology,
+ *  identical across years). Returns { normals: {"m-d": F}, defaultNormal } for makeNormalFor. */
+async function fetchCliNormals(station, year) {
+  const cliJson = await get(`https://mesonet.agron.iastate.edu/json/cli.py?station=${station}&year=${year}`);
+  await sleep(1500);
+  const normals = {};
+  const summer = [];
+  for (const r of JSON.parse(cliJson).results || []) {
+    const n = Number(r.high_normal);
+    const m = String(r.valid || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!Number.isFinite(n) || !m) continue;
+    normals[`${+m[2]}-${+m[3]}`] = n;
+    if ([6, 7, 8].includes(+m[2])) summer.push(n);
+  }
+  const defaultNormal = summer.length ? Math.round((summer.reduce((s, v) => s + v, 0) / summer.length) * 10) / 10 : null;
+  return { normals, defaultNormal };
 }
 
 const arg = (n, d) => { const i = process.argv.indexOf(`--${n}`); return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : d; };
@@ -138,13 +168,33 @@ async function main() {
   const train = arg("train", "2021,2022,2023").split(",").map(Number);
   const test = arg("test", "2024,2025").split(",").map(Number);
   const promote = process.argv.includes("--promote");
+  const mosStation = arg("mos-station", "KNYC");
+  const asosStation = arg("asos-station", "NYC");
+  const asosNetwork = arg("asos-network", "NY_ASOS");
+  const settledLeg = arg("settled", "cli"); // cli (Kalshi/NWS-report venues) | asos (ForecastEx U-series: round(max METAR tmpf) ≡ Weather Underground)
+  const outPath = path.resolve(arg("out", OUT_PATH));
+  const normalsCliYear = arg("normals-cli-year", "");
   const round = (v, k = 4) => (v == null ? null : Math.round(v * 10 ** k) / 10 ** k);
+
+  if (!["cli", "asos"].includes(settledLeg)) throw new Error(`--settled must be cli|asos, got ${settledLeg}`);
+
+  // Station normals: default KNYC table; or derived from the station's own NWS CLI high_normal.
+  let normalFor = F.normalFor;
+  if (normalsCliYear) {
+    process.stdout.write(`[val] fetching ${mosStation} normals from CLI ${normalsCliYear}…\n`);
+    const { normals, defaultNormal } = await fetchCliNormals(mosStation, normalsCliYear);
+    if (defaultNormal == null) throw new Error(`no CLI high_normal data for ${mosStation} ${normalsCliYear}`);
+    normalFor = F.makeNormalFor(normals, defaultNormal);
+    process.stdout.write(`[val] ${Object.keys(normals).length} daily normals, summer default ${defaultNormal}°F\n`);
+  }
 
   const years = [...new Set([...train, ...test])];
   const data = {};
-  for (const y of years) { process.stdout.write(`[val] fetching ${y}…\n`); data[y] = await fetchYear(y); }
+  const yearOpts = { mosStation, asosStation, asosNetwork, roundAsos: settledLeg === "asos", normalFor };
+  for (const y of years) { process.stdout.write(`[val] fetching ${y}…\n`); data[y] = await fetchYear(y, yearOpts); }
 
-  // 1. CLI vs ASOS on shared days — explain the sign flip.
+  // 1. CLI vs ASOS on shared days — quantifies the settled-leg gap (for ForecastEx this is
+  //    the Weather-Underground-vs-NWS-CLI settlement divergence measured on the full history).
   let dSum = 0, dN = 0;
   for (const y of years) {
     for (const [key, rec] of data[y].cli) {
@@ -154,23 +204,24 @@ async function main() {
   }
   const asosMinusCli = dN ? dSum / dN : null;
 
-  const trainPairs = train.flatMap((y) => data[y].cliPairs);
-  const testPairs = test.flatMap((y) => data[y].cliPairs);
-  process.stdout.write(`[val] CLI pairs: train=${trainPairs.length} test=${testPairs.length}\n`);
+  const pairsKey = settledLeg === "asos" ? "asosPairs" : "cliPairs";
+  const trainPairs = train.flatMap((y) => data[y][pairsKey]);
+  const testPairs = test.flatMap((y) => data[y][pairsKey]);
+  process.stdout.write(`[val] ${settledLeg.toUpperCase()} pairs: train=${trainPairs.length} test=${testPairs.length}\n`);
   process.stdout.write(`[val] ASOS max − CLI high mean = ${round(asosMinusCli, 2)}°F over n=${dN} days\n`);
 
-  // 2. Fit on train (CLI).
+  // 2. Fit on train.
   const fitted = merge(F.fitParams(trainPairs));
   const defaults = oracle.DEFAULT_PARAMS;
 
   // 3. OOS score: fitted vs default on held-out test years.
-  const sD = scoreParams(testPairs, defaults);
-  const sF = scoreParams(testPairs, fitted);
+  const sD = scoreParams(testPairs, defaults, normalFor);
+  const sF = scoreParams(testPairs, fitted, normalFor);
   const rpsGain = sD.meanRPS != null && sF.meanRPS != null ? (sD.meanRPS - sF.meanRPS) / sD.meanRPS : null;
 
   const report = {
-    train, test, asosMinusCli: round(asosMinusCli, 2),
-    fittedOnCli: { coolBiasF: fitted.coolBiasF, regressionK: fitted.regressionK, sigmaBaseF: fitted.sigmaBaseF, sigmaNowcastF: fitted.sigmaNowcastF, sigmaPerLeadF: fitted.sigmaPerLeadF },
+    train, test, mosStation, settledLeg, asosMinusCli: round(asosMinusCli, 2),
+    fittedParams: { coolBiasF: fitted.coolBiasF, regressionK: fitted.regressionK, sigmaBaseF: fitted.sigmaBaseF, sigmaNowcastF: fitted.sigmaNowcastF, sigmaPerLeadF: fitted.sigmaPerLeadF },
     oos: {
       default: { meanRPS: round(sD.meanRPS), pitChi2: round(sD.pitChi2, 2), n: sD.n },
       fitted: { meanRPS: round(sF.meanRPS), pitChi2: round(sF.pitChi2, 2), n: sF.n },
@@ -184,13 +235,16 @@ async function main() {
     `(RPS ${round(sF.meanRPS)} vs ${round(sD.meanRPS)})\n`);
 
   if (promote && beatsDefault) {
-    const full = F.fitParams([...trainPairs, ...testPairs]); // fit on ALL CLI pairs for the live file
+    const full = F.fitParams([...trainPairs, ...testPairs]); // fit on ALL pairs for the live file
     full.fittedAt = new Date().toISOString().slice(0, 10);
-    full.source = "IEM NBS MOS (forecast) + NWS CLI (settled, authoritative), summer";
+    full.station = mosStation;
+    full.source = settledLeg === "asos"
+      ? `IEM NBS MOS (forecast, ${mosStation}) + ${asosNetwork}/${asosStation} round(max METAR tmpf) (settled — ForecastEx U-series/Weather Underground definition), summer`
+      : "IEM NBS MOS (forecast) + NWS CLI (settled, authoritative), summer";
     full.validation = report.oos;
-    fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-    fs.writeFileSync(OUT_PATH, JSON.stringify(full, null, 2) + "\n");
-    process.stdout.write(`[val] PROMOTED -> wrote ${OUT_PATH}\n`);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, JSON.stringify(full, null, 2) + "\n");
+    process.stdout.write(`[val] PROMOTED -> wrote ${outPath}\n`);
   } else if (promote) {
     process.stdout.write(`[val] NOT promoted (fitted did not beat default OOS). Defaults stay.\n`);
   }
@@ -201,4 +255,4 @@ if (require.main === module) {
   main().then((ok) => process.exit(ok ? 0 : 2)).catch((e) => { process.stderr.write(`[val] ERROR: ${e.message}\n${e.stack}\n`); process.exit(1); });
 }
 
-module.exports = { forwardProbs, scoreParams };
+module.exports = { forwardProbs, scoreParams, fetchCliNormals };
