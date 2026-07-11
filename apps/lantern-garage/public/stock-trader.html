@@ -312,6 +312,9 @@
   /* Header chart controls */
   .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
   .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
+  /* Patterns toggle "on" state — not colour-only: the label text flips to "ON" and the
+     icon fills, so the state is legible without relying on the accent colour (WCAG 1.4.1). */
+  #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:rgba(74,158,255,.22);border-color:var(--blue,#3b82f6);color:var(--blue,#3b82f6)}
   /* Chart range presets (1D/5D/1M) */
   .range-group{display:flex;gap:2px}
   .range-btn{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
@@ -580,6 +583,9 @@
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
+  <button id="patternsToggle" class="chart-ctrl" type="button" role="switch" aria-checked="false"
+    onclick="togglePatterns()"
+    title="Show support/resistance zones, P&amp;L fill, and entry/stop/target markers on the charts — the technical pattern view for serious trading.">◱ Patterns</button>
   <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
@@ -637,16 +643,16 @@
   <!-- Account summary row (#1712) -->
   <div class="tp-summary" id="tpSummary"></div>
   <!-- Tabs -->
-  <div class="tp-tabs" role="tablist">
-    <button class="tp-tab active" role="tab" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" data-tab="orders" onclick="tpTab('orders')">Orders</button>
-    <button class="tp-tab" role="tab" data-tab="history" onclick="tpTab('history')">Order history</button>
+  <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
+    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
-    <div class="tp-pane active" id="tp-positions"></div>
-    <div class="tp-pane" id="tp-orders"></div>
-    <div class="tp-pane" id="tp-history"></div>
+    <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
+    <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -662,6 +668,9 @@
         <option value="line">Line</option>
         <option value="candle">Candles</option>
       </select>
+      <button id="fsPatternsToggle" class="chart-ctrl" type="button" role="switch" aria-checked="false"
+        onclick="togglePatterns()"
+        title="Show support/resistance zones, P&amp;L fill, and entry/stop/target markers — the technical pattern view for serious trading.">◱ Patterns</button>
       <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -705,7 +714,7 @@
     <div class="sym-head">
       <span aria-hidden="true">🔍</span>
       <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
-      <span class="sym-close" role="button" tabindex="0" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter')closeSymbolSearch()" title="Close">✕</span>
+      <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
     </div>
     <div class="sym-chips" id="symChips">
       <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
@@ -811,6 +820,10 @@ let barsData       = {};
 // Persisted chart type. Candles are the default the first time a user visits.
 let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
 let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
+// Pattern overlays (S/R zone bands, P&L fill, entry/stop/TP markers) — the alternative
+// technical view for serious trading. Off by default (the clean price-line look from
+// #2123), opt-in per user and remembered. #trader-patterns
+let showPatterns   = (()=>{ try{ return localStorage.getItem('trader.patterns') === '1'; }catch(e){ return false; } })();
 let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
 const TICK_SIZE = 0.01;
@@ -1239,11 +1252,12 @@ function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
   if(!force){
     const prevSig = _ladderSig[sigKey];
     if(prevSig && prevSig.overlay===overlay && prevSig.price===currentPrice && prevSig.d===d
-       && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe){
+       && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe
+       && prevSig.showPatterns===showPatterns){   // toggling patterns must force a redraw
       return;
     }
   }
-  _ladderSig[sigKey] = {overlay, price:currentPrice, d, bars, chartType, chartTimeframe};
+  _ladderSig[sigKey] = {overlay, price:currentPrice, d, bars, chartType, chartTimeframe, showPatterns};
 
   _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, sigKey);
 }
@@ -1370,11 +1384,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   let html = '';
 
-  // Zone overlays (S/R zone bands, P&L fill, entry/stop/TP markers) are removed
-  // for ALL users per product decision — the charts show a clean price line only.
-  // Flip SHOW_ZONE_OVERLAYS back to true to restore them. #no-zone-overlays
-  const SHOW_ZONE_OVERLAYS = false;
-  if(SHOW_ZONE_OVERLAYS){
+  // Zone overlays (S/R zone bands, P&L fill, entry/stop/TP markers) — the "alternative
+  // patterns" technical view for serious trading. Off by default (clean price line, the
+  // #2123 look); the Patterns toggle in the chart controls turns them on per user. The
+  // zone data is always fetched (loadZones), so this is a pure render gate. #trader-patterns
+  if(showPatterns){
   // Zone bands
   for(let i=0;i<zones.length;i++){
     const z=zones[i]; if(!z.mid) continue;
@@ -1414,7 +1428,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
     html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
-  } // end SHOW_ZONE_OVERLAYS (zone bands / P&L / entry-stop-TP)
+  } // end showPatterns (zone bands / P&L / entry-stop-TP)
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
@@ -1997,7 +2011,7 @@ function renderWatchlist(){
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
     const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span></span>';
-    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart" onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'){focusTicker('${t.ticker}')}">
+    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
       <div class="wl-content">
         <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
@@ -2756,6 +2770,26 @@ function changeChartType(type){
   renderFullscreenChart();
 }
 
+// Reflect the patterns-overlay state on its toggle button: label text ("Patterns ON/OFF"),
+// filled/outline icon, aria-pressed, and role=switch aria-checked — so the state is exposed
+// to assistive tech and legible without colour (WCAG 1.4.1 / 4.1.2). #trader-patterns
+function _setPatternsBtn(){
+  ['patternsToggle','fsPatternsToggle'].forEach(id=>{
+    const b=document.getElementById(id); if(!b) return;
+    b.textContent=(showPatterns?'◼':'◱')+' Patterns '+(showPatterns?'ON':'OFF');
+    b.classList.toggle('patterns-on', showPatterns);
+    b.setAttribute('aria-checked', showPatterns?'true':'false');   // role=switch state
+  });
+}
+function togglePatterns(){
+  showPatterns = !showPatterns;
+  try{ localStorage.setItem('trader.patterns', showPatterns?'1':'0'); }catch(e){}
+  _setPatternsBtn();
+  // Pure render gate — re-draw every chart's overlay from the already-loaded zone data.
+  wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
+  renderFullscreenChart();
+}
+
 function changeTimeframe(tf, winBars){
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
@@ -2795,8 +2829,16 @@ function syncRangeButtons(tf){
 
 // ── TradingView-style trading panel (#1712) ───────────────────────────────────
 function tpTab(name){
-  document.querySelectorAll('.tp-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
-  document.querySelectorAll('.tp-pane').forEach(p=>p.classList.toggle('active', p.id==='tp-'+name));
+  document.querySelectorAll('.tp-tab').forEach(b=>{
+    const on = b.dataset.tab===name;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on?'true':'false');   // announce the selected tab
+  });
+  document.querySelectorAll('.tp-pane').forEach(p=>{
+    const on = p.id==='tp-'+name;
+    p.classList.toggle('active', on);
+    if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');  // hide inactive panels from AT
+  });
 }
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -3109,6 +3151,7 @@ function startDashboard(){
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   syncRangeButtons(chartTimeframe);
   initFooterResize();
   initWlInfoResize();

@@ -14,6 +14,11 @@ const path = require("path");
 const ROOT = path.join(__dirname, "..", "..", "..", "data", "lantern-garage", "trading");
 const DIR = path.join(ROOT, "watchlists");
 const LEGACY = path.join(ROOT, "watchlist.json");
+// The tracked "ideal trader" starter list — a broad, serious default across equities,
+// an index ETF, gold, and majors crypto (data/.../watchlist.seed.json). This is what a
+// fresh user's list seeds from; the tiny hardcoded array below is only a last resort if
+// the seed file is missing.
+const SEED_FILE = path.join(ROOT, "watchlist.seed.json");
 const DEFAULT = ["SPY", "AAPL", "TSLA", "NVDA", "AMD"];
 
 function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId || "default")) + ".json"); }
@@ -27,7 +32,16 @@ function _readList(file) {
 function _clean(tickers) {
   return [...new Set((tickers || []).map((t) => String(t).toUpperCase().trim()).filter(Boolean))];
 }
-function _seed() { const legacy = _readList(LEGACY); return legacy && legacy.length ? _clean(legacy) : DEFAULT.slice(); }
+function _seed() {
+  // Precedence: a legacy global watchlist.json (migrate an existing single-file setup) →
+  // the tracked ideal-trader seed list → the hardcoded starter. #2376 dropped the seed-file
+  // read, so fresh users/the union collapsed to the 5-symbol hardcoded DEFAULT (#trader-seed).
+  const legacy = _readList(LEGACY);
+  if (legacy && legacy.length) return _clean(legacy);
+  const seed = _readList(SEED_FILE);
+  if (seed && seed.length) return _clean(seed);
+  return DEFAULT.slice();
+}
 
 function setWatchlist(userId, tickers) {
   fs.mkdirSync(DIR, { recursive: true });
