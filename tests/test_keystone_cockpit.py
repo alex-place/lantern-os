@@ -1,4 +1,4 @@
-"""Tests for the Keystone personal cockpit — the human-in-the-loop spine.
+"""Tests for the unisona.ai personal cockpit — the human-in-the-loop spine.
 
 Uses the design's own examples: a CareSource job application and a dentist booking.
 See src/keystone/cockpit.py.
@@ -51,7 +51,7 @@ def test_task_ready_when_all_facts_known():
 
 def test_saves_only_on_approval():
     c = Cockpit(Profile())
-    # Keystone gathered a value from a file but you haven't approved it → held, not durable
+    # unisona.ai gathered a value from a file but you haven't approved it → held, not durable
     c.answer("insurance_plan", "Anthem PPO", source="resume.pdf", approve=False)
     assert c.profile.known("insurance_plan") is None                 # not trusted as truth
     assert c.profile.get("insurance_plan").approved is False

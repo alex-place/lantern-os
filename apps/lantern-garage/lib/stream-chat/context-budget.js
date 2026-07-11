@@ -129,7 +129,7 @@ function normalizeProviderSequence(seq) {
 
 // ── Rolling summary (deterministic / extractive) ────────────────────────────
 function condenseTurn(turn, maxWords = 24) {
-  const label = turn && turn.role === "assistant" ? "Keystone" : "You";
+  const label = turn && turn.role === "assistant" ? "unisona.ai" : "You";
   const words = String((turn && turn.text) || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
   const clipped = words.slice(0, maxWords).join(" ");
   const ell = words.length > maxWords ? "…" : "";

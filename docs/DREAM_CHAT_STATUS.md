@@ -101,7 +101,7 @@ Dream Chat is a **fully functional** multi-agent conversational AI system with a
 **Personas Available:**
 1. **Lantern** — Steady, protective, warm
 2. **Blinkbug** — Chaotic, unhinged, geeked
-3. **Keystone** — Truth integrator, memory anchor
+3. **unisona.ai** — Truth integrator, memory anchor
 4. **Waterfall** — Flowing, adaptive, deep
 5. **Xenon** — Technical, experimental, cryptic
 6. **Founder** — Visionary, bold, pioneering

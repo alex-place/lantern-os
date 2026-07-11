@@ -58,7 +58,7 @@ function compactHistory(history) {
     }
     // Low fidelity: first N words only
     const words = text.trim().split(/\s+/).filter(Boolean).slice(0, LOW_FIDELITY_WORD_LIMIT).join(" ");
-    const roleLabel = role === "assistant" ? "Keystone" : "Dreamer";
+    const roleLabel = role === "assistant" ? "unisona.ai" : "Dreamer";
     const summary = words.length > 0 ? `[${roleLabel}: ${words}…]` : `[${roleLabel}]`;
     logTruncationMetric(text.length, summary.length, "low_fidelity");
     return { role, text: summary };

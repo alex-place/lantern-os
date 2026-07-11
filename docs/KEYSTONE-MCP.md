@@ -4,14 +4,14 @@ created: 2026-06-18
 updated: 2026-06-20
 ---
 
-# Keystone ↔ MCP / live project context
+# unisona.ai ↔ MCP / live project context
 
-Keystone chat is linked to the project's real tools and details, so **any provider
+unisona.ai chat is linked to the project's real tools and details, so **any provider
 (including Grok)** answers grounded in the live repo — not generic guesses.
 
 ## What gets injected
 Before each non-roleplay chat turn, [`lib/keystone-context.js`](../apps/lantern-garage/lib/keystone-context.js)
-gathers (best-effort, cached 60s) and prepends to the Keystone system prompt:
+gathers (best-effort, cached 60s) and prepends to the unisona.ai system prompt:
 - **Open GitHub issues + PRs** (via `gh` — the reliable path).
 - **MCP tool inventory + status** (via `callMcpTool` → the MCP server `/tools/*`).
   If the MCP server is offline it says so; GitHub still works via `gh`.

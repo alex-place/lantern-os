@@ -84,8 +84,8 @@ that job rather than re-tagging.
 
 ## Step 4 — Turn the auto-Release into a launch post (the deliverable)
 
-CI publishes a bare Release named **"Keystone OS vX"** with raw CHANGELOG notes. Rewrite
-it. **Unisona is the user-visible brand — never ship "Keystone/Lantern" in a public post.**
+CI publishes a bare Release named **"unisona.ai vX"** with raw CHANGELOG notes. Rewrite
+it. **Unisona is the user-visible brand — never ship "unisona.ai/Lantern" in a public post.**
 
 1. **Confirm the exe is attached:** `gh release view "v$V" --json assets -q '.assets[].name'` — expect `Unisona-Setup-<ver>.exe` (+ the zips).
 2. **Source features + pricing from the repo, not memory:**
@@ -136,7 +136,7 @@ Full changelog: [CHANGELOG.MD](https://github.com/alex-place/lantern-os/blob/v<X
 ## Gotchas (each cost a real run)
 
 - **`gh pr create` / `gh pr merge` are broken here** (they invoke a git subcommand that errors). Always create + merge via `gh api …/pulls`.
-- **Rebrand the Release.** CI names it "Keystone OS"; the public post must say **Unisona**. Same for the body — Keystone/Lantern are code-only names.
+- **Rebrand the Release.** CI names it "unisona.ai"; the public post must say **Unisona**. Same for the body — unisona.ai/Lantern are code-only names.
 - **Don't hardcode pricing or features.** Read `public/pricing.html` and the CHANGELOG entry every time — baked-in numbers go stale and become a false public claim.
 - **The tag creates the Release — don't pre-create it.** `softprops/action-gh-release` makes it; if you `gh release create` first, the workflow collides.
 - **Unsigned exe.** SmartScreen will warn. Say so in the notes (don't let a user think it's malware). MSIX/SignPath signing is still pending — see `apps/lantern-garage/desktop/README.md`.

@@ -1,6 +1,6 @@
 # Frontier Directions — Deep Research + Design (2026 H2)
 
-> **Status:** Internal design document. Solo developer (Alex Place), Keystone OS — a persistent, local-first convergence-loop AI system.
+> **Status:** Internal design document. Solo developer (Alex Place), unisona.ai — a persistent, local-first convergence-loop AI system.
 >
 > **Method & integrity rule.** Every direction below was put through one loop: *research → mark a novelty verdict → adversarially verify (3 skeptics) → design*. We apply the **External-Reality Rule**: every important claim carries `[claim, evidence, confidence, source]`. **Where the adversarial verify refuted a novelty claim, this document says so and adopts the corrected verdict** — it does not re-publish the original "ahead" framing. The single most important finding of this whole exercise: **all four directions had their original "ahead / category-of-one" headline claims refuted (2–3 of 3 skeptics each). None survived as written.** The honest posture is *parity / mixed with a narrow execution edge*, not category leadership. Public-facing copy must be rewritten accordingly before it ships.
 
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-We evaluated four candidate frontier directions for Keystone OS. The pattern is consistent and uncomfortable: each direction began with a confident "AHEAD" thesis, and each was knocked down by adversarial search to **MIXED or PARITY**. The strategy in every case is *directionally correct* — the bet on owned/local, verifiable, abstaining AI is well-aimed — but **the moats are execution-and-integration, not invention.** In every direction a 2025–2026 product or research artifact already ships the capability we claimed was uniquely ours.
+We evaluated four candidate frontier directions for unisona.ai. The pattern is consistent and uncomfortable: each direction began with a confident "AHEAD" thesis, and each was knocked down by adversarial search to **MIXED or PARITY**. The strategy in every case is *directionally correct* — the bet on owned/local, verifiable, abstaining AI is well-aimed — but **the moats are execution-and-integration, not invention.** In every direction a 2025–2026 product or research artifact already ships the capability we claimed was uniquely ours.
 
 What this means practically: these are still worth building, because (a) each strengthens exactly one stage of the convergence loop, (b) each reuses code we already have rather than adding subsystems, and (c) a real, narrow differentiation survives in each (the *bundle* + execution rigor). But we must strip "category of one," "ahead of shipped products," and "parity on capability" from any external copy until we have measured evidence.
 

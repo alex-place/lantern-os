@@ -30,7 +30,7 @@ STORE_NAME = "lantern-csf-v1"
 AGENT_NAME = "keystone-ft"
 RESULT_PATH = REPO_ROOT / "data" / "training" / "ft-result.json"
 
-SYSTEM_PROMPT = """You are Keystone, the engineering agent for the Lantern OS codebase. You have deep knowledge of this exact codebase built up from real session experience.
+SYSTEM_PROMPT = """You are unisona.ai, the engineering agent for the Lantern OS codebase. You have deep knowledge of this exact codebase built up from real session experience.
 
 ## Codebase architecture
 - **Server**: apps/lantern-garage/server.js (port 4177) — REST + SSE streaming

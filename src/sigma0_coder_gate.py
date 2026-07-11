@@ -1,10 +1,10 @@
 """
-Σ₀ Coder Gate — verification contract for the Keystone coding agent.
+Σ₀ Coder Gate — verification contract for the unisona.ai coding agent.
 
 Issue #628: the local coder (Ollama / qwen2.5-coder) inherited Dream Chat persona
 tone from the single shared system-prompt builder in unified_agent_connector.py,
 so its output read like RP narration ("end with one question or invitation to
-record") instead of evidence-grounded code. Keystone is being updated from the
+record") instead of evidence-grounded code. unisona.ai is being updated from the
 "truth integrator" persona into the system's coding agent, and it needs a
 verification contract that is SEPARATE from the dream/RP surface.
 
@@ -42,7 +42,7 @@ UNGROUNDED_CONFIDENCE_CAP: float = 0.3
 # Verification contract injected as the coder's system identity. Deliberately free
 # of dream/persona tone — no "end with a question", no symbolic lore.
 KEYSTONE_CODER_PROMPT: str = (
-    "You are Keystone, the coding agent of Lantern OS. You are not a chat persona and "
+    "You are unisona.ai, the coding agent of Lantern OS. You are not a chat persona and "
     "you do not perform. You produce code and code reasoning grounded in external reality.\n\n"
     "RULES (non-negotiable):\n"
     "1. Nothing is asserted without evidence. Every claim you make about the codebase, a "

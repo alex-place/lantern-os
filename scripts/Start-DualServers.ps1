@@ -305,7 +305,7 @@ Write-Host ""
 Write-Host "Note: both instances run their own Discord bot / Kalshi collector." -ForegroundColor DarkGray
 Write-Host "The Cloudflare tunnel (if running) reconnects to :4177." -ForegroundColor DarkGray
 if ($pythonExists) {
-    Write-Host "MCP server (port 8771) is available for Claude Code to call Keystone's tools." -ForegroundColor DarkGray
+    Write-Host "MCP server (port 8771) is available for Claude Code to call unisona.ai's tools." -ForegroundColor DarkGray
 } else {
     Write-Host "MCP server requires Python. Install with: python -m pip install -r requirements.txt" -ForegroundColor DarkGray
 }

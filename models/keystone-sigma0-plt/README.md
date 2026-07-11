@@ -1,4 +1,4 @@
-# Keystone-Σ₀ PLT — own-the-model training package
+# unisona.ai-Σ₀ PLT — own-the-model training package
 
 Self-contained code to **own, load, and train** a proprietary Σ₀ coder bootstrapped
 from the Apache-2.0 **LoopCoder-V2** Parallel Loop Transformer (arXiv:2510.24824).

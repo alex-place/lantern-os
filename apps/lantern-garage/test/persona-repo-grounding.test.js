@@ -1,4 +1,4 @@
-// #1922: the single Keystone persona must tell the model it can READ this project's
+// #1922: the single unisona.ai persona must tell the model it can READ this project's
 // repo and ground a resume / "describe my work here" ask on real files, instead of
 // answering "I don't have direct access to its codebase" and emitting a placeholder.
 //

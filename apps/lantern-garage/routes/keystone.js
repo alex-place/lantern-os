@@ -1,7 +1,7 @@
 /**
- * Keystone Debug Agent — server-side execution routes
+ * unisona.ai Debug Agent — server-side execution routes
  *
- * Lets the Keystone persona actually DO things from the dream chat UX:
+ * Lets the unisona.ai persona actually DO things from the dream chat UX:
  * run tests, git status, commit, push, open PRs, read files, run scripts.
  *
  * Operator-gated (#837): only the local operator dashboard (un-proxied loopback) or a caller
@@ -13,7 +13,7 @@ const { isOperatorRequest } = require("../lib/request-auth");
 
 const MAX_OUTPUT = 4000;
 
-// Allowlisted command patterns — Keystone can only run these
+// Allowlisted command patterns — unisona.ai can only run these
 const ALLOWED = [
   // Git
   { match: /^git status$/, cmd: "git status" },
@@ -90,7 +90,7 @@ module.exports = async function keystoneRoutes(req, res, url, deps) {
       if (!resolved) {
         sendJson(res, {
           error: "command_not_allowed",
-          message: `Keystone can only run allowlisted commands. "${cmd}" is not permitted.`,
+          message: `unisona.ai can only run allowlisted commands. "${cmd}" is not permitted.`,
           allowed_patterns: ALLOWED.map(a => a.match.source),
         }, 403);
         return true;

@@ -401,7 +401,7 @@ async function handleStreamChat(req, url, res) {
   // Handle bang commands
   let cmd = parseBangCommand(message);
 
-  // Natural-language research intent: Keystone chat shouldn't require knowing the
+  // Natural-language research intent: unisona.ai chat shouldn't require knowing the
   // `!research` bang syntax for a "long-running task, work it until it's done"
   // ask. A plain "research X" / "look into X" / "investigate X" opener routes
   // into the exact same persisted, resumable research-task loop (lib/research-task.js)
@@ -463,7 +463,7 @@ async function handleStreamChat(req, url, res) {
       const sendToken = (token) => sse.sendToken(res, token);
       const sendDone = (source, meta) => sse.sendDone(res, source, meta);
 
-      sendToken(`Keystone routing…\n\n`);
+      sendToken(`unisona.ai routing…\n\n`);
       const agent = selectAgent(swarmMessage);
       const systemPrompt = `${agent.systemPrompt}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic.`;
 
@@ -476,7 +476,7 @@ async function handleStreamChat(req, url, res) {
             sendToken(`\n\n**Where the council disagreed (${council.dissent.length}):**\n`);
             for (const d of council.dissent) sendToken(`- ${d}\n`);
           }
-          const meta = { agent: "Keystone", provider: result.provider, online: true, swarm: { provider: result.provider, model: result.model, mode, job } };
+          const meta = { agent: "unisona.ai", provider: result.provider, online: true, swarm: { provider: result.provider, model: result.model, mode, job } };
           if (result.consensus) meta.swarm.consensus = result.consensus;
           if (council) meta.swarm.council = council;
           sendDone("keystone", meta);
@@ -614,7 +614,7 @@ async function handleStreamChat(req, url, res) {
       res.end();
       return;
     }
-    // Keystone Kernel Mode: File-grounded, tool-driven code execution
+    // unisona.ai Kernel Mode: File-grounded, tool-driven code execution
     if (cmd.name === "keystone") {
       const issue = cmd.args.trim() || message.replace(/!keystone\s*/i, "").trim();
       if (!issue) {
@@ -638,17 +638,17 @@ async function handleStreamChat(req, url, res) {
       const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
       const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
 
-      sendToken(`🔧 Keystone Kernel Mode\n\n`);
+      sendToken(`🔧 unisona.ai Kernel Mode\n\n`);
       sendToken(`Issue: ${issue}\n\n`);
 
-      // Kernel path uses its own provider chain (#894): Keystone/Ouro first, Claude
+      // Kernel path uses its own provider chain (#894): unisona.ai/Ouro first, Claude
       // explicit last-resort — never inherits chat selectProvider's defaults. (Also
       // fixes the prior bug where the async selectProvider was used un-awaited.)
       const { provider, model: kernelModel, mode: rolloverMode } = await selectKernelProvider(requestedProvider);
       let llmFn;
 
       try {
-        // #897: actually escalate through the kernel chain on failure (Keystone/Ouro
+        // #897: actually escalate through the kernel chain on failure (unisona.ai/Ouro
         // → … → Claude) — not just RECORD the intent — and record each escalation +
         // the final landed-by as convergence events. In shadow mode it's Claude-only.
         const {
@@ -690,7 +690,7 @@ async function handleStreamChat(req, url, res) {
 
         if (result && (result.status === "success" || result.status === "applied_unverified")) {
           const used = providerUsed || { provider, model: kernelModel };
-          sendToken(`\n✅ Keystone execution complete (landed by ${used.provider}/${used.model})\n\n`);
+          sendToken(`\n✅ unisona.ai execution complete (landed by ${used.provider}/${used.model})\n\n`);
           sendToken(`**Plan:**\n${result.plan}\n\n`);
           if (Array.isArray(result.applied)) {
             sendToken(`**Files changed:**\n${result.applied.map((f) => `  - ${f.path}`).join("\n")}\n\n`);
@@ -714,7 +714,7 @@ async function handleStreamChat(req, url, res) {
             });
           } catch (_e) { /* logging must never break the stream */ }
           sendDone("keystone", {
-            agent: "Keystone", provider: used.provider, model: used.model, rolloverMode,
+            agent: "unisona.ai", provider: used.provider, model: used.model, rolloverMode,
             status: "success", filesChanged: Array.isArray(result.applied) ? result.applied.length : 0,
             testsRun: !!result.tests, escalations: escalations.length,
             // #1197 parity metric: who actually landed it (local vs cloud teacher) + verified.
@@ -722,10 +722,10 @@ async function handleStreamChat(req, url, res) {
             verified: !!verified,
           });
         } else {
-          sendToken(`\n❌ Keystone failed after ${escalations.length + 1} attempt(s): ${result ? result.error : "unknown"}\n`);
+          sendToken(`\n❌ unisona.ai failed after ${escalations.length + 1} attempt(s): ${result ? result.error : "unknown"}\n`);
           if (result && result.phase) sendToken(`Phase: ${result.phase}\n`);
           sendDone("keystone", {
-            agent: "Keystone", provider, model: kernelModel, rolloverMode,
+            agent: "unisona.ai", provider, model: kernelModel, rolloverMode,
             status: "failed", error: result ? result.error : "unknown", escalations: escalations.length,
           });
         }
@@ -734,7 +734,7 @@ async function handleStreamChat(req, url, res) {
         sendToken(`Error: ${e.message}\n`);
         // #897: sync-throw escalation also recorded
         emitConvergenceRecord({
-          hypothesis: `Keystone kernel can land issue via ${provider || "unknown"}`,
+          hypothesis: `unisona.ai kernel can land issue via ${provider || "unknown"}`,
           result: `escalated-to-claude: ${e.message}`,
           confidence: 0.0,
           evidence_ids: [e.message],
@@ -743,7 +743,7 @@ async function handleStreamChat(req, url, res) {
           verification_notes: `Sync kernel error; mode=${rolloverMode || "unknown"}`,
           source: `kernel/${provider || "unknown"}/${kernelModel || "default"}`,
         }).catch(() => {});
-        sendDone("keystone", { agent: "Keystone", status: "error", error: e.message });
+        sendDone("keystone", { agent: "unisona.ai", status: "error", error: e.message });
         res.end();
       }
 
@@ -808,7 +808,7 @@ async function handleStreamChat(req, url, res) {
     }
 
     // Grounded self-assessment: !report-card produces an honest letter-grade
-    // scorecard of Keystone OS. Evidence is gathered deterministically (git, real
+    // scorecard of unisona.ai. Evidence is gathered deterministically (git, real
     // counts, eval numbers, boot probe) so the model can only SYNTHESIZE grades
     // from real measurements — it can't invent a receipt. Strengthens Verify.
     if (cmd.name === "report-card" || cmd.name === "report_card" || cmd.name === "reportcard") {
@@ -874,7 +874,7 @@ async function handleStreamChat(req, url, res) {
       }
 
       sse.writeStreamHeaders(res);
-      sse.sendRoute(res, { label: "Research · Σ₀ task loop", agentName: "Keystone", surface: surfaceMode });
+      sse.sendRoute(res, { label: "Research · Σ₀ task loop", agentName: "unisona.ai", surface: surfaceMode });
       const sendToken = (token) => sse.sendToken(res, token);
       const sendDone = (source, meta) => sse.sendDone(res, source, meta);
       const STAGE_LABEL = {
@@ -940,14 +940,14 @@ async function handleStreamChat(req, url, res) {
         }
 
         sendDone("keystone", {
-          agent: "Keystone",
+          agent: "unisona.ai",
           online: true,
           routeLabel: "Research · Σ₀ task loop",
           research: { taskId: task.id, status: task.status, rounds: task.rounds.length, confidence: task.confidence, sources: task.sources.length, recordId },
         });
       } catch (err) {
         sendToken(`\nResearch failed: ${err.message}\n`);
-        sendDone("failed", { agent: "Keystone", online: false, error: err.message });
+        sendDone("failed", { agent: "unisona.ai", online: false, error: err.message });
       }
       return;
     }
@@ -959,7 +959,7 @@ async function handleStreamChat(req, url, res) {
       const question = (cmd.args || "").trim() || message.replace(/^!\S+\s*/, "").trim();
       if (question) {
         sse.writeStreamHeaders(res);
-        sse.sendRoute(res, { label: "Convergence · Σ₀ council", agentName: "Keystone", surface: surfaceMode });
+        sse.sendRoute(res, { label: "Convergence · Σ₀ council", agentName: "unisona.ai", surface: surfaceMode });
         // Use the shared SSE helpers so the frontend (which reads {type:"token",text:…})
         // actually renders these. The old raw {token} format was silently dropped.
         const sendToken = (token) => sse.sendToken(res, token);
@@ -1029,7 +1029,7 @@ async function handleStreamChat(req, url, res) {
             for (const d of dissent) sendToken(`- ${d}\n`);
           }
           sendDone("keystone", {
-            agent: "Keystone",
+            agent: "unisona.ai",
             provider: result.provider,
             online: true,
             routeLabel: "Convergence · Σ₀ council",
@@ -1053,7 +1053,7 @@ async function handleStreamChat(req, url, res) {
               });
             } catch (_e) { /* best-effort */ }
             for (const w of ans.split(" ")) sendToken(w + " ");
-            sendDone("keystone", { agent: "Keystone", provider: fb.provider, online: true, routeLabel: "Convergence · single (council unavailable)" });
+            sendDone("keystone", { agent: "unisona.ai", provider: fb.provider, online: true, routeLabel: "Convergence · single (council unavailable)" });
           } catch (e2) {
             sendToken(`Convergence unavailable: ${err.message}\n`);
             sendDone("failed", { error: err.message });
@@ -1061,7 +1061,7 @@ async function handleStreamChat(req, url, res) {
           return;
         }
       }
-      // Empty !convergance — fall through to normal Keystone chat.
+      // Empty !convergance — fall through to normal unisona.ai chat.
       requestedAgent = requestedAgent || "keystone";
     }
 
@@ -1119,7 +1119,7 @@ async function handleStreamChat(req, url, res) {
 
     // !review #<PR> — pull a pull request's diff and review it in the chat. Lets the
     // user work through draft/autowork PRs ("is this change good?") without leaving
-    // Keystone. Diff fetched shell-free via gh (#873); reviewed by the live model.
+    // unisona.ai. Diff fetched shell-free via gh (#873); reviewed by the live model.
     if (cmd.name === "review") {
       sse.writeStreamHeaders(res);
       const sendToken = (token) => sse.sendToken(res, token);
@@ -1127,7 +1127,7 @@ async function handleStreamChat(req, url, res) {
       const prNum = (String(cmd.args || "").match(/#?(\d+)/) || [])[1];
       if (!prNum) {
         sendToken("Usage: `!review #<PR number>` — e.g. `!review #1302`.");
-        sendDone("review", { agent: "Keystone", online: true });
+        sendDone("review", { agent: "unisona.ai", online: true });
         res.end();
         return;
       }
@@ -1148,7 +1148,7 @@ async function handleStreamChat(req, url, res) {
             { timeout: 25000, maxBuffer: 8 * 1024 * 1024 });
           if (!diff || !diff.trim()) {
             sendToken(`PR #${prNum} has no diff (closed, empty, or not found). [Open on GitHub](https://github.com/alex-place/lantern-os/pull/${prNum})`);
-            sendDone("review", { agent: "Keystone", online: true });
+            sendDone("review", { agent: "unisona.ai", online: true });
             res.end();
             return;
           }
@@ -1156,7 +1156,7 @@ async function handleStreamChat(req, url, res) {
           const clipped = diff.length > MAX ? diff.slice(0, MAX) + "\n…(diff truncated for review)" : diff;
           const fileList = (meta.files || []).map((f) => f.path).join(", ");
           const reviewSystem =
-            "You are a senior engineer reviewing a pull request for the Keystone OS repo " +
+            "You are a senior engineer reviewing a pull request for the unisona.ai repo " +
             "(Node.js app under apps/lantern-garage/, Python under src/). Decide if the change is " +
             "correct, complete, and safe to merge. Be concise and concrete. Use this exact shape:\n" +
             "- **Verdict**: ✅ merge / ⚠️ needs changes / ❌ reject — one line why.\n" +
@@ -1173,7 +1173,7 @@ async function handleStreamChat(req, url, res) {
           const review = await callLlm(reviewSystem, reviewUser, "auto", 1800);
           const link = `https://github.com/alex-place/lantern-os/pull/${prNum}`;
           sendToken(`**[PR #${prNum}](${link})** — ${meta.title || ""}\n\n${(review || "").trim() || "(no review returned)"}`);
-          sendDone("review", { agent: "Keystone", online: true, provider: "review" });
+          sendDone("review", { agent: "unisona.ai", online: true, provider: "review" });
           res.end();
         } catch (err) {
           sse.sendError(res, `Review failed: ${err.message}`);
@@ -1230,13 +1230,13 @@ async function handleStreamChat(req, url, res) {
   // taskType for PCSF provider ranking comes from detectTaskType below.
   const agent = selectAgent(message);
 
-  // ── Keystone debug mode ───────────────────────────────────────────────
-  // When Keystone is selected, bypass persona/doors and talk raw to the model
+  // ── unisona.ai debug mode ───────────────────────────────────────────────
+  // When unisona.ai is selected, bypass persona/doors and talk raw to the model
   // about app dev, repo state, and convergence. Direct API access from the UX.
   const isKeystoneDebug = agent.id === "keystone" && (mcpFlag || message.startsWith("[Convergence task]"));
 
-  // Name reported in done events — Keystone at the desk, the persona (Keystone) in the game
-  const doneAgentName = agent.name || "Keystone";
+  // Name reported in done events — unisona.ai at the desk, the persona (unisona.ai) in the game
+  const doneAgentName = agent.name || "unisona.ai";
 
   let dreamContext = recentDreams.length > 0
     ? `Recent journal entries:\n${recentDreams.slice(0, 3).map((d, i) =>
@@ -1254,7 +1254,7 @@ async function handleStreamChat(req, url, res) {
   })();
 
   // Compact history once; providers reuse this via buildProviderMessages.
-  // historyContext is kept for Keystone debug prompt only — not injected into dream system prompt.
+  // historyContext is kept for unisona.ai debug prompt only — not injected into dream system prompt.
   //
   // #772 REMEMBER stage: assemble a token-budgeted context — a rolling summary of
   // older turns plus recent verbatim turns within the active model's window — from
@@ -1276,7 +1276,7 @@ async function handleStreamChat(req, url, res) {
     compacted = compactHistory(history);
   }
   const historyContext = compacted.length > 0
-    ? `\nPrior conversation turns:\n${compacted.map(h => `${h.role === "assistant" ? "Keystone" : "Dreamer"}: ${h.text}`).join("\n")}`
+    ? `\nPrior conversation turns:\n${compacted.map(h => `${h.role === "assistant" ? "unisona.ai" : "Dreamer"}: ${h.text}`).join("\n")}`
     : "";
 
   // Co-occurrence pairs: symbols that appear together in the same entry strengthen the edge
@@ -1300,8 +1300,8 @@ async function handleStreamChat(req, url, res) {
   // Three Doors instruction — equally weighted future-tense canaries
   const DOORS_INSTRUCTION = `\n\nAt the end of every response, imagine exactly 3 forward-facing doors — canaries the dreamer is sending ahead into their waking and dreaming life. Each door should be a brief, future-tense, equally weighted sensory or experiential path grounded in the last door mentioned and the dreamer's personal symbol mesh. All 3 should carry equal weight — no door is more important. They represent what the dreamer wants to see, hear, feel, taste, touch, or live. Write them as a single hidden line:\n[DOORS: door one | door two | door three]\nRules: future tense, first person, short (under 8 words), no questions, no commands, equally weighted, rooted in the conversation and symbol mesh.${meshHint}`;
 
-  // Keystone debug prompt — raw dev access, no persona, no doors
-  const KEYSTONE_DEBUG_PROMPT = `You are Keystone, a direct debug interface for Keystone OS development. You have access to the full repo context below. Respond as a senior engineer — concise, honest, actionable. No dream persona, no doors, no metaphors.\n\n${_realtimeCtx}\n\nRepo state:\n- Server: apps/lantern-garage/server.js (modular routes under routes/)\n- Streaming: lib/stream-chat.js (Gemini→Claude→OpenAI→Grok→Ollama chain)\n- Dream journal: ${allRecent.length} entries in data/dream_journal/\n- Providers configured: ${['GEMINI_API_KEY','ANTHROPIC_API_KEY','OPENAI_API_KEY','XAI_API_KEY'].filter(k => process.env[k]).join(', ') || 'none'}\n- Symbol mesh: ${symbolMesh.slice(0, 5).join(', ') || 'empty'}\n- Co-occurrence: ${topPairs || 'none'}\n${historyContext}\n\nYou can EXECUTE commands. When you output a single-line bash code block, the UI renders a ▶ Run button.\nONLY use these exact commands (anything else is blocked):\n\nTESTS: \`npm test\` or \`node tests/test_dream_journal_api.js\` or \`node tests/test_dream_journal_chat.js\` or \`node tests/test_dream_chat_multiturns.js\` or \`node tests/test_dream_journal_keystone.js\`\nGIT: \`git status\` \`git diff --stat\` \`git log --oneline -N\` \`git add FILE\` \`git commit -m "MSG"\` \`git push origin master\` \`git branch\`\nPR: \`gh pr create --repo alex-place/lantern-os --head cdblasioli-gif:master --base master --title "TITLE" --body "BODY"\`\nORCH: \`python src/convergence_io_engine.py health\` or \`loop\` or \`inspect\`\nREAD: \`cat FILE\` \`head -N FILE\`\n\nWhen asked to do something, output the EXACT command in a bash code block. The user clicks ▶ to run it. Do NOT suggest commands outside this list.\n\nAnswer directly. Reference file paths. Check data/pcsf/ for state. Check manifests/dream-journal-v1-agent-slots.json and csf/ingest/*.md for work queue.`;
+  // unisona.ai debug prompt — raw dev access, no persona, no doors
+  const KEYSTONE_DEBUG_PROMPT = `You are unisona.ai, a direct debug interface for unisona.ai development. You have access to the full repo context below. Respond as a senior engineer — concise, honest, actionable. No dream persona, no doors, no metaphors.\n\n${_realtimeCtx}\n\nRepo state:\n- Server: apps/lantern-garage/server.js (modular routes under routes/)\n- Streaming: lib/stream-chat.js (Gemini→Claude→OpenAI→Grok→Ollama chain)\n- Dream journal: ${allRecent.length} entries in data/dream_journal/\n- Providers configured: ${['GEMINI_API_KEY','ANTHROPIC_API_KEY','OPENAI_API_KEY','XAI_API_KEY'].filter(k => process.env[k]).join(', ') || 'none'}\n- Symbol mesh: ${symbolMesh.slice(0, 5).join(', ') || 'empty'}\n- Co-occurrence: ${topPairs || 'none'}\n${historyContext}\n\nYou can EXECUTE commands. When you output a single-line bash code block, the UI renders a ▶ Run button.\nONLY use these exact commands (anything else is blocked):\n\nTESTS: \`npm test\` or \`node tests/test_dream_journal_api.js\` or \`node tests/test_dream_journal_chat.js\` or \`node tests/test_dream_chat_multiturns.js\` or \`node tests/test_dream_journal_keystone.js\`\nGIT: \`git status\` \`git diff --stat\` \`git log --oneline -N\` \`git add FILE\` \`git commit -m "MSG"\` \`git push origin master\` \`git branch\`\nPR: \`gh pr create --repo alex-place/lantern-os --head cdblasioli-gif:master --base master --title "TITLE" --body "BODY"\`\nORCH: \`python src/convergence_io_engine.py health\` or \`loop\` or \`inspect\`\nREAD: \`cat FILE\` \`head -N FILE\`\n\nWhen asked to do something, output the EXACT command in a bash code block. The user clicks ▶ to run it. Do NOT suggest commands outside this list.\n\nAnswer directly. Reference file paths. Check data/pcsf/ for state. Check manifests/dream-journal-v1-agent-slots.json and csf/ingest/*.md for work queue.`;
 
   // ── Web Search Grounding (dilation-gated; within→without bridge) ─────
   // Chat-level time-dilation drives how hard to reach external reality: an
@@ -1412,7 +1412,7 @@ async function handleStreamChat(req, url, res) {
         if (canonical && canonical.hit) kbAnswer = canonical;
       }
       if (kbAnswer && kbAnswer.hit) {
-        const kbBlock = `Knowledge Center (Keystone OS docs) — grounding from ${kbAnswer.source}:\n${kbAnswer.text}`;
+        const kbBlock = `Knowledge Center (unisona.ai docs) — grounding from ${kbAnswer.source}:\n${kbAnswer.text}`;
         groundingContext = groundingContext ? `${groundingContext}\n\n${kbBlock}` : kbBlock;
       }
     } catch (e) {
@@ -1420,8 +1420,8 @@ async function handleStreamChat(req, url, res) {
     }
   }
 
-  // ── Keystone live project context (GitHub issues/PRs + MCP tools) ──────────
-  // Links Keystone chat to the project's real tools/details so ANY provider
+  // ── unisona.ai live project context (GitHub issues/PRs + MCP tools) ──────────
+  // Links unisona.ai chat to the project's real tools/details so ANY provider
   // (incl. Grok) answers grounded in the live repo, not generic guesses. Cached
   // 60s, best-effort. Disable with KEYSTONE_MCP=0.
   if (!isKeystoneDebug && surfaceMode !== "three-doors" && message && process.env.KEYSTONE_MCP !== "0") {
@@ -1475,7 +1475,7 @@ async function handleStreamChat(req, url, res) {
   // Capabilities come from the model's native tool calls; task-type / provider routing
   // comes from the model-based Ouro router (below) + measured PCSF ordering.
 
-  // ── RP lives in the Three Doors game only. Dream Chat is always plain Keystone;
+  // ── RP lives in the Three Doors game only. Dream Chat is always plain unisona.ai;
   // roleplay requests in chat get pointed at /three-doors-game.html instead.
   const isRpMode = surfaceMode === "three-doors";
 
@@ -1511,48 +1511,48 @@ async function handleStreamChat(req, url, res) {
   // detectTaskType below so success AND failure record under the routing taxonomy (#1236).
   let leaderboardTaskType = "default";
   const ROUTE_LABEL_MAP = {
-    code: "Keystone · code via convergence",
-    strategy: "Keystone · strategy via convergence",
-    trading: "Keystone · market route",
-    memory_export: "Keystone · CSF memory export",
-    dream_analysis: "Keystone · dream analysis",
+    code: "unisona.ai · code via convergence",
+    strategy: "unisona.ai · strategy via convergence",
+    trading: "unisona.ai · market route",
+    memory_export: "unisona.ai · CSF memory export",
+    dream_analysis: "unisona.ai · dream analysis",
     rp_game: "Three Doors · RP game",
-    coding_change: "Keystone · code / GitHub route",
-    document_request: "Keystone · documents",
-    technical_debug: "Keystone · debug route",
-    code_review: "Keystone · review route",
+    coding_change: "unisona.ai · code / GitHub route",
+    document_request: "unisona.ai · documents",
+    technical_debug: "unisona.ai · debug route",
+    code_review: "unisona.ai · review route",
     convergance_action: "Convergence · loop route",
-    capacity_query: "Keystone · capacity query",
-    dream_chat: "Keystone · chat",
+    capacity_query: "unisona.ai · capacity query",
+    dream_chat: "unisona.ai · chat",
     three_doors: "Three Doors · RP game",
   };
   const routeLabel = isKeystoneDebug
-    ? "Keystone · direct debug"
+    ? "unisona.ai · direct debug"
     : requestedProvider === "keystone-ft"
-      ? "Keystone FT · memory route"
+      ? "unisona.ai FT · memory route"
       : surfaceMode === "three-doors"
-        ? `${agent.name || "Keystone"} · Three Doors`
-        : (ROUTE_LABEL_MAP[converganceIntent] || "Keystone · router");
+        ? `${agent.name || "unisona.ai"} · Three Doors`
+        : (ROUTE_LABEL_MAP[converganceIntent] || "unisona.ai · router");
 
-  // Plain Keystone desk prompt — no persona voice, no doors. Dream Chat is Keystone-only.
+  // Plain unisona.ai desk prompt — no persona voice, no doors. Dream Chat is unisona.ai-only.
   // The product-fact line gives even a weak fallback model (e.g. local Ollama, when the
   // cloud providers are unavailable) a correct, concrete answer to "what is this?" so new
   // users get an orientation instead of improvised dream-journal filler. The journal block
   // is explicitly labelled background so the model does not narrate it as if it were the app.
-  const ROUTER_PROMPT = `You are Keystone Σ₀ — the grounded reasoning and engineering agent for Keystone OS, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Web search: you have \`web_search\` and \`web_fetch\` tools — use them the way a competent assistant does, on your own initiative. Do NOT answer from memory when the answer depends on current, recent, or fast-changing information (news, prices, weather, sports scores, releases/versions, anything phrased as "latest / current / today / this week", or the present status/role of a person, company, or project), or when you are not confident your training knowledge is complete and up to date — search first. Prefer one or two targeted queries over guessing, and open the most relevant result with \`web_fetch\` when a snippet is not enough to answer well. Cite whatever you actually used as clickable Markdown links. If search is unavailable or you still cannot verify a claim, say so plainly and give your confidence — never invent a fact or a source. How you work: you are ONE assistant for every kind of task — everyday help, documents and writing, research, engineering — and you behave like a first-class AI assistant (Claude, ChatGPT, Gemini), not a scripted workflow. Deliver substance in your FIRST reply from whatever is already available (the message, attachments, history, memory, tool results). Never reply with a form and never demand a checklist of fields: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and refine after delivering something useful. Ask at most one clarifying question per reply, only when the answer genuinely changes the work, and put it after the useful content. Attachments are first-class input: they arrive pre-extracted as plain text (docx, pdf, xlsx, pptx and images are parsed for you), so NEVER claim you cannot open or read an attached file type — use its content, and never re-ask for information it already contains. Beyond web search you may have more real tools (document generation via \`generate_document\` — produces a real, submit-ready .docx by default and returns a download link you must repeat in your reply as a Markdown link; image generation via \`generate_image\` — when the user asks you to draw/paint/sketch/illustrate or make a picture of something, call it and include the returned \`![...](url)\` Markdown in your reply so the image renders inline; workspace files; market data via \`trader_market_status\`/\`trader_quote\`/\`trader_positions\`; repo and GitHub tools): use whatever is advertised to you on your own initiative, and treat a tool's input schema as what it ACCEPTS, not a list to collect from the user — e.g. "help with my resume" means give concrete feedback or a tailored draft from what you already know (attachments included), then offer \`generate_document\` to produce the file; every template field is optional, so never recite a field list to the user. Never fabricate user facts (experience, credentials, numbers): assumptions are fine when marked, fabrications never. Report only actions you actually performed: NEVER say you drafted, generated, saved, or updated a file unless the tool call ran in THIS turn and returned a result — either actually call the tool now, show the work inline in your reply, or say what you WILL do next; no imaginary artifacts. Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of Keystone OS. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
+  const ROUTER_PROMPT = `You are unisona.ai Σ₀ — the grounded reasoning and engineering agent for unisona.ai, a local-first private journaling and reasoning app that runs on the user's own machine with no account required. You run the convergence loop (Observe → Remember → Reason → Act → Verify → Converge), and external reality beats internal consistency: ground every important claim in evidence, give an honest confidence, and say "I don't know" rather than improvise. Answer directly, technically, and concretely. You are a precise technical agent — never use roleplay, mystical, or poetic language. For code, give complete, correct, copy-paste-ready implementations grounded in real files/APIs and state exactly how to verify (test command or expected output). Writing code is a DIRECT answer, not a tool task (#2077): when the user asks you to write, show, or explain code (a function, snippet, script, example) and is not asking to change this repository's existing code, put the code straight into your reply in a fenced code block — do NOT call a shell tool (Bash/PowerShell), the coding backend (propose_coding_change), or any repo tool to AUTHOR it. If a tool you tried is blocked or unavailable (a command not on the shell allowlist, a coding backend down), that is never a reason to refuse or to open your reply with the restriction: deliver the code or answer directly first, and mention the tool limit only if it blocks an ACTION the user explicitly asked you to perform. Be concise for simple asks, but COMPREHENSIVE for substantive, factual, or research questions: give full context and reasoning, structure longer answers with short headings and bullet lists, and cite sources as clickable Markdown links [descriptive title](https://url). Web search: you have \`web_search\` and \`web_fetch\` tools — use them the way a competent assistant does, on your own initiative. Do NOT answer from memory when the answer depends on current, recent, or fast-changing information (news, prices, weather, sports scores, releases/versions, anything phrased as "latest / current / today / this week", or the present status/role of a person, company, or project), or when you are not confident your training knowledge is complete and up to date — search first. Prefer one or two targeted queries over guessing, and open the most relevant result with \`web_fetch\` when a snippet is not enough to answer well. Cite whatever you actually used as clickable Markdown links. If search is unavailable or you still cannot verify a claim, say so plainly and give your confidence — never invent a fact or a source. How you work: you are ONE assistant for every kind of task — everyday help, documents and writing, research, engineering — and you behave like a first-class AI assistant (Claude, ChatGPT, Gemini), not a scripted workflow. Deliver substance in your FIRST reply from whatever is already available (the message, attachments, history, memory, tool results). Never reply with a form and never demand a checklist of fields: make reasonable assumptions, mark real gaps inline (e.g. "[add phone]"), and refine after delivering something useful. Ask at most one clarifying question per reply, only when the answer genuinely changes the work, and put it after the useful content. Attachments are first-class input: they arrive pre-extracted as plain text (docx, pdf, xlsx, pptx and images are parsed for you), so NEVER claim you cannot open or read an attached file type — use its content, and never re-ask for information it already contains. Beyond web search you may have more real tools (document generation via \`generate_document\` — produces a real, submit-ready .docx by default and returns a download link you must repeat in your reply as a Markdown link; image generation via \`generate_image\` — when the user asks you to draw/paint/sketch/illustrate or make a picture of something, call it and include the returned \`![...](url)\` Markdown in your reply so the image renders inline; workspace files; market data via \`trader_market_status\`/\`trader_quote\`/\`trader_positions\`; repo and GitHub tools): use whatever is advertised to you on your own initiative, and treat a tool's input schema as what it ACCEPTS, not a list to collect from the user — e.g. "help with my resume" means give concrete feedback or a tailored draft from what you already know (attachments included), then offer \`generate_document\` to produce the file; every template field is optional, so never recite a field list to the user. Never fabricate user facts (experience, credentials, numbers): assumptions are fine when marked, fabrications never. Report only actions you actually performed: NEVER say you drafted, generated, saved, or updated a file unless the tool call ran in THIS turn and returned a result — either actually call the tool now, show the work inline in your reply, or say what you WILL do next; no imaginary artifacts. Your replies render as rich Markdown in this chat UI: \`![alt](https://image-url)\` displays the image inline, a plain YouTube link (https://youtube.com/watch?v=… or https://youtu.be/…) embeds as a player, and \`[text](https://url)\` becomes a link that opens in a new tab — so you absolutely CAN show images and embed videos; never tell the user you "can't embed", "can't display images", or "lack web/embedding capability" (that is false). When an image or video genuinely helps, include it — but use ONLY real, working URLs you actually know (e.g. Wikimedia Commons upload URLs, well-known sources); never invent, guess, or fabricate a media URL — if unsure, link the source page instead. If the user asks "what is this?" or "what can you do?", give a plain one- or two-sentence description of unisona.ai. IMPORTANT: Your very first token must be substantive content — never output only your name or any greeting. Go straight to the answer.\n\n${_realtimeCtx}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}`;
 
   // Grounded identity (#1242). The underlying foundation model (Gemini/Claude/
-  // OpenAI/xAI/Ouro) must never leak its vendor identity through the Keystone
+  // OpenAI/xAI/Ouro) must never leak its vendor identity through the unisona.ai
   // persona — a Gemini-served turn was answering "I'm a large language model built
   // by Google". Inject a deterministic identity block on the assistant surfaces
   // (debug + router); leave the creative RP/journal personas untouched.
   const KEYSTONE_IDENTITY =
-    "You are Keystone, the assistant of Keystone OS — a local-first, model-agnostic " +
-    "reasoning system. You are part of Keystone OS; you were NOT built by Google, OpenAI, " +
-    "Anthropic, xAI, or any other company, and you must never claim otherwise. Keystone OS " +
+    "You are unisona.ai — the assistant of a local-first, model-agnostic " +
+    "reasoning system. You are part of unisona.ai; you were NOT built by Google, OpenAI, " +
+    "Anthropic, xAI, or any other company, and you must never claim otherwise. unisona.ai " +
     "routes each turn across a chain of interchangeable models, so the specific model serving " +
     "any given turn varies. If asked which model or company powers you, answer consistently: " +
-    "you are Keystone (part of Keystone OS), which selects from several interchangeable " +
+    "you are unisona.ai, which selects from several interchangeable " +
     "providers per turn — do not name a specific vendor as your maker or invent a model name.";
   const baseSystemPrompt = isKeystoneDebug
     ? KEYSTONE_DEBUG_PROMPT
@@ -1602,7 +1602,7 @@ async function handleStreamChat(req, url, res) {
   const sendDone = (source, extra = {}) => {
     const signature = {
       agent: agent.id || agent.name || "keystone",
-      agentName: agent.name || "Keystone",
+      agentName: agent.name || "unisona.ai",
       provider: extra.provider || "unknown",
       model: extra.model || "unknown",
       timestamp: new Date().toISOString(),
@@ -1777,7 +1777,7 @@ async function handleStreamChat(req, url, res) {
   // Emit route event with actual routing decision from server
   sendRoute({
     agent: agent.id || agent.name || "keystone",
-    agentName: agent.name || "Keystone",
+    agentName: agent.name || "unisona.ai",
     intent: converganceIntent,
     surface: surfaceMode,
     requiresConvergence: false,
@@ -1793,7 +1793,7 @@ async function handleStreamChat(req, url, res) {
       provider,
       model: model || "unknown",
       agent: agent.id || agent.name || "keystone",
-      agentName: agent.name || "Keystone",
+      agentName: agent.name || "unisona.ai",
       metered: !["ollama", "local"].includes(provider),
       privacyBoundary: ["ollama", "local"].includes(provider) ? "internal" : "external",
       claimBoundary: "live",
@@ -1985,11 +1985,11 @@ async function handleStreamChat(req, url, res) {
   // technical ROUTER_PROMPT (cloud coders lead; local is the offline backstop). The model
   // decides capabilities via native tool calls — nothing is routed on message keywords.
 
-  // ── Keystone: Task-aware provider selection using performance leaderboard ──
+  // ── unisona.ai: Task-aware provider selection using performance leaderboard ──
   let primaryProviderHint = null;
   try {
     // #1167: this used to force isCreative whenever surfaceMode === "dream-chat" —
-    // but "dream-chat" is the surface name for ALL general Keystone chat (isRpMode
+    // but "dream-chat" is the surface name for ALL general unisona.ai chat (isRpMode
     // is what flags the actual roleplay/journal surface, "three-doors"), so EVERY
     // message here was tagged "creative" regardless of content. PROVIDER_CHAINS.creative
     // leads with ollama, which is always "healthy" — so cloud was never reached for
@@ -2127,10 +2127,10 @@ async function handleStreamChat(req, url, res) {
   const intent = (ouroRoute && ouroRoute.taskType) || "default";
   const { orderChainByLeaderboard, recordModelOutcome } = require("./model-leaderboard");
   let staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
-  // Keystone chat (non-RP) is a technical/tool assistant — never fall back to the
+  // unisona.ai chat (non-RP) is a technical/tool assistant — never fall back to the
   // dream-tuned `lantern-csf-dream`, which ignores tools and emits dream-journal
   // narrative ("the Return Door remembers…"). That model is for the Three Doors RP
-  // surface only. Without this, an offline/degraded Keystone chat answers in persona.
+  // surface only. Without this, an offline/degraded unisona.ai chat answers in persona.
   if (!isRpMode) {
     const cleaned = staticChain.filter((m) => m !== "lantern-csf-dream");
     if (cleaned.length) staticChain = cleaned;
@@ -2265,7 +2265,7 @@ async function handleStreamChat(req, url, res) {
       const _ollamaStart = Date.now();
       try {
         // In tool mode, send the FC adapter ONLY the tool preamble it was trained/served
-        // with. The big Keystone router prompt dilutes it (the adapter then defaults to
+        // with. The big unisona.ai router prompt dilutes it (the adapter then defaults to
         // its Bash habit); the clean preamble matches the training distribution so it
         // reliably emits a SAFE <tool_call>. Gated with execution so it toggles as a unit.
         const sysForOllama = process.env.CHAT_TOOL_EXEC === "1"
@@ -2427,7 +2427,7 @@ async function handleStreamChat(req, url, res) {
 
   }
 
-  // Provider 0b: Keystone FT managed agent (Haiku + memory store) — explicit request only.
+  // Provider 0b: unisona.ai FT managed agent (Haiku + memory store) — explicit request only.
   // Streams via the unified Python connector; the Python side tries the managed
   // sessions API (memory-augmented) and falls back to the messages API itself.
   if (message && requestedProvider === "keystone-ft") {
@@ -2465,7 +2465,7 @@ async function handleStreamChat(req, url, res) {
       throw new Error("keystone-ft returned no tokens");
     } catch (err) {
       recordProviderFailure("keystone-ft", err.message);
-      sendError(`Keystone FT failed: ${err.message}. Check ANTHROPIC_API_KEY and data/training/ft-result.json.`);
+      sendError(`unisona.ai FT failed: ${err.message}. Check ANTHROPIC_API_KEY and data/training/ft-result.json.`);
       sendFail(err.message);
       return;
     }
@@ -2706,7 +2706,7 @@ async function handleStreamChat(req, url, res) {
       }
 
       // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) ───────────────────
-      // Gives Keystone real agency: the model can call repo tools (Read/Grep/Glob/LS
+      // Gives unisona.ai real agency: the model can call repo tools (Read/Grep/Glob/LS
       // for everyone; +Bash/PowerShell/Write/Edit for operators) and answer from the
       // results instead of guessing. Same registry + executor as the local model's
       // free-text path (lib/tool-runner), via the reliable native tool_use protocol.
@@ -2789,7 +2789,7 @@ async function handleStreamChat(req, url, res) {
         }
       }
 
-      // Prompt caching: the system block (Keystone/RP instructions + dream/CSF
+      // Prompt caching: the system block (unisona.ai/RP instructions + dream/CSF
       // context) is the stable prefix reused across turns in a session. Marking
       // it with cache_control caches it for 5 min; subsequent turns read it at
       // 0.1x input price instead of reprocessing. No-op (silent) if the prefix

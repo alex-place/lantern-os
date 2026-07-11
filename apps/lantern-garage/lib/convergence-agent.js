@@ -3,14 +3,14 @@
  *
  * Given a user message, produces a response without calling Claude/GPT:
  *   - category : keyword-classified intent class
- *   - persona  : the Keystone-family persona that owns that category
+ *   - persona  : the unisona.ai-family persona that owns that category
  *   - answer   : for grounded categories (work/convergence) this is built from
  *                LIVE data (open GitHub issues, router stats); otherwise a
  *                fixed informational answer for that surface
  *   - actions  : executable follow-ups (bang command or link)
  *   - grounded : true when the answer reflects live data fetched this call
  *
- * Grounding follows the Keystone contract (dream-chat.js): "what should I
+ * Grounding follows the unisona.ai contract (dream-chat.js): "what should I
  * tackle first → inspect open issues, prioritize". Same repo state → same
  * answer (no LLM randomness).
  */
@@ -65,7 +65,7 @@ const KNOWLEDGE = [
     persona: "keystone",
     keywords: ["work", "issue", "task", "todo", "do today", "should i do", "build", "fix", "sprint", "backlog", "pr "],
     answer:
-      "Keystone coordinates technical work grounded in GitHub issues. Run the convergence loop to pull the top-scored issue and generate a spec, or review the open issue backlog directly.",
+      "unisona.ai coordinates technical work grounded in GitHub issues. Run the convergence loop to pull the top-scored issue and generate a spec, or review the open issue backlog directly.",
     actions: [
       { label: "Run convergence loop", command: "!convergance" },
       { label: "Open issues", href: "https://github.com/alex-place/lantern-os/issues" },

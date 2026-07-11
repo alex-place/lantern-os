@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # dispatch release.yml for the new tag (see the trigger step below)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -50,4 +51,16 @@ jobs:
             -m "Release v${{ steps.ver.outputs.value }}"
           git push origin "v${{ steps.ver.outputs.value }}"
           echo "✓ Created tag v${{ steps.ver.outputs.value }}"
-          echo "  release.yml will pick it up and publish the GitHub Release."
+
+      # A tag pushed with GITHUB_TOKEN does NOT trigger release.yml (GitHub's recursion
+      # guard: GITHUB_TOKEN-authored push/create events never start new runs). So the
+      # Release build used to never auto-fire — releases had to be dispatched by hand.
+      # workflow_dispatch is the documented EXCEPTION to that guard, so dispatch it here.
+      - name: Trigger the Release build for the new tag
+        if: steps.check.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.ver.outputs.value }}"
+          gh workflow run release.yml --ref "$TAG" -f tag="$TAG"
+          echo "✓ Dispatched release.yml for $TAG — it builds the zips + desktop installer and publishes the Release."

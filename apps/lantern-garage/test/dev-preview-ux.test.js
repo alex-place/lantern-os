@@ -80,17 +80,17 @@ check('tool name with underscores renders with spaces', () => {
 // ── signature line content ────────────────────────────────────────────────────
 
 check('online sig includes displayLabel and time', () => {
-  const displayLabel = 'Keystone · chat';
+  const displayLabel = 'unisona.ai · chat';
   const time = '2:34 PM';
   const pm = '';
   const visibleText = [displayLabel, time].filter(Boolean).join(' · ');
-  assert.ok(visibleText.includes('Keystone · chat'));
+  assert.ok(visibleText.includes('unisona.ai · chat'));
   assert.ok(visibleText.includes('2:34 PM'));
   assert.ok(!visibleText.includes('/'));  // no raw provider/model in visible text
 });
 
 check('online sig with provider/model puts them in debug block, not main text', () => {
-  const displayLabel = 'Keystone · chat';
+  const displayLabel = 'unisona.ai · chat';
   const time = '2:34 PM';
   const pm = 'anthropic/claude-haiku-4-5';
   const visibleText = [displayLabel, time].filter(Boolean).join(' · ');
@@ -101,7 +101,7 @@ check('online sig with provider/model puts them in debug block, not main text', 
 });
 
 check('offline sig includes "offline" word', () => {
-  const displayLabel = 'Keystone · chat';
+  const displayLabel = 'unisona.ai · chat';
   const time = '2:34 PM';
   const offline = `${displayLabel} · offline · ${time}`;
   assert.ok(offline.includes('offline'));
@@ -109,11 +109,11 @@ check('offline sig includes "offline" word', () => {
 
 check('sig aria-label is human-readable (no raw provider/model)', () => {
   const time = '2:34 PM';
-  const ariaLabel = `Keystone replied at ${time}; model: anthropic/claude-haiku-4-5`;
+  const ariaLabel = `unisona.ai replied at ${time}; model: anthropic/claude-haiku-4-5`;
   // The human-readable part comes first
-  assert.ok(ariaLabel.startsWith('Keystone replied'));
+  assert.ok(ariaLabel.startsWith('unisona.ai replied'));
   // The model info is present but only after the readable intro
-  assert.ok(ariaLabel.indexOf('model:') > ariaLabel.indexOf('Keystone replied'));
+  assert.ok(ariaLabel.indexOf('model:') > ariaLabel.indexOf('unisona.ai replied'));
 });
 
 // ── CSS: prefers-reduced-motion ───────────────────────────────────────────────

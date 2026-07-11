@@ -22,13 +22,13 @@ The Convergence Router is a deterministic request routing system that achieves 9
 ### Routing Strategies
 
 **1. Intent Routing (6 Personas)**
-- Routes messages to one of 6 Keystone agents: `lantern`, `blinkbug`, `keystone`, `waterfall`, `xenon`, `founder`
+- Routes messages to one of 6 unisona.ai agents: `lantern`, `blinkbug`, `keystone`, `waterfall`, `xenon`, `founder`
 - Deterministic scoring based on keyword matches
 - Cache validation with Σ₀ staleness detection
 
 **2. Task Routing (Deterministic + Dynamic)**
 - Deterministic: `market_analysis`, `position_monitoring`, `win_rate_check` → direct endpoints (90% local)
-- Dynamic: Unknown tasks → Keystone dispatcher (10% external)
+- Dynamic: Unknown tasks → unisona.ai dispatcher (10% external)
 
 **3. Market Search (Local Cache)**
 - Cache hit for <1 hour old data
@@ -61,7 +61,7 @@ Returns router statistics and targets.
 ```
 
 ### POST `/api/convergence/route-intent`
-Route a message to the appropriate Keystone agent.
+Route a message to the appropriate unisona.ai agent.
 
 **Request:**
 ```json
@@ -84,7 +84,7 @@ Route a message to the appropriate Keystone agent.
 ```
 
 ### POST `/api/convergence/route-task`
-Route a task to a deterministic endpoint or Keystone dispatcher.
+Route a task to a deterministic endpoint or unisona.ai dispatcher.
 
 **Request:**
 ```json

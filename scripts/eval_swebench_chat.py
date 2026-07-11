@@ -49,7 +49,7 @@ PATCH_INSTRUCTION = (
 # A fenced ```diff / ```patch / ``` block, or a raw `diff --git` region.
 _FENCE = re.compile(r"```(?:diff|patch|[a-zA-Z]*)?\s*\n(.*?)```", re.DOTALL)
 
-# Direct-mode system prompt: the Keystone chat is an AGENT (tool-calling + persona), so a
+# Direct-mode system prompt: the unisona.ai chat is an AGENT (tool-calling + persona), so a
 # single-shot SWE prompt makes it web_search / write repro scripts instead of a patch. --direct
 # bypasses that and tests the MODEL: a bare ollama completion that must emit ONLY a patch.
 RAW_PATCH_SYSTEM = (
@@ -62,7 +62,7 @@ RAW_PATCH_SYSTEM = (
 
 
 def ollama_chat(model, prompt, num_ctx, timeout, host="127.0.0.1", port=11434):
-    """POST one turn straight to ollama /api/chat — no Keystone agent layer. Returns
+    """POST one turn straight to ollama /api/chat — no unisona.ai agent layer. Returns
     (reply_text, done_meta). Raises ConnectionError if unreachable (matches chat_complete)."""
     body = json.dumps({
         "model": model,
@@ -200,7 +200,7 @@ def run_eval(a):
 
     sources, models, with_patch, no_ctx = {}, {}, 0, 0
     t0 = time.time()
-    print(f"\nDriving Keystone chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}  "
+    print(f"\nDriving unisona.ai chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}  "
           f"model={a.label}\n", flush=True)
     print(f"{'instance':<40} {'patch':<6} {'served'}", flush=True)
 
@@ -319,7 +319,7 @@ def main():
     ap.add_argument("--limit", type=int, default=10)
     ap.add_argument("--full", action="store_true", help="run the whole split")
     ap.add_argument("--direct", action="store_true",
-                    help="bypass the Keystone agent; hit ollama /api/chat directly (clean model test)")
+                    help="bypass the unisona.ai agent; hit ollama /api/chat directly (clean model test)")
     ap.add_argument("--model", default="qwen2.5-coder:latest", help="ollama model for --direct")
     ap.add_argument("--num-ctx", type=int, default=16384, dest="num_ctx",
                     help="ollama context window for --direct (oracle/bm25 prompts are large)")

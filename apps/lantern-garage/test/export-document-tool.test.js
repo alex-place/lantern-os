@@ -50,7 +50,7 @@ async function main() {
   // The real payoff: a Word (.docx) export produces a valid Office Open XML file (zip → 'PK')
   // and a clickable download link pointing at the served download route.
   await check("docx export → valid binary + download link", async () => {
-    const md = "# Alex Place — Resume\n\n## Skills\n- AI systems\n- Node.js\n\n## Experience\nBuilt the Keystone convergence loop.";
+    const md = "# Alex Place — Resume\n\n## Skills\n- AI systems\n- Node.js\n\n## Experience\nBuilt the unisona.ai convergence loop.";
     const r = await runTool("export_document", { content: md, format: "docx", title: "Alex Resume" },
       { operator: true, executionEnabled: true });
     const out = r.result || "";

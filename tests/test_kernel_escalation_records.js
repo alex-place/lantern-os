@@ -2,11 +2,11 @@
 /**
  * #897 — kernel escalation emits a convergence record.
  *
- * Verifies that every Keystone kernel failure path (failed result, thrown error)
+ * Verifies that every unisona.ai kernel failure path (failed result, thrown error)
  * emits exactly one ConvergenceRecord with the four required fields:
  * {hypothesis, result, confidence=0, source} and reasoner="kernel-escalation".
  *
- * Does NOT require a live server or actual Keystone run — stubs keystoneRun +
+ * Does NOT require a live server or actual unisona.ai run — stubs keystoneRun +
  * emitConvergenceRecord and exercises the branching logic directly.
  */
 
@@ -95,7 +95,7 @@ async function test_failure_record_has_required_fields() {
   const result = { status: "failed", error: "stub apply failure", phase: "apply" };
 
   await emitConvergenceRecord({
-    hypothesis: `Keystone kernel can land issue via ${provider}`,
+    hypothesis: `unisona.ai kernel can land issue via ${provider}`,
     result: `escalated-to-claude: ${result.error} (phase=${result.phase})`,
     confidence: 0.0,
     evidence_ids: [result.error],
@@ -107,7 +107,7 @@ async function test_failure_record_has_required_fields() {
 
   assert.strictEqual(emitted.length, 1, "exactly one record emitted on failure");
   const rec = emitted[0];
-  assert.ok(rec.hypothesis && rec.hypothesis.includes("Keystone"), "hypothesis present");
+  assert.ok(rec.hypothesis && rec.hypothesis.includes("unisona.ai"), "hypothesis present");
   assert.ok(rec.result && rec.result.includes("escalated-to-claude"), "result encodes escalation");
   assert.strictEqual(rec.confidence, 0.0, "confidence=0 on escalation");
   assert.ok(rec.source && rec.source.startsWith("kernel/"), "source identifies kernel path");
@@ -124,7 +124,7 @@ async function test_throw_record_has_required_fields() {
   const errMsg = "stub kernel error";
 
   await emitConvergenceRecord({
-    hypothesis: `Keystone kernel can land issue via ${provider}`,
+    hypothesis: `unisona.ai kernel can land issue via ${provider}`,
     result: `escalated-to-claude: ${errMsg}`,
     confidence: 0.0,
     evidence_ids: [errMsg],
@@ -160,7 +160,7 @@ async function test_escalation_rate_queryable() {
   // Simulate 3 escalations
   for (let i = 0; i < 3; i++) {
     await emitConvergenceRecord({
-      hypothesis: "Keystone kernel can land issue", result: "escalated-to-claude: err",
+      hypothesis: "unisona.ai kernel can land issue", result: "escalated-to-claude: err",
       confidence: 0.0, evidence_ids: ["err"], reasoner: "kernel-escalation",
       verified: true, source: "kernel/ollama/keystone-ft",
     });

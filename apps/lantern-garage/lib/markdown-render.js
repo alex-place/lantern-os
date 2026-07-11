@@ -340,7 +340,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
       } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
     })();
   </script>
-  <title>${escapeHtml(title)} — Keystone OS</title>
+  <title>${escapeHtml(title)} — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/narrator.css">
   <style>
@@ -427,7 +427,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
 <nav class="site-nav">
   <a class="nav-brand" href="/">
     <img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle">
-    <span style="font-size:18px;font-weight:600">Keystone OS</span>
+    <span style="font-size:18px;font-weight:600">unisona.ai</span>
   </a>
   <div class="nav-links">
     <a href="/dream-chat.html">Chat</a>
@@ -436,7 +436,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html" class="active">Help</a>
     <span class="sep" style="margin: 0 4px;">·</span>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support Keystone on Patreon</a>
+    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support unisona.ai on Patreon</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>
@@ -455,7 +455,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
 <footer class="site-footer">
   <div class="footer-inner">
     <span class="footer-brand">
-      <span class="mandala-icon spin-slow" aria-hidden="true"></span> Keystone OS
+      <span class="mandala-icon spin-slow" aria-hidden="true"></span> unisona.ai
     </span>
     <span class="sep">·</span>
     <a href="/">Home</a>

@@ -6,7 +6,7 @@ updated: 2026-06-20
 
 # Security Policy
 
-Keystone OS is a private, local-first workspace. Treat local state as sensitive:
+unisona.ai is a private, local-first workspace. Treat local state as sensitive:
 journal data, RAG records, runtime receipts, secrets, tokens, operator notes,
 and private test artifacts must not be committed or shared publicly.
 
@@ -101,7 +101,7 @@ Permissions-Policy, Referrer-Policy to all HTML responses.
 
 ## Agent Safety Principles (absorbed from GitHub Agentic Workflows)
 
-The autonomous fleet (pr-watcher, autowork, Keystone) follows the
+The autonomous fleet (pr-watcher, autowork, unisona.ai) follows the
 defense-in-depth model proven by [GitHub Agentic Workflows](https://github.blog/ai-and-ml/automate-repository-tasks-with-github-agentic-workflows/):
 *agents propose, humans dispose.* Five rules, with current status:
 

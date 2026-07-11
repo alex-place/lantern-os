@@ -200,7 +200,7 @@ For any plain (non-looped) local model, we also approximate the loop by re-promp
   (`exit_reason: "single_pass"`) and the three constants; callers may override
   `maxLoops`/`cdfThreshold` per call.
 - **Wired into [`lib/stream-chat.js`](../apps/lantern-garage/lib/stream-chat.js)** — for
-  `reasoning`/`coding` intents (and only when **not** Keystone-debug, **not** roleplay, and
+  `reasoning`/`coding` intents (and only when **not** unisona.ai-debug, **not** roleplay, and
   no explicit provider was picked), a looped pass runs on the local model and the `done`
   event carries **`loop_n` / `confidence` / `exit_reason`**. The **"Loop Depth (Σ₀)"** panel
   in [`dream-chat.html`](../apps/lantern-garage/public/dream-chat.html) renders them as

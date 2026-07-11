@@ -43,13 +43,13 @@ Glob, Grep, Bash, PowerShell, Write, Edit), all **sandboxed to the repo**
 likewise clones *coding-session* behavior. Without a decided product scope, every such request
 gets reframed as "a different product," and capability never accretes toward a coherent whole.
 
-This ADR fixes the scope: **Keystone OS is a personal AI wrapper** — a single local-first pane
+This ADR fixes the scope: **unisona.ai is a personal AI wrapper** — a single local-first pane
 through which its owner gets real things done — and decides *where new user-facing capability lives*
 so that broadening scope does **not** become sprawl (which ADR-0002 forbids).
 
 ## Decision
 
-1. **End-product definition.** Keystone OS is a **local-first personal AI operating cockpit
+1. **End-product definition.** unisona.ai is a **local-first personal AI operating cockpit
    ("the wrapper")**: the owner's single surface for getting real-world tasks done — look up and
    ground information, create artifacts (documents, resumes, media), assist with multi-step tasks
    (e.g. job applications), code, trade, and remember — all backed by the Convergence loop and

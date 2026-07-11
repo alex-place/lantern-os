@@ -1,7 +1,7 @@
 "use strict";
 // Convergence loop status — the Converge stage made visible to the chat UX.
 //
-// Reads the append-only ConvergenceRecord log that dream-chat / Keystone replies
+// Reads the append-only ConvergenceRecord log that dream-chat / unisona.ai replies
 // emit (data/convergence/records.jsonl) plus any compiled patterns
 // (data/convergence/patterns.jsonl, written by scripts/convergence_close_loop.py)
 // and returns a compact live summary for the dream-chat observability panel.

@@ -8,7 +8,7 @@
 
 ## Context
 
-The Keystone trader's IBKR integration was **fictional**. `lib/trading-api-bridge.js`
+The unisona.ai trader's IBKR integration was **fictional**. `lib/trading-api-bridge.js`
 authenticated with `Authorization: Bearer ${IBKR_API_KEY}` against
 `https://api.ibkr.com/v1/accounts/{id}/summary`, and `docs/IBKR-API-SETUP.md` told
 users "No Gateway needed. Connect directly with API credentials."
@@ -36,7 +36,7 @@ with zero evidence; and `getDashboardData()` served hardcoded static quotes
 
 ## Decision
 
-Adopt **CPAPI via the local Client Portal Gateway** as Keystone's IBKR connectivity
+Adopt **CPAPI via the local Client Portal Gateway** as unisona.ai's IBKR connectivity
 model, implemented **read-only** in `lib/ibkr-cpapi.js`.
 
 - **CPAPI, not TWS socket.** This server already speaks HTTP; CPAPI needs no extra
@@ -62,7 +62,7 @@ model, implemented **read-only** in `lib/ibkr-cpapi.js`.
 
 - **Accept:** a running gateway is now a prerequisite for live IBKR data (a real
   operational cost — the user or IBeam must keep a session authenticated). This is
-  inherent to IBKR's design, not a Keystone choice.
+  inherent to IBKR's design, not a unisona.ai choice.
 - **Accept:** no IBKR order entry until a follow-up ADR adds it (intentional).
 - **Gain:** the settings/status badge tells the truth; disconnected reads honest, not
   green. No fabricated market data. The integration is grounded in an API that exists.

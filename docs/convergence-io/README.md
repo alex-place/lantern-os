@@ -1,6 +1,6 @@
 # Convergence IO — the typed primitive stack
 
-`src/convergence_io/` is Keystone's **typed governance + routing layer**: a set of small,
+`src/convergence_io/` is unisona.ai's **typed governance + routing layer**: a set of small,
 independently-testable primitives that operationalize the project's ten governance
 principles (P1–P10) and the external-predicate rule (M1). Each primitive is a *format*
 or a *gate* with a narrow contract; together they're meant to route every action through a

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-resume_docx.py — docx read/write helper for the Keystone chat document-processing
+resume_docx.py — docx read/write helper for the unisona.ai chat document-processing
 feature (routes/documents.js). Two modes:
 
   extract <in.docx>           -> prints the document's plain text to stdout

@@ -2,11 +2,11 @@
 
 **Sprint:** 2026-06-15 to 2026-06-20  
 **Target Version:** 1.5.0  
-**Workflow:** Issue → Keystone Technical Coordinator → Implementation → Verification
+**Workflow:** Issue → unisona.ai Technical Coordinator → Implementation → Verification
 
 ## Quick Start
 
-### 1. Access Dream Chat (Keystone Work Interface)
+### 1. Access Dream Chat (unisona.ai Work Interface)
 ```
 Browser: http://127.0.0.1:4177/dream-chat.html
 Port 4177 = stable (master branch)
@@ -16,7 +16,7 @@ Port 4178 = dev preview (current branch)
 ### 2. Use !convergance to Route Issues
 ```
 Message: !convergance
-Keystone will:
+unisona.ai will:
 1. Fetch open 1.5-release issues from GitHub
 2. Classify each by priority (P0 > P1 > P2)
 3. Suggest implementation order
@@ -26,7 +26,7 @@ Keystone will:
 ### 3. Example: Analyze Issue #456 (Security Fixes)
 ```
 User: "Analyze issue #456 and propose implementation"
-Keystone responds with:
+unisona.ai responds with:
 - Issue summary (what problem/request)
 - Concrete requirements
 - File paths to inspect
@@ -39,7 +39,7 @@ Keystone responds with:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ USER OPENS DREAM CHAT (Keystone Work Mode)              │
+│ USER OPENS DREAM CHAT (unisona.ai Work Mode)              │
 └────────────────────┬────────────────────────────────────┘
                      │
         ┌────────────▼────────────────┐
@@ -49,7 +49,7 @@ Keystone responds with:
         └────────────┬────────────────┘
                      │
         ┌────────────▼────────────────┐
-        │ Keystone Technical Coordinator
+        │ unisona.ai Technical Coordinator
         │ - No dream doors/persona
         │ - Pure GitHub + code focus
         │ - Suggests file paths
@@ -69,7 +69,7 @@ Keystone responds with:
         ┌────────────▼─────────────────────┐
         │ OPERATOR TAKES ACTION:            │
         │ - Opens files in editor           │
-        │ - Makes changes per Keystone plan │
+        │ - Makes changes per unisona.ai plan │
         │ - Runs tests                      │
         │ - Creates PR / pushes to branch   │
         └────────────┬─────────────────────┘
@@ -105,13 +105,13 @@ Keystone responds with:
 ```
 !convergance
 ```
-Keystone will fetch and prioritize all issues tagged with `1.5-release`.
+unisona.ai will fetch and prioritize all issues tagged with `1.5-release`.
 
 ### Focus on Specific Issue
 ```
 Analyze issue #456 and propose implementation
 ```
-Keystone will:
+unisona.ai will:
 - Fetch issue details from GitHub
 - Understand the problem
 - Inspect relevant code paths
@@ -121,14 +121,14 @@ Keystone will:
 ```
 What work should we tackle next?
 ```
-Keystone will:
+unisona.ai will:
 - Review open P0 and P1 issues
 - Check code readiness
 - Recommend highest-impact next step
 
-## Keystone System Behavior
+## unisona.ai System Behavior
 
-**Technical Focus:** Keystone does NOT include dream-journal elements, door suggestions, or persona flavor.
+**Technical Focus:** unisona.ai does NOT include dream-journal elements, door suggestions, or persona flavor.
 
 **Guaranteed in Response:**
 - ✓ GitHub issue analysis
@@ -146,12 +146,12 @@ Keystone will:
 
 ## Verification
 
-After Keystone routes an issue, verify:
+After unisona.ai routes an issue, verify:
 
 ### 1. File Access
 ```bash
 cd apps/lantern-garage
-# Check files Keystone mentioned
+# Check files unisona.ai mentioned
 ls lib/dream-chat.js
 grep -n "keystone" lib/dream-chat.js
 ```
@@ -180,7 +180,7 @@ taskkill /F /IM node.exe
 cd apps/lantern-garage && npm start
 ```
 
-### Keystone Gives Vague Response
+### unisona.ai Gives Vague Response
 **Re-route with more context:**
 ```
 "Analyze issue #456: What are the concrete XSS attack vectors we need to block?"
@@ -197,7 +197,7 @@ cd apps/lantern-garage && npm start
 
 ✓ Sprint is complete when:
 1. All P0 issues analyzed and PR status visible
-2. Keystone responses verified: pure technical (no dream doors)
+2. unisona.ai responses verified: pure technical (no dream doors)
 3. At least 5 issues moved from "open" to "in review" (PR created)
 4. No test failures on master
 5. v1.5.0 tag created
@@ -206,5 +206,5 @@ cd apps/lantern-garage && npm start
 
 - **[CLAUDE.md](../CLAUDE.md)** — Agent workstream rules, per-agent lanes
 - **[PROVIDERS.md](../PROVIDERS.md)** — LLM provider configuration
-- **[Keystone Technical Refactor](./KEYSTONE-TECHNICAL-REFACTOR.md)** — System prompt details
+- **[unisona.ai Technical Refactor](./KEYSTONE-TECHNICAL-REFACTOR.md)** — System prompt details
 - **[Sprint Plan](./data/sprints/COMET-LEAP-1.5-2026-06-20.md)** — Full sprint backlog

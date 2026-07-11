@@ -257,7 +257,7 @@ async function testWebSearch() {
     const r = await fetch('http://127.0.0.1:8772/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'Unisona OS', max_results: 3 } } }),
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'unisona.ai', max_results: 3 } } }),
     });
     const data = await r.json();
     if (data.result && data.result.success) {
@@ -1766,7 +1766,7 @@ document.getElementById('input').addEventListener('input', e => {
     { value: 'perplexity',  label: 'Perplexity',  bucket: 'perplexity' },
     { value: 'cohere',      label: 'Cohere',      bucket: 'cohere'     },
     { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
-    { value: 'keystone-ft', label: 'Keystone FT', bucket: 'ollama', local: true },
+    { value: 'keystone-ft', label: 'unisona.ai FT', bucket: 'ollama', local: true },
   ];
 
   function applyRequestedProvider() {

@@ -8,7 +8,7 @@ updated: 2026-06-20
 
 ## Purpose
 
-This document covers the local and cloud runtime behavior, deployment gates, and CI/CD validation for Keystone OS Garage.
+This document covers the local and cloud runtime behavior, deployment gates, and CI/CD validation for unisona.ai Garage.
 
 ## Runtime Modes
 

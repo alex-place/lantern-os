@@ -155,7 +155,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     return true;
   }
 
-  // ── Code modification endpoint (Keystone can apply real changes) ─────────
+  // ── Code modification endpoint (unisona.ai can apply real changes) ─────────
   if (url.pathname === "/api/code/apply" && req.method === "POST") {
     try {
       const raw = await collectRequestBody(req);

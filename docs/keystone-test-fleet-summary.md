@@ -1,4 +1,4 @@
-# Keystone Autonomous Test Fleet — Summary & Quick Start
+# unisona.ai Autonomous Test Fleet — Summary & Quick Start
 
 **Date**: 2026-06-16  
 **Status**: Issues created, ready for Phase 0 implementation  
@@ -9,7 +9,7 @@
 
 ## What We Built
 
-A **complete GitHub issue roadmap** for an autonomous testing agent (Keystone) that:
+A **complete GitHub issue roadmap** for an autonomous testing agent (unisona.ai) that:
 
 1. **Runs browser automation** (Playwright) against dream-chat.html, home, trader dashboard
 2. **Detects bugs** (crashes, missing elements, console errors, security issues)
@@ -17,7 +17,7 @@ A **complete GitHub issue roadmap** for an autonomous testing agent (Keystone) t
 4. **Files issues** to GitHub automatically with approval gate
 5. **Streams all steps** via SSE (fully observable, per #527 A1 pattern)
 6. **Persists results** in convergence records (append-only JSONL)
-7. **Integrates with Keystone persona** in dream-chat.html ("test the app")
+7. **Integrates with unisona.ai persona** in dream-chat.html ("test the app")
 8. **Auto-runs daily** at startup (03:00 UTC)
 
 ---
@@ -86,7 +86,7 @@ Day 8–9: Phase 4 (observability)
 
 ```
 Day 10: Phase 5 (integration)
-  - Keystone persona routes "test" messages
+  - unisona.ai persona routes "test" messages
   - Daily cron scheduler
   - Error recovery & resilience
   

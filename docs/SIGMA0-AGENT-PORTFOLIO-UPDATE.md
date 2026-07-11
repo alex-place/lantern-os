@@ -1,6 +1,6 @@
-# Σ₀ (Keystone Coder) Serving Architecture — Staff Portfolio Update (v2)
+# Σ₀ (unisona.ai Coder) Serving Architecture — Staff Portfolio Update (v2)
 
-**Workstream:** Keystone chat / Σ₀ coder runtime
+**Workstream:** unisona.ai chat / Σ₀ coder runtime
 **Date:** 2026-06-21
 **Audience:** Senior engineering peer-review panel + funding stakeholder
 **Decision owner:** Σ₀ workstream lead

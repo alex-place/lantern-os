@@ -1,13 +1,13 @@
 "use strict";
 /**
- * Keystone live project context — links Keystone chat to the project's real tools
+ * unisona.ai live project context — links unisona.ai chat to the project's real tools
  * and details so any provider (incl. Grok) can answer grounded in GitHub + MCP.
  *
  * Gathers (best-effort, cached 60s):
  *   - open GitHub issues + PRs (via `gh`; the reliable path)
  *   - the MCP server's tool inventory + status (via callMcpTool; degrades if MCP down)
  *   - current branch
- * Returns a compact context block injected into Keystone's system prompt.
+ * Returns a compact context block injected into unisona.ai's system prompt.
  *
  * Everything is best-effort: any failure is omitted, never thrown.
  */

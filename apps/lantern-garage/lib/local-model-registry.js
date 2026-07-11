@@ -107,7 +107,7 @@ const DEFAULTS = [
     taskTypes: ["kernel"],
     rank: 0,
     capabilityScore: 0.45,
-    note: "Keystone kernel fine-tune of Ouro (kernel chain lead, #894).",
+    note: "unisona.ai kernel fine-tune of Ouro (kernel chain lead, #894).",
   },
   {
     id: "keystone-sigma0-plt",

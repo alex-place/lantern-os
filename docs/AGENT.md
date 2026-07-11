@@ -174,7 +174,7 @@ keep the survivors.** (Demonstrated unverified 0.90 → verified 0.95 → patter
 grading pass (periodic / on-settlement) so it runs without a human.
 
 Routing for trade chat is cached deterministically by
-[`convergence-router.js`](apps/lantern-garage/lib/convergence-router.js) (120 Keystone routes, >70%
+[`convergence-router.js`](apps/lantern-garage/lib/convergence-router.js) (120 unisona.ai routes, >70%
 hit rate); live data flows collector → server snapshot → UI poll (no UI-direct Kalshi calls).
 
 ---

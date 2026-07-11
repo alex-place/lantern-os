@@ -1,7 +1,7 @@
 # OSS Landscape Baseline — 2026-07-06
 
 **What this is:** a grounded, verified snapshot of the open-source terrain across every layer the
-Keystone control-plane touches. Baselines our knowledge so we build on proven OSS instead of
+unisona.ai control-plane touches. Baselines our knowledge so we build on proven OSS instead of
 reinventing it, and know exactly what to **stand on** (wrap), **beat** (benchmark against),
 **watch** (competitor), or use as **reference**. Produced by an 8-agent audit (178 web lookups),
 every license / maintenance status / number verified against a 2026 source.
@@ -23,7 +23,7 @@ Across coding agents, runtimes, models, routing, memory, verification, and orche
 3. **verifiable receipts** (diff + test + source + cost + why-this-model), or
 4. **outcome-based routing** that learns which backend wins on *the user's own* repos.
 
-That four-part **accountability layer is the unoccupied ground** — and the product thesis. Keystone
+That four-part **accountability layer is the unoccupied ground** — and the product thesis. unisona.ai
 is **assembly, not invention**: proven OSS components + the accountability layer nobody ships.
 Because it's assembly, the components are copyable — **the moat is execution quality + the
 compounding owned data** (approvals, rejections, per-repo outcome history, receipts), not the parts.
@@ -32,7 +32,7 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
 
 ## The stack — stand on / beat / watch
 
-| Layer | ✅ Stand on (component) | 🎯 Baseline to beat | 👁 Watch (competitor) | Keystone's owned piece (the gap) |
+| Layer | ✅ Stand on (component) | 🎯 Baseline to beat | 👁 Watch (competitor) | unisona.ai's owned piece (the gap) |
 |---|---|---|---|---|
 | **Coding agents** | **OpenHands** (MIT, headless, LiteLLM→100+ providers, SWE-bench 72%); **Aider** (Apache-2.0, best diff engine) | **Codex CLI** (Terminal-Bench 83.4%, OpenAI-first) | **opencode** (178k★), **Goose** (Linux Foundation), **Cline** (62k★) | memory / approval / receipts |
 | **Local runtime** | **Ollama** + **llama.cpp** (MIT, 8GB-native); ExLlamaV3 (MIT) | — | LM Studio (proprietary) | dumb substrate — correct as-is |
@@ -92,7 +92,7 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
   `lms` CLI + headless daemon). Free for commercial use per terms, but closed.
 - **HF TGI** · **HFOILv1** (source-available, *not* OSI; ≤0.9.4 was Apache) · **avoid** for a hosted
   paid service — license restricts it.
-- **Gap:** every engine here is a stateless token-generator. That's correct — Keystone supplies the
+- **Gap:** every engine here is a stateless token-generator. That's correct — unisona.ai supplies the
   accountability the substrate deliberately lacks.
 
 ### Open-weight coding models — the local-engine candidates (vs Ouro-1.4B)

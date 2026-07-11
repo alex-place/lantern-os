@@ -1,4 +1,4 @@
-# Keystone — What it can't do (yet)
+# unisona.ai — What it can't do (yet)
 
 **Date:** 2026-06-20 · An honest, evidence-tagged audit of current limitations, per the External Reality Rule. Tags: **[measured]** / **[observed]** (seen live) / **[design]** (a deliberate constraint) / **[fixed]** (resolved in this pass).
 
@@ -10,7 +10,7 @@
 - **No automatic cross-session recall in chat.** Within a session, context carries (#772); across sessions it does not auto-recall — that lives in the journal / CSF and is manual. [observed]
 
 ## Autonomy & the convergence loop
-- **The loop doesn't run end-to-end in the live serving path.** Chat emits Convergence Records but nothing grades most of them, so Keystone does **not** yet learn from ordinary conversations — only the Kalshi trade slice closes Reason→Verify→Converge. [agent-spine note]
+- **The loop doesn't run end-to-end in the live serving path.** Chat emits Convergence Records but nothing grades most of them, so unisona.ai does **not** yet learn from ordinary conversations — only the Kalshi trade slice closes Reason→Verify→Converge. [agent-spine note]
 - **Governors aren't gating live actions.** The grounding throttle and the Σ₀ surprise canary exist but aren't yet wired onto every action. [agent-spine §6.5]
 
 ## Autowork (autonomous issue-fixing)

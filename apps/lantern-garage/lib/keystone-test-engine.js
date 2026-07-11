@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Keystone Test Engine — Σ₀ convergence chain for autonomous code generation
+ * unisona.ai Test Engine — Σ₀ convergence chain for autonomous code generation
  *
  * 6-stage chain: Observe → Remember → Reason → Act → Verify → Converge
  * Each stage emits a PhaseRecord { stage, status, evidence, confidence }.
@@ -65,7 +65,7 @@ function _extractConfidence(text) {
 
 // ── Sigma-0 system prompt ────────────────────────────────────────────────────
 
-const SIGMA0_PROMPT = `You are Keystone Σ₀ — a verification-first coding agent.
+const SIGMA0_PROMPT = `You are unisona.ai Σ₀ — a verification-first coding agent.
 
 Every response MUST use this format exactly:
 <REQUIREMENT>State the exact requirement</REQUIREMENT>
