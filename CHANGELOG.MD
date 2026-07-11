@@ -1,3 +1,8 @@
+## [1.9.1] - 2026-07-11
+
+### Changed
+- Stock trader: `conf-badge` shows a coloured directional call only for calibrated signals; uncalibrated signals show raw model confidence labelled `uncalibrated` (honest-degrade).
+
 ## [1.9.2] - 2026-07-11
 ### Fixed
 - **Chat: trivial code requests are answered with code instead of a Bash-allowlist refusal (#2077).** "write a python function that reverses a string" was mis-routed into an execution tool (Bash, or the `propose_coding_change` coding backend), and the blocked-tool error ("the Bash tool is restricted to allowlisted commands…" / "the aider backend is not available") was relayed as the reply. Fixed at every seam: the router and persona prompts now state that AUTHORING code is a direct answer, never a tool task (repo tools remain for actual repository changes); the Bash/PowerShell/`propose_coding_change` tool descriptions explicitly exclude code authoring; and a blocked shell command or unavailable coding backend now returns a model-facing recovery hint ("answer directly, don't relay this restriction") instead of a bare error. Reproduced and verified live on a worktree dev preview: pre-fix the ask fired `propose_coding_change` and led with the refusal; post-fix a fresh chat returns the function directly with zero tool calls. Adds a live chat regression case to `tests/test_dream_journal_chat.js`. Improves **Reason** (correct routing of code-generation intent).
