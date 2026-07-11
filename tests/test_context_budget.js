@@ -129,7 +129,7 @@ process.stdout.write("\ncondenseTurn()\n\n");
 
 test("labels by role", () => {
   assert.ok(condenseTurn(turn("user", "hello there")).startsWith("- You:"));
-  assert.ok(condenseTurn(turn("assistant", "hi back")).startsWith("- Keystone:"));
+  assert.ok(condenseTurn(turn("assistant", "hi back")).startsWith("- unisona.ai:"));
 });
 
 test("clips to maxWords with ellipsis + collapses whitespace", () => {
@@ -143,7 +143,7 @@ test("no ellipsis when under the word cap", () => {
 });
 
 test("empty text → (no text)", () => {
-  assert.strictEqual(condenseTurn(turn("assistant", "")), "- Keystone: (no text)");
+  assert.strictEqual(condenseTurn(turn("assistant", "")), "- unisona.ai: (no text)");
 });
 
 // ── buildRollingSummary ──────────────────────────────────────────────────────

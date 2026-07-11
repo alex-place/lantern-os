@@ -1,7 +1,7 @@
 /**
  * PR Watcher — polls open GitHub PRs every 60s.
  * After a PR has been idle for IDLE_MS (default 3min), pulls the diff + body,
- * sends to Keystone chat for review, and posts the result as a PR comment.
+ * sends to unisona.ai chat for review, and posts the result as a PR comment.
  *
  * Reviews are keyed to the PR's HEAD COMMIT SHA: each commit is reviewed at most
  * once. This is deliberate — posting a comment bumps the PR's `updatedAt`, so a
@@ -666,7 +666,7 @@ class PrWatcher {
         message,
         user: "pr-watcher",
         conversationId: "pr-review-fleet",
-        // The route reads `agent` (not `forceAgent`) → keep the Keystone reviewer persona.
+        // The route reads `agent` (not `forceAgent`) → keep the unisona.ai reviewer persona.
         agent: "keystone",
         // Pin a working provider. The default (no provider) path classifies a diff-bearing
         // review as "coding" and routes to the local Σ₀ coder / preferred provider, which on

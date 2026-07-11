@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Wrapped-vs-raw benchmark for the Keystone coding-backend control plane (#2173).
+Wrapped-vs-raw benchmark for the unisona.ai coding-backend control plane (#2173).
 
 Same coding tasks, same local model (Qwen2.5-Coder via Ollama), two paths:
 

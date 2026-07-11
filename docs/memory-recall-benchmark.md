@@ -1,6 +1,6 @@
 # Memory Recall Benchmark (LongMemEval) — methodology + how to run
 
-Durable, re-runnable harness that measures Keystone's **live** memory retrieval
+Durable, re-runnable harness that measures unisona.ai's **live** memory retrieval
 against the **LongMemEval** task, and wires a head-to-head against external
 memory systems (Letta/MemGPT, Mem0, Zep). Closes the "we assert a memory edge we
 never measured" gap (#1739) — the prior `runs.jsonl` referenced a harness that was

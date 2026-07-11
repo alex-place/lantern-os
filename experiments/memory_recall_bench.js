@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * memory_recall_bench.js — durable, re-runnable LongMemEval recall harness for
- * Keystone's LIVE memory retrieval (#1739).
+ * unisona.ai's LIVE memory retrieval (#1739).
  *
  * Why this exists: the memory "edge" had been asserted but never durably measured
  * — data/longmemeval/runs.jsonl referenced an `experiments/longmemeval_harness.py`
@@ -27,7 +27,7 @@
  *   node experiments/memory_recall_bench.js --no-write --json
  *
  * Dataset shape (either is accepted):
- *   - Keystone fixture: { instances:[ { id, question, sessions:[{session_id,turns:[{role,content}]}], answer_session_ids:[..] } ] }
+ *   - unisona.ai fixture: { instances:[ { id, question, sessions:[{session_id,turns:[{role,content}]}], answer_session_ids:[..] } ] }
  *   - Official LongMemEval: [ { question_id, question, haystack_session_ids, haystack_sessions:[[{role,content}]], answer_session_ids:[..] } ]
  */
 'use strict';

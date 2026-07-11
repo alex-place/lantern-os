@@ -6,7 +6,7 @@ updated: 2026-06-20
 
 # Innovator Evidence Method
 
-Keystone OS uses the operator's Innovator method for release decisions. The old
+unisona.ai uses the operator's Innovator method for release decisions. The old
 Seven smoke check is deprecated and must not be treated as a release gate.
 
 ## Method
@@ -48,7 +48,7 @@ Each promoted artifact should record:
 ## Deprecated Legacy Path
 
 The old Seven audit can remain as historical context in source repos, but
-Keystone OS readiness must use `docs/CONVERGENCE-LOOP.md`.
+unisona.ai readiness must use `docs/CONVERGENCE-LOOP.md`.
 
 ## Hard Stops
 

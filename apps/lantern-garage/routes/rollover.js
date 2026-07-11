@@ -2,7 +2,7 @@
 /**
  * Rollover observability (#898): GET /api/rollover/status
  *
- * Computes the Keystone-vs-Claude landed-work share + escalation rate from two sources:
+ * Computes the unisona.ai-vs-Claude landed-work share + escalation rate from two sources:
  *   1. Convergence records (reasoner="keystone-kernel") — written by autowork when the
  *      kernel actually runs an issue.
  *   2. Git branch attribution — count merged PRs by branch prefix (claude/, auto/issue-*,

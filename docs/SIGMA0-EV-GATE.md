@@ -6,7 +6,7 @@ updated: 2026-06-30
 
 # Σ₀ EV Gate — the trader's Converge stage
 
-*How Keystone decides ENTER vs SKIP on a candidate trade: one transparent
+*How unisona.ai decides ENTER vs SKIP on a candidate trade: one transparent
 expected-value model over weighted evidence, not a stack of discretionary gates.*
 
 Source: [`src/trading_agents/convergence_ev.py`](../src/trading_agents/convergence_ev.py)
@@ -21,11 +21,11 @@ The trader collects evidence from several detectors — Grok's read, Claude's re
 whether price is at a real support/resistance zone, a 1-minute structure shift, a
 candle pattern, the higher-timeframe trend, and ticker news. The old design ran
 these as **pass/fail gates** (Riley's WAIT/GOOD/PERFECT tiers, plus a Claude HOLD
-veto), which exists to stop a *human* from overtrading. Keystone doesn't need that
+veto), which exists to stop a *human* from overtrading. unisona.ai doesn't need that
 crutch — it can weigh every piece at once and act on **expected value**.
 
 The EV gate turns each candidate trade into a **Convergence Record** (one of
-Keystone's four core objects: hypothesis + evidence + confidence + result) and
+unisona.ai's four core objects: hypothesis + evidence + confidence + result) and
 makes a single, auditable ENTER/SKIP call.
 
 ---

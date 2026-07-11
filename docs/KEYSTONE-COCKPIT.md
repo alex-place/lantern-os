@@ -1,19 +1,19 @@
-# Keystone Cockpit — the human-in-the-loop spine
+# unisona.ai Cockpit — the human-in-the-loop spine
 
 **Status: BUILT + TESTED (2026-06-25).** Core in [`src/keystone/cockpit.py`](../src/keystone/cockpit.py);
 8 tests in [`tests/test_keystone_cockpit.py`](../tests/test_keystone_cockpit.py).
 
-The personal-AI flow Keystone is built around:
+The personal-AI flow unisona.ai is built around:
 
 ```
-You ask Keystone
+You ask unisona.ai
 → it identifies the task and the evidence it needs
 → it gathers from local files / web / email / calendar / MCP / an approved model
 → it shows what it found and what it plans to do
 → you approve anything that SENDS, SCHEDULES, SUBMITS, SPENDS, or CHANGES records.
 ```
 
-Keystone never assumes it can submit an application, book an appointment, or email someone
+unisona.ai never assumes it can submit an application, book an appointment, or email someone
 without showing you the final action first.
 
 ## Two human-in-the-loop gates
@@ -24,7 +24,7 @@ A store of personal facts: resume facts, family scheduling preferences, insuranc
 choose to store, preferred doctors/dentists, active applications. Every fact is one of:
 
 - **approved** — durable, trusted as truth (the cockpit acts on it);
-- **proposed** — held; gathered or inferred by Keystone but **not trusted until you approve**
+- **proposed** — held; gathered or inferred by unisona.ai but **not trusted until you approve**
   (confidence capped at 0.7).
 
 The save **only happens on approval** (`Profile.approve`). Facts are editable; persistence is
@@ -44,7 +44,7 @@ never authorizes a mutation.
 
 ## The Question Machine, here
 
-When Keystone lacks a key fact for a task — *"Which CareSource role?"*, *"What insurance
+When unisona.ai lacks a key fact for a task — *"Which CareSource role?"*, *"What insurance
 plan?"*, *"Who needs the dentist appointment?"* — it surfaces the **smallest useful
 question**: the single highest-priority missing fact, **one at a time**, in the task's
 declared priority order (`Cockpit.next_question`). You answer; the answer is saved as durable

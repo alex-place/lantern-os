@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-Dream Chat is the conversational AI interface of Lantern OS, providing multi-agent dialogue through 6 distinct personas (Lantern, Blinkbug, Keystone, Waterfall, Xenon, Founder). It supports 4 AI providers with automatic failover and health monitoring.
+Dream Chat is the conversational AI interface of Lantern OS, providing multi-agent dialogue through 6 distinct personas (Lantern, Blinkbug, unisona.ai, Waterfall, Xenon, Founder). It supports 4 AI providers with automatic failover and health monitoring.
 
 **Required Services:**
 - At least 1 AI provider (Anthropic, OpenAI, Google Gemini, or local Ollama)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Populate the Keystone Radio audio library from its committed manifest.
+Populate the unisona.ai Radio audio library from its committed manifest.
 
 The radio playlist lives in `apps/lantern-garage/public/radio/stations.json`
 (small, committed). The audio files themselves are NOT committed (they'd be

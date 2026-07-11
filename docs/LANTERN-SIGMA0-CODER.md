@@ -23,7 +23,7 @@ updated: 2026-06-21
 
 A LoRA fine-tuned on the project's past Claude Code engineering sessions, served through
 Ollama, and routed to work by the performance leaderboard. It backed autowork and the
-Keystone engineering desk as the local-first coder.
+unisona.ai engineering desk as the local-first coder.
 
 | | |
 |---|---|

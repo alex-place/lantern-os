@@ -1,10 +1,10 @@
-"""Keystone-Σ₀ PLT model configuration.
+"""unisona.ai-Σ₀ PLT model configuration.
 
-This is Keystone OS's *own* configuration for a Parallel Loop Transformer (PLT)
+This is unisona.ai's *own* configuration for a Parallel Loop Transformer (PLT)
 coder. It is a faithful, renamed re-derivation of the upstream IQuestPLTCoder
 config (Apache-2.0, `Multilingual-Multimodal-NLP/LoopCoder-V2`,
 arXiv:2510.24824) so that we OWN the architecture end-to-end (ADR-0011) — the
-weights are bootstrapped from that Apache-2.0 checkpoint and become a Keystone
+weights are bootstrapped from that Apache-2.0 checkpoint and become a unisona.ai
 artifact we adjust via adapters (ADR-0010).
 
 PLT reuses the same `num_hidden_layers` physical layers across `plt_num_loops`

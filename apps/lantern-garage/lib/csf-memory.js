@@ -593,7 +593,7 @@ function formatCSFContextForPrompt(message, opts = {}) {
     const convo = queryConversationMemory(message, 4);
     if (convo.length > 0) {
       const convoText = convo
-        .map(c => `- ${c.role === "lantern" ? "You (Keystone) previously said" : "The user previously said"}: ${c.text.slice(0, 220)}`)
+        .map(c => `- ${c.role === "lantern" ? "You (unisona.ai) previously said" : "The user previously said"}: ${c.text.slice(0, 220)}`)
         .join("\n");
       parts.push(`Possibly-relevant excerpts from this user's earlier conversations with you, recalled by keyword overlap (persisted across sessions). Treat them as prior context, not verified fact: if they are clearly on-topic you may rely on and reference them; if a match looks coincidental or you are unsure, say so rather than vouching for the details:\n${convoText}`);
     }

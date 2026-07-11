@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""QLoRA SFT for Keystone-Σ₀ PLT — adapter-only over a frozen base (ADR-0010).
+"""QLoRA SFT for unisona.ai-Σ₀ PLT — adapter-only over a frozen base (ADR-0010).
 
 Per ADR-0010, weight adjustment is adapter-only: the bootstrapped base stays
 frozen, updates land in a replaceable LoRA adapter regenerable from verified

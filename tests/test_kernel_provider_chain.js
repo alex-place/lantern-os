@@ -38,7 +38,7 @@ async function run() {
     assert.ok(Array.isArray(kernelChain) && kernelChain.length >= 2,
       "kernel chain must have at least 2 entries");
     assert.strictEqual(kernelChain[0].provider, "ollama",
-      "kernel chain must start with ollama (Keystone/Ouro)");
+      "kernel chain must start with ollama (unisona.ai/Ouro)");
     assert.ok(kernelChain[0].models.some((m) => m.includes("keystone") || m.includes("ouro")),
       "first kernel chain step must include a keystone or ouro model");
     // Last entry must be anthropic (last-resort fallback)

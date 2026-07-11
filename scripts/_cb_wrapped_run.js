@@ -1,6 +1,6 @@
 "use strict";
 // Helper for scripts/eval_coding_backend_ab.py — runs ONE coding task through the
-// Keystone coding-backend control plane end-to-end (propose -> HOLD -> receipt ->
+// unisona.ai coding-backend control plane end-to-end (propose -> HOLD -> receipt ->
 // approve -> apply) and prints JSON so the Python harness can grade the applied code.
 // Usage: node scripts/_cb_wrapped_run.js "<task prompt>" [backend]
 const fs = require("fs");

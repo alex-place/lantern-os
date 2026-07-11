@@ -1,6 +1,6 @@
 # BENCHMARKS — External Marks Registry
 
-**The maintained list of every *public, externally-defined* benchmark Keystone OS has run or
+**The maintained list of every *public, externally-defined* benchmark unisona.ai has run or
 plans to run.** "Real online marks" = benchmarks owned by someone else, with a fixed public
 dataset and a grading contract we don't control (HumanEval, SWE-bench, LongMemEval, …). This is
 the Σ₀ external-reality rule applied to ourselves: a capability claim is only real with

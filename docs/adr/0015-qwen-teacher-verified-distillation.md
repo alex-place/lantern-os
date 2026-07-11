@@ -80,7 +80,7 @@ implement it as an extension of the existing flywheel — not as a new subsystem
    auditable and a bad teacher is traceable and revocable.
 
 3. **The student is Ouro-1.4B (runnable now).** The crystallized corpus trains an **Ouro-1.4B
-   QLoRA adapter** (~45 s/step on the 8 GB 3070) — not the 7.6 B Keystone-Σ₀ PLT, which cannot
+   QLoRA adapter** (~45 s/step on the 8 GB 3070) — not the 7.6 B unisona.ai-Σ₀ PLT, which cannot
    train under 8 GB and waits on the ≥24 GB box ([#1829]). "Crystallize a model for oura" targets
    Ouro deliberately.
 
@@ -156,7 +156,7 @@ running it on the GPU box under ADR-0010.
   safe default if this ADR is rejected — merged PRs are already verified. Rejected as *sole*
   source because PR volume is finite and long-diff-skewed (only 530/1,178 unisona rows fit
   seq=1536, [[crystallization-grounding-corpus]]); a verified proposer cheaply widens coverage.
-- **Distil into the 7.6 B Keystone-Σ₀ PLT instead of Ouro-1.4B.** Deferred — the 7.6 B student
+- **Distil into the 7.6 B unisona.ai-Σ₀ PLT instead of Ouro-1.4B.** Deferred — the 7.6 B student
   cannot train under 8 GB (#1829). The corpus this pipeline produces is model-agnostic and can
   feed the PLT student later on the ≥24 GB box.
 

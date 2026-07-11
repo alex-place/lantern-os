@@ -4,7 +4,7 @@ created: 2026-05-26
 updated: 2026-07-10
 ---
 
-# AGENTS.md — Keystone OS
+# AGENTS.md — unisona.ai
 
 A focused guide for AI coding agents. **Read this before touching anything.**
 
@@ -254,7 +254,7 @@ Never claim a skill or fleet slot is active unless confirmed by implementation o
 
 ### Theory
 
-From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In Keystone OS:
+From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In unisona.ai:
 
 - **Quantum dust** = observations, measurements, user input, convergence signals
 - **Doors** = routing pathways between agents, memory layers, and external observations
@@ -266,8 +266,8 @@ From the Σ₀ Collapse Certificate: ungrounded self-referential systems collaps
 
 | Layer | Dust Source | Door | Where It's Lost |
 |-------|-------------|------|-----------------|
-| **Message input** | User message | Dream→Keystone | Agent selection ignores message content |
-| **Provider routing** | API attempt logs | Keystone→Provider | Fallback chain has no escalation gate |
+| **Message input** | User message | Dream→unisona.ai | Agent selection ignores message content |
+| **Provider routing** | API attempt logs | unisona.ai→Provider | Fallback chain has no escalation gate |
 | **Intent routing** | Keyword scores | Intent→Agent cache | Cache misses re-scores but never updates |
 | **Memory selection** | Relevance scores | CSF→Context | Low-score memories forced into context |
 | **Escalation gate** | Novelty score | Gate→Escalation | Decision logged but conditionally ignored |
@@ -276,7 +276,7 @@ From the Σ₀ Collapse Certificate: ungrounded self-referential systems collaps
 
 See `docs/SIGMA0-COLLAPSE-PARADOXES.md` for the full analysis. Quick summary:
 
-1. **Agent Selection Hard Loop**: Keystone always selected regardless of message. Dust arrives but routing doesn't read it.
+1. **Agent Selection Hard Loop**: unisona.ai always selected regardless of message. Dust arrives but routing doesn't read it.
 2. **Provider Fallback Divergence**: Attempt logs written but no loop reads to adjust chains. Exponential cost growth.
 3. **Convergence Route Staleness**: Relevance scores computed fresh, cached decisions never validated against new state.
 4. **Memory Truncation Unmeasured**: History compressed deterministically without quality metrics. Predictive power degrades silently.
@@ -288,7 +288,7 @@ For each paradox, the fix is the same: **Create feedback pathways where dust obs
 
 Example (Paradox 1 — Agent Selection):
 ```javascript
-// BROKEN: Always returns Keystone
+// BROKEN: Always returns unisona.ai
 return keystone;
 
 // FIXED: Dust (message) influences routing
@@ -349,7 +349,7 @@ the change-record, stale-clobber, and **new-surface sprawl tripwire** gates at
 
 ### Porting third-party code (licensing — Critical)
 
-Only **permissive** OSS (Apache-2.0 / MIT / BSD-family) may be ported into Keystone. **GPL / AGPL / LGPL code MUST NOT be ported** — copyleft would relicense the whole project; re-implement clean-room from the docs instead. Every port (vendored verbatim under `vendor/<name>/` with the upstream `LICENSE` preserved, or a clean-room re-implementation credited in the file's docstring) must be recorded in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). See that file for the full convention (#1412).
+Only **permissive** OSS (Apache-2.0 / MIT / BSD-family) may be ported into unisona.ai. **GPL / AGPL / LGPL code MUST NOT be ported** — copyleft would relicense the whole project; re-implement clean-room from the docs instead. Every port (vendored verbatim under `vendor/<name>/` with the upstream `LICENSE` preserved, or a clean-room re-implementation credited in the file's docstring) must be recorded in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). See that file for the full convention (#1412).
 
 ### Agent Documentation (for `claude/*`, `gemini/*`, etc. branches)
 

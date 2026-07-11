@@ -1,7 +1,7 @@
 "use strict";
 /**
  * indeed-oauth.js — OAuth 2.1 + PKCE client for Indeed's official MCP server so a user
- * can connect their Indeed account to Keystone and the assistant can search real Indeed
+ * can connect their Indeed account to unisona.ai and the assistant can search real Indeed
  * jobs on their behalf (Anthropic MCP-connector path: the stored token is passed as
  * mcp_servers[].authorization_token when the chat routes to Claude).
  *
@@ -69,7 +69,7 @@ async function ensureClient(redirectUri) {
   // NB: no `scope` in the registration body — Indeed's DCR rejects it
   // (invalid_client_metadata); allowed scopes are requested at authorize time instead.
   const body = {
-    client_name: process.env.INDEED_CLIENT_NAME || "Keystone OS (Unisona)",
+    client_name: process.env.INDEED_CLIENT_NAME || "unisona.ai",
     redirect_uris: [redirectUri],
     grant_types: ["authorization_code", "refresh_token"],
     response_types: ["code"],

@@ -89,7 +89,7 @@ async function run() {
     const agentName = r.body.agent;
     assert.ok(agentName, "should have agent name");
     assert.ok(
-      agentName.includes("Keystone") || agentName.includes("Founder") || agentName.includes("Blinkbug"),
+      agentName.includes("unisona.ai") || agentName.includes("Founder") || agentName.includes("Blinkbug"),
       `anchor/memory should select keystone-ish agent, got: ${agentName}`
     );
   });
@@ -194,6 +194,34 @@ async function run() {
       assert.strictEqual(r.status, 200);
       assert.ok(typeof r.body.reply === "string", `request ${i + 1} has reply`);
     }
+  });
+
+  // ── Regression #2077: pure code-gen asks are answered with code ───────────
+  // Live-LLM behavioral case (no deterministic contract exists for chat): a
+  // trivial "write a function" ask must come back with actual code and must not
+  // relay a shell/coding-backend restriction ("Bash tool is restricted to
+  // allowlisted commands…") as the answer.
+  console.log("\nCode-generation regression (#2077)");
+
+  await test("trivial code request returns code, not a shell-restriction refusal", async () => {
+    const r = await request("POST", "/api/dream/chat", {
+      message: "write a python function that reverses a string",
+    });
+    assert.strictEqual(r.status, 200);
+    const reply = String(r.body.reply || "");
+    if (r.body.online === false) {
+      console.log("    (no provider online — offline fallback exempt)");
+      return;
+    }
+    assert.ok(
+      /def\s+\w+\s*\(|```/.test(reply),
+      `expected python code in reply, got: ${reply.slice(0, 240)}`
+    );
+    const refusal = /(restricted to allowlisted|not allowlisted|allowlisted commands|bash tool is restricted|cannot (run|execute) (the )?(bash|shell|command))/i;
+    assert.ok(
+      !refusal.test(reply),
+      `reply relays a shell restriction instead of answering: ${reply.slice(0, 300)}`
+    );
   });
 
   // ── Summary ───────────────────────────────────────────────────────────────

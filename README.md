@@ -4,7 +4,7 @@ created: 2026-05-26
 updated: 2026-07-10
 ---
 
-# Keystone OS (product: **Unisona**)
+# unisona.ai (product: **Unisona**)
 
 <!-- Core CI / quality gates -->
 [![CI](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/ci.yml)
@@ -31,11 +31,11 @@ updated: 2026-07-10
 [![Release provenance](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/release-provenance.yml)
 [![MCP Tunnel Canary](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml/badge.svg)](https://github.com/alex-place/lantern-os/actions/workflows/mcp-tunnel-canary.yml)
 
-**Keystone OS** is the internal/architecture name; the **user-facing product is [Unisona](https://unisona.ai)** (primary domain **unisona.ai**; the older `lantern-os.net` still resolves). "Lantern OS" is dead branding — repo/app paths (`lantern-os`, `lantern-garage`) and code identifiers keep the legacy name, but no user-facing surface should say Lantern. It is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
+**unisona.ai** is the internal/architecture name; the **user-facing product is [Unisona](https://unisona.ai)** (primary domain **unisona.ai**; the older `lantern-os.net` still resolves). "Lantern OS" is dead branding — repo/app paths (`lantern-os`, `lantern-garage`) and code identifiers keep the legacy name, but no user-facing surface should say Lantern. It is a persistent local-first reasoning system with autonomous deployment, evidence-grounded convergence, and operator-controlled agent lanes.
 
 It combines a web app, local memory systems, MCP tooling, multi-provider routing, and a structured convergence loop so work moves from raw context → validated artifacts → archived evidence with clear receipts and ground-truth verification.
 
-**Current state (v1.8.x, 2026-07):** **Unisona 1.8 — "one front door"** shipped 2026-06-30 (see [docs/UNISONA-1.8.md](docs/UNISONA-1.8.md)): every stage of the loop now has a user-facing cockpit surface. Since then the 1.8.1xx line added accounts/auth (email-confirm hard gate, Terms of Service + EULA consent, tiered entitlements), a Windows desktop app (thin launcher, ADR-0014), and continued grounding/vision work. Foundations still standing: Σ₀ (Sigma-Zero) verification framework · serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`) · **WCAG AA accessibility** on all surfaces · **non-destructive auto-deploy** with `git merge --ff-only`. The product surface is **[Unisona / Keystone Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of the system.
+**Current state (v1.8.x, 2026-07):** **Unisona 1.8 — "one front door"** shipped 2026-06-30 (see [docs/UNISONA-1.8.md](docs/UNISONA-1.8.md)): every stage of the loop now has a user-facing cockpit surface. Since then the 1.8.1xx line added accounts/auth (email-confirm hard gate, Terms of Service + EULA consent, tiered entitlements), a Windows desktop app (thin launcher, ADR-0014), and continued grounding/vision work. Foundations still standing: Σ₀ (Sigma-Zero) verification framework · serving split into **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`) · **WCAG AA accessibility** on all surfaces · **non-destructive auto-deploy** with `git merge --ff-only`. The product surface is **[Unisona / unisona.ai Chat](docs/KEYSTONE-PRODUCT.md)** — the member's operator console for their own copy of the system.
 
 ---
 
@@ -50,7 +50,7 @@ It combines a web app, local memory systems, MCP tooling, multi-provider routing
 
 ## Table of Contents
 
-1. [What is Keystone OS?](#what-is-keystone-os)
+1. [What is unisona.ai?](#what-is-keystone-os)
 2. [Current Capabilities](#current-capabilities)
 3. [Release Status: v1.8](#release-status-v18)
 4. [Σ₀ (Sigma-Zero) Architecture](#σ₀-sigma-zero-architecture)
@@ -66,9 +66,9 @@ It combines a web app, local memory systems, MCP tooling, multi-provider routing
 
 ---
 
-## What is Keystone OS?
+## What is unisona.ai?
 
-Keystone OS is an **operating system for reasoning work** — not a traditional OS, but an app-level platform for managing complex, multi-step cognitive tasks.
+unisona.ai is an **operating system for reasoning work** — not a traditional OS, but an app-level platform for managing complex, multi-step cognitive tasks.
 
 ### Core Operating Model
 
@@ -80,7 +80,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ### Who Should Use This
 
-- **Keystone OS members** (subscribers) — you get the repo, the tools, and **Keystone chat**, the operator console for your own copy of the system. See **[Keystone Chat product definition](docs/KEYSTONE-PRODUCT.md)**.
+- **unisona.ai members** (subscribers) — you get the repo, the tools, and **unisona.ai chat**, the operator console for your own copy of the system. See **[unisona.ai Chat product definition](docs/KEYSTONE-PRODUCT.md)**.
 - **Solo developers** working on complex projects that need evidence-backed decision-making
 - **AI researchers** exploring convergence dynamics, autonomous routing, and persistent memory systems
 - **Organizations** needing local-first agent workflows with operator control and audit trails
@@ -92,7 +92,7 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **[Keystone Chat](docs/KEYSTONE-PRODUCT.md)** | ✅ Live | Member operator console — grounded technical chat, **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`), tool-wired, leaderboard-measured |
+| **[unisona.ai Chat](docs/KEYSTONE-PRODUCT.md)** | ✅ Live | Member operator console — grounded technical chat, **fast-cached default + deep Σ₀ opt-in** (`OURO_NATIVE=1`), tool-wired, leaderboard-measured |
 | **[Explore Feed](docs/EXPLORE-FEED.md)** | ✅ Live (2026-06-26) | Single-pane, PCSF-ranked content stream (reads/watch/build/docs/beliefs) with filter chips; learns from clicks/dismisses on the same leaderboard that ranks model providers — no new recommender subsystem (#1211) |
 | **Dream Journal** | ✅ Live | Freeform chat, local storage, JSONL export, PWA mode |
 | **1.6 Trader Dashboard** | ✅ Live (2026-06-16) | Real-time market data, position management, convergence metrics |
@@ -134,13 +134,13 @@ Observe → Remember → Reason → Act → Verify → Converge
 
 ## Σ₀ (Sigma-Zero) Architecture
 
-Keystone OS is built on **Σ₀** — a mathematical framework for verifying that systems don't collapse due to ungrounded feedback loops.
+unisona.ai is built on **Σ₀** — a mathematical framework for verifying that systems don't collapse due to ungrounded feedback loops.
 
 ### The Five Σ₀ Paradoxes (Identified 2026-06-14)
 
 | Paradox | Problem | Fix Status |
 |---------|---------|-----------|
-| **Agent Selection Hard Loop** | Keystone always chosen; message ignored | ✅ Fixed (PR #464) |
+| **Agent Selection Hard Loop** | unisona.ai always chosen; message ignored | ✅ Fixed (PR #464) |
 | **Provider Fallback Divergence** | Retries unbounded, no escalation gate | ✅ Fixed (PR #593) |
 | **Convergence Route Staleness** | Cache frozen, never validates new state | ✅ Fixed (PR #503) |
 | **Memory Truncation Unmeasured** | History loss silent, no quality metrics | ✅ Fixed (PR #473) |
@@ -178,7 +178,7 @@ The stable server (port 4177) uses a **non-destructive deployment model** that p
 
 ## WCAG AA Accessibility Compliance (2026-06-24)
 
-All surfaces now meet **WCAG 2.1 Level AA** standards. Keystone OS is committed to accessibility for all users, including those using keyboard navigation and assistive technologies.
+All surfaces now meet **WCAG 2.1 Level AA** standards. unisona.ai is committed to accessibility for all users, including those using keyboard navigation and assistive technologies.
 
 ### Accessibility Features
 
@@ -191,7 +191,7 @@ All surfaces now meet **WCAG 2.1 Level AA** standards. Keystone OS is committed 
 
 ### Compliance Details
 
-Per WCAG 2.1 Success Criterion 2.4.7 (Focus Visible), all keyboard-operable elements must have a visible focus indicator with minimum 3:1 contrast ratio. Keystone's cyan accent provides 5.8:1 contrast on both light and dark backgrounds.
+Per WCAG 2.1 Success Criterion 2.4.7 (Focus Visible), all keyboard-operable elements must have a visible focus indicator with minimum 3:1 contrast ratio. unisona.ai's cyan accent provides 5.8:1 contrast on both light and dark backgrounds.
 
 ### Latest Updates (2026-06-24)
 
@@ -380,7 +380,7 @@ There is **no lane cap**. The **assigned-issue convergence gate** (a PR closing 
 
 ## Autonomous Systems
 
-Keystone OS includes several autonomous systems that run without operator intervention:
+unisona.ai includes several autonomous systems that run without operator intervention:
 
 ### 1. Autonomous Repair (Health Monitoring)
 
@@ -520,7 +520,7 @@ npm run dev --prefix apps/lantern-garage
 
 ### For Product & Members
 
-- **[docs/KEYSTONE-PRODUCT.md](docs/KEYSTONE-PRODUCT.md)** — Keystone chat product definition (operator console for members) + serving contract (fast default / deep opt-in)
+- **[docs/KEYSTONE-PRODUCT.md](docs/KEYSTONE-PRODUCT.md)** — unisona.ai chat product definition (operator console for members) + serving contract (fast default / deep opt-in)
 - **[docs/SIGMA0-OURO-CODER.md](docs/SIGMA0-OURO-CODER.md)** — the Σ₀ coding agent (sibling surface): ship changes a developer merges with confidence
 
 ### For Architects
@@ -586,7 +586,7 @@ npm run dev --prefix apps/lantern-garage
 
 ## Privacy
 
-Keystone OS is **local-first by design.**
+unisona.ai is **local-first by design.**
 
 - Dream journal data and local runtime receipts stay on your machine
 - No telemetry or tracking built in
@@ -609,7 +609,7 @@ Or set in the UI settings drawer at runtime.
 
 © 2026 Alex Place
 
-Keystone OS is built with:
+unisona.ai is built with:
 - **Node.js** — Web server + API
 - **Python** — Convergence loop, MCP, memory
 - **Claude / Gemini / OpenAI** — Multi-provider routing

@@ -1,7 +1,7 @@
 /**
  * Convergance Merge Trainer — !convergance integration for auto merge resolver
  *
- * Allows Keystone technical coordinator to:
+ * Allows unisona.ai technical coordinator to:
  * 1. Query merge resolver performance metrics
  * 2. Analyze patterns from decision logs
  * 3. Generate recommendations for improvement
@@ -9,7 +9,7 @@
  *
  * Usage in !convergance:
  * User: "How can we improve our merge resolver?"
- * Keystone: [uses this trainer to analyze + provide insights]
+ * unisona.ai: [uses this trainer to analyze + provide insights]
  */
 
 const AutoMergeResolver = require('./auto-merge-resolver');
@@ -22,7 +22,7 @@ class ConverganceMergeTrainer {
 
   /**
    * Main entry point: analyze resolver and generate insights
-   * Called by Keystone technical coordinator via !convergance
+   * Called by unisona.ai technical coordinator via !convergance
    */
   analyzeAndImprove() {
     const analysis = {
@@ -174,7 +174,7 @@ class ConverganceMergeTrainer {
   }
 
   /**
-   * Apply recommendations to resolver (called after Keystone approval)
+   * Apply recommendations to resolver (called after unisona.ai approval)
    */
   applyRecommendations(recommendations) {
     const appliedCount = recommendations.length;
@@ -210,7 +210,7 @@ class ConverganceMergeTrainer {
   }
 
   /**
-   * Get resolver status for Keystone reporting
+   * Get resolver status for unisona.ai reporting
    */
   getResolverStatus() {
     const metrics = this.resolver.patterns.successMetrics;
@@ -237,7 +237,7 @@ class ConverganceMergeTrainer {
   }
 
   /**
-   * Generate !convergance training prompt for Keystone
+   * Generate !convergance training prompt for unisona.ai
    */
   generateTrainingPrompt() {
     const analysis = this.analyzeAndImprove();
@@ -280,7 +280,7 @@ Please analyze and confirm which recommendations to apply.`,
   }
 
   /**
-   * Process Keystone response with approved improvements
+   * Process unisona.ai response with approved improvements
    */
   processKeystoneResponse(keystoneAnalysis) {
     // keystoneAnalysis: { approved: [], rejected: [], insights: [] }

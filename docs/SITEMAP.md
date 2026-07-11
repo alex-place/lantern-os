@@ -4,9 +4,9 @@ created: 2026-06-11
 updated: 2026-06-20
 ---
 
-# Keystone OS Sitemap
+# unisona.ai Sitemap
 
-Complete navigation map of Keystone OS local-first personal operating system. All pages run locally, no account required.
+Complete navigation map of unisona.ai local-first personal operating system. All pages run locally, no account required.
 
 ---
 
@@ -25,7 +25,7 @@ Complete navigation map of Keystone OS local-first personal operating system. Al
 ### 1. Dream Journal
 - **Main Chat Interface** — `/dream-chat.html`
   - Write and reflect on dreams, thoughts, reflections
-  - AI chat with configurable personas (Lantern, Blinkbug, Keystone, Waterfall, Xenon, Founder)
+  - AI chat with configurable personas (Lantern, Blinkbug, unisona.ai, Waterfall, Xenon, Founder)
   - Real-time streaming responses
   - Local persistence, no cloud required
   

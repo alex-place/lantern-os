@@ -1,6 +1,6 @@
 "use strict";
 /**
- * Wires lib/repo-map.js's PageRank/symbol-graph selection into the live Keystone
+ * Wires lib/repo-map.js's PageRank/symbol-graph selection into the live unisona.ai
  * kernel's GROUND phase (#1409 acceptance: "the coding path consumes it").
  *
  * repo-context.js's searchRepoFiles() already does keyword+symbol matching over the

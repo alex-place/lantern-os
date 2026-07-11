@@ -139,6 +139,6 @@ def test_grounding_context_returns_preamble(tmp_grounding):
 
     preamble, ids = coder_grounding.grounding_context("convergence loop", k=2)
 
-    assert "Keystone OS grounding" in preamble
+    assert "unisona.ai grounding" in preamble
     assert len(ids) >= 1
     assert any("CONVERGANCE" in id_ or "convergence" in id_ for id_ in ids)

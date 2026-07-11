@@ -4,7 +4,7 @@ created: 2026-06-08
 updated: 2026-06-20
 ---
 
-# Keystone OS Skills & Capabilities
+# unisona.ai Skills & Capabilities
 
 **⚠️ REQUIRED READING: Before working with any skill, all agents must review [SECURITY.md](SECURITY.md)**
 
@@ -106,7 +106,7 @@ Live API key management without server restart.
 |-------|-----------|----------|
 | **Lantern** | Reflection, guidance, wisdom | dream, reflect, meaning, symbol |
 | **Blinkbug** | Analysis, patterns, data | analyze, pattern, track, data |
-| **Keystone** | Autonomous testing, QE, convergence | test, scan, audit, keystone, issue |
+| **unisona.ai** | Autonomous testing, QE, convergence | test, scan, audit, keystone, issue |
 | **Waterfall** | Flow, emotion, narrative | feel, story, journey, flow |
 | **Xenon** | Creativity, imagination, play | create, imagine, play, explore |
 | **Founder** | Vision, goals, direction | goal, vision, plan, future |
@@ -133,7 +133,7 @@ Configure via `/api-keys-settings.html` — keys persist to `.env.local` with ho
 
 ## Fleet Integration
 
-### Autonomous Test Fleet (Keystone)
+### Autonomous Test Fleet (unisona.ai)
 Trigger in dream-chat: `"test the app"` / `"scan for issues"` / `"audit the system"`
 
 **Scenarios:** home-load · dream-chat-init · dream-chat-first-message · theme-toggle ·

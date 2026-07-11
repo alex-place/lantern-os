@@ -180,7 +180,7 @@ module.exports = async function githubIssueRoute(req, res, url, deps) {
   const lines = [];
   if (embedUrl) lines.push(`![screenshot](${embedUrl})`, "");
   if (desc) lines.push(desc, "");
-  lines.push("---", "<sub>Filed from Keystone OS chat 📷 screenshot reporter.</sub>", "");
+  lines.push("---", "<sub>Filed from unisona.ai chat 📷 screenshot reporter.</sub>", "");
   if (meta.url) lines.push(`- **Page:** ${String(meta.url).slice(0, 500)}`);
   if (meta.userAgent) lines.push(`- **Agent:** ${String(meta.userAgent).slice(0, 300)}`);
   if (meta.viewport) lines.push(`- **Viewport:** ${String(meta.viewport).slice(0, 40)}`);

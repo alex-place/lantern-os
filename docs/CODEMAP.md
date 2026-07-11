@@ -4,9 +4,9 @@ created: 2026-06-07
 updated: 2026-06-20
 ---
 
-# Keystone OS — Codemap & Feature Roadmap
+# unisona.ai — Codemap & Feature Roadmap
 
-**Canonical status reference for the Keystone OS codebase.**  
+**Canonical status reference for the unisona.ai codebase.**  
 **Version:** 2026-06-07  
 **Coverage:** System-wide feature state, active surfaces, and forward roadmap.
 
@@ -24,7 +24,7 @@ updated: 2026-06-20
 
 ## 1. System Overview
 
-Keystone OS is a local-first operating cockpit combining:
+unisona.ai is a local-first operating cockpit combining:
 
 | Surface | Technology | Purpose |
 |---|---|---|
@@ -67,7 +67,7 @@ capture context
 | Dreamer chat | Implemented | `/api/dreamer/chat` | Dream + chat combined endpoint |
 | Agent list | Implemented | `/api/agents` | Returns persona roster |
 | Agent slots | Implemented | `/api/agents/slots` | Reads from `manifests/dream-journal-v1-agent-slots.json` |
-| Keystone status | Implemented | `/api/keystone/status` | Git branch, dirty files, provider key presence |
+| unisona.ai status | Implemented | `/api/keystone/status` | Git branch, dirty files, provider key presence |
 | Agent Status page | Implemented | `public/agent-status.html` | Dashboard linking to all status endpoints |
 | Knowledge Center | Implemented | `public/knowledgecenter.html` | Documentation index |
 | Theme toggle | Implemented | `public/index.html` | Dark/light mode |
@@ -78,7 +78,7 @@ capture context
 | Feature | Status | Notes |
 |---|---|---|
 | Freeform chat journaling | Implemented | Text input, multi-turn, local storage |
-| Persona routing | Implemented | 6 personas: Keystone, Lantern, Xenon, Blinkbug, Waterfall, Founder |
+| Persona routing | Implemented | 6 personas: unisona.ai, Lantern, Xenon, Blinkbug, Waterfall, Founder |
 | Door parsing | Implemented | `[DOORS: A | B | C]` parsed and rendered as chips |
 | Voice input (Web Speech API) | Implemented | Browser TTS; voice selector in settings |
 | Symbol tagging | Implemented | DCF auto-classification on entries |
@@ -178,7 +178,7 @@ capture context
 
 ### Phase 3: v1.0.2 — Research & Intelligence (July 2026)
 
-**Goal:** Turn Keystone OS into a research cockpit, not just a journal.
+**Goal:** Turn unisona.ai into a research cockpit, not just a journal.
 
 - [ ] Research request pipeline: `research/requests/open/` with structured templates
 - [ ] Automated source registry freshness checks
@@ -216,7 +216,7 @@ capture context
 | Workstream | Lead Agent | Status | Next Action |
 |---|---|---|---|
 | Chat provider gateway | Xenon | Implemented | Configure real API keys |
-| Agent Status dashboard | Keystone | Implemented | Add real-time websocket updates |
+| Agent Status dashboard | unisona.ai | Implemented | Add real-time websocket updates |
 | Convergence validation ring | Founder's Wish | Active | Stabilize 3-agent consensus rate |
 | CSF memory engine v2 | Blinkbug | Implemented | Add test coverage for `create_procedure()` |
 | RAG research synthesis | Waterfall | Active | Fill inaccessible paywalled sources |
@@ -264,4 +264,4 @@ capture context
 
 ---
 
-*This Codemap is the single source of truth for Keystone OS feature state. When in doubt, check here first.*
+*This Codemap is the single source of truth for unisona.ai feature state. When in doubt, check here first.*

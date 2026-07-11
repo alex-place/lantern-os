@@ -1,7 +1,7 @@
 # Comet Leap v1.5 — P1 Sprint via !convergance
 
 **Sprint Dates:** 2026-06-15 to 2026-06-20 (5 days remaining)  
-**Coordinator:** Keystone Technical Coordinator  
+**Coordinator:** unisona.ai Technical Coordinator  
 **Workflow:** !convergance self-training loop  
 **Status:** Active
 
@@ -47,8 +47,8 @@
 
 ## !convergance Workflow (5-Step Loop)
 
-### Step 1: Keystone Intake Query
-Keystone queries `/api/convergance/intake` with P1 scope:
+### Step 1: unisona.ai Intake Query
+unisona.ai queries `/api/convergance/intake` with P1 scope:
 ```
 GET /api/convergance/intake?sprint=comet-leap-p1&issues=454,455,457,460,462
 ```
@@ -59,8 +59,8 @@ Returns:
 - Resource constraints
 - Success metrics
 
-### Step 2: Keystone Analysis & Recommendation
-Keystone analyzes:
+### Step 2: unisona.ai Analysis & Recommendation
+unisona.ai analyzes:
 - **Issue complexity:** Blocker vs Polish prioritization
 - **Lane availability:** Which agent lanes are free
 - **Dependencies:** Cross-issue blocking (e.g., #454 → #455)
@@ -73,9 +73,9 @@ Generates recommendations:
 - Merge strategy (atomic vs batched)
 
 ### Step 3: User Approval (Interactive)
-User reviews Keystone's plan:
+User reviews unisona.ai's plan:
 ```
-Keystone: "P1 Sprint Execution Plan
+unisona.ai: "P1 Sprint Execution Plan
 
 Blockers (days 1-3):
   - #454 (Token Audit) → claude/ lane [EST: 8h]
@@ -91,7 +91,7 @@ Execution: Start blockers immediately, Polish in parallel on day 3.
 Approve? (Y/n)"
 ```
 
-User: `Y` → Keystone proceeds
+User: `Y` → unisona.ai proceeds
 
 ### Step 4: Autonomous Execution (Per Agent Lane)
 Each agent works independently:
@@ -126,8 +126,8 @@ Each agent works independently:
 - Add diagrams and examples
 - Create PR #XXX
 
-### Step 5: Keystone Integration & Merge
-Keystone queries `/api/convergance/merge-status`:
+### Step 5: unisona.ai Integration & Merge
+unisona.ai queries `/api/convergance/merge-status`:
 ```
 GET /api/convergance/merge-status?prs=PR_LIST
 ```
@@ -140,7 +140,7 @@ For each completed PR:
 
 Reports back:
 ```
-Keystone: "P1 Sprint Status
+unisona.ai: "P1 Sprint Status
 
 ✓ Completed: #454 (Token Audit), #455 (Kingdome)
 ⏳ In Progress: #457 (Rate Limit), #460 (Perf Opt)
@@ -155,7 +155,7 @@ Estimated completion: 2026-06-19 (1 day before deadline)"
 ## Convergance Checkpoints
 
 ### Daily (EOD)
-- Keystone queries `/api/convergance/daily-report`
+- unisona.ai queries `/api/convergance/daily-report`
 - Reports PR status, test results, merge readiness
 - Identifies blockers early
 
@@ -181,7 +181,7 @@ Estimated completion: 2026-06-19 (1 day before deadline)"
 
 ---
 
-## API Endpoints Used by Keystone
+## API Endpoints Used by unisona.ai
 
 | Endpoint | Purpose |
 |----------|---------|
@@ -200,9 +200,9 @@ To start the !convergance P1 sprint:
 ```
 User: "Start P1 sprint via !convergance"
 
-Keystone: [queries /api/convergance/intake]
-Keystone: [analysis & recommendations]
-Keystone: "P1 Sprint Execution Plan
+unisona.ai: [queries /api/convergance/intake]
+unisona.ai: [analysis & recommendations]
+unisona.ai: "P1 Sprint Execution Plan
 
 Blockers (days 1-3):
   - #454 (Token Audit) → claude/ lane
@@ -217,7 +217,7 @@ Approve? (Y/n)"
 
 User: Y
 
-Keystone: "✓ Sprint started. Agents beginning work on assigned issues."
+unisona.ai: "✓ Sprint started. Agents beginning work on assigned issues."
 ```
 
 ---

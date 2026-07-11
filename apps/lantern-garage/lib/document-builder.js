@@ -183,7 +183,7 @@ async function renderDocx(markdown, title) {
 async function renderXlsx(markdown, title) {
   const ExcelJS = require("exceljs");
   const wb = new ExcelJS.Workbook();
-  wb.creator = "Keystone OS";
+  wb.creator = "unisona.ai";
   const ws = wb.addWorksheet((String(title || "Sheet1")).slice(0, 28).replace(/[*?:/\\[\]]/g, " ") || "Sheet1");
   const blocks = mdBlocks(markdown);
   const table = blocks.find((b) => b.type === "table");

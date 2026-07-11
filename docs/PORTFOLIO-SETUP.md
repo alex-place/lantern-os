@@ -59,7 +59,7 @@ This data is served from `/api/positions` via the Trading Dashboard service (por
    IBKR_PORT=4001
    ```
 
-4. **Restart Keystone OS**
+4. **Restart unisona.ai**
    ```bash
    npm run dev --prefix apps/lantern-garage
    ```
@@ -77,7 +77,7 @@ This data is served from `/api/positions` via the Trading Dashboard service (por
 ```
 Chat: "Check my portfolio"
          ↓
-Keystone Router detects "trading" context
+unisona.ai Router detects "trading" context
          ↓
 Trading API Bridge connects to IBKR Gateway (port 4001)
          ↓
@@ -85,7 +85,7 @@ Retrieves real account data + positions + signals
          ↓
 Injects into chat context
          ↓
-LLM responds with actual portfolio (via Keystone routing)
+LLM responds with actual portfolio (via unisona.ai routing)
 ```
 
 ---
@@ -109,7 +109,7 @@ Should return your actual portfolio when IBKR Gateway is running.
 Response metadata should show:
 ```json
 {
-  "agent": "Keystone",
+  "agent": "unisona.ai",
   "provider": "gemini" (or selected provider),
   "trading_context": true
 }
@@ -127,7 +127,7 @@ Response metadata should show:
 1. Verify IBKR Gateway is installed
 2. Launch IBKR Gateway application
 3. Check http://127.0.0.1:4001/status returns 200
-4. Restart Keystone OS
+4. Restart unisona.ai
 
 ### "Can't connect to IBKR"
 
@@ -136,7 +136,7 @@ Response metadata should show:
 **Fix:**
 1. Check IBKR Gateway settings for actual port
 2. Update `IBKR_PORT` in `.env`
-3. Restart Keystone OS
+3. Restart unisona.ai
 
 ### "Getting paper trading data instead of live"
 
@@ -146,7 +146,7 @@ Response metadata should show:
 1. Open IBKR Gateway
 2. Switch to live trading account
 3. Log in with live credentials
-4. Restart Keystone OS
+4. Restart unisona.ai
 
 ---
 
@@ -192,11 +192,11 @@ getDashboardData()   // Combines all APIs into single response
 
 When you ask Dream Chat "What's my portfolio?":
 
-1. **Keystone Router** detects "trading" context
+1. **unisona.ai Router** detects "trading" context
 2. **Trading API Bridge** attempts to connect to IBKR Gateway (localhost:4001)
 3. **If IBKR Gateway is running:**
    - Real account data + positions fetched
-   - Injected into Keystone's context
+   - Injected into unisona.ai's context
    - LLM responds with actual holdings
 
 4. **If IBKR Gateway is NOT running (current state):**
@@ -208,7 +208,7 @@ When you ask Dream Chat "What's my portfolio?":
 
 ## Next Steps
 
-1. ✅ Trading integration fully wired (Keystone routing ready)
+1. ✅ Trading integration fully wired (unisona.ai routing ready)
 2. ✅ Connectors implemented (IBKR, KALSHI, Alpaca)
 3. ⏳ **Install IBKR Gateway** (from https://www.interactivebrokers.com/en/trading/ibkr-gateway)
 4. ⏳ Launch IBKR Gateway (it will run on port 4001 by default)

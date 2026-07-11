@@ -1,4 +1,4 @@
-// Shared theme toggle logic for all Unisona OS pages
+// Shared theme toggle logic for all unisona.ai pages
 (function() {
   const stored = localStorage.getItem('lantern-theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;

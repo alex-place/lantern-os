@@ -1,7 +1,20 @@
-## [1.9.1] - 2026-07-10
+## [1.9.4] - 2026-07-11
 
 ### Added
-- **ForecastEx NYC port grounded (#2217): KLGA oracle fit + public board reader.** Settlement PROVEN from primary sources — the only live ForecastEx NYC daily-high is U-series `UHLGA` (CFTC product code U[H][LGA]) settling on Weather Underground's LaGuardia daily high, measured ≡ round(max METAR tmpf) 14/14 vs the venue's published settlement flips; the NWS CLI disagrees 6/13 days (up to 4°F), and the DH/Central-Park series is delisted — so Kalshi↔ForecastEx NYC is a station-BASIS pair, not an arb. New `lib/forecastex-board.js` reads the venue's public EOD CSVs (prices incl. settlements, ≥2026-02-03, no auth) — the Observe leg no longer needs the IBKR EC entitlement that blocked #2216. The fit/validate scripts are now station-generic (KNYC default byte-identical), and the KLGA fit is committed (`data/kalshi/weather-oracle-params-klga.json`: n=1825, OOS RPS 0.0356 vs 0.0508 default = 30% gain, PIT χ² 81.75→21.25, promotion gate passed). Honest negative: `ceilingSupport=[]` — no measurable ≥100°F ceiling on LGA in five summers, so the Kalshi fade edge does NOT transfer as fitted; `lib/forecastex-weather.js` forces a non-binding ceiling when the station fit carries none and stays `certified:false`. 16 new tests. Research note: `docs/research/2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md`. Improves **Observe + Reason + Verify**; no order code.
+- Trader: ForecastEx NYC port grounded — KLGA oracle fit + public board reader (#2398).
+
+## [1.9.1] - 2026-07-11
+
+### Changed
+- Stock trader: `conf-badge` shows a coloured directional call only for calibrated signals; uncalibrated signals show raw model confidence labelled `uncalibrated` (honest-degrade).
+
+## [1.9.2] - 2026-07-11
+### Fixed
+- **Chat: trivial code requests are answered with code instead of a Bash-allowlist refusal (#2077).** "write a python function that reverses a string" was mis-routed into an execution tool (Bash, or the `propose_coding_change` coding backend), and the blocked-tool error ("the Bash tool is restricted to allowlisted commands…" / "the aider backend is not available") was relayed as the reply. Fixed at every seam: the router and persona prompts now state that AUTHORING code is a direct answer, never a tool task (repo tools remain for actual repository changes); the Bash/PowerShell/`propose_coding_change` tool descriptions explicitly exclude code authoring; and a blocked shell command or unavailable coding backend now returns a model-facing recovery hint ("answer directly, don't relay this restriction") instead of a bare error. Reproduced and verified live on a worktree dev preview: pre-fix the ask fired `propose_coding_change` and led with the refusal; post-fix a fresh chat returns the function directly with zero tool calls. Adds a live chat regression case to `tests/test_dream_journal_chat.js`. Improves **Reason** (correct routing of code-generation intent).
+
+## [1.9.1] - 2026-07-10
+### Fixed
+- **Guest role no longer sees the Settings (/orchestration.html) and Work (/work.html) links — header tabs and footer sitemap.** Guests — not signed in, or an account explicitly assigned the `guest` role — saw operator-surface links they cannot meaningfully use. `auth-gate.js` gains `hideGuestNav()` mirroring the existing `hideTradeNav()` pattern: matched by href across every `<nav>` plus `.site-footer` (the same coverage as applyNavVisibility), so it covers the site-chrome.js chrome and any page-inline nav/footer, and it fails open on transient session errors like the rest of the nav wiring. The pages stay reachable by URL (orchestration is public read-only; work is server-gated) — this only trims links. Verified live from a worktree preview server: guest on / shows Chat/Trader/Explore with Settings+Work `display:none` in header and footer; test-login as supporter restores them; zero console errors. Improves **Act** (role-appropriate guest surface).
 
 ## [1.9.0] - 2026-07-10
 

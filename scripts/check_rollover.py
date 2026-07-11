@@ -1,5 +1,5 @@
 """
-Keystone rollover stage harness (#895).
+unisona.ai rollover stage harness (#895).
 
 Reports the current rollover stage, which gates are met, what's blocking,
 and optionally logs a shadow run to data/rollover/shadow-runs.jsonl.
@@ -10,7 +10,7 @@ Usage:
     python scripts/check_rollover.py log-shadow \\
         --issue 901 --keystone-proposed --claude-landed       # log a shadow run
     python scripts/check_rollover.py log-shadow \\
-        --issue 902 --keystone-proposed --keystone-correct    # log a correct Keystone run
+        --issue 902 --keystone-proposed --keystone-correct    # log a correct unisona.ai run
 
 Exit codes:
     0  current stage gate(s) all pass  (or log-shadow succeeded)
@@ -42,20 +42,20 @@ STAGE_GATES = {
     },
     1: {
         "S1-A": (lambda d: d["leaderboard_accuracy"], 0.50, "eval accuracy >= 50%"),
-        "S1-B": (lambda d: d["keystone_landings"],    5,    ">= 5 Keystone autonomous PR landings"),
+        "S1-B": (lambda d: d["keystone_landings"],    5,    ">= 5 unisona.ai autonomous PR landings"),
         "S1-C": (lambda d: 1.0 - d["claude_fallback_rate"], 0.60, "Claude fallback rate < 40%"),
         "S1-D": (lambda d: d["all_auto_prs_gated"],   True, "all auto/ PRs have leaderboard gate row"),
     },
     2: {
         "S2-A": (lambda d: d["leaderboard_accuracy"], 0.60, "eval accuracy >= 60%"),
-        "S2-B": (lambda d: d["keystone_share_30d"],   0.60, ">= 60% of last-30 issues landed by Keystone"),
+        "S2-B": (lambda d: d["keystone_share_30d"],   0.60, ">= 60% of last-30 issues landed by unisona.ai"),
         "S2-C": (lambda d: d["no_regressions"],       True, "no golden-set regression (ok True -> False)"),
         "S2-D": (lambda d: d["dashboard_live"],       True, "rollover dashboard live (#898)"),
     },
     3: {
         "S3-A": (lambda d: d["leaderboard_accuracy"], 0.65, "eval accuracy >= 65%"),
         "S3-B": (lambda d: d["server_starts_offline"], True, "server starts without ANTHROPIC_API_KEY"),
-        "S3-C": (lambda d: d["keystone_share_30d"],   0.80, ">= 80% of last-30 issues landed by Keystone"),
+        "S3-C": (lambda d: d["keystone_share_30d"],   0.80, ">= 80% of last-30 issues landed by unisona.ai"),
     },
 }
 
@@ -101,13 +101,13 @@ def compute_metrics():
     autowork_total = len(autowork)
     fallback_rate  = fallback_total / autowork_total if autowork_total > 0 else 0.0
 
-    # Keystone landings: autowork runs that are "ok" and not "[unverified]"
+    # unisona.ai landings: autowork runs that are "ok" and not "[unverified]"
     keystone_landings = sum(
         1 for r in autowork
         if r.get("ok") and not str(r.get("commitSha", "")).startswith("[unverified]")
     )
 
-    # Keystone share (last 30 completed runs)
+    # unisona.ai share (last 30 completed runs)
     last30 = autowork[-30:]
     keystone_last30 = sum(1 for r in last30 if r.get("ok") and not str(r.get("commitSha", "")).startswith("[unverified]"))
     keystone_share_30d = keystone_last30 / len(last30) if last30 else 0.0
@@ -185,7 +185,7 @@ def print_status(metrics, rows):
     print(f"  Shadow runs:      {metrics['shadow_runs_total']}")
     print(f"  Claude fallbacks: {metrics['claude_fallback_total']}  "
           f"(rate {metrics['claude_fallback_rate']*100:.0f}%)")
-    print(f"  Keystone share:   {metrics['keystone_share_30d']*100:.0f}% (last 30)")
+    print(f"  unisona.ai share:   {metrics['keystone_share_30d']*100:.0f}% (last 30)")
     print()
     for r in rows:
         icon = "✓" if r["passed"] else "✗"
@@ -235,7 +235,7 @@ def cmd_log_shadow(args):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="Keystone rollover stage harness")
+    ap = argparse.ArgumentParser(description="unisona.ai rollover stage harness")
     ap.add_argument("--json", action="store_true", help="machine-readable JSON output")
     sub = ap.add_subparsers(dest="cmd")
 

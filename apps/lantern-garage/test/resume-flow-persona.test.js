@@ -1,4 +1,4 @@
-// #1919: the Keystone persona must drive the resume-builder flow through the existing
+// #1919: the unisona.ai persona must drive the resume-builder flow through the existing
 // primitives (no scripted intake form): deliver a draft first, persist the resume
 // profile to workspace/resume-profile.json and reload it on a return visit (Remember),
 // tailor to a pasted posting with honest gaps, and export a real .docx via

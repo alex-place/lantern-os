@@ -45,7 +45,7 @@ check("same claims + in-text source link: not flagged", () => {
   assert.strictEqual(linked.anchored, true);
 });
 
-// file:line citation counts as an anchor (the Keystone code-grounding case).
+// file:line citation counts as an anchor (the unisona.ai code-grounding case).
 const fileCite = scoreReplyGroundedness(
   "The handler validates the request and returns a boolean. " +
   "It is wired in apps/lantern-garage/lib/stream-chat.js:716 and runs on every turn. " +

@@ -5,7 +5,7 @@
       "id": 0,
       "name": "cold-grade-whole-app",
       "prompt": "!report-card",
-      "expected_output": "A grounded letter-grade report card for Keystone OS: framing sentence, a Dimension|Grade|Evidence table with 5-8 rows where every evidence cell cites something real (a file, a log line, a number, an observed behavior), a 'what would raise it' note on weak rows, and a bold Overall grade + one candid synthesis paragraph. Grades should spread (not all B+), and weak dimensions named honestly.",
+      "expected_output": "A grounded letter-grade report card for unisona.ai: framing sentence, a Dimension|Grade|Evidence table with 5-8 rows where every evidence cell cites something real (a file, a log line, a number, an observed behavior), a 'what would raise it' note on weak rows, and a bold Overall grade + one candid synthesis paragraph. Grades should spread (not all B+), and weak dimensions named honestly.",
       "files": [],
       "assertions": [
         {"text": "Output contains a markdown table with Dimension, Grade, and Evidence columns", "passed": null, "evidence": ""},

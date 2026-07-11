@@ -1,4 +1,4 @@
-"""Keystone personal cockpit — human-in-the-loop profile + action gate."""
+"""unisona.ai personal cockpit — human-in-the-loop profile + action gate."""
 
 from .cockpit import (
     Cockpit,

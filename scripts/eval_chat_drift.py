@@ -76,7 +76,7 @@ def summarize_adherence(by_turn):
 
 def chat_turn(host, port, message, history, session_id, provider, timeout):
     """POST one conversation turn (with the browser's trailing-history window) to the
-    Keystone chat SSE endpoint; return (reply_text, done_meta)."""
+    unisona.ai chat SSE endpoint; return (reply_text, done_meta)."""
     body = json.dumps({
         "message": message,
         "provider": provider or "",
@@ -112,7 +112,7 @@ def run_drift(a):
 
     history, detail, sources, models, by_turn = [], [], {}, {}, []
     t0 = time.time()
-    print(f"\nDriving Keystone chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}  "
+    print(f"\nDriving unisona.ai chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}  "
           f"session={session_id}  turns={len(turns)}\n", flush=True)
     for i, message in enumerate(turns, start=1):
         t1 = time.time()

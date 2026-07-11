@@ -1,6 +1,6 @@
 """Tests for the Σ₀ coder gate (issue #628).
 
-The gate gives Keystone-the-coder a verification contract separate from the dream
+The gate gives unisona.ai-the-coder a verification contract separate from the dream
 personas, caps confidence when ungrounded, and refuses to promote unstructured
 output into a ConvergenceRecord. These tests need no running Ollama.
 """

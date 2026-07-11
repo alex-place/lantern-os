@@ -133,7 +133,7 @@ registry**, owned in-repo, with four concrete decisions:
   - ~~Remove the `req.session.patreon` compat shim one release after rollout.~~ **Done (#1947)** —
     the read fallback + write mirror in `session-identity.js` were removed after 100+ patch releases;
     every login writes `session.user` and every gate reads it, no other code touched the shim.
-  - Discord guild-role → Keystone-role mapping (currently Discord/Google/local default to the free
+  - Discord guild-role → unisona.ai-role mapping (currently Discord/Google/local default to the free
     tier; Patreon remains the paid-tier source of truth). *(still open)*
   - Close #1876, #1877; fold #1879 (role naming) and #1880 (nav sync) as adjacent cleanups.
 

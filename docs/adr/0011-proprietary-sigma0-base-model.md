@@ -82,7 +82,7 @@ Convergence Core; one more interchangeable backend that happens to be ours.
 
 ## Decision
 
-We will **build and own a proprietary Σ₀ base model — "Keystone-Σ₀" — by owning its modeling code,
+We will **build and own a proprietary Σ₀ base model — "unisona.ai-Σ₀" — by owning its modeling code,
 not by depending on any vendor's serving path.**
 
 1. **Own the architecture.** We author our own `modeling_keystone_plt.py` implementing the PLT
@@ -92,12 +92,12 @@ not by depending on any vendor's serving path.**
    adopted as the inference path (un-evolvable, ≥24 GB).
 
 2. **Bootstrap weights legally, then make them ours.** Initialize from LoopCoder-V2's Apache-2.0
-   checkpoint loaded through *our* modeling code. From that point the weights are a Keystone artifact
+   checkpoint loaded through *our* modeling code. From that point the weights are a unisona.ai artifact
    we may adjust.
 
 3. **Weights are adjusted only via the [ADR-0010](0010-verify-gated-continual-learning-last-resort.md)
    path** — adapter-only, base frozen, verified-experience source-gate, collapse tripwire, reversible,
-   operator-gated. "Weights adjusted in future design" means **adapters over a frozen Keystone base**,
+   operator-gated. "Weights adjusted in future design" means **adapters over a frozen unisona.ai base**,
    never raw base-weight retraining. This ADR does not start training; it makes the base *we* own the
    thing those future adapters attach to.
 
@@ -109,7 +109,7 @@ not by depending on any vendor's serving path.**
    ([ADR-0004](0004-append-only-memory.md), [ADR-0003](0003-one-canonical-csf-module.md)). Base and
    adapter checkpoints are content-addressed and **archived in CSF** — no new store.
 
-6. **Interchangeable, not hardcoded.** Keystone-Σ₀ registers in
+6. **Interchangeable, not hardcoded.** unisona.ai-Σ₀ registers in
    [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js) as one more
    VRAM-gated, evidence-gated entry ([ADR-0005](0005-interchangeable-model-providers.md)). It LEADS
    only when a reproduced on-box eval beats the incumbent (Qwen2.5-Coder / the frontier coder). Until
