@@ -3,14 +3,17 @@
 /**
  * Cross-venue divergence monitor (#2221) — READ-ONLY.
  *
- * ⚠️ SETTLEMENT-STATION CAVEAT (live probe 2026-07-08, docs/research/2026-07-08-forecastex-
- * probe-findings.md): the original premise — that Kalshi and ForecastEx settle NYC daily-high
- * on the IDENTICAL KNYC report — is FALSE. ForecastEx NYC (`UHLGA`) settles on LaGuardia
- * (KLGA); Kalshi `KXHIGHNY` settles on Central Park (KNYC). LGA runs a systematic ~1–3°F
- * warmer, so a position spanning the two books is NOT market-neutral — it carries KLGA↔KNYC
- * BASIS RISK. Treat a flagged gap as a BASIS signal to investigate, not a riskless arb, until
- * a same-station pair is found. The alignment + fee math below is unchanged and correct; only
- * the neutrality interpretation changed.
+ * ⚠️ SETTLEMENT-STATION CAVEAT (PROVEN 2026-07-10, docs/research/2026-07-10-forecastex-
+ * uhlga-settlement-and-klga-fit.md; first flagged by the 2026-07-08 probe): the original
+ * premise — that Kalshi and ForecastEx settle NYC daily-high on the IDENTICAL KNYC report —
+ * is FALSE. ForecastEx NYC (`UHLGA`, the only listed NYC series) settles on Weather
+ * Underground's LaGuardia daily high (≡ round(max METAR tmpf), measured 14/14 vs venue
+ * settlements); Kalshi `KXHIGHNY` settles on the NWS CLI for Central Park (KNYC) — different
+ * station AND a different daily-max definition (WU ran 1-4°F below the CLI on 6/13 sampled
+ * days). A position spanning the two books is NOT market-neutral — it carries KLGA↔KNYC
+ * BASIS RISK. Treat a flagged gap as a BASIS signal to investigate, not a riskless arb. The
+ * alignment + fee math below is unchanged and correct; ForecastEx range prices can be built
+ * from the public EOD feed via forecastex-board.toRangeBuckets.
  *
  * When the same temperature bucket is priced apart on the two books by more than the (tiny)
  * combined fee, that gap is flagged. This module only DETECTS and reports — it contains NO

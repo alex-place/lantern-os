@@ -1,3 +1,8 @@
+## [1.9.4] - 2026-07-11
+
+### Added
+- Trader: ForecastEx NYC port grounded — KLGA oracle fit + public board reader (#2398).
+
 ## [1.9.3] - 2026-07-11
 
 ### Fixed
