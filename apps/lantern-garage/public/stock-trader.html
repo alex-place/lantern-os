@@ -26,7 +26,11 @@
   :root{
     --bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
     --border:#252b35;--text0:#e8eaf0;--text1:#9aa0ad;--text2:#5c6370;
-    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:#4a9eff;
+    /* --blue is the terminal's INTERACTIVE/brand accent (active tabs, focus, links,
+       hovers). Alias it to the site's shared --accent (from site.css, loaded first)
+       so the trader's brand colour matches index + dream-chat and follows the theme.
+       The domain up/down colours (--green/--red) stay distinct. #trader-consistency */
+    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff);
     --purple:#a78bfa;--gold:#f5a623;
     --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
     /* TradingView-style chart contrast */
@@ -48,7 +52,7 @@
      so cards, panels and dividers stay legible (#1577). */
   html[data-theme="light"] .card,
   html[data-theme="light"] .fpanel{background:var(--bg1);border-color:var(--border)}
-  html[data-theme="light"] .card:hover{border-color:#b9c2d0}
+  html[data-theme="light"] .card:hover{border-color:color-mix(in srgb, var(--accent) 55%, var(--border))}
   html[data-theme="light"] .wl-item,
   html[data-theme="light"] .log-item,
   html[data-theme="light"] .order-row,
@@ -80,7 +84,7 @@
   .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
   .footer-resize:hover::before{background:var(--tv-text-secondary)}
   body.resizing-footer{cursor:ns-resize;user-select:none}
-  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
+  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);box-shadow:0 1px 0 var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
@@ -125,7 +129,7 @@
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
-  .nav-link:hover{color:var(--text0);background:var(--bg3)}
+  .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
   .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
@@ -140,6 +144,7 @@
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:7px;font-weight:700;border-color:rgba(255,255,255,.08)}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
+  .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
   .wl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
@@ -183,14 +188,14 @@
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
   .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
-  .card:hover{border-color:rgba(255,255,255,.12)}
+  .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
      border so the clicked chart reads as the active one the rest of the screen
      tracks. Theme-aware. */
-  .card.active{background:rgba(32,38,52,.98);border-color:rgba(255,255,255,.22)}
-  html[data-theme="light"] .card.active{background:#e5eaf2;border-color:#9aa6b8}
+  .card.active{background:rgba(32,38,52,.98);border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
+  html[data-theme="light"] .card.active{background:#e5eaf2;border-color:var(--accent)}
   .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
-  .card.state-watching{border-color:rgba(74,158,255,.25)}
+  .card.state-watching{border-color:color-mix(in srgb, var(--accent) 28%, var(--border))}
   .card.state-quiet{opacity:.75}
   .card-header{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .card-ticker{font-family:var(--mono);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px dotted transparent}
@@ -234,6 +239,16 @@
   .conf-badge.bull{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--green)}
   .conf-badge.bear{background:rgba(255,95,109,.1);border:1px solid rgba(255,95,109,.3);color:var(--red)}
   .conf-badge.neut{background:rgba(92,99,112,.15);border:1px solid var(--border);color:var(--text2)}
+  /* Pattern-read chip (#trader-patterns): the honest name of the chart pattern the
+     deterministic engine actually detected (last_signal.candle) — Head & Shoulders,
+     Double Bottom/Top, Failed Breakout, Break & Retest, Bait Candle, Exhaustion.
+     Dashed border distinguishes a "read" from the solid conviction badge; only shown
+     when Patterns is ON and a pattern is genuinely detected. Bias-coloured. */
+  .pat-chip{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px dashed var(--border);background:var(--bg2);cursor:help}
+  .pat-chip .pat-type{color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-size:8px}
+  .pat-chip.bull{border-color:rgba(0,212,170,.45);color:var(--green)}
+  .pat-chip.bear{border-color:rgba(255,95,109,.45);color:var(--red)}
+  .pat-chip.neut{border-color:var(--border);color:var(--text1)}
   /* P&L badge */
   .pnl-badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600}
   .pnl-pos{background:rgba(0,212,170,.15);color:var(--green)}
@@ -274,7 +289,7 @@
   .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55)}
   .sym-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:8px;outline:none}
-  .sym-head input:focus{border-color:var(--blue)}
+  .sym-head input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .sym-close{cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;border-radius:4px}
   .sym-close:hover{color:var(--text0);background:var(--bg2)}
   .sym-chips{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
@@ -311,14 +326,14 @@
     box-shadow:0 0 0 1px var(--bg1,#111)}
   /* Header chart controls */
   .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-  .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
+  .chart-ctrl:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   /* Patterns toggle "on" state — not colour-only: the label text flips to "ON" and the
      icon fills, so the state is legible without relying on the accent colour (WCAG 1.4.1). */
-  #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:rgba(74,158,255,.22);border-color:var(--blue,#3b82f6);color:var(--blue,#3b82f6)}
+  #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
   /* Chart range presets (1D/5D/1M) */
   .range-group{display:flex;gap:2px}
   .range-btn{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-  .range-btn:hover{color:var(--text0);background:var(--bg3)}
+  .range-btn:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .range-btn.active{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.18);color:#fff}
   /* Fullscreen ticker chart */
   .fs-bg{position:fixed;inset:0;background:rgba(5,6,8,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -448,7 +463,7 @@
   .ot-fieldcell{display:flex;flex-direction:column;gap:3px}
   .ot-fieldcell>span{font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em}
   .ot-exit-fields .ot-field{width:100%;text-align:right}
-  .ot-field:focus{outline:none;border-color:var(--blue);background:var(--bg1)}
+  .ot-field:focus{outline:none;border-color:var(--accent);background:var(--bg1);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .ot-field:disabled{opacity:.45;cursor:not-allowed}
   .ot-info-row{display:flex;justify-content:space-between;font-size:10px;color:var(--text2)}
   .ot-info-row span:last-child{color:var(--text0)}
@@ -585,7 +600,7 @@
   </select>
   <button id="patternsToggle" class="chart-ctrl" type="button" role="switch" aria-checked="false"
     onclick="togglePatterns()"
-    title="Show support/resistance zones, P&amp;L fill, and entry/stop/target markers on the charts — the technical pattern view for serious trading.">◱ Patterns</button>
+    title="Serious-trader view: support/resistance zones, P&amp;L fill and entry/stop/target markers on the charts, plus the named chart pattern the engine actually detected per ticker (Head &amp; Shoulders, Double Bottom/Top, Failed Breakout, Break &amp; Retest, Bait Candle, Exhaustion).">◱ Patterns</button>
   <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
@@ -670,7 +685,7 @@
       </select>
       <button id="fsPatternsToggle" class="chart-ctrl" type="button" role="switch" aria-checked="false"
         onclick="togglePatterns()"
-        title="Show support/resistance zones, P&amp;L fill, and entry/stop/target markers — the technical pattern view for serious trading.">◱ Patterns</button>
+        title="Serious-trader view: support/resistance zones, P&amp;L fill and entry/stop/target markers, plus the named chart pattern the engine actually detected (Head &amp; Shoulders, Double Bottom/Top, Failed Breakout, Break &amp; Retest, Bait Candle, Exhaustion).">◱ Patterns</button>
       <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -1491,6 +1506,41 @@ function emphasisAttrs(dir, conf){
 }
 
 // ── Build one ticker card ───────────────────────────────────────────────────
+// Human-readable read-out for the ONLY chart patterns the deterministic signal
+// engine actually emits (lib/signal-engine/candles.js → last_signal.candle). We map
+// each enum to a friendly name + a category from the trader's own framework
+// (reversal / continuation / trap / exhaustion) + a bias. We deliberately do NOT
+// list patterns the engine doesn't detect (bull flag, ascending triangle, cup &
+// handle, engulfing, gap-and-go) — surfacing an undetected pattern would be a
+// fabricated claim (Σ₀ external-reality rule). #trader-patterns
+const PATTERN_META = {
+  HEAD_AND_SHOULDERS:      { label: 'Head & Shoulders', type: 'Reversal',     bias: 'bear' },
+  DOUBLE_TOP:              { label: 'Double Top',       type: 'Reversal',     bias: 'bear' },
+  DOUBLE_BOTTOM:           { label: 'Double Bottom',    type: 'Reversal',     bias: 'bull' },
+  FAILED_BREAKOUT_BEARISH: { label: 'Failed Breakout',  type: 'Trap',         bias: 'bear' },
+  FAILED_BREAKOUT_BULLISH: { label: 'Failed Breakdown', type: 'Trap',         bias: 'bull' },
+  BREAK_AND_RETEST_BULLISH:{ label: 'Break & Retest',   type: 'Continuation', bias: 'bull' },
+  BAIT_CANDLE_BULLISH:     { label: 'Bait Candle',      type: 'Trap',         bias: 'bull' },
+  BAIT_CANDLE_BEARISH:     { label: 'Bait Candle',      type: 'Trap',         bias: 'bear' },
+  EXHAUSTIVE_SPIKE:        { label: 'Exhaustion Spike', type: 'Reversal',     bias: 'bear' },
+  EXHAUSTIVE_DROP:         { label: 'Exhaustion Drop',  type: 'Reversal',     bias: 'bull' },
+};
+// Compact pattern-read chip for a card's meta row. Returns '' unless the Patterns
+// view is ON and the engine genuinely detected a named pattern for this ticker —
+// so nothing is invented and the default clean view is untouched. The engine's own
+// `reasons` string rides along as the tooltip (the evidence behind the read).
+function patternChipHtml(sig){
+  if(!showPatterns || !sig || !sig.candle) return '';
+  const meta = PATTERN_META[sig.candle];
+  if(!meta) return '';   // unknown enum → don't guess a label
+  const cls = meta.bias || 'neut';
+  const why = String(sig.reasons || '').replace(/"/g,'&quot;').slice(0,140);
+  const struct = (sig.structure && sig.structure !== 'NEUTRAL')
+    ? ` · structure ${sig.structure.toLowerCase()}` : '';
+  return `<div class="pat-chip ${cls}" title="Detected by the deterministic signal engine — ${meta.type}. ${why}${struct}">`
+    + `<span class="pat-type">${meta.type}</span>${meta.label}</div>`;
+}
+
 function buildCard(ticker, d){
   const state = tickerState(d);
   const pos   = d.position;
@@ -1527,7 +1577,7 @@ function buildCard(ticker, d){
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
-  <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
+  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}${watchHtml}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
@@ -1575,7 +1625,7 @@ function updateCardMeta(ticker, d){
       const near = (d.zones||[])[0];
       if(near) watchHtml = `<div style="font-family:var(--mono);font-size:8px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
     }
-    metaEl.innerHTML = confHtml + watchHtml;
+    metaEl.innerHTML = confHtml + patternChipHtml(sig) + watchHtml;
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
@@ -2785,8 +2835,12 @@ function togglePatterns(){
   showPatterns = !showPatterns;
   try{ localStorage.setItem('trader.patterns', showPatterns?'1':'0'); }catch(e){}
   _setPatternsBtn();
-  // Pure render gate — re-draw every chart's overlay from the already-loaded zone data.
-  wlPrices.forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price));
+  // Pure render gate — re-draw every chart's overlay AND refresh each card's meta row
+  // so the pattern-read chips appear/disappear with the toggle. All from already-loaded data.
+  wlPrices.forEach(t=>{
+    renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
+    updateCardMeta(t.ticker, zonesData[t.ticker]||{});
+  });
   renderFullscreenChart();
 }
 
