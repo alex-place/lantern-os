@@ -374,28 +374,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     if (!ticker) { sendJson(res, { error: 'ticker required' }, 400); return true; }
     try {
       const yahoo = require('../../lib/market-data-yahoo');
-      const data = await yahoo.getBars(ticker, '1d');
-      const bars = (data && Array.isArray(data.bars)) ? data.bars : [];
-      if (bars.length < 2) { sendJson(res, { ticker, returns: {}, available: false }, 200); return true; }
-      const closes = bars.map((b) => b.close);
-      const price = closes[closes.length - 1];
-      const retOver = (n) => { if (bars.length <= n) return null; const p0 = closes[bars.length - 1 - n]; return p0 ? +(((price - p0) / p0) * 100).toFixed(2) : null; };
-      const yr = new Date().getUTCFullYear();
-      const yi = bars.findIndex((b) => new Date(b.timestamp).getUTCFullYear() === yr);
-      const ytd = yi >= 0 && closes[yi] ? +(((price - closes[yi]) / closes[yi]) * 100).toFixed(2) : null;
-      const avgVol = Math.round(bars.slice(-30).reduce((s, b) => s + (b.volume || 0), 0) / Math.min(30, bars.length));
-      const sma = (n) => { const sl = closes.slice(-Math.min(n, closes.length)); return sl.reduce((s, c) => s + c, 0) / sl.length; };
-      const s20 = sma(20), s50 = sma(50), s200 = sma(200);
-      const bull = [s20, s50, s200].filter((s) => price > s).length;
-      const technical = bull >= 3 ? 'Strong Buy' : bull === 2 ? 'Buy' : bull === 1 ? 'Sell' : 'Strong Sell';
-      sendJson(res, {
-        ticker, price,
-        returns: { '1M': retOver(21), '3M': retOver(63), 'YTD': ytd, '1Y': retOver(252), '3Y': retOver(756) },
-        volume: bars[bars.length - 1].volume, avgVolume: avgVol,
-        technical, bullCount: bull,
-        sma20: +s20.toFixed(2), sma50: +s50.toFixed(2),
-        available: true,
-      }, 200);
+      sendJson(res, await yahoo.getSymbolStats(ticker), 200);
     } catch (error) {
       sendJson(res, { error: error.message, returns: {} }, 200);
     }
