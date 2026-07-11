@@ -1,3 +1,8 @@
+## [1.9.5] - 2026-07-11
+
+### Added
+- Trader: restore watchlist seed + patterns toggle, plus a11y fixes (#2404).
+
 ## [1.9.4] - 2026-07-11
 
 ### Added

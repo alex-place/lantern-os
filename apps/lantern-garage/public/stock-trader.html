@@ -20,15 +20,24 @@
 <link rel="stylesheet" href="/css/site.css">
 
 <style>
-  @import url('/vendor/fonts/fonts.css'); /* #861: vendored local-first (was Google Fonts CDN) */
   @import url('/css/trader.css');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
   :root{
     --bg0:#0a0c0f;--bg1:#111318;--bg2:#181c22;--bg3:#1f242d;
-    --border:#252b35;--text0:#e8eaf0;--text1:#9aa0ad;--text2:#5c6370;
-    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:#4a9eff;
+    --border:#252b35;--text0:#e8eaf0;--text1:#b3b9c5;--text2:#828a99;
+    /* --blue is the terminal's INTERACTIVE/brand accent (active tabs, focus, links,
+       hovers). Alias it to the site's shared --accent (from site.css, loaded first)
+       so the trader's brand colour matches index + dream-chat and follows the theme.
+       The domain up/down colours (--green/--red) stay distinct. #trader-consistency */
+    --green:#00d4aa;--red:#ff5f6d;--amber:#f5a623;--blue:var(--accent,#4a9eff);
     --purple:#a78bfa;--gold:#f5a623;
-    --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+    /* Fonts: the EXACT stacks index + dream-chat use — no vendored IBM Plex. #trader-fonts
+       --sans = site.css body font; --display = the shared brand/heading stack (index
+       .hero h1 / dream-chat .hero-title); --mono = the system mono dream-chat uses for
+       its numeric bits. All system fonts, so the trader reads like the rest of the app. */
+    --sans:"Segoe UI",system-ui,-apple-system,sans-serif;
+    --display:"Century Gothic","Franklin Gothic Heavy","Arial Rounded MT Bold","Segoe UI Black","Segoe UI",system-ui,sans-serif;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
     /* TradingView-style chart contrast */
     --tv-text-primary:#ffffff;--tv-text-secondary:#d1d4dc;
     --tv-grid:rgba(255,255,255,.06);--tv-axis:rgba(255,255,255,.65);
@@ -48,13 +57,13 @@
      so cards, panels and dividers stay legible (#1577). */
   html[data-theme="light"] .card,
   html[data-theme="light"] .fpanel{background:var(--bg1);border-color:var(--border)}
-  html[data-theme="light"] .card:hover{border-color:#b9c2d0}
+  html[data-theme="light"] .card:hover{border-color:color-mix(in srgb, var(--accent) 55%, var(--border))}
   html[data-theme="light"] .wl-item,
   html[data-theme="light"] .log-item,
   html[data-theme="light"] .order-row,
   html[data-theme="light"] .news-item{border-bottom-color:rgba(0,0,0,.07)}
   html[data-theme="light"] .range-btn.active{background:rgba(0,0,0,.08);border-color:rgba(0,0,0,.15);color:var(--text0)}
-  html,body{height:100%;background:var(--bg0);color:var(--text0);font-family:var(--sans);font-size:13px;overflow-x:hidden}
+  html,body{height:100%;background:var(--bg0);color:var(--text0);font-family:var(--sans);font-size:14px;overflow-x:hidden}
   body{overflow-y:hidden}            /* global nav (52px) + .layout fill the viewport; panels scroll internally */
   .site-footer{display:none}         /* full-screen app has its own footer; suppress the injected global one (#1579) */
   /* ── Layout ── */
@@ -74,58 +83,70 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:210px 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w,210px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
+     A thin ew-resize strip with a centred grip; min/max are enforced in
+     initColumnResizers() and the chosen widths persist. #trader-cols */
+  .col-resize{width:7px;cursor:ew-resize;z-index:35;touch-action:none;background:transparent;pointer-events:auto}
+  .col-resize::before{content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:3px;height:42px;border-radius:3px;background:var(--border);transition:background .15s}
+  .col-resize:hover::before,.col-resize:focus-visible::before{background:var(--accent)}
+  .col-resize:focus-visible{outline:none}
+  .col-resize-left{position:absolute;top:0;bottom:0;right:0;height:auto}      /* on the sidebar's right edge */
+  .col-resize-ticket{position:relative;flex:0 0 auto}                          /* flex sibling left of the order panel */
+  body.resizing-col{cursor:ew-resize;user-select:none}
+  body.resizing-col .col-resize::before{background:var(--accent)}
   /* Draggable divider to resize the bottom panel section (#1630) */
   .footer-resize{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:30}
   .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
   .footer-resize:hover::before{background:var(--tv-text-secondary)}
   body.resizing-footer{cursor:ns-resize;user-select:none}
-  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;padding:0 18px}
+  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);box-shadow:0 1px 0 var(--border);display:flex;align-items:center;gap:14px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+  .header::-webkit-scrollbar{height:0}   /* toolbar scrolls if a narrow screen can't fit every control, without a visible bar */
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
      run all the way to the bottom; the footer trading panel sits under the charts. */
-  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0}
+  .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
   .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
-  .tp-stat .l{font-family:var(--mono);font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
-  .tp-stat .v{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0)}
+  .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
+  .tp-stat .v{font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text0)}
   .tp-stat .v.pos{color:var(--green)} .tp-stat .v.neg{color:var(--red)}
   .tp-tabs{display:flex;gap:2px;padding:6px 12px 0;border-bottom:1px solid var(--border);overflow-x:auto}
-  .tp-tab{font-family:var(--mono);font-size:11px;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px 8px;cursor:pointer;white-space:nowrap}
+  .tp-tab{font-family:var(--mono);font-size:12px;color:var(--text2);background:none;border:none;border-bottom:2px solid transparent;padding:6px 12px 8px;cursor:pointer;white-space:nowrap}
   .tp-tab:hover{color:var(--text1)}
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
-  .tp-badge{font-size:9px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
+  .tp-badge{font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
   .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
   .tp-pane{display:none}
   .tp-pane.active{display:block}
   /* positions / orders table */
-  .tp-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
-  .tp-table th{text-align:right;font-weight:500;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .tp-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+  .tp-table th{text-align:right;font-weight:500;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2);padding:5px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
   .tp-table th:first-child,.tp-table td:first-child{text-align:left}
   .tp-table td{text-align:right;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);color:var(--text1);white-space:nowrap}
   .tp-table tr:hover td{background:var(--bg2)}
   .tp-side{font-weight:700} .tp-side.long{color:var(--green)} .tp-side.short{color:var(--red)}
   .tp-sym{font-weight:700;color:var(--text0);cursor:pointer}
   .tp-sym:hover{color:var(--blue)}
-  .tp-empty{font-family:var(--mono);font-size:11px;color:var(--text2);padding:24px;text-align:center}
+  .tp-empty{font-family:var(--mono);font-size:12px;color:var(--text2);padding:24px;text-align:center}
   /* ── Header ── */
-  .logo{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green);letter-spacing:.08em;white-space:nowrap}
+  .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
-  .hstat{font-family:var(--mono);font-size:10px;display:flex;flex-direction:column;gap:1px;min-width:80px}
-  .hstat .l{color:var(--text2);font-size:8px;text-transform:uppercase;letter-spacing:.1em}
+  .hstat{font-family:var(--mono);font-size:11px;display:flex;flex-direction:column;gap:1px;min-width:80px}
+  .hstat .l{color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
   .hstat .v{color:var(--text0)}
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
-  .badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
+  .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-  .nav-link{font-family:var(--mono);font-size:10px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
-  .nav-link:hover{color:var(--text0);background:var(--bg3)}
+  .nav-link{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+  .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
   .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
@@ -138,15 +159,16 @@
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
   .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
-  .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:7px;font-weight:700;border-color:rgba(255,255,255,.08)}
+  .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:10px;font-weight:700;border-color:rgba(255,255,255,.08)}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
+  .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
   .wl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
   .wl-price{font-family:var(--mono);font-size:9.5px;color:var(--text1)}
-  .wl-chg{font-family:var(--mono);font-size:9px;font-weight:600;white-space:nowrap}
+  .wl-chg{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
-  .wl-signal{font-family:var(--mono);font-size:8px}
+  .wl-signal{font-family:var(--mono);font-size:10px}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
      Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
   .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
@@ -158,24 +180,24 @@
   .sidebar:has(.wl-info.show) .wl-resize{display:block}
   body.resizing-wlinfo{user-select:none;cursor:ns-resize}
   .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
-  .wi-name{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .wi-px{font-family:var(--mono);font-size:13px;font-weight:600;margin-top:5px}
-  .wi-meta{font-family:var(--mono);font-size:9px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
+  .wi-name{font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wi-px{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px}
+  .wi-meta{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
   .wi-meta b{color:var(--text1);font-weight:600}
   /* #1711: expanded info — Technicals / Returns / Key stats sections */
-  .wi-sect{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
-  .wi-tech{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text1)}
+  .wi-sect{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
+  .wi-tech{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text1)}
   .wi-tech.up{color:var(--green)} .wi-tech.dn{color:var(--red)}
   .wi-rets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
   .wi-ret{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:5px 4px;text-align:center}
-  .wi-ret-v{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text2)}
+  .wi-ret-v{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)}
   .wi-ret.up .wi-ret-v{color:var(--green)} .wi-ret.dn .wi-ret-v{color:var(--red)}
-  .wi-ret-l{font-family:var(--mono);font-size:8px;color:var(--text2);margin-top:1px}
+  .wi-ret-l{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:1px}
   .wl-add{display:flex;padding:8px 12px;border-bottom:1px solid var(--border)}
   /* #1709: single full-width "Add symbol" button → opens the search popup */
-  .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
+  .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{font-family:var(--mono);font-size:10px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
+  .wl-remove{font-family:var(--mono);font-size:11px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;grid-auto-rows:352px}
@@ -183,14 +205,14 @@
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
   .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
-  .card:hover{border-color:rgba(255,255,255,.12)}
+  .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
      border so the clicked chart reads as the active one the rest of the screen
      tracks. Theme-aware. */
-  .card.active{background:rgba(32,38,52,.98);border-color:rgba(255,255,255,.22)}
-  html[data-theme="light"] .card.active{background:#e5eaf2;border-color:#9aa6b8}
+  .card.active{background:rgba(32,38,52,.98);border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
+  html[data-theme="light"] .card.active{background:#e5eaf2;border-color:var(--accent)}
   .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
-  .card.state-watching{border-color:rgba(74,158,255,.25)}
+  .card.state-watching{border-color:color-mix(in srgb, var(--accent) 28%, var(--border))}
   .card.state-quiet{opacity:.75}
   .card-header{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
   .card-ticker{font-family:var(--mono);font-size:14px;font-weight:600;cursor:pointer;border-bottom:1px dotted transparent}
@@ -205,18 +227,18 @@
   .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1}
   .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
   /* Drag-to-reorder chart slots (multi-chart layouts) */
-  .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:13px;line-height:1;user-select:none;padding:0 2px}
+  .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
   .drag-handle:active{cursor:grabbing}
   .card.dragging{opacity:.45}
   .card.drag-over{outline:2px dashed var(--blue);outline-offset:-2px}
-  .card-price{font-family:var(--mono);font-size:12px;color:var(--text1)}
+  .card-price{font-family:var(--mono);font-size:13px;color:var(--text1)}
   /* Tick-flash (#1627): on each price change, flash green/red for ~1s then fade
      back to the normal colour. Normal state is untouched. */
   @keyframes cpFlashUp{0%{color:var(--green);background:rgba(0,212,170,.20)}100%{color:var(--text1);background:transparent}}
   @keyframes cpFlashDown{0%{color:var(--red);background:rgba(255,95,109,.20)}100%{color:var(--text1);background:transparent}}
   .card-price.flash-up{animation:cpFlashUp 1s ease-out;border-radius:3px}
   .card-price.flash-down{animation:cpFlashDown 1s ease-out;border-radius:3px}
-  .card-state{font-family:var(--mono);font-size:8px;padding:2px 6px;border-radius:2px;letter-spacing:.1em}
+  .card-state{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;letter-spacing:.1em}
   .state-open .card-state{background:rgba(0,212,170,.12);color:var(--green)}
   .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue)}
   .state-quiet .card-state{background:rgba(92,99,112,.1);color:var(--text2)}
@@ -230,24 +252,34 @@
   /* Confidence badge */
   /* Signal chip (#2301): a compact inline pill hugging its text, not a loud
      full-width bar. Sits inline in the card meta row, out of the chart's way. */
-  .conf-badge{font-family:var(--mono);font-size:9px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .conf-badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:5px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .conf-badge.bull{background:rgba(0,212,170,.1);border:1px solid rgba(0,212,170,.3);color:var(--green)}
   .conf-badge.bear{background:rgba(255,95,109,.1);border:1px solid rgba(255,95,109,.3);color:var(--red)}
   .conf-badge.neut{background:rgba(92,99,112,.15);border:1px solid var(--border);color:var(--text2)}
+  /* Pattern-read chip (#trader-patterns): the honest name of the chart pattern the
+     deterministic engine actually detected (last_signal.candle) — Head & Shoulders,
+     Double Bottom/Top, Failed Breakout, Break & Retest, Bait Candle, Exhaustion.
+     Dashed border distinguishes a "read" from the solid conviction badge; only shown
+     when Patterns is ON and a pattern is genuinely detected. Bias-coloured. */
+  .pat-chip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px dashed var(--border);background:var(--bg2);cursor:help}
+  .pat-chip .pat-type{color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-size:10px}
+  .pat-chip.bull{border-color:rgba(0,212,170,.45);color:var(--green)}
+  .pat-chip.bear{border-color:rgba(255,95,109,.45);color:var(--red)}
+  .pat-chip.neut{border-color:var(--border);color:var(--text1)}
   /* Honest-degrade: uncalibrated signal shown neutral, never dressed as an edge. */
   .conf-badge.uncal{background:rgba(92,99,112,.12);border:1px solid var(--border);color:var(--text2)}
   .conf-badge .cb-model{color:var(--text)}
   .conf-badge .cb-uncal{font-size:8px;letter-spacing:.04em;text-transform:uppercase;opacity:.8}
   .conf-badge .cb-hit{color:var(--text2);font-size:8px}
   /* P&L badge */
-  .pnl-badge{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;font-weight:600}
+  .pnl-badge{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:3px;font-weight:600}
   .pnl-pos{background:rgba(0,212,170,.15);color:var(--green)}
   .pnl-neg{background:rgba(255,95,109,.15);color:var(--red)}
   /* Zone ladder */
   .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
-  .order-ticket button{flex:1;font-family:var(--mono);font-size:10px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
+  .order-ticket button{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
   /* #1696: always-vibrant BUY/SELL — bold fill + bright text (no longer relies on
      Σ₀ highlighting to stand out). */
   /* BUY/SELL are SECONDARY affordances here, not primary CTAs (#2301): the viewer
@@ -255,12 +287,12 @@
      signal are the content. Small, neutral, ghost buttons with only a faint
      directional tint on hover; theme-agnostic (var(--text1)). sig-on still lifts
      the side the grounded Σ₀ signal favors, but restrained. */
-  .btn-buy{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:11px}
+  .btn-buy{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:12px}
   .btn-buy:hover{background:rgba(0,212,170,.12);color:var(--green);border-color:rgba(0,212,170,.45)}
-  .btn-sell{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:11px}
+  .btn-sell{background:transparent;color:var(--text1);border-color:var(--border);font-weight:600;font-size:12px}
   .btn-sell:hover{background:rgba(255,95,109,.12);color:var(--red);border-color:rgba(255,95,109,.45)}
-  /* beat .order-ticket button{font-size:10px;border:1px solid transparent} */
-  .order-ticket .btn-buy, .order-ticket .btn-sell{font-size:11px;border-color:var(--border)}
+  /* beat .order-ticket button{font-size:11px;border:1px solid transparent} */
+  .order-ticket .btn-buy, .order-ticket .btn-sell{font-size:12px;border-color:var(--border)}
   /* Σ₀-grounded signal emphasis (#1578): a side is highlighted only when the
      card's dir matches AND conf ≥ the kalshi-suggest MIN_CONVICTION floor (65%).
      Otherwise (flat / quiet / low-confidence) BOTH buttons mute — no emphasis
@@ -279,22 +311,22 @@
   .sym-modal{width:min(700px,93vw);max-height:78vh;background:var(--bg1);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.55)}
   .sym-head{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .sym-head input{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-size:15px;padding:9px 12px;border-radius:8px;outline:none}
-  .sym-head input:focus{border-color:var(--blue)}
+  .sym-head input:focus{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .sym-close{cursor:pointer;color:var(--text2);font-size:16px;padding:4px 8px;border-radius:4px}
   .sym-close:hover{color:var(--text0);background:var(--bg2)}
   .sym-chips{display:flex;gap:6px;padding:8px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap}
-  .sym-chip{font-family:var(--mono);font-size:10px;padding:4px 11px;border-radius:14px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
+  .sym-chip{font-family:var(--mono);font-size:11px;padding:4px 11px;border-radius:14px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
   .sym-chip.active{background:var(--blue);color:#04121a;border-color:var(--blue);font-weight:600}
   .sym-results{overflow-y:auto;flex:1}
   .sym-row{display:flex;align-items:center;gap:12px;padding:8px 14px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03)}
   .sym-row:hover,.sym-row.sel{background:var(--bg2)}
   .sym-logo{width:28px;height:28px;border-radius:50%;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);flex:0 0 auto}
   .sym-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
-  .sym-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:9px;font-weight:700}
-  .sym-sym{font-family:var(--mono);font-weight:700;font-size:13px;color:var(--text0);min-width:62px}
-  .sym-name{flex:1;color:var(--text1);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sym-ex{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.05em}
-  .sym-empty{padding:22px;text-align:center;color:var(--text2);font-size:12px}
+  .sym-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:11px;font-weight:700}
+  .sym-sym{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--text0);min-width:62px}
+  .sym-name{flex:1;color:var(--text1);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sym-ex{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:.05em}
+  .sym-empty{padding:22px;text-align:center;color:var(--text2);font-size:13px}
   @media (prefers-reduced-motion: reduce){ .order-ticket button{transition:none} }
   /* Chart canvas + overlay — canvas covers the full ladder and draws its own
      right-side price axis (52px) + bottom time axis (16px); the HTML overlay
@@ -306,7 +338,7 @@
   .xh-v,.xh-h{position:absolute;pointer-events:none;z-index:7;display:none}
   .xh-v{width:0;top:0;bottom:16px;border-left:1px dashed var(--tv-text-secondary,#8892a0)}
   .xh-h{height:0;left:0;right:52px;border-top:1px dashed var(--tv-text-secondary,#8892a0)}
-  .xh-lbl{position:absolute;pointer-events:none;z-index:8;display:none;font-family:var(--mono);font-size:9px;line-height:1;padding:2px 4px;border-radius:2px;background:var(--bg3,#2a2e39);color:var(--text0,#e8eaed);white-space:nowrap}
+  .xh-lbl{position:absolute;pointer-events:none;z-index:8;display:none;font-family:var(--mono);font-size:11px;line-height:1;padding:2px 4px;border-radius:2px;background:var(--bg3,#2a2e39);color:var(--text0,#e8eaed);white-space:nowrap}
   .xh-price{right:0;transform:translateY(-50%)}
   .xh-time{bottom:0;transform:translateX(-50%)}
   /* Mobile scrubber dot — rides the price line where the vertical crosshair meets it.
@@ -315,12 +347,34 @@
     margin:-4px 0 0 -4px;border-radius:50%;background:transparent;border:1.3px solid var(--accent,#3b9eff);
     box-shadow:0 0 0 1px var(--bg1,#111)}
   /* Header chart controls */
-  .chart-ctrl{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-  .chart-ctrl:hover{color:var(--text0);background:var(--bg3)}
+  .chart-ctrl{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .chart-ctrl:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
+  /* Patterns toggle "on" state — not colour-only: the label text flips to "ON" and the
+     icon fills, so the state is legible without relying on the accent colour (WCAG 1.4.1). */
+  /* Patterns dropdown: the trigger reads "active" (accent) when any layer is opted in;
+     the panel is a floating checklist positioned under whichever button opened it. */
+  #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
+  .pat-menu{position:fixed;z-index:200;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
+  .pat-menu[hidden]{display:none}
+  .pat-menu-group{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);padding:8px 8px 3px}
+  .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
+  .pat-menu-item:hover{background:var(--bg2)}
+  .pat-menu-item input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
+  .pat-menu-item .pat-lbl{flex:1}
+  /* Live match-count badge: how many watched symbols this layer applies to right now.
+     Accent when >0, muted "0" when empty — so an empty option reads as "none now",
+     not "broken". The whole row dims when it has nothing to show. */
+  .pat-count{flex:0 0 auto;min-width:20px;text-align:center;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);border-radius:9px;padding:1px 6px}
+  .pat-menu-item.empty{opacity:.55}
+  .pat-menu-item.empty .pat-count{color:var(--text2);background:var(--bg2)}
+  .pat-menu-note{font-family:var(--sans);font-size:11px;line-height:1.35;color:var(--text2);padding:6px 8px 2px}
+  .pat-menu-foot{display:flex;justify-content:space-between;gap:8px;padding:6px 6px 3px;margin-top:4px;border-top:1px solid var(--border)}
+  .pat-menu-foot button{font-family:var(--sans);font-size:12px;background:none;border:0;color:var(--accent);cursor:pointer;padding:3px 5px;border-radius:4px}
+  .pat-menu-foot button:hover{background:var(--bg2)}
   /* Chart range presets (1D/5D/1M) */
   .range-group{display:flex;gap:2px}
-  .range-btn{font-family:var(--mono);font-size:10px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
-  .range-btn:hover{color:var(--text0);background:var(--bg3)}
+  .range-btn{font-family:var(--mono);font-size:11px;padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+  .range-btn:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .range-btn.active{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.18);color:#fff}
   /* Fullscreen ticker chart */
   .fs-bg{position:fixed;inset:0;background:rgba(5,6,8,.85);z-index:1000;display:flex;align-items:center;justify-content:center;padding:24px}
@@ -328,8 +382,8 @@
   .fs-chart{background:var(--bg1);border:1px solid var(--border);border-radius:6px;width:100%;height:100%;max-width:1400px;display:flex;flex-direction:column}
   .fs-header{padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border)}
   .fs-ticker{font-family:var(--mono);font-size:16px;font-weight:600}
-  .fs-price{font-family:var(--mono);font-size:13px;color:var(--text1)}
-  .fs-close{margin-left:auto;cursor:pointer;font-family:var(--mono);font-size:11px;color:var(--text1);
+  .fs-price{font-family:var(--mono);font-size:14px;color:var(--text1)}
+  .fs-close{margin-left:auto;cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--text1);
     padding:5px 10px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
   .fs-close:hover{color:var(--text0)}
   .fs-body{flex:1;position:relative;margin:14px}
@@ -343,15 +397,15 @@
   .ot-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .ot-bg.hidden{display:none}
   .ot-modal{pointer-events:auto;background:var(--bg1);border-left:1px solid var(--border);
-    width:340px;max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
+    width:var(--ticket-w,340px);max-width:92vw;height:100%;overflow-y:auto;font-family:var(--mono);
     box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
   @keyframes otSlideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}
   /* When the ticket is open, REFLOW the deck (and footer) to the left so the cards
      sit BESIDE the panel instead of hidden under it. Gated on body.ot-open, which
      the guest/read-only view never gets (openOrderPanel is !GUEST) — so the guest
      layout never shifts (the old bug: it shifted while the panel stayed invisible). */
-  body.ot-open .main{ padding-right: 356px; }
-  body.ot-open .footer{ padding-right: 356px; }
+  body.ot-open .main{ padding-right: calc(var(--ticket-w,340px) + 16px); }
+  body.ot-open .footer{ padding-right: calc(var(--ticket-w,340px) + 16px); }
   @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
   /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
@@ -373,7 +427,7 @@
      hidden on desktop (both panels show). */
   .mobile-view-tabs{ display:none; }
   .mvt-btn{ flex:0 1 104px; min-height:28px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
-    border-radius:7px; font-family:var(--mono); font-size:11px; font-weight:600; letter-spacing:.02em; cursor:pointer;
+    border-radius:7px; font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.02em; cursor:pointer;
     display:flex; align-items:center; justify-content:center; transition:background .15s,border-color .15s; }
   .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
@@ -422,39 +476,39 @@
   }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
-  .ot-close{cursor:pointer;font-size:11px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
+  .ot-close{cursor:pointer;font-size:12px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
   .ot-close:hover{color:var(--text0)}
   .ot-body{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
   .ot-side-row{display:flex;gap:6px}
-  .ot-side-btn{flex:1;text-align:center;padding:8px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:12px;cursor:pointer;line-height:1.6}
-  .ot-side-btn .ot-side-label{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)}
+  .ot-side-btn{flex:1;text-align:center;padding:8px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:13px;cursor:pointer;line-height:1.6}
+  .ot-side-btn .ot-side-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text2)}
   .ot-side-btn.active.sell{background:rgba(255,95,109,.15);border-color:var(--red);color:var(--red)}
   .ot-side-btn.active.sell .ot-side-label{color:var(--red)}
   .ot-side-btn.active.buy{background:rgba(0,212,170,.15);border-color:var(--green);color:var(--green)}
   .ot-side-btn.active.buy .ot-side-label{color:var(--green)}
-  .ot-spread{font-size:9px;color:var(--text2);text-align:center;margin-top:4px}
+  .ot-spread{font-size:11px;color:var(--text2);text-align:center;margin-top:4px}
   .ot-tabs{display:flex;gap:6px}
-  .ot-tab{flex:1;text-align:center;padding:5px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:10px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
+  .ot-tab{flex:1;text-align:center;padding:5px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
   .ot-tab.active{background:var(--bg3);color:var(--text0);border-color:var(--text1)}
   .ot-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .ot-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
-  .ot-field{background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:12px;padding:5px 7px;border-radius:3px;width:100px;text-align:right}
+  .ot-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
+  .ot-field{background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:13px;padding:5px 7px;border-radius:3px;width:100px;text-align:right}
   .ot-field:disabled{opacity:.4}
-  .ot-usd{font-size:10px;color:var(--text2);text-align:right;flex:1}
+  .ot-usd{font-size:11px;color:var(--text2);text-align:right;flex:1}
   .ot-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
-  .ot-section-title{font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.15em}
+  .ot-section-title{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.15em}
   .ot-exit-row{display:flex;flex-direction:column;gap:7px}
   .ot-exit-head{display:flex;align-items:center;gap:7px;cursor:pointer}
   .ot-exit-head input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px;cursor:pointer}
   .ot-exit-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .ot-fieldcell{display:flex;flex-direction:column;gap:3px}
-  .ot-fieldcell>span{font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em}
+  .ot-fieldcell>span{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.1em}
   .ot-exit-fields .ot-field{width:100%;text-align:right}
-  .ot-field:focus{outline:none;border-color:var(--blue);background:var(--bg1)}
+  .ot-field:focus{outline:none;border-color:var(--accent);background:var(--bg1);box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)}
   .ot-field:disabled{opacity:.45;cursor:not-allowed}
-  .ot-info-row{display:flex;justify-content:space-between;font-size:10px;color:var(--text2)}
+  .ot-info-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text2)}
   .ot-info-row span:last-child{color:var(--text0)}
-  .ot-submit{font-family:var(--mono);font-size:12px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;text-transform:uppercase;text-align:center}
+  .ot-submit{font-family:var(--mono);font-size:13px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;text-transform:uppercase;text-align:center}
   .ot-submit.buy{background:rgba(0,212,170,.15);color:var(--green);border-color:var(--green)}
   .ot-submit.buy:hover{background:rgba(0,212,170,.28)}
   .ot-submit.sell{background:rgba(255,95,109,.15);color:var(--red);border-color:var(--red)}
@@ -464,29 +518,29 @@
   /* Sticky within the scrolling .fpanel (#1626): the section title stays pinned at
      the top while the feed scrolls under it. Opaque bg + the panel's own padding
      reclaimed via negative margins so nothing peeks above it. */
-  .panel-title{font-family:var(--mono);font-size:9px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;position:sticky;top:-10px;z-index:3;background:var(--bg1);margin:-10px -14px 8px;padding:10px 14px 6px}
+  .panel-title{font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);letter-spacing:.15em;text-transform:uppercase;position:sticky;top:-10px;z-index:3;background:var(--bg1);margin:-10px -14px 8px;padding:10px 14px 6px}
   .s0-sig{border:1px solid var(--tv-border);border-left:3px solid var(--green);border-radius:4px;padding:7px 9px;margin-bottom:6px;background:rgba(0,212,170,.05)}
   .s0-sig.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
-  .s0-head{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--tv-text)}
-  .s0-lvl{font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);margin-top:2px}
-  .s0-why{font-size:10px;color:var(--tv-text-secondary);margin-top:3px;font-style:italic}
-  .s0-empty{font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:4px 0}
+  .s0-head{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--tv-text)}
+  .s0-lvl{font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);margin-top:2px}
+  .s0-why{font-size:11px;color:var(--tv-text-secondary);margin-top:3px;font-style:italic}
+  .s0-empty{font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);padding:4px 0}
   /* #1710: "watching" narration lines */
-  .s0-watchhdr{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 4px;border-top:1px solid var(--tv-border);padding-top:7px}
-  .s0-watch{font-family:var(--mono);font-size:10px;color:var(--tv-text);padding:4px 8px;margin-bottom:4px;border-left:3px solid var(--blue);border-radius:3px;background:rgba(74,158,255,.06);line-height:1.4}
+  .s0-watchhdr{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 4px;border-top:1px solid var(--tv-border);padding-top:7px}
+  .s0-watch{font-family:var(--mono);font-size:11px;color:var(--tv-text);padding:4px 8px;margin-bottom:4px;border-left:3px solid var(--blue);border-radius:3px;background:rgba(74,158,255,.06);line-height:1.4}
   .s0-watch.short{border-left-color:var(--red);background:rgba(255,95,109,.05)}
   .s0-watch b{color:var(--tv-text);font-weight:700}
   .s0-eye{margin-right:2px}
-  .s0-status{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:2px 0 7px;margin-bottom:6px;border-bottom:1px solid var(--tv-border)}
+  .s0-status{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);padding:2px 0 7px;margin-bottom:6px;border-bottom:1px solid var(--tv-border)}
   .s0-status .pos{color:var(--green)} .s0-status .neg{color:var(--red)}
   /* Σ₀ Council (Converge stage): calibration + per-signal realized edge */
-  .s0-cl-mat{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.08em}
+  .s0-cl-mat{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:.08em}
   .s0-cl-mat.ready{color:var(--green);background:rgba(0,212,170,.12)}
   .s0-cl-mat.warm{color:var(--amber);background:rgba(255,176,32,.12)}
-  .s0-cl-stats{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:10px;color:var(--tv-text-secondary);padding:7px 0;margin:6px 0;border-top:1px solid var(--tv-border);border-bottom:1px solid var(--tv-border)}
+  .s0-cl-stats{display:flex;flex-wrap:wrap;gap:4px 14px;font-family:var(--mono);font-size:11px;color:var(--tv-text-secondary);padding:7px 0;margin:6px 0;border-top:1px solid var(--tv-border);border-bottom:1px solid var(--tv-border)}
   .s0-cl-stats b{color:var(--tv-text);font-weight:700}
-  .s0-cl-hdr{font-family:var(--mono);font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 5px}
-  .s0-cl-row{display:grid;grid-template-columns:74px 1fr 52px;gap:8px;align-items:center;font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)}
+  .s0-cl-hdr{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--tv-text-secondary);margin:8px 0 5px}
+  .s0-cl-row{display:grid;grid-template-columns:74px 1fr 52px;gap:8px;align-items:center;font-family:var(--mono);font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)}
   .s0-cl-name{color:var(--tv-text);font-weight:600}
   .s0-cl-name.member{color:var(--purple)}
   .s0-cl-bar{position:relative;height:8px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
@@ -494,24 +548,24 @@
   .s0-cl-bar i.pos{background:var(--green)} .s0-cl-bar i.neg{background:var(--red)}
   .s0-cl-lift{text-align:right;font-weight:700}
   .s0-cl-lift.pos{color:var(--green)} .s0-cl-lift.neg{color:var(--red)} .s0-cl-lift.nil{color:var(--tv-text-secondary)}
-  .s0-cl-sub{font-size:8px;color:var(--tv-text-secondary)}
+  .s0-cl-sub{font-size:10px;color:var(--tv-text-secondary)}
   /* Agent log */
-  .log-item{font-family:var(--mono);font-size:10px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:45px 55px 1fr;gap:4px;align-items:start}
+  .log-item{font-family:var(--mono);font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);display:grid;grid-template-columns:45px 55px 1fr;gap:4px;align-items:start}
   .log-time{color:var(--text2)}.log-agent{font-weight:600}
   .log-grok{color:var(--purple)}.log-claude{color:var(--blue)}.log-risk{color:var(--amber)}
   .log-system{color:var(--text1)}.log-trail{color:var(--green)}.log-body{color:var(--text0);word-break:break-word}
   /* Orders */
-  .order-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:9px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .order-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:11px;border-bottom:1px solid rgba(255,255,255,.03)}
   /* Market status */
-  .mkt-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:10px}
+  .mkt-row{display:flex;justify-content:space-between;padding:3px 0;font-family:var(--mono);font-size:11px}
   .mkt-label{color:var(--tv-text-secondary)}.mkt-val{color:var(--tv-text-primary)}
   /* Market news (#1582) — surfaces the existing /api/trading/news/recent feed */
   .news-item{display:block;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.03);text-decoration:none}
   .news-item:hover .news-head{color:var(--blue)}
-  .news-head{font-family:var(--sans);font-size:11px;color:var(--text0);line-height:1.35;display:block}
-  .news-meta{font-family:var(--mono);font-size:8px;color:var(--text2);letter-spacing:.05em;text-transform:uppercase;margin-top:2px}
+  .news-head{font-family:var(--sans);font-size:12px;color:var(--text0);line-height:1.35;display:block}
+  .news-meta{font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:.05em;text-transform:uppercase;margin-top:2px}
   .news-meta .news-impact{color:var(--amber)}
-  .news-empty{font-family:var(--mono);font-size:9px;color:var(--text2)}
+  .news-empty{font-family:var(--mono);font-size:11px;color:var(--text2)}
   /* ── Guest (logged-out) mode ──────────────────────────────────────────────
      The SAME terminal, served read-only to visitors without the "trade"
      entitlement: every chart feature (multi-chart grid, candles, timeframes,
@@ -585,6 +639,9 @@
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
+  <button id="patternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
+    onclick="togglePatternMenu(this)"
+    title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
   <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
@@ -623,6 +680,7 @@
 
 <!-- Sidebar -->
 <div class="sidebar" role="complementary" aria-label="Watchlist">
+  <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
   </div>
@@ -642,16 +700,16 @@
   <!-- Account summary row (#1712) -->
   <div class="tp-summary" id="tpSummary"></div>
   <!-- Tabs -->
-  <div class="tp-tabs" role="tablist">
-    <button class="tp-tab active" role="tab" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" data-tab="orders" onclick="tpTab('orders')">Orders</button>
-    <button class="tp-tab" role="tab" data-tab="history" onclick="tpTab('history')">Order history</button>
+  <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
+    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
-    <div class="tp-pane active" id="tp-positions"></div>
-    <div class="tp-pane" id="tp-orders"></div>
-    <div class="tp-pane" id="tp-history"></div>
+    <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
+    <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -667,6 +725,9 @@
         <option value="line">Line</option>
         <option value="candle">Candles</option>
       </select>
+      <button id="fsPatternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
+        onclick="togglePatternMenu(this)"
+        title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in.">◱ Patterns ▾</button>
       <select id="fsChartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
         <option value="1m">1m</option>
         <option value="5m">5m</option>
@@ -710,7 +771,7 @@
     <div class="sym-head">
       <span aria-hidden="true">🔍</span>
       <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
-      <span class="sym-close" role="button" tabindex="0" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter')closeSymbolSearch()" title="Close">✕</span>
+      <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
     </div>
     <div class="sym-chips" id="symChips">
       <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
@@ -722,6 +783,7 @@
 </div>
 
 <div class="ot-bg hidden" id="otBg" onclick="if(event.target===this)closeOrderTicket()">
+  <div class="col-resize col-resize-ticket" id="ticketResize" role="separator" aria-orientation="vertical" aria-label="Resize the order panel" tabindex="0" title="Drag to resize the order panel"></div>
   <div class="ot-modal">
     <div class="ot-header">
       <span class="ot-ticker" id="otTickerLabel">—</span>
@@ -816,6 +878,30 @@ let barsData       = {};
 // Persisted chart type. Candles are the default the first time a user visits.
 let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
 let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
+// Pattern overlays (S/R zone bands, P&L fill, entry/stop/TP markers) — the alternative
+// technical view for serious trading. Off by default (the clean price-line look from
+// #2123), opt-in per user and remembered. #trader-patterns
+// Pattern layers — each an independent, remembered opt-in (the Patterns dropdown).
+// `zones`/`levels` gate the chart overlays; the rest gate the per-ticker pattern-read
+// chip by pattern family. All default OFF → the clean price-line view (#2123). Stored
+// as one JSON blob so adding a layer never needs a migration. #trader-patterns
+const PATTERN_PREF_KEYS = ['zones','levels','hs','doubletop','doublebottom','failedbreak','breakretest','bait','exhaustion'];
+let patternPrefs = (()=>{
+  const base = {}; PATTERN_PREF_KEYS.forEach(k=> base[k]=false);
+  try{
+    const saved = JSON.parse(localStorage.getItem('trader.patternPrefs')||'null');
+    if(saved && typeof saved==='object'){ PATTERN_PREF_KEYS.forEach(k=>{ if(typeof saved[k]==='boolean') base[k]=saved[k]; }); return base; }
+    // Migrate the old single on/off toggle: ON → enable every layer.
+    if(localStorage.getItem('trader.patterns')==='1'){ PATTERN_PREF_KEYS.forEach(k=> base[k]=true); }
+  }catch(e){}
+  return base;
+})();
+function anyPatternOn(){ return PATTERN_PREF_KEYS.some(k=> patternPrefs[k]); }
+function persistPatternPrefs(){ try{ localStorage.setItem('trader.patternPrefs', JSON.stringify(patternPrefs)); }catch(e){} }
+// Compact signature of the OVERLAY-affecting prefs, so the ladder render-memo redraws
+// the instant a zone/levels checkbox flips (the pattern chips live in the meta row, not
+// the overlay, so only these two matter here).
+function _overlaySig(){ return (patternPrefs.zones?'z':'')+(patternPrefs.levels?'l':''); }
 let fullscreenTicker = null;
 let otTicker = null, otSide = 'buy', otOrderType = 'market';
 const TICK_SIZE = 0.01;
@@ -829,7 +915,7 @@ const MIN_VISIBLE_BARS = 10;
 
 // TradingView-style chart colors (canvas can't read CSS custom properties,
 // so these mirror the --tv-* vars defined in :root).
-const CHART_AXIS_FONT   = '10px "IBM Plex Mono",monospace';
+const CHART_AXIS_FONT   = '11px ui-monospace, "SF Mono", Menlo, Consolas, monospace';
 // Read the live --tv-* vars so chart axes/grid follow the light/dark theme (#1577).
 const chartVar = (name, fb) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fb;
 const CHART_AXIS_COLOR  = () => chartVar('--tv-axis', 'rgba(255,255,255,.65)');
@@ -1017,7 +1103,7 @@ function zlLine(topPct, color, label, textColor){
   return `<div style="position:absolute;left:0;right:64px;top:${topPct};height:1px;
     background:repeating-linear-gradient(90deg,${color} 0,${color} 5px,transparent 5px,transparent 9px);"></div>
     <div style="position:absolute;left:4px;top:${topPct};transform:translateY(-100%);
-    font-family:'IBM Plex Mono',monospace;font-size:8px;color:${textColor};
+    font-family:var(--mono);font-size:10px;color:${textColor};
     background:rgba(10,12,15,.8);padding:1px 3px;border-radius:2px;white-space:nowrap;">${label}</div>`;
 }
 
@@ -1066,12 +1152,17 @@ const TIME_LEVELS = [
   { id:'year', key:d=>d.getFullYear(),                 kind:'year' },
 ];
 const _MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// US market timezone for all chart time labels — the axis reads in Eastern clock time,
+// 12-hour (AM/PM), regardless of the viewer's own timezone or locale. #trader-timescale
+const _ET = 'America/New_York';
+function _etTime(d){ return d.toLocaleTimeString('en-US',{timeZone:_ET,hour:'numeric',minute:'2-digit',hour12:true}); } // "9:30 AM"
+function _etDayNum(d){ return d.toLocaleDateString('en-US',{timeZone:_ET,day:'numeric'}); }                            // "28"
 function _fmtTick(d, kind, showDate){
-  if(kind === 'year')  return String(d.getFullYear());
-  if(kind === 'month') return _MONTHS[d.getMonth()] + (d.getMonth()===0 ? " '"+String(d.getFullYear()).slice(2) : '');
-  if(kind === 'day')   return String(d.getDate());           // #1698: day number only (28, not 6/28)
-  const hhmm = d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit',hour12:false});
-  return showDate ? d.getDate()+' '+hhmm : hhmm;             // month is carried by the 'month' tick
+  if(kind === 'year')  return d.toLocaleDateString('en-US',{timeZone:_ET,year:'numeric'});
+  if(kind === 'month'){ const m=d.toLocaleDateString('en-US',{timeZone:_ET,month:'short'}); const isJan=d.toLocaleDateString('en-US',{timeZone:_ET,month:'numeric'})==='1'; return m + (isJan ? " '"+d.toLocaleDateString('en-US',{timeZone:_ET,year:'2-digit'}) : ''); }
+  if(kind === 'day')   return _etDayNum(d);                   // #1698: day number only (28, not 6/28)
+  const hhmm = _etTime(d);
+  return showDate ? _etDayNum(d)+' '+hhmm : hhmm;            // month is carried by the 'month' tick
 }
 function timeAxisTicks(bars, maxTicks){
   const n = bars.length;
@@ -1186,10 +1277,11 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // vertical gridline per tick.
     ctx.fillStyle = CHART_AXIS_COLOR();
     ctx.textBaseline = 'bottom';
-    const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 84)));
+    // Wider slots + gap than the old 24-hour labels, because "9:30 AM" is longer than "09:30".
+    const timeMaxTicks = Math.max(2, Math.min(16, Math.floor(pw / 96)));
     const timeTicks = timeAxisTicks(bars, timeMaxTicks);
     let lastLabelX = -1e9;
-    const MIN_LABEL_GAP = 52;   // px — keep labels (e.g. a date + the next hour) from colliding
+    const MIN_LABEL_GAP = 64;   // px — keep 12-hour labels (e.g. "28 9:30 AM") from colliding
     for(const t of timeTicks){
       if(!t.label) continue;
       const cx = t.idx*slotW + slotW/2;
@@ -1205,6 +1297,15 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       else if(cx > pw-24){ tx = pw-2; align = 'right'; }
       ctx.textAlign = align;
       ctx.fillText(t.label, tx, h-2);
+    }
+    // Label the dynamic timescale with its timezone: the intraday axis reads in US
+    // Eastern clock time and the buckets change with zoom, so anchor a small "ET" tag
+    // in the axis corner. Skipped on daily+ scales (date-only, timezone-agnostic). #trader-timescale
+    const _intraday = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
+    if(_intraday){
+      ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = CHART_AXIS_COLOR();
+      ctx.fillText('ET', w-2, h-2);
     }
 
     // Clip price series to the plot box so a zoomed-in price scale can push
@@ -1228,7 +1329,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         ctx.stroke();
         const bodyTop = y(Math.max(b.open,b.close));
         const bodyBot = y(Math.min(b.open,b.close));
-        const bw = Math.max(1, slotW*0.6);
+        // Cap the body width so a window with few visible bars doesn't render giant
+        // candles (slotW*0.6 is unbounded when zoomed in) — TradingView-style max. #trader-candles
+        const bw = Math.max(1, Math.min(slotW*0.6, 14));
         ctx.fillRect(x-bw/2, bodyTop, bw, Math.max(1, bodyBot-bodyTop));
       }
     }else{
@@ -1268,11 +1371,12 @@ function renderZoneLadder(ticker, d, currentPrice, canvasEl, overlayEl, force){
   if(!force){
     const prevSig = _ladderSig[sigKey];
     if(prevSig && prevSig.overlay===overlay && prevSig.price===currentPrice && prevSig.d===d
-       && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe){
+       && prevSig.bars===bars && prevSig.chartType===chartType && prevSig.chartTimeframe===chartTimeframe
+       && prevSig.ovl===_overlaySig()){   // toggling overlay layers must force a redraw
       return;
     }
   }
-  _ladderSig[sigKey] = {overlay, price:currentPrice, d, bars, chartType, chartTimeframe};
+  _ladderSig[sigKey] = {overlay, price:currentPrice, d, bars, chartType, chartTimeframe, ovl:_overlaySig()};
 
   _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, sigKey);
 }
@@ -1299,7 +1403,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
       currentPrice = getCurrentPrice(ticker);
       if(!currentPrice || currentPrice <= 0){
         overlay.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-          + 'height:100%;font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:var(--text2)'
+          + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2)'
           + '">Waiting for price data</div>';
         if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
         return;
@@ -1315,7 +1419,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   // once, so this never flashes over charts that simply haven't fetched yet.
   if(barsLoadedOnce && !bars.length){
     overlay.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;'
-      + 'height:100%;font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:var(--text2)'
+      + 'height:100%;font-family:var(--mono);font-size:11px;color:var(--text2)'
       + '">Chart data unavailable</div>';
     if(canvas){ const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); }
     return;
@@ -1378,8 +1482,26 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   if(view.yMin != null && view.yMax != null){
     rMin = view.yMin; rMax = view.yMax;
   } else {
+    // Robust auto-fit: the keyless Yahoo feed occasionally ships a bad tick — a single
+    // bar whose high/low (or open/close) is wildly off — and fitting to the raw min/max
+    // let one glitch blow the whole price range open, rendering that candle huge and
+    // squashing the rest. Ignore the bogus extreme of any bar whose span is >10× the
+    // median bar span (use its body, or skip it), so the range fits the REAL action and
+    // the outlier's excess wick is simply clipped to the plot. #trader-candles
     let lo = Infinity, hi = -Infinity;
-    for(const b of viewBars){ if(b.low < lo) lo = b.low; if(b.high > hi) hi = b.high; }
+    const _spans = viewBars.map(b=>Math.abs(b.high-b.low)).filter(x=>x>0).sort((a,b)=>a-b);
+    const _medSpan = _spans.length ? _spans[Math.floor(_spans.length/2)] : 0;
+    const _glitch = _medSpan>0 ? _medSpan*10 : Infinity;
+    let _kept = 0;
+    for(const b of viewBars){
+      let bl = b.low, bh = b.high;
+      if(_medSpan>0 && (bh-bl) > _glitch){                 // bad-tick wick — fall back to the body
+        bl = Math.min(b.open, b.close); bh = Math.max(b.open, b.close);
+        if((bh-bl) > _glitch) continue;                    // body is bogus too → skip the bar entirely
+      }
+      if(bl < lo) lo = bl; if(bh > hi) hi = bh; _kept++;
+    }
+    if(!_kept) for(const b of viewBars){ if(b.low < lo) lo = b.low; if(b.high > hi) hi = b.high; }
     // Always keep the live price in view; include entry so an open trade's
     // basis is visible. (Stop/TP/zones are clamped to the edges in the overlay
     // rather than allowed to blow the range out — matches TradingView.)
@@ -1399,11 +1521,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
 
   let html = '';
 
-  // Zone overlays (S/R zone bands, P&L fill, entry/stop/TP markers) are removed
-  // for ALL users per product decision — the charts show a clean price line only.
-  // Flip SHOW_ZONE_OVERLAYS back to true to restore them. #no-zone-overlays
-  const SHOW_ZONE_OVERLAYS = false;
-  if(SHOW_ZONE_OVERLAYS){
+  // Overlay layers — each an independent, remembered opt-in from the Patterns menu
+  // (#trader-patterns): `zones` draws the S/R zone bands the engine detected; `levels`
+  // draws the open position's P&L fill + entry/stop/target lines. All from already-
+  // fetched data (pure render gate). Both off by default → clean price line (#2123).
+  if(patternPrefs.zones){
   // Zone bands
   for(let i=0;i<zones.length;i++){
     const z=zones[i]; if(!z.mid) continue;
@@ -1420,10 +1542,12 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
     html += `<div style="position:absolute;right:0;width:62px;top:${pct(z.mid)};transform:translateY(-50%);
-      font-family:'IBM Plex Mono',monospace;font-size:8px;line-height:1.3;padding:1px 3px;white-space:nowrap;
+      font-family:var(--mono);font-size:10px;line-height:1.3;padding:1px 3px;white-space:nowrap;
       color:${sup?'rgba(0,212,170,.85)':'rgba(255,95,109,.85)'}">${sup?'S':'R'} ${z.strength||'?'} · ${z.touches||'?'}T</div>`;
   }
+  } // end patternPrefs.zones (S/R bands)
 
+  if(patternPrefs.levels){
   // P&L fill between entry and current price
   if(pos&&pos.entry){
     const fillTop = Math.max(rMin,Math.min(rMax,Math.max(currentPrice,pos.entry)));
@@ -1443,20 +1567,20 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += zlLine(pct(pos.stop),'rgba(255,95,109,.85)',`STOP $${fmt(pos.stop,pos.stop>=100?2:4)}`,'#ff5f6d');
   if(pos&&pos.tp&&pos.tp>=rMin&&pos.tp<=rMax)
     html += zlLine(pct(pos.tp),'rgba(0,212,170,.85)',`TP $${fmt(pos.tp,pos.tp>=100?2:4)}`,'#00d4aa');
-  } // end SHOW_ZONE_OVERLAYS (zone bands / P&L / entry-stop-TP)
+  } // end patternPrefs.levels (P&L / entry-stop-TP)
 
   // Current price line
   const priceText = priceLabel || ('$' + fmt(currentPrice, currentPrice>=100?2:4));
   const lineColor = priceLabel ? '#9aa0ad' : '#e8eaf0';
   html += `<div style="position:absolute;left:0;right:0;top:${pct(currentPrice)};height:1.5px;background:${lineColor};z-index:5;"></div>`;
   html += `<div style="position:absolute;left:4px;top:${pct(currentPrice)};transform:translateY(-110%);z-index:6;
-    font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:600;color:${lineColor};
+    font-family:var(--mono);font-size:11px;font-weight:600;color:${lineColor};
     background:var(--bg1);padding:1px 4px;border-radius:2px;white-space:nowrap;">${priceText}</div>`;
 
   // Timeframe badge (top-left, always above the price line/label)
   if(chartTimeframe){
     html += `<div style="position:absolute;left:4px;top:2px;z-index:7;
-      font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;color:var(--tv-axis);
+      font-family:var(--mono);font-size:10px;font-weight:600;color:var(--tv-axis);
       background:var(--bg1);padding:1px 4px;border-radius:2px;pointer-events:none;">${chartTimeframe.toUpperCase()}</div>`;
   }
 
@@ -1506,6 +1630,57 @@ function emphasisAttrs(dir, conf){
 }
 
 // ── Build one ticker card ───────────────────────────────────────────────────
+// Human-readable read-out for the ONLY chart patterns the deterministic signal
+// engine actually emits (lib/signal-engine/candles.js → last_signal.candle). We map
+// each enum to a friendly name + a category from the trader's own framework
+// (reversal / continuation / trap / exhaustion) + a bias. We deliberately do NOT
+// list patterns the engine doesn't detect (bull flag, ascending triangle, cup &
+// handle, engulfing, gap-and-go) — surfacing an undetected pattern would be a
+// fabricated claim (Σ₀ external-reality rule). #trader-patterns
+// `family` = the Patterns-menu checkbox key that controls this enum (bull/bear
+// variants share one family, e.g. both BAIT_CANDLE_* → 'bait').
+const PATTERN_META = {
+  HEAD_AND_SHOULDERS:      { label: 'Head & Shoulders', type: 'Reversal',     bias: 'bear', family: 'hs' },
+  DOUBLE_TOP:              { label: 'Double Top',       type: 'Reversal',     bias: 'bear', family: 'doubletop' },
+  DOUBLE_BOTTOM:           { label: 'Double Bottom',    type: 'Reversal',     bias: 'bull', family: 'doublebottom' },
+  FAILED_BREAKOUT_BEARISH: { label: 'Failed Breakout',  type: 'Trap',         bias: 'bear', family: 'failedbreak' },
+  FAILED_BREAKOUT_BULLISH: { label: 'Failed Breakdown', type: 'Trap',         bias: 'bull', family: 'failedbreak' },
+  BREAK_AND_RETEST_BULLISH:{ label: 'Break & Retest',   type: 'Continuation', bias: 'bull', family: 'breakretest' },
+  BAIT_CANDLE_BULLISH:     { label: 'Bait Candle',      type: 'Trap',         bias: 'bull', family: 'bait' },
+  BAIT_CANDLE_BEARISH:     { label: 'Bait Candle',      type: 'Trap',         bias: 'bear', family: 'bait' },
+  EXHAUSTIVE_SPIKE:        { label: 'Exhaustion Spike', type: 'Reversal',     bias: 'bear', family: 'exhaustion' },
+  EXHAUSTIVE_DROP:         { label: 'Exhaustion Drop',  type: 'Reversal',     bias: 'bull', family: 'exhaustion' },
+};
+// Ordered menu of the individually opt-in Patterns layers (overlays + detections).
+const PATTERN_MENU = [
+  { group: 'Overlays' },
+  { key: 'zones',        label: 'Support / Resistance' },
+  { key: 'levels',       label: 'Entry / Stop / Target' },
+  { group: 'Detected patterns' },
+  { key: 'hs',           label: 'Head & Shoulders' },
+  { key: 'doubletop',    label: 'Double Top' },
+  { key: 'doublebottom', label: 'Double Bottom' },
+  { key: 'failedbreak',  label: 'Failed Breakout' },
+  { key: 'breakretest',  label: 'Break & Retest' },
+  { key: 'bait',         label: 'Bait Candle' },
+  { key: 'exhaustion',   label: 'Exhaustion' },
+];
+// Compact pattern-read chip for a card's meta row. Returns '' unless the engine
+// genuinely detected a named pattern AND that pattern's family is opted-in via the
+// Patterns menu — so nothing is invented and the default clean view is untouched.
+// The engine's own `reasons` string rides along as the tooltip (the evidence).
+function patternChipHtml(sig){
+  if(!sig || !sig.candle) return '';
+  const meta = PATTERN_META[sig.candle];
+  if(!meta || !patternPrefs[meta.family]) return '';   // unknown enum or family off → nothing
+  const cls = meta.bias || 'neut';
+  const why = String(sig.reasons || '').replace(/"/g,'&quot;').slice(0,140);
+  const struct = (sig.structure && sig.structure !== 'NEUTRAL')
+    ? ` · structure ${sig.structure.toLowerCase()}` : '';
+  return `<div class="pat-chip ${cls}" title="Detected by the deterministic signal engine — ${meta.type}. ${why}${struct}">`
+    + `<span class="pat-type">${meta.type}</span>${meta.label}</div>`;
+}
+
 function buildCard(ticker, d){
   const state = tickerState(d);
   const pos   = d.position;
@@ -1525,7 +1700,7 @@ function buildCard(ticker, d){
   let watchHtml = '';
   if(state==='watching'){
     const near = (d.zones||[])[0];
-    if(near) watchHtml = `<div style="font-family:var(--mono);font-size:8px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
+    if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
   }
 
   const badge = regimeBadgeInfo(ticker, state);
@@ -1542,7 +1717,7 @@ function buildCard(ticker, d){
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
-  <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
+  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}${watchHtml}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
@@ -1588,9 +1763,9 @@ function updateCardMeta(ticker, d){
     let watchHtml = '';
     if(state==='watching'){
       const near = (d.zones||[])[0];
-      if(near) watchHtml = `<div style="font-family:var(--mono);font-size:8px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
+      if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
     }
-    metaEl.innerHTML = confHtml + watchHtml;
+    metaEl.innerHTML = confHtml + patternChipHtml(sig) + watchHtml;
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
@@ -2026,7 +2201,7 @@ function renderWatchlist(){
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
     const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span></span>';
-    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart" onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'){focusTicker('${t.ticker}')}">
+    return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
       <div class="wl-content">
         <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
@@ -2195,7 +2370,8 @@ function _hideXh(ladder){
 function _fmtCrossTime(ts){
   const d = new Date(String(ts).replace(' ','T'));
   if(isNaN(d)) return '';
-  return d.toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  // US Eastern, 12-hour — same clock the axis reads (#trader-timescale).
+  return d.toLocaleString('en-US', { timeZone:_ET, month:'short', day:'numeric', hour:'numeric', minute:'2-digit', hour12:true });
 }
 // x,y are cursor coords relative to the canvas (CSS px); w,h the canvas size.
 function _updateXh(ladder, canvasId, x, y, w, h){
@@ -2250,11 +2426,13 @@ function zoomTimeGoal(view, n, factor){
   if(n < 2) return;
   const curVis = view.gVis != null ? view.gVis : (view.visibleBars || n);
   const curOff = view.gOff != null ? view.gOff : (view.barOffset || 0);
-  const center = (n - curOff - curVis) + curVis/2;          // centered
   const nv = Math.max(MIN_VISIBLE_BARS, Math.min(n, curVis*factor));
-  const ns = Math.max(0, Math.min(n-nv, center - nv/2));
+  // Right-anchored zoom: keep the latest visible bar pinned to the right edge
+  // (the current time) and grow/shrink the window to the LEFT, so zooming never
+  // drifts off "now". offset is bars-from-the-right; clamp it into the valid
+  // range so the window can never extend past the most recent bar. #trader-zoom
   view.gVis = nv;
-  view.gOff = Math.max(0, n - nv - ns);
+  view.gOff = Math.max(0, Math.min(curOff, n - nv));
 }
 function zoomPriceGoal(view, factor){
   if(view.lastRMin == null || view.lastRMax == null) return;
@@ -2548,6 +2726,7 @@ async function loadZones(){
     updateRegimeBadges();
     renderFullscreenChart();
     renderSigma0Signals();
+    if(_patMenuEl && !_patMenuEl.hidden) _syncPatternMenu();   // refresh live match-counts if the menu is open
   }catch(e){ console.warn('zones load failed',e); }
   finally{ zonesLoading = false; }
 }
@@ -2785,6 +2964,122 @@ function changeChartType(type){
   renderFullscreenChart();
 }
 
+// Reflect how many pattern layers are opted in on both trigger buttons: the label
+// carries the active count (e.g. "◱ Patterns (3) ▾"), and the button reads "active"
+// (accent) whenever anything is on. Legible without colour (the count) — WCAG 1.4.1.
+function _setPatternsBtn(){
+  const on = anyPatternOn();
+  const n = PATTERN_PREF_KEYS.filter(k=> patternPrefs[k]).length;
+  ['patternsToggle','fsPatternsToggle'].forEach(id=>{
+    const b=document.getElementById(id); if(!b) return;
+    b.textContent = '◱ Patterns'+(n?' ('+n+')':'')+' ▾';
+    b.classList.toggle('patterns-on', on);
+  });
+}
+// Re-render everything the pattern prefs affect: chart overlays (zones/levels) + each
+// card's meta row (the pattern chips) + the fullscreen chart. All from already-loaded data.
+function _refreshPatternRender(){
+  (wlPrices||[]).forEach(t=>{
+    renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
+    updateCardMeta(t.ticker, zonesData[t.ticker]||{});
+  });
+  renderFullscreenChart();
+}
+// Flip one pattern layer on/off, remember it, and repaint.
+function setPatternPref(key, on){
+  if(!PATTERN_PREF_KEYS.includes(key)) return;
+  patternPrefs[key] = !!on;
+  persistPatternPrefs();
+  _setPatternsBtn();
+  _refreshPatternRender();
+}
+// Build the floating checklist once and keep the checkboxes in sync with the prefs.
+let _patMenuEl = null;
+// How many watched tickers each layer currently applies to, so the menu can show a
+// live count next to every option — a "0" makes clear an option is empty *right now*
+// (no such pattern / no open position) rather than broken. Overlays: zones = tickers
+// with S/R data, levels = open positions. Patterns: tickers whose detected candle maps
+// to that family. #trader-patterns
+function _patternAvailability(){
+  const c = {}; PATTERN_PREF_KEYS.forEach(k=> c[k]=0);
+  const zd = (typeof zonesData!=='undefined' && zonesData) ? zonesData : {};
+  for(const t in zd){
+    const d = zd[t] || {};
+    if((d.zones||[]).length) c.zones++;
+    if(d.position) c.levels++;
+    const cand = (d.last_signal||{}).candle;
+    const fam = cand && PATTERN_META[cand] && PATTERN_META[cand].family;
+    if(fam && c[fam]!=null) c[fam]++;
+  }
+  return c;
+}
+function _buildPatternMenu(){
+  if(_patMenuEl) return _patMenuEl;
+  const m = document.createElement('div');
+  m.className = 'pat-menu'; m.id = 'patMenu'; m.setAttribute('role','menu'); m.hidden = true;
+  m.innerHTML = PATTERN_MENU.map(row =>
+    row.group
+      ? `<div class="pat-menu-group">${row.group}</div>`
+      : `<label class="pat-menu-item"><input type="checkbox" data-pat="${row.key}"${patternPrefs[row.key]?' checked':''}><span class="pat-lbl">${row.label}</span><span class="pat-count" data-count-for="${row.key}"></span></label>`
+  ).join('')
+  + `<div class="pat-menu-note" id="patMenuNote"></div>`
+  + `<div class="pat-menu-foot"><button type="button" data-pat-all="1">Select all</button><button type="button" data-pat-none="1">Clear all</button></div>`;
+  m.addEventListener('change', (e)=>{ const cb=e.target.closest('input[data-pat]'); if(cb) setPatternPref(cb.dataset.pat, cb.checked); });
+  m.addEventListener('click', (e)=>{
+    const all=e.target.closest('[data-pat-all]'), none=e.target.closest('[data-pat-none]');
+    if(all||none){ PATTERN_PREF_KEYS.forEach(k=> patternPrefs[k]=!!all); persistPatternPrefs(); _syncPatternMenu(); _setPatternsBtn(); _refreshPatternRender(); }
+  });
+  document.body.appendChild(m);
+  _patMenuEl = m; return m;
+}
+function _syncPatternMenu(){
+  if(!_patMenuEl) return;
+  const avail = _patternAvailability();
+  _patMenuEl.querySelectorAll('input[data-pat]').forEach(cb=>{
+    const k = cb.dataset.pat;
+    cb.checked = !!patternPrefs[k];
+    const n = avail[k] || 0;
+    const item = cb.closest('.pat-menu-item');
+    const badge = item && item.querySelector('.pat-count[data-count-for="'+k+'"]');
+    if(badge){ badge.textContent = n; badge.title = n+' watched symbol'+(n===1?'':'s')+' match right now'; }
+    if(item) item.classList.toggle('empty', n===0);   // dim options with nothing to show now
+  });
+  // One-line explainer so an all-zero moment doesn't read as "broken".
+  const note = _patMenuEl.querySelector('#patMenuNote');
+  if(note){
+    const anyOn = anyPatternOn();
+    const anyData = PATTERN_PREF_KEYS.some(k=> patternPrefs[k] && (avail[k]||0)>0);
+    note.textContent = !anyOn
+      ? 'Tick a layer to show it on the charts.'
+      : (anyData ? 'Counts = symbols matching now; updates each scan.'
+                 : 'Nothing matches your picks yet — patterns appear as the scanner detects them.');
+  }
+}
+function _closePatternMenu(){
+  if(_patMenuEl){ _patMenuEl.hidden = true; }
+  ['patternsToggle','fsPatternsToggle'].forEach(id=>{ const b=document.getElementById(id); if(b) b.setAttribute('aria-expanded','false'); });
+}
+function togglePatternMenu(btn){
+  const m = _buildPatternMenu();
+  if(!m.hidden){ _closePatternMenu(); return; }
+  _syncPatternMenu();
+  m.hidden = false;
+  // Position under the trigger, kept on-screen.
+  const r = btn.getBoundingClientRect();
+  m.style.visibility='hidden';                     // measure before placing
+  const mw = m.offsetWidth || 210, mh = m.offsetHeight || 0;
+  let left = Math.min(r.left, window.innerWidth - mw - 8);
+  let top  = r.bottom + 4;
+  if(top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 4);   // flip up if no room
+  m.style.left = Math.max(8,left)+'px'; m.style.top = top+'px'; m.style.visibility='visible';
+  btn.setAttribute('aria-expanded','true');
+}
+// Close on outside click or Escape.
+document.addEventListener('mousedown', (e)=>{
+  if(_patMenuEl && !_patMenuEl.hidden && !_patMenuEl.contains(e.target) && !e.target.closest('#patternsToggle,#fsPatternsToggle')) _closePatternMenu();
+});
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') _closePatternMenu(); });
+
 function changeTimeframe(tf, winBars){
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
@@ -2824,8 +3119,16 @@ function syncRangeButtons(tf){
 
 // ── TradingView-style trading panel (#1712) ───────────────────────────────────
 function tpTab(name){
-  document.querySelectorAll('.tp-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===name));
-  document.querySelectorAll('.tp-pane').forEach(p=>p.classList.toggle('active', p.id==='tp-'+name));
+  document.querySelectorAll('.tp-tab').forEach(b=>{
+    const on = b.dataset.tab===name;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on?'true':'false');   // announce the selected tab
+  });
+  document.querySelectorAll('.tp-pane').forEach(p=>{
+    const on = p.id==='tp-'+name;
+    p.classList.toggle('active', on);
+    if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');  // hide inactive panels from AT
+  });
 }
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -3074,6 +3377,50 @@ function initWlInfoResize(){
   handle.addEventListener('touchstart',start,{passive:false});
 }
 
+// Drag-to-resize the LEFT (watchlist) and RIGHT (order ticket) columns. Widths are CSS
+// vars on :root so the grid track, the ticket panel, and the deck's reflow padding all
+// read them; clamped to sane min/max and persisted. Charts re-fit (forced repaint, rAF-
+// throttled) as you drag. Arrow keys nudge the focused divider. #trader-cols
+function initColumnResizers(){
+  const root = document.documentElement;
+  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:160, max:420, def:210 };
+  const TICKET  = { cssVar:'--ticket-w',  key:'trader.ticketW',  min:300, max:560, def:340 };
+  [SIDEBAR, TICKET].forEach(c=>{ const v=parseInt(localStorage.getItem(c.key)||'',10); if(v>0) root.style.setProperty(c.cssVar, Math.max(c.min,Math.min(c.max,v))+'px'); });
+  let raf=0;
+  const repaint=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; try{ (wlPrices||[]).forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price, null, null, true)); renderFullscreenChart(); }catch(e){} }); };
+  const curW=(cfg)=> parseInt(getComputedStyle(root).getPropertyValue(cfg.cssVar),10) || cfg.def;
+  const setW=(cfg,w,save)=>{ const cw=Math.max(cfg.min,Math.min(cfg.max,Math.round(w))); root.style.setProperty(cfg.cssVar, cw+'px'); if(save){ try{ localStorage.setItem(cfg.key,String(cw)); }catch(e){} } repaint(); return cw; };
+  function wire(handleId, cfg, edge){
+    const handle=document.getElementById(handleId); if(!handle) return;
+    let dragging=false;
+    const onMove=(e)=>{ if(!dragging) return; if(e.cancelable) e.preventDefault();
+      const x=(e.touches&&e.touches[0])?e.touches[0].clientX:e.clientX;
+      // left edge: width = distance from the viewport's left; right edge: from its right.
+      setW(cfg, edge==='left' ? x : (window.innerWidth - x), false);
+    };
+    const onUp=()=>{ if(!dragging) return; dragging=false; document.body.classList.remove('resizing-col');
+      setW(cfg, curW(cfg), true);   // persist the final width
+      window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+      window.removeEventListener('touchmove',onMove); window.removeEventListener('touchend',onUp);
+    };
+    const start=(e)=>{ e.preventDefault(); dragging=true; document.body.classList.add('resizing-col');
+      window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+      window.addEventListener('touchmove',onMove,{passive:false}); window.addEventListener('touchend',onUp); };
+    handle.addEventListener('mousedown',start);
+    handle.addEventListener('touchstart',start,{passive:false});
+    handle.addEventListener('keydown',(e)=>{
+      const grow = edge==='left' ? 'ArrowRight' : 'ArrowLeft';   // key that widens this column
+      const shrink = edge==='left' ? 'ArrowLeft' : 'ArrowRight';
+      if(e.key===grow) setW(cfg, curW(cfg)+16, true);
+      else if(e.key===shrink) setW(cfg, curW(cfg)-16, true);
+      else return;
+      e.preventDefault();
+    });
+  }
+  wire('sidebarResize', SIDEBAR, 'left');
+  wire('ticketResize',  TICKET,  'right');
+}
+
 // Drag-to-reorder chart slots in fixed layouts. Delegated on the grid (survives
 // re-renders); only the ⠿ handle initiates a drag, so chart pan/zoom still works.
 let _dragWlTk = null;   // a watchlist symbol being dragged onto a chart (#1700)
@@ -3138,9 +3485,11 @@ function startDashboard(){
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
+  _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   syncRangeButtons(chartTimeframe);
   initFooterResize();
   initWlInfoResize();
+  initColumnResizers();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
   // loads, unless the user closes it with X.
