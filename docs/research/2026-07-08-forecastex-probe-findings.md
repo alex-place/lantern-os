@@ -1,5 +1,15 @@
 # ForecastEx read-only probe — findings (#2216)
 
+> **ADDENDUM 2026-07-10** — the follow-up
+> [2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md](2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md)
+> confirms the LGA station call from primary sources (CFTC U-contract terms + the venue's
+> own product list) and adds two facts this probe couldn't see: (1) the U-series settles on
+> **Weather Underground** (≡ round(max METAR tmpf), measured 14/14) — **not** the NWS CLI;
+> (2) the full board incl. settlements is **public** at `forecastex.com/api/download`, so
+> the Observe leg does not need the EC entitlement (orders still do). The KLGA re-fit this
+> note called for is done and committed (`weather-oracle-params-klga.json`, 30% OOS gain,
+> no measurable ≥100 ceiling).
+
 **Date:** 2026-07-08 · **Account:** DUR193395 (IBKR paper) · **Method:** live read-only
 CPAPI calls via `experiments/forecastex_probe.js` (OAuth1, `local-owner` creds). No order
 code was run.

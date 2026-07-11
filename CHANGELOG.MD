@@ -1,6 +1,26 @@
-## [1.9.3] - 2026-07-11
+## [1.9.6] - 2026-07-11
 ### Added
 - **SPY-benchmarked Sharpe strategy research package for the Σ₀ trader (decision-support; no live capital path).** The intraday R-multiple backtest could not answer "does this beat SPY total return over years?", so this adds a reproducible, evidence-grounded research suite. `scripts/daily-backtest-harness.js` pulls multi-year daily total-return (Yahoo `adjclose`, dividends reinvested) and reports CAGR, annualized Sharpe ±95% CI (Lo 2002), max drawdown, per-calendar-year YoY, a strategy correlation matrix, and an inverse-vol COMBO — all benchmarked vs SPY buy-&-hold. Measured result: **COMBO3 (SPY + multi-market trend + gold) Sharpe 1.12 vs SPY 0.89, maxDD −34%→−12%, sleeve ρ̄ 0.36** — the diversification (√N) free lunch, verified on real numbers. `scripts/intraday-microstructure-harness.js` demonstrates √N breadth scaling on intraday cross-sectional reversal and quantifies the ~6bps transaction-cost break-even (the wall between daily-sleeve and HFT Sharpe). `scripts/sell-the-news-harness.js` falsifies the fade (post-event drift/PEAD dominates). `scripts/earnings-pead-harness.js` backtests real Nasdaq earnings surprises (event study + market-neutral sleeve). Adds `docs/UNISONA-SHARPE-CERTIFICATE.md` (+ `.sha256`, Status: Proposed) — proved theorems, a two-condition sleeve-admission gate (ρ<0.4 AND edge CI>0), and a measured evidence table (E2 VERIFIED). Operator ratification pending; all figures historical/backtested. Improves **Verify** (grounds trader strategy claims in reproducible, SPY-benchmarked evidence).
+
+## [1.9.5] - 2026-07-11
+
+### Added
+- Trader: restore watchlist seed + patterns toggle, plus a11y fixes (#2404).
+
+## [1.9.4] - 2026-07-11
+
+### Added
+- Trader: ForecastEx NYC port grounded — KLGA oracle fit + public board reader (#2398).
+
+## [1.9.3] - 2026-07-11
+
+### Fixed
+- CI: avoid the pr-gates OWASP `eval(` false-positive on `model.eval()` in the reranker eval harness (#2401/#2355).
+
+## [1.9.1] - 2026-07-11
+
+### Changed
+- Stock trader: `conf-badge` shows a coloured directional call only for calibrated signals; uncalibrated signals show raw model confidence labelled `uncalibrated` (honest-degrade).
 
 ## [1.9.2] - 2026-07-11
 ### Fixed
