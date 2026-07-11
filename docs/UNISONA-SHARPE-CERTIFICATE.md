@@ -1,276 +1,316 @@
-# Unisona Sharpe Certificate — v1 (DRAFT · Status: Proposed)
+---
+author: Claude (claude lane) · reviewed Grok (grok lane)
+created: 2026-07-11
+updated: 2026-07-11
+machine_check: node scripts/verify-sharpe-certificate.js  # exit 0 = document matches evidence
+---
 
-**Purpose.** Certify the *mathematics* on which the Unisona chat + Σ₀ trader
-optimize client risk-adjusted return (Sharpe ratio), and specify the design that
-follows from that mathematics. This document proves what is provable, cites what
-is established, and quarantines what is empirical and still pending our own
-measured evidence. It is an **evidence artifact**, not a performance guarantee.
+# Σ — Unisona Sharpe Certificate
 
-> **What a certificate can and cannot certify.**
-> - **CERTIFIABLE (done here):** the theorems are correct, and the design
->   *correctly implements* them. Math is provable; a design either does or does
->   not follow from it.
-> - **NOT CERTIFIABLE by math alone:** that the live system *will* earn a given
->   Sharpe. That is an empirical claim about the future, conditional on each
->   strategy's realized edge, correlations, costs, capacity, and regime. It is
->   settled only by out-of-sample evidence from
->   [`scripts/daily-backtest-harness.js`](../scripts/daily-backtest-harness.js)
->   and live audited results — never by this document.
+### Risk-adjusted-return integrity for the Σ₀ trader, along the loop: **Observe · Remember · Reason · Act · Verify · Converge**
 
-- **Approval gate:** per [docs/adr/README.md](adr/README.md), this is
-  `Status: Proposed` and is **not authoritative until Alex approves it.** Agents
-  draft; the operator ratifies.
-- **Integrity:** covered by its git commit SHA plus a detached SHA-256 sidecar
-  (`UNISONA-SHARPE-CERTIFICATE.sha256`). Any edit changes both.
-- **Operator authority is absolute.** Every allocation this certificate governs
-  remains auditable, veto-able, and reversible (see §5, Collapse-Certificate
-  Alignment).
-
-### Evidence update — 2026-07-10 (E2 promoted to VERIFIED)
-
-This directly updates the evidence table (§3) with measured results from the
-daily-backtest-harness run on 2026-07-10 (git-stamped record:
-`data/trading/leaderboard/leaderboard-2026-07-10.json`):
-
-- **E2 (diversification fires on our strategies) → VERIFIED.** COMBO3 (SPY +
-  multi-market trend + gold, risk-weighted) delivered the Theorem-1 lift on real
-  numbers: sleeve ρ̄ = 0.36 (Gold ρ = 0.10, multi-market trend ρ = 0.28 to SPY),
-  Sharpe **0.89 → 1.12** (CI [0.50, 1.74]), max drawdown **−34% → −11.9%**.
-- **Negative result is now a constraint.** The two intuitive next sleeves —
-  mean-reversion RSI(2) (ρ = 0.61) and short-vol/put-write (ρ = 0.73) — were
-  measured, found correlated-in-disguise (long-equity beta in other clothing),
-  and rejected: adding them raised blend equity correlation to 0.80 and *dropped*
-  Sharpe to 1.08. The harness falsified the narrative and enforced the bar.
-- **E1 remains CLAIMED** — positive net Sharpes per sleeve are logged, but
-  multi-window (incl. bear-market) verification is still required.
+> **Two timescales, three evidence classes, one honest gap.** Fast layer = the
+> math we can *prove* (diversification, sizing). Slow layer = the edges we can only
+> *measure* (which strategies actually have one). The gap: nothing here certifies
+> future returns — only that the theorems are correct, the design implements them,
+> and the measured claims match a committed, re-runnable record.
 
 ---
 
-## 0. Definitions (so the theorems are unambiguous)
+## What this document is — and is not
 
-For a strategy or portfolio with excess-return stream `r_t` (return above the
-risk-free rate):
+**IS.** A certificate that (1) states the mathematics the trader uses to maximize
+client Sharpe, labelled by how strongly each claim is established; (2) records what
+we *measured* on real market data, including every idea that **failed**; and (3) is
+**machine-checked** — a script re-asserts every load-bearing number against a
+committed evidence file, and this document is not to be trusted if that script
+fails on a fresh clone.
 
-- **Sharpe ratio** `S = E[r] / σ(r)`, annualized by `S_ann = S · √P` where `P` is
-  periods/year (P = 252 for daily). Sharpe is the object we maximize.
-- **Ex-ante** Sharpe = expectation under our model. **Ex-post** Sharpe = realized
-  in data. The certificate optimizes ex-ante; §4 requires ex-post verification.
-- **Correlation** `ρ_ij = corr(r_i, r_j)` between two strategies' return streams.
-- All returns are net of the modeled cost `COST_BPS` per turnover event.
+**IS NOT.** A promise of returns. A live-capital authorization. A backtest dressed
+as a guarantee. Sharpe, drawdown, and correlation here are *historical/backtested*
+and conditional on the window, costs, and survivorship noted in each section.
 
----
-
-## 1. The theorems (the certified math)
-
-### Theorem 1 — Diversification raises Sharpe (the core result). *Proved here.*
-
-*Statement.* Let `N` strategies each have excess-return mean `μ`, standard
-deviation `σ`, Sharpe `s = μ/σ`, and equal pairwise correlation `ρ`. An
-equal-weight combination has Sharpe
-
-$$ S(N,\rho) = s \cdot \frac{\sqrt{N}}{\sqrt{1 + (N-1)\rho}}. $$
-
-*Proof.* Equal weights `w_i = 1/N`. Portfolio mean `= μ`. Portfolio variance
-
-$$ \mathrm{Var} = \frac{1}{N^2}\Big(N\sigma^2 + N(N-1)\rho\sigma^2\Big)
-= \frac{\sigma^2}{N}\big(1+(N-1)\rho\big). $$
-
-So portfolio std `= σ·√((1+(N-1)ρ)/N)`, and
-`S = μ / std = s·√(N/(1+(N-1)ρ))`. ∎
-
-*Consequences (the design's whole reason to exist).*
-- `ρ → 0` (uncorrelated): `S → s·√N`. **Ten independent Sharpe-0.5 strategies
-  combine to Sharpe ≈ 1.58.** This is the free lunch.
-- `ρ → 1` (identical): `S → s`. Correlated bets add **nothing**.
-- ⇒ **The design must pay for *low correlation*, not just more strategies.**
-  A trend follower + a mean-reverter + a carry harvester beats three momentum
-  clones of the same thing.
-
-### Theorem 2 — The maximum-Sharpe portfolio is the tangency portfolio. *Cited (Markowitz 1952); proof sketch.*
-
-*Statement.* For return vector `μ` and covariance `Σ`, the weights maximizing
-`(wᵀμ)/√(wᵀΣw)` are `w* ∝ Σ⁻¹μ`.
-
-*Proof sketch.* Maximizing the Sharpe is scale-invariant in `w`; setting the
-gradient of `(wᵀμ)/√(wᵀΣw)` to zero yields `μ ∝ Σw`, i.e. `w ∝ Σ⁻¹μ`. ∎
-*Design consequence:* allocation must be **covariance-aware** — size by inverse
-covariance, not equally, once correlations are estimated with enough data.
-
-### Theorem 3 — Volatility targeting improves *realized* Sharpe under vol clustering. *Cited: Moreira & Muir (2017), "Volatility-Managed Portfolios," J. Finance.*
-
-Scaling exposure inversely to forecast volatility (`leverage_t = σ*/σ̂_t`) leaves
-Sharpe unchanged under i.i.d. returns, but **raises** realized Sharpe when
-volatility is forecastable and clustered (empirically true in markets), because
-exposure is cut *before* high-variance, low-return regimes. *Design consequence:*
-position size targets a constant portfolio vol `σ*`, not a constant dollar/share.
-
-### Theorem 4 — Higher Sharpe implies shallower drawdown. *Cited: Magdon-Ismail & Atiya (2004).*
-
-For a return process with drift `μ` and vol `σ`, expected maximum drawdown over a
-horizon scales (in the diffusion approximation) inversely with the Sharpe ratio.
-*Design consequence:* optimizing Sharpe is **not** at odds with client
-drawdown-aversion — it is the same objective. The Calmar (return/maxDD) improves
-with Sharpe.
-
-### Theorem 5 — Fractional Kelly is the Sharpe-favorable growth point. *Cited: Kelly (1956); MacLean/Thorp/Ziemba.*
-
-Full-Kelly sizing maximizes long-run log-growth but with punishing variance.
-**Half-Kelly captures ≈ 75% of the growth at ≈ 25% of the variance** — a strictly
-better risk-adjusted operating point. *Design consequence:* the sizing layer caps
-at a *fraction* of Kelly (`f ≤ ½`), never full Kelly.
-
-### Theorem 6 — Regime gating raises unconditional Sharpe *iff* the classifier beats its base rate. *Proved here (conditional).*
-
-*Statement.* Partition time into "risk-on" and "risk-off" regimes. If a classifier
-identifies risk-off periods (lower/negative drift, higher vol) with
-better-than-base-rate accuracy, then conditionally moving to cash during predicted
-risk-off raises the unconditional Sharpe.
-
-*Proof.* Unconditional excess return is the regime-probability-weighted mean;
-excising a segment whose conditional mean is below the cash rate raises the
-numerator and (since risk-off vol is higher) lowers the denominator — both move
-Sharpe up. The inequality **reverses** if the classifier is at or below base rate
-(whipsaw cost with no informational gain). ∎
-
-*This is the honest hinge of the whole system.* Theorem 6 does **not** assert our
-200-day / GEM regime gate has edge — it states the *precise condition* under which
-it helps, and thereby **converts a hope into a measurable hypothesis**: does our
-gate classify risk-off better than base rate, net of switching cost? That number
-is produced by the harness, not asserted here. (Current 10-yr harness run: the
-200d gate cut max-drawdown from −33.7% to −19.5% and lifted Sharpe 0.89 → 1.01 —
-consistent with Theorem 6 holding over that window. One window is not proof; §4.)
+**Operator authority is absolute.** Nothing here governs live capital until Alex
+signs §Converge. Every allocation stays auditable, veto-able, and one-command
+reversible.
 
 ---
 
-## 2. Design — how chat + trader optimize client Sharpe
+## How to audit this document
 
-The theorems compose into a single pipeline. Each stage cites the theorem it
-implements.
+Every load-bearing claim maps to a runnable check. If a command fails on a fresh
+clone, **the document has drifted and must be reconciled before it is trusted.**
 
-```
-        ┌─────────────────────────── UNISONA CHAT (operator + verification) ──────────────────────────┐
-        │  • states ex-ante Sharpe estimate + confidence for every proposed allocation                 │
-        │  • surfaces the evidence [claim, evidence, confidence, source] per decision                   │
-        │  • operator veto / override / rollback — ALWAYS (Collapse-Cert §5)                            │
-        └───────────────────────────────────────────────────────────────────────────────────────────┘
-                                              │  approved intent
-                                              ▼
-   Σ₀ TRADER — Sharpe-optimization stack (ex-ante → gated → sized → verified):
-     1. STRATEGY ENSEMBLE        Σ₀ TA-core + trend + mean-reversion + carry   → diversify (Thm 1)
-     2. CORRELATION-AWARE ALLOC  size by Σ⁻¹μ, penalize correlated bets        → tangency  (Thm 2)
-     3. REGIME GATE              200d/GEM risk-on/off overlay, edge-gated        → drawdown  (Thm 6)
-     4. VOL TARGETING            leverage_t = σ*/σ̂_t to a fixed portfolio vol   → realized S (Thm 3)
-     5. FRACTIONAL-KELLY CAP     per-position f ≤ ½ Kelly, hard heat limit       → growth pt (Thm 5)
-     6. VERIFY GATE              execute only if ex-ante S ≥ threshold AND
-                                 evidence passes; else abstain                    → Σ₀ rigor
-     7. AUDIT + ROLLBACK         every fill logged; reversible; operator veto     → Collapse-Cert
-```
+| Claim | Class | Verify with |
+|---|---|---|
+| The certificate's headline numbers match the evidence | **MEASURED** | `node scripts/verify-sharpe-certificate.js` → exit 0 (11/11) |
+| Leaderboard vs SPY: CAGR / Sharpe±CI / maxDD / YoY / ρ-matrix | **MEASURED** | `node scripts/daily-backtest-harness.js` |
+| √N breadth scaling + intraday cost break-even (~6 bps) | **MEASURED** | `node scripts/intraday-microstructure-harness.js` |
+| "Sell the news" falsified; drift (PEAD) dominates | **MEASURED** | `node scripts/sell-the-news-harness.js` |
+| Real earnings-surprise PEAD event study + backtest | **MEASURED** | `node scripts/earnings-pead-harness.js` |
+| Diversification raises Sharpe ≈ √N (Theorem 1) | **PROVEN** | §Reason T1 (closed-form) + verifier E2 checks |
+| Regime gating helps iff classifier beats base rate (Theorem 6) | **PROVEN** | §Reason T6 (closed-form, conditional) |
+| Tangency / vol-target / Kelly | **STANDARD CONSTRUCTION** | §Reason T2–T5 (cited) |
+| Committed evidence record | **ARTIFACT** | `data/trading/leaderboard/leaderboard-2026-07-10.json` |
 
-**Why chat and trader are one loop, not two products.** Chat is the *Reason +
-operator-verification* surface; the trader is the *Act + Verify* surface. The
-Sharpe estimate a client sees in chat is the **same** ex-ante number the sizing
-layer acts on — no divergence between what's shown and what's done. This is the
-CLAUDE.md single-loop constraint (Observe→Remember→Reason→Act→Verify→Converge)
-applied to capital.
-
-**The optimization objective, precisely.** Maximize ex-ante annualized Sharpe
-subject to: (a) portfolio vol ≤ `σ*`; (b) per-position size ≤ ½-Kelly; (c) total
-portfolio heat ≤ operator limit; (d) no position without passing the verify gate;
-(e) full reversibility. Sharpe is the objective; the constraints are the
-non-negotiable client-protection envelope.
+*Verified-on 2026-07-11 at git commit of this file. Machine check: 11 passed, 0 failed.*
 
 ---
 
-## 3. What is PROVEN vs. what is CLAIMED-pending-evidence
+## Glossary — internal → standard terms
 
-| # | Statement | Status | Settled by |
-|---|-----------|--------|-----------|
-| C1 | Combining low-correlation positive-Sharpe strategies raises aggregate Sharpe ≈ √N | **PROVEN** (Thm 1) | this document |
-| C2 | Max-Sharpe allocation is covariance-aware (`w∝Σ⁻¹μ`) | **PROVEN** (Thm 2) | this document |
-| C3 | Vol targeting raises realized Sharpe under vol clustering | **ESTABLISHED** (Thm 3, cited) | Moreira–Muir 2017 |
-| C4 | Higher Sharpe ⇒ shallower expected max drawdown | **ESTABLISHED** (Thm 4, cited) | Magdon-Ismail 2004 |
-| C5 | ½-Kelly is the Sharpe-favorable growth point | **ESTABLISHED** (Thm 5, cited) | Kelly / Thorp |
-| C6 | Regime gating helps *iff* classifier beats base rate | **PROVEN** (Thm 6, conditional) | this document |
-| E1 | *Our* Σ₀ / trend / MR / carry strategies each have positive net Sharpe | **CLAIMED — pending evidence** | daily-backtest-harness |
-| E2 | *Our* strategies are mutually low-correlation (so Thm 1 fires) | **VERIFIED** — Gold ρ=0.10, MFtrend ρ=0.28 to SPY; mean-reversion ρ=0.61 and short-vol ρ=0.73 rejected (raised blend equity corr to 0.80, Sharpe 1.12→1.08) | correlation matrix + leaderboard, daily-backtest-harness 2026-07-10; COMBO3 aggregate S=1.12 [0.50,1.74], maxDD −11.9% |
-| E3 | *Our* 200d/GEM gate beats its base rate net of cost | **PARTIAL — 1 window consistent** | harness, multi-window |
-| E4 | The live system will deliver Sharpe > SPY's ≈ 0.5 for clients | **UNPROVEN — future** | live audited track record |
-
-**The certificate certifies C1–C6 and the design's faithful implementation of
-them. It explicitly does NOT certify E1–E4.** Those are the deliverables of §4.
+| Here | Means |
+|---|---|
+| **sleeve** | one standalone strategy that can be blended into the portfolio |
+| **COMBO3** | inverse-vol (risk-parity) blend of SPY + multi-market trend + gold |
+| **ρ̄ (rho-bar)** | average pairwise correlation of the sleeves in a blend |
+| **the gate** | the two-condition admission rule for a new sleeve (§Act) |
+| **edge** | a positive standalone Sharpe whose 95% CI excludes zero |
+| **the loop** | Observe · Remember · Reason · Act · Verify · Converge (the whole system) |
 
 ---
 
-## 4. Verification protocol (what turns E-claims into evidence)
+## Plain-language summary
 
-To promote each empirical claim from CLAIMED to VERIFIED, run and log:
-
-1. **Per-strategy net Sharpe (E1)** — daily-backtest-harness on each strategy,
-   multi-window (include a bear window: 2000–02, 2008), costs on. Record Sharpe +
-   95% CI (Sharpe SE ≈ `√((1+S²/2)/T)`).
-2. **Correlation matrix (E2)** — pairwise `ρ` of the strategies' daily return
-   streams. Thm 1 only pays if the off-diagonals are small.
-3. **Gate edge (E3)** — classify each day risk-on/off, compare gate accuracy to
-   the base rate; compute switching-cost-adjusted Sharpe lift across ≥3 windows.
-4. **Aggregate ex-ante vs ex-post (E4)** — does the combined stack's realized
-   Sharpe match the Thm-1/2 prediction? Gap = model error to investigate.
-
-Each run writes a git-stamped record under `data/trading/leaderboard/`. The
-certificate's empirical table (§3) is updated **only** from those records — never
-from memory or a single paper (Noise-Sorting rule).
+Don't try to beat the S&P on raw return — almost nothing does over the long run.
+Aim instead for the **same return with far less pain** (higher Sharpe), because a
+smoother ride compounds better and keeps clients invested. The one free lunch is
+**diversification**: blend a few strategies that are *genuinely uncorrelated* and
+the combined Sharpe rises roughly like √(number of independent bets). We proved
+that math, then measured it: **COMBO3 lifted Sharpe from 0.89 to 1.12 and cut the
+worst drawdown from −34% to −12%.** We then tried six more sleeves to push higher.
+All six failed — and *why* they failed is the most useful thing we learned:
+**finding uncorrelated streams is easy; finding one with a real, cost-surviving
+edge is hard.** The path to elite Sharpe is breadth (many small edges) plus cheap
+execution — an infrastructure problem, not a signal problem.
 
 ---
 
-## 5. Collapse-Certificate alignment (client protection, non-negotiable)
+# OBSERVE — what we measure, and from where
 
-Any strategy or allocation admitted under this certificate MUST satisfy:
+**Status: MEASURED.** All prices are Yahoo daily `adjclose` (total return,
+dividends reinvested) unless noted; earnings surprises are Nasdaq's keyless
+endpoint; intraday is Yahoo 15-minute bars.
 
-- **Explicit heat limits** — max per-position and max portfolio exposure.
-- **½-Kelly ceiling** — no full-Kelly or beyond; no leverage past the risk budget.
-- **Human-in-the-loop** — operator validates before live deployment; veto anytime.
-- **Full audit trail + rollback** — every decision reversible in one commit/flag.
-- **Self-correction trigger** — auto-flatten / halt if rolling realized Sharpe or
-  max-drawdown breaches a preset threshold (the ex-post safety canary).
-- **Abstention over gambling** — if the verify gate fails, the system holds cash.
-  Not trading is a valid, Sharpe-preserving action.
-- **Two-condition sleeve-admission gate** — a candidate sleeve is admitted to the
-  ensemble only after it demonstrates **BOTH**: (a) *measured* pairwise ρ < 0.4 to
-  the current blend, AND (b) a positive standalone Sharpe whose 95% CI **excludes
-  0** (a real, significant edge). Low correlation is *necessary but not
-  sufficient* — a zero-edge uncorrelated sleeve dilutes return. The harness
-  correlation matrix + Sharpe CIs are the sole arbiter; narrative difference is
-  never enough. Binding precedents (2026-07-10): mean-reversion (ρ=0.61) and
-  short-vol (ρ=0.73) **rejected on (a)**; BOTH L/S momentum variants **rejected on
-  (b)** despite being genuinely market-neutral — L/S sector (ρ≈0.09 to blend,
-  Sharpe 0.18 [−0.44, 0.80]) and L/S single-stock (ρ≈0.13 to blend, −0.06 to SPY,
-  Sharpe 0.24 [−0.38, 0.86], −59.7% momentum-crash drawdown). Each *lowered* COMBO
-  Sharpe (1.12→1.06/1.07) though each cut maxDD to ~−9%. **Finding: decorrelation
-  is easy; a significant standalone edge is the scarce ingredient.** COMBO3 remains
-  the verified ensemble; the direct arbiter is whether a sleeve raises the *blended*
-  Sharpe, which none of the four candidates did this window.
+- **Daily total return, 10y**, SPY + ex-US + bills + bonds + gold + commodities +
+  44 large-caps + 9 sectors. Feeds the leaderboard and the sleeve correlation matrix.
+- **Intraday 15m, ~1mo**, 44 names. Feeds the √N breadth + cost-wall probe.
+- **Real earnings surprises**, 44 names × 4 quarters (Nasdaq). Feeds the PEAD test.
+
+**Honest limits.** Daily-total-return via `adjclose` is faithful; intraday reaches
+only ~1 month (Yahoo's cap) and uses mid/close prices (no live fills/spread);
+Nasdaq gives only ~4 quarters keyless (a ~1-year earnings window); the single-stock
+universe is survivorship-biased (today's survivors). Each downstream claim inherits
+these and says so.
 
 ---
 
-## 6. Signatures
+# REMEMBER — the durable, re-runnable record
+
+**Status: ARTIFACT.** Nothing in this certificate floats free of a committed file.
+
+- **Evidence record:** `data/trading/leaderboard/leaderboard-2026-07-10.json` —
+  every strategy's CAGR, Sharpe±CI, maxDD, YoY, and the full correlation matrix,
+  git-stamped.
+- **This certificate + its hash:** `docs/UNISONA-SHARPE-CERTIFICATE.sha256`.
+- **Provenance of everything tried:** Appendix M below — the six rejected sleeves,
+  each with its measured reason. Kept verbatim so we never re-run a dead end.
+
+---
+
+# REASON — the certified mathematics
+
+Each theorem carries an evidence class and the regime under which it holds.
+
+### T1 — Diversification raises Sharpe ≈ √N. **Status: PROVEN.**
+
+*Plain words.* Blend N strategies that don't move together and the combined Sharpe
+grows like √N. Uncorrelated is the whole point; correlated bets add nothing.
+
+*Formal.* For N sleeves each with Sharpe `s` and equal pairwise correlation `ρ`, an
+equal-weight blend has `S(N,ρ) = s·√N / √(1+(N−1)ρ)`. Proof: portfolio variance
+`= (σ²/N)(1+(N−1)ρ)`; divide mean `μ` by its root. As `ρ→0`, `S→s·√N`; as `ρ→1`,
+`S→s`. ∎
+
+*Scope / caveat.* Requires the sleeves to *have* comparable positive Sharpe. A
+zero-edge uncorrelated sleeve does **not** help — it dilutes return (measured: §Verify).
+
+### T6 — Regime gating helps *iff* the classifier beats its base rate. **Status: PROVEN (conditional).**
+
+*Plain words.* Stepping to cash in "risk-off" windows raises Sharpe only if you can
+actually tell risk-off from risk-on better than chance; otherwise whipsaw costs lose.
+
+*Formal.* Excising a segment whose conditional mean < cash rate raises the numerator
+and (risk-off vol being higher) lowers the denominator — both raise Sharpe. The
+inequality reverses at/below base rate. ∎ *This converts "our trend filter helps"
+from hope into a measurable hypothesis.*
+
+### T2–T5 — Sizing & allocation. **Status: STANDARD CONSTRUCTION (cited).**
+
+- **T2 Tangency** — max-Sharpe weights `w ∝ Σ⁻¹μ` (Markowitz 1952): allocate by
+  inverse covariance, not equally.
+- **T3 Vol targeting** — scale exposure to constant vol; raises *realized* Sharpe
+  under vol clustering (Moreira–Muir 2017).
+- **T4 Sharpe→drawdown** — higher Sharpe ⇒ shallower expected max drawdown
+  (Magdon-Ismail 2004). Optimizing Sharpe *is* optimizing the client's ride.
+- **T5 ½-Kelly** — half-Kelly captures ~75% of growth at ~25% of variance
+  (Kelly 1956; Thorp): the Sharpe-favorable operating point; never full Kelly.
+
+### T7 — Elite Sharpe = T1 industrialized. **Status: STANDARD CONSTRUCTION (cited).**
+
+Grinold's Fundamental Law: `Sharpe ≈ edge-per-bet × √(independent bets)`. Firms at
+Sharpe 4–10 don't have better per-bet skill; they run *thousands* of tiny,
+market-neutral, independent bets and lever the smooth result. Our COMBO3 is the
+correct small-N seed of the same law.
+
+---
+
+# ACT — the design, and the admission gate
+
+**Status: HEURISTIC (operational design derived from the theorems above).**
+
+The chat and trader are **one loop**: the Sharpe number a client sees in chat is the
+same ex-ante number the sizing layer acts on. The trader pipeline:
+
+1. **Ensemble** — blend low-ρ sleeves *(T1)*
+2. **Correlation-aware allocation** — size by `Σ⁻¹μ` *(T2)*
+3. **Regime gate** — trend/GEM risk-on/off overlay *(T6)*
+4. **Vol targeting** — to a fixed portfolio vol *(T3)*
+5. **½-Kelly cap** + hard heat limit *(T5)*
+6. **Verify gate** — trade only if ex-ante Sharpe clears threshold; else hold cash
+7. **Audit + rollback** — every fill logged, reversible, operator-vetoable
+
+### The two-condition sleeve-admission gate
+
+**A new sleeve is admitted only if BOTH hold** (measured, not argued):
+
+- **(a)** measured pairwise **ρ < 0.4** to the current blend, AND
+- **(b)** a positive standalone **Sharpe whose 95% CI excludes 0** (a real edge).
+
+*Why both.* T1 needs uncorrelated *and* positive-edge sleeves. Low ρ alone is
+necessary, not sufficient — a zero-edge uncorrelated sleeve dilutes return. The
+harness correlation matrix + Sharpe CIs are the sole arbiter; narrative difference
+("another asset class", "sounds uncorrelated") is never enough. The **direct**
+arbiter is whether the sleeve raises the *blended* Sharpe.
+
+### Red team — gaming a Sharpe certificate
+
+| Attack | What it fakes | Detection |
+|---|---|---|
+| Overfit a backtest to Sharpe 5 from one clever rule | breadth it doesn't have | demand ≥ N independent bets; wide single-rule CI |
+| Survivorship-picked universe | edge that vanished with the losers | flag universe construction; the −60% L/S crash exposed it |
+| Report gross, hide costs | a live edge that dies at the spread | cost sweep + break-even bps (intraday harness) |
+| One lucky window | significance | Sharpe 95% CI; multi-window (incl. bear) still required |
+| Correlated sleeve dressed as diversifier | independence | measured ρ to the blend, not a story (killed mean-rev, short-vol) |
+
+---
+
+# VERIFY — what the measurements actually said
+
+**Status: MEASURED.** Machine-checked by `verify-sharpe-certificate.js` (11/11).
+
+### Evidence table
+
+| # | Claim | Verdict | Numbers |
+|---|---|---|---|
+| E2 | Diversification (T1) fires on our strategies | **VERIFIED** | COMBO3 Sharpe **1.12** vs SPY **0.89**; maxDD **−12%** vs **−34%**; sleeve ρ̄ **0.36** (Gold ρ=0.10, MFtrend ρ=0.28) |
+| E1 | Each core sleeve has positive net Sharpe | **PARTIAL** | all positive; COMBO3 CI [0.50, 1.74] excludes 0; 10y single window — multi-window (incl. bear) still required |
+| E3 | Regime gate (T6) beats base rate net of cost | **PARTIAL** | 200d gate cut maxDD −34%→−19.5%, Sharpe 0.89→1.01 over this window; not multi-window-confirmed |
+| R1–R6 | Six extra sleeves beat COMBO3 | **REFUTED (all 6)** | see below |
+
+### The six rejections — the real lesson
+
+| Sleeve | ρ↔SPY | Standalone Sharpe (CI) | Rejected on | Reading |
+|---|---|---|---|---|
+| Mean-reversion RSI(2) | 0.61 | 0.58 [−0.04, 1.21] | **(a) correlated** | long-equity in disguise |
+| Short-vol / put-write | 0.73 | 0.53 [−0.10, 1.15] | **(a) correlated** | long-equity tail, in disguise |
+| L/S sector momentum | −0.02 | 0.18 [−0.44, 0.80] | **(b) no edge** | truly neutral, no premium this decade |
+| L/S single-stock momentum | 0.06 | 0.24 [−0.38, 0.86] | **(b) no edge** | −60% momentum crash; breadth didn't rescue |
+| Sell-the-news (fade) | −0.07 | −1.02 [−1.64, −0.39] | **falsified** | fade is *backwards*; drift dominates |
+| Earnings PEAD (buy-the-news) | ~0.07 | thin, CI spans 0 | **(b) no edge (yet)** | right sign; ~1y window + beat/miss imbalance too weak |
+
+> **The finding, stated plainly:** *Genuine uncorrelated diversification is easy to
+> find; a significant, net-of-cost standalone edge is genuinely scarce.* None of the
+> six raised the blended Sharpe. COMBO3 stands.
+
+### The √N wall (why elite Sharpe is out of reach without infra)
+
+Intraday cross-sectional reversal showed **gross Sharpe rising ≈ √N** with breadth
+(N=4→3.4, N=44→19.1) — the Fundamental Law, live. But it **dies at a ~6 bps
+transaction-cost break-even.** Below ~6 bps all-in → wildly profitable (HFT, via
+co-location/rebates); above it → dead (everyone crossing the spread). **The gap from
+Sharpe 1.1 to Sharpe 10 is an execution/infrastructure problem, not a signal one.**
+
+---
+
+# CONVERGE — conclusion, open gaps, and the operator gate
+
+**What is settled.** COMBO3 is the verified ensemble: own the market, add
+multi-market trend and gold as genuine diversifiers, size by risk. Higher Sharpe
+than SPY, a third of the drawdown, machine-checked.
+
+**What is open (tracked, not hidden).**
+1. **E1/E3 → multi-window.** Confirm each sleeve's edge and the regime gate across
+   windows that include a bear market (2000–02, 2008). *Needs a longer daily feed.*
+2. **10-year PEAD.** The one rejected sleeve with a sign-confirmed footprint;
+   re-test with a keyed earnings API over a decade. *Needs an API key.*
+3. **The industrial-√N path.** Many small market-neutral edges at middle frequency
+   where break-even cost > our real trading cost — the only √N path open to a
+   non-co-located shop.
+4. **Vol-targeting COMBO3** to a client return target — the client-facing capstone,
+   ready to build now.
+
+**Collapse-certificate alignment (client protection, non-negotiable).** Explicit
+heat limits; ½-Kelly ceiling, no leverage past the risk budget; human-in-the-loop
+before any live deployment; full audit trail + one-command rollback; auto-flatten if
+rolling realized Sharpe or maxDD breaches a preset threshold; **abstention (hold
+cash) is always a valid, Sharpe-preserving action.**
+
+### Signatures
 
 | Role | Name | Status | Date |
-|------|------|--------|------|
-| Author (agent) | Claude (claude lane) | drafted | 2026-07-11 |
-| Mathematics | §1 Thms 1 & 6 proved; 2–5 cited | self-checked | 2026-07-11 |
-| E2 promotion + measured-ρ gate | Grok (grok lane) | reviewed & evidence-updated | 2026-07-11 |
-| E2 revision applied to file | Claude (claude lane) | applied; harness numbers re-checked | 2026-07-11 |
-| Operator ratification | **Alex Place** | ☐ **PENDING** | — |
+|---|---|---|---|
+| Author (agent) | Claude (claude lane) | drafted; math self-checked; machine-check 11/11 | 2026-07-11 |
+| E2 promotion + gate review | Grok (grok lane) | reviewed & evidence-updated | 2026-07-11 |
+| **Operator ratification** | **Alex Place** | ☐ **PENDING** | — |
 
-*This certificate is `Status: Proposed`. It carries no authority over live capital
-until the operator signs §6. The return door remains fully open.*
+*`Status: Proposed`. No authority over live capital until the operator signs. The
+return door stays open.*
 
 ---
 
-### References
-- Markowitz, H. (1952). *Portfolio Selection.* J. Finance.
-- Kelly, J. (1956). *A New Interpretation of Information Rate.*
-- Magdon-Ismail, M. & Atiya, A. (2004). *Maximum Drawdown.* Risk.
-- Moreira, A. & Muir, T. (2017). *Volatility-Managed Portfolios.* J. Finance.
-- MacLean, Thorp, Ziemba (2011). *The Kelly Capital Growth Investment Criterion.*
-- Companion evidence: [`scripts/daily-backtest-harness.js`](../scripts/daily-backtest-harness.js),
-  records under `data/trading/leaderboard/`.
+## References
+
+- Markowitz (1952) *Portfolio Selection*; Kelly (1956); Magdon-Ismail & Atiya (2004)
+  *Maximum Drawdown*; Moreira & Muir (2017) *Volatility-Managed Portfolios*;
+  Grinold *Fundamental Law of Active Management*; MacLean/Thorp/Ziemba (2011).
+- Companion code: `scripts/daily-backtest-harness.js`,
+  `scripts/intraday-microstructure-harness.js`, `scripts/sell-the-news-harness.js`,
+  `scripts/earnings-pead-harness.js`, `scripts/verify-sharpe-certificate.js`.
+- Evidence: `data/trading/leaderboard/leaderboard-2026-07-10.json`.
+
+---
+
+## Appendix M — Provenance / maintenance log (everything tried, kept verbatim)
+
+- **2026-07-10 — Daily leaderboard built.** SPY total-return benchmark; COMBO3
+  (SPY+MFtrend+Gold) Sharpe 1.12 vs 0.89, maxDD −12% vs −34%, sleeve ρ̄ 0.36. E2 → VERIFIED.
+- **2026-07-10 — Mean-reversion + short-vol rejected on (a).** ρ=0.61 / 0.73 to
+  equity; adding them dropped blend Sharpe 1.12→1.08 and raised equity-ρ to 0.80.
+  *Lesson: "sounds different" ≠ uncorrelated; measure ρ.*
+- **2026-07-10 — L/S sector momentum rejected on (b).** ρ≈0 (genuinely neutral) but
+  Sharpe 0.18 CI spans 0; blend Sharpe fell to 1.06. *Lesson: low ρ is necessary,
+  not sufficient — a zero-edge sleeve dilutes return. Gate upgraded to two conditions.*
+- **2026-07-11 — L/S single-stock momentum rejected on (b).** More breadth (44 names)
+  didn't rescue the edge; −60% momentum crash (survivorship-amplified). Sharpe 0.24 CI spans 0.
+- **2026-07-11 — Intraday microstructure probe.** √N breadth scaling confirmed live;
+  gross Sharpe 19 at N=44; break-even ~6 bps. *Lesson: the HFT gap is execution, not signal.*
+- **2026-07-11 — "Sell the news" falsified.** Post-event DRIFT (PEAD) dominates the
+  fade; literal fade is Sharpe −1.02 / −92% DD. Correct direction (buy-the-news) is
+  uncorrelated but thin on a jump proxy.
+- **2026-07-11 — Earnings PEAD, real Nasdaq surprises.** Event study directionally
+  correct (beats drift up, misses drift down) but insignificant over the ~1y keyless
+  window; beat/miss imbalance (155 vs 18) in a bull year starves the short leg.
+  Tracked as open gap #2 (needs 10y keyed feed).
+- **2026-07-11 — Machine-checker added.** `verify-sharpe-certificate.js`, 11 assertions,
+  11/11 pass against the committed record. This document is now drift-detectable.
