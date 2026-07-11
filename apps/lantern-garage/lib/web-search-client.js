@@ -336,6 +336,69 @@ function _isRateLimited(err) {
   return /rate-limited|429/i.test(String(err || ""));
 }
 
+// #openhands-dup — the Σ₀ post-reply grounding pass (dream-chat.js::verifyResponse)
+// calls the RAW webSearchMcp once per extracted claim, and verifyResponse itself
+// runs several times per chat turn (gemini Σ₀ pass, anthropic Σ₀ pass, the canary
+// "Ground this" retry). With the same reply each pass extracts the same claim, so
+// one turn fired the IDENTICAL web_search query 13-20 times in a row
+// (data/tool-logs/2026-07-11.jsonl). webSearchMcp is the un-cached path — the 5-min
+// success cache only wraps webSearch() — so nothing coalesced them.
+//
+// Fix: a small dedup layer keyed by query+maxResults that (a) COALESCES concurrent
+// identical calls onto one in-flight promise (the 5 claims run under Promise.all,
+// so a plain result cache can't help them — they all start before any finishes),
+// and (b) briefly caches the resolved result so the repeated verifyResponse passes
+// within a turn reuse it instead of re-firing. Unlike webSearch's success-only
+// cache this caches failures too: a failed grounding query should NOT be retried
+// 20 times in one turn either. The window is short (default 2 min) so a genuinely
+// new turn a few minutes later still grounds fresh.
+const GROUNDING_DEDUP_TTL_MS = parseInt(process.env.GROUNDING_DEDUP_TTL_MS || "120000", 10); // 2 min
+const GROUNDING_DEDUP_MAX_ENTRIES = 500;
+const _groundingInflight = new Map(); // key -> Promise
+const _groundingRecent = new Map();   // key -> { result, expiresAt }
+
+function _groundingCachePrune() {
+  if (_groundingRecent.size < GROUNDING_DEDUP_MAX_ENTRIES) return;
+  const oldest = _groundingRecent.keys().next().value;
+  if (oldest !== undefined) _groundingRecent.delete(oldest);
+}
+
+// Test-only: reset dedup state between cases without waiting out the TTL.
+function _clearGroundingDedup() { _groundingInflight.clear(); _groundingRecent.clear(); }
+
+/**
+ * Deduped/coalesced variant of webSearchMcp for the per-turn grounding pass.
+ * Identical (query, maxResults) calls within GROUNDING_DEDUP_TTL_MS hit at most
+ * one real MCP request: concurrent callers share the in-flight promise, later
+ * callers get the cached result. Same signature and return shape as webSearchMcp.
+ * @param {(q:string,m:number,t:number)=>Promise<any>} [impl] - override for tests.
+ */
+function webSearchMcpDeduped(query, maxResults = 5, timeoutMs = MCP_TIMEOUT, impl = webSearchMcp) {
+  const key = _cacheKey(query, maxResults);
+
+  const recent = _groundingRecent.get(key);
+  if (recent) {
+    if (Date.now() <= recent.expiresAt) return Promise.resolve(recent.result);
+    _groundingRecent.delete(key);
+  }
+
+  const inflight = _groundingInflight.get(key);
+  if (inflight) return inflight;
+
+  const p = (async () => {
+    try {
+      const result = await impl(query, maxResults, timeoutMs);
+      _groundingCachePrune();
+      _groundingRecent.set(key, { result, expiresAt: Date.now() + GROUNDING_DEDUP_TTL_MS });
+      return result;
+    } finally {
+      _groundingInflight.delete(key);
+    }
+  })();
+  _groundingInflight.set(key, p);
+  return p;
+}
+
 async function _webSearchUncached(query, maxResults, opts) {
   const mcpTimeout = opts.mcpTimeoutMs || MCP_ATTEMPT_TIMEOUT;
   const retries = opts.retries == null ? 1 : opts.retries;
@@ -391,6 +454,8 @@ async function webSearch(query, maxResults = 5, opts = {}) {
 
 module.exports = {
   webSearchMcp,
+  webSearchMcpDeduped,
+  _clearGroundingDedup,
   webSearchDirect,
   webSearchWiki,
   webSearch,

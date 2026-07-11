@@ -1183,7 +1183,7 @@ async function verifyResponse(draft, userMessage, agentName) {
 
   const fs = require("fs");
   const path = require("path");
-  const { webSearchMcp } = require("./web-search-client");
+  const { webSearchMcpDeduped } = require("./web-search-client");
   const { callVerifyModel } = require("./verify-llm");
   const { execFile } = require("child_process");
   const execFileAsync = require("util").promisify(execFile);
@@ -1298,7 +1298,10 @@ async function verifyResponse(draft, userMessage, agentName) {
     // 2b: web search via MCP (try to confirm anything not yet codebase-confirmed)
     if (confidence < 0.75) {
       try {
-        const searchResult = await webSearchMcp(`${c.claim} site:github.com OR site:docs.anthropic.com OR developer docs`, 3);
+        // Deduped: identical claim queries across the several verifyResponse passes
+        // per turn (gemini Σ₀, anthropic Σ₀, canary retry) collapse to one MCP call
+        // instead of firing 13-20× (#openhands-dup).
+        const searchResult = await webSearchMcpDeduped(`${c.claim} site:github.com OR site:docs.anthropic.com OR developer docs`, 3);
         if (searchResult?.results?.length) {
           const snippet = searchResult.results[0].snippet || "";
           evidence = `web: ${snippet.slice(0, 120)}`;
