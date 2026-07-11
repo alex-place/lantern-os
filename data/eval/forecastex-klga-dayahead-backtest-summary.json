@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-10T23:52:52.768Z",
+  "generatedAt": "2026-07-11T00:03:37.343Z",
   "product": "UHLGA",
   "from": "2026-02-03",
   "to": "2026-07-09",
@@ -67,6 +67,14 @@
     "hitRate": 0.3393,
     "netPnlCents": 6441,
     "meanPnlCentsPerCard": 28.8,
+    "tradeable": {
+      "cards": 17,
+      "nonFillableExcluded": 207,
+      "hitRate": 0.8235,
+      "netPnlCents": 448,
+      "meanPnlCentsPerCard": 26.4,
+      "note": "cards whose day-ahead close sat at 0.00/1.00 are excluded as non-fillable; this is the P&L certification is allowed to trust"
+    },
     "byMonth": {
       "2026-02": {
         "n": 41,
@@ -89,6 +97,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-12"
       },
@@ -99,6 +108,7 @@
         "worst_c": 71.7,
         "fair": 0.1205,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 92,
         "date": "2026-02-12"
       },
@@ -109,6 +119,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-12"
       },
@@ -119,6 +130,7 @@
         "worst_c": 8.2,
         "fair": 0.0731,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 18,
         "date": "2026-02-12"
       },
@@ -129,6 +141,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-13"
       },
@@ -139,6 +152,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-13"
       },
@@ -149,6 +163,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-13"
       },
@@ -159,6 +174,7 @@
         "worst_c": 14,
         "fair": 0.1508,
         "outcome": 1,
+        "tradeable": true,
         "pnl_c": -59,
         "date": "2026-02-13"
       },
@@ -169,6 +185,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-14"
       },
@@ -179,6 +196,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-14"
       },
@@ -189,6 +207,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-14"
       },
@@ -199,6 +218,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-14"
       },
@@ -209,6 +229,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-15"
       },
@@ -219,6 +240,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-15"
       },
@@ -229,6 +251,7 @@
         "worst_c": 5.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": -7,
         "date": "2026-02-15"
       },
@@ -239,6 +262,7 @@
         "worst_c": 40.3,
         "fair": 0.1146,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 59,
         "date": "2026-02-15"
       },
@@ -249,6 +273,7 @@
         "worst_c": 13.5,
         "fair": 0.0663,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 32,
         "date": "2026-02-15"
       },
@@ -259,6 +284,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-16"
       },
@@ -269,6 +295,7 @@
         "worst_c": 64.7,
         "fair": 0.1205,
         "outcome": 1,
+        "tradeable": true,
         "pnl_c": -15,
         "date": "2026-02-16"
       },
@@ -279,6 +306,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-16"
       },
@@ -289,6 +317,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-17"
       },
@@ -299,6 +328,7 @@
         "worst_c": 5.7,
         "fair": 0.1205,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 26,
         "date": "2026-02-17"
       },
@@ -309,6 +339,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-17"
       },
@@ -319,6 +350,7 @@
         "worst_c": 9,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 36,
         "date": "2026-02-17"
       },
@@ -329,6 +361,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-18"
       },
@@ -339,6 +372,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-20"
       },
@@ -349,6 +383,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-20"
       },
@@ -359,6 +394,7 @@
         "worst_c": 20.3,
         "fair": 0.1146,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 39,
         "date": "2026-02-20"
       },
@@ -369,6 +405,7 @@
         "worst_c": 12.7,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 40,
         "date": "2026-02-22"
       },
@@ -379,6 +416,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-23"
       },
@@ -389,6 +427,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-23"
       },
@@ -399,6 +438,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-23"
       },
@@ -409,6 +449,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-23"
       },
@@ -419,6 +460,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-24"
       },
@@ -429,6 +471,7 @@
         "worst_c": 22,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 49,
         "date": "2026-02-26"
       },
@@ -439,6 +482,7 @@
         "worst_c": 15.6,
         "fair": 0.0392,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 23,
         "date": "2026-02-26"
       },
@@ -449,6 +493,7 @@
         "worst_c": 6.2,
         "fair": 0.0731,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 16,
         "date": "2026-02-27"
       },
@@ -459,6 +504,7 @@
         "worst_c": 6.5,
         "fair": 0.0663,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 25,
         "date": "2026-02-27"
       },
@@ -469,6 +515,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-02-28"
       },
@@ -479,6 +526,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-02-28"
       },
@@ -489,6 +537,7 @@
         "worst_c": 36.3,
         "fair": 0.1146,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 55,
         "date": "2026-02-28"
       },
@@ -499,6 +548,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-02"
       },
@@ -509,6 +559,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-03"
       },
@@ -519,6 +570,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-03"
       },
@@ -529,6 +581,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-03"
       },
@@ -539,6 +592,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-04"
       },
@@ -549,6 +603,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-04"
       },
@@ -559,6 +614,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-04"
       },
@@ -569,6 +625,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-04"
       },
@@ -579,6 +636,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-05"
       },
@@ -589,6 +647,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-05"
       },
@@ -599,6 +658,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-05"
       },
@@ -609,6 +669,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-05"
       },
@@ -619,6 +680,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-06"
       },
@@ -629,6 +691,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-06"
       },
@@ -639,6 +702,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-06"
       },
@@ -649,6 +713,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-06"
       },
@@ -659,6 +724,7 @@
         "worst_c": 9.2,
         "fair": 0.0731,
         "outcome": 0,
+        "tradeable": true,
         "pnl_c": 19,
         "date": "2026-03-06"
       },
@@ -669,6 +735,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-08"
       },
@@ -679,6 +746,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-08"
       },
@@ -689,6 +757,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-08"
       },
@@ -699,6 +768,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-08"
       },
@@ -709,6 +779,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-09"
       },
@@ -719,6 +790,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-09"
       },
@@ -729,6 +801,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-09"
       },
@@ -739,6 +812,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-09"
       },
@@ -749,6 +823,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-10"
       },
@@ -759,6 +834,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-10"
       },
@@ -769,6 +845,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-10"
       },
@@ -779,6 +856,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-10"
       },
@@ -789,6 +867,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-11"
       },
@@ -799,6 +878,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-11"
       },
@@ -809,6 +889,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-11"
       },
@@ -819,6 +900,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-11"
       },
@@ -829,6 +911,7 @@
         "worst_c": 98.9,
         "fair": 0,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-12"
       },
@@ -839,6 +922,7 @@
         "worst_c": 69.1,
         "fair": 0.8467,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-12"
       },
@@ -849,6 +933,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-13"
       },
@@ -859,6 +944,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-13"
       },
@@ -869,6 +955,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-13"
       },
@@ -879,6 +966,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-14"
       },
@@ -889,6 +977,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-14"
       },
@@ -899,6 +988,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-14"
       },
@@ -909,6 +999,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-14"
       },
@@ -919,6 +1010,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-15"
       },
@@ -929,6 +1021,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-15"
       },
@@ -939,6 +1032,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-15"
       },
@@ -949,6 +1043,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-15"
       },
@@ -959,6 +1054,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-16"
       },
@@ -969,6 +1065,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-16"
       },
@@ -979,6 +1076,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-16"
       },
@@ -989,6 +1087,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-18"
       },
@@ -999,6 +1098,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-18"
       },
@@ -1009,6 +1109,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-18"
       },
@@ -1019,6 +1120,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-18"
       },
@@ -1029,6 +1131,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-19"
       },
@@ -1039,6 +1142,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-19"
       },
@@ -1049,6 +1153,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-19"
       },
@@ -1059,6 +1164,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-19"
       },
@@ -1069,6 +1175,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-20"
       },
@@ -1079,6 +1186,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-20"
       },
@@ -1089,6 +1197,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-20"
       },
@@ -1099,6 +1208,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-20"
       },
@@ -1109,6 +1219,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-21"
       },
@@ -1119,6 +1230,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-21"
       },
@@ -1129,6 +1241,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-21"
       },
@@ -1139,6 +1252,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-21"
       },
@@ -1149,6 +1263,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-22"
       },
@@ -1159,6 +1274,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-22"
       },
@@ -1169,6 +1285,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-22"
       },
@@ -1179,6 +1296,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-23"
       },
@@ -1189,6 +1307,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-23"
       },
@@ -1199,6 +1318,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-23"
       },
@@ -1209,6 +1329,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-23"
       },
@@ -1219,6 +1340,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-24"
       },
@@ -1229,6 +1351,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-24"
       },
@@ -1239,6 +1362,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-24"
       },
@@ -1249,6 +1373,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-24"
       },
@@ -1259,6 +1384,7 @@
         "worst_c": 57.1,
         "fair": 0.2738,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-25"
       },
@@ -1269,6 +1395,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-25"
       },
@@ -1279,6 +1406,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-25"
       },
@@ -1289,6 +1417,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-25"
       },
@@ -1299,6 +1428,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-26"
       },
@@ -1309,6 +1439,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-26"
       },
@@ -1319,6 +1450,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-26"
       },
@@ -1329,6 +1461,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-26"
       },
@@ -1339,6 +1472,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-27"
       },
@@ -1349,6 +1483,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-27"
       },
@@ -1359,6 +1494,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-27"
       },
@@ -1369,6 +1505,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-27"
       },
@@ -1379,6 +1516,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-28"
       },
@@ -1389,6 +1527,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-28"
       },
@@ -1399,6 +1538,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-28"
       },
@@ -1409,6 +1549,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-28"
       },
@@ -1419,6 +1560,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-29"
       },
@@ -1429,6 +1571,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-29"
       },
@@ -1439,6 +1582,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-29"
       },
@@ -1449,6 +1593,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-29"
       },
@@ -1459,6 +1604,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-30"
       },
@@ -1469,6 +1615,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-30"
       },
@@ -1479,6 +1626,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-30"
       },
@@ -1489,6 +1637,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-30"
       },
@@ -1499,6 +1648,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-03-31"
       },
@@ -1509,6 +1659,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-31"
       },
@@ -1519,6 +1670,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-31"
       },
@@ -1529,6 +1681,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-03-31"
       },
@@ -1539,6 +1692,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-01"
       },
@@ -1549,6 +1703,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-01"
       },
@@ -1559,6 +1714,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-01"
       },
@@ -1569,6 +1725,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-01"
       },
@@ -1579,6 +1736,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-02"
       },
@@ -1589,6 +1747,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-02"
       },
@@ -1599,6 +1758,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-02"
       },
@@ -1609,6 +1769,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-02"
       },
@@ -1619,6 +1780,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-03"
       },
@@ -1629,6 +1791,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-03"
       },
@@ -1639,6 +1802,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-03"
       },
@@ -1649,6 +1813,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-03"
       },
@@ -1659,6 +1824,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-04"
       },
@@ -1669,6 +1835,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-04"
       },
@@ -1679,6 +1846,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-04"
       },
@@ -1689,6 +1857,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-04"
       },
@@ -1699,6 +1868,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-05"
       },
@@ -1709,6 +1879,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-05"
       },
@@ -1719,6 +1890,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-05"
       },
@@ -1729,6 +1901,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-05"
       },
@@ -1739,6 +1912,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-06"
       },
@@ -1749,6 +1923,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-06"
       },
@@ -1759,6 +1934,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-06"
       },
@@ -1769,6 +1945,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-06"
       },
@@ -1779,6 +1956,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-07"
       },
@@ -1789,6 +1967,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-07"
       },
@@ -1799,6 +1978,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-07"
       },
@@ -1809,6 +1989,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-07"
       },
@@ -1819,6 +2000,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-08"
       },
@@ -1829,6 +2011,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-08"
       },
@@ -1839,6 +2022,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-08"
       },
@@ -1849,6 +2033,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-08"
       },
@@ -1859,6 +2044,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-09"
       },
@@ -1869,6 +2055,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-09"
       },
@@ -1879,6 +2066,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-09"
       },
@@ -1889,6 +2077,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-09"
       },
@@ -1899,6 +2088,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-10"
       },
@@ -1909,6 +2099,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-10"
       },
@@ -1919,6 +2110,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-10"
       },
@@ -1929,6 +2121,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-10"
       },
@@ -1939,6 +2132,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-11"
       },
@@ -1949,6 +2143,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-11"
       },
@@ -1959,6 +2154,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-11"
       },
@@ -1969,6 +2165,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-11"
       },
@@ -1979,6 +2176,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-12"
       },
@@ -1989,6 +2187,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-12"
       },
@@ -1999,6 +2198,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-12"
       },
@@ -2009,6 +2209,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-12"
       },
@@ -2019,6 +2220,7 @@
         "worst_c": 79.3,
         "fair": 0.0745,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-13"
       },
@@ -2029,6 +2231,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-13"
       },
@@ -2039,6 +2242,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-13"
       },
@@ -2049,6 +2253,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-13"
       },
@@ -2059,6 +2264,7 @@
         "worst_c": 57.1,
         "fair": 0.2738,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-14"
       },
@@ -2069,6 +2275,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-14"
       },
@@ -2079,6 +2286,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-14"
       },
@@ -2089,6 +2297,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-14"
       },
@@ -2099,6 +2308,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-15"
       },
@@ -2109,6 +2319,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-15"
       },
@@ -2119,6 +2330,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-15"
       },
@@ -2129,6 +2341,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-15"
       },
@@ -2139,6 +2352,7 @@
         "worst_c": 92.3,
         "fair": 0.0111,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-16"
       },
@@ -2149,6 +2363,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-16"
       },
@@ -2159,6 +2374,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-16"
       },
@@ -2169,6 +2385,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-16"
       },
@@ -2179,6 +2396,7 @@
         "worst_c": 87,
         "fair": 0.0311,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-17"
       },
@@ -2189,6 +2407,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-17"
       },
@@ -2199,6 +2418,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-17"
       },
@@ -2209,6 +2429,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-17"
       },
@@ -2219,6 +2440,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-18"
       },
@@ -2229,6 +2451,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-18"
       },
@@ -2239,6 +2462,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-18"
       },
@@ -2249,6 +2473,7 @@
         "worst_c": 69.1,
         "fair": 0.1533,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-19"
       },
@@ -2259,6 +2484,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-19"
       },
@@ -2269,6 +2495,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-19"
       },
@@ -2279,6 +2506,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-19"
       },
@@ -2289,6 +2517,7 @@
         "worst_c": 57.1,
         "fair": 0.2738,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-20"
       },
@@ -2299,6 +2528,7 @@
         "worst_c": 10,
         "fair": 0.1547,
         "outcome": 1,
+        "tradeable": false,
         "pnl_c": 99,
         "date": "2026-04-20"
       },
@@ -2309,6 +2539,7 @@
         "worst_c": 11.4,
         "fair": 0.1667,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-20"
       },
@@ -2319,6 +2550,7 @@
         "worst_c": 9.7,
         "fair": 0.1508,
         "outcome": 0,
+        "tradeable": false,
         "pnl_c": -1,
         "date": "2026-04-20"
       }
