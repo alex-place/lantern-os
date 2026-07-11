@@ -354,6 +354,14 @@
   .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
   .pat-menu-item:hover{background:var(--bg2)}
   .pat-menu-item input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex:0 0 auto}
+  .pat-menu-item .pat-lbl{flex:1}
+  /* Live match-count badge: how many watched symbols this layer applies to right now.
+     Accent when >0, muted "0" when empty — so an empty option reads as "none now",
+     not "broken". The whole row dims when it has nothing to show. */
+  .pat-count{flex:0 0 auto;min-width:20px;text-align:center;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--accent);background:color-mix(in srgb, var(--accent) 14%, transparent);border-radius:9px;padding:1px 6px}
+  .pat-menu-item.empty{opacity:.55}
+  .pat-menu-item.empty .pat-count{color:var(--text2);background:var(--bg2)}
+  .pat-menu-note{font-family:var(--sans);font-size:11px;line-height:1.35;color:var(--text2);padding:6px 8px 2px}
   .pat-menu-foot{display:flex;justify-content:space-between;gap:8px;padding:6px 6px 3px;margin-top:4px;border-top:1px solid var(--border)}
   .pat-menu-foot button{font-family:var(--sans);font-size:12px;background:none;border:0;color:var(--accent);cursor:pointer;padding:3px 5px;border-radius:4px}
   .pat-menu-foot button:hover{background:var(--bg2)}
@@ -2670,6 +2678,7 @@ async function loadZones(){
     updateRegimeBadges();
     renderFullscreenChart();
     renderSigma0Signals();
+    if(_patMenuEl && !_patMenuEl.hidden) _syncPatternMenu();   // refresh live match-counts if the menu is open
   }catch(e){ console.warn('zones load failed',e); }
   finally{ zonesLoading = false; }
 }
@@ -2938,6 +2947,24 @@ function setPatternPref(key, on){
 }
 // Build the floating checklist once and keep the checkboxes in sync with the prefs.
 let _patMenuEl = null;
+// How many watched tickers each layer currently applies to, so the menu can show a
+// live count next to every option — a "0" makes clear an option is empty *right now*
+// (no such pattern / no open position) rather than broken. Overlays: zones = tickers
+// with S/R data, levels = open positions. Patterns: tickers whose detected candle maps
+// to that family. #trader-patterns
+function _patternAvailability(){
+  const c = {}; PATTERN_PREF_KEYS.forEach(k=> c[k]=0);
+  const zd = (typeof zonesData!=='undefined' && zonesData) ? zonesData : {};
+  for(const t in zd){
+    const d = zd[t] || {};
+    if((d.zones||[]).length) c.zones++;
+    if(d.position) c.levels++;
+    const cand = (d.last_signal||{}).candle;
+    const fam = cand && PATTERN_META[cand] && PATTERN_META[cand].family;
+    if(fam && c[fam]!=null) c[fam]++;
+  }
+  return c;
+}
 function _buildPatternMenu(){
   if(_patMenuEl) return _patMenuEl;
   const m = document.createElement('div');
@@ -2945,8 +2972,9 @@ function _buildPatternMenu(){
   m.innerHTML = PATTERN_MENU.map(row =>
     row.group
       ? `<div class="pat-menu-group">${row.group}</div>`
-      : `<label class="pat-menu-item"><input type="checkbox" data-pat="${row.key}"${patternPrefs[row.key]?' checked':''}> ${row.label}</label>`
+      : `<label class="pat-menu-item"><input type="checkbox" data-pat="${row.key}"${patternPrefs[row.key]?' checked':''}><span class="pat-lbl">${row.label}</span><span class="pat-count" data-count-for="${row.key}"></span></label>`
   ).join('')
+  + `<div class="pat-menu-note" id="patMenuNote"></div>`
   + `<div class="pat-menu-foot"><button type="button" data-pat-all="1">Select all</button><button type="button" data-pat-none="1">Clear all</button></div>`;
   m.addEventListener('change', (e)=>{ const cb=e.target.closest('input[data-pat]'); if(cb) setPatternPref(cb.dataset.pat, cb.checked); });
   m.addEventListener('click', (e)=>{
@@ -2958,7 +2986,26 @@ function _buildPatternMenu(){
 }
 function _syncPatternMenu(){
   if(!_patMenuEl) return;
-  _patMenuEl.querySelectorAll('input[data-pat]').forEach(cb=>{ cb.checked = !!patternPrefs[cb.dataset.pat]; });
+  const avail = _patternAvailability();
+  _patMenuEl.querySelectorAll('input[data-pat]').forEach(cb=>{
+    const k = cb.dataset.pat;
+    cb.checked = !!patternPrefs[k];
+    const n = avail[k] || 0;
+    const item = cb.closest('.pat-menu-item');
+    const badge = item && item.querySelector('.pat-count[data-count-for="'+k+'"]');
+    if(badge){ badge.textContent = n; badge.title = n+' watched symbol'+(n===1?'':'s')+' match right now'; }
+    if(item) item.classList.toggle('empty', n===0);   // dim options with nothing to show now
+  });
+  // One-line explainer so an all-zero moment doesn't read as "broken".
+  const note = _patMenuEl.querySelector('#patMenuNote');
+  if(note){
+    const anyOn = anyPatternOn();
+    const anyData = PATTERN_PREF_KEYS.some(k=> patternPrefs[k] && (avail[k]||0)>0);
+    note.textContent = !anyOn
+      ? 'Tick a layer to show it on the charts.'
+      : (anyData ? 'Counts = symbols matching now; updates each scan.'
+                 : 'Nothing matches your picks yet — patterns appear as the scanner detects them.');
+  }
 }
 function _closePatternMenu(){
   if(_patMenuEl){ _patMenuEl.hidden = true; }
