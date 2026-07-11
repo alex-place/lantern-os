@@ -1,0 +1,300 @@
+{"query": "STARS: Skill-Triggered Audit for Request-Conditioned Invocation Safety in Agent Systems", "gold_id": "2604.10286"}
+{"query": "AdLoCo: adaptive batching significantly improves communications efficiency and convergence for Large Language Models", "gold_id": "2508.18182"}
+{"query": "Diffusion Domain Expansion: Learning to Coordinate Pre-trained Diffusion Models", "gold_id": "2605.23275"}
+{"query": "One-Shot Multi-Label Causal Discovery in High-Dimensional Event Sequences", "gold_id": "2509.23213"}
+{"query": "Spoken in Jest, Detected in Earnest: A Systematic Review of Sarcasm Recognition -- Multimodal Fusion, Challenges, and Future Prospects", "gold_id": "2509.04605"}
+{"query": "The Illusion of Opting in AI-Mediated Consequential Decisions", "gold_id": "2605.28210"}
+{"query": "PCA-Enhanced Adaptive NVAR Framework for High-Resolution Sea Surface Temperature Forecasting in the East Sea", "gold_id": "2606.12141"}
+{"query": "RCBSF: A Multi-Agent Framework for Automated Contract Revision via Stackelberg Game", "gold_id": "2604.10740"}
+{"query": "Robust DDoS-Attack Classification with 3D CNNs Against Adversarial Methods", "gold_id": "2509.10543"}
+{"query": "Symplectic convolutional neural networks", "gold_id": "2508.19842"}
+{"query": "Filtering Beats Fine Tuning: A Bayesian Kalman View of In Context Learning in LLMs", "gold_id": "2601.06100"}
+{"query": "PrivacyGuard: A Modular Framework for Privacy Auditing in Machine Learning", "gold_id": "2510.23427"}
+{"query": "Nonparametric Regression Discontinuity Designs with Survival Outcomes", "gold_id": "2604.03502"}
+{"query": "Findings of the BlackboxNLP 2025 Shared Task: Localizing Circuits and Causal Variables in Language Models", "gold_id": "2511.18409"}
+{"query": "Towards On-Policy Data Evolution for Visual-Native Multimodal Deep Search Agents", "gold_id": "2605.10832"}
+{"query": "RoboInspector: Unveiling the Unreliability of Policy Code for LLM-enabled Robotic Manipulation", "gold_id": "2508.21378"}
+{"query": "Efficient Swap Regret Minimization in Combinatorial Bandits", "gold_id": "2602.02087"}
+{"query": "EEG-X: Device-Agnostic and Noise-Robust Foundation Model for EEG", "gold_id": "2511.08861"}
+{"query": "Continuous Temporal Representations of Event-Based Signals via Interference-Based Wave Modeling", "gold_id": "2605.01270"}
+{"query": "Financial Decision Making using Reinforcement Learning with Dirichlet Priors and Quantum-Inspired Genetic Optimization", "gold_id": "2509.00095"}
+{"query": "Approximating $f$-Divergences with Rank Statistics", "gold_id": "2601.22784"}
+{"query": "Too Much of a Good Thing: When sim2real Efforts Impede Policy Learning (And What to Do About It)", "gold_id": "2606.02636"}
+{"query": "When Long Helps Short: How Context Length in Supervised Fine-tuning Affects Behavior of Large Language Models", "gold_id": "2509.18762"}
+{"query": "Trajectory-Agnostic Asteroid Detection in TESS with Deep Learning", "gold_id": "2605.12391"}
+{"query": "SLeDGe: Semi-Supervised Learning on Data Streams with Graph Structure Learning", "gold_id": "2606.21096"}
+{"query": "ActLoc: Learning to Localize on the Move via Active Viewpoint Selection", "gold_id": "2508.20981"}
+{"query": "FedAdaVR: Adaptive Variance Reduction for Robust Federated Learning under Limited Client Participation", "gold_id": "2601.22204"}
+{"query": "Parametric Nonconvex Optimization via Convex Surrogates", "gold_id": "2604.05640"}
+{"query": "Instance-Wise Monotonic Calibration by Constrained Transformation", "gold_id": "2507.06516"}
+{"query": "Asymptotically optimal sequential change detection for bounded means", "gold_id": "2602.05272"}
+{"query": "FM-EAC: Feature Model-based Enhanced Actor-Critic for Multi-Task Control in Dynamic Environments", "gold_id": "2512.15430"}
+{"query": "See Beyond a Single View: Multi-Attribution Learning Leads to Better Conversion Rate Prediction", "gold_id": "2508.15217"}
+{"query": "Does Order Matter : Connecting The Law of Robustness to Robust Generalization", "gold_id": "2602.20971"}
+{"query": "BaseRT: Best-in-Class LLM Inference on Apple Silicon via Native Metal", "gold_id": "2607.00501"}
+{"query": "Explainable deep reinforcement learning reveals energy-efficient control strategies for turbulent drag reduction", "gold_id": "2606.00949"}
+{"query": "A Survey of Scientific Large Language Models: From Data Foundations to Agent Frontiers", "gold_id": "2508.21148"}
+{"query": "BiRQ: Bi-Level Self-Labeling Random Quantization for Self-Supervised Speech Recognition", "gold_id": "2509.15430"}
+{"query": "AL-SPCE -- Reliability analysis for nondeterministic models using stochastic polynomial chaos expansions and active learning", "gold_id": "2507.04553"}
+{"query": "Cure or Poison? Embedding Instructions Visually Alters Hallucination in Vision-Language Models", "gold_id": "2508.01678"}
+{"query": "MatteViT: High-Frequency-Aware Document Shadow Removal with Shadow Matte Guidance", "gold_id": "2512.08789"}
+{"query": "Randomized Advantage Transformation (RAT): Computing Natural Policy Gradients via Direct Backpropagation", "gold_id": "2605.18591"}
+{"query": "Regularization Through Reasoning: Systematic Improvements in Language Model Classification via Explanation-Enhanced Fine-Tuning", "gold_id": "2511.02044"}
+{"query": "Spatio-Temporal LLM: Reasoning about Environments and Actions", "gold_id": "2507.05258"}
+{"query": "Multimodal Policy Internalization for Conversational Agents", "gold_id": "2510.09474"}
+{"query": "Loss Landscape Diagnosis for Gradient-Based Gray-Scott System Inversion: Disentangling the Roles of PINN Components", "gold_id": "2606.11258"}
+{"query": "Compressed Models are NOT Trust-equivalent to Their Large Counterparts", "gold_id": "2508.13533"}
+{"query": "Synergizing Kolmogorov-Arnold Networks with Dynamic Adaptive Weighting for High-Frequency and Multi-Scale PDE Solutions", "gold_id": "2512.22283"}
+{"query": "CADS: Conformal Adaptive Decision System for Cost-Efficient Image Classification", "gold_id": "2605.16401"}
+{"query": "Informative Text-Image Alignment for Visual Affordance Learning with Foundation Models", "gold_id": "2509.17074"}
+{"query": "PolyFrame at MWE-2026 AdMIRe 2: When Words Are Not Enough: Multimodal Idiom Disambiguation", "gold_id": "2602.18652"}
+{"query": "CAPER: Clause-Aligned Process Supervision for Text-to-SQL", "gold_id": "2606.03327"}
+{"query": "Enhancing Multimodal In-Context Learning via Inductive-Deductive Reasoning", "gold_id": "2605.02378"}
+{"query": "iReasoner: Trajectory-Aware Intrinsic Reasoning Supervision for Self-Evolving Large Multimodal Models", "gold_id": "2601.05877"}
+{"query": "ACE-RL: Adaptive Constraint-Enhanced Reward for Long-form Generation Reinforcement Learning", "gold_id": "2509.04903"}
+{"query": "Developing AI Agents with Simulated Data: Why, what, and how?", "gold_id": "2602.15816"}
+{"query": "Direct Estimation of Schr\u00f6dinger Bridge Time-Series Drifts: Finite-Sample, Asymptotic, and Adaptive Guarantees", "gold_id": "2605.05432"}
+{"query": "MX-SAFE: Versatile Inference- and Training-Proof Microscaling Format with On-the-Fly Exponent and Mantissa Bit Allocation", "gold_id": "2605.24391"}
+{"query": "Towards Self-Evolving Benchmarks: Synthesizing Agent Trajectories via Test-Time Exploration under Validate-by-Reproduce Paradigm", "gold_id": "2510.00415"}
+{"query": "Cluster Contrast for Unsupervised Visual Representation Learning", "gold_id": "2507.12359"}
+{"query": "Learning Can Converge Stably to the Wrong Belief under Latent Reliability", "gold_id": "2603.21491"}
+{"query": "SWE-EVO: Benchmarking Coding Agents in Long-Horizon Software Evolution Scenarios", "gold_id": "2512.18470"}
+{"query": "Comparing Scalar Objective Functions for Multi-Criteria Engineering Optimization", "gold_id": "2606.28541"}
+{"query": "Fast and Effective Computation of Generalized Symmetric Matrix Factorization", "gold_id": "2603.19147"}
+{"query": "Self-adaptive Dataset Construction for Real-World Multimodal Safety Scenarios", "gold_id": "2509.04403"}
+{"query": "SEAL: Structure and Element Aware Learning to Improve Long Structured Document Retrieval", "gold_id": "2508.20778"}
+{"query": "Road Risk Monitor: A Deployable U.S. Road Incident Forecasting System with Live Weather and Road-Level Tiles", "gold_id": "2605.04242"}
+{"query": "Dataset Watermarking for Closed LLMs with Provable Detection", "gold_id": "2605.06865"}
+{"query": "A New Approach for Multicriteria Assessment in the Ranking of Alternatives Using Cardinal and Ordinal Data", "gold_id": "2507.08875"}
+{"query": "Scalable Gaussian Processes: Advances in Iterative Methods and Pathwise Conditioning", "gold_id": "2507.06839"}
+{"query": "Robust Physics Discovery from Highly Corrupted Data: A PINN Framework Applied to the Nonlinear Schr\u00f6dinger Equation", "gold_id": "2601.04176"}
+{"query": "CartoMapQA: A Fundamental Benchmark Dataset Evaluating Vision-Language Models on Cartographic Map Understanding", "gold_id": "2512.03558"}
+{"query": "DLT-Corpus: A Large-Scale Text Collection for the Distributed Ledger Technology Domain", "gold_id": "2602.22045"}
+{"query": "Native Hybrid Attention for Efficient Sequence Modeling", "gold_id": "2510.07019"}
+{"query": "SemCSE-Multi: Multifaceted and Decodable Embeddings for Aspect-Specific and Interpretable Scientific Domain Mapping", "gold_id": "2510.11599"}
+{"query": "Using AI to Optimize Patient Transfer and Resource Utilization During Mass-Casualty Incidents: A Simulation Platform", "gold_id": "2509.08756"}
+{"query": "Trustworthy Multi-Agent Systems: Mitigating Semantic Drift with the Argent Signaling Protocol", "gold_id": "2606.19356"}
+{"query": "Memory poisoning and secure multi-agent systems", "gold_id": "2603.20357"}
+{"query": "Generative AI Fuels Solo Entrepreneurship, but Teams Still Lead at the Top", "gold_id": "2605.10291"}
+{"query": "Near Optimal Convergence to Coarse Correlated Equilibrium in General-Sum Markov Games", "gold_id": "2511.02157"}
+{"query": "Human genetic evidence is associated with drug approval across therapeutic areas: an observational analysis of 26,278 target-disease pairs with temporal validation and feature ablation", "gold_id": "2606.14823"}
+{"query": "Grammar-Forced Translation of Natural Language to Temporal Logic using LLMs", "gold_id": "2512.16814"}
+{"query": "Model Correlation Detection via Random Selection Probing", "gold_id": "2509.24171"}
+{"query": "From Consensus to Split Decisions: ABC-Stratified Sentiment in Holocaust Oral Histories", "gold_id": "2603.28913"}
+{"query": "Prior-Guided Symbolic Regression: Towards Scientific Consistency in Equation Discovery", "gold_id": "2602.13021"}
+{"query": "Lowering the Barrier to IREX Participation: Open-Source Algorithms, Toolkit, and Benchmarking for Iris Recognition", "gold_id": "2605.20735"}
+{"query": "Learning Depth from Past Selves: Self-Evolution Contrast for Robust Depth Estimation", "gold_id": "2511.15167"}
+{"query": "Bitboard version of Tetris AI", "gold_id": "2603.26765"}
+{"query": "GutenOCR: A Grounded Vision-Language Front-End for Documents", "gold_id": "2601.14490"}
+{"query": "Chain of Mindset: Reasoning with Adaptive Cognitive Modes", "gold_id": "2602.10063"}
+{"query": "Revisiting Change VQA in Remote Sensing with Structured and Native Multimodal Qwen Models", "gold_id": "2604.18429"}
+{"query": "3LM: Bridging Arabic, STEM, and Code through Benchmarking", "gold_id": "2507.15850"}
+{"query": "DeepPlanner: Scaling Planning Capability for Deep Research Agents via Advantage Shaping", "gold_id": "2510.12979"}
+{"query": "Detecting and Preventing Harmful Behaviors in AI Companions: Development and Evaluation of the SHIELD Supervisory System", "gold_id": "2510.15891"}
+{"query": "ReLay: Personalized LLM-Generated Plain-Language Summaries for Better Understanding, but at What Cost?", "gold_id": "2605.00468"}
+{"query": "ReFORM: Reflected Flows for On-support Offline RL via Noise Manipulation", "gold_id": "2602.05051"}
+{"query": "DRL-Based Beam Positioning for LEO Satellite Constellations with Weighted Least Squares", "gold_id": "2511.08852"}
+{"query": "Reflecting Twice before Speaking with Empathy: Self-Reflective Alternating Inference for Empathy-Aware End-to-End Spoken Dialogue", "gold_id": "2601.18281"}
+{"query": "Ferret-UI Lite: Lessons from Building Small On-Device GUI Agents", "gold_id": "2509.26539"}
+{"query": "Model Stealing Through the Lens of Model Multiplicity", "gold_id": "2606.15493"}
+{"query": "Geodesic Calculus on Implicitly Defined Latent Manifolds", "gold_id": "2510.09468"}
+{"query": "Empty Shelves or Lost Keys? Recall Is the Bottleneck for Parametric Factuality", "gold_id": "2602.14080"}
+{"query": "Generating Key Postures of Bharatanatyam Adavus with Pose Estimation", "gold_id": "2603.29570"}
+{"query": "Deep Whole-body Parkour", "gold_id": "2601.07701"}
+{"query": "Language-Guided Tuning: Enhancing Numeric Optimization with Textual Feedback", "gold_id": "2508.15757"}
+{"query": "Exposing Privacy Risks in Graph Retrieval-Augmented Generation", "gold_id": "2508.17222"}
+{"query": "SAGE: A Quantitative Evaluation of Socialized Evolution in Agent Ecosystems", "gold_id": "2606.03544"}
+{"query": "IAMAP: Unlocking Deep Learning in QGIS for non-coders and limited computing resources", "gold_id": "2508.00627"}
+{"query": "Geometrically Constrained and Token-Based Probabilistic Spatial Transformers", "gold_id": "2509.11218"}
+{"query": "A Dynamical Systems Framework for Reinforcement Learning Safety and Robustness Verification", "gold_id": "2508.15588"}
+{"query": "Comparing Classical and Quantum Variational Classifiers on the XOR Problem", "gold_id": "2602.24220"}
+{"query": "Plural Voices, Single Agent: Towards Inclusive AI in Multi-User Domestic Spaces", "gold_id": "2510.19008"}
+{"query": "MOO: A Multi-view Oriented Observations Dataset for Viewpoint Analysis in Cattle Re-Identification", "gold_id": "2603.04314"}
+{"query": "Are LLM Belief Updates Consistent with Bayes' Theorem?", "gold_id": "2507.17951"}
+{"query": "SiDiaC-v.2.0: Sinhala Diachronic Corpus Version 2.0", "gold_id": "2603.10861"}
+{"query": "Tourists Profiling by Interest Analysis", "gold_id": "2512.14704"}
+{"query": "SBFA: Single Sneaky Bit Flip Attack to Break Large Language Models", "gold_id": "2509.21843"}
+{"query": "Online learning with noisy side observations", "gold_id": "2604.13740"}
+{"query": "How Do Answer Tokens Read Reasoning Traces? Self-Reading Patterns in Thinking LLMs for Quantitative Reasoning", "gold_id": "2604.19149"}
+{"query": "Divergence-Minimization for Latent-Structure Models: Monotone Operators, Contraction Guarantees, and Robust Inference", "gold_id": "2511.17974"}
+{"query": "Enhancement of E-commerce Sponsored Search Relevancy with LLM", "gold_id": "2607.03886"}
+{"query": "In-Context Prompting Obsoletes Agent Orchestration for Procedural Tasks", "gold_id": "2604.27891"}
+{"query": "Guided Generation for Developable Antibodies", "gold_id": "2507.02670"}
+{"query": "Physics-Informed Machine Learning for Pouch Cell Temperature Estimation", "gold_id": "2604.14566"}
+{"query": "Minimax and Adaptive Covariance Matrix Estimation under Differential Privacy", "gold_id": "2603.19703"}
+{"query": "Towards Reliable AI in 6G: Detecting Concept Drift in Wireless Network", "gold_id": "2508.00042"}
+{"query": "MMBench-Live: A Continuously Evolving Benchmark for Multimodal Models", "gold_id": "2607.01813"}
+{"query": "General Preference Reinforcement Learning", "gold_id": "2605.18721"}
+{"query": "DLM-SWAI: Steering Diffusion Language Models Before They Unmask", "gold_id": "2605.29626"}
+{"query": "Mind the Gap No More: Achieving Zero-Gap Multimodal Integration via One Tokenizer", "gold_id": "2602.12286"}
+{"query": "ATN3D: Density-Aware LiDAR-Radar Early 3D Object Detection Under Extreme Sparsity", "gold_id": "2606.09634"}
+{"query": "Scaling Bidirectional Spans and Span Violations in Attention Mechanism", "gold_id": "2512.13033"}
+{"query": "Teaching Diffusion to Speculate Left-to-Right", "gold_id": "2606.11552"}
+{"query": "Hybrid CNN-Transformer Architecture for Arabic Speech Emotion Recognition", "gold_id": "2604.07357"}
+{"query": "Illuminating LLM Coding Agents: Visual Analytics for Deeper Understanding and Enhancement", "gold_id": "2508.12555"}
+{"query": "Economic Evaluation of LLMs", "gold_id": "2507.03834"}
+{"query": "Keyphrase Generative Representation of Youth Crisis Conversations Beyond Static Taxonomies", "gold_id": "2605.27546"}
+{"query": "Towards Faithful Reasoning in Comics for Small MLLMs", "gold_id": "2601.02991"}
+{"query": "FrugalRAG: Less is More in RL Finetuning for Multi-Hop Question Answering", "gold_id": "2507.07634"}
+{"query": "Your GFlowNet Secretly Learns an Optimal Transport Plan", "gold_id": "2606.06272"}
+{"query": "Hypothesis Testing over Observable Regimes in Singular Models", "gold_id": "2602.24165"}
+{"query": "Addressing the Waypoint-Action Gap in End-to-End Autonomous Driving via Vehicle Motion Models", "gold_id": "2602.06214"}
+{"query": "Superclass-Guided Representation Disentanglement for Spurious Correlation Mitigation", "gold_id": "2508.08570"}
+{"query": "Simulating Student Success in the Age of GenAI: A Kantian-Axiomatic Perspective", "gold_id": "2510.00091"}
+{"query": "Personalized Contest Recommendation in Fantasy Sports", "gold_id": "2508.14065"}
+{"query": "OSMGen: Highly Controllable Satellite Image Synthesis using OpenStreetMap Data", "gold_id": "2511.00345"}
+{"query": "Metis AI: The Overlooked Middle Zone Between AI-Native and World-Movers", "gold_id": "2605.14407"}
+{"query": "Active Multiple-Prediction-Powered Inference", "gold_id": "2605.08429"}
+{"query": "RECAP: A Resource-Efficient Method for Adversarial Prompting in Large Language Models", "gold_id": "2601.15331"}
+{"query": "Hierarchical Reasoning Models: Perspectives and Misconceptions", "gold_id": "2510.00355"}
+{"query": "AI-Driven Alpha Decay: Algorithmic Homogenization, Reflexive Signal Erosion, and the Paradox of Intelligent Markets", "gold_id": "2605.23905"}
+{"query": "AirFed: A Federated Graph-Enhanced Multi-Agent Reinforcement Learning Framework for Multi-UAV Cooperative Mobile Edge Computing", "gold_id": "2510.23053"}
+{"query": "Robustly Learning Monotone Single-Index Models", "gold_id": "2508.04670"}
+{"query": "Subgraph Federated Learning via Spectral Methods", "gold_id": "2510.25657"}
+{"query": "Visualization of Machine Learning Models through Their Spatial and Temporal Listeners", "gold_id": "2603.27527"}
+{"query": "Instructional Prompt Optimization for Few-Shot LLM-Based Recommendations on Cold-Start Users", "gold_id": "2509.09066"}
+{"query": "DL$^3$M: A Vision-to-Language Framework for Expert-Level Medical Reasoning through Deep Learning and Large Language Models", "gold_id": "2512.13742"}
+{"query": "InteractScience: Programmatic and Visually-Grounded Evaluation of Interactive Scientific Demonstration Code Generation", "gold_id": "2510.09724"}
+{"query": "Solving Physics Olympiad via Reinforcement Learning on Physics Simulators", "gold_id": "2604.11805"}
+{"query": "Critical Percolation as a Synthetic Data Model for Interpretability", "gold_id": "2606.20347"}
+{"query": "Multi-Dimensional Autoscaling of Stream Processing Services on Edge Devices", "gold_id": "2510.06882"}
+{"query": "RDBLearn: Simple In-Context Prediction Over Relational Databases", "gold_id": "2602.18495"}
+{"query": "Making Sense of Touch from the Child's View for Contrastive Learning", "gold_id": "2606.31943"}
+{"query": "An Uncertainty-Aware Loss Function Incorporating Fuzzy Logic: Application to MRI Brain Image Segmentation", "gold_id": "2604.16490"}
+{"query": "Energy-Guided Generative Modeling for Low-Energy Molecular Structure Discovery", "gold_id": "2512.22597"}
+{"query": "Fine-Tuning Code Language Models to Detect Cross-Language Bugs", "gold_id": "2507.21954"}
+{"query": "A Qualitative Comparative Evaluation of Cognitive and Generative Theories", "gold_id": "2510.03453"}
+{"query": "Steering Emotional Dynamics for Art Therapy: Controllable Narrative Script Generation through Hierarchically Guided LLM Agents", "gold_id": "2606.16481"}
+{"query": "LeanTutor: Towards a Verified AI Mathematical Proof Tutor", "gold_id": "2601.17473"}
+{"query": "A Quantum Model for Constrained Markowitz Modern Portfolio Using Slack Variables to Process Mixed-Binary Optimization under QAOA", "gold_id": "2601.03278"}
+{"query": "Faver: Boosting LLM-based RTL Generation with Function Abstracted Verifiable Middleware", "gold_id": "2510.08664"}
+{"query": "MoBiE: Efficient Inference of Mixture of Binary Experts under Post-Training Quantization", "gold_id": "2604.06798"}
+{"query": "Locating acts of mechanistic reasoning in student team conversations with mechanistic machine learning", "gold_id": "2604.21870"}
+{"query": "Can LLMs Faithfully Explain Themselves in Low-Resource Languages? A Case Study on Emotion Detection in Persian", "gold_id": "2511.19719"}
+{"query": "RealTalk: Realistic Emotion-Aware Lifelike Talking-Head Synthesis", "gold_id": "2508.12163"}
+{"query": "Clipping the Price of Adaptivity at the Tail", "gold_id": "2606.22669"}
+{"query": "Finite-Agent Stochastic Differential Games on Large Graphs: II. Graph-Based Architectures", "gold_id": "2509.12484"}
+{"query": "Window-Diffusion: Accelerating Diffusion Language Model Inference with Windowed Token Pruning and Caching", "gold_id": "2601.20332"}
+{"query": "Lost in Localization: Building RabakBench with Human-in-the-Loop Validation to Measure Multilingual Safety Gaps", "gold_id": "2507.05980"}
+{"query": "Tab-TRM: Tiny Recursive Model for Insurance Pricing on Tabular Data", "gold_id": "2601.07675"}
+{"query": "Understanding and Improving Length Generalization in Hierarchical Sparse Attention Models", "gold_id": "2510.17196"}
+{"query": "GRIP: Algorithm-Agnostic Machine Unlearning for Mixture-of-Experts via Geometric Router Constraints", "gold_id": "2601.16905"}
+{"query": "MCP-Orchestrated Multi-Agent System for Automated Disinformation Detection", "gold_id": "2508.10143"}
+{"query": "Higher-Order Knowledge Representations for Agentic Scientific Reasoning", "gold_id": "2601.04878"}
+{"query": "IPI-proxy: An Intercepting Proxy for Red-Teaming Web-Browsing AI Agents Against Indirect Prompt Injection", "gold_id": "2605.11868"}
+{"query": "MAGIQ: A Post-Quantum Multi-Agentic AI Governance System with Provable Security", "gold_id": "2605.06933"}
+{"query": "Selective Weak-to-Strong Generalization", "gold_id": "2511.14166"}
+{"query": "RL Forgets! Towards Continual Policy Optimization", "gold_id": "2607.04364"}
+{"query": "Towards Scalable Customization and Deployment of Multi-Agent Systems for Enterprise Applications", "gold_id": "2606.18502"}
+{"query": "ERGO: Efficient High-Resolution Visual Understanding for Vision-Language Models", "gold_id": "2509.21991"}
+{"query": "Triple X: A LLM-Based Multilingual Speech Recognition System for the INTERSPEECH2025 MLC-SLM Challenge", "gold_id": "2507.17288"}
+{"query": "Causal Discovery for Irregularly Time Series with Consistency Guarantees", "gold_id": "2507.03310"}
+{"query": "UniSAFE: A Comprehensive Benchmark for Safety Evaluation of Unified Multimodal Models", "gold_id": "2603.17476"}
+{"query": "Human Behavior Atlas: Benchmarking Unified Psychological and Social Behavior Understanding", "gold_id": "2510.04899"}
+{"query": "Beyond Independent Passages: Adaptive Passage Combination Retrieval for Retrieval Augmented Open-Domain Question Answering", "gold_id": "2507.04069"}
+{"query": "Selective KV-Cache Sharing to Mitigate Timing Side-Channels in LLM Inference", "gold_id": "2508.08438"}
+{"query": "Spiking Neural Networks for Mental Workload Classification with a Multimodal Approach", "gold_id": "2509.21346"}
+{"query": "Separating Semantic Competition from Context Length in RAG Reading", "gold_id": "2605.27294"}
+{"query": "Inpainting the Neural Picture: Inferring Unrecorded Brain Area Dynamics from Multi-Animal Datasets", "gold_id": "2510.11924"}
+{"query": "Disentangling Bias by Modeling Intra- and Inter-modal Causal Attention for Multimodal Sentiment Analysis", "gold_id": "2508.04999"}
+{"query": "Graph Learning Should Move Beyond Restrictive Views of Spectral and Message-Passing GNNs", "gold_id": "2602.10031"}
+{"query": "Synchronization-based clustering on the unit hypersphere", "gold_id": "2603.05067"}
+{"query": "Foundations for Agentic AI Investigations from the Forensic Analysis of OpenClaw", "gold_id": "2604.05589"}
+{"query": "Conversational Education at Scale: A Multi-LLM Agent Workflow for Procedural Learning and Pedagogic Quality Assessment", "gold_id": "2507.05528"}
+{"query": "Structuring versus Problematizing: How LLM-based Agents Scaffold Learning in Diagnostic Reasoning", "gold_id": "2604.09158"}
+{"query": "OpenMENA: An Open-Source Memristor Interfacing and Compute Board for Neuromorphic Edge-AI Applications", "gold_id": "2511.03747"}
+{"query": "Investigating Human-Model Discrepancies in Speech Quality Assessment via Acoustic and Prosodic Perturbations", "gold_id": "2606.19951"}
+{"query": "A Transdiagnostic Space of Disorder Like Phenotypes in Reinforcement Learning Agents", "gold_id": "2607.07753"}
+{"query": "Enhancing the Effectiveness and Durability of Backdoor Attacks in Federated Learning through Maximizing Task Distinction", "gold_id": "2509.18904"}
+{"query": "SynthSAEBench: Evaluating Sparse Autoencoders on Scalable Realistic Synthetic Data", "gold_id": "2602.14687"}
+{"query": "Meta-RL Induces Exploration in Language Agents", "gold_id": "2512.16848"}
+{"query": "CUPID: A Plug-in Framework for Joint Aleatoric and Epistemic Uncertainty Estimation with a Single Model", "gold_id": "2603.10745"}
+{"query": "Probabilistic Modeling of Latent Agentic Substructures in Deep Neural Networks", "gold_id": "2509.06701"}
+{"query": "Debiased Front-Door Learners for Heterogeneous Effects", "gold_id": "2509.22531"}
+{"query": "The New Associationism: Lessons from Deep Learning", "gold_id": "2606.20600"}
+{"query": "Parallel-SFT: Improving Zero-Shot Cross-Programming-Language Transfer for Code RL", "gold_id": "2604.20835"}
+{"query": "Agentar-Fin-R1: Enhancing Financial Intelligence through Domain Expertise, Training Efficiency, and Advanced Reasoning", "gold_id": "2507.16802"}
+{"query": "STARK: Strategic Team of Agents for Refining Kernels", "gold_id": "2510.16996"}
+{"query": "VAR RL Done Right: Tackling Asynchronous Policy Conflicts in Visual Autoregressive Generation", "gold_id": "2601.02256"}
+{"query": "VNN-LIB 2.0: Rigorous Foundations for Neural Network Verification", "gold_id": "2605.07451"}
+{"query": "UNCAGE: Contrastive Attention Guidance for Masked Generative Transformers in Text-to-Image Generation", "gold_id": "2508.05399"}
+{"query": "Multi-Teacher Knowledge Distillation via Teacher-Informed Mixture Priors", "gold_id": "2605.27967"}
+{"query": "SAGE: Shaping Anchors for Guided Exploration in RLVR of LLMs", "gold_id": "2605.18864"}
+{"query": "Machine Learning-Driven Crystal System Prediction for Perovskites Using Augmented X-ray Diffraction Data", "gold_id": "2602.04435"}
+{"query": "MotivGraph-SoIQ: Integrating Motivational Knowledge Graphs and Socratic Dialogue for Enhanced LLM Ideation", "gold_id": "2509.21978"}
+{"query": "Gyan: An Explainable Neuro-Symbolic Language Model", "gold_id": "2605.04759"}
+{"query": "Worlds Within Words: Translating Culture in Ancient Chinese Texts with Multi-Agent Coordination", "gold_id": "2606.01276"}
+{"query": "SafeBench-Seq: A Homology-Clustered, CPU-Only Baseline for Protein Hazard Screening with Physicochemical/Composition Features and Cluster-Aware Confidence Intervals", "gold_id": "2512.17527"}
+{"query": "Low-Rank Adaptation Reduces Catastrophic Forgetting in Sequential Transformer Encoder Fine-Tuning: Controlled Empirical Evidence and Frozen-Backbone Representation Probes", "gold_id": "2603.27707"}
+{"query": "CiteRadar: A Citation Intelligence Platform for Researcher Profiling and Geographic Visualization", "gold_id": "2604.25057"}
+{"query": "Environment Agnostic Goal-Conditioning, A Study of Reward-Free Autonomous Learning", "gold_id": "2511.04598"}
+{"query": "Biases in the Blind Spot: Detecting What LLMs Fail to Mention", "gold_id": "2602.10117"}
+{"query": "Beyond Accuracy: Measuring Bias Acknowledgment in Chain-of-Thought Reasoning for Responsible AI Evaluation", "gold_id": "2606.15127"}
+{"query": "Entropy Objectives in Markov Decision Processes", "gold_id": "2606.21726"}
+{"query": "LENS: Learning to Segment Anything with Unified Reinforced Reasoning", "gold_id": "2508.14153"}
+{"query": "GuardTrace-VL: Detecting Unsafe Multimodel Reasoning via Iterative Safety Supervision", "gold_id": "2511.20994"}
+{"query": "Constructing Industrial-Scale Optimization Modeling Benchmark", "gold_id": "2602.10450"}
+{"query": "Budget-Constrained Online Retrieval-Augmented Generation: The Chunk-as-a-Service Model", "gold_id": "2604.26981"}
+{"query": "Minimax Limits of k-Fold Cross-Validation via Majority", "gold_id": "2605.25859"}
+{"query": "One step further with Monte-Carlo sampler to guide diffusion better", "gold_id": "2603.06685"}
+{"query": "ClearGCD: Mitigating Shortcut Learning For Robust Generalized Category Discovery", "gold_id": "2511.22892"}
+{"query": "AEG: A Baremetal Framework for AI Acceleration via Direct Hardware Access in Heterogeneous Accelerators", "gold_id": "2604.09565"}
+{"query": "PARC: An Autonomous Self-Reflective Coding Agent for Robust Execution of Long-Horizon Tasks", "gold_id": "2512.03549"}
+{"query": "Recon: Reconstruction-Guided Reasoning Synthesis for User Modeling", "gold_id": "2605.26969"}
+{"query": "Optimizing Prognostic Biomarker Discovery in Pancreatic Cancer Through Hybrid Ensemble Feature Selection and Multi-Omics Data", "gold_id": "2509.02648"}
+{"query": "AI/ML based Joint Source and Channel Coding for HARQ-ACK Payload", "gold_id": "2511.19943"}
+{"query": "SoK: Enhancing Cryptographic Collaborative Learning with Differential Privacy", "gold_id": "2601.09460"}
+{"query": "Context Selection for Hypothesis and Statistical Evidence Extraction from Full-Text Scientific Articles", "gold_id": "2603.21193"}
+{"query": "Rate-optimal Design for Anytime Best Arm Identification", "gold_id": "2510.23199"}
+{"query": "ORIGAMISPACE: Benchmarking Multimodal LLMs in Multi-Step Spatial Reasoning with Mathematical Constraints", "gold_id": "2511.18450"}
+{"query": "AdaRubric: Task-Adaptive Rubrics for Reliable LLM Agent Evaluation and Reward Learning", "gold_id": "2603.21362"}
+{"query": "Universal NER v2: Towards a Massively Multilingual Named Entity Recognition Benchmark", "gold_id": "2604.12744"}
+{"query": "Response Wide Shut? Surprising Observations in Basic Vision Language Model Capabilities", "gold_id": "2507.10442"}
+{"query": "What Is Preference Optimization Doing, and Why?", "gold_id": "2512.00778"}
+{"query": "MorphoQuant: Modality-Aware Quantization for Omni-modal Large Language Models", "gold_id": "2606.04349"}
+{"query": "Covariance Structure and Coordinate Heterogeneity Govern Binary Quantization of Contrastive Embeddings", "gold_id": "2605.17524"}
+{"query": "BaroPoser: Real-time Human Motion Tracking from IMUs and Barometers in Everyday Devices", "gold_id": "2508.03313"}
+{"query": "Early Discoveries of Algorithmist I: Promise of Provable Algorithm Synthesis at Scale", "gold_id": "2603.22363"}
+{"query": "Compositional Adversarial Training for Robust Visual Watermarking", "gold_id": "2605.16720"}
+{"query": "Domain-Independent Game Abstraction using Word Embedding Techniques", "gold_id": "2605.15543"}
+{"query": "Value-State Gated Attention for Mitigating Extreme-Token Phenomena in Transformers", "gold_id": "2510.09017"}
+{"query": "MAIA: A Collaborative Medical AI Platform for Integrated Healthcare Innovation", "gold_id": "2507.19489"}
+{"query": "UniClawBench: A Universal Benchmark for Proactive Agents on Real-World Tasks", "gold_id": "2607.08768"}
+{"query": "Foresighted Online Policy Optimization with Interference", "gold_id": "2510.15273"}
+{"query": "First On-Orbit Demonstration of a Geospatial Foundation Model", "gold_id": "2512.01181"}
+{"query": "Universal Dynamics of Warmup Stable Decay: understanding WSD beyond Transformers", "gold_id": "2601.09000"}
+{"query": "Benchmarking LLM-Based Static Analysis for Secure Smart Contract Development: Reliability, Limitations, and Potential Hybrid Solutions", "gold_id": "2605.11163"}
+{"query": "Targeted Deep Architectures: A TMLE-Based Framework for Robust Causal Inference in Neural Networks", "gold_id": "2507.12435"}
+{"query": "Simplifying Flow Matching Transformations with Low-Rank Mixture Models", "gold_id": "2606.29724"}
+{"query": "Imitating Mistakes in a Learning Companion AI Agent for Online Peer Learning", "gold_id": "2507.12801"}
+{"query": "Statistical Robustness of Interval CVaR Based Regression Models under Perturbation and Contamination", "gold_id": "2601.11420"}
+{"query": "Early Warning Signals for OpenVLA Failure under Visual Distribution Shift", "gold_id": "2606.29699"}
+{"query": "Partition-of-Unity Gaussian Kolmogorov-Arnold Networks", "gold_id": "2604.23599"}
+{"query": "Fine-Tuning Multilingual Language Models for Code Review: An Empirical Study on Industrial C# Projects", "gold_id": "2507.19271"}
+{"query": "MC-INR: Efficient Encoding of Multivariate Scientific Simulation Data using Meta-Learning and Clustered Implicit Neural Representations", "gold_id": "2507.02494"}
+{"query": "Not All Tokens See Equally: Perception-Grounded Policy Optimization for Large Vision-Language Models", "gold_id": "2604.01840"}
+{"query": "Increasing the Thinking Budget is Not All You Need", "gold_id": "2512.19585"}
+{"query": "Flow Matching-Based Autonomous Driving Planning with Advanced Interactive Behavior Modeling", "gold_id": "2510.11083"}
+{"query": "LLMs for Resource Allocation: A Participatory Budgeting Approach to Inferring Preferences", "gold_id": "2508.06060"}
+{"query": "ModSSC: A Modular Framework for Semi-Supervised Classification on Heterogeneous Data", "gold_id": "2512.13228"}
+{"query": "Dr. Assistant: Enhancing Clinical Diagnostic Inquiry via Structured Diagnostic Reasoning Data and Reinforcement Learning", "gold_id": "2601.13690"}
+{"query": "Auditing Games for Sandbagging", "gold_id": "2512.07810"}
+{"query": "Egocentric Co-Pilot: Web-Native Smart-Glasses Agents for Assistive Egocentric AI", "gold_id": "2603.01104"}
+{"query": "StreamingThinker: Large Language Models Can Think While Reading", "gold_id": "2510.17238"}
+{"query": "RankQ: Offline-to-Online Reinforcement Learning via Self-Supervised Action Ranking", "gold_id": "2605.11151"}
+{"query": "What's in a Name? Morphological Shortcuts by LLMs in Pharmacology", "gold_id": "2606.05616"}
+{"query": "Fractal Flow: Hierarchical and Interpretable Normalizing Flow via Topic Modeling and Recursive Strategy", "gold_id": "2508.19750"}
+{"query": "Machine learning enables experimental access to photon-by-photon arrival times in scintillation detectors", "gold_id": "2605.27937"}
+{"query": "CoDe-NeRF: Neural Rendering via Dynamic Coefficient Decomposition", "gold_id": "2508.06632"}
+{"query": "FinPersona-Bench: A Benchmark for Longitudinal Psychometric Stability of Autonomous Financial Agents", "gold_id": "2606.31522"}
+{"query": "Find a Scapegoat: Poisoning Membership Inference Attack and Defense to Federated Learning", "gold_id": "2507.00423"}
+{"query": "Opening Musical Creativity? Embedded Ideologies in Generative-AI Music Systems", "gold_id": "2508.08805"}
+{"query": "Hi-SAFE: Hierarchical Secure Aggregation for Lightweight Federated Learning", "gold_id": "2511.18887"}
+{"query": "Beyond Surface-Level Detection: Towards Cognitive-Driven Defense Against Jailbreak Attacks via Meta-Operations Reasoning", "gold_id": "2508.03054"}
+{"query": "Uniform-Correct Policy Optimization: Breaking RLVR's Indifference to Diversity", "gold_id": "2605.00365"}
+{"query": "A Multimodal Approach to Heritage Preservation in the Context of Climate Change", "gold_id": "2510.14136"}
+{"query": "A Gradient Perspective on RLVR Stability and Winner Advantage Policy Optimization", "gold_id": "2606.16154"}
+{"query": "TokSuite: Measuring the Impact of Tokenizer Choice on Language Model Behavior", "gold_id": "2512.20757"}
+{"query": "Navigating Unreliable Parametric and Contextual Knowledge: Explicit Knowledge Conflict Resolution for LLM Inference", "gold_id": "2606.20245"}
+{"query": "Domain-driven Metrics for Reinforcement Learning: A Case Study on Epidemic Control using Agent-based Simulation", "gold_id": "2508.05154"}
+{"query": "Elements of Conformal Prediction for Statisticians", "gold_id": "2603.23923"}

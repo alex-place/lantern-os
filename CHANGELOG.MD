@@ -1,3 +1,8 @@
+## [1.9.3] - 2026-07-11
+
+### Fixed
+- CI: avoid the pr-gates OWASP `eval(` false-positive on `model.eval()` in the reranker eval harness (#2401/#2355).
+
 ## [1.9.1] - 2026-07-11
 
 ### Changed
