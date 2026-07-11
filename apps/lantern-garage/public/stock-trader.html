@@ -266,6 +266,11 @@
   .pat-chip.bull{border-color:rgba(0,212,170,.45);color:var(--green)}
   .pat-chip.bear{border-color:rgba(255,95,109,.45);color:var(--red)}
   .pat-chip.neut{border-color:var(--border);color:var(--text1)}
+  /* Honest-degrade: uncalibrated signal shown neutral, never dressed as an edge. */
+  .conf-badge.uncal{background:rgba(92,99,112,.12);border:1px solid var(--border);color:var(--text2)}
+  .conf-badge .cb-model{color:var(--text)}
+  .conf-badge .cb-uncal{font-size:8px;letter-spacing:.04em;text-transform:uppercase;opacity:.8}
+  .conf-badge .cb-hit{color:var(--text2);font-size:8px}
   /* P&L badge */
   .pnl-badge{font-family:var(--mono);font-size:11px;padding:2px 8px;border-radius:3px;font-weight:600}
   .pnl-pos{background:rgba(0,212,170,.15);color:var(--green)}
@@ -961,6 +966,30 @@ function tickerState(d){
   if(d.position) return 'open';
   const c = d.last_signal?.confidence || d.confidence || 0;
   return c >= 45 ? 'watching' : 'quiet';
+}
+
+// Honest signal badge: render a directional CALL with colour only when the
+// signal type is CALIBRATED — i.e. it carries a settled-trade hit-rate + n on
+// last_signal.sigma0.calibration. Until that per-signal calibration feed lands, show
+// the raw model confidence clearly labelled "model … · uncalibrated" in neutral
+// styling, so an unproven 98% is visible but never dressed up as an actionable edge.
+function sigBadge(d){
+  const sig  = d.last_signal || {};
+  const conf = Math.round(d.confidence || sig.confidence || 0);
+  const dir  = d.direction || sig.direction || 'NEUTRAL';
+  const icon = dir==='BULLISH'?'▲ LONG':dir==='BEARISH'?'▼ SHORT':'· FLAT';
+  const dirCls = dir==='BULLISH'?'bull':dir==='BEARISH'?'bear':'neut';
+  const cat  = d.catalyst ? ' | '+String(d.catalyst).slice(0,40) : '';
+  const cal  = (sig.sigma0 && sig.sigma0.calibration) || d.signal_calibration || null;
+  const n    = cal ? (cal.n ?? cal.count ?? 0) : 0;
+  const hit  = cal && cal.hit_rate != null ? cal.hit_rate : null;
+  if(n >= 20 && hit != null){                       // calibrated → a real directional call
+    const cc = cal.calibrated_conf != null ? Math.round(cal.calibrated_conf*100) : conf;
+    return `<div class="conf-badge ${dirCls}" title="${dir} signals like this resolved ${Math.round(hit*100)}% of the time over ${n} settled trades.">`
+      + `${icon} ${cc}%<span class="cb-hit">hit ${Math.round(hit*100)}% · n=${n}</span>${cat}</div>`;
+  }
+  return `<div class="conf-badge uncal" title="Raw model confidence — not yet backed by a settled-trade hit-rate for this signal type. Shown, not acted on.">`
+    + `${icon} <span class="cb-model">model ${conf}%</span><span class="cb-uncal">uncalibrated</span>${cat}</div>`;
 }
 
 // ── Live market-regime classification ───────────────────────────────────────
@@ -1661,9 +1690,9 @@ function buildCard(ticker, d){
 
   const dirClass = dir==='BULLISH'?'bull':dir==='BEARISH'?'bear':'neut';
   const dirIcon  = dir==='BULLISH'?'▲ LONG ':dir==='BEARISH'?'▼ SHORT ':'· FLAT ';
-  // Always render the conviction row so every card is the SAME height and shows a
-  // long/short % (a missing badge made the BREAKOUT/quiet cards shorter + blank).
-  const confHtml = `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`;
+  // Always render the conviction row so every card is the SAME height (a missing
+  // badge made the BREAKOUT/quiet cards shorter + blank). Honest-degrade via sigBadge.
+  const confHtml = sigBadge(d);
 
   let pnlHtml = '';
   if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
@@ -1730,7 +1759,7 @@ function updateCardMeta(ticker, d){
 
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
-    const confHtml = `<div class="conf-badge ${dirClass}">${dirIcon}${conf}%${d.catalyst?' | '+d.catalyst.slice(0,45):''}</div>`;
+    const confHtml = sigBadge(d);
     let watchHtml = '';
     if(state==='watching'){
       const near = (d.zones||[])[0];
