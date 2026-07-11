@@ -95,10 +95,20 @@ function buildSummary(rows, { minSettledDays = MIN_SETTLED_DAYS, minSettledCards
   const dist = verify.buildReport(graded);
   const closes = rows.filter((r) => r && r.event === "close");
   const cards = closes.flatMap((r) => (r.cards || []).filter((c) => c.pnl_c != null));
-  const netPnlCents = Math.round(cards.reduce((s, c) => s + c.pnl_c, 0) * 10) / 10;
+  // Older ledger rows may predate the `tradeable` flag; fall back to the ask band so the
+  // certification gate is degenerate-price-proof regardless of when the row was written.
+  const isTradeable = (c) => (c.tradeable != null ? c.tradeable : dayahead.isTradeableAsk(c.ask));
+  const tradeable = cards.filter(isTradeable);
+  const round1 = (x) => Math.round(x * 10) / 10;
+  const netPnlCents = round1(cards.reduce((s, c) => s + c.pnl_c, 0));
+  const tradeableNetPnlCents = round1(tradeable.reduce((s, c) => s + c.pnl_c, 0));
   const hits = cards.filter((c) => c.pnl_c > 0).length;
+  const tradeableHits = tradeable.filter((c) => c.pnl_c > 0).length;
   const settledDays = closes.length;
-  const certifiedEdge = settledDays >= minSettledDays && cards.length >= minSettledCards && netPnlCents > 0;
+  // CERTIFY on the TRADEABLE cards only. Fading a 0.00/1.00 EOD print "wins" on paper but
+  // isn't fillable, so a liquidity artifact must never trip certification (#2217 backtest:
+  // 92% of raw P&L was such non-fillable prints).
+  const certifiedEdge = settledDays >= minSettledDays && tradeable.length >= minSettledCards && tradeableNetPnlCents > 0;
   return {
     updatedAt: new Date().toISOString(),
     product: PRODUCT,
@@ -113,9 +123,14 @@ function buildSummary(rows, { minSettledDays = MIN_SETTLED_DAYS, minSettledCards
       cardsSettled: cards.length, hits,
       hitRate: cards.length ? Math.round((hits / cards.length) * 1000) / 1000 : null,
       netPnlCents,
+      // fillable subset — the one certification is allowed to trust
+      tradeableCards: tradeable.length, tradeableHits,
+      tradeableHitRate: tradeable.length ? Math.round((tradeableHits / tradeable.length) * 1000) / 1000 : null,
+      tradeableNetPnlCents,
+      nonFillableCards: cards.length - tradeable.length,
     },
     certifiedEdge,
-    gate: `certifiedEdge requires >=${minSettledDays} settled days AND >=${minSettledCards} settled band-robust cards AND net P&L > 0; a human flips forecastex-weather certified on top of this evidence`,
+    gate: `certifiedEdge requires >=${minSettledDays} settled days AND >=${minSettledCards} TRADEABLE band-robust cards (ask in (${dayahead.TRADEABLE_ASK_MIN}, ${dayahead.TRADEABLE_ASK_MAX}), i.e. fillable — NOT degenerate 0/1 closes) AND tradeable net P&L > 0; a human flips forecastex-weather certified on top of this evidence`,
   };
 }
 

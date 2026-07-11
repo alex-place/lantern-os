@@ -20,6 +20,15 @@ const oracle = require("./kalshi-weather-edge");
 const verify = require("./kalshi-weather-verify");
 const { rangeYes } = require("./forecastex-board");
 
+// A card is only realistically FILLABLE if its day-ahead close sits inside a tradeable band.
+// The Feb–Apr 2026 backtest (#2217) showed 92% of the raw edge P&L came from cards whose EOD
+// close was 0.00 or 1.00 — degenerate/stale prints on thin, deep-ITM/OTM winter contracts that
+// nobody offers at that price. Fading them "wins" on paper but can't be executed. The
+// certification P&L must exclude them so a liquidity artifact can never certify an edge.
+const TRADEABLE_ASK_MIN = 0.02;
+const TRADEABLE_ASK_MAX = 0.98;
+const isTradeableAsk = (ask) => Number.isFinite(ask) && ask > TRADEABLE_ASK_MIN && ask < TRADEABLE_ASK_MAX;
+
 /**
  * Kalshi-style ladder covering ALL of ℝ from a cumulative threshold board
  * (sorted [{thr, yes}]). Buckets: open bottom (<= t0), one bucket per adjacent
@@ -142,6 +151,7 @@ function gradeDay(pred, settle, { flatFeeC = 1 } = {}) {
     return {
       bucket: c.bucket, side: c.side, ask,
       worst_c: c.worst_c, fair: c.fair, outcome,
+      tradeable: isTradeableAsk(ask), // false for degenerate 0/1 closes — not fillable
       pnl_c: cardPnlCents(c.side, ask, outcome, flatFeeC),
     };
   });
@@ -151,4 +161,5 @@ function gradeDay(pred, settle, { flatFeeC = 1 } = {}) {
 module.exports = {
   ladderFromBoard, askMapFromBoard, settleInterval, bucketOutcome,
   settledBucketIdx, cardPnlCents, predictDay, gradeDay,
+  isTradeableAsk, TRADEABLE_ASK_MIN, TRADEABLE_ASK_MAX,
 };

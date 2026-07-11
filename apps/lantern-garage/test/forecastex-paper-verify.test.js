@@ -110,6 +110,26 @@ const getMos = async () => ({
     assert.strictEqual(s.distribution.active, false);      // verdict withheld under MIN_SAMPLES
   });
 
+  check("certification gate ignores degenerate 0/1 closes (liquidity-artifact proof)", () => {
+    // 40 settled days of a card faded at a degenerate 1.00 close that settles 0: +99¢ each,
+    // net hugely positive, n>=20 days AND n>=20 cards — yet NONE are fillable, so no cert.
+    const files3 = { ledger: path.join(tmp, "l3.jsonl"), state: path.join(tmp, "st3.json"), summary: path.join(tmp, "s3.json") };
+    const lad = [["<=83", null, 83], ["84", 84, 84], [">=85", 85, null]];
+    for (let i = 0; i < 40; i++) {
+      const day = `2026-06-${String(i + 1).padStart(2, "0")}`;
+      fs.appendFileSync(files3.ledger, JSON.stringify({ event: "open", id: `UHLGA-${day}`, ticker: `UHLGA-${day}`, date: day,
+        ladder: lad, dist: { "<=83": 0.34, "84": 0.33, ">=85": 0.33 }, ask: { "<=83": 1.0, "84": 0.5, ">=85": 0.0 }, heldBucket: "<=83" }) + "\n");
+      fs.appendFileSync(files3.ledger, JSON.stringify({ event: "close", id: `UHLGA-${day}`, date: day, settledHigh: 88, clean: true, maxYes: 87, minNo: 88, settledBucket: 2,
+        cards: [{ bucket: "<=83", side: "no", ask: 1.0, tradeable: false, outcome: 0, pnl_c: 99 }] }) + "\n");
+    }
+    const rows3 = fs.readFileSync(files3.ledger, "utf8").trim().split("\n").map(JSON.parse);
+    const s = pv.buildSummary(rows3);
+    assert.strictEqual(s.settledDays, 40);
+    assert.ok(s.edges.netPnlCents > 3000);          // raw P&L looks great…
+    assert.strictEqual(s.edges.tradeableCards, 0);  // …but every card is non-fillable
+    assert.strictEqual(s.certifiedEdge, false);     // so certification stays FALSE
+  });
+
   await run("scheduler tick is a no-op before the evening run hour", async () => {
     const early = new Date("2026-07-10T12:00:00Z"); // 08:00 ET < 21:00 ET gate
     const r = await pv._tick({ now: early, files: FILES });

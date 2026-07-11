@@ -103,6 +103,22 @@ check("predictDay + gradeDay end-to-end with the real KLGA params (NO_CEILING in
   for (const c of g.cards) assert.ok(c.outcome === 0 || c.outcome === 1);
 });
 
+check("isTradeableAsk / card.tradeable: degenerate 0-1 closes are flagged non-fillable", () => {
+  assert.strictEqual(d.isTradeableAsk(0.0), false);
+  assert.strictEqual(d.isTradeableAsk(1.0), false);
+  assert.strictEqual(d.isTradeableAsk(0.01), false);
+  assert.strictEqual(d.isTradeableAsk(0.5), true);
+  assert.strictEqual(d.isTradeableAsk(0.36), true);
+  // a graded card carries the tradeable flag matching its exact close
+  const { params } = loadVenueParams();
+  // board where the bottom bucket prices at a degenerate 1.00 (P(high>80)=0 close)
+  const degenBoard = [{ thr: 80, yes: 0.0 }, { thr: 81, yes: 0.0 }, { thr: 82, yes: 0.0 }];
+  const pred = d.predictDay({ board: degenBoard, forecastHigh: 84, lead: 1, month: 7, day: 9, params, minEdgeCents: 5, feeCents: makeFlatFee(1) });
+  const g = d.gradeDay(pred, { high: 84, clean: true, maxYes: 83, minNo: 84 }, { flatFeeC: 1 });
+  const bottom = g.cards.find((c) => c.bucket === "<=80");
+  if (bottom) assert.strictEqual(bottom.tradeable, false); // ask 1.00 -> non-fillable
+});
+
 check("gradeDay refuses proper scores when settlement bounds span buckets", () => {
   const { params } = loadVenueParams();
   const pred = d.predictDay({

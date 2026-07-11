@@ -260,6 +260,11 @@ async function main() {
   const pendingCards = rows.filter((r) => !r.settle).reduce((s, r) => s + r.nActionable, 0);
   const pnlTotal = settledCards.reduce((s, c) => s + c.pnl_c, 0);
   const hits = settledCards.filter((c) => c.pnl_c > 0).length;
+  // Fillable subset: fading a degenerate 0.00/1.00 EOD close isn't executable, so P&L on those
+  // cards is an artifact. Report the tradeable-only edge separately — it is the honest number.
+  const tradeableCards = settledCards.filter((c) => (c.tradeable != null ? c.tradeable : dayahead.isTradeableAsk(c.ask)));
+  const tradeablePnl = tradeableCards.reduce((s, c) => s + c.pnl_c, 0);
+  const tradeableHits = tradeableCards.filter((c) => c.pnl_c > 0).length;
   const byMonth = {};
   for (const c of settledCards) {
     const m = c.date.slice(0, 7);
@@ -295,6 +300,15 @@ async function main() {
       hitRate: settledCards.length ? r4(hits / settledCards.length) : null,
       netPnlCents: r1(pnlTotal),
       meanPnlCentsPerCard: settledCards.length ? r1(pnlTotal / settledCards.length) : null,
+      // fillable subset (ask not at a degenerate 0/1 close) — the honest, executable edge
+      tradeable: {
+        cards: tradeableCards.length,
+        nonFillableExcluded: settledCards.length - tradeableCards.length,
+        hitRate: tradeableCards.length ? r4(tradeableHits / tradeableCards.length) : null,
+        netPnlCents: r1(tradeablePnl),
+        meanPnlCentsPerCard: tradeableCards.length ? r1(tradeablePnl / tradeableCards.length) : null,
+        note: "cards whose day-ahead close sat at 0.00/1.00 are excluded as non-fillable; this is the P&L certification is allowed to trust",
+      },
       byMonth,
       cards: settledCards,
     },
