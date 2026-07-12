@@ -35,6 +35,14 @@ private/**
 data/dreamer/notebooks/*.jsonl
 data/dream_journal/*.jsonl
 
+# Runtime trading logs — appended by the live server on every signal/trade/news
+# fetch. Writers create-if-missing (appendJsonlQueued mkdir+append); readers
+# tolerate absence (readJsonlCached / try-catch → []). Not seed data, so they
+# only churn local git status and grow the repo unbounded (#2314).
+data/lantern-garage/trading/agent-log.jsonl
+data/lantern-garage/trading/news.jsonl
+data/lantern-garage/trading/orders.jsonl
+
 # Flourishing feeds cache — runtime-derived World Bank snapshot (local only)
 data/flourishing-cache.json
 
