@@ -413,6 +413,24 @@
     } catch (e) { /* best-effort: capture still falls back on hard failure */ }
   }
 
+  // Wait for the page to actually settle before we photograph it (#2412). The old
+  // code fired html2canvas synchronously the instant the modal opened, so on a
+  // data-heavy page (the trading terminal, a long chat) it caught a half-painted
+  // frame — the "screenshot is too fast" the reporter described. We yield two
+  // animation frames (layout + paint) and wait on document.fonts, capped so a
+  // stuck webfont load can never hang the capture.
+  function settleThen(fn) {
+    var done = false;
+    var run = function () { if (done) return; done = true; fn(); };
+    try {
+      var fonts = document.fonts && document.fonts.ready;
+      if (fonts && typeof fonts.then === "function") fonts.then(function () { requestAnimationFrame(function () { requestAnimationFrame(run); }); });
+    } catch (e) { /* fonts API best-effort */ }
+    // Hard ceiling: capture within 350ms even if fonts.ready never resolves.
+    setTimeout(function () { requestAnimationFrame(function () { requestAnimationFrame(run); }); }, 120);
+    setTimeout(run, 350);
+  }
+
   // Renders the live DOM to an image with html2canvas, so the user never has to
   // pick a screen/window/tab — clicking 📷 (or opening the modal) just screenshots
   // the page they're looking at. Our own modal + overlays are excluded.
@@ -425,31 +443,45 @@
     var bg = "";
     try { bg = getComputedStyle(document.body).backgroundColor; } catch (e) { /* default below */ }
     if (!bg || bg === "rgba(0, 0, 0, 0)" || bg === "transparent") bg = "#0e1117";
-    // Render the visible viewport (not the full scroll height) — that's what the
-    // user actually sees when they hit report.
-    window.html2canvas(document.body, {
-      backgroundColor: bg,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      scale: 1,
-      width: window.innerWidth,
-      height: window.innerHeight,
-      x: window.scrollX,
-      y: window.scrollY,
-      scrollX: -window.scrollX,
-      scrollY: -window.scrollY,
-      ignoreElements: function (el) {
-        return el.id === "issue-modal" || el.id === "drop-overlay";
-      },
-      onclone: function (clonedDoc) { sanitizeCloneColors(clonedDoc); }
-    }).then(function (canvas) {
-      canvas.toBlob(function (blob) {
-        if (blob) acceptBlob(blob);
-        else setStatus("Couldn't render the page — upload an image or paste instead.", true);
-      }, "image/png");
-    }).catch(function (e) {
-      setStatus("Couldn't capture the page (" + (e && e.message ? e.message : e) + "). Upload or paste instead.", true);
+    // Capture the WHOLE page, not just the viewport (#2412). The reporter's
+    // complaint — "isn't showing the whole page" — was viewport-only capture: on a
+    // scrolling page (home, dream-chat) everything below the fold was cut off. We
+    // now shoot from the top-left of the full scrollable document. Fixed
+    // full-screen apps (the trading terminal has body{overflow:hidden}) have
+    // scrollHeight ≈ innerHeight, so they're unaffected. A generous cap keeps a
+    // pathologically long page from timing out html2canvas.
+    var de = document.documentElement;
+    var fullW = Math.max(window.innerWidth, de.scrollWidth, document.body.scrollWidth);
+    var fullH = Math.max(window.innerHeight, de.scrollHeight, document.body.scrollHeight);
+    var MAX_H = window.innerHeight * 6;   // don't try to render an unbounded feed
+    if (fullH > MAX_H) fullH = MAX_H;
+    settleThen(function () {
+      window.html2canvas(document.body, {
+        backgroundColor: bg,
+        useCORS: true,
+        allowTaint: false,
+        logging: false,
+        scale: 1,
+        width: fullW,
+        height: fullH,
+        windowWidth: fullW,
+        windowHeight: fullH,
+        x: 0,
+        y: 0,
+        scrollX: 0,
+        scrollY: 0,
+        ignoreElements: function (el) {
+          return el.id === "issue-modal" || el.id === "drop-overlay";
+        },
+        onclone: function (clonedDoc) { sanitizeCloneColors(clonedDoc); }
+      }).then(function (canvas) {
+        canvas.toBlob(function (blob) {
+          if (blob) acceptBlob(blob);
+          else setStatus("Couldn't render the page — upload an image or paste instead.", true);
+        }, "image/png");
+      }).catch(function (e) {
+        setStatus("Couldn't capture the page (" + (e && e.message ? e.message : e) + "). Upload or paste instead.", true);
+      });
     });
   }
 
