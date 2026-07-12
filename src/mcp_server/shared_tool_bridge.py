@@ -15,7 +15,39 @@ from pathlib import Path
 from typing import Any, Callable, Dict, MutableMapping
 
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+def _resolve_repo_root() -> Path:
+    """Locate a repo checkout that actually contains the Node bridge.
+
+    ``Path(__file__).parents[2]`` is correct in the common case, but if this MCP
+    server was launched from a git worktree that was later DELETED (e.g.
+    ``.claude/worktrees/<name>`` pruned after a session), that path points at a
+    checkout that no longer exists and every tool call dies with
+    ``node_bridge_unavailable`` and never recovers. Resolve against candidates in
+    priority order and pick the first whose ``scripts/tool-runner-bridge.js`` is a
+    real file, so a stale/deleted-worktree launch self-heals to a live checkout.
+    """
+    here = Path(__file__).resolve()
+    candidates: list[Path] = []
+    env = os.getenv("LANTERN_MCP_REPO_ROOT") or os.getenv("KEYSTONE_REPO_ROOT")
+    if env:
+        candidates.append(Path(env))
+    candidates.append(here.parents[2])  # normal case: repo root above src/mcp_server
+    # If we're inside a worktree, the main checkout sits just above `.claude`.
+    parts = here.parts
+    if ".claude" in parts:
+        candidates.append(Path(*parts[: parts.index(".claude")]))
+    candidates.append(Path.cwd())
+    candidates.extend(Path.cwd().resolve().parents)
+    for cand in candidates:
+        try:
+            if (cand / "scripts" / "tool-runner-bridge.js").is_file():
+                return cand
+        except OSError:
+            continue
+    return here.parents[2]  # nothing valid found — keep prior behavior (honest error)
+
+
+REPO_ROOT = _resolve_repo_root()
 BRIDGE_PATH = REPO_ROOT / "scripts" / "tool-runner-bridge.js"
 GENERATED_MANIFEST_PATH = REPO_ROOT / "manifests" / "tool-capability-manifest-v1.json"
 BRIDGE_TIMEOUT_SECONDS = 35
