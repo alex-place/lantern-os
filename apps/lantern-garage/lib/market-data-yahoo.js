@@ -423,8 +423,65 @@ async function validateSymbol(ticker) {
   }
 }
 
+/**
+ * Yahoo-summary fundamentals for the focused single-symbol view (#2412) — the
+ * fields the Yahoo Finance quote page shows above the fold: previous close /
+ * open, day + 52-week range, bid/ask, market cap, beta, P/E, EPS, dividend
+ * yield, and the mean analyst target. Keyless quoteSummary (same cookie+crumb
+ * path as getEarningsSurprise), cached 10 min. Returns null for crypto / on any
+ * failure so the caller degrades to what it already has. Every value is a plain
+ * number|string|null — no Yahoo {raw,fmt} wrappers leak to the client.
+ */
+async function getQuoteSummary(ticker) {
+  const sym = tickerToYahoo(ticker);
+  if (isCrypto(ticker) || !/^[A-Z.]{1,6}$/.test(sym)) return null;
+  const key = `qs_${sym}`;
+  const hit = cacheGet(key, 10 * 60 * 1000);
+  if (hit !== null) return hit;
+  const raw = (v) => (v && typeof v === 'object' && 'raw' in v ? v.raw : (typeof v === 'number' ? v : null));
+  const doFetch = async (retry) => {
+    const cr = await _getCrumb(retry);
+    if (!cr) return null;
+    const modules = 'price,summaryDetail,defaultKeyStatistics,financialData';
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=${modules}&crumb=${encodeURIComponent(cr.crumb)}`;
+    const r = await _rawGet(url, { Cookie: cr.cookie });
+    if (r.status === 401 && !retry) return doFetch(true); // stale crumb → refresh once
+    if (r.status !== 200) return null;
+    let result;
+    try { result = JSON.parse(r.body).quoteSummary.result[0]; } catch (_e) { return null; }
+    if (!result) return null;
+    const sd = result.summaryDetail || {};
+    const ks = result.defaultKeyStatistics || {};
+    const fd = result.financialData || {};
+    const dy = raw(sd.dividendYield);
+    return {
+      ticker,
+      previousClose: raw(sd.previousClose),
+      open: raw(sd.open),
+      dayLow: raw(sd.dayLow),
+      dayHigh: raw(sd.dayHigh),
+      bid: raw(sd.bid),
+      ask: raw(sd.ask),
+      fiftyTwoWeekLow: raw(sd.fiftyTwoWeekLow),
+      fiftyTwoWeekHigh: raw(sd.fiftyTwoWeekHigh),
+      marketCap: raw(sd.marketCap),
+      beta: raw(sd.beta),
+      trailingPE: raw(sd.trailingPE),
+      forwardPE: raw(sd.forwardPE),
+      eps: raw(ks.trailingEps),
+      dividendYield: dy != null ? round(dy * 100, 2) : null,
+      targetMeanPrice: raw(fd.targetMeanPrice),
+      available: true,
+    };
+  };
+  let out = null;
+  try { out = await doFetch(false); } catch (_e) { out = null; }
+  cacheSet(key, out); // cache null too — avoid hammering symbols with no summary
+  return out;
+}
+
 module.exports = {
   getQuotes, getBars, getBarsMulti, getMarketStatus, validateSymbol,
-  getEarningsSurprise,
+  getEarningsSurprise, getQuoteSummary,
   isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
 };
