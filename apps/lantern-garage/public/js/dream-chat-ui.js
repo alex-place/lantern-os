@@ -1,3 +1,18 @@
+// ── Σ₀ operator-view gate (#2332) ────────────────────────────────────────────
+// The Σ₀ groundedness/council apparatus ("✓ Σ₀", "⚠ ungrounded", "🌐 Ground this",
+// "⚠ Σ₀ seam-open") is operator tooling. To a first-time consumer these badges read
+// as errors/warnings tacked onto the AI's answer. Only surface them to operators
+// (admin / tech_support, or the auth-gate's body.is-admin class); consumers still get
+// plain-language honesty notes and functional auto-verification.
+function isSigma0OperatorView() {
+  try {
+    const role = (typeof lanternSession === 'object' && lanternSession) ? lanternSession.role : '';
+    if (role === 'admin' || role === 'tech_support') return true;
+    if (typeof document !== 'undefined' && document.body && document.body.classList.contains('is-admin')) return true;
+  } catch { /* fail closed to consumer view */ }
+  return false;
+}
+
 // ── Deterministic tool-flow persistence (#1268) ──────────────────────────────
 // Image/video/vision/doc-gen requests are handled entirely client-side (no LLM
 // call), so they never hit /api/dream/chat — which means they never reached the
@@ -1365,7 +1380,7 @@ async function sendMessage(opts = {}) {
     bubble.appendChild(truncBadge);
   }
 
-  if (bubble.dataset.sigma0Corrected) {
+  if (bubble.dataset.sigma0Corrected && isSigma0OperatorView()) {
     const badge = document.createElement('span');
     badge.title = `Σ₀ verified — ${bubble.dataset.sigma0Claims} claim(s) grounded`;
     badge.style.cssText = 'font-size:10px;opacity:0.55;margin-left:6px;vertical-align:middle';
@@ -1399,9 +1414,10 @@ async function sendMessage(opts = {}) {
       note.textContent = '↻ auto-verifying an unsourced claim…';
       bubble.appendChild(note);
       sendMessage({ text, forceGround: true, auto: true });
-    } else {
-      // AMBER (or red while offline): the honest passive badge. Unchanged from before the
-      // active gate — internally consistent but unverified, surfaced to the user.
+    } else if (isSigma0OperatorView()) {
+      // AMBER (or red while offline): the honest passive badge. Operator-only (#2332) —
+      // "⚠ ungrounded" / "🌐 Ground this" is Σ₀ grounding tooling and reads as an error
+      // to a first-time consumer. Internally consistent but unverified, surfaced to operators.
       const badge = document.createElement('span');
       badge.title = 'Confident claims with no external source — self-consistent but unverified.'
         + (risk ? ` (Σ₀ groundedness risk ${risk})` : '');
@@ -1429,7 +1445,9 @@ async function sendMessage(opts = {}) {
 
   // Σ₀ council: the unified 4-way answerability verdict (grounded / seam-open / pin / refuted)
   // + the disagreement Δ. A subtle chip beside the reply; grounded is the quiet healthy case.
-  if (bubble.dataset.councilVerdict) {
+  // Operator-only (#2332): the raw "Σ₀ seam-open/pin/refuted" labels are internal jargon that
+  // reads as an error to consumers. The refuted→retry exec-output affordance goes with it.
+  if (bubble.dataset.councilVerdict && isSigma0OperatorView()) {
     const v = bubble.dataset.councilVerdict;
     const d = bubble.dataset.councilDelta;
     const MAP = {
