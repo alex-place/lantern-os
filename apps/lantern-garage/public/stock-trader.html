@@ -2216,6 +2216,12 @@ function renderWatchlist(){
 // + signal. Company name is lazy-fetched once via the Alpaca-backed symbol-info GET.
 const _symStats = {};   // ticker → /api/trading/symbol-stats (returns/volume/technicals)
 function _fmtVol(v){ return v==null?'—': v>=1e9?(v/1e9).toFixed(2)+'B': v>=1e6?(v/1e6).toFixed(2)+'M': v>=1e3?(v/1e3).toFixed(1)+'K': v; }
+// Yahoo-summary formatters (#2412): market cap (T/B/M), plain 2-dp numbers, price,
+// and a low–high range. All null-safe → '—'.
+function _fmtCap(v){ return v==null?'—': v>=1e12?(v/1e12).toFixed(2)+'T': v>=1e9?(v/1e9).toFixed(2)+'B': v>=1e6?(v/1e6).toFixed(2)+'M': (''+v); }
+function _fmtNum(v){ return v==null?'—': (+v).toFixed(2); }
+function _fmtPx(v){ return v==null?'—': '$'+(+v).toFixed(2); }
+function _fmtRange(lo,hi){ return (lo==null&&hi==null)?'—': _fmtPx(lo)+' – '+_fmtPx(hi); }
 function renderSymbolInfo(ticker){
   const el = document.getElementById('wlInfo'); if(!el) return;
   if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
@@ -2242,6 +2248,23 @@ function renderSymbolInfo(ticker){
     <div class="wi-rets">${retCell('1M',st.returns['1M'])}${retCell('3M',st.returns['3M'])}${retCell('YTD',st.returns['YTD'])}${retCell('1Y',st.returns['1Y'])}${retCell('3Y',st.returns['3Y'])}</div>
     <div class="wi-sect">Key stats</div>
     <div class="wi-meta"><span><b>Volume</b> ${_fmtVol(st.volume)}</span><span><b>Avg Vol</b> ${_fmtVol(st.avgVolume)}</span><span><b>SMA50</b> $${st.sma50}</span></div>`:''}
+    ${(st&&st.quote&&st.quote.available)?(q=>`
+    <div class="wi-sect">Quote</div>
+    <div class="wi-meta">
+      <span><b>Prev Close</b> ${_fmtPx(q.previousClose)}</span>
+      <span><b>Open</b> ${_fmtPx(q.open)}</span>
+      <span><b>Bid</b> ${_fmtPx(q.bid)}</span>
+      <span><b>Ask</b> ${_fmtPx(q.ask)}</span>
+      <span><b>Day Range</b> ${_fmtRange(q.dayLow,q.dayHigh)}</span>
+      <span><b>52wk Range</b> ${_fmtRange(q.fiftyTwoWeekLow,q.fiftyTwoWeekHigh)}</span>
+      <span><b>Mkt Cap</b> ${_fmtCap(q.marketCap)}</span>
+      <span><b>Beta</b> ${_fmtNum(q.beta)}</span>
+      <span><b>P/E</b> ${_fmtNum(q.trailingPE)}</span>
+      <span><b>Fwd P/E</b> ${_fmtNum(q.forwardPE)}</span>
+      <span><b>EPS</b> ${_fmtNum(q.eps)}</span>
+      <span><b>Div Yield</b> ${q.dividendYield==null?'—':q.dividendYield+'%'}</span>
+      <span><b>1y Target</b> ${_fmtPx(q.targetMeanPrice)}</span>
+    </div>`)(st.quote):''}
     <div class="wi-sect">About</div>
     <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>`;
   if(!_symNames[ticker] && kind==='Equity'){
