@@ -103,6 +103,23 @@ function _localTradingGet(pathAndQuery, timeoutMs = 9000) {
   });
 }
 
+// Prefer the co-located server's loopback endpoint (reuses its warm cache); if no
+// server is listening — e.g. the tool runs inside the standalone MCP bridge with
+// no lantern-garage on :4177 (ECONNREFUSED/timeout) — fall back to the SAME keyless
+// feed directly so read-only market data still resolves instead of erroring. Same
+// data source either way, so no divergence. Broker/account tools have no such
+// fallback (they genuinely need the live account) and stay loopback-only.
+async function _tradingDataOrDirect(pathAndQuery, directFn) {
+  try {
+    return await _localTradingGet(pathAndQuery);
+  } catch (loopbackErr) {
+    if (typeof directFn === "function") {
+      try { return await directFn(); } catch (_e) { throw loopbackErr; }
+    }
+    throw loopbackErr;
+  }
+}
+
 function _runShell(command) {
   const cmd = String(command || "").trim();
   const resolved = resolveCommand(cmd);
@@ -1132,7 +1149,10 @@ const REGISTRY = {
     schema: { type: "object", properties: {} },
     async run() {
       try {
-        const d = await _localTradingGet("/api/trading/market-status");
+        const d = await _tradingDataOrDirect(
+          "/api/trading/market-status",
+          () => require("./market-data-yahoo").getMarketStatus(),
+        );
         if (!d || d.available === false) {
           return `[trader_market_status: live market data unavailable${d && d.reason ? ` — ${d.reason}` : ""}. Say so rather than guessing.]`;
         }
@@ -1162,7 +1182,10 @@ const REGISTRY = {
       const t = String(i.ticker || "").trim().toUpperCase();
       if (!t) return "[trader_quote error: a ticker is required]";
       try {
-        const d = await _localTradingGet(`/api/trading/symbol-stats?ticker=${encodeURIComponent(t)}`);
+        const d = await _tradingDataOrDirect(
+          `/api/trading/symbol-stats?ticker=${encodeURIComponent(t)}`,
+          () => require("./market-data-yahoo").getSymbolStats(t),
+        );
         if (!d || d.available === false) return `[trader_quote: no live data for ${t}. Say so rather than guessing.]`;
         const r = d.returns || {};
         const pct = (v) => (v == null ? "n/a" : `${v >= 0 ? "+" : ""}${v}%`);
