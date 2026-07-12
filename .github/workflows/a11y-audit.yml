@@ -92,6 +92,12 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      # The "Comment PR" step calls github.rest.issues.createComment, which is the
+      # ISSUES API (a PR comment is an issue comment) and needs issues:write. With
+      # only pull-requests:write the step failed on every PR with "Resource not
+      # accessible by integration", showing this non-gating report job as a red X
+      # even though the real "A11y Tests (WCAG 2.1 AA)" gate passed.
+      issues: write
     steps:
       - uses: actions/checkout@v7
 
@@ -121,6 +127,9 @@ jobs:
 
       - name: Comment PR
         if: github.event_name == 'pull_request'
+        # Purely informational "audit passed" comment — never fail the job over it
+        # (e.g. a fork PR still gets a read-only token regardless of permissions).
+        continue-on-error: true
         uses: actions/github-script@v9
         with:
           script: |
