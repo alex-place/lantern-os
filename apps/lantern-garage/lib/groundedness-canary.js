@@ -137,6 +137,24 @@ function contextUsage(text, ctx) {
   return Math.min(1, hits / ctxTerms.size / USAGE_TARGET);
 }
 
+// #2322 — a "summarize / rewrite / translate THIS provided text" turn is grounded in the
+// source the user pasted inline, NOT in web/KB/repo. Without recognising that, a faithful
+// summary scores as confident-and-unanchored (the 42-state) and the Σ₀ council returns red
+// (seam_open) — a false negative that alarms users on a normal "summarize this" turn. When
+// the user's message is a transform intent AND carries substantial inline source, that source
+// IS the anchor: return it so the caller folds it into groundingContext for the canaries/
+// council only (it never changes the model prompt — the model already has the text). A bare
+// knowledge question ("summarize the French Revolution") has no pasted source, stays below the
+// length floor, and is correctly left to external grounding.
+const TRANSFORM_INTENT = /\b(summar(?:ize|ise|y|ising|izing)|tl;?dr|condense|shorten|abridge|recap|rewrite|re-?write|rephrase|reword|paraphrase|translate|proofread|key points|main points|bullet points)\b/i;
+const PROVIDED_SOURCE_MIN_CHARS = 400;
+function providedSourceGrounding(message) {
+  const m = String(message || "");
+  if (m.length < PROVIDED_SOURCE_MIN_CHARS) return "";   // no substantial pasted source
+  if (!TRANSFORM_INTENT.test(m)) return "";              // not a transform-of-provided-text turn
+  return m;                                              // the pasted source IS the anchor
+}
+
 /**
  * Score a completed reply for 42-state proximity (confident + unanchored).
  *
@@ -267,5 +285,6 @@ module.exports = {
   ungroundedSignal,
   groundednessRoutingHint,
   selfDeclaredUngrounded,
+  providedSourceGrounding,
   MIN_TOKENS,
 };

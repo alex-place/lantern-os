@@ -187,5 +187,37 @@ check("#2075 context present AND used: still anchored (no false negative)", () =
   assert.ok(grounded.signals.contextUsage > 0.5, `usage=${grounded.signals.contextUsage}`);
 });
 
+// #2322 — a "summarize/rewrite/translate THIS provided text" turn is grounded in the pasted
+// source, not in web/KB/repo. providedSourceGrounding() surfaces that source so the canary
+// anchors on it; a faithful summary must then drop below threshold instead of reading red.
+const { providedSourceGrounding } = require("../lib/groundedness-canary");
+const PASTED =
+  "Please summarize this: The Apollo program was a United States human spaceflight program " +
+  "carried out by NASA between 1961 and 1972. It landed the first humans on the Moon in 1969 " +
+  "during Apollo 11. Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael " +
+  "Collins orbited above. The program cost roughly 25 billion dollars and involved hundreds of " +
+  "thousands of engineers and scientists. Six missions landed astronauts on the Moon in total.";
+const SUMMARY =
+  "The Apollo program was a NASA human spaceflight effort from 1961 to 1972 that first landed " +
+  "humans on the Moon in 1969 on Apollo 11, with Armstrong and Aldrin on the surface and Collins " +
+  "in orbit. It cost about 25 billion dollars and six missions landed astronauts on the Moon.";
+check("#2322 provided-text transform: intent + substantial source is recognized", () => {
+  assert.ok(providedSourceGrounding(PASTED).length > 0, "should return the pasted source as anchor");
+});
+check("#2322 short knowledge question is NOT treated as provided source", () => {
+  assert.strictEqual(providedSourceGrounding("summarize the French Revolution"), "", "no pasted source → external grounding");
+});
+check("#2322 non-transform long paste is NOT anchored on itself", () => {
+  const longNoIntent = "What do you think about this? " + "word ".repeat(200);
+  assert.strictEqual(providedSourceGrounding(longNoIntent), "", "no transform intent → not a provided-text turn");
+});
+check("#2322 faithful summary of pasted source scores grounded (no false red)", () => {
+  const red = scoreReplyGroundedness(SUMMARY, { groundingContext: "" });
+  const ok = scoreReplyGroundedness(SUMMARY, { groundingContext: providedSourceGrounding(PASTED) });
+  assert.strictEqual(red.ungrounded, true, `without anchor it reads red, risk=${red.risk}`);
+  assert.strictEqual(ok.anchored, true, "summary anchors on the pasted source");
+  assert.strictEqual(ok.ungrounded, false, `with anchor it clears threshold, risk=${ok.risk}`);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall groundedness-canary checks passed");
