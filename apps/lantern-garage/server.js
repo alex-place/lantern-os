@@ -753,7 +753,7 @@ server.listen(port, host, () => {
         });
         child.on("error", (e) => console.error("[rag-house] boot regen spawn failed (non-fatal):", e && e.message));
         child.unref();
-        console.log(`[rag-house] boot regen dispatched (flat file missing/stale > ${maxAgeH}h)`);
+        console.info(`[rag-house] boot regen dispatched (flat file missing/stale > ${maxAgeH}h)`);
       } catch (e) {
         console.error("[rag-house] boot regen failed (non-fatal):", e && e.message);
       }
