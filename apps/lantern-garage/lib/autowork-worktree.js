@@ -18,7 +18,7 @@
 "use strict";
 
 const path = require("path");
-const { createWorktree, removeWorktree } = require("../../../src/worktree-manager");
+const { createWorktree, removeWorktree, pruneStaleWorktrees } = require("../../../src/worktree-manager");
 
 /**
  * Create an isolated worktree for an autonomous run.
@@ -34,6 +34,11 @@ const { createWorktree, removeWorktree } = require("../../../src/worktree-manage
  *   been pushed). Safe to call more than once.
  */
 function createIssueWorktree(mainRoot, issueNumber, issueTitle) {
+  // Self-heal: sweep merged+clean stragglers left by crashed runs / interactive
+  // sessions before adding another tree, so .claude/worktrees can't grow without
+  // bound and slow local grep/Glob (#2308). Best-effort — never blocks a run.
+  try { pruneStaleWorktrees(mainRoot); } catch { /* non-fatal */ }
+
   const { worktreePath, branch } = createWorktree(
     "auto", issueNumber, issueTitle || `issue-${issueNumber}`, mainRoot);
   let removed = false;
