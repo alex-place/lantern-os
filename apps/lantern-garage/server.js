@@ -727,6 +727,39 @@ server.listen(port, host, () => {
     }
   }, 8000);
 
+  // ── Boot-time rag://house regen (#2339) ──
+  // The internal-house flat file (data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md)
+  // is now gitignored (#2337), so a fresh clone / GCE deploy ships an EMPTY rag://house
+  // resource until someone runs `npm run regen:rag` by hand. Regen it once at boot when the
+  // file is missing or stale (> RAG_HOUSE_MAX_AGE_H hours, default 24) so prod is never
+  // silently empty. Deferred off the critical boot path and spawned detached so the ~seconds
+  // of file-walking never blocks the listener. Set RAG_HOUSE_BOOT_REGEN=0 to disable.
+  if (process.env.RAG_HOUSE_BOOT_REGEN !== "0") {
+    setTimeout(() => {
+      try {
+        const fsx = require("fs");
+        const flat = path.join(repoRoot, "data", "internal-rag-house", "LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md");
+        const maxAgeH = Number(process.env.RAG_HOUSE_MAX_AGE_H || 24);
+        let stale = true;
+        try {
+          const st = fsx.statSync(flat);
+          stale = st.size === 0 || (Date.now() - st.mtimeMs) > maxAgeH * 3600 * 1000;
+        } catch { stale = true; /* missing */ }
+        if (!stale) return;
+        const { spawn } = require("child_process");
+        const script = path.join(repoRoot, "scripts", "regen-flat-rag.mjs");
+        const child = spawn(process.execPath, [script, "--internal"], {
+          cwd: repoRoot, detached: true, stdio: "ignore",
+        });
+        child.on("error", (e) => console.error("[rag-house] boot regen spawn failed (non-fatal):", e && e.message));
+        child.unref();
+        console.info(`[rag-house] boot regen dispatched (flat file missing/stale > ${maxAgeH}h)`);
+      } catch (e) {
+        console.error("[rag-house] boot regen failed (non-fatal):", e && e.message);
+      }
+    }, 9000);
+  }
+
   // ── Market/trading background loops ─────────────────────────────────────────
   // These 24/7 collectors + convergence loops start on every boot. The desktop
   // launcher (docs/adr/0014) runs the Core purely for chat and sets
