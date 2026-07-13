@@ -15,6 +15,11 @@
 # install time so the box doesn't roll back to an older release on first tick.
 set -euo pipefail
 
+# A systemd oneshot starts with an empty environment; git needs HOME for its global
+# config (`git config --global` writes ~/.gitconfig). Without it every roll dies with
+# "fatal: $HOME not set" (exit 128) — the bug that froze the box at v1.8.0 (2026-07-10).
+export HOME="${HOME:-/root}"
+
 REPO="${LANTERN_REPO:-alex-place/lantern-os}"
 CHECKOUT="${LANTERN_CHECKOUT:-/opt/lantern-os}"
 STATE="${LANTERN_RELEASE_STATE:-/var/lib/lantern/deployed-release.tag}"

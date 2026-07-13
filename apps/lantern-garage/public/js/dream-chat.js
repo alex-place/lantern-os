@@ -172,7 +172,7 @@
     .then(v => {
       if (v?.version) {
         const el = document.getElementById("app-version");
-        if (el) el.textContent = `Unisona OS v${v.version} · private · local`;
+        if (el) el.textContent = `unisona.ai v${v.version} · private · local`;
       }
     })
     .catch(() => {});

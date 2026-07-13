@@ -17,14 +17,18 @@ your keys, your machine.
   children, no trading microservice, no Cloudflare tunnel.
 - Binds **127.0.0.1 only** (it deletes `PORT` and sets `LANTERN_GARAGE_HOST` so
   the Core can never accidentally bind `0.0.0.0`).
-- Waits until the server actually answers, then opens the UI as a **standalone,
-  chromeless app window** — Edge/Chrome `--app` mode (the WebView2 engine already on
-  Windows; **no bundled Chromium** — ADR-0014 G5). Falls back to the default browser
-  if neither is found.
-- **Windowless**: the shipped exe is GUI-subsystem — **no console window** — so logs
-  go to `%LOCALAPPDATA%\unisona\logs\desktop.log`, not a terminal.
-- **Closing the app window** quits the app and tears down the **whole child-process
-  tree** (also `Ctrl+C` in dev). No orphaned headless server.
+- Waits until the server answers, then hands the tokened loopback endpoint to the
+  **native app window** — a **.NET WPF + WebView2** shell (`Unisona.exe`, see
+  [`shell/`](shell/)): a real Windows window with its own title bar and taskbar entry,
+  **not** a browser and **not** `msedge.exe`. It renders via the WebView2 runtime (the
+  Edge *engine* already on Win10/11; **no bundled Chromium** — ADR-0014 G5). In dev
+  without the shell you can still use `--embed`'s endpoint or the old `--app` fallback.
+- **Windowless backend**: the Core exe (`unisona-core.exe`) is GUI-subsystem — **no
+  console** — so logs go to `%LOCALAPPDATA%\unisona\logs\desktop.log`; the shell logs
+  to `shell.log` beside it.
+- **Closing the window** quits the app and tears down the **whole child-process tree**
+  (the shell taskkills it; the served page's heartbeat also self-stops the Core). No
+  orphaned headless server.
 
 It uses **only Node builtins** — zero dependencies — so it can be wrapped into a
 single executable later without dragging in a dependency tree.
@@ -66,12 +70,31 @@ records the decision **against Electron** (native-module rebuild friction + a
 150 MB Chromium the user's browser already provides) in favour of shipping **one
 Node runtime (the exe itself) + the app directory + a small signed launcher**.
 
-We ship **exactly one executable.** `unisona.exe` is a full Node runtime with the
-launcher embedded, so it can play both roles: the launcher, and — re-invoked with
-`UNISONA_CORE=1` — the Node runtime that runs the Core's `server.js`. No second
-`node.exe` is bundled. The app *code* (`server.js`, `lib/`, `public/`, and
-`node_modules` incl. the native `sharp`/`tesseract.js` binaries) still ships as
-files on disk, because native `.node` addons cannot live inside a SEA blob.
+We ship **two executables** (still no bundled Chromium, no second `node.exe`):
+
+- **`Unisona.exe`** — the **native window**: a .NET WPF + WebView2 shell
+  ([`shell/`](shell/)), self-contained single-file. It boots the Core, then hosts the
+  cockpit in a real app window. This is what the shortcuts launch.
+- **`unisona-core.exe`** — the **Core backend**: the Node SEA (a full Node runtime with
+  `launcher.js` embedded), which plays both the launcher and — re-invoked with
+  `UNISONA_CORE=1` — the runtime that runs the Core's `server.js`. The shell spawns it
+  with `--embed`; it prints/writes the tokened loopback endpoint and never opens a browser.
+
+The app *code* (`server.js`, `lib/`, `public/`, and `node_modules` incl. the native
+`sharp`/`tesseract.js` binaries) ships as files on disk beside them, because native
+`.node` addons cannot live inside a SEA blob. *(Historically there was one `unisona.exe`
+that also opened an Edge `--app` window; the native shell replaces that window — see the
+[shell handshake](#the-shell-core-handshake) below and ADR-0014.)*
+
+### The shell↔Core handshake
+
+The shell ([`shell/CoreProcess.cs`](shell/CoreProcess.cs)) spawns `unisona-core.exe
+--embed` and waits for the Core to report ready. Because the Core exe is GUI-subsystem
+(its stdout pipe may be unwired), `launcher.js --embed` writes the tokened endpoint to
+`%LOCALAPPDATA%\unisona\endpoint.json` (`{url, pid, port, ts}`) **and** stdout; the shell
+deletes any stale file first, then polls for a fresh write whose `pid` matches the process
+it launched, and navigates the WebView2 there. In dev (no `unisona-core.exe` beside it)
+the shell falls back to `node launcher.js --embed`.
 
 Build steps (ADR-0014 §Follow-ups):
 
@@ -119,18 +142,21 @@ Build steps (ADR-0014 §Follow-ups):
    # or: npm run build:installer --prefix apps/lantern-garage/desktop
    # → apps/lantern-garage/desktop/dist/Unisona-Setup-<version>.exe
    ```
-   It stages the payload with the repo-mirroring layout (`resources/app` = the garage
-   app, `src/` + root `node_modules` at the install root, so the Core's
-   `../../../src` requires resolve), then compiles a **per-user** installer (no admin,
-   no UAC) that lays the app into `%LOCALAPPDATA%\unisona`. **No `node.exe`** —
-   `unisona.exe` is the runtime. A **completeness guard** fails the build if any
-   declared dependency is absent from the staged `node_modules`, so a bundle that
-   won't boot can't ship. *Verified on Windows:* build → silent-install → the
-   installed `unisona.exe` boots the Core (HTTP 200 on loopback) → clean uninstall.
-   **Build prereqs:** Inno Setup 6 (`winget install JRSoftware.InnoSetup`) and a
-   checkout with a complete `npm ci` — built from a checkout with **no running
-   server** (a live server holds `node_modules` handles and the copy skips them).
-   The **MSIX / Microsoft-Store** channel is separate (Store handles install+update).
+   It builds the Core SEA **and** the native shell (`dotnet publish`), stages the
+   payload with the repo-mirroring layout (`resources/app` = the garage app, `src/` +
+   root `node_modules` at the install root, so the Core's `../../../src` requires
+   resolve), then compiles a **per-user** installer (no admin, no UAC) that lays
+   `Unisona.exe` (shell) + `unisona-core.exe` (Core SEA) + the app tree into
+   `%LOCALAPPDATA%\unisona`. **No `node.exe`** — the SEA is the runtime. A
+   **completeness guard** fails the build if any declared dependency is absent from the
+   staged `node_modules`, so a bundle that won't boot can't ship. *Verified on Windows
+   (2026-07-10):* build → silent-install → the installed `Unisona.exe` boots the Core
+   via `unisona-core.exe --embed` (HTTP 200 on loopback, zero `node.exe`) → clean
+   uninstall. **Build prereqs:** Inno Setup 6 (`winget install JRSoftware.InnoSetup`),
+   the **.NET SDK** (`net10.0-windows`, for the shell), and a checkout with a complete
+   `npm ci` — built with **no running server** (a live server holds `node_modules`
+   handles and the copy skips them). CI installs .NET via `actions/setup-dotnet`. The
+   **MSIX / Microsoft-Store** channel is separate (Store handles install+update).
 
 ## Phase 0 hardening (see ADR-0014) — foundations landed (#1946)
 

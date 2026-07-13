@@ -36,7 +36,10 @@ const distDir = join(desktopDir, "dist");
 // Stage OUTSIDE the garage tree — cpSync refuses to copy apps/lantern-garage into a
 // subdirectory of itself. <repoRoot>/dist is gitignored and not under the garage.
 const stagingDir = join(repoRoot, "dist", "unisona-stage");
-const exePath = join(distDir, "unisona.exe");
+const exePath = join(distDir, "unisona.exe");           // the Node SEA (Core backend)
+const shellProj = join(desktopDir, "shell", "Unisona.Shell.csproj");
+const shellOut = join(distDir, "shell");                // dotnet publish output
+const shellExe = join(shellOut, "Unisona.exe");         // the native WebView2 window
 const version = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")).version;
 
 function run(cmd, args, opts = {}) {
@@ -47,11 +50,31 @@ const mb = (p) => (statSync(p).size / 1024 / 1024).toFixed(1);
 
 console.log(`[installer] Unisona ${version} — node ${process.version} on ${process.platform}`);
 
-// 1. Ensure the exe exists (build it if missing).
+// 1. Ensure the Core SEA exists (build it if missing).
 if (!existsSync(exePath)) {
-  console.log("[installer] unisona.exe not built yet — building it first…");
+  console.log("[installer] unisona.exe (Core SEA) not built yet — building it first…");
   run(process.execPath, [join(here, "build-desktop-exe.mjs")]);
 }
+
+// 1b. Build the native .NET WebView2 shell (Unisona.exe) — the app window the user
+// launches. Self-contained single-file, so it needs no .NET runtime on the target.
+// Requires the .NET SDK (net10.0-windows); CI installs it via actions/setup-dotnet.
+console.log("[installer] building the native shell → dotnet publish …");
+rmSync(shellOut, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+try {
+  run("dotnet", ["publish", shellProj, "-c", "Release", "-r", "win-x64",
+    "--self-contained", "true", "-p:PublishSingleFile=true", "-o", shellOut]);
+} catch (e) {
+  console.error("\n✗ Could not build the native shell (dotnet publish failed).");
+  console.error("  Install the .NET SDK (net10.0-windows) — `winget install Microsoft.DotNet.SDK.10` —");
+  console.error("  or in CI add an actions/setup-dotnet step. Refusing to ship without the app window.\n");
+  throw e;
+}
+if (!existsSync(shellExe)) {
+  console.error(`\n✗ dotnet publish produced no Unisona.exe at ${shellExe}\n`);
+  process.exit(1);
+}
+console.log(`[installer] native shell built → Unisona.exe (${mb(shellExe)} MB)`);
 
 // 2. Stage the payload. On Windows, robocopy is far faster than cpSync for the
 // ~100k node_modules files and rides out long paths / transient locks; cpSync is
@@ -100,8 +123,17 @@ cpSync(join(repoRoot, "package.json"), join(stagingDir, "package.json"));
 // from <install>/data/contexts, NOT the relocated user state, so it must ship with
 // the app or the Core falls back to built-in defaults (the personas.json ENOENT).
 cpSync(join(repoRoot, "data", "contexts"), join(stagingDir, "data", "contexts"), { recursive: true });
-cpSync(exePath, join(stagingDir, "unisona.exe"));
-console.log("[installer] staged.");
+// The Core SEA is the backend brain (runtime + launcher + Core); the shell spawns it
+// in --embed mode. Named distinctly from the shell's Unisona.exe (case-insensitive FS).
+cpSync(exePath, join(stagingDir, "unisona-core.exe"));
+// The native shell + any self-extract native libs it publishes → install root
+// (Unisona.exe is what the shortcuts launch). Skip debug symbols.
+cpSync(shellOut, stagingDir, { recursive: true, filter: (s) => !/\.(pdb|xml)$/i.test(s) });
+if (!existsSync(join(stagingDir, "Unisona.exe"))) {
+  console.error("\n✗ staging is missing Unisona.exe (the shell). Refusing to compile.\n");
+  process.exit(1);
+}
+console.log("[installer] staged (Unisona.exe shell + unisona-core.exe backend).");
 
 // 2b. Completeness guard. The packaged app must contain EVERY declared runtime dep
 // or the installed Core crashes at boot (e.g. `Cannot find module 'busboy'`). Check

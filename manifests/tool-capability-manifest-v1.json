@@ -250,6 +250,24 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "convergence_inspect",
+      "description": "Inspect the convergence orchestrator's live state — registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Read-only; grounds Observe with real engine state instead of guessing.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "propose_coding_change",
       "description": "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
       "input_schema": {
@@ -316,6 +334,31 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "generate_image",
+      "description": "Generate an image from a text description and return a Markdown image link that renders inline in the chat. Use this whenever the user asks you to draw, paint, sketch, illustrate, or generate a picture/image of something — decide on your own initiative, don't wait to be told to 'use a tool'. Pass the subject to depict as `prompt`. On success you MUST include the returned ![...](url) Markdown in your reply so the user actually sees the image. If it reports generation is unavailable, tell the user plainly — never invent an image URL.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "What to depict, e.g. 'a lighthouse at dusk, watercolor style'"
+          }
+        },
+        "required": [
+          "prompt"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "github_issue",
       "description": "Look up a specific GitHub issue or pull request by number in this project's repo, returning its title, state, labels, and body. Use this whenever the user asks to find, show, view, read, or summarize an issue or PR by number (e.g. \"find issue #1342\", \"what's PR 1200 about\"). Do NOT grep the repo for issue numbers — issues live on GitHub, not in the files.",
       "input_schema": {
@@ -329,6 +372,28 @@
         "required": [
           "number"
         ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "list_pull_requests",
+      "description": "List the project's open GitHub pull requests (number, title, draft state, branch). Use this whenever the user asks to show, list, browse, or review the open PRs / pull requests (e.g. \"show me prs\", \"what PRs are open\", \"list pull requests\"). This is the correct tool for listing PRs — github_issue only looks up ONE issue/PR by number.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max PRs to return (default 20, max 50)"
+          }
+        }
       },
       "policy": "read",
       "operator_required": false,
@@ -623,7 +688,7 @@
     },
     {
       "name": "local_eval_keystone_run",
-      "description": "Run the Keystone eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
+      "description": "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
       "input_schema": {
         "type": "object",
         "properties": {

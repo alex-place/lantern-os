@@ -144,7 +144,7 @@ test("endpointFor: an unmanaged model falls back to the global OLLAMA_BASE_URL d
 test("selfConverges: kernel models loop internally; the PLT coder is wrapped", () => {
   freshEnv(() => {
     assert.equal(reg.selfConverges("ouro:latest"), true, "Ouro Q-exits internally");
-    assert.equal(reg.selfConverges("keystone-ft"), true, "Keystone-ft is an Ouro fine-tune");
+    assert.equal(reg.selfConverges("keystone-ft"), true, "unisona.ai-ft is an Ouro fine-tune");
     assert.equal(
       reg.selfConverges("keystone-sigma0-plt"), false,
       "fixed 2-loop PLT is NOT a Q-exit certificate → Core wraps it in loopedReason()",

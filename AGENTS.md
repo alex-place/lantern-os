@@ -1,10 +1,10 @@
 ---
 author: Alex Place
 created: 2026-05-26
-updated: 2026-07-07
+updated: 2026-07-10
 ---
 
-# AGENTS.md — Keystone OS
+# AGENTS.md — unisona.ai
 
 A focused guide for AI coding agents. **Read this before touching anything.**
 
@@ -132,8 +132,11 @@ The route architecture is modular. **The authoritative list of what's registered
 | [`apps/lantern-garage/lib/dreamer-store.js`](apps/lantern-garage/lib/dreamer-store.js) | `readRecentDreams()`, notebook storage |
 | [`apps/lantern-garage/lib/conversation-store.js`](apps/lantern-garage/lib/conversation-store.js) | append/read conversation JSONL |
 | [`apps/lantern-garage/lib/csf-memory.js`](apps/lantern-garage/lib/csf-memory.js) | CSF long-term memory reader, door state persistence |
+| [`apps/lantern-garage/lib/convergence-adapter.js`](apps/lantern-garage/lib/convergence-adapter.js) | **The one guarded seam onto `src/convergence_io_engine.py`** (circuit breaker + timeout). `runEngineCommand('inspect'\|'health')` backs the `convergence_inspect` tool and `GET /api/actions/inspect` — don't spawn the engine ad hoc, call this. |
 
 **Rule: If you need a route, grep the `routes[]` array in `server.js` for the module, then read that module. If you need streaming, read `lib/stream-chat.js`. Read `server.js` itself only for startup / child-process / supervisor behavior.**
+
+**Orchestrator is tool-reachable:** the assistant can read live orchestrator state via the `convergence_inspect` native tool (operator-only; defined in `lib/tool-runner.js`, auto-exposed over MCP by `shared_tool_bridge`). Regenerate the golden tool manifest after any registry change: `echo '' | node scripts/tool-runner-bridge.js generate-manifest`.
 
 ### 5. Don't discover what tests exist — run them
 
@@ -251,7 +254,7 @@ Never claim a skill or fleet slot is active unless confirmed by implementation o
 
 ### Theory
 
-From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In Keystone OS:
+From the Σ₀ Collapse Certificate: ungrounded self-referential systems collapse or diverge unless they receive *persistent external grounding*. In unisona.ai:
 
 - **Quantum dust** = observations, measurements, user input, convergence signals
 - **Doors** = routing pathways between agents, memory layers, and external observations
@@ -263,8 +266,8 @@ From the Σ₀ Collapse Certificate: ungrounded self-referential systems collaps
 
 | Layer | Dust Source | Door | Where It's Lost |
 |-------|-------------|------|-----------------|
-| **Message input** | User message | Dream→Keystone | Agent selection ignores message content |
-| **Provider routing** | API attempt logs | Keystone→Provider | Fallback chain has no escalation gate |
+| **Message input** | User message | Dream→unisona.ai | Agent selection ignores message content |
+| **Provider routing** | API attempt logs | unisona.ai→Provider | Fallback chain has no escalation gate |
 | **Intent routing** | Keyword scores | Intent→Agent cache | Cache misses re-scores but never updates |
 | **Memory selection** | Relevance scores | CSF→Context | Low-score memories forced into context |
 | **Escalation gate** | Novelty score | Gate→Escalation | Decision logged but conditionally ignored |
@@ -273,7 +276,7 @@ From the Σ₀ Collapse Certificate: ungrounded self-referential systems collaps
 
 See `docs/SIGMA0-COLLAPSE-PARADOXES.md` for the full analysis. Quick summary:
 
-1. **Agent Selection Hard Loop**: Keystone always selected regardless of message. Dust arrives but routing doesn't read it.
+1. **Agent Selection Hard Loop**: unisona.ai always selected regardless of message. Dust arrives but routing doesn't read it.
 2. **Provider Fallback Divergence**: Attempt logs written but no loop reads to adjust chains. Exponential cost growth.
 3. **Convergence Route Staleness**: Relevance scores computed fresh, cached decisions never validated against new state.
 4. **Memory Truncation Unmeasured**: History compressed deterministically without quality metrics. Predictive power degrades silently.
@@ -285,7 +288,7 @@ For each paradox, the fix is the same: **Create feedback pathways where dust obs
 
 Example (Paradox 1 — Agent Selection):
 ```javascript
-// BROKEN: Always returns Keystone
+// BROKEN: Always returns unisona.ai
 return keystone;
 
 // FIXED: Dust (message) influences routing
@@ -346,7 +349,7 @@ the change-record, stale-clobber, and **new-surface sprawl tripwire** gates at
 
 ### Porting third-party code (licensing — Critical)
 
-Only **permissive** OSS (Apache-2.0 / MIT / BSD-family) may be ported into Keystone. **GPL / AGPL / LGPL code MUST NOT be ported** — copyleft would relicense the whole project; re-implement clean-room from the docs instead. Every port (vendored verbatim under `vendor/<name>/` with the upstream `LICENSE` preserved, or a clean-room re-implementation credited in the file's docstring) must be recorded in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). See that file for the full convention (#1412).
+Only **permissive** OSS (Apache-2.0 / MIT / BSD-family) may be ported into unisona.ai. **GPL / AGPL / LGPL code MUST NOT be ported** — copyleft would relicense the whole project; re-implement clean-room from the docs instead. Every port (vendored verbatim under `vendor/<name>/` with the upstream `LICENSE` preserved, or a clean-room re-implementation credited in the file's docstring) must be recorded in [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). See that file for the full convention (#1412).
 
 ### Agent Documentation (for `claude/*`, `gemini/*`, etc. branches)
 
@@ -369,7 +372,7 @@ When committing to an agent branch, update AGENTS.md with:
 How this agent operates...
 
 ### Constraints
-- Max 1 open PR per lane
+- No open-PR cap (lanes may keep many concurrent PRs)
 - Focus area: [describe]
 ```
 
@@ -414,10 +417,9 @@ SKIP_ALL_CHECKS=1 git commit -m "EMERGENCY: critical hotfix"
 
 This repo supports **multiple humans working in parallel** while maintaining quality gates.
 
-### AI Agents: One-PR-per-lane
-- AI agents (claude/, gemini/, codex/, devin/, grok/, openai/) are limited to **one open PR per agent lane**
-- This prevents AI agents from creating conflicting work in the same lane
-- Example: Only one `claude/*` PR can be open at a time
+### AI Agents: no open-PR cap
+- Agent lanes are fixed: `claude/`, `gemini/`, `codex/`, `devin/`, `grok/`, `openai/`.
+- **There is no open-PR cap.** A lane may keep any number of concurrent open PRs at once, so one agent can run as many parallel sessions as it likes; commits/pushes to a branch with an open PR are always allowed. (The former `WORKSTREAM_MAX_OPEN_PRS` cap and the CI "Single-workstream check" gate were removed in #2367; the git hooks no longer count open PRs.)
 
 ### Humans: Dynamic per-contributor lanes
 Human lanes are **dynamic** — there is no fixed roster and no shared "all humans" lane.
@@ -427,32 +429,31 @@ their branches with their own name gets their own concurrent lane:
 - `alex/…`, `kriskin/…`, `mookman11/…` are the current human lanes — and **any new
   `<name>/…` prefix becomes a new lane automatically** (no code change, no roster edit).
   This supports more than one and more than three humans working at once.
-- Each lane may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default **3**),
-  so one contributor can run several concurrent sessions in parallel: `alex/` can have a
-  few PRs open while `kriskin/` and `mookman11/` each have their own — they never block
-  each other. Set `WORKSTREAM_MAX_OPEN_PRS=1` to restore strict one-PR-per-lane focus.
+- **There is no open-PR cap.** A lane may keep any number of concurrent open PRs, so a
+  contributor can run as many parallel sessions as they like — lanes never block each
+  other. (The former `WORKSTREAM_MAX_OPEN_PRS` cap and the CI "Single-workstream check"
+  gate were removed; the git hooks no longer count open PRs.)
 - A branch with **no `/`** (ad-hoc, unprefixed) falls back to a single shared `human`
   lane, so stray branches can't spawn unlimited free lanes.
 
-### Assigned-issue merge gate (Verify → Converge)
-A PR that **closes a human-assigned GitHub issue** cannot be auto-merged into `master`
-until the work is grounded with **both**:
-1. a **convergence record** (`!convergance` — hypothesis + evidence + confidence), and
-2. **autowork verification** (`!work` / `!autowork` ran the loop end-to-end).
+### Auto-merge (green + review-APPROVE)
+The single merger (`apps/lantern-garage/lib/pr-watcher.js`) auto-merges a PR once it is
+**green** (all CI checks pass, minus deploy-preview/base-red self-heal), **conflict-free**,
+**not a draft**, and its **fleet auto-review returned `VERDICT: APPROVE`** — except PRs
+touching a **protected path** (auth / money / `.github/workflows/` / secrets / migrations),
+which still need a human. One merge per tick. Auto-merge is ON by default on the fleet host
+(`PR_WATCHER_ENABLED=1`); `PR_WATCHER_AUTOMERGE=0` makes it review-only.
 
-The single merger (`apps/lantern-garage/lib/pr-watcher.js`) enforces this: it reads the
-PR's `convergance-record` + `autowork-verified` labels **or** the fleet host's autowork
-run log (`data/autowork-runs/*.jsonl`). A successful autowork run satisfies both and
-applies the labels automatically. Until then the PR is held with reason
-`needs_convergance_record:#N` / `needs_autowork_verification:#N`. Unassigned issues and
-PRs that close no issue are unaffected. Issues are routed to a lane + assignee via
-`/refinement`.
+**Assigned-issue convergence gate — now OFF by default.** The former requirement that a PR
+closing a human-assigned issue carry a `convergance-record` + `autowork-verified` signal
+before merging is **no longer applied** (removed so green PRs land). The logic is retained
+and re-enable-able per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
 
 ### Rules
-- **Commits and pushes to a branch that already has an open PR are always allowed.**
-- **No new branches while your lane has an open PR.** The pre-push hook enforces this via GitHub CLI.
+- **Commits and pushes to any lane branch are always allowed.**
+- **No open-PR cap** — a lane may open as many concurrent PRs as it wants (cap removed).
 - **Exempt branches:** `gh-pages` (static site deploy) and `master` are long-lived branches and never count as a workstream.
-- **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...`
+- **Emergency bypass:** `SKIP_MONOWORKSTREAM=1 git commit ...` or `SKIP_MONOWORKSTREAM=1 git push ...` (skips the slop / secret / change-record gates)
 
 **Note:** Multiple agents running concurrently via `.claude/agent-slots.json` is a core design feature, not a workstream violation. The rule applies to Git branches / PRs, not to active agent slots.
 
@@ -627,4 +628,4 @@ python src/convergence_io_engine.py inspect
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 
-**Last Updated:** 2026-07-01 — entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.
+**Last Updated:** 2026-07-10 — removed the per-lane open-PR cap for both AI-agent and human lanes (the `WORKSTREAM_MAX_OPEN_PRS` cap + CI "Single-workstream check" were removed in #2367; auto-merge now lands green + review-APPROVE PRs). Prior (2026-07-01): entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.

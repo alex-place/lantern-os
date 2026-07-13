@@ -3,7 +3,7 @@
 // Node port of src/trading_agents/convergence_ev.py (dependency-free). Riley's
 // WAIT/GOOD/PERFECT tiers and "extreme-zones-only" gates exist to manage HUMAN
 // error — they keep a discretionary trader from overtrading and from acting on
-// partial confirmation. Keystone doesn't need that crutch: it weighs every piece
+// partial confirmation. unisona.ai doesn't need that crutch: it weighs every piece
 // of evidence at once and acts on EXPECTED VALUE.
 //
 // This turns a candidate trade into a Convergence Record (one of the four core

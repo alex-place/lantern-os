@@ -148,7 +148,7 @@ def grounding_context(query: str, k: int = 5) -> tuple[str, list[str]]:
     hits = retrieve(query, k)
     if not hits:
         return "", []
-    lines = ["Relevant Keystone OS grounding (Knowledge Center, retrieved from CSF):"]
+    lines = ["Relevant unisona.ai grounding (Knowledge Center, retrieved from CSF):"]
     ids = []
     for h in hits:
         src = h["path"] or h["doc"] or h["id"]

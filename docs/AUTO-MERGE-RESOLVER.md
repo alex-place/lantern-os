@@ -1,6 +1,6 @@
 # Auto Merge Resolver with !convergance Self-Training
 
-A self-improving PR merge decision system that learns from outcomes and integrates with Keystone technical coordinator via !convergance workflow.
+A self-improving PR merge decision system that learns from outcomes and integrates with unisona.ai technical coordinator via !convergance workflow.
 
 ## Overview
 
@@ -8,8 +8,8 @@ The Auto Merge Resolver:
 - **Analyzes** incoming PRs against merge readiness criteria
 - **Learns** from successful/failed merge outcomes
 - **Improves** heuristics via !convergance training
-- **Reports** metrics and recommendations to Keystone
-- **Auto-updates** patterns based on Keystone approval
+- **Reports** metrics and recommendations to unisona.ai
+- **Auto-updates** patterns based on unisona.ai approval
 
 ## How It Works
 
@@ -44,7 +44,7 @@ The resolver:
 
 ### 3. Self-Training (Convergance Trainer)
 
-Keystone periodically calls:
+unisona.ai periodically calls:
 
 ```
 GET /api/merge/convergance-query
@@ -82,9 +82,9 @@ Example response:
 }
 ```
 
-### 4. Keystone Analysis & Approval
+### 4. unisona.ai Analysis & Approval
 
-Keystone:
+unisona.ai:
 - Reviews recommendations
 - Approves high-confidence improvements
 - Rejects risky changes
@@ -146,7 +146,7 @@ Heuristics update automatically. Patterns saved to `data/merge-patterns.json`.
 Full analysis with gaps and recommendations
 
 **GET /api/merge/convergance-query**
-Training prompt for Keystone
+Training prompt for unisona.ai
 
 **GET /api/merge/export**
 Full training history and state export
@@ -230,12 +230,12 @@ Patterns inform confidence scoring in future merges.
 
 ## Integration with !convergance
 
-### Keystone Query in Dream Chat
+### unisona.ai Query in Dream Chat
 
 ```
 User: "What improvements should we make to the merge resolver?"
-Keystone: [queries /api/merge/convergance-query]
-Keystone: "Auto Merge Resolver analysis:
+unisona.ai: [queries /api/merge/convergance-query]
+unisona.ai: "Auto Merge Resolver analysis:
   
 Current Accuracy: 78.5% (target: 90%)
 
@@ -252,16 +252,16 @@ Recommended Improvements:
 Shall I apply these improvements? (Y/n)"
 
 User: "Yes, apply the P0 items."
-Keystone: [POST /api/merge/apply-improvements with approved recs]
-Keystone: "✓ Applied 2 P0 improvements. Merge resolver updated."
+unisona.ai: [POST /api/merge/apply-improvements with approved recs]
+unisona.ai: "✓ Applied 2 P0 improvements. Merge resolver updated."
 ```
 
 ### Metrics Reporting
 
 ```
 User: "Show merge resolver health"
-Keystone: [queries /api/merge/status]
-Keystone: "Auto Merge Resolver Status:
+unisona.ai: [queries /api/merge/status]
+unisona.ai: "Auto Merge Resolver Status:
 - Accuracy: 85.3% (good)
 - Total Decisions: 120
 - Successful Merges: 102
@@ -291,7 +291,7 @@ File: `data/merge-patterns.json`
 }
 ```
 
-Edit thresholds manually, or let Keystone train them.
+Edit thresholds manually, or let unisona.ai train them.
 
 ## Data Files
 
@@ -321,7 +321,7 @@ Tests cover:
 
 ✓ Done when:
 1. Auto Merge Resolver reports **≥85% accuracy**
-2. **All P0 gaps** identified and addressed by Keystone
+2. **All P0 gaps** identified and addressed by unisona.ai
 3. **Top 3 patterns** have >90% success rate
 4. **Training cycle** completes (analyze → recommend → approve → apply)
 5. **Zero regressions** in merge quality

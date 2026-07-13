@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-Keystone OS incorporates functionality ported or adapted from third-party
+unisona.ai incorporates functionality ported or adapted from third-party
 open-source projects. This file records each component, its upstream source, its
 license, and what was lifted — the attribution required to stay compliant with
 permissive licenses (Apache-2.0 / MIT / BSD).
@@ -8,8 +8,8 @@ permissive licenses (Apache-2.0 / MIT / BSD).
 ## Porting policy
 
 - **Permissive only.** Only Apache-2.0, MIT, and BSD-family code may be ported
-  into Keystone. **GPL / AGPL / LGPL code must NOT be ported** — copyleft would
-  relicense Keystone. When in doubt, re-implement clean-room from the docs.
+  into unisona.ai. **GPL / AGPL / LGPL code must NOT be ported** — copyleft would
+  relicense unisona.ai. When in doubt, re-implement clean-room from the docs.
 - **Two compliant forms:**
   1. *Vendored verbatim* — place under `vendor/<name>/` with the upstream
      `LICENSE` file preserved unmodified, and add an entry below.

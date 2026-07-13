@@ -26,7 +26,7 @@ account of why an ungrounded self-improving system tends to collapse or diverge.
 ## What this document is — and is not
 
 **It is:** the internal, evidence-classed design-and-theory record for one system's *Verify*
-stage — the stability machinery of a local-first reasoning loop ([Keystone OS](../CLAUDE.md),
+stage — the stability machinery of a local-first reasoning loop ([unisona.ai](../CLAUDE.md),
 repo `alex-place/lantern-os`). It is written by **Alex Place with AI coding agents** (disclosed;
 agent sessions author and revise text under the operator's review, and the dates are real project
 dates — this project runs in 2026). Its primary audience is the loop itself and the people
@@ -88,7 +88,7 @@ Internal names are project identifiers, not claimed technical contributions:
 | Σ_θ | the **Model-Update Acceptance Gate** — a checkpoint-promotion gate for weight updates (Part II) |
 | "42-state" | colloquial name for the degenerate frozen state (projection onto the null subspace); explicitly *no formal meaning* (§2) |
 | collapse | representational / model collapse (Shumailov et al. 2024); locally, loss of contraction structure in the linearized dynamics |
-| Keystone, Lantern, Unisona | project code names; carry no technical content |
+| unisona.ai, Lantern, Unisona | project code names; carry no technical content |
 
 ## Contents
 
@@ -1565,7 +1565,7 @@ contraction math is attributed to Lohmiller & Slotine 1998 and Khalil 2002).*
 
 ### Original Design
 
-The intended demonstration would run the Σ₀ machinery on the Keystone OS
+The intended demonstration would run the Σ₀ machinery on the unisona.ai
 conversation log (`data/conversations/garage-conversations.jsonl`), encoding
 each turn as
 

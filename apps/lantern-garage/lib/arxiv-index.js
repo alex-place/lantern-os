@@ -1,7 +1,7 @@
 "use strict";
 
 /**
- * arXiv recent-research retrieval for the Keystone chat assistant.
+ * arXiv recent-research retrieval for the unisona.ai chat assistant.
  *
  * Mirrors the existing `queryResearchLibrary()` seam in csf-memory.js, but backs it
  * with a precomputed BM25 index (built by scripts/arxiv_build_index.py) instead of a

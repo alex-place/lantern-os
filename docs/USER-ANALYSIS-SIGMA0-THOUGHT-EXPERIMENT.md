@@ -13,7 +13,7 @@ User: "I need help planning my grocery shopping for the week.
 ```
 
 **System Response:**
-- ✅ Route classification: Keystone agent selected (correct for conversational context)
+- ✅ Route classification: unisona.ai agent selected (correct for conversational context)
 - ✅ Intent detection: `dream_chat` (generic chat mode)
 - ✅ Surface: `dream-chat` (correct UI)
 - ❌ API call: Failed (no API keys configured)
@@ -25,12 +25,12 @@ User: "I need help planning my grocery shopping for the week.
 
 ### 1. Intent Routing (Σ₀ Stage: Reason)
 - System correctly identifies message as conversational chat (not code, trading, research)
-- Routes to Keystone agent (appropriate for non-technical user)
+- Routes to unisona.ai agent (appropriate for non-technical user)
 - Applies no special context modes automatically
 
 ### 2. Agent Selection
 - Multi-persona system active: 6 agents available (lantern, blinkbug, keystone, waterfall, xenon, founder)
-- Keystone persona correctly selected for natural conversation
+- unisona.ai persona correctly selected for natural conversation
 - Agent system prompt injection working (system prompt loaded for selected agent)
 
 ### 3. Streaming Architecture
@@ -237,7 +237,7 @@ System: Quick reference + advanced techniques
 
 The system has **routing but no state management**:
 
-1. **Message arrives** → Keystone agent selected (routing works ✅)
+1. **Message arrives** → unisona.ai agent selected (routing works ✅)
 2. **System tries to call LLM** → API key missing (ACT fails ❌)
 3. **System returns error** → No context saved (REMEMBER fails ❌)
 4. **Next message arrives** → No history loaded (REASON starts from zero ❌)
@@ -288,10 +288,10 @@ User (next minute): "Show me a video"
 
 **vs. Current System:**
 ```
-Message 1 → Route to Keystone → API fails → Error
-Message 2 → Route to Keystone → API fails → Error (no memory of msg 1)
-Message 3 → Route to Keystone → API fails → Error (no memory of msg 1-2)
-Message 4 → Route to Keystone → API fails → Error (no memory of msg 1-3)
+Message 1 → Route to unisona.ai → API fails → Error
+Message 2 → Route to unisona.ai → API fails → Error (no memory of msg 1)
+Message 3 → Route to unisona.ai → API fails → Error (no memory of msg 1-2)
+Message 4 → Route to unisona.ai → API fails → Error (no memory of msg 1-3)
 ```
 
 ---

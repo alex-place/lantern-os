@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a self-contained, loadable Keystone-Σ₀ PLT checkpoint dir.
+"""Build a self-contained, loadable unisona.ai-Σ₀ PLT checkpoint dir.
 
 Downloads the Apache-2.0 LoopCoder-V2 weights + tokenizer, drops OUR modeling +
 configuration code beside them, and rewrites config.json so
@@ -34,7 +34,7 @@ DROP_FILES = [
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Download + patch LoopCoder-V2 → Keystone-Σ₀ PLT")
+    ap = argparse.ArgumentParser(description="Download + patch LoopCoder-V2 → unisona.ai-Σ₀ PLT")
     ap.add_argument("--out", default=str(HERE / "checkpoint"), help="output checkpoint dir")
     ap.add_argument("--revision", default="main")
     ap.add_argument("--repo", default=UPSTREAM)

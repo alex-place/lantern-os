@@ -1,0 +1,175 @@
+{"query": "How can autonomous language-model agents be made safer when using skills and tools for user tasks?", "gold_id": "2604.10286"}
+{"query": "How can distributed training of Large Language Models be optimized for heterogeneous hardware resources under dynamic workloads?", "gold_id": "2508.18182"}
+{"query": "How does Diffusion Domain Expansion (DDE) enhance the capabilities of pre-trained diffusion models for generating larger objects and handling more complex conditions?", "gold_id": "2605.23275"}
+{"query": "How can one-shot causal inference be applied to large-scale event sequences without requiring extensive global testing?", "gold_id": "2509.23213"}
+{"query": "How does incorporating speech data help in detecting sarcasm?", "gold_id": "2509.04605"}
+{"query": "How do current AI systems create a false sense of choice for users, and what ethical concerns does this raise?", "gold_id": "2605.28210"}
+{"query": "How does the Adaptive Next-Generation Reservoir Computing framework improve SST forecasting accuracy compared to traditional numerical ocean models and other deep learning methods?", "gold_id": "2606.12141"}
+{"query": "How does the Risk-Constrained Bilevel Stackelberg Framework improve automated contract revision in Legal AI?", "gold_id": "2604.10740"}
+{"query": "How can using spatio-temporal hive-plot encodings and 3D convolutional neural networks improve the detection of DDoS attacks?", "gold_id": "2509.10543"}
+{"query": "How can using symplectic convolutional neural networks improve the accuracy of solving partial differential equations like the wave equation and the nonlinear Schrödinger equation?", "gold_id": "2508.19842"}
+{"query": "How does a large language model adapt its understanding in real-time based on new information?", "gold_id": "2601.06100"}
+{"query": "What tools are available to assess the privacy risks of machine learning models in sensitive domains?", "gold_id": "2510.23427"}
+{"query": "How can researchers estimate the causal effect of treatments based on threshold rules when dealing with incomplete outcome data in time-to-event analyses?", "gold_id": "2604.03502"}
+{"query": "How can researchers compare different mechanisms for interpreting how language models operate without a standardized evaluation framework?", "gold_id": "2511.18409"}
+{"query": "How does a new approach improve how AI agents use tools and remember images from searches to solve complex problems?", "gold_id": "2605.10832"}
+{"query": "What tool helps in generating reliable policy code for robotic manipulation based on user instructions?", "gold_id": "2508.21378"}
+{"query": "What new approach can be used to design efficient algorithms for combinatorial bandits when the number of actions is exponentially large?", "gold_id": "2602.02087"}
+{"query": "What is a new approach to improving EEG analysis by addressing variability in datasets and low signal-to-noise ratio?", "gold_id": "2511.08861"}
+{"query": "How does modeling biological signals using interference-based wave representations help capture the structured activation patterns in event-driven processes?", "gold_id": "2605.01270"}
+{"query": "How does a hybrid reinforcement learning framework using quantum mutation-based genetic optimization improve budget allocation for maximizing profitability in the tech industry?", "gold_id": "2509.00095"}
+{"query": "How can rank histograms be used to estimate $f$-divergences between two univariate distributions without directly estimating their density ratios?", "gold_id": "2601.22784"}
+{"query": "How can simulating robots in a virtual environment affect their performance when deployed in real-world tasks?", "gold_id": "2606.02636"}
+{"query": "How does increasing the length of supervised fine-tuning data affect language model performance on shorter context tasks?", "gold_id": "2509.18762"}
+{"query": "How can machine learning techniques be used to detect moving objects in TESS image time-series data without making assumptions about their speed or direction?", "gold_id": "2605.12391"}
+{"query": "What is a new approach to semi-supervised learning on evolving data streams that can adapt to changing relationships between samples?", "gold_id": "2606.21096"}
+{"query": "How does an active viewpoint-aware planning framework improve robot navigation by selecting optimal viewing directions?", "gold_id": "2508.20981"}
+{"query": "What new federated learning algorithm is designed to handle client dropout by using adaptive optimization and variance reduction?", "gold_id": "2601.22204"}
+{"query": "How does using a surrogate function composed of convex and monotonic terms help solve complex nonconvex optimization problems more efficiently?", "gold_id": "2604.05640"}
+{"query": "How can researchers address the issue of overconfident predictions in deep neural networks by ensuring monotonicity in calibration maps?", "gold_id": "2507.06516"}
+{"query": "What's the biggest challenge when trying to detect sudden changes quickly if the normal behavior before the change depends on what happens after?", "gold_id": "2602.05272"}
+{"query": "What is a new approach that combines planning, acting, and learning for multi-task control in dynamic environments?", "gold_id": "2512.15430"}
+{"query": "How can companies improve their online advertising by better utilizing multiple attribution mechanisms?", "gold_id": "2508.15217"}
+{"query": "What does the extension of the Law of Robustness to arbitrary data distributions reveal about the relationship between Lipschitz constants and sample size in machine learning models?", "gold_id": "2602.20971"}
+{"query": "What is the highest inference throughput for large language models on Apple Silicon, and how does it compare to existing runtimes?", "gold_id": "2607.00501"}
+{"query": "How does combining Multi-Agent Deep Reinforcement Learning with eXplainable Deep Learning help reduce drag in turbulent flows?", "gold_id": "2606.00949"}
+{"query": "How are large language models like GPT-3 being used to improve scientific research?", "gold_id": "2508.21148"}
+{"query": "How does BiRQ enhance speech representation learning by combining elements of both efficient and informative self-supervised learning methods?", "gold_id": "2509.15430"}
+{"query": "How can researchers improve the efficiency of reliability analysis for systems with inherent randomness without significantly compromising accuracy?", "gold_id": "2507.04553"}
+{"query": "How does directly embedding textual instructions into images improve the performance of Vision-Language Models?", "gold_id": "2508.01678"}
+{"query": "How does the MatteViT framework improve shadow removal in documents while preserving fine structural details?", "gold_id": "2512.08789"}
+{"query": "How does model compression affect prediction accuracy and trustworthiness in resource-constrained environments?", "gold_id": "2508.13533"}
+{"query": "How do researchers address limitations in PINNs when dealing with complex, multi-scale scientific computing problems?", "gold_id": "2512.22283"}
+{"query": "How can AI models be optimized for more efficient use of computational resources in clinical settings?", "gold_id": "2605.16401"}
+{"query": "How can researchers improve the accuracy of robots in understanding and interacting with their environment by better aligning visual features with language descriptions?", "gold_id": "2509.17074"}
+{"query": "What system was developed to improve multimodal models' performance in disambiguating idiomatic expressions across multiple languages?", "gold_id": "2602.18652"}
+{"query": "How does CAPER help in identifying the exact part of an SQL query that caused it to fail?", "gold_id": "2606.03327"}
+{"query": "How do vision-language models struggle with in-context learning tasks when presented with multiple visual tokens?", "gold_id": "2605.02378"}
+{"query": "How can self-play and intrinsic feedback be used to improve the intermediate reasoning of large multimodal models in visually grounded decision making?", "gold_id": "2601.05877"}
+{"query": "How does ACE-RL improve the performance of large language models in generating long-form content for specific scenarios?", "gold_id": "2509.04903"}
+{"query": "What are the advantages and drawbacks of using simulated data for training artificial intelligence models?", "gold_id": "2602.15816"}
+{"query": "How does direct estimation of Schrödinger bridge drifts using kernelized methods compare to previous approaches in terms of statistical error isolation?", "gold_id": "2605.05432"}
+{"query": "What new hardware-friendly quantization scheme did the Open Compute Project introduce in 2022 to reduce data size for deep learning models?", "gold_id": "2605.24391"}
+{"query": "How can researchers create more challenging benchmarks for evaluating AI agent abilities?", "gold_id": "2510.00415"}
+{"query": "How does CueCo improve upon existing methods in unsupervised visual representation learning by combining contrastive learning and clustering?", "gold_id": "2507.12359"}
+{"query": "What happens when feedback in machine learning systems is uncertain?", "gold_id": "2603.21491"}
+{"query": "What benchmark evaluates AI coding agents' performance in simulating the long-term evolution of software projects?", "gold_id": "2512.18470"}
+{"query": "How do different methods for combining multiple criteria in optimization problems affect the solutions obtained?", "gold_id": "2606.28541"}
+{"query": "What technique ensures symmetry in matrix factorization models used in machine learning and other fields?", "gold_id": "2603.19147"}
+{"query": "How can researchers address the limitations of current methods in constructing datasets for multimodal large language models?", "gold_id": "2509.04403"}
+{"query": "How does the proposed method improve upon existing approaches in long structured document retrieval?", "gold_id": "2508.20778"}
+{"query": "What is the name of the system that combines historical incident archives, weather data, and road geometry to provide real-time traffic safety forecasts across the United States?", "gold_id": "2605.04242"}
+{"query": "How can researchers ensure that proprietary datasets or benchmark data are not inadvertently included in large language models during training?", "gold_id": "2605.06865"}
+{"query": "How do modern multi-criteria assessment techniques like DEA, SFA, and MCDM help evaluate Decision-Making Units based on various criteria, and what are their limitations when dealing with both quantitative and qualitative data?", "gold_id": "2507.08875"}
+{"query": "How do researchers address the scalability issues with Gaussian processes when dealing with large datasets and modern computing hardware?", "gold_id": "2507.06839"}
+{"query": "How can Physics-Informed Neural Networks with automatic differentiation be used to accurately recover physical parameters from noisy data in complex systems like the Nonlinear Schrodinger Equation?", "gold_id": "2601.04176"}
+{"query": "How can visual-language models be improved in understanding cartographic maps?", "gold_id": "2512.03558"}
+{"query": "What is the largest existing text collection specifically for Distributed Ledger Technology research, and how does it differ from existing NLP resources focused on cryptocurrency price prediction and smart contracts?", "gold_id": "2602.22045"}
+{"query": "How does NHA combine linear and full attention mechanisms to improve efficiency while maintaining recall accuracy in sequence modeling?", "gold_id": "2510.07019"}
+{"query": "How does SemCSE-Multi improve similarity assessments and visualization of scientific domains?", "gold_id": "2510.11599"}
+{"query": "How can deep reinforcement learning be used to improve patient-hospital allocation decisions during mass casualty incidents?", "gold_id": "2509.08756"}
+{"query": "What is a new protocol being developed to help human supervisors better understand and manage the performance of multi-agent language models when they generate incorrect or incomplete responses?", "gold_id": "2606.19356"}
+{"query": "What are the various types of memory systems used in agentic AI and multi-agent systems, and how do they differ?", "gold_id": "2603.20357"}
+{"query": "How did the release of ChatGPT-3.5 impact entrepreneurial activity on Product Hunt?", "gold_id": "2605.10291"}
+{"query": "What's the latest improvement in how fast decentralized algorithms can find equilibrium points in complex games?", "gold_id": "2511.02157"}
+{"query": "What study found a significant association between genetic associations and drug target approval rates?", "gold_id": "2606.14823"}
+{"query": "How does the proposed framework, Grammar Forced Translation (GraFT), address challenges in natural language to temporal logic translation?", "gold_id": "2512.16814"}
+{"query": "How can researchers determine if a large language model has been fine-tuned from another without needing access to model parameters?", "gold_id": "2509.24171"}
+{"query": "How do off-the-shelf sentiment classifiers perform on long-form Holocaust oral histories when dealing with domain shift?", "gold_id": "2603.28913"}
+{"query": "How does PG-SR differ from existing symbolic regression methods in addressing the Pseudo-Equation Trap?", "gold_id": "2602.13021"}
+{"query": "What are two recent advancements in open-source iris recognition algorithms that meet strict speed and memory constraints for large-scale evaluations?", "gold_id": "2605.20735"}
+{"query": "How can researchers improve the accuracy of depth estimation in autonomous vehicles during rainy or foggy weather?", "gold_id": "2511.15167"}
+{"query": "How can bitboard optimization and advanced reinforcement learning algorithms improve Tetris AI performance for complex sequential decision-making tasks?", "gold_id": "2603.26765"}
+{"query": "What are the key features and performance improvements of GutenOCR compared to its base models, and how does it perform on specific types of documents?", "gold_id": "2601.14490"}
+{"query": "How do current language model reasoning methods fail to effectively solve complex problems by not adapting their approach across different stages?", "gold_id": "2602.10063"}
+{"query": "How do recent vision-language models perform on change visual question answering tasks compared to traditional methods?", "gold_id": "2604.18429"}
+{"query": "What are the key features of 3LM, and how do they address the limitations in existing Arabic benchmarks for real-world applications?", "gold_id": "2507.15850"}
+{"query": "How do current large language models handle complex tasks that require long-term planning?", "gold_id": "2510.12979"}
+{"query": "What is SHIELD, and how does it help prevent harmful emotional dynamics in AI-powered companions?", "gold_id": "2510.15891"}
+{"query": "How do large language models improve plain language summaries for different readers in health contexts?", "gold_id": "2605.00468"}
+{"query": "How do current offline reinforcement learning methods handle challenges like out-of-distribution errors and multimodal policy distributions?", "gold_id": "2602.05051"}
+{"query": "How does a hybrid reinforcement learning framework improve multi-satellite positioning in low Earth orbit constellations?", "gold_id": "2511.08852"}
+{"query": "What are the challenges in developing end-to-end spoken language models for empathetic dialogue, and how does EmpathyEval help overcome these issues?", "gold_id": "2601.18281"}
+{"query": "How do researchers develop compact AI agents that can interact effectively with graphical user interfaces on various devices?", "gold_id": "2509.26539"}
+{"query": "How do model stealing attacks differ from traditional methods in terms of economic impact?", "gold_id": "2606.15493"}
+{"query": "How can researchers effectively analyze and manipulate high-dimensional data using geometric tools derived from autoencoders?", "gold_id": "2510.09468"}
+{"query": "How do large language models perform when faced with factual errors, and what distinguishes between missing knowledge versus limited access to encoded facts?", "gold_id": "2602.14080"}
+{"query": "How can machine learning be used to preserve traditional Bharatanatyam dance postures in the digital age?", "gold_id": "2603.29570"}
+{"query": "How can humanoid robots learn to navigate and perform complex movements on diverse terrains by combining perception with motion tracking?", "gold_id": "2601.07701"}
+{"query": "How can natural language processing be used to improve machine learning configuration tuning?", "gold_id": "2508.15757"}
+{"query": "How does leveraging graph-based knowledge structures in retrieval-augmented generation models impact user privacy?", "gold_id": "2508.17222"}
+{"query": "How does collaboration among language agents enhance their performance beyond individual self-improvement?", "gold_id": "2606.03544"}
+{"query": "What is a new user-friendly tool for remote sensing that simplifies the implementation of deep learning without requiring extensive coding skills or large datasets?", "gold_id": "2508.00627"}
+{"query": "How can fine-grained visual classification be made more resilient to geometric distortions using transformer-based vision pipelines?", "gold_id": "2509.11218"}
+{"query": "How can researchers use dynamical systems theory to enhance the safety and robustness of reinforcement learning policies in critical applications?", "gold_id": "2508.15588"}
+{"query": "How do classical machine learning models compare to a two-qubit variational quantum classifier in solving XOR problems under different levels of noise and data size?", "gold_id": "2602.24220"}
+{"query": "How does the Plural Voices Model address ethical challenges faced by AI agents when interacting with diverse user groups?", "gold_id": "2510.19008"}
+{"query": "What is the Multi-view Oriented Observation (MOO) dataset used for in animal re-identification research?", "gold_id": "2603.04314"}
+{"query": "How do large language models update their beliefs about statements in line with Bayesian principles when given new information?", "gold_id": "2507.17951"}
+{"query": "What is the largest Sinhala language corpus available that covers a historical span from the 5th to the 20th century?", "gold_id": "2603.10861"}
+{"query": "How can analyzing both qualitative and quantitative aspects of tourists' digital traces help us better understand the complex dynamics of attraction networks?", "gold_id": "2512.14704"}
+{"query": "How do Bit-Flip Attacks specifically impact the performance of Large Language Models (LLMs) compared to Deep Neural Networks (DNNs)?", "gold_id": "2509.21843"}
+{"query": "What's an efficient way to handle online learning problems with partial observability, especially when dealing with noisy feedback from other actions?", "gold_id": "2604.13740"}
+{"query": "What patterns in language model reasoning traces can indicate whether an answer is correct or incorrect?", "gold_id": "2604.19149"}
+{"query": "What is a divergence-minimization framework used for in statistical inference?", "gold_id": "2511.17974"}
+{"query": "What strategies can improve keyword matching in sponsored search to enhance ad relevance and user experience?", "gold_id": "2607.03886"}
+{"query": "How does placing the entire procedure in the system prompt and letting the model self-orchestrate compare to traditional agent orchestration frameworks for procedural tasks?", "gold_id": "2604.27891"}
+{"query": "What computational model was developed to optimize antibody sequences based on favorable developability?", "gold_id": "2507.02670"}
+{"query": "How does a physics-informed machine learning approach improve the accuracy and efficiency of predicting temperature profiles in battery cells?", "gold_id": "2604.14566"}
+{"query": "What is the impact of differential privacy on estimating high-dimensional covariance matrices, and how does it compare to non-private methods?", "gold_id": "2603.19703"}
+{"query": "What are the challenges faced by AI-native 6G networks in handling dynamic changes in wireless environments?", "gold_id": "2508.00042"}
+{"query": "How can researchers create a dynamic multimodal evaluation benchmark to ensure the effectiveness of vision-language models over time?", "gold_id": "2607.01813"}
+{"query": "How can we improve the alignment of large language models for open-ended tasks without relying on programmatic verifiers?", "gold_id": "2605.18721"}
+{"query": "How can inference-time methods be used to control the generation of text from diffusion language models without requiring retraining?", "gold_id": "2605.29626"}
+{"query": "How do current multimodal large language models struggle with integrating different types of input data effectively?", "gold_id": "2602.12286"}
+{"query": "How do automated vehicles struggle with detecting objects at distances greater than 30 meters in urban traffic?", "gold_id": "2606.09634"}
+{"query": "How can researchers improve the efficiency of training large Transformer models by addressing geometric inefficiency?", "gold_id": "2512.13033"}
+{"query": "How do diffusion language models help reduce inference costs in large language models during the generation process?", "gold_id": "2606.11552"}
+{"query": "What is the current state of research in Arabic Speech Emotion Recognition, and how does this paper address its limitations?", "gold_id": "2604.07357"}
+{"query": "How can researchers efficiently review and adjust coding agents' processes without manually inspecting each output?", "gold_id": "2508.12555"}
+{"query": "How can we fairly compare different language models based on their strengths and weaknesses?", "gold_id": "2507.03834"}
+{"query": "How did researchers improve the accuracy of mental health detection in youth SMS conversations by expanding an existing classification system?", "gold_id": "2605.27546"}
+{"query": "How do existing Chain-of-Thought methods fail to effectively integrate visual, textual, and social cues in comic understanding?", "gold_id": "2601.02991"}
+{"query": "How can reinforcement learning be effectively applied to multi-hop QA tasks by adapting retrieval steps based on question complexity?", "gold_id": "2507.07634"}
+{"query": "What is the relationship between non-acyclic GFlowNets and optimal transport, and how can this connection be used to improve sampling of structured objects?", "gold_id": "2606.06272"}
+{"query": "What are the key challenges to hypothesis testing in singular statistical models, and how does the paper address these issues?", "gold_id": "2602.24165"}
+{"query": "How can researchers improve the training and comparison of action-based models in autonomous driving compared to existing waypoint-based methods?", "gold_id": "2602.06214"}
+{"query": "How does leveraging superclasses help improve group robustness in machine learning models?", "gold_id": "2508.08570"}
+{"query": "How does a Kantian-axiomatic approach to Monte Carlo simulations help evaluate students' perceptions of generative AI in terms of ease of use and learnability?", "gold_id": "2510.00091"}
+{"query": "What AI algorithm helps in recommending sports fantasy contests based on player preferences?", "gold_id": "2508.14065"}
+{"query": "How can generative models like OSMGen help automate urban monitoring using OpenStreetMap data?", "gold_id": "2511.00345"}
+{"query": "What are some examples of digital tasks that current AI struggles to automate effectively?", "gold_id": "2605.14407"}
+{"query": "How can healthcare AI be monitored post-deployment more efficiently without increasing costs?", "gold_id": "2605.08429"}
+{"query": "What's a cost-effective method to prevent large language models from generating harmful or policy-violating content when exposed to malicious inputs?", "gold_id": "2601.15331"}
+{"query": "How do researchers enhance transformer models for logical reasoning tasks?", "gold_id": "2510.00355"}
+{"query": "How do AI-driven investment strategies affect the lifespan of market signals?", "gold_id": "2605.23905"}
+{"query": "How does AirFed improve the coordination of multiple unmanned aerial vehicles in large-scale IoT environments?", "gold_id": "2510.23053"}
+{"query": "What is the first efficient algorithm for learning Single-Index Models with Gaussian noise, and what types of activation functions can it handle?", "gold_id": "2508.04670"}
+{"query": "How can federated learning with graph-structured data be improved to address privacy and scalability issues while capturing inter-node dependencies?", "gold_id": "2510.25657"}
+{"query": "What is the main focus of the paper regarding how models are analyzed in visualization?", "gold_id": "2603.27527"}
+{"query": "How does optimizing instructional prompts for a few-shot large language model improve recommender systems for cold-start users?", "gold_id": "2509.09066"}
+{"query": "How can visual models be integrated with clinical reasoning to improve the accuracy of disease detection in medical images?", "gold_id": "2512.13742"}
+{"query": "How can large language models be used to create interactive scientific demonstrations for education and research?", "gold_id": "2510.09724"}
+{"query": "Can physics simulations be used to train language models for better understanding and solving physics problems?", "gold_id": "2604.11805"}
+{"query": "What new type of synthetic dataset has been developed to better evaluate interpretability methods in neural networks?", "gold_id": "2606.20347"}
+{"query": "How does MUDAP help edge devices manage limited resources while maintaining service level objectives?", "gold_id": "2510.06882"}
+{"query": "How can a single pretrained model be adapted to new prediction tasks in relational databases without per-task training or heavy tuning?", "gold_id": "2602.18495"}
+{"query": "How does touch contribute to babies' understanding of visual concepts?", "gold_id": "2606.31943"}
+{"query": "What novel approach is introduced to improve brain image segmentation by addressing uncertainty issues?", "gold_id": "2604.16490"}
+{"query": "What is a new approach in computational chemistry that combines energy-guided generative models with explicit energy landscape modeling to generate diverse low-energy molecular conformers?", "gold_id": "2512.22597"}
+{"query": "How effective are pre-trained code language models in detecting cross-language bugs across different programming language pairs?", "gold_id": "2507.21954"}
+{"query": "How do cognitive and generative AI models compare in terms of their ability to be evaluated?", "gold_id": "2510.03453"}
+{"query": "How can large language models be used to create more emotionally resonant narratives for therapeutic purposes?", "gold_id": "2606.16481"}
+{"query": "What is a new AI-based tool designed to help students learn theorem proving?", "gold_id": "2601.17473"}
+{"query": "How do quantum algorithms address inequality constraints in financial portfolio optimization?", "gold_id": "2601.03278"}
+{"query": "How can leveraging human experience during chip design improve the accuracy of LLM-based RTL generation?", "gold_id": "2510.08664"}
+{"query": "How does MoBiE address the efficiency issues in Mixture-of-Experts (MoE) based large language models while maintaining performance?", "gold_id": "2604.06798"}
+{"query": "How can machine learning help identify moments of students' mechanistic reasoning in team conversations?", "gold_id": "2604.21870"}
+{"query": "How do large language models generate self-explanations for predictions, and what concerns arise regarding their faithfulness in low-resource languages like Persian?", "gold_id": "2511.19719"}
+{"query": "How can artificial social intelligence improve its ability to synthesize realistic and emotionally accurate talking heads while maintaining the subject's identity?", "gold_id": "2508.12163"}
+{"query": "What is the main challenge faced by adaptive stochastic convex optimization methods and how does the paper propose to overcome it?", "gold_id": "2606.22669"}
+{"query": "What is a new approach for finding Nash equilibria in complex games where agents interact on graphs under uncertainty?", "gold_id": "2509.12484"}
+{"query": "How can diffusion language models be optimized for faster inference without losing accuracy?", "gold_id": "2601.20332"}
+{"query": "What is RabakBench and how does it address safety concerns in low-resource languages?", "gold_id": "2507.05980"}
+{"query": "What's a new neural network architecture designed for insurance modeling that uses a recursive latent reasoning approach?", "gold_id": "2601.07675"}
+{"query": "What recent research helps explain how chunk-based sparse attention improves language model performance on very long inputs?", "gold_id": "2510.17196"}

@@ -2,7 +2,7 @@
 """
 Rollover promotion gate (#895).
 
-The Σ₀ Keystone-coding-agent rollover (#892) advances through stages
+The Σ₀ unisona.ai-coding-agent rollover (#892) advances through stages
 (shadow → assist → default → independent). A stage may only advance when the live
 kernel clears two measurable bars on the golden eval set, expressed as an External
 Reality envelope [claim, evidence, confidence, source]:
@@ -79,7 +79,7 @@ def evaluate_gate(row, baseline_row=None, gate_b_floor=COLD_BASELINE_ACCURACY, s
             f"bytes_per_correct={base_bpc}"
         )
     envelope = GroundingEnvelope(
-        claim=f"Keystone {'MAY' if passed else 'may NOT'} advance to rollover stage '{stage}'",
+        claim=f"unisona.ai {'MAY' if passed else 'may NOT'} advance to rollover stage '{stage}'",
         evidence=evidence,
         confidence=confidence if passed else 0.0,
         source=f"{os.path.relpath(LEADERBOARD, ROOT).replace(os.sep, '/')}#ts={row.get('ts')}",

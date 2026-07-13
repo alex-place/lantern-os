@@ -1,6 +1,6 @@
 """
 Harvest arXiv AI/LLM paper metadata (title + abstract + categories + date) into a
-local append-only corpus on drive F:, so the Keystone chat assistant can answer
+local append-only corpus on drive F:, so the unisona.ai chat assistant can answer
 AI/model/LLM questions with research published *after* the model's knowledge cutoff.
 
 Metadata only — no PDFs, no full text. Uses arXiv's sanctioned OAI-PMH bulk route

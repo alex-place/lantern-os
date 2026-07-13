@@ -30,7 +30,7 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 const FALLBACK = {
   sources: SOURCES.map((s) => ({ name: s.name, url: s.url })),
   items: [
-    { title: "Explore feeds are loading — check back shortly.", link: "/explore.html", source: "Keystone OS", date: null },
+    { title: "Explore feeds are loading — check back shortly.", link: "/explore.html", source: "unisona.ai", date: null },
   ],
 };
 

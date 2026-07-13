@@ -388,12 +388,18 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       const s20 = sma(20), s50 = sma(50), s200 = sma(200);
       const bull = [s20, s50, s200].filter((s) => price > s).length;
       const technical = bull >= 3 ? 'Strong Buy' : bull === 2 ? 'Buy' : bull === 1 ? 'Sell' : 'Strong Sell';
+      // Yahoo-summary fundamentals (#2412) — prev close/open, ranges, mkt cap,
+      // beta, P/E, EPS, div yield, target — so the focused view reaches parity
+      // with the Yahoo quote page. Best-effort; null on failure (panel degrades).
+      let quote = null;
+      try { quote = await yahoo.getQuoteSummary(ticker); } catch (_e) { quote = null; }
       sendJson(res, {
         ticker, price,
         returns: { '1M': retOver(21), '3M': retOver(63), 'YTD': ytd, '1Y': retOver(252), '3Y': retOver(756) },
         volume: bars[bars.length - 1].volume, avgVolume: avgVol,
         technical, bullCount: bull,
         sma20: +s20.toFixed(2), sma50: +s50.toFixed(2),
+        quote,
         available: true,
       }, 200);
     } catch (error) {

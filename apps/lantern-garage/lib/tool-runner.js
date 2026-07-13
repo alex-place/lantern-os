@@ -103,10 +103,36 @@ function _localTradingGet(pathAndQuery, timeoutMs = 9000) {
   });
 }
 
+// Prefer the co-located server's loopback endpoint (reuses its warm cache); if no
+// server is listening — e.g. the tool runs inside the standalone MCP bridge with
+// no lantern-garage on :4177 (ECONNREFUSED/timeout) — fall back to the SAME keyless
+// feed directly so read-only market data still resolves instead of erroring. Same
+// data source either way, so no divergence. Broker/account tools have no such
+// fallback (they genuinely need the live account) and stay loopback-only.
+async function _tradingDataOrDirect(pathAndQuery, directFn) {
+  try {
+    return await _localTradingGet(pathAndQuery);
+  } catch (loopbackErr) {
+    if (typeof directFn === "function") {
+      try { return await directFn(); } catch (_e) { throw loopbackErr; }
+    }
+    throw loopbackErr;
+  }
+}
+
 function _runShell(command) {
   const cmd = String(command || "").trim();
   const resolved = resolveCommand(cmd);
-  if (!resolved) throw _codedError(`command not allowlisted: ${cmd}`, "command_not_allowlisted");
+  if (!resolved) {
+    // Model-facing recovery hint (#2077): a blocked command must never become the
+    // user-visible answer — without this, models relayed "the Bash tool is
+    // restricted to allowlisted commands" as their reply to trivial code requests.
+    throw _codedError(
+      `command not allowlisted: ${cmd}. This is an environment limit, not an answer — ` +
+      "do NOT relay this restriction to the user or refuse. If the user asked for code " +
+      "or an explanation, write it directly in your reply without running anything.",
+      "command_not_allowlisted");
+  }
   return safeExec(tokenizeCommand(resolved), {
     cwd: REPO, encoding: "utf-8", timeout: 30000, maxBuffer: 1024 * 1024,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
@@ -281,12 +307,12 @@ const REGISTRY = {
     },
   },
   Bash: {
-    policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only.",
+    policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
     schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   PowerShell: {
-    policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only.",
+    policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
     schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
@@ -346,6 +372,39 @@ const REGISTRY = {
     },
   },
 
+  // ── Convergence orchestrator (observe) ──────────────────────────────────────
+  // Wires the assistant directly onto convergence_io_engine.py via the guarded
+  // convergence-adapter seam (circuit breaker + timeout), instead of the old
+  // loose subprocess spawns. Read-only: reports the orchestrator's live state.
+  convergence_inspect: {
+    policy: "read",
+    guest_safe: false, // exposes internal fleet/orchestrator state — operator only
+    desc: "Inspect the convergence orchestrator's live state — registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Read-only; grounds Observe with real engine state instead of guessing.",
+    schema: { type: "object", properties: {}, additionalProperties: false },
+    async run() {
+      const { runEngineCommand } = require("./convergence-adapter");
+      const s = await runEngineCommand("inspect");
+      if (s.error) {
+        return `[convergence_inspect unavailable: ${s.error} — the orchestrator (convergence_io_engine.py) could not be reached; say so rather than inventing state]`;
+      }
+      const circuits = s.circuits && Object.keys(s.circuits).length
+        ? JSON.stringify(s.circuits)
+        : "none tripped";
+      const lines = [
+        `convergence orchestrator state (as of ${s.timestamp || "now"}):`,
+        `  cells: ${s.cells ?? "?"}`,
+        `  active slots: ${s.slots_active ?? "?"} (dream-journal: ${s.dream_journal_slots_active ?? "?"})`,
+        `  circuits: ${circuits}`,
+        `  pending CSF specs: ${s.csf_agent?.pending_specs ?? "?"} (${s.csf_agent?.status || "?"})`,
+      ];
+      if (s.target_latencies) {
+        lines.push(`  target latencies (ms): ${Object.entries(s.target_latencies).map(([k, v]) => `${k}=${v}`).join(", ")}`);
+      }
+      if (s.last_log) lines.push(`  last log: ${s.last_log}`);
+      return lines.join("\n");
+    },
+  },
+
   // ── Coding control plane (#2185): propose → verify → HOLD for approval ──────
   // The idiomatic seam onto the coding backend (routes/coding.js is the HTTP twin).
   // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
@@ -353,7 +412,7 @@ const REGISTRY = {
   propose_coding_change: {
     policy: "mutating",
     desc:
-      "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
+      "Propose a change to a repository's EXISTING code using the accountable coding backend. Use only when the user asked for a repo change — never to write example/new code the user just wants to see (answer that directly in your reply). Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
     schema: {
       type: "object",
       properties: {
@@ -376,7 +435,11 @@ const REGISTRY = {
       } catch (e) {
         return `[propose_coding_change error: ${e.message}]`;
       }
-      if (!r || !r.ok) return `[propose_coding_change failed: ${(r && r.error) || "no proposal"}${r && r.hint ? " — " + r.hint : ""}]`;
+      if (!r || !r.ok) {
+        return `[propose_coding_change failed: ${(r && r.error) || "no proposal"}${r && r.hint ? " — " + r.hint : ""}] ` +
+          "Backend unavailability is an environment limit, not an answer — do not open your reply " +
+          "with it or refuse. If the user only asked for code, write the code directly in your reply.";
+      }
       const v = r.verification || {};
       const files = (r.proposal && r.proposal.filesChanged) || [];
       const verdict = v.decisive ? (v.passed === false ? "FAILED" : "passed") : "not decisive (guard-only)";
@@ -842,7 +905,7 @@ const REGISTRY = {
   // if unavailable. OPERATOR policy (shell execution).
   local_eval_keystone_run: {
     policy: "shell",
-    desc: "Run the Keystone eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
+    desc: "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
     schema: {
       type: "object",
       properties: {
@@ -1086,7 +1149,10 @@ const REGISTRY = {
     schema: { type: "object", properties: {} },
     async run() {
       try {
-        const d = await _localTradingGet("/api/trading/market-status");
+        const d = await _tradingDataOrDirect(
+          "/api/trading/market-status",
+          () => require("./market-data-yahoo").getMarketStatus(),
+        );
         if (!d || d.available === false) {
           return `[trader_market_status: live market data unavailable${d && d.reason ? ` — ${d.reason}` : ""}. Say so rather than guessing.]`;
         }
@@ -1116,7 +1182,10 @@ const REGISTRY = {
       const t = String(i.ticker || "").trim().toUpperCase();
       if (!t) return "[trader_quote error: a ticker is required]";
       try {
-        const d = await _localTradingGet(`/api/trading/symbol-stats?ticker=${encodeURIComponent(t)}`);
+        const d = await _tradingDataOrDirect(
+          `/api/trading/symbol-stats?ticker=${encodeURIComponent(t)}`,
+          () => require("./market-data-yahoo").getSymbolStats(t),
+        );
         if (!d || d.available === false) return `[trader_quote: no live data for ${t}. Say so rather than guessing.]`;
         const r = d.returns || {};
         const pct = (v) => (v == null ? "n/a" : `${v >= 0 ? "+" : ""}${v}%`);

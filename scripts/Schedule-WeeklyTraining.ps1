@@ -70,7 +70,7 @@ if ($ExistingTask) {
 }
 else {
     Write-Host "  [+] Creating task..." -ForegroundColor Green
-    Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger $TaskTrigger -Settings $TaskSettings -Description "Keystone weekly training: dispatch to GPU providers, run benchmarks, update issues" | Out-Null
+    Register-ScheduledTask -TaskName $TaskName -Action $TaskAction -Trigger $TaskTrigger -Settings $TaskSettings -Description "unisona.ai weekly training: dispatch to GPU providers, run benchmarks, update issues" | Out-Null
 }
 
 Write-Host ""

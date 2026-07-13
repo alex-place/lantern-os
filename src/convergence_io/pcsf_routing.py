@@ -42,7 +42,7 @@ class FailureClass(str, Enum):
 
 @dataclass(frozen=True)
 class ProviderCapability:
-    """Static provider/model metadata owned by Keystone, not provider health."""
+    """Static provider/model metadata owned by unisona.ai, not provider health."""
 
     provider_id: str
     model_id: str

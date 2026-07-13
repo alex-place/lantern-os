@@ -1,11 +1,11 @@
 ---
 name: report-card
-description: Produce an honest, evidence-grounded letter-grade report card for Keystone OS as it actually is right now — graded dimensions, real evidence per row, an overall grade, and a candid one-paragraph summary. Use this whenever the user types `!report-card`, or asks to "grade the app", "evaluate the app as it is now", "how are we doing", "give me an honest assessment", "where do we stand", "what's the state of the project", or otherwise wants a frank, no-flattery scorecard of the system's current quality. Trigger even when the user doesn't say the words "report card" — any request for a candid overall grade of the app or project is this skill. Do NOT use it for grading a single PR diff (that's a code review) or for a roadmap/planning ask.
+description: Produce an honest, evidence-grounded letter-grade report card for unisona.ai as it actually is right now — graded dimensions, real evidence per row, an overall grade, and a candid one-paragraph summary. Use this whenever the user types `!report-card`, or asks to "grade the app", "evaluate the app as it is now", "how are we doing", "give me an honest assessment", "where do we stand", "what's the state of the project", or otherwise wants a frank, no-flattery scorecard of the system's current quality. Trigger even when the user doesn't say the words "report card" — any request for a candid overall grade of the app or project is this skill. Do NOT use it for grading a single PR diff (that's a code review) or for a roadmap/planning ask.
 ---
 
 # Report Card
 
-The user wants the truth about where the app stands — not encouragement, not a roadmap, not a code review of one diff. A letter-grade scorecard of **Keystone OS as a whole, right now**, where every grade is earned by evidence they can check.
+The user wants the truth about where the app stands — not encouragement, not a roadmap, not a code review of one diff. A letter-grade scorecard of **unisona.ai as a whole, right now**, where every grade is earned by evidence they can check.
 
 This is a Σ₀ artifact. The North Star says *external reality beats internal consistency* and *every important claim needs [claim, evidence, confidence, source]*. A report card that grades from vibes or memory is worse than none — it launders feeling into a letter. So the whole job is: ground each grade in something you actually observed, and let the grades fall where the evidence puts them, even when that stings.
 

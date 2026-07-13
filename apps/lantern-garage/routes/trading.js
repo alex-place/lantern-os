@@ -83,14 +83,32 @@ async function _autoscanTick() {
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
       if (n) console.log(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
-      // Act stage: execute on the owner's IBKR account. No-op unless armed
-      // (TRADER_AUTO_EXECUTE / TRADER_MANAGE_EXITS); every order still passes the hard
-      // guard. `extended` routes pre/post-market fills through LMT + outsideRTH orders.
-      const at = await runAutoTrade(scan, { bridge: _autoBridge, userId: process.env.TRADER_AUTO_USER || 'local-owner', extended: !marketHours });
-      for (const e of (at.executed || [])) {
-        console.log(`[AutoTrader] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
+      // Act stage: execute on EVERY connected IBKR account, not just one — so when a
+      // second person links their account the autopilot trades both. TRADER_AUTO_USER,
+      // if set, pins it to a single user (back-compat / testing). Dedupe by broker
+      // account id so an alias (two userIds → same DUR… account) isn't traded twice.
+      // Runs sequentially; every order still passes the per-account hard guard, and
+      // `extended` routes pre/post-market fills through LMT + outsideRTH orders.
+      const ibkrCreds = require('../lib/ibkr-credentials');
+      const watchlistStore = require('../lib/watchlist-store');
+      const users = process.env.TRADER_AUTO_USER ? [process.env.TRADER_AUTO_USER] : ibkrCreds.listUsers();
+      const _seenAccts = new Set();
+      for (const uid of users) {
+        const acct = await _autoBridge.getIBKRAccount(uid).catch(() => null);
+        if (!acct || !acct.account_id) continue;                 // not connected/authenticated
+        if (_seenAccts.has(acct.account_id)) continue;            // alias → same account, skip
+        _seenAccts.add(acct.account_id);
+        // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
+        // so entries/signal-exits only touch names they curated. Held-position exits
+        // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
+        const wl = new Set(watchlistStore.getWatchlist(uid).map((s) => String(s).toUpperCase()));
+        const userScan = { ...scan, signals: (scan.signals || []).filter((s) => wl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
+        const at = await runAutoTrade(userScan, { bridge: _autoBridge, userId: uid, extended: !marketHours });
+        for (const e of (at.executed || [])) {
+          console.log(`[AutoTrader:${acct.account_id}] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
+        }
+        if ((at.enabled || at.manageExits) && !(at.executed || []).length && at.reason) console.log(`[AutoTrader:${acct.account_id}] no action — ${at.reason}`);
       }
-      if ((at.enabled || at.manageExits) && !(at.executed || []).length && at.reason) console.log(`[AutoTrader] no action — ${at.reason}`);
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }

@@ -10,8 +10,9 @@ const PUBLIC = path.join(__dirname, "..", "public");
 const BRAND = /\b(Keystone|Lantern)\w*/g;
 
 // Documented, legitimate exceptions for BODY copy (titles are still checked everywhere):
-//  - knowledgecenter.html lists INTERNAL docs by their real titles ("Keystone OS — …");
-//    renaming them would misname the artifacts. The issue says leave internal docs untouched.
+//  - knowledgecenter.html: "Keystone" doc titles were swept to unisona.ai in the 2026-07
+//    rename, but cards still show real file paths/module names (LANTERN-*.md doc titles,
+//    keystone-context.js) — paths are ids, not brand copy.
 //  - three-doors-game.html has in-game CHARACTERS named "Lantern"/"Keystone" (hand-drawn
 //    reference art + dialogue) — fiction, not the product brand.
 const BODY_ALLOWLIST = new Set(["knowledgecenter.html", "three-doors-game.html"]);

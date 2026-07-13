@@ -342,6 +342,40 @@ function isUsEquityMarketOpen() {
 }
 
 /**
+ * Per-ticker returns/volume/technicals from keyless Yahoo daily bars — the single
+ * source of truth for the `/api/trading/symbol-stats` route AND the `trader_quote`
+ * tool's direct fallback (so a quote resolves whether or not a co-located server is
+ * up). Pure over getBars; no server/broker state. Returns { ticker, price, returns,
+ * volume, avgVolume, technical, bullCount, sma20, sma50, available }.
+ */
+async function getSymbolStats(ticker) {
+  const t = String(ticker || '').trim().toUpperCase();
+  if (!t) return { ticker: t, returns: {}, available: false };
+  const data = await getBars(t, '1d');
+  const bars = (data && Array.isArray(data.bars)) ? data.bars : [];
+  if (bars.length < 2) return { ticker: t, returns: {}, available: false };
+  const closes = bars.map((b) => b.close);
+  const price = closes[closes.length - 1];
+  const retOver = (n) => { if (bars.length <= n) return null; const p0 = closes[bars.length - 1 - n]; return p0 ? +(((price - p0) / p0) * 100).toFixed(2) : null; };
+  const yr = new Date().getUTCFullYear();
+  const yi = bars.findIndex((b) => new Date(b.timestamp).getUTCFullYear() === yr);
+  const ytd = yi >= 0 && closes[yi] ? +(((price - closes[yi]) / closes[yi]) * 100).toFixed(2) : null;
+  const avgVol = Math.round(bars.slice(-30).reduce((s, b) => s + (b.volume || 0), 0) / Math.min(30, bars.length));
+  const sma = (n) => { const sl = closes.slice(-Math.min(n, closes.length)); return sl.reduce((s, c) => s + c, 0) / sl.length; };
+  const s20 = sma(20), s50 = sma(50), s200 = sma(200);
+  const bull = [s20, s50, s200].filter((s) => price > s).length;
+  const technical = bull >= 3 ? 'Strong Buy' : bull === 2 ? 'Buy' : bull === 1 ? 'Sell' : 'Strong Sell';
+  return {
+    ticker: t, price,
+    returns: { '1M': retOver(21), '3M': retOver(63), YTD: ytd, '1Y': retOver(252), '3Y': retOver(756) },
+    volume: bars[bars.length - 1].volume, avgVolume: avgVol,
+    technical, bullCount: bull,
+    sma20: +s20.toFixed(2), sma50: +s50.toFixed(2),
+    available: true,
+  };
+}
+
+/**
  * Keyless market status — VIX + regime + SPY trend + session open, straight from
  * Yahoo. Replaces the Python→Alpaca `get_market_status` call that hit the 7s
  * timeout and left the header's VIX/Market stuck at "—" (#1860). Broker-only
@@ -423,8 +457,65 @@ async function validateSymbol(ticker) {
   }
 }
 
+/**
+ * Yahoo-summary fundamentals for the focused single-symbol view (#2412) — the
+ * fields the Yahoo Finance quote page shows above the fold: previous close /
+ * open, day + 52-week range, bid/ask, market cap, beta, P/E, EPS, dividend
+ * yield, and the mean analyst target. Keyless quoteSummary (same cookie+crumb
+ * path as getEarningsSurprise), cached 10 min. Returns null for crypto / on any
+ * failure so the caller degrades to what it already has. Every value is a plain
+ * number|string|null — no Yahoo {raw,fmt} wrappers leak to the client.
+ */
+async function getQuoteSummary(ticker) {
+  const sym = tickerToYahoo(ticker);
+  if (isCrypto(ticker) || !/^[A-Z.]{1,6}$/.test(sym)) return null;
+  const key = `qs_${sym}`;
+  const hit = cacheGet(key, 10 * 60 * 1000);
+  if (hit !== null) return hit;
+  const raw = (v) => (v && typeof v === 'object' && 'raw' in v ? v.raw : (typeof v === 'number' ? v : null));
+  const doFetch = async (retry) => {
+    const cr = await _getCrumb(retry);
+    if (!cr) return null;
+    const modules = 'price,summaryDetail,defaultKeyStatistics,financialData';
+    const url = `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(sym)}?modules=${modules}&crumb=${encodeURIComponent(cr.crumb)}`;
+    const r = await _rawGet(url, { Cookie: cr.cookie });
+    if (r.status === 401 && !retry) return doFetch(true); // stale crumb → refresh once
+    if (r.status !== 200) return null;
+    let result;
+    try { result = JSON.parse(r.body).quoteSummary.result[0]; } catch (_e) { return null; }
+    if (!result) return null;
+    const sd = result.summaryDetail || {};
+    const ks = result.defaultKeyStatistics || {};
+    const fd = result.financialData || {};
+    const dy = raw(sd.dividendYield);
+    return {
+      ticker,
+      previousClose: raw(sd.previousClose),
+      open: raw(sd.open),
+      dayLow: raw(sd.dayLow),
+      dayHigh: raw(sd.dayHigh),
+      bid: raw(sd.bid),
+      ask: raw(sd.ask),
+      fiftyTwoWeekLow: raw(sd.fiftyTwoWeekLow),
+      fiftyTwoWeekHigh: raw(sd.fiftyTwoWeekHigh),
+      marketCap: raw(sd.marketCap),
+      beta: raw(sd.beta),
+      trailingPE: raw(sd.trailingPE),
+      forwardPE: raw(sd.forwardPE),
+      eps: raw(ks.trailingEps),
+      dividendYield: dy != null ? round(dy * 100, 2) : null,
+      targetMeanPrice: raw(fd.targetMeanPrice),
+      available: true,
+    };
+  };
+  let out = null;
+  try { out = await doFetch(false); } catch (_e) { out = null; }
+  cacheSet(key, out); // cache null too — avoid hammering symbols with no summary
+  return out;
+}
+
 module.exports = {
-  getQuotes, getBars, getBarsMulti, getMarketStatus, validateSymbol,
-  getEarningsSurprise,
+  getQuotes, getBars, getBarsMulti, getMarketStatus, getSymbolStats, validateSymbol,
+  getEarningsSurprise, getQuoteSummary,
   isCrypto, tickerToYahoo, isUsEquityMarketOpen, _TF: TF,
 };

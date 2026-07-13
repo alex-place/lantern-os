@@ -1,6 +1,6 @@
 {
   "name": "lantern-garage-app",
-  "version": "1.8.0",
+  "version": "1.9.5",
   "private": true,
   "description": "Local-first Lantern OS garage full-stack app.",
   "scripts": {
@@ -45,7 +45,8 @@
     "test:grounded": "node test/kalshi-grounded.test.js",
     "test:verify-llm": "node test/verify-llm.test.js",
     "test:hooks": "node test/git-hooks-repo-managed.test.js",
-    "test:sigma0": "node test/surface-boundary.test.js && node test/no-keyword-routing.test.js && node test/kalshi-fees-ev.test.js && node test/kalshi-grounded.test.js && node test/tenant.test.js && node test/deployment-profile.test.js && node test/desktop-phase0.test.js && node test/appdata-migration.test.js && node test/desktop-loopback-token.test.js && node test/desktop-loopback-token-http.test.js && node test/verify-llm.test.js && node test/git-hooks-repo-managed.test.js",
+    "test:convergence-tool": "node test/convergence-inspect-tool.test.js",
+    "test:sigma0": "node test/surface-boundary.test.js && node test/no-keyword-routing.test.js && node test/kalshi-fees-ev.test.js && node test/kalshi-grounded.test.js && node test/tenant.test.js && node test/deployment-profile.test.js && node test/desktop-phase0.test.js && node test/appdata-migration.test.js && node test/desktop-loopback-token.test.js && node test/desktop-loopback-token-http.test.js && node test/verify-llm.test.js && node test/git-hooks-repo-managed.test.js && node test/convergence-inspect-tool.test.js",
     "test:sprint16": "node ../../tests/test_sprint16_dashboards.js",
     "test:all": "node ../../tests/run-dream-journal-tests.js api chat multiturn keystone cache ui dream-chat-ui && npm run test:three-doors",
     "dev": "node --watch server.js",

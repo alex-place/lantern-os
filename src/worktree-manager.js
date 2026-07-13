@@ -92,6 +92,68 @@ function removeWorktree(worktreePath, { deleteBranch = false, branch, repoRoot =
 }
 
 /**
+ * Return true if `ref` (a commit) is already contained in origin/master —
+ * i.e. the worktree's branch has fully landed. Best-effort: any git error
+ * (missing ref, no remote) counts as "not merged" so we never remove on doubt.
+ */
+function isMergedToMaster(ref, repoRoot = REPO_ROOT) {
+  const base = (() => {
+    try { git(["rev-parse", "--verify", "--quiet", "origin/master"], repoRoot); return "origin/master"; }
+    catch { return "master"; }
+  })();
+  try {
+    execFileSync("git", ["-C", repoRoot, "merge-base", "--is-ancestor", ref, base],
+      { stdio: "ignore" });
+    return true;   // exit 0 → ref is an ancestor of base
+  } catch {
+    return false;  // exit 1 (not ancestor) or any error
+  }
+}
+
+/**
+ * Reclaim stale per-issue worktrees under <repoRoot>/.claude/worktrees.
+ *
+ * These accumulate because a crashed autowork run, an interactive agent
+ * session, or a workflow scratch tree can exit without calling its own
+ * cleanup — and because they live *inside* the repo root, every local
+ * grep/Glob then scans N copies of the tree (the #2308 drag).
+ *
+ * Conservative by construction: a worktree is removed ONLY when its branch is
+ * fully merged into origin/master AND its working tree is clean (no staged,
+ * unstaged, or untracked changes). Anything unmerged or dirty is reported and
+ * kept, so in-flight work from a concurrent session is never destroyed. The
+ * branch is preserved on removal (the merged commits already live on master).
+ *
+ * @returns {{ removed: string[], keptDirty: string[], keptUnmerged: string[] }}
+ */
+function pruneStaleWorktrees(repoRoot = REPO_ROOT, { dryRun = false } = {}) {
+  const report = { removed: [], keptDirty: [], keptUnmerged: [] };
+  // Drop admin entries whose directory was already deleted by hand.
+  try { git(["worktree", "prune"], repoRoot); } catch {}
+
+  const base = worktreeBase(repoRoot);
+  for (const wt of listWorktrees(repoRoot)) {
+    // Only touch trees under this checkout's .claude/worktrees — never the
+    // sibling server checkouts or another repo's trees.
+    const inBase = path.resolve(wt.path).startsWith(path.resolve(base) + path.sep);
+    if (!inBase || !wt.head) continue;
+    if (!fs.existsSync(wt.path)) continue;
+
+    let dirty = true;
+    try { dirty = git(["status", "--porcelain"], wt.path).length > 0; } catch {}
+    if (dirty) { report.keptDirty.push(wt.path); continue; }
+
+    if (!isMergedToMaster(wt.head, repoRoot)) { report.keptUnmerged.push(wt.path); continue; }
+
+    if (!dryRun) {
+      removeWorktree(wt.path, { deleteBranch: false, branch: wt.branch, repoRoot });
+    }
+    report.removed.push(wt.path);
+  }
+  return report;
+}
+
+/**
  * List all registered worktrees (excluding main).
  */
 function listWorktrees(repoRoot = REPO_ROOT) {
@@ -112,4 +174,28 @@ function listWorktrees(repoRoot = REPO_ROOT) {
   return trees.filter(t => t.path !== repoRoot);
 }
 
-module.exports = { createWorktree, removeWorktree, listWorktrees, worktreeBase, WORKTREE_BASE: worktreeBase(REPO_ROOT) };
+module.exports = {
+  createWorktree, removeWorktree, listWorktrees, pruneStaleWorktrees, isMergedToMaster,
+  worktreeBase, WORKTREE_BASE: worktreeBase(REPO_ROOT),
+};
+
+// CLI: `node src/worktree-manager.js prune [--dry-run]` reclaims merged+clean
+// worktrees under this checkout. Default is a real prune; --dry-run only reports.
+if (require.main === module) {
+  const cmd = process.argv[2];
+  if (cmd === "prune") {
+    const dryRun = process.argv.includes("--dry-run");
+    const r = pruneStaleWorktrees(REPO_ROOT, { dryRun });
+    const out = (line) => process.stdout.write(line + "\n");
+    const tag = dryRun ? "[dry-run] would remove" : "removed";
+    out(`${tag} ${r.removed.length} merged+clean worktree(s):`);
+    for (const p of r.removed) out("  - " + p);
+    if (r.keptDirty.length)    out(`kept ${r.keptDirty.length} (uncommitted changes):`);
+    for (const p of r.keptDirty)    out("  ~ " + p);
+    if (r.keptUnmerged.length) out(`kept ${r.keptUnmerged.length} (branch not merged):`);
+    for (const p of r.keptUnmerged) out("  ! " + p);
+  } else {
+    console.error("usage: node src/worktree-manager.js prune [--dry-run]");
+    process.exit(1);
+  }
+}

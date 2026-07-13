@@ -83,7 +83,7 @@ def _parse_sse(raw):
 
 
 def chat_complete(host, port, message, provider, agent, mcp, route_intent, timeout):
-    """POST one turn to the Keystone chat SSE endpoint; return (reply_text, done_meta).
+    """POST one turn to the unisona.ai chat SSE endpoint; return (reply_text, done_meta).
 
     Reads the whole SSE response (the handler closes the stream after `done`).
     Raises ConnectionError if unreachable."""
@@ -122,7 +122,7 @@ def run_eval(a):
 
     detail, n_ok, t0 = [], 0, time.time()
     sources, models, note_counts = {}, {}, {}
-    print(f"\nDriving Keystone chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}\n", flush=True)
+    print(f"\nDriving unisona.ai chat @ {a.host}:{a.port}  provider={a.provider or 'auto'}\n", flush=True)
     print(f"{'task':<14} {'pass':<5} {'served':<18} {'note'}", flush=True)
     for i in range(n):
         ex = ds[i]

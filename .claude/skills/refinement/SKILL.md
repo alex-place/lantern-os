@@ -1,11 +1,11 @@
 ---
 name: refinement
-description: Groom the Keystone OS GitHub backlog to the agile Definition-of-Ready bar — route every open issue to a dev lane (kriskin / mookman / alex), set its milestone, set its priority (p0/p1/p2), fill its type, flag thin issues needs-triage, and set its assignee, then report what changed. Use this whenever the user types `/refinement`, or asks to "refine the backlog", "groom the backlog", "triage the issues", "prioritize the backlog", "assign lanes", "label the backlog by lane", "set milestones on the issues", "assign the issues to kriskin/mookman/alex", "sort the backlog into lanes", or otherwise wants open issues distributed across the three contributor lanes with labels, milestones, priorities, and assignees. Trigger even when the user doesn't say "refinement" — any request to organize/distribute/triage/prioritize the open GitHub issues is this skill. Do NOT use it to actually write code for an issue (that's autowork), to grade the app (that's report-card), or to review a single PR diff (that's code-review).
+description: Groom the unisona.ai GitHub backlog to the agile Definition-of-Ready bar — route every open issue to a dev lane (kriskin / mookman / alex), set its milestone, set its priority (p0/p1/p2), fill its type, flag thin issues needs-triage, and set its assignee, then report what changed. Use this whenever the user types `/refinement`, or asks to "refine the backlog", "groom the backlog", "triage the issues", "prioritize the backlog", "assign lanes", "label the backlog by lane", "set milestones on the issues", "assign the issues to kriskin/mookman/alex", "sort the backlog into lanes", or otherwise wants open issues distributed across the three contributor lanes with labels, milestones, priorities, and assignees. Trigger even when the user doesn't say "refinement" — any request to organize/distribute/triage/prioritize the open GitHub issues is this skill. Do NOT use it to actually write code for an issue (that's autowork), to grade the app (that's report-card), or to review a single PR diff (that's code-review).
 ---
 
 # Backlog Refinement
 
-Keystone OS is built by three contributor lanes. The backlog is only useful if every open
+unisona.ai is built by three contributor lanes. The backlog is only useful if every open
 issue is *ready to pull from the top* — sitting in the right lane, in the right milestone,
 prioritized, typed, and owned. This skill does that grooming pass —
 **route → milestone → prioritize → type → readiness-check → assign → report** — and nothing

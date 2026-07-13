@@ -109,12 +109,15 @@ jobWorker.start(2000); // Poll every 2 seconds for new jobs
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
 require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
-// PR Watcher — auto-reviews PRs idle for 3min via Keystone fleet, and (when
-// PR_WATCHER_AUTOMERGE=1) auto-merges reviewed + green + conflict-free PRs.
+// PR Watcher — auto-reviews PRs idle for 3min via unisona.ai fleet, and auto-merges
+// reviewed(APPROVE) + green + conflict-free PRs. Auto-merge is ON by default on the
+// single designated fleet host (PR_WATCHER_ENABLED=1); set PR_WATCHER_AUTOMERGE=0 to
+// review-only. Merge bar: green CI checks + a fleet-review APPROVE verdict, minus the
+// protected-path carve-out (auth/money/CI/secrets still need a human).
 const prWatcher = new PrWatcher({
   repoRoot, port,
   idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000),
-  autoMerge: process.env.PR_WATCHER_AUTOMERGE === "1",
+  autoMerge: process.env.PR_WATCHER_AUTOMERGE !== "0",
   mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
     ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
     : null,
@@ -123,6 +126,11 @@ const prWatcher = new PrWatcher({
     : null,
   // CI must run + go green before auto-merge. Opt out only for CI-less repos.
   requireChecks: process.env.PR_WATCHER_REQUIRE_CHECKS !== "0",
+  // The assigned-issue convergence gate (needs convergance-record + autowork-verified
+  // labels before a PR closing a human-assigned issue may land) is OFF by default —
+  // green + review-APPROVE is the merge bar. Re-enable with
+  // PR_WATCHER_ASSIGNED_ISSUE_GATE=1.
+  assignedIssueGate: process.env.PR_WATCHER_ASSIGNED_ISSUE_GATE === "1",
 });
 
 // Shared dependency bundle passed to every route module
@@ -258,7 +266,7 @@ const routes = [
   require("./routes/dream"),
   require("./routes/dreams"),
   require("./routes/keystone"),
-  require("./routes/rollover"), // #898: Keystone-vs-Claude landed-work share
+  require("./routes/rollover"), // #898: unisona.ai-vs-Claude landed-work share
   require("./routes/image"),
   require("./routes/web-images"),
   require("./routes/youtube"),
@@ -323,8 +331,13 @@ try {
   console.error("[FATAL] " + err.message);
   process.exit(1);
 }
+// Persist sessions to disk so a restart doesn't sign everyone out (the default
+// in-memory store dropped every session on each deploy — the ":4178 signs me out on
+// reload" report). data/sessions is gitignored, so it survives resets too.
+const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
+  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -714,6 +727,39 @@ server.listen(port, host, () => {
     }
   }, 8000);
 
+  // ── Boot-time rag://house regen (#2339) ──
+  // The internal-house flat file (data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md)
+  // is now gitignored (#2337), so a fresh clone / GCE deploy ships an EMPTY rag://house
+  // resource until someone runs `npm run regen:rag` by hand. Regen it once at boot when the
+  // file is missing or stale (> RAG_HOUSE_MAX_AGE_H hours, default 24) so prod is never
+  // silently empty. Deferred off the critical boot path and spawned detached so the ~seconds
+  // of file-walking never blocks the listener. Set RAG_HOUSE_BOOT_REGEN=0 to disable.
+  if (process.env.RAG_HOUSE_BOOT_REGEN !== "0") {
+    setTimeout(() => {
+      try {
+        const fsx = require("fs");
+        const flat = path.join(repoRoot, "data", "internal-rag-house", "LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md");
+        const maxAgeH = Number(process.env.RAG_HOUSE_MAX_AGE_H || 24);
+        let stale = true;
+        try {
+          const st = fsx.statSync(flat);
+          stale = st.size === 0 || (Date.now() - st.mtimeMs) > maxAgeH * 3600 * 1000;
+        } catch { stale = true; /* missing */ }
+        if (!stale) return;
+        const { spawn } = require("child_process");
+        const script = path.join(repoRoot, "scripts", "regen-flat-rag.mjs");
+        const child = spawn(process.execPath, [script, "--internal"], {
+          cwd: repoRoot, detached: true, stdio: "ignore",
+        });
+        child.on("error", (e) => console.error("[rag-house] boot regen spawn failed (non-fatal):", e && e.message));
+        child.unref();
+        console.info(`[rag-house] boot regen dispatched (flat file missing/stale > ${maxAgeH}h)`);
+      } catch (e) {
+        console.error("[rag-house] boot regen failed (non-fatal):", e && e.message);
+      }
+    }, 9000);
+  }
+
   // ── Market/trading background loops ─────────────────────────────────────────
   // These 24/7 collectors + convergence loops start on every boot. The desktop
   // launcher (docs/adr/0014) runs the Core purely for chat and sets
@@ -863,8 +909,9 @@ server.listen(port, host, () => {
   // accounts multiplies auto-review comments (each comment also re-triggers the
   // others). Enable PR_WATCHER_ENABLED=1 on exactly ONE machine.
   if (process.env.PR_WATCHER_ENABLED === "1") {
+    // Auto-merge default is ON (green + review-APPROVE); PR_WATCHER_AUTOMERGE=0 for
+    // review-only. Current mode is exposed via prWatcher.getStatus().autoMerge.
     prWatcher.start();
-    console.log(`[PR Watcher] auto-merge ${process.env.PR_WATCHER_AUTOMERGE === "1" ? "ENABLED" : "off (set PR_WATCHER_AUTOMERGE=1 to land ready PRs)"}`);
   } else {
     console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
   }

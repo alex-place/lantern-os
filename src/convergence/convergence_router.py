@@ -11,7 +11,7 @@ Confidence reflects the decision's grounding:
 - a compute fallback is lower      (no cached pattern; a model/heuristic chose)
 - a bare fallback is lowest        (default route, no evidence)
 
-Reference: apps/lantern-garage/lib/convergence-router.js (120 Keystone routes,
+Reference: apps/lantern-garage/lib/convergence-router.js (120 unisona.ai routes,
 >70% cache hit rate); src/convergence/objects.py::ConvergenceRecord.
 """
 from __future__ import annotations

@@ -119,11 +119,20 @@ function getGitVersion(repoRoot) {
     const tag = execSync("git describe --tags --always", { cwd: repoRoot, encoding: "utf8" }).trim();
     const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: repoRoot, encoding: "utf8" }).trim();
     const date = execSync("git log -1 --format=%cI", { cwd: repoRoot, encoding: "utf8" }).trim();
+    // Version source of truth is the ROOT package.json (bumped on every release,
+    // e.g. 1.9.6). The static public/version.json and apps/lantern-garage/package.json
+    // routinely lag the real build (#2334), so prefer root package.json, then fall
+    // back to the git tag, then version.json.
     let semver = tag;
     try {
-      const vj = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/lantern-garage/public/version.json"), "utf8"));
-      if (vj.version) semver = vj.version;
-    } catch {}
+      const root = JSON.parse(fs.readFileSync(path.join(repoRoot, "package.json"), "utf8"));
+      if (root.version) semver = root.version;
+    } catch {
+      try {
+        const vj = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/lantern-garage/public/version.json"), "utf8"));
+        if (vj.version) semver = vj.version;
+      } catch {}
+    }
     return { commit, tag, branch, date, semver };
   } catch {
     return { commit: "unknown", tag: "unknown", branch: "unknown", date: new Date().toISOString(), semver: "unknown" };

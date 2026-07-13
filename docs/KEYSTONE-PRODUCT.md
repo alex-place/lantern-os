@@ -1,6 +1,6 @@
-# Keystone Chat — product definition & operating contract
+# unisona.ai Chat — product definition & operating contract
 
-> **One line:** Keystone chat is the member's **operator console for Lantern OS** — the
+> **One line:** unisona.ai chat is the member's **operator console for Lantern OS** — the
 > one place a member talks to the system, directs its tools, and watches the convergence
 > loop turn a question into verified, cited work.
 
@@ -20,7 +20,7 @@ system.** That is the product.
 1. **Be grounded in their actual state** — answers cite the real repo, open issues,
    persistent memory, web results, and live tool output. The **External Reality Rule** is
    the trust contract: every claim carries `[claim, evidence, confidence, source]`. When
-   Keystone says "the benchmark passes," it is true with a receipt.
+   unisona.ai says "the benchmark passes," it is true with a receipt.
 2. **Operate the tools, not just describe them** — "research X", "run the benchmark",
    "status of the Kalshi collector", "intake this task" route to the real tools
    (convergence router, MCP tools, the research loop) and report results, not prose about
@@ -34,7 +34,7 @@ system.** That is the product.
 
 ## What it is explicitly NOT
 
-- Not the dream-journal / mystic voice. Keystone is the **technical coordinator** face,
+- Not the dream-journal / mystic voice. unisona.ai is the **technical coordinator** face,
   grounded in GitHub issues — no dream-door suggestions injected.
 - Not a stateless Q&A box.
 - Not a surface that ever asserts system status it did not verify.
@@ -130,7 +130,7 @@ OURO_MODEL=ByteDance/Ouro-1.4B OURO_ADAPTER=<adapter> OURO_MERGE=1 OURO_ATTN=sdp
 3. **Bigger base only when it pays** — bench Ouro-2.6B/-Thinking vs 1.4B before VRAM spend.
 4. **Clean the Σ₀ training set** — strip `### Response:` template artifacts; retrain; re-bench.
 5. **Grow the golden set** — project-grounded + reasoning prompts, not just trivia.
-6. **Route by difficulty** — Keystone picks fast vs deep per query (Convergence Reason
+6. **Route by difficulty** — unisona.ai picks fast vs deep per query (Convergence Reason
    stage), logged to the leaderboard for continuous tuning.
 
 ## Guardrails

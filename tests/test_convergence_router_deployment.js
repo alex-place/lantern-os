@@ -99,7 +99,7 @@ async function run() {
     assert.ok(result.endpoint, "should have endpoint");
   });
 
-  await testAsync("unknown tasks route to Keystone dispatcher", async () => {
+  await testAsync("unknown tasks route to unisona.ai dispatcher", async () => {
     const router = new ConvergenceRouter();
     const result = await router.routeTask("novel_task_type", {});
     assert.strictEqual(result.source, "dynamic_route");

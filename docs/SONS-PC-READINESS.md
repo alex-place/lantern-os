@@ -8,7 +8,7 @@ updated: 2026-06-20
 
 ## Simple Answer
 
-This document tracks readiness for deploying Keystone OS on the son's PC (dual-boot setup).
+This document tracks readiness for deploying unisona.ai on the son's PC (dual-boot setup).
 
 ## Executive Summary
 
@@ -17,6 +17,6 @@ Dual-boot configuration for Windows / Linux on the son's PC. See the main `docs/
 ## Status
 
 - [ ] OS installation verified
-- [ ] Keystone OS dependencies installed
+- [ ] unisona.ai dependencies installed
 - [ ] Dream Journal accessible
 - [ ] Network configuration tested

@@ -61,7 +61,7 @@
   },
   {
     "path": "CONTRIBUTING.md",
-    "title": "Contributing to Keystone OS",
+    "title": "Contributing to unisona.ai",
     "category": "guides",
     "description": "Contributor guide: fork/branch workflow, monoworkstream lane rule, ES6/2-space code style, WCAG-AA and i18n checklists, pytest + PR process.",
     "status": "Living",
@@ -231,7 +231,7 @@
     "path": "docs/adr/0008-end-product-personal-ai-wrapper.md",
     "title": "ADR-0008: The end product is a personal AI wrapper — capabilities are Tools + Skills in the one loop",
     "category": "architecture",
-    "description": "ADR defining Keystone OS as a local-first personal AI cockpit; capabilities added as Tools+Skills not subsystems. Status Proposed, awaiting approval.",
+    "description": "ADR defining unisona.ai as a local-first personal AI cockpit; capabilities added as Tools+Skills not subsystems. Status Proposed, awaiting approval.",
     "status": "Draft",
     "updated": "2026-06-24",
     "grounding": "Partial",
@@ -267,7 +267,7 @@
     "path": "docs/adr/0011-proprietary-sigma0-base-model.md",
     "title": "ADR-0011: Own a proprietary Σ₀ base model",
     "category": "architecture",
-    "description": "Proposed (not approved): fork a PLT looped-coder into a Keystone-owned Σ₀ base, adapter-only, council+CSF native; staged, each stage gated on on-box evidence.",
+    "description": "Proposed (not approved): fork a PLT looped-coder into a unisona.ai-owned Σ₀ base, adapter-only, council+CSF native; staged, each stage gated on on-box evidence.",
     "status": "Draft",
     "updated": "2026-06-29",
     "grounding": "Partial",
@@ -385,7 +385,7 @@
   },
   {
     "path": "docs/ARCHITECTURE.md",
-    "title": "Keystone OS — Architecture (Current State)",
+    "title": "unisona.ai — Architecture (Current State)",
     "category": "architecture",
     "description": "Canonical current-state architecture snapshot with file:line evidence and an honest known-divergences section.",
     "status": "Living",
@@ -435,7 +435,7 @@
     "path": "docs/BENCHMARKS.md",
     "title": "BENCHMARKS — External Marks Registry",
     "category": "research",
-    "description": "Living registry of external benchmarks Keystone runs: HumanEval/MBPP Run, SWE-bench/LongMemEval Partial, ARC-AGI/HLE/OSWorld Planned, with evidence ledgers.",
+    "description": "Living registry of external benchmarks unisona.ai runs: HumanEval/MBPP Run, SWE-bench/LongMemEval Partial, ARC-AGI/HLE/OSWorld Planned, with evidence ledgers.",
     "status": "Living",
     "updated": "2026-06-30",
     "grounding": "Grounded",
@@ -517,7 +517,7 @@
   },
   {
     "path": "docs/CODEMAP.md",
-    "title": "Keystone OS — Codemap & Feature Roadmap",
+    "title": "unisona.ai — Codemap & Feature Roadmap",
     "category": "architecture",
     "description": "Historical: 2026-06 feature/status map; lists 6 personas (now removed), multi-provider chain live (now billing-dead), superseded by ARCHITECTURE.md.",
     "status": "Superseded",
@@ -573,7 +573,7 @@
     "grounding": "Ungrounded",
     "action": "keep",
     "mergeInto": "",
-    "reason": "Canonical immutable architecture spine; keep but prose calls product 'Lantern OS' (stale brand — now Keystone/unisona.ai)"
+    "reason": "Canonical immutable architecture spine; keep but prose calls product 'Lantern OS' (stale brand — now unisona.ai/unisona.ai)"
   },
   {
     "path": "docs/convergence-core-mapping.md",
@@ -709,7 +709,7 @@
   },
   {
     "path": "docs/CONVERGENCE-LOOP.md",
-    "title": "Keystone OS Convergence Loop",
+    "title": "unisona.ai Convergence Loop",
     "category": "guides",
     "description": "The 12-step operating/release-decision method for a convergence loop (inspect→map claims→validate→fix→promote/hold/reject), with promotion states.",
     "status": "Reference",
@@ -717,7 +717,7 @@
     "grounding": "Ungrounded",
     "action": "keep",
     "mergeInto": "",
-    "reason": "Stable procedural guide, correctly Keystone-branded; a maintained method doc (normal to be evidence-free)"
+    "reason": "Stable procedural guide, correctly unisona.ai-branded; a maintained method doc (normal to be evidence-free)"
   },
   {
     "path": "docs/convergence-router-deployment-guide.md",
@@ -985,9 +985,9 @@
   },
   {
     "path": "docs/csf-ingest-2026-06-16-issue-628-keystone-coder-sigma0.md",
-    "title": "Issue #628 — Keystone becomes the Σ₀ coding agent",
+    "title": "Issue #628 — unisona.ai becomes the Σ₀ coding agent",
     "category": "reports",
-    "description": "Historical convergence receipt for making Keystone the coding agent; superseded by later Ouro/Σ₀ coder work and predates the persona removal.",
+    "description": "Historical convergence receipt for making unisona.ai the coding agent; superseded by later Ouro/Σ₀ coder work and predates the persona removal.",
     "status": "Historical",
     "updated": "2026-06-16",
     "grounding": "Grounded",
@@ -1093,7 +1093,7 @@
   },
   {
     "path": "docs/DREAM-JOURNAL-QUICKSTART.md",
-    "title": "Keystone OS Dream Journal — Lightweight Deployment",
+    "title": "unisona.ai Dream Journal — Lightweight Deployment",
     "category": "setup",
     "description": "Quickstart for the standalone 229MB Dream Journal Docker image and its dream/chat API endpoints; mentions Grok interpretation which is no longer a live provider.",
     "status": "Reference",
@@ -1141,7 +1141,7 @@
   },
   {
     "path": "docs/fallout-radio-backlog.md",
-    "title": "Keystone Radio — Feature Backlog",
+    "title": "unisona.ai Radio — Feature Backlog",
     "category": "guides",
     "description": "Feature+backlog log for the fallout-radio.html jukebox: 273-track offline library, CRT UI, gitignored audio fetched via script.",
     "status": "Living",
@@ -1153,7 +1153,7 @@
   },
   {
     "path": "docs/FEATURE-TEST-SUMMARY-20260616.md",
-    "title": "Keystone Chat Feature Implementation & Test Summary",
+    "title": "unisona.ai Chat Feature Implementation & Test Summary",
     "category": "reports",
     "description": "Historical: 2026-06-16 one-off 'COMPLETE & TESTED / READY FOR PRODUCTION' session log for theme toggle, settings, PCSF signatures and Σ₀ routing; a point-in-time artifact.",
     "status": "Historical",
@@ -1249,7 +1249,7 @@
   },
   {
     "path": "docs/KEYSTONE-BRAND-GUIDELINES.md",
-    "title": "Keystone Chat — Brand Guidelines",
+    "title": "unisona.ai Chat — Brand Guidelines",
     "category": "guides",
     "description": "Brand, color-token, typography, component, and voice spec sourced from site.css; correctly retires 'Lantern OS' as user-facing.",
     "status": "Living",
@@ -1261,7 +1261,7 @@
   },
   {
     "path": "docs/KEYSTONE-COCKPIT.md",
-    "title": "Keystone Cockpit — the Human-in-the-Loop Spine",
+    "title": "unisona.ai Cockpit — the Human-in-the-Loop Spine",
     "category": "architecture",
     "description": "Built+tested spine for the personal-AI flow: editable approved/proposed Profile, ActionGate holding send/schedule/submit/spend, and smallest-useful-question surfacing.",
     "status": "Living",
@@ -1273,7 +1273,7 @@
   },
   {
     "path": "docs/KEYSTONE-IP-AND-BUILDOUT.md",
-    "title": "Keystone OS — IP Register & 2-Year Buildout Plan",
+    "title": "unisona.ai — IP Register & 2-Year Buildout Plan",
     "category": "architecture",
     "description": "Defensive-publication IP register + 8-quarter roadmap; honestly tags each invention [implemented]/[design]; most milestones planned.",
     "status": "Living",
@@ -1285,7 +1285,7 @@
   },
   {
     "path": "docs/KEYSTONE-LIMITATIONS.md",
-    "title": "Keystone — What It Can't Do (Yet)",
+    "title": "unisona.ai — What It Can't Do (Yet)",
     "category": "guides",
     "description": "Evidence-tagged audit of current limitations (no live web fetch default, loop not end-to-end in serving, autowork branch reuse, weak local kernel ~10% pass@1, 4 real skills).",
     "status": "Living",
@@ -1297,7 +1297,7 @@
   },
   {
     "path": "docs/KEYSTONE-MCP.md",
-    "title": "Keystone ↔ MCP / live project context",
+    "title": "unisona.ai ↔ MCP / live project context",
     "category": "setup",
     "description": "How keystone-context.js injects live repo state (open issues/PRs via gh, MCP tool inventory, branch) into the chat system prompt, provider-agnostically; context-injection not tool-calling.",
     "status": "Reference",
@@ -1309,7 +1309,7 @@
   },
   {
     "path": "docs/KEYSTONE-PRODUCT.md",
-    "title": "Keystone Chat — Product Definition & Operating Contract",
+    "title": "unisona.ai Chat — Product Definition & Operating Contract",
     "category": "guides",
     "description": "Product contract for the member-facing operator console: grounded, tool-wired, fast chat; includes the fast/deep Ouro serving decision and measured 3070 latency baseline. Some 'Lantern OS' phrasing.",
     "status": "Living",
@@ -1321,7 +1321,7 @@
   },
   {
     "path": "docs/KEYSTONE-PROGRESS-REPORT-2026-06-19.md",
-    "title": "Keystone Progress Report (2026-06-19)",
+    "title": "unisona.ai Progress Report (2026-06-19)",
     "category": "reports",
     "description": "Historical shareholder-style engineering progress snapshot for period ending 2026-06-19; evidence-tagged, superseded by later work.",
     "status": "Historical",
@@ -1333,7 +1333,7 @@
   },
   {
     "path": "docs/KEYSTONE-SIGMA0-SUSTAINED-WORK-DESIGN.md",
-    "title": "Keystone-Σ₀: Self-Converging Local Kernel + Chat Harness for Sustained Work",
+    "title": "unisona.ai-Σ₀: Self-Converging Local Kernel + Chat Harness for Sustained Work",
     "category": "research",
     "description": "Design for wiring depth/halt/surprise telemetry through serving→chat→autowork; honest about Stage-0 parity gap and refuted 'ahead' claims.",
     "status": "Draft",
@@ -1345,7 +1345,7 @@
   },
   {
     "path": "docs/keystone-test-fleet-plan.md",
-    "title": "Keystone Autonomous Test Fleet — Full Buildout Plan",
+    "title": "unisona.ai Autonomous Test Fleet — Full Buildout Plan",
     "category": "reports",
     "description": "Historical: 23-issue Playwright test-fleet buildout roadmap (#601-623) for autonomous QA; planning artifact, not current guide.",
     "status": "Historical",
@@ -1357,7 +1357,7 @@
   },
   {
     "path": "docs/keystone-test-fleet-summary.md",
-    "title": "Keystone Autonomous Test Fleet — Summary & Quick Start",
+    "title": "unisona.ai Autonomous Test Fleet — Summary & Quick Start",
     "category": "reports",
     "description": "Historical: quick-start summary of the 23-issue test-fleet roadmap; near-duplicate of the full buildout plan.",
     "status": "Duplicate",
@@ -1369,7 +1369,7 @@
   },
   {
     "path": "docs/KEYSTONE-UX-NORMIE-PLAN.md",
-    "title": "Keystone UX Simplification Plan — Make It Work for Normies",
+    "title": "unisona.ai UX Simplification Plan — Make It Work for Normies",
     "category": "guides",
     "description": "7-week plan to strip jargon and add onboarding/progressive-disclosure to chat; mostly aspirational checklist, references 7-provider dropdown that no longer reflects funded chain.",
     "status": "Draft",
@@ -1417,9 +1417,9 @@
   },
   {
     "path": "docs/lore/CAST.md",
-    "title": "Keystone OS — Canonical Character Cast",
+    "title": "unisona.ai — Canonical Character Cast",
     "category": "lore",
-    "description": "Canon visual+voice descriptions for the four mascot characters (Lantern, Blinkbug, Eclipse, Keystone); symbolic identity, not live personas.",
+    "description": "Canon visual+voice descriptions for the four mascot characters (Lantern, Blinkbug, Eclipse, unisona.ai); symbolic identity, not live personas.",
     "status": "Lore",
     "updated": "2026-06-29",
     "grounding": "Ungrounded",
@@ -1431,7 +1431,7 @@
     "path": "docs/mcp-client-setup.md",
     "title": "MCP Client Setup",
     "category": "setup",
-    "description": "Guide to connect ChatGPT, Claude Desktop, Grok, and Cursor to the Keystone MCP server via OAuth or Bearer token.",
+    "description": "Guide to connect ChatGPT, Claude Desktop, Grok, and Cursor to the unisona.ai MCP server via OAuth or Bearer token.",
     "status": "Reference",
     "updated": "2026-06-18",
     "grounding": "Ungrounded",
@@ -1441,7 +1441,7 @@
   },
   {
     "path": "docs/MCP-CONNECTOR.md",
-    "title": "Keystone OS MCP Connector",
+    "title": "unisona.ai MCP Connector",
     "category": "setup",
     "description": "Safety contract + verification runbook for the local-first MCP connector: evidence classes, held items, and a promotion gate before any agent trusts the surface.",
     "status": "Reference",
@@ -1479,7 +1479,7 @@
     "path": "docs/memory-recall-benchmark.md",
     "title": "Memory Recall Benchmark (LongMemEval) — methodology + how to run",
     "category": "reports",
-    "description": "Re-runnable harness measuring Keystone's live memory retrieval on LongMemEval vs Letta/Mem0/Zep; committed fixture is synthetic, real dataset gitignored, incumbents wired not run.",
+    "description": "Re-runnable harness measuring unisona.ai's live memory retrieval on LongMemEval vs Letta/Mem0/Zep; committed fixture is synthetic, real dataset gitignored, incumbents wired not run.",
     "status": "Reference",
     "updated": "2026-06-30",
     "grounding": "Partial",
@@ -1489,7 +1489,7 @@
   },
   {
     "path": "docs/MEMORY-RETRIEVAL.md",
-    "title": "How Keystone Remembers — The CSF Memory & Retrieval System",
+    "title": "How unisona.ai Remembers — The CSF Memory & Retrieval System",
     "category": "guides",
     "description": "Remember-stage guide: append-only JSONL + CSF memory, tiers, IDF-weighted retrieval, with a LongMemEval recall@5 benchmark table.",
     "status": "Living",
@@ -1633,7 +1633,7 @@
   },
   {
     "path": "docs/PRIVACY_GOVERNANCE.md",
-    "title": "Privacy Governance — Keystone OS",
+    "title": "Privacy Governance — unisona.ai",
     "category": "guides",
     "description": "Policy on never showcasing private/personal data; prohibited vs approved demo data, handling rules, and commit/CI enforcement.",
     "status": "Living",
@@ -1705,9 +1705,9 @@
   },
   {
     "path": "docs/research/2026-06-19-kernel-model-frontier.md",
-    "title": "Re-grounding the Keystone OS Kernel Model Question — Ouro LoopLM vs the 2026 Small-Model Frontier",
+    "title": "Re-grounding the unisona.ai Kernel Model Question — Ouro LoopLM vs the 2026 Small-Model Frontier",
     "category": "research",
-    "description": "Primary-source-verified benchmark plan comparing Ouro-1.4B LoopLM against the current small-model frontier on Keystone's own metrics.",
+    "description": "Primary-source-verified benchmark plan comparing Ouro-1.4B LoopLM against the current small-model frontier on unisona.ai's own metrics.",
     "status": "Living",
     "updated": "2026-06-21",
     "grounding": "Grounded",
@@ -1885,7 +1885,7 @@
   },
   {
     "path": "docs/research/2026-06-28-keystone-chat-frontier-stack.md",
-    "title": "Keystone Chat — Frontier Dev Stack (Research + Design)",
+    "title": "unisona.ai Chat — Frontier Dev Stack (Research + Design)",
     "category": "research",
     "description": "Proposed design: capability-gated local-first harness (Qwen-27B ≥24GB else Claude cloud); harness-is-product bet; not an accepted ADR.",
     "status": "Draft",
@@ -2053,7 +2053,7 @@
   },
   {
     "path": "docs/ROLLOVER.md",
-    "title": "Rollover — Staging the Keystone Kernel as Primary Coding Agent",
+    "title": "Rollover — Staging the unisona.ai Kernel as Primary Coding Agent",
     "category": "architecture",
     "description": "Staged, gated plan to move the coding agent from Claude to the local Ouro kernel; env-flag stages with measurable promotion gates.",
     "status": "Living",
@@ -2365,7 +2365,7 @@
   },
   {
     "path": "docs/SITEMAP.md",
-    "title": "Keystone OS Sitemap",
+    "title": "unisona.ai Sitemap",
     "category": "ops",
     "description": "Historical: page/API navigation map; lists removed RP personas, 'Orion Edition' status, Alpaca/IBKR trading and phase-complete claims that no longer match the app.",
     "status": "Historical",
@@ -2391,7 +2391,7 @@
     "path": "docs/SONS-PC-READINESS.md",
     "title": "Son's PC Readiness",
     "category": "setup",
-    "description": "Near-empty stub tracking a dual-boot deploy of Keystone OS on the son's PC; all checklist items unchecked, no real content.",
+    "description": "Near-empty stub tracking a dual-boot deploy of unisona.ai on the son's PC; all checklist items unchecked, no real content.",
     "status": "Draft",
     "updated": "2026-06-20",
     "grounding": "Ungrounded",
@@ -2617,7 +2617,7 @@
   },
   {
     "path": "docs/V1-READINESS-GATES.md",
-    "title": "Keystone OS v1.0.0 Readiness Gates",
+    "title": "unisona.ai v1.0.0 Readiness Gates",
     "category": "ops",
     "description": "Nine gates (repo cleanliness, honesty, loop evidence, owner approval) that define v1.0.0 as a gate not a date; still a valid release-readiness rubric.",
     "status": "Reference",
@@ -2737,7 +2737,7 @@
   },
   {
     "path": "KEYSTONE.md",
-    "title": "Keystone: Complete LLM Integration for Keystone OS",
+    "title": "unisona.ai: Complete LLM Integration for unisona.ai",
     "category": "setup",
     "description": "Aspirational: claims all 10 providers wired into live task-aware fallback chains + auto-retirement; only Gemini/Vertex is actually funded today.",
     "status": "Historical",
@@ -2929,7 +2929,7 @@
   },
   {
     "path": "PROVIDERS.md",
-    "title": "Keystone OS — AI Provider Chain Documentation",
+    "title": "unisona.ai — AI Provider Chain Documentation",
     "category": "setup",
     "description": "Provider inventory, keys, PCSF-backed routing and decode/serving params; provider status table stale (marks Anthropic/OpenAI/xAI active when only Gemini is funded).",
     "status": "Reference",
@@ -2941,7 +2941,7 @@
   },
   {
     "path": "SCRIPTS.md",
-    "title": "Keystone OS — Script Inventory",
+    "title": "unisona.ai — Script Inventory",
     "category": "guides",
     "description": "Reference index of runnable scripts (startup, Discord bot, orchestrator, tests, tunnels); some entries may lag current script set.",
     "status": "Reference",
@@ -2965,7 +2965,7 @@
   },
   {
     "path": "SKILLS.md",
-    "title": "Keystone OS Skills & Capabilities",
+    "title": "unisona.ai Skills & Capabilities",
     "category": "guides",
     "description": "Reference for live skills, agent personas, and provider chain; persona table and provider-status column are stale.",
     "status": "Reference",
@@ -2979,7 +2979,7 @@
     "path": "THIRD-PARTY-NOTICES.md",
     "title": "Third-Party Notices",
     "category": "ops",
-    "description": "License-attribution registry for third-party code ported into Keystone (currently Aider repo-map clean-room); permissive-only porting policy.",
+    "description": "License-attribution registry for third-party code ported into unisona.ai (currently Aider repo-map clean-room); permissive-only porting policy.",
     "status": "Living",
     "updated": "2026-06-30",
     "grounding": "Grounded",
@@ -3001,7 +3001,7 @@
   },
   {
     "path": "UX_STANDARDS.md",
-    "title": "Keystone OS — UX & Wording Standards",
+    "title": "unisona.ai — UX & Wording Standards",
     "category": "guides",
     "description": "UX and wording standards for all pages: spacing/typography/color tokens, tone, section-naming, WCAG-AA contrast checklist. Some 'Lantern' example copy is stale.",
     "status": "Reference",

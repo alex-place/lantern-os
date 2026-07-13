@@ -7,7 +7,7 @@ updated: 2026-07-03
 # Architecture Decision Records (ADRs)
 
 This directory holds the **canonical, append-only log of architectural decisions** for
-Keystone OS. An ADR captures *one* decision: the context that forced it, the choice made,
+unisona.ai. An ADR captures *one* decision: the context that forced it, the choice made,
 its status, and the consequences we accept by making it.
 
 ADRs are how we keep architectural knowledge from scattering across ~120 ad-hoc docs and
@@ -74,7 +74,7 @@ against the *merged* master, not your branch's base.
 | [0007](0007-monoworkstream-one-pr-lane-per-agent.md) | Monoworkstream — one PR lane per agent | Accepted (Alex Place, 2026-07-02) |
 | [0008](0008-end-product-personal-ai-wrapper.md) | End product is a personal AI wrapper — capabilities are Tools + Skills | Accepted (Alex Place, 2026-07-02) |
 | [0009](0009-one-routing-contract-cloud-primary-coding.md) | One routing contract — cloud-primary coding | Accepted (Alex Place, 2026-06-28) |
-| [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Accepted (Alex Place, 2026-07-02) |
+| [0010](0010-verify-gated-continual-learning-last-resort.md) | Distillation is a deferred last resort — verify-gated, benchmark-never-the-target | Proposed |
 | [0011](0011-proprietary-sigma0-base-model.md) | Own a proprietary Σ₀ base model — fork PLT, adapter-only weights, council + CSF native | Accepted (Alex Place, 2026-07-04) |
 | [0012](0012-nested-adaptive-reason.md) | Nested adaptive Reason — Q-exit (within-model) x fidelity escalation (cross-model) | Accepted (Alex Place, 2026-07-02) |
 | [0013](0013-subsystem-register-one-loop-gate.md) | Subsystem register + one-loop gate — every surface names a loop stage or is scheduled for extraction | Accepted (Alex Place, 2026-07-02) |

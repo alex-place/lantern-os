@@ -69,7 +69,7 @@ ok("healthy varied reply → below threshold", () => {
   const text = [
     "The Convergence Core is a local-first reasoning system that remembers, reasons, acts, and verifies.",
     "It stores experience in append-only logs and improves via retrieval, not weight modification.",
-    "The primary interface is dream-chat.html where you can talk to Keystone directly.",
+    "The primary interface is dream-chat.html where you can talk to unisona.ai directly.",
     "External grounding ensures nothing is accepted without evidence from web or codebase sources.",
   ].join(" ");
   const { proximity } = scoreReplyCollapse(text);
@@ -91,7 +91,7 @@ ok("observe: short text → collapse axis does not trip, proximity 0", () => {
 });
 
 ok("observe: healthy reply → collapse axis does not trip", () => {
-  const text = "Keystone OS is a persistent local-first reasoning system. It uses a convergence loop: " +
+  const text = "unisona.ai is a persistent local-first reasoning system. It uses a convergence loop: " +
     "Observe, Remember, Reason, Act, Verify. The system never fabricates evidence and always " +
     "grounds claims against observable reality. The dream journal is the primary user interface.";
   const r = runCanaries(text, { emit: false, context: { agent: "keystone", provider: "anthropic" } });

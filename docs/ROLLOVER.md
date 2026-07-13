@@ -1,8 +1,8 @@
-# ROLLOVER.md — staging the Keystone kernel as the primary coding agent
+# ROLLOVER.md — staging the unisona.ai kernel as the primary coding agent
 
 > Epic: [#892](https://github.com/alex-place/lantern-os/issues/892). This doc is the
 > staged plan and **measurable exit criteria** for moving the primary coding agent
-> from Claude (cloud) to the in-house Keystone/Ouro kernel — and for the final step
+> from Claude (cloud) to the in-house unisona.ai/Ouro kernel — and for the final step
 > of dropping the Claude default. It documents behavior that already exists in code;
 > it does not propose a new subsystem.
 
@@ -18,9 +18,9 @@ recorded.
 | Stage | `KEYSTONE_ROLLOVER_MODE` | Who answers the kernel path | Claude's role | Advance requires |
 |---|---|---|---|---|
 | **0 — Shadow** | `shadow` (default/unset) | Claude only | Primary | Kernel components built + the Σ₀-K1 gates that don't need a live run (A, D, E) green |
-| **1 — Assist** | `default` | Keystone/Ouro **first**, Claude fallback | Fallback | Gate **B** PASS (accuracy > 0.34 cold floor) **and** Gate **F** PASS (bytes-per-correct not worse than baseline) at stage `assist` |
-| **2 — Default** | `default` | Keystone/Ouro first, Claude last-resort | Last-resort | Gate B/F PASS at stage `default` **and** escalation rate < Y% over N landed items (see §4) |
-| **3 — Independent** | `default` (+ key removed) | Keystone/Ouro | Opt-in only | Stage-3 exit criteria (§4) — the only point at which the `ANTHROPIC_API_KEY` default is removed |
+| **1 — Assist** | `default` | unisona.ai/Ouro **first**, Claude fallback | Fallback | Gate **B** PASS (accuracy > 0.34 cold floor) **and** Gate **F** PASS (bytes-per-correct not worse than baseline) at stage `assist` |
+| **2 — Default** | `default` | unisona.ai/Ouro first, Claude last-resort | Last-resort | Gate B/F PASS at stage `default` **and** escalation rate < Y% over N landed items (see §4) |
+| **3 — Independent** | `default` (+ key removed) | unisona.ai/Ouro | Opt-in only | Stage-3 exit criteria (§4) — the only point at which the `ANTHROPIC_API_KEY` default is removed |
 
 Stages are driven by a single env var, so a stage is a **config change, not a
 deploy**, and rolling *back* is the same one-line change.
@@ -78,7 +78,7 @@ consecutive rollover stages** at `KEYSTONE_ROLLOVER_MODE=default`:
 3. **Autonomy:** Claude **escalation rate < Y%** (default Y = 10%) of landed work
    items — i.e. the kernel finished the work itself ≥ 90% of the time. Escalations
    are recorded as convergence events (#897) so this rate is computed from real data,
-   and the Keystone-vs-Claude landed-work share is the rollover dashboard (#898).
+   and the unisona.ai-vs-Claude landed-work share is the rollover dashboard (#898).
 
 Until all three hold, `anthropic` stays in the chain as fallback.
 

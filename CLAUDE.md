@@ -89,7 +89,7 @@ Reject architectural sprawl. Prefer extension over addition. Maintain a single C
 
 ## Project Overview
 
-Keystone OS is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
+unisona.ai is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
 
 ## Quickstart (Read QUICKSTART.md First)
 
@@ -217,7 +217,7 @@ Key runtime components:
 | `kalshi-api.js` | Kalshi REST client (auth, order placement, market data) |
 | `kalshi-collector.js` | 6s polling loop; 429 backoff with `Retry-After`; exposes `getStatus()` |
 | `kalshi-suggest.js` | Tight-band entry suggestion engine |
-| `convergence-router.js` | Deterministic routing cache — 120 Keystone routes, >70% hit rate |
+| `convergence-router.js` | Deterministic routing cache — 120 unisona.ai routes, >70% hit rate |
 | `trading-history-logger.js` | Trade/signal history JSONL persistence |
 
 Live data flow: `kalshi-collector` → server snapshot → UI polls `/api/trading/kalshi/decisive-deck` (no UI-direct Kalshi calls).
@@ -261,7 +261,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 
 `pytest.ini` sets `pythonpath = apps src` so tests can import from both trees without install.
 
-## Keystone Testing Charter
+## unisona.ai Testing Charter
 
 **Autonomous test agent** using Agentic QE principles for continuous self-improvement.
 
@@ -297,7 +297,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 ### Triggering Autonomous Tests
 **In dream-chat.html:**
 - Type: `"test the app"` or `"scan for issues"` or `"audit the system"`
-- Keystone agent will autonomously:
+- unisona.ai agent will autonomously:
   1. **Observe**: Fetch list of issues needing validation
   2. **Research**: Analyze codebase for test coverage gaps
   3. **Reason**: Generate test plan using Playwright scenarios
@@ -349,11 +349,13 @@ use `scripts/eval_humaneval_chat.py`.
 
 ## Per-Lane Workstream Rule (Critical)
 
-Each **lane** may keep up to **`WORKSTREAM_MAX_OPEN_PRS` open PRs at once** (default
-**3**), so one user or agent can run several concurrent sessions in parallel. All lanes
-run concurrently. The lane key is the branch's **first path segment**: agent prefixes are
-fixed lanes, every other prefix is a **dynamic human lane** named after that prefix. Set
-`WORKSTREAM_MAX_OPEN_PRS=1` to restore the old one-PR-per-lane behaviour.
+**There is no per-lane open-PR cap.** Every lane may keep any number of concurrent open
+PRs, so a user or agent can run as many parallel sessions as they like. All lanes run
+concurrently. The lane key is still the branch's **first path segment** (used for
+attribution and lane grouping, not for a limit): agent prefixes are fixed lanes, every
+other prefix is a **dynamic human lane** named after that prefix. Merge-time
+serialisation is handled by the single in-process merger (`pr-watcher.js`), which lands
+one green + reviewed PR per tick.
 
 | Branch prefix | Lane | Kind |
 |---|---|---|
@@ -375,19 +377,25 @@ more than three) humans can work at once. `alex/`, `kriskin/`, `mookman11/` no l
 block each other.
 
 Rules:
-- A lane is blocked from opening a **new** PR only once it already has `WORKSTREAM_MAX_OPEN_PRS` open (default 3); below that, concurrent session-branches are allowed
-- Commits/pushes to a branch **that already has an open PR** are always allowed
+- No open-PR cap — a lane may open as many concurrent PRs as it wants (the old
+  `WORKSTREAM_MAX_OPEN_PRS` cap and the CI "Single-workstream check" gate were removed)
+- Commits/pushes to any lane branch are always allowed
 - `gh-pages`, `master`, `dev` are exempt
 - Direct push to master is blocked — open a PR, or: `OVERRIDE_MERGE=1 git push origin master`
 - Slop commit messages (empty, < 8 chars, "wip", "placeholder", "temp", etc.) are blocked
 
-**Assigned-issue merge gate:** a PR that closes a **human-assigned** issue cannot
-auto-merge into `master` until it carries **both** a convergence record (`!convergance`)
-and autowork verification (`!work`/`!autowork`) — surfaced as the `convergance-record` +
-`autowork-verified` labels, or the fleet host's `data/autowork-runs/*.jsonl` evidence. A
-successful autowork run satisfies both. Enforced by the single merger
-(`apps/lantern-garage/lib/pr-watcher.js`); held with `needs_convergance_record:#N` /
-`needs_autowork_verification:#N`.
+**Auto-merge:** the single in-process merger (`apps/lantern-garage/lib/pr-watcher.js`)
+auto-merges a PR once it is **green (all CI checks pass)**, **conflict-free**, **not a
+draft**, and its **fleet auto-review returned `VERDICT: APPROVE`** — except PRs touching
+a **protected path** (auth / money / `.github/workflows/` / secrets / migrations), which
+still need a human. Auto-merge is ON by default on the designated fleet host
+(`PR_WATCHER_ENABLED=1`); set `PR_WATCHER_AUTOMERGE=0` to review-only.
+
+**Assigned-issue convergence gate (now OFF by default):** the former requirement that a
+PR closing a **human-assigned** issue carry a convergence record (`convergance-record`) +
+autowork verification (`autowork-verified`) before merging is **no longer applied** — it
+was removed as a routine blocker so green PRs land. The logic is retained and
+re-enable-able per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
 
 Hooks are **repo-managed**: `core.hooksPath` points git at the tracked
 `scripts/hooks/` directory, so every clone runs the same pre-commit / commit-msg /

@@ -136,7 +136,7 @@ ai trader/
 
 ---
 
-## Keystone OS Integration Strategy
+## unisona.ai Integration Strategy
 
 ### Option 1: **Native Bounded Module** (Recommended)
 

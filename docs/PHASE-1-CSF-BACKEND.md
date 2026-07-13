@@ -27,7 +27,7 @@ Replaced JSON-based Three-Doors Kingdome persistence with CSF v07 binary format.
 - `ThreeDoorsGameState` — In-memory state model
 - Load/save via CSF v07 with JSON backup
 - 7-stage journey: garden→present→future→xp→xenon→sigil→fog
-- Agent filtering: Lantern/Blinkbug/Keystone/Waterfall/Xenon/Founder
+- Agent filtering: Lantern/Blinkbug/unisona.ai/Waterfall/Xenon/Founder
 - Consolidation: Pattern extraction at loop boundary
 
 **apps/lantern-garage/routes/dream.js**

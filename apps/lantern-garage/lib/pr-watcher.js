@@ -1,7 +1,7 @@
 /**
  * PR Watcher — polls open GitHub PRs every 60s.
  * After a PR has been idle for IDLE_MS (default 3min), pulls the diff + body,
- * sends to Keystone chat for review, and posts the result as a PR comment.
+ * sends to unisona.ai chat for review, and posts the result as a PR comment.
  *
  * Reviews are keyed to the PR's HEAD COMMIT SHA: each commit is reviewed at most
  * once. This is deliberate — posting a comment bumps the PR's `updatedAt`, so a
@@ -85,13 +85,19 @@ const DEFAULT_PROTECTED_PATHS = [
 ];
 
 class PrWatcher {
-  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeIgnorePatterns = null, mergeProtectedPaths = null, baseRef = "master", requireChecks = true } = {}) {
+  constructor({ repoRoot, port = 4177, idleMs = IDLE_MS, autoMerge = false, mergeIgnoreChecks = null, mergeIgnorePatterns = null, mergeProtectedPaths = null, baseRef = "master", requireChecks = true, assignedIssueGate = false } = {}) {
     this.repoRoot = repoRoot;
     this.port = port;
     this.idleMs = idleMs;
     // Auto-merge: actually land reviewed + green + conflict-free PRs (one per tick).
     // Off by default; the watcher only reviewed before. Enable per-host.
     this.autoMerge = autoMerge;
+    // Assigned-issue convergence gate: when true, a PR closing a HUMAN-ASSIGNED issue
+    // must also carry a convergence record + autowork verification before it lands.
+    // OFF by default — the merge bar is green CI + a review APPROVE. The gate logic and
+    // its helpers remain (unit-tested, re-enable-able) but are not applied unless this
+    // flag is set, so green + reviewed PRs land without the extra step.
+    this.assignedIssueGate = assignedIssueGate;
     this.baseRef = baseRef;
     // Require CI to have actually RUN and passed before merging. Without this, a PR
     // with an EMPTY status-check rollup (no workflow ran, or every check was on the
@@ -428,7 +434,9 @@ class PrWatcher {
       // Stale head — a push landed since we last polled; let the next tick re-review.
       if (pv.headRefOid && pv.headRefOid !== entry.headSha) continue;
 
-      const gate = await this._assignedIssueGate(pv);
+      // Assigned-issue convergence gate is OFF by default (green + review-APPROVE is
+      // the merge bar). Only compute + apply it when explicitly re-enabled per-host.
+      const gate = this.assignedIssueGate ? await this._assignedIssueGate(pv) : null;
       const decision = this._shouldMerge(pv, entry, now, baseIgnore, gate);
       if (!decision.merge) {
         if (decision.reason.startsWith("needs_")) {
@@ -658,7 +666,7 @@ class PrWatcher {
         message,
         user: "pr-watcher",
         conversationId: "pr-review-fleet",
-        // The route reads `agent` (not `forceAgent`) → keep the Keystone reviewer persona.
+        // The route reads `agent` (not `forceAgent`) → keep the unisona.ai reviewer persona.
         agent: "keystone",
         // Pin a working provider. The default (no provider) path classifies a diff-bearing
         // review as "coding" and routes to the local Σ₀ coder / preferred provider, which on

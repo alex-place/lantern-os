@@ -1,6 +1,6 @@
 "use strict";
 
-// Keystone coding-backend control plane (first slice of the OSS-BASELINE thesis).
+// unisona.ai coding-backend control plane (first slice of the OSS-BASELINE thesis).
 //
 // The blank space the OSS audit found in EVERY layer: mature coding agents (Aider,
 // OpenHands, opencode, …) are stateless per-repo executors — they apply+commit

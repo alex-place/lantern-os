@@ -2,7 +2,7 @@
 
 **Status:** Living standard · **Owner:** Alex Place · **Last updated:** 2026-06-29
 
-How we review the backlog, label issues, and triage PRs in Keystone OS. The goal is a backlog that is **honest, prioritised, and small** — every open item is real, scored, and tied to the one loop (Observe → Remember → Reason → Act → Verify → Converge). This doc adapts mainstream GitHub triage practice to the Σ₀ North Star.
+How we review the backlog, label issues, and triage PRs in unisona.ai. The goal is a backlog that is **honest, prioritised, and small** — every open item is real, scored, and tied to the one loop (Observe → Remember → Reason → Act → Verify → Converge). This doc adapts mainstream GitHub triage practice to the Σ₀ North Star.
 
 > **Σ₀ tie-in.** The backlog is itself a Convergence object. Reviewing it *is* the Converge stage applied to our own work: reject sprawl, demand evidence, keep one source of truth. An issue with no loop-stage and no evidence is not a task — it is noise.
 
@@ -119,7 +119,7 @@ A PR is reviewed on four components: **title, description, diff, metadata** (lab
 - **Small and single-purpose.** Large multi-concern PRs get sent back to split.
 - **Links its issue** (`Closes #N`) so merge auto-closes the work.
 - **Draft = not-ready-but-open-for-feedback.** In this repo, the fleet opens DRAFT PRs; a draft is *work-in-progress*, not a merge candidate.
-- **Triage rule (Keystone-specific):** fleet **DRAFT** slop with no real diff → **close**, don't merge. `pr-watcher.js` auto-merges only **READY** PRs that pass the verdict gate. Conflicts are almost always CHANGELOG/`package.json` bumps.
+- **Triage rule (unisona.ai-specific):** fleet **DRAFT** slop with no real diff → **close**, don't merge. `pr-watcher.js` auto-merges only **READY** PRs that pass the verdict gate. Conflicts are almost always CHANGELOG/`package.json` bumps.
 - **Per-agent lane rule:** one open PR lane per agent prefix (`claude/`, `gemini/`, …). Don't open a second lane branch until the first merges.
 - **Stale PRs:** if a branch has rotted against `origin/master` or duplicates landed work, close it with a reason rather than letting it linger.
 - **Merge method:** squash by default; commits on an open PR branch ride the squash.

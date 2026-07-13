@@ -37,12 +37,12 @@ def fixture_paths(tmp_path):
     records = [
         # Will pass -> high confidence -> should become a pattern.
         {"id": "rec-pass", "hypothesis": "passing claim", "evidence_ids": ["m1", "m2"],
-         "result": "ok", "confidence": 0.8, "reasoner": "Keystone",
+         "result": "ok", "confidence": 0.8, "reasoner": "unisona.ai",
          "timestamp": "2026-06-16T04:59:31.053Z", "verified": False,
          "verification_notes": None},
         # Will fail -> collapsed confidence -> excluded from patterns.
         {"id": "rec-fail", "hypothesis": "failing claim", "evidence_ids": ["m3"],
-         "result": "bad", "confidence": 0.8, "reasoner": "Keystone",
+         "result": "bad", "confidence": 0.8, "reasoner": "unisona.ai",
          "timestamp": "2026-06-16T04:59:32.602Z", "verified": False,
          "verification_notes": None},
         # High NIS surprise -> collapsed confidence.
@@ -139,5 +139,5 @@ def test_high_confidence_verified_record_appears_in_patterns(fixture_paths):
     assert {p["record_id"] for p in on_disk} == pattern_ids
     pat = next(p for p in on_disk if p["record_id"] == "rec-pass")
     assert pat["evidence_count"] == 2
-    assert pat["reasoner"] == "Keystone"
+    assert pat["reasoner"] == "unisona.ai"
     assert pat["success_rate"] == pytest.approx(0.9)

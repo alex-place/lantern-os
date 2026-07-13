@@ -71,17 +71,55 @@ def get_recent():
     })
 
 
-@dream_bp.route('/mirror/<int:dream_id>', methods=['GET'])
+def _build_mirror_prompt(entry):
+    """Compose a reflective mirror prompt from the ACTUAL dream entry — its
+    narrative, recorded symbols, and emotions — rather than a fixed string."""
+    content = (entry.get("content") or "").strip()
+    symbols = entry.get("tags") or []
+    emotions = entry.get("emotions") or []
+
+    parts = []
+    if content:
+        snippet = content[:240] + ("…" if len(content) > 240 else "")
+        parts.append(f'In your dream you wrote: "{snippet}"')
+    else:
+        parts.append("This dream has no recorded narrative yet.")
+    if symbols:
+        parts.append(
+            "Sit with these recurring symbols: "
+            + ", ".join(str(s) for s in symbols[:6]) + "."
+        )
+    if emotions:
+        parts.append(
+            "You felt "
+            + ", ".join(str(e) for e in emotions[:6])
+            + " — where in waking life does that feeling live?"
+        )
+    parts.append(
+        "What is this dream asking you to notice, and what pattern connects it to "
+        "your recent dreams?"
+    )
+    return " ".join(parts)
+
+
+@dream_bp.route('/mirror/<dream_id>', methods=['GET'])
 def get_mirror(dream_id):
-    """Generate a mirror prompt for a dream entry."""
+    """Generate a mirror prompt from the real dream entry (#2097)."""
     journal = _get_journal()
     if not journal:
         return jsonify({"error": "cognitive_layer_unavailable"}), 503
 
-    # Placeholder: return character status as mirror context
+    entry = journal.get_entry(dream_id)
+    if not entry:
+        return jsonify({"error": "dream_not_found", "dream_id": dream_id}), 404
+
+    content = entry.get("content") or ""
     return jsonify({
-        "dream_id": dream_id,
-        "prompt": "Reflect on the symbols and emotions in this dream. What patterns recur?",
+        "dream_id": entry.get("id"),
+        "prompt": _build_mirror_prompt(entry),
+        "content_preview": content[:160],
+        "symbols": entry.get("tags") or [],
+        "emotions": entry.get("emotions") or [],
         "characters": journal.character_status(),
     })
 

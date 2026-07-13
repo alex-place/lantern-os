@@ -203,7 +203,7 @@ def build_row(pr: dict, diff: str, issue_cache: dict, with_issue_body: bool = Fa
     if len(intent) < 12:  # a title with no context is a weak instruction
         return None
 
-    where = f"the {repo} repository" if repo else "the Keystone OS repository"
+    where = f"the {repo} repository" if repo else "the unisona.ai repository"
     instruction = (
         f"You are a coding agent working in {where}. "
         "Implement the following change and return a unified diff.\n\n" + intent

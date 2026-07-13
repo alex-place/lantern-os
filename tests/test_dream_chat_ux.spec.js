@@ -1,5 +1,5 @@
 /**
- * Dream Chat UX Playwright tests — dream-chat.html (the primary Keystone OS chat)
+ * Dream Chat UX Playwright tests — dream-chat.html (the primary unisona.ai chat)
  *
  * Drives the real chat surface as a user would:
  *   - page load, starter chips, input + send affordances
@@ -28,10 +28,10 @@ const FALLBACK_RE = /No AI providers are set up|All providers offline|Connection
 
 // The happy-path SSE script: route → 2 tokens → done (with routeLabel + cleanText).
 const HAPPY_STREAM = [
-  { type: "route", label: "Keystone · auto" },
+  { type: "route", label: "unisona.ai · auto" },
   { type: "token", text: "Hello " },
-  { type: "token", text: "from Keystone." },
-  { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "Hello from Keystone." },
+  { type: "token", text: "from unisona.ai." },
+  { type: "done", source: "claude", routeLabel: "unisona.ai · Claude", cleanText: "Hello from unisona.ai." },
 ];
 
 /**
@@ -50,10 +50,10 @@ async function mockDreamChat(page, cfg = {}) {
     window.__chatRequests = [];
     window.__convRequests = [];
     const events = (cfg.streamEvents || [
-      { type: "route", label: "Keystone · auto" },
+      { type: "route", label: "unisona.ai · auto" },
       { type: "token", text: "Hello " },
-      { type: "token", text: "from Keystone." },
-      { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "Hello from Keystone." },
+      { type: "token", text: "from unisona.ai." },
+      { type: "done", source: "claude", routeLabel: "unisona.ai · Claude", cleanText: "Hello from unisona.ai." },
     ]);
 
     window.fetch = async (input, init) => {
@@ -106,20 +106,20 @@ async function send(page, text) {
 const lastAgent = (page) => page.locator(".message.agent").last();
 
 test.describe("Dream Chat — page load", () => {
-  test("loads with the Keystone OS title", async ({ page }) => {
+  test("loads with the unisona.ai title", async ({ page }) => {
     await page.goto(PAGE);
-    await expect(page).toHaveTitle(/Dream Chat|Keystone OS/i);
+    await expect(page).toHaveTitle(/Dream Chat|unisona.ai/i);
   });
 
-  test("nav brand reads Keystone OS", async ({ page }) => {
+  test("nav brand reads unisona.ai", async ({ page }) => {
     await page.goto(PAGE);
-    await expect(page.locator(".nav-brand")).toContainText("Keystone OS");
+    await expect(page.locator(".nav-brand")).toContainText("unisona.ai");
   });
 
-  test("empty state shows the Keystone Desk welcome", async ({ page }) => {
+  test("empty state shows the unisona.ai Desk welcome", async ({ page }) => {
     await page.goto(PAGE);
     await expect(page.locator("#empty-state")).toBeVisible();
-    await expect(page.locator("#empty-state")).toContainText("Keystone Desk");
+    await expect(page.locator("#empty-state")).toContainText("unisona.ai Desk");
   });
 
   test("renders six starter chips", async ({ page }) => {
@@ -182,7 +182,7 @@ test.describe("Dream Chat — streaming render", () => {
   test("streamed tokens render in the agent bubble (regression: thinking ReferenceError)", async ({ page }) => {
     await page.goto(PAGE);
     await send(page, "stream tokens");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     await expect(lastAgent(page)).not.toHaveClass(/error/);
     await expect(lastAgent(page)).not.toContainText(FALLBACK_RE);
   });
@@ -206,27 +206,27 @@ test.describe("Dream Chat — streaming render", () => {
   test("the thinking mandala is removed once tokens arrive", async ({ page }) => {
     await page.goto(PAGE);
     await send(page, "no spinner left behind");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     await expect(page.locator(".thinking-mandala")).toHaveCount(0);
   });
 
   test("route signature is shown when the done event carries a routeLabel", async ({ page }) => {
     await page.goto(PAGE);
     await send(page, "show route");
-    await expect(page.locator(".msg-route-sig").last()).toContainText("Keystone · Claude", { timeout: 8000 });
+    await expect(page.locator(".msg-route-sig").last()).toContainText("unisona.ai · Claude", { timeout: 8000 });
   });
 
   test("send button re-enables after the stream completes", async ({ page }) => {
     await page.goto(PAGE);
     await send(page, "re-enable me");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     await expect(page.locator("#send-btn")).toBeEnabled();
   });
 
   test("two sequential sends produce two user and two agent bubbles", async ({ page }) => {
     await page.goto(PAGE);
     await send(page, "first message");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     await send(page, "second message");
     await expect(page.locator(".message.user")).toHaveCount(2);
     await expect(page.locator(".message.agent")).toHaveCount(2);
@@ -286,9 +286,9 @@ test.describe("Dream Chat — local command routing", () => {
     // /api/convergence/agent POST path is no longer called by the client.
     await mockDreamChat(page, {
       streamEvents: [
-        { type: "route", label: "Keystone · auto" },
+        { type: "route", label: "unisona.ai · auto" },
         { type: "token", text: "Top issue: fix the streaming bug." },
-        { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "Top issue: fix the streaming bug." },
+        { type: "done", source: "claude", routeLabel: "unisona.ai · Claude", cleanText: "Top issue: fix the streaming bug." },
       ],
     });
     await page.goto(PAGE);
@@ -303,14 +303,14 @@ test.describe("Dream Chat — local command routing", () => {
     // old /api/convergence/agent direct POST endpoint.
     await mockDreamChat(page, {
       streamEvents: [
-        { type: "route", label: "Keystone · auto" },
-        { type: "token", text: "The router caches 120 Keystone routes." },
-        { type: "done", source: "claude", routeLabel: "Keystone · Claude", cleanText: "The router caches 120 Keystone routes." },
+        { type: "route", label: "unisona.ai · auto" },
+        { type: "token", text: "The router caches 120 unisona.ai routes." },
+        { type: "done", source: "claude", routeLabel: "unisona.ai · Claude", cleanText: "The router caches 120 unisona.ai routes." },
       ],
     });
     await page.goto(PAGE);
     await send(page, "!ask explain the convergence router");
-    await expect(lastAgent(page)).toContainText("120 Keystone routes", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("120 unisona.ai routes", { timeout: 8000 });
     expect(await page.evaluate(() => window.__chatRequests.length)).toBe(1);
     expect(await page.evaluate(() => window.__convRequests.length)).toBe(0);
   });
@@ -350,7 +350,7 @@ test.describe("Dream Chat — settings, sessions, new chat", () => {
     await mockDreamChat(page);
     await page.goto(PAGE);
     await send(page, "this should be cleared");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     await page.click("#new-chat-btn");
     await expect(page.locator(".message")).toHaveCount(0);
     await expect(page.locator("#empty-state")).toBeVisible();
@@ -367,7 +367,7 @@ test.describe("Dream Chat — provider selection & responsive", () => {
     await page.selectOption("#provider-select", "ollama");
     await page.locator("#settings-modal .modal-close").click();
     await send(page, "use the local loop please");
-    await expect(lastAgent(page)).toContainText("Hello from Keystone.", { timeout: 8000 });
+    await expect(lastAgent(page)).toContainText("Hello from unisona.ai.", { timeout: 8000 });
     expect(await page.evaluate(() => window.__chatRequests[0].provider)).toBe("ollama");
   });
 

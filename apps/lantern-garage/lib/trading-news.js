@@ -67,6 +67,20 @@ function scoreDirection(headline) {
   return { direction, direction_score };
 }
 
+// One-line NL narration for a news event (#2354). See _narrateOrder in
+// trading-memory.js for the rationale — a prose gloss makes the event a
+// first-class, relevance-gated memory instead of an unretrievable JSON blob.
+function _narrateNews(item, dir, sentiment) {
+  const headline = item.headline || item.title || "";
+  const source = item.source || "";
+  const impact = item.impact || 0;
+  const direction = (dir && dir.direction) || "neutral";
+  let text = `News [${direction}]: ${headline || "(no headline)"}`;
+  if (source) text += ` — ${source}`;
+  text += ` (impact ${impact}, ${sentiment})`;
+  return text;
+}
+
 function _csfEntityRecord(item, memoryId) {
   const now = _now();
   const sentiment = _impactToSentiment(item.impact || 0);
@@ -82,6 +96,9 @@ function _csfEntityRecord(item, memoryId) {
     created_at: item.published || now,
     updated_at: now,
     content: {
+      // #2354 — NL gloss so the news event is retrievable prose in the shared CSF
+      // recall path (csf-memory.js scores/embeds content.text), not a bare JSON blob.
+      text: _narrateNews(item, dir, sentiment),
       news_id: item.id || memoryId,
       headline: item.headline || item.title || "",
       source: item.source || "",
@@ -294,4 +311,5 @@ module.exports = {
   queryNewsTradeRelations,
   scoreDirection,
   symbolSentiment,
+  _narrateNews,
 };

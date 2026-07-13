@@ -6,5 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+# systemd oneshots start with an empty environment — without HOME, the script's
+# `git config --global` (and any git that reads ~/.gitconfig) dies with
+# "fatal: $HOME not set" (exit 128), which froze the box at v1.8.0 (2026-07-10).
+Environment=HOME=/root
 # Live copy runs from /usr/local/bin so a tag checkout can't remove it mid-run.
 ExecStart=/usr/local/bin/lantern-release-deploy.sh

@@ -1,5 +1,5 @@
 /**
- * Keystone route tests for the Dream Journal debug/operator path.
+ * unisona.ai route tests for the Dream Journal debug/operator path.
  * Runs against a live lantern-garage server.
  */
 
@@ -55,7 +55,7 @@ async function test(name, fn) {
 }
 
 async function run() {
-  console.log("\nDream Journal Keystone Tests\n");
+  console.log("\nDream Journal unisona.ai Tests\n");
 
   console.log("GET /api/keystone/status");
 
