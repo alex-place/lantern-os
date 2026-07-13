@@ -128,6 +128,23 @@ function armHybrid(lexMap, denseMap, alpha) {
   return out;
 }
 
+// ── Reciprocal Rank Fusion (#2389) ─────────────────────────────────────────────────
+// Fuse the base retrieval arms by RANK, not score: each doc scores Σ_arm 1/(k + rank_arm),
+// k=60 (Cormack et al. 2009, "Reciprocal Rank Fusion outperforms Condorcet…"). Score-free
+// fusion sidesteps the min-max normalization the hybrid arm needs, so a single arm's
+// score scale can't dominate. A doc with no positive evidence in an arm contributes 0 from
+// that arm (consistent with rankGold's non-positive = not-retrieved guard), so RRF can't
+// reward a doc an arm never actually surfaced. Returns a Map<docId, fusedScore>.
+const RRF_K = 60;
+function armRRF(scoreMaps, k = RRF_K) {
+  const fused = new Map();
+  for (const sm of scoreMaps) {
+    const ranked = [...sm.entries()].filter(([, s]) => s > 0).sort((a, b) => b[1] - a[1]);
+    ranked.forEach(([id], i) => fused.set(id, (fused.get(id) || 0) + 1 / (k + i + 1)));
+  }
+  return fused;
+}
+
 // ── ranking + metrics ─────────────────────────────────────────────────────────────
 // Honest 1-based rank of the gold doc. Two guards against inflated recall:
 //  (1) a non-positive score = no retrieval evidence → Infinity (not "found by luck").
@@ -220,6 +237,9 @@ async function main() {
   const arms = ["lexical-idf", "bm25-okapi"];
   if (ollamaUp) arms.push("nomic-dense", `hybrid-a${ALPHA}`);
   if (ollamaUp && RERANKER_ENDPOINT) arms.push("hybrid+rerank");
+  // RRF fuses the BASE retrieval arms (lexical-idf, bm25-okapi, + nomic-dense when up) —
+  // not the hybrid/rerank arms, which are themselves fusions. Always runs (≥2 base arms).
+  arms.push("rrf");
 
   // Per-arm aggregates: overall + 3 overlap bands.
   const overall = {}, byBand = {};
@@ -239,6 +259,7 @@ async function main() {
     const lex = armLexicalIdf(corpus, q.query, dfInfo);
     const b25 = armBm25(corpus, q.query, bm);
     const ranks = { "lexical-idf": rankGold(lex, q.gold_id), "bm25-okapi": rankGold(b25, q.gold_id) };
+    const rrfArms = [lex, b25]; // base arms to fuse; dense joins below when Ollama is up
 
     if (ollamaUp) {
       const qv = await embedText(q.query);
@@ -246,6 +267,7 @@ async function main() {
       const hybrid = armHybrid(lex, dense, ALPHA);
       ranks["nomic-dense"] = rankGold(dense, q.gold_id);
       ranks[`hybrid-a${ALPHA}`] = rankGold(hybrid, q.gold_id);
+      rrfArms.push(dense);
       if (RERANKER_ENDPOINT) {
         // Rerank the top-20 hybrid candidates.
         const top = [...hybrid.entries()].sort((a, b) => b[1] - a[1]).slice(0, 20)
@@ -254,6 +276,7 @@ async function main() {
         ranks["hybrid+rerank"] = rr ? rankGold(rr, q.gold_id) : Infinity;
       }
     }
+    ranks["rrf"] = rankGold(armRRF(rrfArms), q.gold_id);
     for (const a of arms) { accumulate(overall[a], ranks[a]); accumulate(byBand[a][band], ranks[a]); }
   }
 
@@ -281,6 +304,28 @@ async function main() {
     console.log([a.padEnd(16), fmtBand(byBand[a].low), fmtBand(byBand[a].mid), fmtBand(byBand[a].high)].join(""));
   }
 
+  // oracle-band-best — DIAGNOSTIC CEILING, NOT a deployable arm. Per band, the best SINGLE
+  // base arm's R@5 (an oracle that already knows which arm wins each band). It bounds what any
+  // real per-query router could reach and shows how much of RRF's lift is just "pick the right
+  // arm per band." Never ship this or quote it as an achievable number.
+  const singleArms = arms.filter((a) => a !== "rrf" && a !== "hybrid+rerank" && !a.startsWith("hybrid-a"));
+  const oracleBandBest = {};
+  for (const band of ["low", "mid", "high"]) {
+    let best = null;
+    for (const a of singleArms) {
+      if (!byBand[a][band].n) continue;
+      const r5 = finalize(byBand[a][band])["R@5"];
+      if (best === null || r5 > best.r5) best = { arm: a, r5 };
+    }
+    oracleBandBest[band] = best;
+  }
+  console.log(`\n## oracle-band-best (DIAGNOSTIC CEILING — not deployable) — R@5`);
+  console.log(["".padEnd(16), "low".padStart(13), "mid".padStart(13), "high".padStart(13)].join(""));
+  console.log(["best-arm R@5".padEnd(16),
+    ...["low", "mid", "high"].map((b) => (oracleBandBest[b] ? oracleBandBest[b].r5.toFixed(3) : "n/a").padStart(13))].join(""));
+  console.log(["(which arm)".padEnd(16),
+    ...["low", "mid", "high"].map((b) => (oracleBandBest[b] ? oracleBandBest[b].arm : "n/a").padStart(13))].join(""));
+
   if (skipped.length) {
     console.log("\n## Skipped arms (NOT silently dropped)");
     for (const s of skipped) console.log("  - " + s);
@@ -292,7 +337,9 @@ async function main() {
     corpus: usingFixture ? "fixture" : corpusPath,
     corpusDocs: corpus.length, queries: queries.length, alpha: ALPHA,
     ollama: ollamaUp, reranker: !!RERANKER_ENDPOINT,
-    arms: rows, byBandR5: bandRows, skipped,
+    arms: rows, byBandR5: bandRows, rrfK: RRF_K,
+    oracleBandBestR5: oracleBandBest, // DIAGNOSTIC CEILING, not deployable (see report note)
+    skipped,
   };
   const runsLog = runsLogPath();
   fs.mkdirSync(path.dirname(runsLog), { recursive: true });
@@ -304,5 +351,5 @@ async function main() {
 if (require.main === module) {
   main().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); });
 } else {
-  module.exports = { main, lexicalOverlap, armBm25, buildBm25, armLexicalIdf, armHybrid, rankGold };
+  module.exports = { main, lexicalOverlap, armBm25, buildBm25, armLexicalIdf, armHybrid, armRRF, rankGold };
 }
