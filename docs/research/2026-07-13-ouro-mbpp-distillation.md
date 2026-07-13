@@ -27,8 +27,22 @@ training rows. 900 tasks → **734 verified rows** (82% teacher pass rate).
 | distilled candidate | 0.200 (8/40) | **16** | 15 |
 
 Δ = −0.05 < margin 0.03 → **rejected**; the live `final/` adapter is untouched (Convergence
-Record in `data/eval/ouro-promotion-log.jsonl`). The n=40 gap is within noise, so the honest
-read is **no improvement**.
+Record in `data/eval/ouro-promotion-log.jsonl`).
+
+**Paired-diff significance** (`scripts/eval_paired_diff.py` on the per-problem detail files):
+B−A **+0.05**, SEM 0.101, **95% CI [−0.148, +0.248]**, sign-test **p=0.80**, **24/40 ties**
+(9 incumbent-wins, 7 candidate-wins) → **NOT significant**. Candidate and incumbent are
+statistically indistinguishable; the −0.05 is noise.
+
+### The binding constraint is the eval, not the training
+
+At n=40 the pass@1 CI is **±0.20** — the eval physically cannot resolve the sub-5% change a
+single distillation pass could plausibly buy, and a decisive n≈400 is ~13 h at Ouro's ~2 min/
+problem. So **blind on-box HumanEval-gated training iteration is not productive on this box** —
+every candidate near the incumbent lands inside the same noise band. The productive moves are
+(a) a **faster eval** (batched decode / shorter budget) to shrink the CI, or (b) a **big-enough
+lever** (a much larger verified HumanEval-style teacher corpus) that clears ±0.20 in one shot —
+not more small warm-start touch-ups the eval can't score.
 
 ## The actionable insight
 
