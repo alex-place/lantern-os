@@ -16,18 +16,35 @@
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
 const { roleLevel } = require("./role-hierarchy");
 
-// Patreon tier → role (campaign "Dream Journal By Lantern OS"). Kept here so all
-// provider-specific role logic lives in the registry.
-const PATREON_TIER_TO_ROLE = {
-  "28764312": "supporter", // Wanderer ($5)
-  "28740619": "deep_dreamer", // Deep Dreamer ($20)
-  "28764307": "admin", // Synthesasia Guild ($200)
+// Patreon tier → role by PLEDGE AMOUNT, not campaign-specific tier IDs. The old
+// numeric tier IDs were bound to a single campaign ("Dream Journal by Lantern OS"),
+// so moving to a new campaign (patreon.com/cw/UnisonaAI) silently broke gating —
+// the new campaign's tiers have different IDs. Gating by the dollar amount the
+// member is entitled to ($5 / $20 / $200) is campaign-agnostic: any campaign that
+// keeps the same price points maps correctly with zero code changes. `fetchUser`
+// already requests `amount_cents`; we now use it. Thresholds are env-overridable
+// (cents) so a re-pricing is a config change, not a code change.
+const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+const TIER_CENTS = {
+  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5  Wanderer
+  deep_dreamer: num(process.env.PATREON_DEEP_DREAMER_CENTS, 2000), // $20 (trading unlock)
+  admin: num(process.env.PATREON_ADMIN_CENTS, 20000), // $200 top tier
 };
 
+/** Highest role earned by the max pledge amount (cents) the member is entitled to. */
+function roleForAmountCents(maxCents) {
+  if (maxCents >= TIER_CENTS.admin) return "admin";
+  if (maxCents >= TIER_CENTS.deep_dreamer) return "deep_dreamer";
+  if (maxCents >= TIER_CENTS.supporter) return "supporter";
+  return null;
+}
+
 // Per-provider admin overrides, keyed by "<provider>:<providerId>". The Patreon
-// owner id retains admin regardless of tier (was OWNER_IDS in patreon-auth.js).
+// OWNER's user id retains admin regardless of tier. This is account-bound (the
+// person's Patreon user id), NOT campaign-bound — so a move to a new Patreon
+// ACCOUNT changes it. Set it via LANTERN_ADMIN_IDS (comma-separated Patreon user
+// ids); the previous hardcoded owner id belonged to the old account and is dropped.
 const ADMIN_OVERRIDES = new Set([
-  "patreon:49294581",
   ...String(process.env.LANTERN_ADMIN_IDS || "")
     .split(",")
     .map((s) => s.trim())
@@ -35,7 +52,13 @@ const ADMIN_OVERRIDES = new Set([
 ]);
 
 function isAdminOverride(provider, providerId) {
-  return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
+  // Accept both an explicit "provider:id" entry and a bare "id" entry in
+  // LANTERN_ADMIN_IDS, so setting the owner is just their Patreon user id
+  // (e.g. LANTERN_ADMIN_IDS=12345678) without needing the "patreon:" prefix.
+  return (
+    ADMIN_OVERRIDES.has(`${provider}:${providerId}`) ||
+    ADMIN_OVERRIDES.has(String(providerId))
+  );
 }
 
 /**
@@ -138,9 +161,18 @@ const PROVIDERS = {
       if (!r.ok) throw new Error(`Patreon userinfo failed: ${r.status} ${await r.text()}`);
       const j = await r.json();
       const { data, included } = j;
-      const membership = (included || []).find((x) => x.type === "member");
+      const inc = included || [];
+      const membership = inc.find((x) => x.type === "member");
       const tierIds =
         membership?.relationships?.currently_entitled_tiers?.data?.map((t) => t.id) || [];
+      // Resolve each entitled tier's pledge amount from the included `tier` objects
+      // (fetched via fields[tier]=title,amount_cents) so role gating keys off dollars,
+      // not campaign-specific tier ids.
+      const tierAttrsById = {};
+      for (const x of inc) if (x.type === "tier") tierAttrsById[x.id] = x.attributes || {};
+      const entitledAmountsCents = tierIds
+        .map((id) => Number(tierAttrsById[id]?.amount_cents))
+        .filter((n) => Number.isFinite(n));
       return {
         providerId: data.id,
         email: data.attributes.email || null,
@@ -148,13 +180,17 @@ const PROVIDERS = {
         name: data.attributes.full_name || "",
         avatar: null,
         tier: tierIds[0] || null,
-        memberships: tierIds,
+        memberships: tierIds, // tier ids (kept for storage/back-compat)
+        entitledAmountsCents, // pledge amounts (cents) — the role source of truth
       };
     },
     mapRole(user) {
-      for (const tierId of user.memberships || []) {
-        if (PATREON_TIER_TO_ROLE[tierId]) return PATREON_TIER_TO_ROLE[tierId];
-      }
+      const amounts = (user.entitledAmountsCents || []).filter((n) => Number.isFinite(n));
+      const maxCents = amounts.length ? Math.max(...amounts) : 0;
+      const byAmount = roleForAmountCents(maxCents);
+      if (byAmount) return byAmount;
+      // Entitled to a membership but below the lowest priced tier (or amount missing) —
+      // treat any active membership as at least a supporter, else free tier.
       return (user.memberships || []).length > 0 ? "supporter" : "guest";
     },
   },
@@ -202,5 +238,6 @@ module.exports = {
   isAdminOverride,
   profileHasAdminOverride,
   listEnabledProviders,
-  PATREON_TIER_TO_ROLE,
+  TIER_CENTS,
+  roleForAmountCents,
 };

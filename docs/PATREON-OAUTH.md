@@ -60,19 +60,26 @@ The server will now:
 
 ## Role Mapping
 
-Patreon tiers are mapped to Lantern roles automatically based on tier IDs. The mapping is defined in `apps/lantern-garage/lib/patreon-auth.js`:
+Patreon tiers are mapped to roles by **pledge amount** (not campaign-specific tier IDs),
+so moving to a new campaign — e.g. `patreon.com/cw/UnisonaAI` — never breaks gating. The
+mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmountCents`):
 
-| Tier Name | Tier ID | Lantern Role | Access |
-|-----------|---------|--------------|--------|
-| Free | (not a member) | `guest` | Public pages only |
-| Wanderer | 28764312 | `supporter` | Chat + features |
-| Deep Dreamer | 28740619 | `founder` | All features |
-| Synthesasia Guild | 28764307 | `admin` | Admin tools |
+| Tier (default price) | Lantern Role | Access |
+|-----------|--------------|--------|
+| Free (not a member) | `guest` | Public pages only |
+| $5 / Wanderer | `supporter` | Chat + features |
+| $20 / Deep Dreamer | `deep_dreamer` | All features + trading unlock |
+| $200 / top tier | `admin` | Admin tools |
 
-To customize tier mapping:
-1. Edit `TIER_TO_ROLE` in `apps/lantern-garage/lib/patreon-auth.js`
-2. Get tier IDs from your Patreon campaign settings → Tier management
-3. Restart the server
+Notes:
+- **Any pledge ≥ the threshold** earns the role (so custom pledges above a tier still map
+  up); a member below the lowest price still resolves to `supporter`.
+- **Re-pricing?** Override the thresholds (in cents) without code changes:
+  `PATREON_SUPPORTER_CENTS`, `PATREON_DEEP_DREAMER_CENTS`, `PATREON_ADMIN_CENTS`.
+- **Owner admin** is account-bound, not tier-bound: set `LANTERN_ADMIN_IDS` to the campaign
+  owner's Patreon **user id** (numeric, from `/api/oauth2/v2/identity` while logged in as the
+  owner). This changes when you move to a new Patreon account.
+- Restart the server after changing any of these.
 
 ## API Endpoints
 
