@@ -219,5 +219,36 @@ check("#2322 faithful summary of pasted source scores grounded (no false red)", 
   assert.strictEqual(ok.ungrounded, false, `with anchor it clears threshold, risk=${ok.risk}`);
 });
 
+// #2322 (generate-from-source) — a "make a quiz / questions / flashcards FROM this passage"
+// turn is also closed-context: the output is derived from the pasted source, so it must anchor
+// on it too. Requires BOTH a generate intent AND source deixis ("this/the passage/…"), so an
+// open-world "write a quiz about WW2" stays unanchored.
+const QUIZ_PASTED =
+  "Create a 20-question multiple-choice quiz based on this passage: The water cycle describes " +
+  "how water moves through Earth's systems. Water evaporates from oceans and lakes, condenses " +
+  "into clouds, falls as precipitation, and flows back to the sea through rivers and groundwater. " +
+  "Evaporation is driven by solar energy; condensation forms clouds; precipitation returns water " +
+  "to the surface; runoff and infiltration route it back to the oceans to begin the cycle again.";
+const QUIZ_REPLY =
+  "1. What drives evaporation in the water cycle? A) Wind B) Solar energy C) Gravity D) Pressure — Answer: B. " +
+  "2. What process forms clouds? A) Condensation B) Runoff C) Infiltration D) Precipitation — Answer: A. " +
+  "3. How does precipitation return water to the surface? A) Evaporation B) Rain and snow C) Condensation D) Groundwater — Answer: B. " +
+  "4. What routes water back to the oceans? A) Clouds B) Rivers and groundwater C) Solar energy D) Evaporation — Answer: B.";
+check("#2322 quiz-from-passage: generate intent + source deixis + substantial source is recognized", () => {
+  assert.ok(providedSourceGrounding(QUIZ_PASTED).length > 0, "quiz built from a pasted passage anchors on it");
+});
+check("#2322 open-world quiz (no pasted source) is NOT anchored", () => {
+  assert.strictEqual(providedSourceGrounding("make a 10-question quiz about the water cycle"), "", "no source deixis / no paste → external");
+  // deixis but no substantial source stays below the length floor
+  assert.strictEqual(providedSourceGrounding("quiz me on this"), "", "deixis but no pasted source → not anchored");
+});
+check("#2322 quiz derived from pasted passage scores grounded (no false seam_open)", () => {
+  const red = scoreReplyGroundedness(QUIZ_REPLY, { groundingContext: "" });
+  const ok = scoreReplyGroundedness(QUIZ_REPLY, { groundingContext: providedSourceGrounding(QUIZ_PASTED) });
+  assert.strictEqual(red.ungrounded, true, `without anchor the quiz reads red, risk=${red.risk}`);
+  assert.strictEqual(ok.anchored, true, "quiz anchors on the pasted passage");
+  assert.strictEqual(ok.ungrounded, false, `with anchor it clears threshold, risk=${ok.risk}`);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall groundedness-canary checks passed");

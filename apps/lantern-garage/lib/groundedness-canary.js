@@ -137,22 +137,32 @@ function contextUsage(text, ctx) {
   return Math.min(1, hits / ctxTerms.size / USAGE_TARGET);
 }
 
-// #2322 — a "summarize / rewrite / translate THIS provided text" turn is grounded in the
-// source the user pasted inline, NOT in web/KB/repo. Without recognising that, a faithful
-// summary scores as confident-and-unanchored (the 42-state) and the Σ₀ council returns red
-// (seam_open) — a false negative that alarms users on a normal "summarize this" turn. When
-// the user's message is a transform intent AND carries substantial inline source, that source
-// IS the anchor: return it so the caller folds it into groundingContext for the canaries/
-// council only (it never changes the model prompt — the model already has the text). A bare
-// knowledge question ("summarize the French Revolution") has no pasted source, stays below the
-// length floor, and is correctly left to external grounding.
+// #2322 — a closed-context turn is grounded in the source the user pasted inline, NOT in
+// web/KB/repo. Two families qualify:
+//   • TRANSFORM  — "summarize / rewrite / translate THIS text" (output restates the source)
+//   • GENERATE   — "make a quiz / questions / flashcards / outline FROM this passage" (output
+//                  is derived from, and must be faithful to, the source)
+// Without recognising this, a faithful summary OR a quiz built from the passage scores as
+// confident-and-unanchored (the 42-state) and the Σ₀ council returns red/seam_open — a false
+// negative that alarms users on a normal "summarize this" / "quiz me on this" turn. When the
+// user's message is such an intent AND carries substantial inline source, that source IS the
+// anchor: return it so the caller folds it into groundingContext for the canaries/council only
+// (it never changes the model prompt — the model already has the text). A bare knowledge
+// question ("summarize the French Revolution", "quiz me on WW2") has no pasted source, stays
+// below the length floor, and is correctly left to external grounding.
 const TRANSFORM_INTENT = /\b(summar(?:ize|ise|y|ising|izing)|tl;?dr|condense|shorten|abridge|recap|rewrite|re-?write|rephrase|reword|paraphrase|translate|proofread|key points|main points|bullet points)\b/i;
+// Generate-FROM-source intents. Paired below with an explicit "this/the following/above/…"
+// deixis so an open-world "write a quiz about the French Revolution" (no pasted source) is NOT
+// treated as anchored — only "quiz on THIS passage / the text below" is.
+const GENERATE_INTENT = /\b(quiz|questions?|multiple[-\s]?choice|flash\s?cards?|test|exam|worksheet|study guide|outline|notes|glossary|flashcard|q&a|q ?and ?a)\b/i;
+const SOURCE_DEIXIS = /\b(this|these|the following|below|above|provided|attached|pasted|the (?:passage|text|transcript|article|excerpt|document|email|conversation|notes|content|paragraph|chapter))\b/i;
 const PROVIDED_SOURCE_MIN_CHARS = 400;
 function providedSourceGrounding(message) {
   const m = String(message || "");
   if (m.length < PROVIDED_SOURCE_MIN_CHARS) return "";   // no substantial pasted source
-  if (!TRANSFORM_INTENT.test(m)) return "";              // not a transform-of-provided-text turn
-  return m;                                              // the pasted source IS the anchor
+  if (TRANSFORM_INTENT.test(m)) return m;                // summarize/rewrite/translate THIS text
+  if (GENERATE_INTENT.test(m) && SOURCE_DEIXIS.test(m)) return m; // quiz/questions FROM this text
+  return "";                                             // not a closed-context provided-text turn
 }
 
 /**
