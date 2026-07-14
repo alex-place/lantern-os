@@ -42,6 +42,7 @@
     "test:mcp-msg": "node test/chat-mcp-message.test.js",
     "test:finnhub-gate": "node test/finnhub-legal-gate.test.js",
     "test:trade-gate": "node test/kalshi-fees-ev.test.js",
+    "test:portfolio": "node test/portfolio-analytics.test.js",
     "test:grounded": "node test/kalshi-grounded.test.js",
     "test:verify-llm": "node test/verify-llm.test.js",
     "test:hooks": "node test/git-hooks-repo-managed.test.js",
