@@ -117,6 +117,14 @@ function needsGrounding(message) {
     /\b(define|explain|compare|difference between)\b/,
     /\?(\s|$)/,                   // ends with question mark
     /\b(weather|stock|price|cost|rate|score|status of)\b/,
+    // #2193 — sports / stats / entity-lookup domains. A bare lookup like "Brandon Singer
+    // PGA" or "LeBron James stats" carries no question word, so it fell through and the
+    // model answered from memory (hedging or asking the user to clarify) instead of
+    // searching. These domain words are strong "go look this up" signals: player/team
+    // stats, rankings, schedules, and rosters are exactly the current-facts the model
+    // should not improvise. (Kept domain-specific so ordinary prose isn't over-grounded.)
+    /\b(pga|lpga|nba|wnba|nfl|mlb|nhl|mls|atp|wta|fifa|uefa|ncaa|f1|formula 1|olympics?|premier league|la liga)\b/,
+    /\b(stats|statistics|standings?|rankings?|leaderboard|roster|lineup|schedule|scores?|box score|batting|scoring average|handicap|world ranking)\b/,
   ];
   return needsPatterns.some((p) => p.test(lower));
 }
