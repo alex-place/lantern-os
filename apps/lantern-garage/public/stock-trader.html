@@ -3521,6 +3521,30 @@ function _sortedWlPrices(){
   return wlPrices;
 }
 
+// ── Live candle ticking (Robinhood-style) ─────────────────────────────────────
+// Bars refresh from the server every 15s, but prices poll every 3s — splice each
+// price tick into the IN-PROGRESS bar so the last candle moves live: close tracks
+// the tick, high/low stretch when exceeded, and a fresh bar opens when the clock
+// crosses a bar boundary. Server bars remain the truth — each loadBars() replaces
+// the whole array, so synthesis only ever fills the 15s gap (no fabricated data:
+// same feed, finer cadence). Feed gaps >1 bar are left alone rather than invented.
+const _TF_MS = { '1m':6e4, '5m':3e5, '15m':9e5, '1h':36e5, '4h':144e5, '1d':864e5 };
+function _tickLastBar(tk, px){
+  const bars = barsData[tk];
+  const dur = _TF_MS[chartTimeframe];
+  if(!bars || !bars.length || !(px>0) || !dur) return;      // 1w/1mo: no live synthesis
+  const last = bars[bars.length-1];
+  const t0 = +new Date(last.timestamp);
+  const now = Date.now();
+  if(now < t0 + dur){                                        // tick belongs to the open bar
+    if(px > last.high) last.high = px;
+    if(px < last.low)  last.low  = px;
+    last.close = px;
+  } else if(now < t0 + 2*dur){                               // boundary crossed → open the next bar
+    bars.push({ timestamp:new Date(t0+dur).toISOString(), open:px, high:px, low:px, close:px, volume:0 });
+  }                                                          // older gap → wait for real server bars
+}
+
 async function loadWatchlistPrices(){
   if(pricesLoading) return;
   pricesLoading = true;
@@ -3547,6 +3571,7 @@ async function loadWatchlistPrices(){
         }
         _lastCardPrice[t.ticker] = t.price;
       }
+      _tickLastBar(t.ticker, t.price);   // live candle: splice the tick into the open bar
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
     });
     updateRegimeBadges();
