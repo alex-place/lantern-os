@@ -809,6 +809,13 @@
     <option value="5Y">5Y</option>
     <option value="All">All</option>
   </select>
+  <span class="hgroup-sep" aria-hidden="true"></span>
+  <select id="drawToolSel" class="chart-ctrl" aria-label="Drawing tools" onchange="setDrawTool(this.value)" title="Draw on charts — click to place; alt-click a drawing to delete; Esc to stop. Persists per symbol.">
+    <option value="">✏ Draw</option>
+    <option value="h">─ Level</option>
+    <option value="l">╱ Trend</option>
+    <option value="clear">🗑 Clear symbol</option>
+  </select>
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
@@ -852,12 +859,14 @@
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
+    <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
     <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -1044,6 +1053,12 @@
         <div class="ot-info-row"><span>Tick size</span><span>$0.01</span></div>
         <div class="ot-info-row"><span>Tick value</span><span id="otTickValue">$0.00</span></div>
         <div class="ot-info-row"><span>Trade value</span><span id="otTradeValue">$0.00</span></div>
+      </div>
+
+      <!-- #2445: rapid mode — explicit opt-in; skips confirms + arms Shift+B/S -->
+      <div class="ot-exit-head" style="margin-top:2px">
+        <input type="checkbox" id="otRapid" aria-label="Rapid mode — skip order confirmations" onchange="setRapidMode(this.checked)">
+        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">⚡ Rapid mode — no confirms</span>
       </div>
 
       <div class="ot-submit" id="otSubmit" onclick="submitOrderTicket()">Buy 1 — MARKET</div>
@@ -1616,6 +1631,32 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = dc;
       ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI*2); ctx.fill();
+    }
+    // ── User drawings (#2444): purple levels + trendlines, per-symbol persisted.
+    {
+      const tk = _canvasTicker(canvas);
+      const list = (tk && _drawings[tk]) || [];
+      if(list.length || (_drawPending && _drawPending.tk===tk)){
+        const ts0=+new Date(bars[0].timestamp), ts1=+new Date(bars[n-1].timestamp)||ts0+1;
+        const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
+        ctx.lineWidth=1.2;
+        for(const d of list){
+          ctx.strokeStyle='#a78bfa';
+          if(d.t==='h'){
+            const yy=y(d.price);
+            ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(pw,yy); ctx.stroke();
+            ctx.fillStyle='#a78bfa'; ctx.font='9px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign='right'; ctx.textBaseline='bottom';
+            ctx.fillText('$'+d.price, pw-3, yy-2);
+          } else if(d.t==='l'){
+            ctx.beginPath(); ctx.moveTo(xOf(d.aTs), y(d.aPrice)); ctx.lineTo(xOf(d.bTs), y(d.bPrice)); ctx.stroke();
+          }
+        }
+        if(_drawPending && _drawPending.tk===tk){   // first trendline point: anchor dot
+          ctx.fillStyle='#a78bfa';
+          ctx.beginPath(); ctx.arc(xOf(_drawPending.ts), y(_drawPending.price), 3, 0, Math.PI*2); ctx.fill();
+        }
+      }
     }
     ctx.restore();
   }
@@ -2403,6 +2444,144 @@ function renderOrderTicket(){
   submit.className = 'ot-submit ' + otSide;
 }
 
+// ── Drawing tools (#2444) — price levels + trendlines, persisted per symbol ──
+// ✏ Draw select arms a tool: Level = one click places a horizontal line at that
+// price; Trend = two clicks make a segment. Alt-click near a drawing deletes it
+// (armed or not). Esc disarms. Stored in localStorage, rendered inside
+// renderChart so drawings survive zoom/pan/timeframe/theme changes.
+const _drawings=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.drawings')||'{}'); }catch(e){ return {}; } })();
+function _saveDrawings(){ try{ localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); }catch(e){} }
+let _drawTool='', _drawPending=null;   // pending = first click of a trendline
+function setDrawTool(v){
+  if(v==='clear'){
+    const tk=fullscreenTicker||activeTicker;
+    if(tk && _drawings[tk] && _drawings[tk].length && confirm(`Remove all ${_drawings[tk].length} drawing(s) on ${tk}?`)){
+      delete _drawings[tk]; _saveDrawings(); renderTicker(tk);
+    }
+    v='';
+  }
+  _drawTool=v; _drawPending=null;
+  const s=document.getElementById('drawToolSel'); if(s) s.value=v;
+}
+function _canvasTicker(canvas){ return canvas.id==='chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/,''); }
+// Delete the drawing nearest the click (within 9px), in the same pixel space it renders in.
+function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph){
+  const list=_drawings[tk]||[]; if(!list.length) return false;
+  const rng=data.rMax-data.rMin; if(rng<=0) return false;
+  const yOf=p=>((data.rMax-p)/rng)*ph;
+  const n=data.bars.length, slotW=pw/n;
+  const ts0=+new Date(data.bars[0].timestamp), ts1=+new Date(data.bars[n-1].timestamp)||ts0+1;
+  const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
+  const segDist=(px,py,x1,y1,x2,y2)=>{ const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy||1;
+    const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/L2));
+    return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); };
+  let best=-1, bestD=9;
+  list.forEach((d,i)=>{
+    const dist = d.t==='h' ? Math.abs(yOf(d.price)-yPx)
+      : segDist(xPx,yPx,xOf(d.aTs),yOf(d.aPrice),xOf(d.bTs),yOf(d.bPrice));
+    if(dist<bestD){ bestD=dist; best=i; }
+  });
+  if(best<0) return false;
+  list.splice(best,1); if(!list.length) delete _drawings[tk];
+  _saveDrawings(); return true;
+}
+// Capture-phase so an armed tool wins over the card's own click-to-focus.
+document.addEventListener('click', e=>{
+  if(!_drawTool && !e.altKey) return;
+  const lad=e.target.closest('.zone-ladder'); if(!lad) return;
+  const canvas=lad.querySelector('.chart-canvas'); if(!canvas) return;
+  const data=_crossData[canvas.id]; if(!data||!data.bars||!data.bars.length) return;
+  const rect=canvas.getBoundingClientRect();
+  const xPx=e.clientX-rect.left, yPx=e.clientY-rect.top;
+  const pw=Math.max(0, canvas.clientWidth-AXIS_W), ph=Math.max(0, canvas.clientHeight-AXIS_H);
+  if(xPx>pw||yPx>ph) return;                                  // axis strips: hands off
+  const tk=_canvasTicker(canvas); if(!tk) return;
+  const price=data.rMax-(yPx/ph)*(data.rMax-data.rMin);
+  const n=data.bars.length, slotW=pw/n;
+  const idx=Math.max(0,Math.min(n-1,Math.round(xPx/slotW-0.5)));
+  const ts=+new Date(data.bars[idx].timestamp);
+  if(e.altKey){                                               // delete (works with tool off)
+    if(_deleteNearestDrawing(tk,data,xPx,yPx,pw,ph)){ e.stopPropagation(); e.preventDefault(); renderTicker(tk); }
+    return;
+  }
+  e.stopPropagation(); e.preventDefault();
+  if(_drawTool==='h'){
+    (_drawings[tk]=_drawings[tk]||[]).push({t:'h', price:+price.toFixed(4)});
+    _saveDrawings();
+  } else if(_drawTool==='l'){
+    if(!_drawPending || _drawPending.tk!==tk){ _drawPending={tk, ts, price:+price.toFixed(4)}; }
+    else {
+      (_drawings[tk]=_drawings[tk]||[]).push({t:'l', aTs:_drawPending.ts, aPrice:_drawPending.price, bTs:ts, bPrice:+price.toFixed(4)});
+      _drawPending=null; _saveDrawings();
+    }
+  }
+  renderTicker(tk);
+}, true);
+
+// ── Trade journal auto-tag (#2446) ────────────────────────────────────────────
+// Every order placed from THIS device gets a context snapshot at the moment of
+// placement: signal direction+confidence, detected pattern, RVOL, session phase.
+// Post-session review is the human Converge stage. localStorage, capped at 500.
+const _journal=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.journal')||'[]'); }catch(e){ return []; } })();
+function journalLog(o){
+  try{
+    const d=zonesData[o.symbol]||{}, sig=d.last_signal||{};
+    const reg=(typeof marketRegime==='function' ? marketRegime(o.symbol) : {})||{};
+    _journal.unshift({
+      ts:new Date().toISOString(),
+      symbol:o.symbol, side:o.side, qty:o.qty, type:o.type||'market', source:o.source||'ticket',
+      price:getCurrentPrice(o.symbol)||null,
+      signal:(d.direction||sig.direction||'')+(d.confidence||sig.confidence?(' '+(d.confidence||sig.confidence)+'%'):''),
+      pattern:sig.candle||'',
+      rvol:reg.volumeRatio?+reg.volumeRatio.toFixed(2):null,
+      session:(document.getElementById('mktClockLabel')||{}).textContent||'',
+    });
+    if(_journal.length>500) _journal.length=500;
+    localStorage.setItem('trader.journal', JSON.stringify(_journal));
+  }catch(e){}
+}
+function renderJournal(){
+  const el=document.getElementById('tp-journal'); if(!el) return;
+  if(!_journal.length){ el.innerHTML='<div class="tp-empty">No trades journaled on this device yet — place an order and its signal context is captured automatically.</div>'; return; }
+  el.innerHTML = `<table class="tp-table"><thead><tr>
+    <th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Px</th><th>Signal</th><th>Pattern</th><th>RVOL</th><th>Session</th><th>Via</th></tr></thead><tbody>`+
+    _journal.map(j=>`<tr>
+      <td style="color:var(--text2)">${_fmtOrderTime(j.ts)}</td>
+      <td><span class="tp-sym" onclick="focusTicker('${j.symbol}')">${j.symbol}</span></td>
+      <td class="tp-side ${j.side==='buy'?'long':'short'}">${(j.side||'').toUpperCase()}</td>
+      <td>${j.qty}</td><td>${j.price?'$'+fmt(j.price,2):'—'}</td>
+      <td>${j.signal||'—'}</td><td>${j.pattern||'—'}</td>
+      <td>${j.rvol!=null?j.rvol+'×':'—'}</td><td>${j.session||'—'}</td>
+      <td style="color:var(--text2)">${j.source}</td></tr>`).join('')+'</tbody></table>';
+}
+
+// ── Rapid order mode (#2445) — explicit, persisted opt-in ─────────────────────
+// ON: ticket submits + flatten skip the confirm dialog, and Shift+B / Shift+S
+// fire an instant market order for the focused symbol at the last-used quantity.
+// OFF (default): everything confirms, Shift+B/S do nothing extra.
+let _rapid = (()=>{ try{ return localStorage.getItem('trader.rapidMode')==='1'; }catch(e){ return false; } })();
+let _lastQty = (()=>{ try{ return Math.max(1, Number(localStorage.getItem('trader.lastQty'))||1); }catch(e){ return 1; } })();
+function setRapidMode(on){
+  _rapid = !!on;
+  try{ localStorage.setItem('trader.rapidMode', on?'1':'0'); }catch(e){}
+  const cb=document.getElementById('otRapid'); if(cb) cb.checked=_rapid;
+}
+document.addEventListener('DOMContentLoaded', ()=>{ const cb=document.getElementById('otRapid'); if(cb) cb.checked=_rapid; });
+async function placeMarketOrder(sym, side, qty, source){
+  try{
+    const r = await fetch('/api/trading/orders/place', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker:sym, side, qty, type:'market' })
+    });
+    const result = await r.json();
+    if(!r.ok || result.status!=='placed'){ _alertToast('⚠ '+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
+    _alertToast(`⚡ ${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
+    journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
+    await Promise.all([loadOrders(), loadPortfolio()]);
+    return true;
+  }catch(e){ _alertToast('⚠ order failed: '+e.message); return false; }
+}
+
 // #2439: risk-based sizing — units = floor(risk$ / |entry − stop|). Entry is the
 // limit price when set, else the live price. Requires the stop-loss exit enabled.
 function otSizeFromRisk(){
@@ -2445,7 +2624,8 @@ async function submitOrderTicket(){
   let msg = `${otSide.toUpperCase()} ${qty} ${otTicker} ${otOrderType === 'limit' ? 'at $'+body.limitPrice : 'at market'} (paper account)?`;
   if(body.takeProfit) msg += `\nTake profit: $${body.takeProfit}`;
   if(body.stopLoss)   msg += `\nStop loss: $${body.stopLoss}`;
-  if(!confirm(msg)) return;
+  if(!_rapid && !confirm(msg)) return;   // #2445: rapid mode skips the confirm
+  _lastQty = qty; try{ localStorage.setItem('trader.lastQty', String(qty)); }catch(e){}
 
   try{
     const r = await fetch('/api/trading/orders/place', {
@@ -2458,6 +2638,7 @@ async function submitOrderTicket(){
       alert('Order failed: ' + (result.error || result.reason || r.statusText));
       return;
     }
+    journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
     closeOrderTicket();
     await Promise.all([loadOrders(), loadPortfolio()]);
   }catch(e){
@@ -2673,6 +2854,7 @@ function renderFullscreenChart(){
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
+  if(_drawTool || _drawPending){ setDrawTool(''); return; }   // #2444: Esc disarms drawing first
   if(!document.getElementById('otBg').classList.contains('hidden')) closeOrderTicket();
   else closeFullscreenChart();
 });
@@ -2687,8 +2869,12 @@ document.addEventListener('keydown', e=>{
   if(e.ctrlKey || e.metaKey || e.altKey) return;
   const guest=document.body.classList.contains('guest');
   if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>focusTicker(sym), {title:'Jump to symbol'}); return; }
-  if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault(); openOrderTicket(activeTicker,'buy'); } return; }
-  if(e.key==='s'||e.key==='S'){ if(activeTicker && !guest){ e.preventDefault(); openOrderTicket(activeTicker,'sell'); } return; }
+  // #2445: Shift+B/S in rapid mode = instant market order at the last-used qty.
+  // Plain B/S (or rapid mode off) = open the ticket as before.
+  if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault();
+    if(e.shiftKey && _rapid) placeMarketOrder(activeTicker,'buy',_lastQty,'rapid-key'); else openOrderTicket(activeTicker,'buy'); } return; }
+  if(e.key==='s'||e.key==='S'){ if(activeTicker && !guest){ e.preventDefault();
+    if(e.shiftKey && _rapid) placeMarketOrder(activeTicker,'sell',_lastQty,'rapid-key'); else openOrderTicket(activeTicker,'sell'); } return; }
   if(e.key==='ArrowLeft' || e.key==='ArrowRight'){
     const list=visibleTickers(); if(!list.length) return;
     e.preventDefault();
@@ -3606,7 +3792,7 @@ async function flattenPosition(symbol, side, qty, skipConfirm){
   const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
   const q = Math.abs(Number(qty)||0);
   if(!q) return false;
-  if(!skipConfirm && !confirm(`FLATTEN ${symbol}: ${exitSide.toUpperCase()} ${q} at market (paper account)?`)) return false;
+  if(!skipConfirm && !_rapid && !confirm(`FLATTEN ${symbol}: ${exitSide.toUpperCase()} ${q} at market (paper account)?`)) return false;   // #2445: rapid mode skips confirm
   try{
     const r = await fetch('/api/trading/orders/place', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -3614,6 +3800,7 @@ async function flattenPosition(symbol, side, qty, skipConfirm){
     });
     const result = await r.json();
     if(!r.ok || result.status!=='placed'){ alert('Flatten failed: '+(result.error||result.reason||r.statusText)); return false; }
+    journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
   }catch(e){ alert('Flatten failed: '+e.message); return false; }
