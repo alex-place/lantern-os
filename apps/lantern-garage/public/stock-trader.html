@@ -860,6 +860,7 @@
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
+    <button class="tp-tab" role="tab" id="tptab-signals" aria-selected="false" aria-controls="tp-signals" data-tab="signals" onclick="tpTab('signals');renderSigma0Signals()" title="The Σ₀ EV gate's live verdicts — certified entries with entry/stop/target, expected value, and win probability">Σ₀ Signals <span class="tp-badge" id="tpSigCount">0</span></button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -867,6 +868,7 @@
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-signals" role="tabpanel" aria-labelledby="tptab-signals" tabindex="0" hidden><div id="sigma0Signals"></div></div>
   </div>
 </div>
 
@@ -3302,10 +3304,11 @@ async function loadZones(){
 }
 
 // ── Σ₀ Signals: explicit "when to enter" instructions from the EV decision ────
-// Reads each ticker's last_signal.sigma0 (convergence_ev) and renders an
-// actionable entry instruction — direction, entry/stop/target, R:R, EV, p_win,
-// and the evidence — instead of merely tinting a BUY/SELL button. The engine
-// auto-executes ENTER signals; this is the human-readable narration of that.
+// Reads each ticker's Σ₀ EV verdict — last_signal.convergence (live Node engine)
+// or last_signal.sigma0 (legacy Python shape) — and renders an actionable entry
+// instruction: direction, entry/stop/target, R:R, EV, p_win, and the evidence,
+// instead of merely tinting a BUY/SELL button. The engine auto-executes ENTER
+// signals; this is the human-readable narration of that.
 // Compact session/portfolio status for the Σ₀ panel (#1625) — the old Telegram
 // "Portfolio Update / Session Start" lines, but dense (no chat spacing): equity,
 // today P&L, open positions, market regime + open/closed, tickers scanned, cadence.
@@ -3330,18 +3333,32 @@ function renderSigma0Signals(){
   const statusHtml = renderS0StatusHtml();
   const enters = [];
   Object.keys(zonesData||{}).forEach(t=>{
-    const s0 = (zonesData[t]&&zonesData[t].last_signal&&zonesData[t].last_signal.sigma0) || null;
-    if(!s0 || s0.decision !== 'ENTER') return;
-    const ins = s0.instruction || {};
-    const dir = String(ins.direction || zonesData[t].direction || '').toUpperCase();
+    const sig = (zonesData[t]&&zonesData[t].last_signal) || null;
+    if(!sig) return;
+    // The engine emits the Σ₀ EV verdict under `convergence` (signal-engine/scan.js);
+    // `sigma0` is the legacy key from the Python trader. Read BOTH — the panel sat
+    // empty for weeks because it only knew the dead key while verdicts flowed live.
+    const s0 = sig.sigma0 || null;
+    const conv = sig.convergence || null;
+    const verdict = s0 || conv;
+    if(!verdict || verdict.decision !== 'ENTER') return;
+    const ins = (s0 && s0.instruction) || {};
+    const plan = sig.plan || {};
+    const dir = String(ins.direction || sig.direction || zonesData[t].direction || '').toUpperCase();
+    const r2 = v => (v==null?null:Math.round(v*100)/100);
     enters.push({
       ticker:t, isShort: dir==='BEARISH',
       label: dir==='BULLISH'?'LONG':dir==='BEARISH'?'SHORT':'—',
-      entry:ins.entry, stop:ins.stop, target:ins.target, rr:ins.rr,
-      ev:s0.ev_r, p:s0.p_win, why:(s0.why||[]).join(', ')
+      entry: ins.entry ?? r2(sig.entry_price),
+      stop:  ins.stop  ?? plan.stop,
+      target:ins.target?? plan.target1,
+      rr:    ins.rr    ?? (conv && conv.target_r),
+      ev:verdict.ev_r, p:verdict.p_win,
+      why: s0 ? (s0.why||[]).join(', ') : String(sig.reasons||'')
     });
   });
   enters.sort((a,b)=> (b.ev||0)-(a.ev||0));
+  const sc=document.getElementById('tpSigCount'); if(sc) sc.textContent=enters.length;   // badge: certified entries at a glance
 
   // #1710: narrate what the agent is actively WATCHING — tickers with a direction
   // that reached the EV gate (SKIP) or are sitting in a zone, so the panel shows
