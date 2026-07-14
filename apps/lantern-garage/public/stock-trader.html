@@ -113,8 +113,10 @@
   /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
      actions collapse into a ☰ dropdown instead of a long sideways-scrolling row.
      The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
-  /* The ☰ is PERMANENT: Pre/After + Kalshi live in it at every width; on narrow
-     screens it additionally swallows the chart controls, Explore, and broker link. */
+  /* The ☰ is PERMANENT: the feed stamp, Pre/After, Kalshi, Explore, Connect broker,
+     and Chat live in it at every width; on narrow screens it additionally swallows
+     the chart controls. Only the tiny pulse dot stays inline — a staleness signal
+     is useless hidden inside a closed menu. */
   .hmenu-btn{font-size:15px;line-height:1;padding:6px 11px}
   .hmenu{position:fixed;top:104px;right:8px;z-index:1300;background:var(--bg1);border:1px solid var(--border);
     border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.5);padding:12px;display:flex;flex-direction:column;
@@ -125,6 +127,12 @@
   .hmenu .nav-link{display:block;text-align:center}
   .hmenu .hmenu-keys{order:99;font-family:var(--mono);font-size:10px;color:var(--text2);text-align:center;
     border-top:1px solid var(--border);padding-top:8px;line-height:1.7}
+  /* Inside the ☰ each action explains itself: a caption rendered from
+     data-hmenu-desc. CSS-only (::after), so when an element moves back to the
+     inline toolbar on wide screens the caption vanishes with no DOM cleanup. */
+  .hmenu [data-hmenu-desc]::after{content:attr(data-hmenu-desc);display:block;font-size:10px;
+    font-weight:400;letter-spacing:0;text-transform:none;color:var(--text2);white-space:normal;
+    line-height:1.35;margin-top:3px;max-width:260px}
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
@@ -759,14 +767,14 @@
 <!-- Header -->
 <h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Trading toolbar">
-  <div class="logo">Unisona<span>Trader</span></div>
-  <div class="badge badge-paper">PAPER</div>
-  <div class="badge guest-badge" id="guestBadge" style="display:none">READ-ONLY</div>
-  <div class="hstat acct"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
-  <div class="hstat acct"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
-  <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
-  <div class="hstat acct"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
-  <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+  <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
+  <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
+  <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
+  <div class="hstat acct" title="Total account value — cash plus open positions"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
+  <div class="hstat acct" title="Profit or loss so far today"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
+  <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
+  <div class="hstat acct" title="How many positions are currently open"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
+  <div class="hstat" title="US equity session status — open, closed, or pre/after hours"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
   <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
@@ -779,7 +787,7 @@
     <option value="6">6 charts</option>
     <option value="10">10 charts</option>
   </select>
-  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
+  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)" title="Draw charts as a line or as candlesticks">
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
@@ -788,7 +796,7 @@
     onclick="togglePatternMenu(this)"
     title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
   <span class="hgroup-sep" aria-hidden="true"></span>
-  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
+  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)" title="Bar interval — how much time each candle covers">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
     <option value="15m">15m</option>
@@ -817,15 +825,25 @@
     <option value="clear">🗑 Clear symbol</option>
   </select>
   </div><!-- /hgroup -->
-  <div class="pulse" id="feedPulse"></div>
+  <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
-  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()" title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only.">⏰ Pre/After —</button>
-  <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
-  <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
-  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
-  <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()" title="Ask the Unisona assistant about markets, symbols, and your positions">💬 Chat</button>
-  <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu" title="Chart controls and more">☰</button>
+  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()"
+    title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only."
+    data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
+  <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
+    data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
+  <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
+    data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
+  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none"
+    title="Connect your Interactive Brokers account so trades route to your own paper or live account"
+    data-hmenu-desc="Link your own Interactive Brokers account — trades then route to it instead of the shared paper account.">🔗 <span id="brokerLabel">Connect broker</span></a>
+  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
+  <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
+    title="Ask the Unisona assistant about markets, symbols, and your positions"
+    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
+  <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
+    aria-label="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat"
+    title="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat">☰</button>
 </div>
 
 <!-- Sidebar -->
@@ -856,9 +874,9 @@
   <div class="tp-summary" id="tpSummary"></div>
   <!-- Tabs -->
   <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
-    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
-    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
+    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
   </div>
   <!-- Tab bodies -->
@@ -941,8 +959,8 @@
         <option value="All">All</option>
       </select>
       <div class="order-ticket fs-order-ticket">
-        <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')">BUY</button>
-        <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')">SELL</button>
+        <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')" title="Open a buy order ticket for this symbol (paper trade)">BUY</button>
+        <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')" title="Open a sell order ticket for this symbol (paper trade)">SELL</button>
       </div>
       <span class="fs-close" onclick="closeFullscreenChart()">✕ Close</span>
     </div>
@@ -4379,12 +4397,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   const mq=matchMedia('(max-width:760px)');
   // narrowOnly:false → lives in the ☰ at EVERY width (secondary toggles/links);
   // narrowOnly:true  → collapses in only when the toolbar is too tight.
+  // Missing selectors are skipped, so #feedStamp (the LIVE·3s feed-honesty label,
+  // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
+  // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
     {sel:'.header .hgroup',            narrowOnly:true },
+    {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
-    {sel:'.header a[href*="explore"]', narrowOnly:true },
-    {sel:'#brokerLink',                narrowOnly:true },
+    {sel:'.header a[href*="explore"]', narrowOnly:false},
+    {sel:'#brokerLink',                narrowOnly:false},
+    {sel:'#dcToggle',                  narrowOnly:false},
   ];
   const items=[];   // {el, marker, narrowOnly} — marker = comment left in the header slot
   picks.forEach(p=>{
@@ -4410,6 +4433,13 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     btn.setAttribute('aria-expanded', menu.hidden?'false':'true');
   });
   document.addEventListener('click', e=>{ if(!menu.hidden && !menu.contains(e.target)) close(); });
+  // Choosing an action from the menu closes it (chat toggle, links, Pre/After) so
+  // the result is visible immediately. Chart controls (.hgroup) keep it open —
+  // layout/type/timeframe are usually adjusted together.
+  menu.addEventListener('click', e=>{
+    if(e.target.closest('.hgroup')) return;
+    if(e.target.closest('a,button')) close();
+  });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   mq.addEventListener('change', apply);
   // Fallback: some environments (viewport emulation, older WebViews) never fire
