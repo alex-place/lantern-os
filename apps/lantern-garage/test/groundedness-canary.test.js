@@ -187,5 +187,68 @@ check("#2075 context present AND used: still anchored (no false negative)", () =
   assert.ok(grounded.signals.contextUsage > 0.5, `usage=${grounded.signals.contextUsage}`);
 });
 
+// #2322 — a "summarize/rewrite/translate THIS provided text" turn is grounded in the pasted
+// source, not in web/KB/repo. providedSourceGrounding() surfaces that source so the canary
+// anchors on it; a faithful summary must then drop below threshold instead of reading red.
+const { providedSourceGrounding } = require("../lib/groundedness-canary");
+const PASTED =
+  "Please summarize this: The Apollo program was a United States human spaceflight program " +
+  "carried out by NASA between 1961 and 1972. It landed the first humans on the Moon in 1969 " +
+  "during Apollo 11. Neil Armstrong and Buzz Aldrin walked on the lunar surface while Michael " +
+  "Collins orbited above. The program cost roughly 25 billion dollars and involved hundreds of " +
+  "thousands of engineers and scientists. Six missions landed astronauts on the Moon in total.";
+const SUMMARY =
+  "The Apollo program was a NASA human spaceflight effort from 1961 to 1972 that first landed " +
+  "humans on the Moon in 1969 on Apollo 11, with Armstrong and Aldrin on the surface and Collins " +
+  "in orbit. It cost about 25 billion dollars and six missions landed astronauts on the Moon.";
+check("#2322 provided-text transform: intent + substantial source is recognized", () => {
+  assert.ok(providedSourceGrounding(PASTED).length > 0, "should return the pasted source as anchor");
+});
+check("#2322 short knowledge question is NOT treated as provided source", () => {
+  assert.strictEqual(providedSourceGrounding("summarize the French Revolution"), "", "no pasted source → external grounding");
+});
+check("#2322 non-transform long paste is NOT anchored on itself", () => {
+  const longNoIntent = "What do you think about this? " + "word ".repeat(200);
+  assert.strictEqual(providedSourceGrounding(longNoIntent), "", "no transform intent → not a provided-text turn");
+});
+check("#2322 faithful summary of pasted source scores grounded (no false red)", () => {
+  const red = scoreReplyGroundedness(SUMMARY, { groundingContext: "" });
+  const ok = scoreReplyGroundedness(SUMMARY, { groundingContext: providedSourceGrounding(PASTED) });
+  assert.strictEqual(red.ungrounded, true, `without anchor it reads red, risk=${red.risk}`);
+  assert.strictEqual(ok.anchored, true, "summary anchors on the pasted source");
+  assert.strictEqual(ok.ungrounded, false, `with anchor it clears threshold, risk=${ok.risk}`);
+});
+
+// #2322 (generate-from-source) — a "make a quiz / questions / flashcards FROM this passage"
+// turn is also closed-context: the output is derived from the pasted source, so it must anchor
+// on it too. Requires BOTH a generate intent AND source deixis ("this/the passage/…"), so an
+// open-world "write a quiz about WW2" stays unanchored.
+const QUIZ_PASTED =
+  "Create a 20-question multiple-choice quiz based on this passage: The water cycle describes " +
+  "how water moves through Earth's systems. Water evaporates from oceans and lakes, condenses " +
+  "into clouds, falls as precipitation, and flows back to the sea through rivers and groundwater. " +
+  "Evaporation is driven by solar energy; condensation forms clouds; precipitation returns water " +
+  "to the surface; runoff and infiltration route it back to the oceans to begin the cycle again.";
+const QUIZ_REPLY =
+  "1. What drives evaporation in the water cycle? A) Wind B) Solar energy C) Gravity D) Pressure — Answer: B. " +
+  "2. What process forms clouds? A) Condensation B) Runoff C) Infiltration D) Precipitation — Answer: A. " +
+  "3. How does precipitation return water to the surface? A) Evaporation B) Rain and snow C) Condensation D) Groundwater — Answer: B. " +
+  "4. What routes water back to the oceans? A) Clouds B) Rivers and groundwater C) Solar energy D) Evaporation — Answer: B.";
+check("#2322 quiz-from-passage: generate intent + source deixis + substantial source is recognized", () => {
+  assert.ok(providedSourceGrounding(QUIZ_PASTED).length > 0, "quiz built from a pasted passage anchors on it");
+});
+check("#2322 open-world quiz (no pasted source) is NOT anchored", () => {
+  assert.strictEqual(providedSourceGrounding("make a 10-question quiz about the water cycle"), "", "no source deixis / no paste → external");
+  // deixis but no substantial source stays below the length floor
+  assert.strictEqual(providedSourceGrounding("quiz me on this"), "", "deixis but no pasted source → not anchored");
+});
+check("#2322 quiz derived from pasted passage scores grounded (no false seam_open)", () => {
+  const red = scoreReplyGroundedness(QUIZ_REPLY, { groundingContext: "" });
+  const ok = scoreReplyGroundedness(QUIZ_REPLY, { groundingContext: providedSourceGrounding(QUIZ_PASTED) });
+  assert.strictEqual(red.ungrounded, true, `without anchor the quiz reads red, risk=${red.risk}`);
+  assert.strictEqual(ok.anchored, true, "quiz anchors on the pasted passage");
+  assert.strictEqual(ok.ungrounded, false, `with anchor it clears threshold, risk=${ok.risk}`);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nall groundedness-canary checks passed");
