@@ -1523,6 +1523,23 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.beginPath();
     ctx.rect(0, 0, pw, ph);
     ctx.clip();
+    // ── Feed-glitch wick sanitizer (#trader-candles v2) ──────────────────────
+    // Yahoo ships bars with tiny bodies and monstrous ONE-SIDED wicks (measured
+    // on AAPL: 96/2024 hourly bars with $14–26 spikes on ~$0.30 bodies — normal
+    // high, bogus low, or vice versa). The previous total-span>10×median test
+    // missed one-sided spikes whenever the window's median crept up. New rule,
+    // per wick SIDE: anything longer than 4× the median bar span is a feed
+    // glitch → clamp it to body ± one median span so it reads as a normal bar.
+    // (Parameters measured on the corrupt cluster: range 22→12.2, tallest bar
+    // 37% of plot, real ≤4× wicks untouched.) renderZoneLadder's auto-range
+    // mirrors the same rule so range and drawing always agree.
+    const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
+    const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
+    const _wdet = _med2>0 ? _med2*4 : Infinity;
+    const saneHiLo = b => {
+      const bh=Math.max(b.open,b.close), bl=Math.min(b.open,b.close);
+      return { hi:(b.high-bh>_wdet)? bh+_med2 : b.high, lo:(bl-b.low>_wdet)? bl-_med2 : b.low };
+    };
     // ── Volume histogram (#2436) — bottom band of the plot, TradingView-style.
     // Bars already carry volume (the regime engine consumes it); day traders need
     // to SEE it. Skipped gracefully when the feed ships no volume (e.g. indices).
@@ -1545,7 +1562,8 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       let started=false;
       for(let i=0;i<n;i++){
         const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
-        cpv += ((b.high+b.low+b.close)/3)*v; cv += v;
+        const sv=saneHiLo(b);                       // glitch wicks must not skew VWAP
+        cpv += ((sv.hi+sv.lo+b.close)/3)*v; cv += v;
         const vx=i*slotW + slotW/2, vy=y(cpv/cv);
         if(!started){ ctx.moveTo(vx,vy); started=true; } else ctx.lineTo(vx,vy);
       }
@@ -1563,22 +1581,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       }
     }
     if(type==='candle'){
-      // Bad-tick wick clamp (#trader-candles): the auto-range already IGNORES any
-      // wick >10× the median bar span, but we still drew it raw — so glitch wicks
-      // slammed into the plot ceiling/floor as full-height streaks. Clamp the DRAWN
-      // wick to the body ± one median span so a bogus tick reads as a normal bar.
-      const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
-      const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
       for(let i=0;i<n;i++){
         const b = bars[i];
         const x = i*slotW + slotW/2;
         const up = b.close >= b.open;
         const color = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
-        let wHi = b.high, wLo = b.low;
-        if(_med2>0 && (wHi-wLo) > _med2*10){
-          wHi = Math.max(b.open,b.close) + _med2;
-          wLo = Math.min(b.open,b.close) - _med2;
-        }
+        const sw = saneHiLo(b);                     // per-side glitch clamp (v2)
+        const wHi = sw.hi, wLo = sw.lo;
         ctx.strokeStyle = color;
         ctx.fillStyle   = color;
         ctx.lineWidth   = 1;
@@ -1788,23 +1797,26 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   if(view.yMin != null && view.yMax != null){
     rMin = view.yMin; rMax = view.yMax;
   } else {
-    // Robust auto-fit: the keyless Yahoo feed occasionally ships a bad tick — a single
-    // bar whose high/low (or open/close) is wildly off — and fitting to the raw min/max
-    // let one glitch blow the whole price range open, rendering that candle huge and
-    // squashing the rest. Ignore the bogus extreme of any bar whose span is >10× the
-    // median bar span (use its body, or skip it), so the range fits the REAL action and
-    // the outlier's excess wick is simply clipped to the plot. #trader-candles
+    // Robust auto-fit (#trader-candles v2): the keyless Yahoo feed regularly ships
+    // bars with a tiny body and a monstrous ONE-SIDED wick (measured on AAPL:
+    // 96/2024 hourly bars with $14–26 spikes on ~$0.30 bodies). The old test used
+    // TOTAL span >10× median, which missed one-sided spikes whenever the median
+    // crept up — the range blew open and the corrupt candle rendered full-height.
+    // Per wick SIDE: longer than 4× the median span = feed glitch → treat as
+    // body ± one median (the same rule renderChart draws with, so range and
+    // drawing always agree); a bar whose BODY alone exceeds 10× median is
+    // skipped as wholly bogus.
     let lo = Infinity, hi = -Infinity;
     const _spans = viewBars.map(b=>Math.abs(b.high-b.low)).filter(x=>x>0).sort((a,b)=>a-b);
     const _medSpan = _spans.length ? _spans[Math.floor(_spans.length/2)] : 0;
-    const _glitch = _medSpan>0 ? _medSpan*10 : Infinity;
+    const _wickDet = _medSpan>0 ? _medSpan*4 : Infinity;
+    const _glitch  = _medSpan>0 ? _medSpan*10 : Infinity;
     let _kept = 0;
     for(const b of viewBars){
-      let bl = b.low, bh = b.high;
-      if(_medSpan>0 && (bh-bl) > _glitch){                 // bad-tick wick — fall back to the body
-        bl = Math.min(b.open, b.close); bh = Math.max(b.open, b.close);
-        if((bh-bl) > _glitch) continue;                    // body is bogus too → skip the bar entirely
-      }
+      const bodyHi = Math.max(b.open, b.close), bodyLo = Math.min(b.open, b.close);
+      if((bodyHi-bodyLo) > _glitch) continue;              // bogus body → skip the bar entirely
+      const bh = (b.high-bodyHi > _wickDet) ? bodyHi+_medSpan : b.high;
+      const bl = (bodyLo-b.low  > _wickDet) ? bodyLo-_medSpan : b.low;
       if(bl < lo) lo = bl; if(bh > hi) hi = bh; _kept++;
     }
     if(!_kept) for(const b of viewBars){ if(b.low < lo) lo = b.low; if(b.high > hi) hi = b.high; }
