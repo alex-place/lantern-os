@@ -3156,13 +3156,19 @@ function tpTab(name){
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
   a=a||{};
-  const cell=(l,v,cls)=>`<div class="tp-stat"><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`;
+  const cell=(l,v,cls,tip)=>`<div class="tp-stat"${tip?` title="${tip}"`:''}><div class="l">${l}</div><div class="v ${cls||''}">${v}</div></div>`;
   const money=(v)=> v==null?'—':'$'+fmt(v,2);
   const signed=(v)=> v==null?'—':(v>=0?'+':'-')+'$'+fmt(Math.abs(v),2);
   const cls=(v)=> v>0?'pos':v<0?'neg':'';
   el.innerHTML =
-    cell('Account balance', money(a.cash)) +
-    cell('Equity', money(a.equity)) +
+    // Account value = equity (net liquidation) — the TRUE worth of the account, which
+    // tracks P&L. `cash` (totalcashvalue) is shown separately because in a margin
+    // account it is INFLATED by short-sale proceeds: opening a short deposits the sale
+    // proceeds into cash while creating an equal buy-back liability, so cash can read far
+    // higher than the account is actually worth (e.g. cash $1.22M vs equity $957k with a
+    // large short open). Labeling cash "Account balance" made a losing account look rich.
+    cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.') +
+    cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.') +
     cell('Realized P&L', signed(a.realized_today), cls(a.realized_today)) +
     cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized)) +
     cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today)) +
