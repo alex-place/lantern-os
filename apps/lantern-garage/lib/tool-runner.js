@@ -1255,6 +1255,83 @@ const REGISTRY = {
     },
   },
 
+  trading_gate_explain: {
+    policy: "read",
+    guest_safe: true, // public market data + engine verdicts; no account info
+    desc: "Explain the trading EV gate: for each live signal (or one ticker), show the Riley conviction vs the 65-point floor, the Σ₀ expected-value verdict (ENTER or SKIP) with p_win vs the 0.45 minimum and EV vs the +0.15R minimum, the weighted evidence behind it (zone, structure, candle, news, volume, earnings, sector), and the trade plan levels. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did the gate skip X', or wants the statistical case for/against an entry. The gate's abstention is a real answer — report SKIPs honestly, never upgrade them to recommendations. Pair with trader_quote for price context and recall_memory for the strategy's history.",
+    schema: {
+      type: "object",
+      properties: {
+        ticker: { type: "string", description: "Optional: explain one ticker (e.g. AAPL). Omit for the full board of live signals." },
+      },
+    },
+    async run(i) {
+      const want = String(i && i.ticker ? i.ticker : "").trim().toUpperCase();
+      let evc = null;
+      try { evc = require("./signal-engine").convergenceEv; } catch (_e) { /* thresholds shown as n/a */ }
+      const EV_MIN = evc ? evc.EV_MIN : 0.15;
+      const P_MIN = evc ? evc.P_MIN : 0.45;
+      const FLOOR = 65; // MIN_CONVICTION (lib/kalshi-suggest.js) — the shared conviction floor
+      try {
+        const [zonesD, mkt] = await Promise.all([
+          _localTradingGet("/api/trading/zones"),
+          _localTradingGet("/api/trading/market-status").catch(() => null),
+        ]);
+        const zones = (zonesD && zonesD.zones) || {};
+        let entries = Object.entries(zones)
+          .map(([t, d]) => ({ t, d, sig: d && d.last_signal }))
+          .filter((e) => e.sig && (e.sig.confidence || 0) > 0);
+        if (want) entries = entries.filter((e) => e.t === want);
+        if (!entries.length) {
+          return want
+            ? `[trading_gate_explain: no live signal for ${want} — the Riley gate did not mark it actionable this scan (below the proximity/RSI/structure bar, or insufficient data). That IS the explanation: it never reached the EV layer.]`
+            : "[trading_gate_explain: no actionable signals on the board this scan. The gate's silence is the verdict — nothing cleared the Riley bar to even be EV-scored.]";
+        }
+        entries.sort((a, b) => (b.sig.confidence || 0) - (a.sig.confidence || 0));
+        const fmt = (v, n = 2) => (v == null || !Number.isFinite(Number(v)) ? "n/a" : Number(v).toFixed(n));
+        const head = mkt
+          ? `Session ${mkt.market_open ? "OPEN" : "CLOSED"} · VIX ${mkt.vix} (${mkt.vix_regime}) · SPY regime ${mkt.market}. Gate thresholds: conviction ≥${FLOOR}, p_win ≥${P_MIN}, EV ≥ +${EV_MIN}R.`
+          : `Gate thresholds: conviction ≥${FLOOR}, p_win ≥${P_MIN}, EV ≥ +${EV_MIN}R.`;
+        const enterCount = entries.filter((e) => e.sig.convergence && e.sig.convergence.decision === "ENTER").length;
+        const lines = [head, `Signals above the Riley bar: ${entries.length} · EV-certified ENTER: ${enterCount}`, ""];
+        for (const { t, sig } of entries.slice(0, want ? 1 : 8)) {
+          const conv = sig.convergence || null;
+          const convOK = (sig.confidence || 0) >= FLOOR;
+          lines.push(`${t} ${sig.direction === "BULLISH" ? "▲" : "▼"} ${sig.direction} — conviction ${sig.confidence} (floor ${FLOOR} ${convOK ? "✓" : "✗ — stand down"}) · quality ${sig.quality || "?"}${sig.confidence >= 96 ? " [uncalibrated score, not a win probability]" : ""}`);
+          if (conv) {
+            const pOK = conv.p_win >= P_MIN, evOK = conv.ev_r >= EV_MIN;
+            lines.push(`  EV gate: ${conv.decision} — p_win ${fmt(conv.p_win)} (min ${P_MIN} ${pOK ? "✓" : "✗"}) · EV ${conv.ev_r >= 0 ? "+" : ""}${fmt(conv.ev_r)}R (min +${EV_MIN}R ${evOK ? "✓" : "✗"}) at target ${fmt(conv.target_r, 1)}R${conv.decision === "ENTER" ? ` · size ×${fmt(conv.size_mult)}` : ""}`);
+            if (conv.decision !== "ENTER") {
+              const gaps = [];
+              if (!pOK) gaps.push(`needs +${fmt((P_MIN - conv.p_win) * 100, 1)}pts of win-probability`);
+              if (!evOK) gaps.push(`EV short by ${fmt(EV_MIN - conv.ev_r)}R`);
+              if (gaps.length) lines.push(`  Shortfall: ${gaps.join(" and ")} — the odds don't pay for the risk at these levels.`);
+            }
+          } else {
+            lines.push("  EV gate: not run (insufficient evidence this scan) — treat as SKIP.");
+          }
+          const ev2 = [];
+          if (sig.rsi != null) ev2.push(`RSI ${sig.rsi}`);
+          if (sig.structure) ev2.push(`structure ${sig.structure}`);
+          if (sig.candle) ev2.push(`candle ${sig.candle}`);
+          if (sig.volume_ratio != null) ev2.push(`vol ${fmt(sig.volume_ratio, 1)}×`);
+          if (sig.news && sig.news.n) ev2.push(`news ${sig.news.label} (${sig.news.n} items, ${sig.news.score >= 0 ? "+" : ""}${sig.news.score})`);
+          if (sig.earnings) ev2.push(`EPS surprise ${sig.earnings.surprise_pct >= 0 ? "+" : ""}${sig.earnings.surprise_pct}%`);
+          if (sig.sector && sig.sector.trend_pct != null) ev2.push(`sector ${sig.sector.etf} ${sig.sector.trend_pct >= 0 ? "+" : ""}${sig.sector.trend_pct}%`);
+          if (ev2.length) lines.push(`  Evidence: ${ev2.join(" · ")}`);
+          if (sig.plan) lines.push(`  Plan if entered: entry ~$${fmt(sig.entry_price)}, stop $${fmt(sig.plan.stop)}, T1 $${fmt(sig.plan.target1)}, T2 $${fmt(sig.plan.target2)}, hold ~${sig.plan.hold_days}d`);
+          if (sig.reasons) lines.push(`  Riley notes: ${String(sig.reasons).slice(0, 160)}`);
+          lines.push("");
+        }
+        if (!want && entries.length > 8) lines.push(`(+${entries.length - 8} more signals — ask for a specific ticker for detail)`);
+        if (mkt && !mkt.market_open) lines.push("Session is CLOSED: these verdicts are from the last scan and re-evaluate when ticks resume.");
+        return lines.join("\n");
+      } catch (e) {
+        return `[trading_gate_explain error: ${e.message} — the signal engine is unreachable; say so rather than inventing a verdict.]`;
+      }
+    },
+  },
+
   // ── Portfolio analytics (UNISONA-SHARPE-CERTIFICATE applied to real holdings) ──
   // Reason-stage tools: measured Sharpe/correlation evidence over the operator's
   // ACTUAL broker positions (ADR-0022 per-user IBKR), plus a covariance-aware

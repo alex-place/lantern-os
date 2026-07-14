@@ -863,6 +863,28 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "trading_gate_explain",
+      "description": "Explain the trading EV gate: for each live signal (or one ticker), show the Riley conviction vs the 65-point floor, the Σ₀ expected-value verdict (ENTER or SKIP) with p_win vs the 0.45 minimum and EV vs the +0.15R minimum, the weighted evidence behind it (zone, structure, candle, news, volume, earnings, sector), and the trade plan levels. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did the gate skip X', or wants the statistical case for/against an entry. The gate's abstention is a real answer — report SKIPs honestly, never upgrade them to recommendations. Pair with trader_quote for price context and recall_memory for the strategy's history.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "description": "Optional: explain one ticker (e.g. AAPL). Omit for the full board of live signals."
+          }
+        }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "portfolio_analysis",
       "description": "Analyze the operator's ACTUAL broker holdings for risk-adjusted quality: current weights, per-holding and whole-portfolio annualized Sharpe with 95% CI, volatility, worst drawdown over the window, pairwise correlation matrix, and concentration (largest position, effective N, avg pairwise correlation). Use when the user asks how diversified or risky their portfolio is, what its Sharpe is, or whether their holdings overlap. Cite the window and CIs as evidence — this is historical measurement, never a promise, and never personalized advice.",
       "input_schema": {

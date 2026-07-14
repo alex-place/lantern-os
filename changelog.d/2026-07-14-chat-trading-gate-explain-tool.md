@@ -1,0 +1,3 @@
+### Added
+
+- chat: `trading_gate_explain` native tool — the assistant can now answer "what should I trade / why is there no trade" from the live Σ₀ EV gate itself: per-signal Riley conviction vs the 65 floor, ENTER/SKIP verdict with p_win vs 0.45 and EV vs +0.15R (with shortfall math on SKIPs), the weighted evidence (zone/structure/candle/news/volume/earnings/sector), plan levels, and honest caveats (uncalibrated scores flagged, closed-session verdicts labeled stale, abstention reported as a real answer). Guest-safe (public market data only); model-invoked non-deterministically alongside trader_quote/recall_memory. (#2432-era gate-explainer follow-through)
