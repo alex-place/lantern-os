@@ -6,7 +6,7 @@ Lantern OS uses a deterministic routing system to efficiently route user message
 
 The convergence router is a pattern-matching system that:
 1. Analyzes user intent from natural language
-2. Routes to appropriate Keystone agents (120+ routes)
+2. Routes to appropriate unisona.ai agents (120+ routes)
 3. Applies cached code templates for common patterns
 4. Maintains >70% cache hit rate for token efficiency
 
@@ -22,7 +22,7 @@ graph TD
     C -->|Debugging| F[Debug Agent]
     C -->|Documentation| G[Docs Agent]
     C -->|Trading| H[Trading Agent]
-    C -->|Default| I[Keystone Agent]
+    C -->|Default| I[unisona.ai Agent]
     
     D --> J[Route Handler]
     E --> J
@@ -88,7 +88,7 @@ Stores pre-computed responses for common patterns:
 
 ### 3. Route Handlers
 
-120+ Keystone routes for specific domains:
+120+ unisona.ai routes for specific domains:
 - `market-search`: Market data queries
 - `code-gen`: Code generation patterns
 - `debug-troubleshoot`: Error diagnosis
