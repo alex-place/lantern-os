@@ -79,12 +79,15 @@ function formatGroundingContext(results, query) {
     "Use the following real-time search results to ground your response. Do not hallucinate beyond what is supported.",
     "",
   ];
-  for (const r of results.slice(0, 5)) {
-    lines.push(`[${r.rank}] ${r.title}`);
+  results.slice(0, 5).forEach((r, i) => {
+    // News results carry no `rank` (they come from the RSS feed) — fall back to the
+    // list position so the citation index is never "[undefined]".
+    lines.push(`[${r.rank != null ? r.rank : i + 1}] ${r.title}`);
     lines.push(`    URL: ${r.url}`);
+    if (r.published) lines.push(`    Published: ${r.published}`);
     if (r.snippet) lines.push(`    Snippet: ${r.snippet}`);
     lines.push("");
-  }
+  });
   lines.push("--- End grounding ---");
   return lines.join("\n");
 }
@@ -281,6 +284,102 @@ async function webSearchWiki(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) 
   });
 }
 
+// #2276 — current-events / geopolitical / "latest news" queries were answered with
+// historical, encyclopedic Wikipedia pages, because every source in the chain (DDG
+// instant-answer, then the Wikipedia API fallback) returns reference content, not
+// dated news. A "recent geopolitical news strait of hormuz oil prices" turn wants
+// timely articles, not the Strait of Hormuz Wikipedia article.
+//
+// This is a FRESHNESS-first source: Google News' keyless RSS search endpoint returns
+// recent, dated articles for an arbitrary query. It is tried BEFORE the encyclopedic
+// sources for news-intent queries (see _webSearchUncached), so current-events turns
+// ground on real news instead of reference pages — and it fails gracefully (no key,
+// bounded timeout, honest empty result) so a blip just falls through to the old chain.
+async function webSearchNews(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT) {
+  const https = require("https");
+  return new Promise((resolve) => {
+    const q = encodeURIComponent(query);
+    const path = `/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+    const req = https.request(
+      {
+        hostname: "news.google.com",
+        path,
+        method: "GET",
+        headers: { "User-Agent": GROUNDING_UA, "Accept": "application/rss+xml, application/xml, text/xml" },
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let data = "";
+        res.on("data", (chunk) => { data += chunk; if (data.length > 1600000) req.destroy(); });
+        res.on("end", () => {
+          const httpErr = _httpFallbackError("news", res, data);
+          if (httpErr) { resolve({ success: false, error: httpErr, source: "news" }); return; }
+          try {
+            const results = _parseNewsRss(data, maxResults);
+            if (!results.length) { resolve({ success: false, error: "no results (news)", source: "news" }); return; }
+            resolve({ success: true, results, source: "news" });
+          } catch (e) {
+            resolve({ success: false, error: `news parse: ${e.message}`, source: "news" });
+          }
+        });
+      }
+    );
+    req.on("error", (err) => resolve({ success: false, error: `news: ${err.message}`, source: "news" }));
+    req.on("timeout", () => { req.destroy(); resolve({ success: false, error: "news timeout", source: "news" }); });
+    req.end();
+  });
+}
+
+// Dependency-free RSS parse for the Google News feed. Each <item> carries a title
+// ("Headline - Source"), a link, a pubDate, and a <source> — we surface the pubDate +
+// source in the snippet so the model can SEE the article is recent and cite it.
+const _NEWS_ITEM_RE = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
+function _rssPick(block, tag) {
+  const m = block.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+  return m ? m[1] : "";
+}
+function _cdata(s) {
+  return String(s || "").replace(/^\s*<!\[CDATA\[/, "").replace(/\]\]>\s*$/, "").trim();
+}
+function _parseNewsRss(xml, maxResults = 5) {
+  const results = [];
+  const seen = new Set();
+  let m;
+  _NEWS_ITEM_RE.lastIndex = 0;
+  while ((m = _NEWS_ITEM_RE.exec(xml)) && results.length < maxResults) {
+    const block = m[1];
+    const title = _stripTags(_cdata(_rssPick(block, "title")));
+    const url = _decodeEntities(_cdata(_rssPick(block, "link"))).trim();
+    const pubDate = _stripTags(_cdata(_rssPick(block, "pubDate")));
+    const source = _stripTags(_cdata(_rssPick(block, "source")));
+    const desc = _stripTags(_cdata(_rssPick(block, "description")));
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    const meta = [pubDate, source].filter(Boolean).join(" · ");
+    const snippet = (meta ? `${meta} — ` : "") + (desc || title);
+    results.push({ title: title || url, url, snippet, published: pubDate || null, source: source || null });
+  }
+  return results;
+}
+
+// Does this query want fresh news rather than a reference page? Deliberately tighter
+// than needsGrounding(): an explicit news word (news/headlines/breaking/geopolitical/
+// election/war/…) OR a recency word (latest/recent/today/this week/right now) paired
+// with events framing. "current node version" / "how to" stay false so ordinary
+// factual grounding is unchanged.
+const _NEWS_WORDS = /\b(news|headlines?|breaking|geopolitic\w*|election|elections|ceasefire|sanctions?|invasion|conflict|war|outbreak|earthquake|hurricane|wildfire|shooting|protests?)\b/i;
+const _RECENCY_WORDS = /\b(latest|recent(?:ly)?|today|tonight|this week|this morning|right now|happening|current events?|breaking)\b/i;
+function _isNewsQuery(query) {
+  const q = String(query || "");
+  if (!q.trim()) return false;
+  if (_NEWS_WORDS.test(q)) return true;
+  // recency word alone only counts when the query is not obviously a how-to/definition
+  if (_RECENCY_WORDS.test(q) && !/\b(how to|what is|define|explain|version|install|error|code|function)\b/i.test(q)) {
+    return true;
+  }
+  return false;
+}
+
 // Normalize either MCP envelope or a direct result into {success, results, error}.
 function _unwrapSearch(raw) {
   let payload = raw;
@@ -341,8 +440,28 @@ async function _webSearchUncached(query, maxResults, opts) {
   const retries = opts.retries == null ? 1 : opts.retries;
   const mcpImpl = opts._mcpImpl || webSearchMcp;
   const fallbackImpls = opts._fallbackImpls || [webSearchDirect, webSearchWiki];
+  const newsImpl = opts._newsImpl || webSearchNews;
   const backoffMs = opts._retryBackoffMs == null ? KEYLESS_RETRY_BACKOFF_MS : opts._retryBackoffMs;
   let lastErr = "search failed";
+
+  // #2276 — for a current-events / news query, try the freshness-first news source
+  // BEFORE the MCP + encyclopedic chain, so timely articles win over reference pages
+  // (Wikipedia). Non-news queries skip this entirely (behavior unchanged). Falls
+  // through on any failure, so a news blip still gets the old chain's answer.
+  const isNews = opts.news != null ? opts.news : _isNewsQuery(query);
+  if (isNews) {
+    try {
+      let r = await newsImpl(query, maxResults);
+      if (r.success) return r;
+      if (_isRateLimited(r.error) && backoffMs > 0) {
+        await new Promise((res) => setTimeout(res, backoffMs));
+        r = await newsImpl(query, maxResults);
+        if (r.success) return r;
+      }
+      lastErr = r.error || lastErr;
+    } catch (e) { lastErr = e.message || lastErr; }
+  }
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const raw = await mcpImpl(query, maxResults, mcpTimeout);
@@ -393,7 +512,10 @@ module.exports = {
   webSearchMcp,
   webSearchDirect,
   webSearchWiki,
+  webSearchNews,
   webSearch,
+  _parseNewsRss,
+  _isNewsQuery,
   _httpFallbackError,
   _cacheKey,
   _clearSearchCache,
