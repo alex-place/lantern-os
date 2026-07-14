@@ -97,8 +97,26 @@ function isOperatorRequest(req, env = process.env) {
   return tokensEqual(requestToken(req), token); // remote, but holds the operator token
 }
 
+/**
+ * The user id forwarded on an in-process chat-tool loopback request, or "".
+ * tool-runner's _localTradingGet marks its hops `x-keystone-internal` and — because
+ * the in-process HTTP hop carries no session cookie — forwards the requesting
+ * user's id as `x-keystone-user` so per-user broker state (IBKR creds, ADR-0022)
+ * still resolves. Honored ONLY on requests that already hold operator trust
+ * (un-proxied loopback / operator token — the same trust that gates shell tools),
+ * so a proxied/public caller can never impersonate a user by setting the header.
+ */
+function internalUserId(req, env = process.env) {
+  const h = (req && req.headers) || {};
+  if (!h["x-keystone-internal"] || !h["x-keystone-user"]) return "";
+  if (!isOperatorRequest(req, env)) return "";
+  try { return decodeURIComponent(String(h["x-keystone-user"])); }
+  catch { return String(h["x-keystone-user"]); }
+}
+
 module.exports = {
   isOperatorRequest,
+  internalUserId,
   isLoopback,
   isProxied,
   tokensEqual,
