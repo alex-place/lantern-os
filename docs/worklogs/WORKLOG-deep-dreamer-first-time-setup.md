@@ -84,7 +84,7 @@ npm run dev --prefix apps/lantern-garage
   ([`auth-gate.js:8`](../../apps/lantern-garage/public/js/auth-gate.js)).
 
 ### Step 2 — User subscribes on Patreon (external)
-- User visits `https://www.patreon.com/c/lanterndreamjournal` and joins the **Deep Dreamer** tier.
+- User visits `https://www.patreon.com/cw/UnisonaAI` and joins the **Deep Dreamer** tier.
 - Patreon processes the $20/mo payment. (This is outside Lantern OS.)
 
 ### Step 3 — User signs in with Patreon (OAuth PKCE)
