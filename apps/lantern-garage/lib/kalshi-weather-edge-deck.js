@@ -19,11 +19,48 @@
  * places an order.
  */
 
+const fs = require("fs");
+const path = require("path");
 const kalshi = require("./kalshi-api");
 const nws = require("./kalshi-mos"); // NBS MOS forecast source (calibration-matched — #1871)
 const model = require("./kalshi-weather-edge");
 const { sizePosition } = require("./kalshi-kelly");
 const { getCalibrator } = require("./kalshi-calibration");
+
+// P0-7 (docs/TRADER-ANALYSIS-2026-07.md): the Kelly gate stack reads ctx.drawdownFrac and
+// ctx.openInGroup, but the deck never computed them (always 0), so the drawdown breaker and the
+// concentration gate could NEVER fire. These wire real values in.
+const HWM_FILE = path.join(process.cwd(), "data", "kalshi", "bankroll-hwm.json");
+
+/** Update the bankroll high-water-mark and return the current drawdown fraction (0..1). */
+function updateAndGetDrawdownFrac(currentCents) {
+  if (!(currentCents > 0)) return 0;
+  let peak = 0;
+  try { peak = Number(JSON.parse(fs.readFileSync(HWM_FILE, "utf8")).peakCents) || 0; } catch { peak = 0; }
+  const newPeak = Math.max(peak, currentCents);
+  if (newPeak !== peak) {
+    try {
+      fs.mkdirSync(path.dirname(HWM_FILE), { recursive: true });
+      fs.writeFileSync(HWM_FILE, JSON.stringify({ peakCents: newPeak, updatedAt: new Date().toISOString() }));
+    } catch { /* best effort */ }
+  }
+  return newPeak > 0 ? Math.max(0, (newPeak - currentCents) / newPeak) : 0;
+}
+
+/** Count OPEN positions per settlement-day key from a getPositions() result (concentration gate). */
+function heldCountByDayKey(positionsData) {
+  const rows = (positionsData && Array.isArray(positionsData.market_positions)) ? positionsData.market_positions : [];
+  const map = {};
+  for (const p of rows) {
+    const qty = Number(p.position ?? p.quantity ?? p.total_traded ?? p.count ?? 0);
+    if (!qty) continue;
+    const d = dateFromTicker(p.ticker);
+    if (!d) continue;
+    const key = `${d.month}-${d.day}`;
+    map[key] = (map[key] || 0) + 1;
+  }
+  return map;
+}
 
 const MONTHS = { JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6, JUL: 7, AUG: 8, SEP: 9, OCT: 10, NOV: 11, DEC: 12 };
 const SOURCES = [
@@ -188,6 +225,19 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     byDay.get(key).markets.push(m);
   }
 
+  // P0-7 risk context (best-effort; defaults keep the deck working if the API is unreachable).
+  // drawdownFrac feeds the Kelly drawdown breaker; heldByDay feeds the concentration gate.
+  let drawdownFrac = 0, heldByDay = {};
+  try {
+    const [balR, posR] = await Promise.all([
+      kalshi.getBalance().catch(() => null),
+      kalshi.getPositions().catch(() => null),
+    ]);
+    const bal = (balR && balR.data) ? balR.data : (balR || {});
+    drawdownFrac = updateAndGetDrawdownFrac(Number(bal.balance ?? bal.buying_power ?? bal.cash ?? 0));
+    heldByDay = heldCountByDayKey((posR && posR.data) ? posR.data : posR);
+  } catch { /* best effort — sizing gates fall back to 0 */ }
+
   const cards = [];
   const audit = [];
   const forecastMissing = [];
@@ -212,9 +262,10 @@ async function getWeatherEdgeDeck({ limit = 12, minEdgeCents = 5, series = "KXHI
     const rep = model.robustEdgeReport(fc, lead, ladder, ask, grp.d.month, grp.d.day, minEdgeCents);
     audit.push(`${grp.d.year}-${grp.d.month}-${grp.d.day} lead=${lead} NWS=${fc}°F -> ${rep.verdict}`);
     const ctx = { fc, ymd: fRec.ymd || `${grp.d.year}-${String(grp.d.month).padStart(2, "0")}-${String(grp.d.day).padStart(2, "0")}`,
-      nowMs, confidence: 0.6, calibrator, liveArmed, liveCap };
-    // Concentration gate input: how many actionable rows we're already emitting this day.
-    let openInGroup = 0;
+      nowMs, confidence: 0.6, calibrator, liveArmed, liveCap, drawdownFrac };
+    // Concentration gate: seed with positions ALREADY HELD in this day's group (was blind to them),
+    // then add each row we emit this run.
+    let openInGroup = heldByDay[key] || 0;
     for (const row of rep.actionable) {
       const m = grp.markets.find((x) => x.ticker === row.bucket);
       // dist+ladder ride along so the card can stamp the predictive distribution onto the
