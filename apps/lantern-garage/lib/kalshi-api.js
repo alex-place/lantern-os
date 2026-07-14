@@ -283,7 +283,15 @@ async function placeOrder(o) {
   const maxN = liveMaxContracts();
   const cappedCount = Math.min(o.count || 1, maxN);
 
-  const clientOrderId = crypto.randomUUID();
+  // P0-8: DETERMINISTIC client_order_id from the order params + a 10s time bucket, so an
+  // accidental retry/double-click within the window reuses the id and Kalshi dedups it (409 =
+  // already-placed, safe) instead of a fresh UUID that silently places a SECOND contract.
+  const idBucket = Math.floor(Date.now() / 10000);
+  const clientOrderId = crypto
+    .createHash("sha256")
+    .update([o.ticker, o.side, o.action, o.count, o.limitCents, o.source, idBucket].join("|"))
+    .digest("hex")
+    .slice(0, 32);
   const base = {
     ticker: o.ticker, side: o.side, action: o.action, count: cappedCount,
     type: o.type || "limit", clientOrderId, source: o.source || null,
@@ -305,8 +313,18 @@ async function placeOrder(o) {
     if (o.side === "yes") body.yes_price = o.limitCents; else body.no_price = o.limitCents;
   }
   const res = await request("POST", "/portfolio/orders", { auth: true, body });
-  logLedger({ event: "live_order_submitted", mode: "live", environment: ENV, status: res.status, ...base });
-  return { mode: "live", status: res.status, result: res.data, order: base };
+  // P0-2: distinct events per OUTCOME (accepted vs rejected — the ledger used to log every
+  // attempt as "submitted", conflating rejects/dups with real fills), and capture Kalshi's
+  // order_id so a row is reconcilable against settlement later (P0-8).
+  const ok = res.status >= 200 && res.status < 300;
+  const orderId = (res.data && res.data.order && res.data.order.order_id) || null;
+  logLedger({
+    event: ok ? "live_order_accepted" : "live_order_rejected",
+    mode: "live", environment: ENV, status: res.status,
+    orderId, error: ok ? null : ((res.data && (res.data.error || res.data.message)) || null),
+    ...base,
+  });
+  return { mode: "live", status: res.status, ok, orderId, result: res.data, order: base };
 }
 
 async function cancelOrder(orderId) {
