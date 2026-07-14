@@ -18,6 +18,10 @@ const PAPER_FILE = path.join(KALSHI_DIR, "paper-positions.jsonl");
 const { evaluateExit } = require("./kalshi-adaptive-exits");
 // Fee-aware realized P&L (P1-5): settlement = entry fee only; early sell-back = round-trip.
 const { realizedNetPnlCents } = require("./kalshi-fees");
+// Swappable fill model (P1-4): the exit fill goes through the model so the "exit at bid"
+// assumption is explicit and configurable (KALSHI_FILL_MODEL). Default topOfBook == the
+// prior hard-coded behavior, so this is a no-op unless a different model is selected.
+const fillModel = require("./kalshi-fill-model");
 
 // Legacy thresholds (deprecated — use evaluateExit instead)
 const STOP_LOSS_PCT  = -30;
@@ -205,8 +209,14 @@ async function pollOpen() {
                                          side === "yes" ? "yes_bid_dollars" : "no_bid_dollars")
                          ?? currentAsk;
 
-      // P&L: entered at ask, exit at bid (realistic with spread)
-      const pnlCents = currentBid - entryCents;
+      // Exit fill via the swappable model (P1-4). Default topOfBook returns the bid, so this
+      // equals `currentBid` unless KALSHI_FILL_MODEL selects mid/slippage. Fall back to the
+      // raw bid if the model can't price the book, so we never lose a fill to a null.
+      const modeledExit = fillModel.expectedFillCents({ side, action: "sell" }, market);
+      const exitFillCents = Number.isFinite(modeledExit) ? modeledExit : currentBid;
+
+      // P&L: entered at ask, exit at the modeled fill (realistic with spread)
+      const pnlCents = exitFillCents - entryCents;
       const pnlPct   = Math.round((pnlCents / entryCents) * 100);
 
       const minsToClose = market.close_time
@@ -250,9 +260,9 @@ async function pollOpen() {
       // hand. Take-profit is deliberately NOT auto-closed below — the player decides to
       // sell for profit or hold.
       if (pnlPct <= AUTO_STOP_PCT) {
-        closePosition(pos.id, { exitTag: "STOP-LOSS", exitPriceCents: currentBid, pnlPct });
+        closePosition(pos.id, { exitTag: "STOP-LOSS", exitPriceCents: exitFillCents, pnlPct });
         results.push({ ...pos, title: market.title || pos.ticker, entryCents, currentAsk, currentBid,
-          pnlCents, pnlPct, autoExit: "STOP-LOSS", minsToClose, status: "stopped-out" });
+          exitFillCents, pnlCents, pnlPct, autoExit: "STOP-LOSS", minsToClose, status: "stopped-out" });
         continue;
       }
 
