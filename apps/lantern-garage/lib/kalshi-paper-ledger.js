@@ -16,6 +16,8 @@ const PAPER_FILE = path.join(KALSHI_DIR, "paper-positions.jsonl");
 
 // Adaptive exits (no longer mechanical bands)
 const { evaluateExit } = require("./kalshi-adaptive-exits");
+// Fee-aware realized P&L (P1-5): settlement = entry fee only; early sell-back = round-trip.
+const { realizedNetPnlCents } = require("./kalshi-fees");
 
 // Legacy thresholds (deprecated — use evaluateExit instead)
 const STOP_LOSS_PCT  = -30;
@@ -104,7 +106,15 @@ function getWallet() {
     const exit = Number(e.exitPriceCents ?? 0);
     const qty = Number(o.qty ?? o.count ?? 1) || 1;
     const entry = Number(o.limitCents ?? o.entryCents ?? 50);
-    realizedCents += (exit - entry) * qty;   // realized P&L on the round-trip
+    // P1-5 (docs/TRADER-ANALYSIS-2026-07.md): realized P&L is NET of Kalshi fees, not gross.
+    // Settlement (WON/LOST held to expiry) pays only the entry taker fee; an early sell-back
+    // (STOP-LOSS / take-profit / manual / adaptive exit) pays the round-trip fee. Booking gross
+    // overstated the bankroll by ~1.75¢/contract per early exit — exactly the EV leak the
+    // analysis flagged.
+    const tag = String(e.exitTag || "").toUpperCase();
+    const settled = tag === "WON" || tag === "LOST" || tag === "RESOLVED";
+    const r = realizedNetPnlCents({ entryCents: entry, exitCents: exit, contracts: qty, settled });
+    realizedCents += r ? r.netCents : (exit - entry) * qty;
   }
   for (const [id, o] of opens) if (!closedIds.has(id)) investedCents += costOf(o);
   const cashCents = Math.max(0, PAPER_START_CENTS + realizedCents - investedCents);

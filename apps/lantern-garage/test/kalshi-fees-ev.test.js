@@ -59,5 +59,37 @@ check("a proven negative-expectancy market is SUPPRESSED by the EV gate", () => 
   }
 });
 
+// ── P1-5: round-trip fee + realized net P&L (settlement vs early sell-back) ────
+check("roundTripFeeCents = entry taker + exit taker", () => {
+  const rt = fees.roundTripFeeCents(50, 60, 1);
+  assert.strictEqual(rt, fees.takerFeeCents(50, 1) + fees.takerFeeCents(60, 1));
+});
+
+check("realized net: SETTLED win charges entry fee only (settlement is free)", () => {
+  // bought 10 @ 60¢, resolved YES → 100¢. gross = (100−60)*10 = 400¢; fee = entry taker @60¢×10.
+  const r = fees.realizedNetPnlCents({ entryCents: 60, exitCents: 100, contracts: 10, settled: true });
+  assert.strictEqual(r.grossCents, 400);
+  assert.strictEqual(r.feeCents, fees.takerFeeCents(60, 10));
+  assert.strictEqual(r.netCents, 400 - fees.takerFeeCents(60, 10));
+});
+
+check("realized net: EARLY sell-back charges the round trip (both legs)", () => {
+  // bought 10 @ 50¢, sold back @ 55¢ before settle. gross = 50¢; fee = taker@50 + taker@55, ×10.
+  const r = fees.realizedNetPnlCents({ entryCents: 50, exitCents: 55, contracts: 10, settled: false });
+  assert.strictEqual(r.grossCents, 50);
+  assert.strictEqual(r.feeCents, fees.roundTripFeeCents(50, 55, 10));
+  assert.ok(r.netCents < r.grossCents, "early exit net must be below gross");
+});
+
+check("early exit is strictly more expensive than settling the same move", () => {
+  const early = fees.realizedNetPnlCents({ entryCents: 50, exitCents: 55, contracts: 10, settled: false });
+  const settle = fees.realizedNetPnlCents({ entryCents: 50, exitCents: 55, contracts: 10, settled: true });
+  assert.ok(early.feeCents > settle.feeCents, "round trip must cost more than entry-only");
+});
+
+check("realized net: bad inputs → null (never fabricate a P&L)", () => {
+  assert.strictEqual(fees.realizedNetPnlCents({ entryCents: "x", exitCents: 100 }), null);
+});
+
 if (failures) { console.error(`\n${failures} FAILED`); process.exit(1); }
 console.log("\nAll kalshi-fees-ev tests passed.");
