@@ -3529,6 +3529,37 @@ function _sortedWlPrices(){
 // the whole array, so synthesis only ever fills the 15s gap (no fabricated data:
 // same feed, finer cadence). Feed gaps >1 bar are left alone rather than invented.
 const _TF_MS = { '1m':6e4, '5m':3e5, '15m':9e5, '1h':36e5, '4h':144e5, '1d':864e5 };
+// Ease the open candle's close between REAL ticks (Robinhood-style motion): the
+// canvas repaints each frame with an interpolated close, converging on the true
+// tick in ~450ms. Interpolation between actual prices only — no fabricated
+// wiggle. Canvas-only repaint (no overlay/DOM rebuild), one short rAF loop per
+// tick per ticker, skipped for reduced-motion users and oversized bar windows.
+const _liveAnims = {};   // tk → rAF handle
+function _animateLastBar(tk, fromClose, toClose){
+  const bars = barsData[tk]; if(!bars || !bars.length) return;
+  const last = bars[bars.length-1];
+  const cardCv = document.getElementById('chart-'+tk);
+  const fsCv   = fullscreenTicker===tk ? document.getElementById('chart-fs') : null;
+  const targets = [cardCv, fsCv].filter(c=>c && _crossData[c.id]);
+  const tooBig  = targets.some(c=>(_crossData[c.id].bars||[]).length>400);   // paint cost guard
+  if(!targets.length || tooBig || matchMedia('(prefers-reduced-motion: reduce)').matches){
+    last.close = toClose; return;                            // honest jump, no animation
+  }
+  if(_liveAnims[tk]) cancelAnimationFrame(_liveAnims[tk]);
+  const t0 = performance.now(), dur = 450;
+  const ease = x => 1 - Math.pow(1-x, 3);
+  const step = (now)=>{
+    const p = Math.min(1, (now-t0)/dur);
+    last.close = fromClose + (toClose-fromClose)*ease(p);
+    for(const c of targets){
+      const d = _crossData[c.id];
+      renderChart(c, d.bars, d.rMin, d.rMax, chartType, chartTimeframe);
+    }
+    if(p < 1) _liveAnims[tk] = requestAnimationFrame(step);
+    else { last.close = toClose; delete _liveAnims[tk]; }
+  };
+  _liveAnims[tk] = requestAnimationFrame(step);
+}
 function _tickLastBar(tk, px){
   const bars = barsData[tk];
   const dur = _TF_MS[chartTimeframe];
@@ -3539,9 +3570,14 @@ function _tickLastBar(tk, px){
   if(now < t0 + dur){                                        // tick belongs to the open bar
     if(px > last.high) last.high = px;
     if(px < last.low)  last.low  = px;
-    last.close = px;
+    if(px !== last.close) _animateLastBar(tk, last.close, px);
   } else if(now < t0 + 2*dur){                               // boundary crossed → open the next bar
-    bars.push({ timestamp:new Date(t0+dur).toISOString(), open:px, high:px, low:px, close:px, volume:0 });
+    // New candle opens at the PREVIOUS close (standard synthesis) and glides to
+    // the tick, so the boundary reads as continuous motion, not a teleport.
+    const prevClose = last.close;
+    bars.push({ timestamp:new Date(t0+dur).toISOString(), open:prevClose,
+                high:Math.max(prevClose,px), low:Math.min(prevClose,px), close:prevClose, volume:0 });
+    _animateLastBar(tk, prevClose, px);
   }                                                          // older gap → wait for real server bars
 }
 
