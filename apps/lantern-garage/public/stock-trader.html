@@ -169,6 +169,25 @@
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
+     Stale data must never look live (Σ₀ external-reality rule, applied to the UI). */
+  .feed-stamp{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--green);white-space:nowrap}
+  .feed-stamp.stale{color:var(--red);font-weight:700}
+  .pulse.stale{background:var(--red);animation:none}
+  /* #2439: session clock pill — label carries the phase, value the countdown */
+  #mktClockWrap .l.open{color:var(--green)} #mktClockWrap .l.pre,#mktClockWrap .l.after{color:var(--amber)}
+  /* #2439: RVOL chip in symbol info */
+  .wi-rvol{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:9px;margin-left:8px;border:1px solid var(--border);color:var(--text2)}
+  .wi-rvol.hot{border-color:rgba(245,166,35,.5);color:var(--amber);background:rgba(245,166,35,.08)}
+  /* #2439: price alerts */
+  .wi-alerts{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .wi-alert-add{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid var(--border);background:var(--bg1);color:var(--text1);cursor:pointer}
+  .wi-alert-add:hover{border-color:var(--accent);color:var(--text0)}
+  .wi-alert-chip{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:9px;border:1px solid rgba(245,166,35,.45);background:rgba(245,166,35,.08);color:var(--amber);white-space:nowrap}
+  .wi-alert-chip button{background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px;font-size:10.5px}
+  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  /* #2439: watchlist sort control */
+  .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
   .nav-link{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
@@ -741,6 +760,7 @@
   <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat acct"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
   <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+  <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
@@ -783,7 +803,8 @@
     <option value="All">All</option>
   </select>
   </div><!-- /hgroup -->
-  <div class="pulse"></div>
+  <div class="pulse" id="feedPulse"></div>
+  <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()" title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
@@ -798,6 +819,11 @@
   <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
+    <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
+      <option value="">⇅</option>
+      <option value="chg">Δ%</option>
+      <option value="rvol">RVOL</option>
+    </select>
   </div>
   <div id="wlList"></div>
   <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
@@ -965,6 +991,13 @@
         <input type="number" class="ot-field" id="otQty" aria-label="Quantity" value="1" min="1" step="1" oninput="renderOrderTicket()">
       </div>
       <div class="ot-row"><span></span><span class="ot-usd" id="otUsdEquiv">≈ $0.00 USD</span></div>
+      <!-- #2439: risk-based sizing — "risk $X to my stop" → units. Pros size positions
+           by dollars at risk, not share counts. Needs the stop-loss exit enabled. -->
+      <div class="ot-row">
+        <span class="ot-label" title="Auto-size units from dollars risked to the stop">Risk $ → units</span>
+        <input type="number" class="ot-field" id="otRiskUsd" aria-label="Dollars to risk to the stop" placeholder="—" min="0" step="1" oninput="otSizeFromRisk()">
+      </div>
+      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">enable a stop loss to auto-size</span></div>
 
       <div class="ot-section">
         <div class="ot-section-title">Exits</div>
@@ -989,7 +1022,7 @@
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
-              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl')">
+              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl');otSizeFromRisk()">
             </label>
             <label class="ot-fieldcell"><span>Ticks</span>
               <input type="number" class="ot-field" id="otSlTicks" aria-label="Stop-loss ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('sl')">
@@ -2323,6 +2356,26 @@ function renderOrderTicket(){
   submit.className = 'ot-submit ' + otSide;
 }
 
+// #2439: risk-based sizing — units = floor(risk$ / |entry − stop|). Entry is the
+// limit price when set, else the live price. Requires the stop-loss exit enabled.
+function otSizeFromRisk(){
+  const hint=document.getElementById('otRiskHint');
+  const risk=Number(document.getElementById('otRiskUsd').value);
+  if(!risk || risk<=0){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  const slOn=document.getElementById('otSlEnabled').checked;
+  const stop=Number(document.getElementById('otSlPrice').value);
+  const entry=(otOrderType==='limit' && Number(document.getElementById('otLimitPrice').value)>0)
+    ? Number(document.getElementById('otLimitPrice').value)
+    : getCurrentPrice(otTicker);
+  if(!slOn || !(stop>0)){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  const perShare=Math.abs(entry-stop);
+  if(!(perShare>0)){ if(hint) hint.textContent='stop equals entry — no distance to size from'; return; }
+  const qty=Math.max(1, Math.floor(risk/perShare));
+  document.getElementById('otQty').value=qty;
+  if(hint) hint.textContent=`${qty} units · $${fmt(perShare,2)}/unit to stop · risks $${fmt(qty*perShare,2)}`;
+  renderOrderTicket();
+}
+
 async function submitOrderTicket(){
   if(!otTicker) return;
   const qty = Math.max(1, Number(document.getElementById('otQty').value) || 1);
@@ -2399,7 +2452,7 @@ function adaptLogoBg(img){
 const _wlPx = (p)=> p>100 ? p.toLocaleString() : (p!=null ? p.toFixed(4) : '—');
 
 function renderWatchlist(){
-  document.getElementById('wlList').innerHTML = wlPrices.map(t=>{
+  document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
     const d  = zonesData[t.ticker]||{};
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
@@ -2440,11 +2493,14 @@ function renderSymbolInfo(ticker){
   const st = _symStats[ticker];
   const retCell = (lbl,v)=>`<div class="wi-ret ${v==null?'':v>=0?'up':'dn'}"><div class="wi-ret-v">${v==null?'—':(v>=0?'+':'')+v+'%'}</div><div class="wi-ret-l">${lbl}</div></div>`;
   const techCls = st&&st.technical ? (st.technical.includes('Buy')?'up':st.technical.includes('Sell')?'dn':'') : '';
+  // #2439: RVOL — recent volume vs its own average (the regime engine already
+  // computes this; finally surface it). ≥1.5× reads as "in play" for day traders.
+  const rvol = (marketRegime(ticker)||{}).volumeRatio || 0;
   el.className = 'wl-info show';
   el.innerHTML = `
     <div class="wi-sym">${ticker}</div>
     <div class="wi-name">${_symNames[ticker]||kind}</div>
-    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span></div>
+    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
     ${(st&&st.available)?`
     <div class="wi-sect">Technicals</div>
     <div class="wi-tech ${techCls}">${st.technical}</div>
@@ -2470,7 +2526,9 @@ function renderSymbolInfo(ticker){
       <span><b>1y Target</b> ${_fmtPx(q.targetMeanPrice)}</span>
     </div>`)(st.quote):''}
     <div class="wi-sect">About</div>
-    <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>`;
+    <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
+    <div class="wi-sect">Alerts</div>
+    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ 🔔 Alert</button></div>`;
   if(!_symNames[ticker] && kind==='Equity'){
     fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
       if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
@@ -3100,12 +3158,96 @@ async function loadCouncil(){
 }
 
 let pricesLoading = false;
+// ── P1 trust + workflow bundle (#2439) ────────────────────────────────────────
+// Feed honesty: flip the LIVE stamp red after 2 consecutive failed polls (~6s of
+// silence) so stale prices never masquerade as live. Restores on the next success.
+let _feedFails = 0;
+function _feedStatus(ok){
+  _feedFails = ok ? 0 : _feedFails+1;
+  const stale = _feedFails >= 2;
+  const stamp=document.getElementById('feedStamp'), dot=document.getElementById('feedPulse');
+  if(stamp){ stamp.textContent = stale ? 'STALE — reconnecting' : 'LIVE · 3s'; stamp.classList.toggle('stale', stale); }
+  if(dot) dot.classList.toggle('stale', stale);
+}
+
+// Session clock: US equities phases in ET (pre 4:00–9:30 · open 9:30–16:00 ·
+// after 16:00–20:00 · closed). Countdown to the next phase edge. Weekends roll to
+// Monday. (Exchange holidays are out of scope — the label is a clock, not an oracle.)
+function _updateMktClock(){
+  const lab=document.getElementById('mktClockLabel'), val=document.getElementById('mktClock');
+  if(!lab||!val) return;
+  const now=new Date();
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const mins=et.getHours()*60+et.getMinutes(), day=et.getDay();
+  const fmtC=(m)=>{ const h=Math.floor(m/60), mm=m%60; return (h>0? h+'h ' : '')+String(mm).padStart(2,'0')+'m'; };
+  let phase, cls, left;
+  if(day===0||day===6){ phase='Closed'; cls=''; left=null; }
+  else if(mins<240){ phase='Closed'; cls=''; left=240-mins; }
+  else if(mins<570){ phase='Pre-mkt'; cls='pre'; left=570-mins; }
+  else if(mins<960){ phase='Open'; cls='open'; left=960-mins; }
+  else if(mins<1200){ phase='After-hrs'; cls='after'; left=1200-mins; }
+  else { phase='Closed'; cls=''; left=null; }
+  lab.textContent=phase; lab.className='l '+cls;
+  const suffix = phase==='Open' ? ' to close' : phase==='Pre-mkt' ? ' to open' : phase==='After-hrs' ? ' left' : ' to pre';
+  val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
+}
+setInterval(_updateMktClock, 30000); _updateMktClock();
+
+// One-shot price alerts: stored per symbol in localStorage, checked on every
+// price poll, fire a toast + browser Notification, then self-remove.
+const _alerts=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.alerts')||'{}'); }catch(e){ return {}; } })();
+function _saveAlerts(){ try{ localStorage.setItem('trader.alerts', JSON.stringify(_alerts)); }catch(e){} }
+function _alertChipsHtml(ticker){
+  return (_alerts[ticker]||[]).map((a,i)=>
+    `<span class="wi-alert-chip">${a.dir==='above'?'≥':'≤'} $${a.price}<button onclick="removePriceAlert('${ticker}',${i})" aria-label="Remove alert" title="Remove">✕</button></span>`).join('');
+}
+function addPriceAlert(ticker){
+  const cur=getCurrentPrice(ticker);
+  const raw=prompt(`Alert when ${ticker} crosses… (now $${fmt(cur, cur>=100?2:4)})`, '');
+  const p=Number(raw); if(!raw || !isFinite(p) || p<=0) return;
+  (_alerts[ticker]=_alerts[ticker]||[]).push({ price:p, dir: p>=cur?'above':'below' });
+  _saveAlerts(); renderSymbolInfo(ticker);
+  if(window.Notification && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
+}
+function removePriceAlert(ticker,i){ (_alerts[ticker]||[]).splice(i,1); _saveAlerts(); renderSymbolInfo(ticker); }
+function _alertToast(msg){
+  const t=document.createElement('div'); t.className='alert-toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+}
+function checkPriceAlerts(){
+  for(const [ticker, list] of Object.entries(_alerts)){
+    const px=getCurrentPrice(ticker); if(!px) continue;
+    for(let i=list.length-1;i>=0;i--){
+      const a=list[i];
+      if((a.dir==='above' && px>=a.price) || (a.dir==='below' && px<=a.price)){
+        const msg=`🔔 ${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
+        _alertToast(msg);
+        if(window.Notification && Notification.permission==='granted') try{ new Notification('Unisona Trader', {body:msg}); }catch(e){}
+        list.splice(i,1); _saveAlerts();
+        if(activeTicker===ticker) renderSymbolInfo(ticker);
+      }
+    }
+  }
+}
+
+// Watchlist sort: none (server order) · day % · RVOL. Persisted.
+let _wlSort=(()=>{ try{ return localStorage.getItem('trader.wlSort')||''; }catch(e){ return ''; } })();
+function setWlSort(v){ _wlSort=v; try{ localStorage.setItem('trader.wlSort', v); }catch(e){} renderWatchlist(); }
+document.addEventListener('DOMContentLoaded',()=>{ const s=document.querySelector('.wl-sort'); if(s) s.value=_wlSort; });
+function _sortedWlPrices(){
+  if(_wlSort==='chg')  return wlPrices.slice().sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
+  if(_wlSort==='rvol') return wlPrices.slice().sort((a,b)=>(marketRegime(b.ticker).volumeRatio||0)-(marketRegime(a.ticker).volumeRatio||0));
+  return wlPrices;
+}
+
 async function loadWatchlistPrices(){
   if(pricesLoading) return;
   pricesLoading = true;
   try{
     const r = await fetch('/api/trading/watchlist-prices');
     wlPrices = await r.json();
+    _feedStatus(true);
+    checkPriceAlerts();
     renderWatchlist();
     wlPrices.forEach(t=>{
       updateCardChg(t);
@@ -3128,7 +3270,7 @@ async function loadWatchlistPrices(){
     });
     updateRegimeBadges();
     renderFullscreenChart();
-  }catch(e){}
+  }catch(e){ _feedStatus(false); }   // #2439: a failed poll must not look live
   finally{ pricesLoading = false; }
 }
 
