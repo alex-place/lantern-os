@@ -386,7 +386,7 @@ class IbkrCpapi {
    * ARRAY of order tickets; handles the reply/confirm loop (POST /iserver/reply/{id}).
    * Returns { status:'dry_run'|'submitted'|'error', dry, gate, order, ibkr?, orderId?, error? }.
    */
-  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false } = {}) {
+  async placeOrder({ symbol, conid, side, qty, orderType = 'MKT', price, tif = 'DAY', equity, outsideRth = false, acceptWarnings = false } = {}) {
     const status = await this.getStatus();
     const mode = status.mode; // 'paper' | 'live' | 'unknown'
     // Prefer the caller-supplied equity; else read the account so the guard's
@@ -443,10 +443,22 @@ class IbkrCpapi {
     // (a bare [ticket] → 400, { orders:[ticket] } → 200 PreSubmitted).
     let r = await this._request('POST', `/iserver/account/${encodeURIComponent(accountId)}/orders`, { orders: [ticket] });
     // Order reply messages [{id, message, messageIds}] must be confirmed to proceed.
+    // P0-8 (docs/TRADER-ANALYSIS-2026-07.md): do NOT blindly click through IBKR warnings
+    // (outside-RTH, size-vs-ADV, margin, price-cap). Collect them; only auto-confirm when the
+    // caller EXPLICITLY opts in via acceptWarnings:true. Otherwise surface them for a human.
+    const warnings = [];
     let confirms = 0;
     while (r.ok && Array.isArray(r.json) && r.json[0] && r.json[0].id && r.json[0].message && confirms < 5) {
+      warnings.push({ id: r.json[0].id, message: r.json[0].message });
+      if (!acceptWarnings) break;
       r = await this._request('POST', `/iserver/reply/${encodeURIComponent(r.json[0].id)}`, { confirmed: true });
       confirms += 1;
+    }
+    if (warnings.length && !acceptWarnings) {
+      return {
+        status: 'needs_confirmation', dry: false, gate, order, warnings,
+        note: 'IBKR returned order warnings; re-submit with acceptWarnings:true to confirm each',
+      };
     }
     if (!r.ok) return { status: 'error', dry: false, gate, order, error: r.error || 'order_rejected', ibkr: r.json };
     const first = Array.isArray(r.json) ? r.json[0] : r.json;
