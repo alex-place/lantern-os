@@ -3323,6 +3323,13 @@ async function handleStreamChat(req, url, res) {
 
   // Provider: Ollama (streaming) — last-resort
   if (_p === "ollama") {
+    // The direct-HTTP fallback below (Attempt 2) references `ollamaModel`, but that name
+    // only existed as the loop variable of the earlier local-first `for (const ollamaModel
+    // of modelChain)` block — it is NOT in scope here. Reaching this last-resort path (every
+    // cloud provider failed) therefore threw `ReferenceError: ollamaModel is not defined`,
+    // which escaped to the process-level uncaughtException handler and could crash the
+    // server mid-stream. Bind it to the same lead local model the first-pass used.
+    const ollamaModel = modelChain[0] || process.env.OLLAMA_MODEL || "qwen2.5-coder";
     // Attempt 1: Unified Agent Connector (health-checked, provider-ranked, Python-side SSE)
     if (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local") {
       try {
