@@ -268,7 +268,7 @@ Home (/)
 │
 └── External
     ├── GitHub (https://github.com/alex-place/lantern-os)
-    └── Patreon (https://www.patreon.com/c/lanterndreamjournal)
+    └── Patreon (https://www.patreon.com/cw/UnisonaAI)
 ```
 
 ---

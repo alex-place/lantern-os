@@ -90,7 +90,7 @@ it. **Unisona is the user-visible brand — never ship "unisona.ai/Lantern" in a
 1. **Confirm the exe is attached:** `gh release view "v$V" --json assets -q '.assets[].name'` — expect `Unisona-Setup-<ver>.exe` (+ the zips).
 2. **Source features + pricing from the repo, not memory:**
    - **Features** = the assembled `## [X.Y.Z]` bullets (what's new) + the standing capability set. Keep it human ("Native desktop app — a real window, not a browser tab"), not commit-speak.
-   - **Pricing** = read [`apps/lantern-garage/public/pricing.html`](../../../apps/lantern-garage/public/pricing.html) (tiers: Public / Operator / Supporter / Pilot) and the Patreon page `patreon.com/c/lanterndreamjournal`. Quote the *current* numbers from that file — do not hardcode prices here, they drift.
+   - **Pricing** = read [`apps/lantern-garage/public/pricing.html`](../../../apps/lantern-garage/public/pricing.html) (tiers: Public / Operator / Supporter / Pilot) and the Patreon page `patreon.com/cw/UnisonaAI`. Quote the *current* numbers from that file — do not hardcode prices here, they drift.
 3. **Write the post** to a temp file using the template below, then:
 
 ```bash
