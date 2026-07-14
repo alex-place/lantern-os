@@ -59,20 +59,22 @@ you land back logged in as your real Patreon identity (check `/api/auth/session`
 ## Task 2 — Verify tier→role mapping
 
 The mapping is in [`apps/lantern-garage/lib/auth-providers.js`](../../apps/lantern-garage/lib/auth-providers.js)
-as `PATREON_TIER_TO_ROLE` (⚠️ NOT `patreon-auth.js` / `TIER_TO_ROLE` — the older
-`docs/PATREON-OAUTH.md` is stale on this point). Current values:
+as `roleForAmountCents` — gated by **pledge amount**, not campaign-specific tier IDs, so
+it survives a campaign move (e.g. to `patreon.com/cw/UnisonaAI`). Current thresholds:
 
-| Tier | Tier ID | Role |
-|---|---|---|
-| Wanderer ($5) | `28764312` | `supporter` |
-| Deep Dreamer ($20) | `28740619` | `deep_dreamer` |
-| Synthesasia Guild ($200) | `28764307` | `admin` |
+| Entitled pledge (this campaign) | Role |
+|---|---|
+| ≥ $5 | `supporter` |
+| ≥ $20 (incl. the $200 top tier) | `deep_dreamer` (trading unlock) |
 
-Owner admin override: `patreon:49294581` in `ADMIN_OVERRIDES` (same file).
+A purchasable tier **never** grants `admin` — `resolveRole` caps any tier-derived role at
+`deep_dreamer`. Below $5 / $0 / unresolved amount → `guest` (fail-closed). Override the two
+thresholds (cents) via `PATREON_SUPPORTER_CENTS` / `PATREON_DEEP_DREAMER_CENTS` if you re-price.
 
-Confirm these tier IDs match the current campaign (Patreon → campaign settings →
-Tier management, or the tier `id`s returned by the identity API include). Fix any
-that drifted, or set `LANTERN_ADMIN_IDS` for extra admin overrides.
+Resolution is scoped to `PATREON_CAMPAIGN_ID` (⚠ required) so a member's pledges to other
+creators don't count. Owner admin: set `LANTERN_ADMIN_IDS` to the owner's Patreon user id
+(bare id is read as `patreon:<id>`) — **account-bound**, changes on a new Patreon account,
+and it's the ONLY admin path (the old hardcoded owner id was removed).
 
 ## Task 3 — Deploy the session fixes to master
 

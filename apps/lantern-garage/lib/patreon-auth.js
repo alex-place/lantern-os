@@ -31,9 +31,14 @@ async function handlePatreonCallback(req, res, query /*, deps */) {
   return handleOAuthCallback("patreon", req, res, query);
 }
 
-/** Map Patreon tier ids to a role (delegates to the registry's Patreon mapper). */
+/**
+ * @deprecated Role gating is now by PLEDGE AMOUNT, not tier id — tier ids alone can no
+ * longer resolve a role (this returns "guest" for any input, since no amounts are given).
+ * The live flow uses oauth-core → resolveRole with the fetched entitlement. Kept only so
+ * the historical export doesn't vanish; do NOT reintroduce id-based mapping through it.
+ */
 function mapPatreonTierToRole(tierIds) {
-  return PROVIDERS.patreon.mapRole({ memberships: tierIds || [] });
+  return PROVIDERS.patreon.mapRole({ memberships: tierIds || [], entitledAmountsCents: [] });
 }
 
 /**

@@ -6,7 +6,7 @@ Lantern OS includes a built-in Patreon OAuth login system that gates the entire 
 
 - **OAuth 2.0 with PKCE** — Secure authentication without storing passwords
 - **Session Management** — Server-side session cookies with 7-day TTL
-- **Role-Based Access Control** — Four access tiers: guest, supporter, founder, admin
+- **Role-Based Access Control** — Access tiers: guest, supporter, deep_dreamer (paid), admin (owner only)
 - **Profile Page** — User can view their Patreon info and logout from `/profile.html`
 - **Auto-Redirect** — Unauthenticated users redirected to `/auth.html`
 - **No Vendor Lock-in** — Pure Node.js implementation, no external auth services
@@ -62,23 +62,33 @@ The server will now:
 
 Patreon tiers are mapped to roles by **pledge amount** (not campaign-specific tier IDs),
 so moving to a new campaign — e.g. `patreon.com/cw/UnisonaAI` — never breaks gating. The
-mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmountCents`):
+mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmountCents`),
+and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pledges to
+*other* creators can't grant (or block) a role here.
 
-| Tier (default price) | Lantern Role | Access |
+| Entitled pledge (this campaign) | Role | Access |
 |-----------|--------------|--------|
-| Free (not a member) | `guest` | Public pages only |
-| $5 / Wanderer | `supporter` | Chat + features |
-| $20 / Deep Dreamer | `deep_dreamer` | All features + trading unlock |
-| $200 / top tier | `admin` | Admin tools |
+| Free / not a paying member | `guest` | Public pages only |
+| ≥ $5 | `supporter` | Chat + features (the default paid gate) |
+| ≥ $20 (incl. the $200 top tier) | `deep_dreamer` | All paid features + trading unlock |
 
 Notes:
-- **Any pledge ≥ the threshold** earns the role (so custom pledges above a tier still map
-  up); a member below the lowest price still resolves to `supporter`.
-- **Re-pricing?** Override the thresholds (in cents) without code changes:
-  `PATREON_SUPPORTER_CENTS`, `PATREON_DEEP_DREAMER_CENTS`, `PATREON_ADMIN_CENTS`.
-- **Owner admin** is account-bound, not tier-bound: set `LANTERN_ADMIN_IDS` to the campaign
-  owner's Patreon **user id** (numeric, from `/api/oauth2/v2/identity` while logged in as the
-  owner). This changes when you move to a new Patreon account.
+- **A purchasable tier NEVER grants `admin`.** `admin` is full operator/staff access
+  (provider keys, GPU dispatch, feature flags, and the accounts console that can reset any
+  password / grant admin), so tying it to a price point would let anyone buy site takeover.
+  The $200 top tier therefore maps to `deep_dreamer`; `admin` comes **only** from
+  `LANTERN_ADMIN_IDS`. If you want the $200 tier to unlock something beyond `deep_dreamer`,
+  add a distinct non-admin paid role — don't map it to `admin`.
+- **Fail-closed:** a $0 free-tier member, a below-$5 custom pledge, or an entitlement whose
+  amount can't be resolved all yield `guest` (never a free paid role).
+- **Re-pricing?** Override the two thresholds (cents): `PATREON_SUPPORTER_CENTS`,
+  `PATREON_DEEP_DREAMER_CENTS`.
+- **Demotion:** logging in via Patreon re-baselines the paid role to the *current*
+  entitlement, so a cancelled/downgraded membership loses the tier (staff roles set via
+  `setUserRole`/override are never demoted by a login).
+- **Owner admin** is account-bound: set `LANTERN_ADMIN_IDS` to the campaign owner's Patreon
+  **user id** (numeric, from `/api/oauth2/v2/identity` while logged in as the owner). It
+  changes when you move to a new Patreon account. If unset, **no one is admin.**
 - Restart the server after changing any of these.
 
 ## API Endpoints
@@ -97,7 +107,7 @@ Returns current session info.
     "id": "12345",
     "name": "John Doe",
     "email": "john@example.com",
-    "tier": "28764312"
+    "tier": "<entitled-tier-id>"
   }
 }
 ```
@@ -210,6 +220,6 @@ Should return your user info and role.
 
 For issues or questions:
 1. Check the server logs for `[AUTH]` debug messages
-2. Review `.env` configuration (especially tier IDs)
+2. Review `.env` configuration (PATREON_CAMPAIGN_ID + LANTERN_ADMIN_IDS)
 3. Verify Patreon app settings match your redirect URI
 4. Open an issue on GitHub with full error logs
