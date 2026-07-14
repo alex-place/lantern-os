@@ -6,13 +6,22 @@
 "use strict";
 
 const kalshi = require("./kalshi-api");
-const { getWinRate, getCategory } = require("./kalshi-winrate-tracker");
+const { getWinRate, getCategory, getCategoryStats } = require("./kalshi-winrate-tracker");
 
 // ── entry filters (profitability-driven) ────────────────────────────────────
 const MIN_CONVERGENCE_ASK = 80;  // only convergence plays ≥80¢ (tighter threshold)
 const MAX_CONVERGENCE_ASK = 90;  // only convergence plays ≤90¢ (profitable remainder)
 const MIN_ENTRY_CONVICTION = 65; // only entry cards ≥65% conviction
 const MIN_CATEGORY_WINRATE = 45; // skip category if <45% win rate
+
+// P0-3 (docs/TRADER-ANALYSIS-2026-07.md): win-rate alone is NOT profitability — the crypto
+// ledger shows 54% win-rate but −45¢/trade EXPECTANCY (tiny 1¢ wins vs 100¢ losses). Gate on the
+// category's realized, fee-inclusive expectancy so a category the data proves loses is suppressed.
+function categoryProfitable(ticker) {
+  const st = getCategoryStats(getCategory(ticker));
+  // Unknown category (no trades yet) → don't present it; require proven positive expectancy.
+  return !!(st && typeof st.expectancy === "number" && st.expectancy > 0);
+}
 
 function isShortWindowMarket(m, nowMs) {
   const closeMs = new Date(m.close_time).getTime();
@@ -61,19 +70,13 @@ function scoreIntraday(m, nowMs) {
 // Sweet spot: buy the winning side before resolution, collect the spread to 100¢.
 // Phase 1 optimization: tighter thresholds + win-rate check
 function isConvergenceOpportunity(m, nowMs) {
-  const ya = m.yes_ask || 0;
-  const na = m.no_ask || 0;
-  const high = Math.max(ya, na);
-  if (high < MIN_CONVERGENCE_ASK || high > MAX_CONVERGENCE_ASK) return false;
-
-  // Skip if category has poor win rate
-  const winRate = getWinRate(m.ticker);
-  if (winRate < MIN_CATEGORY_WINRATE) return false;
-
-  const closeMs = new Date(m.close_time).getTime();
-  const minsToClose = Math.round((closeMs - nowMs) / 60000);
-  if (minsToClose <= 0 || minsToClose > 480) return false;
-  return true;
+  // P0-4 (docs/TRADER-ANALYSIS-2026-07.md): DISABLED. The "convergence-profit" thesis — buy the
+  // 80–90¢ favorite to "collect the spread to 100¢" — has NO independent edge: the recommendation's
+  // conviction WAS the market ask (fair value == price), so the 10–20¢ "profit" is exactly the
+  // market's priced loss probability, with fully negative skew (lose 80–90¢ when it flips) and a fee
+  // on top. It is the classic short-premium trap and can't be positive-EV by construction. Re-enable
+  // ONLY behind an independent grounded P(YES) that exceeds the ask net of fees.
+  return false;
 }
 
 async function fetchAllCryptoMarkets() {
@@ -175,9 +178,10 @@ async function getCryptoSuggestions({ limit = 20, collector = null, exitsOnly = 
     // Phase 1: skip low-conviction entries
     if (conviction < MIN_ENTRY_CONVICTION) continue;
 
-    // Phase 1: skip poor-performing categories
-    const winRate = getWinRate(m.ticker);
-    if (winRate < MIN_CATEGORY_WINRATE) continue;
+    // P0-3: gate on realized fee-inclusive EXPECTANCY, not win-rate — a 54%-win category that
+    // loses −45¢/trade (tiny wins, full losses) must be suppressed, and an unproven category
+    // (no trade history) is not presented until it earns a positive expectancy.
+    if (!categoryProfitable(m.ticker)) continue;
 
     const yesAsk = m.yes_ask || 0;
     const noAsk = m.no_ask || 0;
