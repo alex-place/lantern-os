@@ -7,6 +7,32 @@ const path = require("path");
 const fs = require("fs");
 const { requireAuth, requireRole, requireStaff, requireEntitlement, hasEntitlement, meetsRole, isAdmin } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
+const { getSessionUser } = require("../lib/session-identity");
+const { parseCookies, isOperatorRequest } = require("../lib/request-auth");
+
+// The public "front door" — the home page. A brand-new visitor must make an entry
+// choice (sign in as a USER, or "Continue without an account" as a GUEST) before
+// the site opens. Both the apex and the explicit index path count as home so the
+// gate can't be sidestepped by requesting /index.html directly.
+const HOME_PATHS = new Set(["/", "/index.html"]);
+
+/**
+ * Has this request already entered as a user OR a guest? True when:
+ *   • an authenticated session exists (a signed-in user, incl. test-auth), OR
+ *   • the guest-choice cookie is present (they clicked "Continue without an
+ *     account" on /auth.html — the ln_guest=1 marker set there), OR
+ *   • it is a trusted local/operator request (the desktop app + the local operator
+ *     dashboard reach Node over an un-proxied loopback socket; external tunnelled
+ *     visitors carry proxy headers and never qualify — see lib/request-auth).
+ * A visitor with none of these is an unknown first-timer → bounce to /auth.html to
+ * choose. Kept in lock-step with the client first-visit gate in js/auth-gate.js.
+ */
+function hasEnteredAsUserOrGuest(req) {
+  if (getSessionUser(req)?.id) return true;
+  if (parseCookies(req).ln_guest === "1") return true;
+  if (isOperatorRequest(req)) return true;
+  return false;
+}
 
 // Public pages — no auth required
 const PUBLIC_PAGES = {
@@ -120,6 +146,16 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   if (isPageDisabled(pathname) && !isAdmin(req)) {
     res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
     res.end(renderDisabledPage(pathname));
+    return true;
+  }
+
+  // Front-door gate: the home page redirects an unknown visitor to /auth.html so
+  // they choose an entry — sign in (user) or "Continue without an account" (guest).
+  // Only the home path is gated (the rest of PUBLIC_PAGES stays openly reachable);
+  // a chosen guest / signed-in user / local operator passes straight through.
+  if (HOME_PATHS.has(pathname) && !hasEnteredAsUserOrGuest(req)) {
+    res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
+    res.end();
     return true;
   }
 
