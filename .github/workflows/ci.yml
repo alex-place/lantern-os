@@ -140,6 +140,11 @@ jobs:
           node tests/test_session_secret.js
           node tests/test_auth_tokens_failclosed.js
           node tests/test_local_auth_flow.js
+          node tests/test_patreon_auth_flag.js
+          node tests/test_patreon_oauth_cookie.js
+          node apps/lantern-garage/test/patreon-tier-amount.test.js
+          node apps/lantern-garage/test/patreon-fetchuser-parse.test.js
+          node apps/lantern-garage/test/patreon-role-demotion.test.js
 
       - name: Start server
         run: node apps/lantern-garage/server.js &

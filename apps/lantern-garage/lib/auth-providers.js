@@ -177,12 +177,14 @@ const PROVIDERS = {
       const url =
         "https://www.patreon.com/api/oauth2/v2/identity" +
         "?include=memberships.campaign,memberships.currently_entitled_tiers" +
+        "&fields%5Buser%5D=email,full_name" + // sparse fieldsets: request user attrs explicitly
         "&fields%5Btier%5D=title,amount_cents";
       const r = await fetchFn(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!r.ok) throw new Error(`Patreon userinfo failed: ${r.status} ${await r.text()}`);
       const j = await r.json();
-      const { data, included } = j;
-      const inc = included || [];
+      const data = j.data || {};
+      const attrs = data.attributes || {}; // JSON:API may omit attributes — never deref undefined
+      const inc = j.included || [];
       const members = inc.filter((x) => x.type === "member");
       // Scope to OUR campaign. With a configured PATREON_CAMPAIGN_ID, take only the
       // membership whose campaign matches. Without one, proceed ONLY if there is exactly
@@ -209,15 +211,25 @@ const PROVIDERS = {
         .filter((c) => c != null)
         .map(Number)
         .filter((n) => Number.isFinite(n));
+      // Whether this read AUTHORITATIVELY determined the paid entitlement for OUR campaign —
+      // true iff we found our membership AND either it entitles no tiers (a former/free
+      // patron: confirmed no paid entitlement → safe to demote) or we resolved ≥1 amount.
+      // It is FALSE when no membership matched (cancelled-vs-misconfigured campaign id are
+      // indistinguishable) or a membership entitles tiers whose amounts we couldn't read.
+      // The role lifecycle only DEMOTES on an authoritative read, so a wrong PATREON_CAMPAIGN_ID
+      // or a partial API response can't mass-downgrade paying members.
+      const entitlementResolved =
+        membership != null && (tierIds.length === 0 || entitledAmountsCents.length > 0);
       return {
         providerId: data.id,
-        email: data.attributes.email || null,
+        email: attrs.email || null,
         emailVerified: false, // Patreon does not assert email verification
-        name: data.attributes.full_name || "",
+        name: attrs.full_name || "",
         avatar: null,
         tier: tierIds[0] || null,
         memberships: tierIds, // tier ids for OUR campaign (kept for storage/back-compat)
         entitledAmountsCents, // pledge amounts (cents) for OUR campaign — the role source of truth
+        entitlementResolved, // gates the login re-baseline demotion (see user-profiles.js)
       };
     },
     mapRole(user) {

@@ -22,11 +22,20 @@ Lantern OS includes a built-in Patreon OAuth login system that gates the entire 
 3. Accept terms and submit
 4. Copy your **Client ID** and **Client Secret** — keep the secret safe!
 
-### 2. Get Your Campaign ID
+### 2. Get Your Campaign ID (required)
 
-Your Campaign ID is in the URL of your Patreon campaign:
-- URL: `https://www.patreon.com/c/{campaign_id}`
-- Example: If your URL is `https://www.patreon.com/c/16143763`, your Campaign ID is `16143763`
+`PATREON_CAMPAIGN_ID` is the **numeric API campaign id**, used to scope role gating to *your*
+campaign (a member's pledges to other creators must not count). It is **not** the vanity slug
+in the page URL — `patreon.com/cw/UnisonaAI` has no numeric id in it. Get it from the API while
+authenticated as the campaign owner:
+
+```bash
+curl -s https://www.patreon.com/api/oauth2/v2/campaigns \
+  -H "Authorization: Bearer <owner-access-token>"   # → data[].id is your PATREON_CAMPAIGN_ID
+```
+
+If unset, gating only works for a user who backs exactly one campaign; anyone who also backs
+another creator fails closed to `guest`.
 
 ### 3. Configure `.env`
 

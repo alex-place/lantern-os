@@ -504,8 +504,15 @@ function getOrCreateFromIdentity(provider, u, role) {
     // the trading unlock after a cancellation/chargeback). Staff roles (admin,
     // tech_support) are granted out-of-band (setUserRole / admin-override) and are NEVER
     // demoted by a login; the owner's admin-override is re-applied by the caller.
+    //
+    // Only re-baseline when the provider read AUTHORITATIVELY resolved the entitlement
+    // (u.entitlementResolved). A wrong PATREON_CAMPAIGN_ID or a partial API response yields
+    // an EMPTY-but-unresolved read; demoting on that would mass-lock-out paying members, so
+    // it's a no-op (keep the existing role) instead of persisting a downgrade to guest.
     const tierAuthorityReattesting =
-      provider === "patreon" && !STAFF_ROLES.includes(existing.role || "guest");
+      provider === "patreon" &&
+      !STAFF_ROLES.includes(existing.role || "guest") &&
+      u.entitlementResolved === true;
     const nextRole = tierAuthorityReattesting
       ? role || "guest"
       : higherRole(existing.role || "guest", role || "guest");
