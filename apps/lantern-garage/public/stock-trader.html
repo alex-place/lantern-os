@@ -1533,9 +1533,14 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // (Parameters measured on the corrupt cluster: range 22→12.2, tallest bar
     // 37% of plot, real ≤4× wicks untouched.) renderZoneLadder's auto-range
     // mirrors the same rule so range and drawing always agree.
+    // INTRADAY ONLY: a watchlist-wide sweep showed the contamination lives in the
+    // pre/after-hours bars of every equity (META 12.8%, MSFT 12.3% of 1h bars;
+    // crypto ~0%), while daily+ bars are clean — and on dailies a >4× wick can be
+    // a REAL crash day that must render honestly. So dailies pass through raw.
+    const _sanitizing = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
     const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
     const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
-    const _wdet = _med2>0 ? _med2*4 : Infinity;
+    const _wdet = (_sanitizing && _med2>0) ? _med2*4 : Infinity;
     const saneHiLo = b => {
       const bh=Math.max(b.open,b.close), bl=Math.min(b.open,b.close);
       return { hi:(b.high-bh>_wdet)? bh+_med2 : b.high, lo:(bl-b.low>_wdet)? bl-_med2 : b.low };
@@ -1809,8 +1814,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     let lo = Infinity, hi = -Infinity;
     const _spans = viewBars.map(b=>Math.abs(b.high-b.low)).filter(x=>x>0).sort((a,b)=>a-b);
     const _medSpan = _spans.length ? _spans[Math.floor(_spans.length/2)] : 0;
-    const _wickDet = _medSpan>0 ? _medSpan*4 : Infinity;
-    const _glitch  = _medSpan>0 ? _medSpan*10 : Infinity;
+    // Intraday only (mirrors renderChart): dailies are clean and a >4× daily wick
+    // can be a real crash day — it must set the range honestly.
+    const _saneTf = ['1m','5m','15m','1h','4h'].indexOf(chartTimeframe) !== -1;
+    const _wickDet = (_saneTf && _medSpan>0) ? _medSpan*4 : Infinity;
+    const _glitch  = (_saneTf && _medSpan>0) ? _medSpan*10 : Infinity;
     let _kept = 0;
     for(const b of viewBars){
       const bodyHi = Math.max(b.open, b.close), bodyLo = Math.min(b.open, b.close);
