@@ -1,0 +1,55 @@
+{
+  "task": "BiSCo (binary spherical coding) vs PTQTP (dual trit-plane) quality on Qwen2.5-Coder-1.5B (#2396)",
+  "model": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
+  "group": 128,
+  "perplexity_fp16": 1.483,
+  "arms": {
+    "ptqtp_2plane": {
+      "mean_rel_frobenius_err": 0.19,
+      "perplexity": 1.861,
+      "ppl_ratio": 1.255,
+      "effective_bits_per_weight": 3.42,
+      "approx_compression_vs_fp16": 4.68,
+      "quantize_s": 51.9
+    },
+    "bisco_1plane": {
+      "mean_rel_frobenius_err": 0.6553,
+      "perplexity": 1025893.875,
+      "ppl_ratio": 691995.233,
+      "effective_bits_per_weight": 1.125,
+      "approx_compression_vs_fp16": 14.22,
+      "quantize_s": 0.3
+    },
+    "bisco_2plane": {
+      "mean_rel_frobenius_err": 0.3726,
+      "perplexity": 4357.035,
+      "ppl_ratio": 2938.947,
+      "effective_bits_per_weight": 2.25,
+      "approx_compression_vs_fp16": 7.11,
+      "quantize_s": 0.4
+    },
+    "bisco_3plane": {
+      "mean_rel_frobenius_err": 0.2398,
+      "perplexity": 4.758,
+      "ppl_ratio": 3.21,
+      "effective_bits_per_weight": 3.375,
+      "approx_compression_vs_fp16": 4.74,
+      "quantize_s": 0.5
+    }
+  },
+  "matched_budget_headline": {
+    "ptqtp_2plane": {
+      "bits": 3.42,
+      "ppl_ratio": 1.255,
+      "err": 0.19
+    },
+    "bisco_3plane": {
+      "bits": 3.375,
+      "ppl_ratio": 3.21,
+      "err": 0.2398
+    }
+  },
+  "verdict": "PTQTP-2plane (~3.42b) beats BiSCo (bisco_3plane, ~3.375b): ppl x1.255 vs x3.21 \u2014 the codebook-free sign codec loses to dual-ternary at this rung",
+  "evidence_class": "MEASURED",
+  "caveats": "QUALITY-only (both stored dequantized fp16, no packed kernel); perplexity on one prose+code passage; Qwen2.5-Coder-1.5B (NOT the paper's Qwen3-8B) so absolute numbers won't match theirs; BiSCo here is the CORE sign-stream + residual-BSQ codec only \u2014 the paper's category-wise recovery distillation, 8-bit protected channels, and LoRA are NOT reproduced, so this is the raw codec rate-distortion, the fair head-to-head vs PTQTP (also raw)."
+}

@@ -1,0 +1,28 @@
+{
+  "task": "loop-depth vs CoT-scratchpad memory-budget A/B on Ouro-1.4B coding (#2380)",
+  "base_model": "ByteDance/Ouro-1.4B",
+  "adapter": true,
+  "n": 30,
+  "loop_depth": 4,
+  "loop_depth_arm": {
+    "pass@1": 0.3,
+    "passed": 9,
+    "ci95": [
+      0.167,
+      0.479
+    ]
+  },
+  "cot_scratchpad_arm": {
+    "pass@1": 0.0,
+    "passed": 0,
+    "ci95": [
+      -0.0,
+      0.114
+    ]
+  },
+  "delta_depth_minus_cot": 0.3,
+  "wall_s": 2807.1,
+  "verdict": "DIRECTIONAL (CoT arm confounded): loop-depth-4 completion 9/30 (0.30) vs depth-1 CoT-scratchpad 0/30 (0.0). The CoT arm collapses to zero, but that conflates minimal recurrence + chat-vs-completion format + an adapter trained for completion \u2014 so this is NOT a clean memory-budget separation. Decision-relevant read: recurrent DEPTH is the working test-time-compute knob for the served coder; shifting budget to depth-1 + CoT scratchpad is non-viable on this adapter without retraining for the CoT mode. A clean separation needs a model trained for both placements.",
+  "evidence_class": "MEASURED",
+  "caveats": "forced-depth Ouro has a high no-parse rate that depresses both arms; n small (wide Wilson CIs); CoT arm uses a chat scratchpad prompt at depth 1 vs plain completion at max depth, so prompt format co-varies with the compute placement; greedy; exec-graded via eval_humaneval_ouro."
+}

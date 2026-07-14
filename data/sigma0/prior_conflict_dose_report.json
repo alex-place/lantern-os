@@ -1,0 +1,24 @@
+{
+  "task": "context-vs-prior conflict dose-response on Ouro-1.4B (#2391)",
+  "base_model": "ByteDance/Ouro-1.4B",
+  "adapter": false,
+  "n_items": 30,
+  "n_prior_held": 28,
+  "clean_dose_flip_rate_by_k": {
+    "0": 0.0,
+    "1": 0.857,
+    "2": 0.964,
+    "3": 1.0,
+    "4": 0.964
+  },
+  "crossover_k": 1,
+  "noisy_dose_flip_rate_by_err_fraction": {
+    "0.0": 0.964,
+    "0.25": 0.857,
+    "0.5": 0.679,
+    "0.75": 0.143
+  },
+  "verdict": "crossover at k=1 clean snippet(s)",
+  "evidence_class": "MEASURED",
+  "caveats": "greedy; loose token-containment grading; snippets synthesized by deterministic paraphrase (not live BM25); n small so flip_rate has binomial noise; counterfactual answers are fictional to force a genuine prior conflict."
+}

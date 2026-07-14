@@ -1,0 +1,113 @@
+{
+  "task": "does Ouro-1.4B have a quant-critical super weight? (#2386)",
+  "model": "ByteDance/Ouro-1.4B-Thinking",
+  "n_down_proj": 24,
+  "topk_tested": 8,
+  "super_factor_threshold": 2.0,
+  "baseline_perplexity": 1.37,
+  "worst_single_weight_ppl_ratio": 1.005,
+  "worst_location": "model.layers.9.mlp.down_proj[8,1822]",
+  "n_super_weights": 0,
+  "super_weights": [],
+  "results": [
+    {
+      "name": "model.layers.1.mlp.down_proj",
+      "row": 544,
+      "col": 2186,
+      "value": -1.4375,
+      "abs": 1.4375,
+      "pruned_ppl": 1.371,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.0,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.0.mlp.down_proj",
+      "row": 132,
+      "col": 3066,
+      "value": -1.1328125,
+      "abs": 1.1328125,
+      "pruned_ppl": 1.371,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.0,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.2.mlp.down_proj",
+      "row": 61,
+      "col": 1111,
+      "value": -1.09375,
+      "abs": 1.09375,
+      "pruned_ppl": 1.37,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.0,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.9.mlp.down_proj",
+      "row": 8,
+      "col": 1822,
+      "value": -0.9765625,
+      "abs": 0.9765625,
+      "pruned_ppl": 1.377,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.005,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.11.mlp.down_proj",
+      "row": 321,
+      "col": 2609,
+      "value": 0.96484375,
+      "abs": 0.96484375,
+      "pruned_ppl": 1.375,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.004,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.13.mlp.down_proj",
+      "row": 1442,
+      "col": 1425,
+      "value": 0.8671875,
+      "abs": 0.8671875,
+      "pruned_ppl": 1.369,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 0.999,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.12.mlp.down_proj",
+      "row": 945,
+      "col": 1935,
+      "value": -0.84375,
+      "abs": 0.84375,
+      "pruned_ppl": 1.37,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.0,
+      "restore_ok": true,
+      "is_super": false
+    },
+    {
+      "name": "model.layers.4.mlp.down_proj",
+      "row": 448,
+      "col": 2037,
+      "value": 0.828125,
+      "abs": 0.828125,
+      "pruned_ppl": 1.37,
+      "restored_ppl": 1.37,
+      "ppl_ratio": 1.0,
+      "restore_ok": true,
+      "is_super": false
+    }
+  ],
+  "verdict": "NO super weight at >= 2.0x threshold (worst single-weight zeroing = x1.00) -> mixed-precision super-weight plumbing would not help THIS model",
+  "evidence_class": "MEASURED",
+  "caveats": "perplexity on one diverse prose+code passage; scans only the single top-|w| entry per down_proj (not full super-activation tracing); Ouro is weight-tied recurrent so a down_proj is reused across unroll steps; fp16."
+}

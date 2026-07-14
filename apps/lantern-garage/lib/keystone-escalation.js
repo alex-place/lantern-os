@@ -81,29 +81,74 @@ function _landed(result, requireVerified) {
 }
 
 /**
+ * #2385 (arXiv:2607.08665 "Resample or Reroute?") — a failure is "resample-worthy" when
+ * the attempt did NOT land but ALSO did not confidently collapse/diverge/ungrounded/hit
+ * max-depth. Those instability signals mean the cheap model is confidently wrong, so extra
+ * local samples won't help — spend the budget on rerouting instead. A plain near-miss
+ * (tests failed, no collapse signal) is the case where another local sample can flip.
+ */
+function _resampleWorthy(result) {
+  if (!result) return false;
+  return !_escalateSignalled(result);
+}
+
+/**
  * Run the kernel across `providers`, escalating to the next on failure.
  * @param providers ordered [{provider, model}]
- * @param runOne async (provider, model, index) -> keystoneRun result ({status,...})
+ * @param runOne async (provider, model, index, resampleIndex) -> keystoneRun result ({status,...})
+ *        resampleIndex (0-based) lets the caller vary temperature/seed on retries so a
+ *        resample draws a genuinely different sample (0 = the first, greedy attempt).
  * @param onEscalate async (escalationRecord, result) -> void  (per failed attempt)
  * @param requireVerified when true, unverified-but-applied local results escalate
  *        (verify-gated local-first, #1197). Default false = legacy fleet behavior.
- * @returns { result, providerUsed|null, attempts, escalations[], landedBy, verified }
+ * @param resampleBudget #2385 budget-aware resample-vs-reroute: total extra local samples
+ *        allowed across the whole run before paying to reroute. Default 0 = today's behavior
+ *        (purely additive — a failed verify reroutes immediately).
+ * @param isResamplable (provider) -> bool: which providers are cheap enough to resample
+ *        rather than reroute. Default: only the on-box local model ("ollama").
+ * @param resampleGate (result) -> bool: whether THIS failure warrants a resample. Default
+ *        `_resampleWorthy` (near-miss yes, confident-collapse no — reroute).
+ * @param onResample async (resampleRecord, result) -> void  (per extra local sample)
+ * @returns { result, providerUsed|null, attempts, escalations[], resamples[], landedBy, verified }
  */
-async function runKernelWithEscalation({ providers, runOne, onEscalate = async () => {}, requireVerified = false }) {
+async function runKernelWithEscalation({ providers, runOne, onEscalate = async () => {},
+  requireVerified = false, resampleBudget = 0, isResamplable = (p) => p === "ollama",
+  resampleGate = _resampleWorthy, onResample = async () => {} }) {
   const escalations = [];
+  const resamples = [];
   let lastResult = null;
+  let budget = Math.max(0, resampleBudget | 0);
   const list = providers || [];
   for (let i = 0; i < list.length; i++) {
     const { provider, model } = list[i];
-    const result = await runOne(provider, model, i);
-    lastResult = result;
-    if (_landed(result, requireVerified)) {
-      const providerUsed = { provider, model };
-      return {
-        result, providerUsed, attempts: i + 1, escalations,
-        landedBy: landedByOf(providerUsed),
-        verified: !!(result.tests && result.tests.success),
-      };
+    let resampleIndex = 0;
+    let result;
+    // Budget-aware resample loop (#2385): spend cheap local compute (extra samples of the
+    // SAME model) before paying to reroute. A resample fires only when (a) budget remains,
+    // (b) this provider is cheap/local, and (c) the failure is a recoverable near-miss.
+    for (;;) {
+      result = await runOne(provider, model, i, resampleIndex);
+      lastResult = result;
+      if (_landed(result, requireVerified)) {
+        const providerUsed = { provider, model };
+        return {
+          result, providerUsed, attempts: i + 1, escalations, resamples,
+          landedBy: landedByOf(providerUsed),
+          verified: !!(result.tests && result.tests.success),
+        };
+      }
+      if (budget > 0 && isResamplable(provider) && resampleGate(result)) {
+        budget -= 1;
+        resampleIndex += 1;
+        const rrec = {
+          provider, model, attempt: i + 1, resampleIndex,
+          budgetLeft: budget, status: result && result.status,
+        };
+        resamples.push(rrec);
+        await onResample(rrec, result);
+        continue; // draw another local sample of the SAME model
+      }
+      break; // not resample-worthy (or budget spent) → escalate to the next provider
     }
     const next = list[i + 1] || null;
     const rec = {
@@ -115,7 +160,7 @@ async function runKernelWithEscalation({ providers, runOne, onEscalate = async (
     if (!next) break; // chain exhausted
   }
   return {
-    result: lastResult, providerUsed: null, attempts: list.length, escalations,
+    result: lastResult, providerUsed: null, attempts: list.length, escalations, resamples,
     landedBy: null, verified: false,
   };
 }
@@ -232,6 +277,6 @@ function recordDistillationPair({ task, plan, patch, landedBy, verified, escalat
 
 module.exports = {
   kernelEscalationChain, runKernelWithEscalation, recordEscalation, recordLanded,
-  recordDistillationPair, readRolloverShare, landedByOf,
+  recordDistillationPair, readRolloverShare, landedByOf, _resampleWorthy,
   KERNEL_REASONER, SUCCESS_STATUSES, DISTILL_REL,
 };
