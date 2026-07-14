@@ -32,6 +32,12 @@ function check(n, fn) { try { fn(); console.log("  ok  -", n); } catch (e) { fai
     assert.ok(noConfirm.wouldBlock.some(b => b.startsWith("live_confirm_required")), JSON.stringify(noConfirm.wouldBlock));
   });
 
+  // P0-1 prove-or-pause: KALSHI_LIVE_EDGE_PROVEN is unset in this test env, so EVERY order —
+  // even a legit weather order — carries the edge_unproven blocker (fail-closed default).
+  check("edge_unproven blocker present on a legit weather order (fail-closed default)", () => {
+    assert.ok(wx.wouldBlock.some(b => b.startsWith("edge_unproven")), JSON.stringify(wx.wouldBlock));
+  });
+
   console.log(failures ? `\n✗ ${failures} check(s) failed` : "\n✓ order-hardening passed");
   process.exit(failures ? 1 : 0);
 })();

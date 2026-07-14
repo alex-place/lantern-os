@@ -119,16 +119,34 @@ def log_paper_open(ticker: str, title: str, side: str, limit_cents: int, edge: f
     return tid
 
 
-def log_paper_close(tid: str, exit_cents: int, correct: bool):
-    pnl_pct = round((exit_cents - 50) / 50, 4) if correct else round((50 - exit_cents) / 50, 4)
+def kalshi_entry_fee_cents(price_cents: int) -> int:
+    """Kalshi taker fee on a single contract: ceil(0.07 * p * (1-p)) in cents, p in dollars."""
+    import math
+    p = max(0.0, min(1.0, price_cents / 100.0))
+    return math.ceil(0.07 * p * (1.0 - p) * 100.0)
+
+
+def log_paper_close(tid: str, exit_cents: int, correct: bool, entry_cents: int):
+    """Realized PnL of a hold-to-settlement binary. `exit_cents` is THIS position's settlement
+    value (100 if the bought side won, 0 if it lost); `entry_cents` is the real fill price. The
+    old formula PnL'd against a hardcoded 50c entry and always logged +/-100% — this computes the
+    true cents PnL net of the Kalshi entry fee (settlement itself is free)."""
+    fee_cents = kalshi_entry_fee_cents(entry_cents)
+    gross_cents = exit_cents - entry_cents          # +100c win margin at 0c entry .. -entry on a loss
+    net_cents = gross_cents - fee_cents
+    pnl_pct = round(net_cents / entry_cents, 4) if entry_cents else 0.0
     entry = {
-        "event":         "close",
-        "id":            tid,
-        "exitTag":       "RESOLVED",
+        "event":          "close",
+        "id":             tid,
+        "exitTag":        "RESOLVED",
         "exitPriceCents": exit_cents,
-        "pnlPct":        pnl_pct,
-        "correct":       correct,
-        "closedAt":      datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),
+        "entryCents":     entry_cents,
+        "grossCents":     gross_cents,
+        "feeCents":       fee_cents,
+        "netCents":       net_cents,          # realized cents PnL per contract, net of fee
+        "pnlPct":         pnl_pct,
+        "correct":        correct,
+        "closedAt":       datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),
     }
     with PAPER_LOG.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
@@ -287,7 +305,8 @@ def main():
                         result["correct"] = correct
                         result["edge"]    = st.position.get("cio_edge", 0)
                         exit_cents = 100 if outcome == (1 if side_yes else 0) else 0
-                        log_paper_close(st.position["id"], exit_cents, correct)
+                        log_paper_close(st.position["id"], exit_cents, correct,
+                                        st.position.get("entry_cents", 50))
                         flag = "✓ WIN" if correct else "✗ LOSS"
                         print(f"  [{sym}] {st.ticker} RESOLVED — {flag}", flush=True)
                     resolved_results.append(result)
@@ -309,7 +328,7 @@ def main():
                     side = "yes" if edge > 0 else "no"
                     limit = ya if side == "yes" else na
                     tid = log_paper_open(ticker, m.get("title",""), side, limit, edge)
-                    st.position = {"id": tid, "side": side, "cio_edge": edge}
+                    st.position = {"id": tid, "side": side, "cio_edge": edge, "entry_cents": limit}
                     st.signal_fired = True
                     signal_str = f" *** SIGNAL {side.upper()} edge={edge:+.3f} p*={p_star:.3f} → PAPER TRADE"
 

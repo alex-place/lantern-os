@@ -251,6 +251,13 @@ async function placeOrder(o) {
   if (process.env.KALSHI_TRADING_ENABLED !== "1") blockers.push("trading_disabled (set KALSHI_TRADING_ENABLED=1)");
   if (!liveTradingFlagEnabled()) blockers.push("live_flag_off (enable admin flag 'kalshi_live_trading' at /admin-flags.html)");
   if (killSwitchActive()) blockers.push("kill_switch_active (data/kalshi/LIVE-KILL-SWITCH)");
+  // PROVE-OR-PAUSE (docs/TRADER-ANALYSIS-2026-07.md P0-1): no strategy has a settlement-graded,
+  // out-of-sample, net-of-fee positive EV yet. Live orders are hard-paused until the owner runs
+  // the fee-inclusive backtest (kalshi_pnl_backtest.py) and DELIBERATELY asserts a proven edge by
+  // setting KALSHI_LIVE_EDGE_PROVEN=1. Fail-closed: default (unset) blocks every live order.
+  if (process.env.KALSHI_LIVE_EDGE_PROVEN !== "1") {
+    blockers.push("edge_unproven (no OOS net-of-fee settlement-graded EV; set KALSHI_LIVE_EDGE_PROVEN=1 only after a positive backtest — see docs/TRADER-ANALYSIS-2026-07.md)");
+  }
   if (!hasCredentials()) blockers.push("credentials_required");
 
   // Scope gate: restrict live orders to the allowlisted source(s). An unsourced or
