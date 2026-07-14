@@ -100,8 +100,29 @@
   .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
   .footer-resize:hover::before{background:var(--tv-text-secondary)}
   body.resizing-footer{cursor:ns-resize;user-select:none}
-  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);box-shadow:0 1px 0 var(--border);display:flex;align-items:center;gap:14px;padding:0 16px;overflow-x:auto;scrollbar-width:none}
+  .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);box-shadow:0 1px 0 var(--border);display:flex;align-items:center;gap:10px;padding:0 14px;overflow-x:auto;scrollbar-width:none}
   .header::-webkit-scrollbar{height:0}   /* toolbar scrolls if a narrow screen can't fit every control, without a visible bar */
+  /* #2431: one INLINE line — nothing in the toolbar may wrap or shrink; when the
+     screen is too narrow the row scrolls sideways instead of stacking/clipping. */
+  .header > *{flex:0 0 auto;white-space:nowrap}
+  /* #2432: the chart controls read as ONE segmented cluster, not 5 loose widgets. */
+  .hgroup{display:flex;align-items:center;gap:4px;padding:3px 5px;border:1px solid var(--border);border-radius:8px;background:var(--bg0)}
+  .hgroup .chart-ctrl{border:none;background:transparent;border-radius:5px}
+  .hgroup .chart-ctrl:hover{background:var(--bg2)}
+  .hgroup-sep{width:1px;height:16px;background:var(--border);flex:0 0 auto}
+  /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
+     actions collapse into a ☰ dropdown instead of a long sideways-scrolling row.
+     The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
+  /* The ☰ is PERMANENT: Pre/After + Kalshi live in it at every width; on narrow
+     screens it additionally swallows the chart controls, Explore, and broker link. */
+  .hmenu-btn{font-size:15px;line-height:1;padding:6px 11px}
+  .hmenu{position:fixed;top:104px;right:8px;z-index:1300;background:var(--bg1);border:1px solid var(--border);
+    border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.5);padding:12px;display:flex;flex-direction:column;
+    gap:10px;min-width:230px;max-width:calc(100vw - 16px)}
+  .hmenu[hidden]{display:none}
+  .hmenu .hgroup{flex-wrap:wrap;justify-content:center;gap:6px}
+  .hmenu .hgroup-sep{display:none}
+  .hmenu .nav-link{display:block;text-align:center}
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
@@ -137,8 +158,11 @@
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
-  .hstat{font-family:var(--mono);font-size:11px;display:flex;flex-direction:column;gap:1px;min-width:80px}
-  .hstat .l{color:var(--text2);font-size:10px;text-transform:uppercase;letter-spacing:.1em}
+  /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
+     label-over-value pairs — halves the toolbar's height footprint. */
+  .hstat{font-family:var(--mono);font-size:11px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
+    padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg0)}
+  .hstat .l{color:var(--text2);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em}
   .hstat .v{color:var(--text0)}
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
@@ -200,12 +224,16 @@
   .wl-remove{font-family:var(--mono);font-size:11px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
-  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;grid-auto-rows:352px}
+  /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
+     viewport height instead of a fixed 352px, so charts stay usable on tablets,
+     portrait screens, and desktops with the chat rail open. */
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;grid-auto-rows:clamp(260px,38vh,400px)}
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
-  .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover)}
+  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
+  /* #2433: hover lift — the deck responds to the pointer like the site's chips do. */
+  .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover);transform:translateY(-2px)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
      border so the clicked chart reads as the active one the rest of the screen
      tracks. Theme-aware. */
@@ -238,9 +266,15 @@
   @keyframes cpFlashDown{0%{color:var(--red);background:rgba(255,95,109,.20)}100%{color:var(--text1);background:transparent}}
   .card-price.flash-up{animation:cpFlashUp 1s ease-out;border-radius:3px}
   .card-price.flash-down{animation:cpFlashDown 1s ease-out;border-radius:3px}
+  /* #2433: day-change chip — the at-a-glance win/loss cue for each card. */
+  .card-chg{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap}
+  .card-chg.up{background:rgba(0,212,170,.12);color:var(--green)}
+  .card-chg.dn{background:rgba(255,95,109,.12);color:var(--red)}
+  .card-chg.flat{background:rgba(92,99,112,.12);color:var(--text2)}
+  .card-chg:empty{display:none}
   .card-state{font-family:var(--mono);font-size:10px;padding:2px 6px;border-radius:2px;letter-spacing:.1em}
   .state-open .card-state{background:rgba(0,212,170,.12);color:var(--green)}
-  .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue)}
+  .state-watching .card-state{background:rgba(74,158,255,.12);color:var(--blue);animation:pulse 2.4s ease-in-out infinite}
   .state-quiet .card-state{background:rgba(92,99,112,.1);color:var(--text2)}
   /* Live market-regime badge (shown in place of QUIET when the market is
      actually moving — see marketRegime() / regimeBadgeInfo()) */
@@ -420,16 +454,26 @@
                animation:otSlideUp .2s ease; }
   }
   @keyframes otSlideUp{ from{transform:translateY(100%)} to{transform:translateY(0)} }
+  /* ── Responsive tiers (#2435): shed low-priority toolbar items and tighten the
+     layout progressively, instead of clipping ("EAD-NLY") or crushing charts.
+     Priority: chart controls + sign-in/chat > stats > cross-links. The toolbar's
+     horizontal scroll stays as the last resort, not the first. ── */
+  @media (max-width:1024px){
+    .layout{grid-template-columns:var(--sidebar-w,170px) 1fr}   /* narrower watchlist on tablets */
+    .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
+    .header{gap:8px;padding:0 10px}
+  }
+  @media (max-width:950px){
+    .header a[href*="explore"]{display:none}
+    .hstat:not(.acct){display:none}   /* VIX/Market live in the Σ₀ panel too */
+  }
+  @media (max-width:900px){
+    :root{--chat-w:320px}
+    .dc-modal{width:320px}
+  }
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
-  /* Mobile view switch (chart vs ticker list) — a compact centered segmented control,
-     hidden on desktop (both panels show). */
-  .mobile-view-tabs{ display:none; }
-  .mvt-btn{ flex:0 1 104px; min-height:28px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
-    border-radius:7px; font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.02em; cursor:pointer;
-    display:flex; align-items:center; justify-content:center; transition:background .15s,border-color .15s; }
-  .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
@@ -448,28 +492,30 @@
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
     .header .hstat{ min-width:0; }
-    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
-      background:var(--bg1); border-bottom:1px solid var(--border); }
-    /* default = chart view: charts get the room; the account panel is a resizable strip
-       at the bottom (drag its grabber). Override the desktop grid's height:100% (which made
-       the account panel swallow the whole phone screen). */
-    .sidebar{ display:none; flex:1 1 auto; min-height:0; overflow-y:auto; }
-    /* Breathing room at the bottom of the scroll so the last chart clears the account
-       strip instead of being butted right up against it. */
-    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
-    .footer{ flex:0 0 auto; height:var(--footer-h,40vh); min-height:120px; max-height:78vh; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
-    /* Fixed multi-chart grids stack in one column on phones (see applyGridCols) and FILL
-       the available height — the 1–2 rows split .main so the charts resize to the screen
-       (like desktop) instead of a fixed height that overflows and cuts off on small phones. */
-    .cards-grid.grid-fixed{ height:100%; }
+    /* Merged single view (Robinhood-style): hero chart on top, symbol details, then
+       the ticker list — ONE scrolling column, no Chart/Tickers tab switch. Tapping a
+       ticker swaps the hero chart (visibleTickers follows activeTicker on phones)
+       and opens the expanded fullscreen view. */
+    .layout{ overflow-y:auto; }
+    /* DOM order is header→sidebar→main→footer (desktop grid placement); reorder the
+       flex column so the hero CHART leads, then details+list, then the footer. */
+    .header{ order:-3; }
+    .main{ order:-2; flex:0 0 auto; height:auto; min-height:280px; overflow:visible; padding-bottom:8px; }
+    .sidebar{ order:-1; display:flex; flex:0 0 auto; min-height:0; border-right:none; border-top:1px solid var(--border); overflow:visible; }
+    #wlList{ flex:none; overflow:visible; }             /* the PAGE scrolls, not the list */
+    .wl-info{ order:-1; height:auto; max-height:none; } /* details sit right under the chart */
+    .wl-resize{ display:none!important; }
+    .footer{ flex:0 0 auto; height:auto; min-height:0; max-height:none; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
+    /* Charts are the HERO: auto mode stacks the whole deck full-width, each card a
+       readable ~46vh; the page scrolls through them (Robinhood-style). */
+    .cards-grid:not(.grid-fixed){ height:auto; grid-auto-rows:46vh; }
+    /* Focus/zoom (1-slot) + fixed layouts: one tall chart so the technicals and
+       buy/sell sit right below it in the same screen. */
+    .cards-grid.grid-fixed{ height:64vh; }
     /* Never let the chart body collapse to a sliver on a short phone (#2301):
        floor the ladder height and let .main scroll if a card runs tall. Overrides
        the .grid-fixed min-height:0 that allowed the 22px collapse. */
     .cards-grid.grid-fixed .card .zone-ladder{ min-height:180px; }
-    /* tickers view: show the ticker list, hide charts + footer */
-    .layout.mobile-tickers .sidebar{ display:flex; }
-    .layout.mobile-tickers .main,
-    .layout.mobile-tickers .footer{ display:none; }
     /* Bigger touch targets on phones for the dense toolbar controls (#2255). */
     .nav-link, .chart-ctrl, .range-btn{ min-height:36px; }
     .chart-ctrl, .range-btn{ padding:6px 10px; }
@@ -592,7 +638,7 @@
   body.guest .zone-ladder,
   body.guest .card.state-open .zone-ladder,
   body.guest .card.state-quiet .zone-ladder{ height:200px; }
-  .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue) }
+  .signin-cta{ background:var(--blue);color:#04121a;font-weight:700;border-color:var(--blue);white-space:nowrap }
   .signin-cta:hover{ filter:brightness(1.08);color:#04121a;background:var(--blue) }
   .guest-badge{ background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3) }
   /* Empty logged-in account (#2301): balance/positions/orders/history hold nothing,
@@ -609,6 +655,76 @@
      itself to just the tab strip (auto). Mobile (≤580) is flex, unaffected by
      grid-template-rows, and already collapses via the footer rule above. */
   body.acct-empty .layout{ grid-template-rows:52px minmax(0,1fr) auto !important; }
+
+  /* ── Dream-chat rail (#trader-chat) ──────────────────────────────────────────
+     A right-side docked panel that REFLOWS the deck (like the BUY/SELL order
+     ticket), NOT a floating popup. Shares the order-ticket's visual language:
+     same right-edge dock, border-left, slide-in, and content-shift. Talks to the
+     same backend as dream-chat.html (POST /api/dream/chat/stream, SSE tokens). */
+  .dc-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1050;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
+  .dc-bg.hidden{display:none}
+  .dc-modal{pointer-events:auto;display:flex;flex-direction:column;background:var(--bg1);
+    border-left:1px solid var(--border);width:var(--chat-w,360px);max-width:92vw;height:100%;
+    box-shadow:-10px 0 28px rgba(0,0,0,.45);animation:otSlideIn .18s ease}
+  /* Reflow the deck + footer to the left so content sits BESIDE the rail, never under
+     it — the same mechanism the order ticket uses. When both rails are open, reserve
+     room for both and the chat sits to the left of the ticket. */
+  body.dc-open .main{ padding-right: calc(var(--chat-w,360px) + 16px); }
+  body.dc-open .footer{ padding-right: calc(var(--chat-w,360px) + 16px); }
+  body.dc-open.ot-open .main{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
+  body.dc-open.ot-open .footer{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
+  body.ot-open .dc-bg{ right: var(--ticket-w,340px); }
+  @media (max-width:760px){ body.dc-open .main, body.dc-open .footer{ padding-right:0; } body.ot-open .dc-bg{ right:0; } }
+
+  .dc-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
+  .dc-head .dc-title{font-size:14px;font-weight:600;color:var(--text0);display:flex;align-items:center;gap:7px}
+  .dc-head .dc-sub{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text2)}
+  .dc-head .dc-x{cursor:pointer;font-size:12px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);text-decoration:none;white-space:nowrap}
+  .dc-head .dc-x:hover{color:var(--text0);border-color:var(--accent)}
+  .dc-head a.dc-x{margin-left:auto}
+  .dc-log{flex:1 1 auto;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:11px}
+  .dc-msg{max-width:90%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-wrap:break-word;overflow-wrap:anywhere}
+  .dc-msg.user{align-self:flex-end;background:color-mix(in srgb,var(--blue) 16%,var(--bg2));border:1px solid color-mix(in srgb,var(--blue) 45%,var(--border));color:var(--text0);border-bottom-right-radius:3px}
+  .dc-msg.bot{align-self:flex-start;background:var(--bg2);color:var(--text0);border:1px solid var(--border);border-bottom-left-radius:3px}
+  .dc-msg.bot.err{border-color:var(--red);color:var(--red);background:rgba(255,95,109,.08)}
+  .dc-route{align-self:flex-start;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);
+    padding:2px 8px;border:1px solid var(--border);border-radius:999px;background:var(--bg2);margin:-4px 0 -3px}
+  /* Empty state = the site's hero pattern (mandala mark + tagline + starter chips),
+     scaled down for the rail. Chips match dream-chat's .starter-chip. */
+  .dc-empty{margin:auto;text-align:center;color:var(--text2);font-size:12.5px;line-height:1.6;padding:0 10px;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:0}
+  .dc-empty .dc-mark{width:44px;height:44px;opacity:.85;margin-bottom:10px}
+  .dc-empty .dc-hero-t{font-family:var(--display);font-size:15px;font-weight:700;color:var(--text0);letter-spacing:.01em;margin-bottom:3px}
+  .dc-empty .dc-tag{font-style:italic;color:var(--text2);margin-bottom:16px}
+  .dc-chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+  .dc-chip{background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-size:12px;font-family:inherit;
+    padding:7px 13px;border-radius:9999px;cursor:pointer;white-space:nowrap;transition:border-color .18s,background .18s,transform .12s}
+  .dc-chip:hover{border-color:var(--accent);color:var(--text0);background:color-mix(in srgb,var(--accent) 8%,var(--bg2));transform:translateY(-1px)}
+  .dc-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .dc-typing{align-self:flex-start;display:flex;gap:4px;padding:4px 2px}
+  .dc-typing i{width:6px;height:6px;border-radius:50%;background:var(--text2);opacity:.55;animation:dcBlink 1.2s infinite ease-in-out}
+  .dc-typing i:nth-child(2){animation-delay:.2s}.dc-typing i:nth-child(3){animation-delay:.4s}
+  @keyframes dcBlink{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:.9;transform:translateY(-3px)}}
+  .dc-form{flex:0 0 auto;display:flex;gap:8px;align-items:flex-end;padding:12px 14px;border-top:1px solid var(--border);background:var(--bg1)}
+  .dc-form textarea{flex:1 1 auto;resize:none;min-height:40px;max-height:132px;padding:9px 11px;
+    border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text0);
+    font-family:var(--sans);font-size:13px;line-height:1.45}
+  .dc-form textarea::placeholder{color:var(--text2)}
+  .dc-form textarea:focus{outline:none;border-color:var(--accent);background:var(--bg1);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+  /* Send = the home bar's paper-plane icon button (index.html), sized to the rail. */
+  .dc-send{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:40px;height:40px;
+    border-radius:8px;cursor:pointer;border:1px solid var(--accent);
+    background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);transition:background .15s}
+  .dc-send svg{width:17px;height:17px}
+  .dc-send:hover:not(:disabled){background:color-mix(in srgb,var(--accent) 28%,transparent)}
+  .dc-send:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .dc-send:disabled{opacity:.45;cursor:not-allowed}
+  #dcToggle.dc-on{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent);border-color:var(--accent)}
+  /* Phone: a dismissible bottom sheet, mirroring the order ticket's mobile behavior. */
+  @media (max-width:580px){
+    .dc-bg{ top:0; left:0; right:0; background:rgba(0,0,0,.5); pointer-events:auto; align-items:flex-end; justify-content:stretch; }
+    .dc-modal{ width:100%; max-width:100%; height:auto; max-height:82vh; border-left:none;
+      border-top:1px solid var(--border); border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45); animation:otSlideUp .2s ease; }
+  }
 </style>
 </head>
 <body>
@@ -626,6 +742,7 @@
   <div class="hstat acct"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
   <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
+  <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
     <option value="0">⊞ All</option>
     <option value="1">1 chart</option>
@@ -639,9 +756,11 @@
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
+  <span class="hgroup-sep" aria-hidden="true"></span>
   <button id="patternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="togglePatternMenu(this)"
     title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
+  <span class="hgroup-sep" aria-hidden="true"></span>
   <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
@@ -663,19 +782,15 @@
     <option value="5Y">5Y</option>
     <option value="All">All</option>
   </select>
+  </div><!-- /hgroup -->
   <div class="pulse"></div>
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()" title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
   <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
-</div>
-
-<!-- Mobile-only view switch: the ticker list and the charts can't both fit at phone width,
-     so toggle between them (chart view is the default). Hidden on desktop (both show). -->
-<div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
-  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">Chart</button>
-  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">Tickers</button>
+  <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()" title="Ask the Unisona assistant about markets, symbols, and your positions">💬 Chat</button>
+  <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu" title="Chart controls and more">☰</button>
 </div>
 
 <!-- Sidebar -->
@@ -714,6 +829,39 @@
 </div>
 
 </div><!-- /layout -->
+
+<!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
+     move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
+<div class="hmenu" id="hmenu" hidden role="menu" aria-label="Chart controls and actions"></div>
+
+<!-- Dream-chat rail — right-side dock, reflows the deck (#trader-chat) -->
+<div class="dc-bg hidden" id="dcPanel">
+  <aside class="dc-modal" role="dialog" aria-label="Unisona assistant chat" aria-hidden="true">
+    <div class="dc-head">
+      <span class="dc-title">💬 Unisona <span class="dc-sub">Assistant</span></span>
+      <a class="dc-x" href="/dream-chat.html" title="Open the full chat — files, models, voice">Full chat ↗</a>
+      <button type="button" class="dc-x" onclick="dcToggle(false)" aria-label="Close chat" title="Close">✕ Close</button>
+    </div>
+    <div class="dc-log" id="dcLog" role="log" aria-live="polite">
+      <div class="dc-empty" id="dcEmpty">
+        <img class="dc-mark" src="/mandala.svg" alt="" aria-hidden="true">
+        <div class="dc-hero-t">Ask Unisona</div>
+        <div class="dc-tag">Your local AI that remembers you — right beside your charts.</div>
+        <div class="dc-chips" role="group" aria-label="Suggested prompts">
+          <button type="button" class="dc-chip" data-q="What's moving in the market today?">📈 What's moving today?</button>
+          <button type="button" class="dc-chip" data-q="Explain what the SPY chart is doing right now.">🔍 Explain SPY's chart</button>
+          <button type="button" class="dc-chip" data-q="How do I place a paper trade here?">🧭 How do paper trades work?</button>
+        </div>
+      </div>
+    </div>
+    <form class="dc-form" id="dcForm">
+      <textarea id="dcInput" rows="1" placeholder="Ask Unisona anything…" aria-label="Chat message" autocomplete="off"></textarea>
+      <button type="submit" class="dc-send" id="dcSend" aria-label="Send" title="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4Z"/></svg>
+      </button>
+    </form>
+  </aside>
+</div>
 
 <!-- Fullscreen ticker chart -->
 <div class="fs-bg hidden" id="fsBg" onclick="if(event.target===this)closeFullscreenChart()">
@@ -922,6 +1070,11 @@ const CHART_AXIS_COLOR  = () => chartVar('--tv-axis', 'rgba(255,255,255,.65)');
 const CHART_GRID_COLOR  = () => chartVar('--tv-grid', 'rgba(255,255,255,.06)');
 const CHART_CANDLE_UP   = '#26a69a';
 const CHART_CANDLE_DOWN = '#ef5350';
+// #2433: hex → rgba for canvas gradients (gradient stops can't use globalAlpha).
+function _chartRgba(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
 
 // Per-chart zoom/pan view, keyed by the overlay element id (e.g.
 // 'overlay-SPY' or 'overlay-fs' for the fullscreen chart). `visibleBars`/
@@ -1315,17 +1468,28 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.rect(0, 0, pw, ph);
     ctx.clip();
     if(type==='candle'){
+      // Bad-tick wick clamp (#trader-candles): the auto-range already IGNORES any
+      // wick >10× the median bar span, but we still drew it raw — so glitch wicks
+      // slammed into the plot ceiling/floor as full-height streaks. Clamp the DRAWN
+      // wick to the body ± one median span so a bogus tick reads as a normal bar.
+      const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
+      const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
       for(let i=0;i<n;i++){
         const b = bars[i];
         const x = i*slotW + slotW/2;
         const up = b.close >= b.open;
         const color = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+        let wHi = b.high, wLo = b.low;
+        if(_med2>0 && (wHi-wLo) > _med2*10){
+          wHi = Math.max(b.open,b.close) + _med2;
+          wLo = Math.min(b.open,b.close) - _med2;
+        }
         ctx.strokeStyle = color;
         ctx.fillStyle   = color;
         ctx.lineWidth   = 1;
         ctx.beginPath();
-        ctx.moveTo(x, y(b.high));
-        ctx.lineTo(x, y(b.low));
+        ctx.moveTo(x, y(wHi));
+        ctx.lineTo(x, y(wLo));
         ctx.stroke();
         const bodyTop = y(Math.max(b.open,b.close));
         const bodyBot = y(Math.min(b.open,b.close));
@@ -1336,21 +1500,42 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       }
     }else{
       const pts = bars.map((b,i)=>[i*slotW + slotW/2, y(b.close)]);
-      // area fill under the line
+      // #2433: direction-aware line — green when the visible window closed up,
+      // red when down — with a vertical gradient fill fading to transparent.
+      const up = bars[n-1].close >= bars[0].close;
+      const lc = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+      const grad = ctx.createLinearGradient(0, 0, 0, ph);
+      grad.addColorStop(0, _chartRgba(lc, .26));
+      grad.addColorStop(1, _chartRgba(lc, 0));
       ctx.beginPath();
       ctx.moveTo(pts[0][0], ph);
       for(const [x,yy] of pts) ctx.lineTo(x,yy);
       ctx.lineTo(pts[n-1][0], ph);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(74,158,255,.08)';
+      ctx.fillStyle = grad;
       ctx.fill();
       // line
       ctx.beginPath();
       ctx.moveTo(pts[0][0], pts[0][1]);
       for(let i=1;i<n;i++) ctx.lineTo(pts[i][0], pts[i][1]);
-      ctx.strokeStyle = '#4a9eff';
-      ctx.lineWidth = 1.3;
+      ctx.strokeStyle = lc;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
       ctx.stroke();
+    }
+    // #2433: glowing "live" dot on the last close — the deck's heartbeat. Drawn for
+    // both chart types, colored by the visible window's direction.
+    {
+      const last = bars[n-1];
+      const lx = (n-1)*slotW + slotW/2, ly = y(last.close);
+      const dc = (last.close >= (type==='candle' ? last.open : bars[0].close)) ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
+      const glow = ctx.createRadialGradient(lx, ly, 0, lx, ly, 9);
+      glow.addColorStop(0, _chartRgba(dc, .45));
+      glow.addColorStop(1, _chartRgba(dc, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = dc;
+      ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI*2); ctx.fill();
     }
     ctx.restore();
   }
@@ -1714,6 +1899,7 @@ function buildCard(ticker, d){
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span class="card-price" id="cp-${ticker}">—</span>
+      <span class="card-chg" id="chg-${ticker}"></span>
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
@@ -1727,6 +1913,18 @@ function buildCard(ticker, d){
     <button class="${emph.sell}" id="sell-${ticker}" title="${emph.title}" onclick="openOrderTicket('${ticker}','sell')">SELL</button>
   </div>
 </div>`;
+}
+
+// #2433: day-change chip in the card header — ▲/▼ + %, green/red, from the same
+// chg_pct the watchlist shows (single source of truth, no new data).
+function updateCardChg(t){
+  const el = document.getElementById('chg-'+t.ticker);
+  if(!el) return;
+  const chg = Number(t.chg_pct);
+  if(!isFinite(chg)){ el.textContent=''; el.className='card-chg'; return; }
+  const cls = chg>0?'up':chg<0?'dn':'flat';
+  el.className = 'card-chg '+cls;
+  el.textContent = (chg>0?'▲ +':chg<0?'▼ ':'· ')+chg+'%';
 }
 
 // ── Update an existing card's meta in place (no DOM rebuild) ────────────────
@@ -1783,6 +1981,12 @@ let lastCardOrder = null;
 function visibleTickers(){
   const all = wlPrices.map(t=>t.ticker);
   const cap = maxChartsForViewport();               // #2301: never render more than the viewport can show readably
+  // Phone: the page scrolls, so AUTO mode shows the WHOLE deck — every chart
+  // stacked full-width (charts are the hero). Zoom/fixed modes keep the cap.
+  if(cap===1 && !slotCount){
+    const order={open:0,watching:1,quiet:2};
+    return all.slice().sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})]);
+  }
   if(!slotCount){
     const order={open:0,watching:1,quiet:2};
     return all.slice()
@@ -2308,6 +2512,9 @@ function selectChart(t, ev){
   // handle) do their own thing — never focus or fullscreen from those.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
+  // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
+  // right below it (focusTicker does all of that) — no two-tap dance.
+  if(isNarrowTrader()){ focusTicker(t); return; }
   const card = document.getElementById('card-'+t);
   // Second click on the ALREADY-focused chart → open it fullscreen.
   if(card && activeTicker === t && card.classList.contains('active')){
@@ -2745,6 +2952,7 @@ async function loadZones(){
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
       const el = document.getElementById('cp-'+t.ticker);
       if(el) el.textContent = '$'+fmt(t.price, t.price>=100?2:4);
+      updateCardChg(t);
     });
     updateRegimeBadges();
     renderFullscreenChart();
@@ -2900,6 +3108,7 @@ async function loadWatchlistPrices(){
     wlPrices = await r.json();
     renderWatchlist();
     wlPrices.forEach(t=>{
+      updateCardChg(t);
       const el = document.getElementById('cp-'+t.ticker);
       if(el){
         // Tick-flash (#1627): price stays its normal colour, but each time it
@@ -3641,6 +3850,159 @@ async function refreshBrokerStatus(){
 
 document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(); startDashboard(); });
 
+/* ── Hamburger (sandwich) menu ─────────────────────────────────────────────────
+   On narrow screens the chart-controls cluster + secondary actions (Pre/After,
+   Kalshi, Explore, Connect broker) MOVE into a ☰ dropdown; on wide screens they
+   move back inline. Comment markers remember each element's original slot, so
+   ids, event handlers, and select state all survive the round-trip. */
+(function(){
+  const btn=document.getElementById('hmenuBtn'), menu=document.getElementById('hmenu');
+  if(!btn||!menu) return;
+  const mq=matchMedia('(max-width:760px)');
+  // narrowOnly:false → lives in the ☰ at EVERY width (secondary toggles/links);
+  // narrowOnly:true  → collapses in only when the toolbar is too tight.
+  const picks=[
+    {sel:'.header .hgroup',            narrowOnly:true },
+    {sel:'#ovnToggle',                 narrowOnly:false},
+    {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
+    {sel:'.header a[href*="explore"]', narrowOnly:true },
+    {sel:'#brokerLink',                narrowOnly:true },
+  ];
+  const items=[];   // {el, marker, narrowOnly} — marker = comment left in the header slot
+  picks.forEach(p=>{
+    const el=document.querySelector(p.sel);
+    if(!el) return;
+    const marker=document.createComment('hmenu-slot');
+    el.parentNode.insertBefore(marker, el);
+    items.push({el, marker, narrowOnly:p.narrowOnly});
+  });
+  function close(){ menu.hidden=true; btn.setAttribute('aria-expanded','false'); }
+  function apply(){
+    const narrow=mq.matches;
+    if(!narrow) close();
+    // Re-append menu-bound items in list order so the menu stays canonically sorted.
+    items.forEach(i=>{
+      if(narrow || !i.narrowOnly) menu.appendChild(i.el);
+      else i.marker.parentNode.insertBefore(i.el, i.marker.nextSibling);
+    });
+  }
+  btn.addEventListener('click', e=>{
+    e.stopPropagation();
+    menu.hidden=!menu.hidden;
+    btn.setAttribute('aria-expanded', menu.hidden?'false':'true');
+  });
+  document.addEventListener('click', e=>{ if(!menu.hidden && !menu.contains(e.target)) close(); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
+  mq.addEventListener('change', apply);
+  // Fallback: some environments (viewport emulation, older WebViews) never fire
+  // the MediaQueryList 'change' event — re-apply on debounced resize too.
+  let _hmRz;
+  window.addEventListener('resize', ()=>{ clearTimeout(_hmRz); _hmRz=setTimeout(apply, 120); });
+  apply();
+})();
+
+/* ── Dream-chat panel (#trader-chat) ───────────────────────────────────────────
+   A minimal, self-contained chat with the one Unisona assistant. Streams from the
+   same endpoint dream-chat.html uses (POST /api/dream/chat/stream) and renders the
+   `token`/`route`/`error`/`done` SSE events. Kept independent of dream-chat-ui.js
+   so it doesn't pull the full chat page's machinery into the trading terminal. */
+(function(){
+  const panel=document.getElementById('dcPanel'), toggle=document.getElementById('dcToggle');
+  const modal=panel&&panel.querySelector('.dc-modal');
+  const log=document.getElementById('dcLog'), form=document.getElementById('dcForm');
+  const input=document.getElementById('dcInput'), send=document.getElementById('dcSend');
+  const empty=document.getElementById('dcEmpty');
+  if(!panel||!form) return;
+  const history=[];              // {role:'user'|'assistant', content} — last 10 sent for context
+  let busy=false;
+
+  window.dcToggle=function(force){
+    const openNow = typeof force==='boolean' ? force : panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !openNow);
+    document.body.classList.toggle('dc-open', openNow);   // reflows the deck left (like ot-open)
+    if(modal) modal.setAttribute('aria-hidden', openNow?'false':'true');
+    toggle.classList.toggle('dc-on', openNow);
+    toggle.setAttribute('aria-expanded', openNow?'true':'false');
+    if(openNow) setTimeout(()=>input.focus(),30);
+  };
+
+  function esc(s){ const d=document.createElement('div'); d.textContent=s==null?'':String(s); return d.innerHTML; }
+  function add(cls, text){
+    if(empty) empty.remove();
+    const el=document.createElement('div');
+    el.className='dc-msg '+cls;
+    el.textContent=text||'';
+    log.appendChild(el); log.scrollTop=log.scrollHeight;
+    return el;
+  }
+
+  // Auto-grow the textarea; Enter sends, Shift+Enter newlines.
+  input.addEventListener('input', ()=>{ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; });
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); form.requestSubmit(); } });
+
+  // Starter chips (site pattern: dream-chat .starter-chip) — one-click prompts.
+  log.addEventListener('click', e=>{
+    const chip=e.target.closest('.dc-chip'); if(!chip) return;
+    input.value=chip.dataset.q||chip.textContent.trim();
+    form.requestSubmit();
+  });
+
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const text=input.value.trim();
+    if(!text||busy) return;
+    busy=true; send.disabled=true;
+    add('user', text);
+    history.push({role:'user', content:text});
+    input.value=''; input.style.height='auto';
+
+    const typing=document.createElement('div');
+    typing.className='dc-typing'; typing.setAttribute('aria-label','Thinking'); typing.innerHTML='<i></i><i></i><i></i>';
+    log.appendChild(typing); log.scrollTop=log.scrollHeight;
+
+    let bubble=null, full='', routed=false, errored=false;
+    const ensureBubble=()=>{ if(!bubble){ if(typing.parentNode) typing.remove(); bubble=add('bot',''); } return bubble; };
+
+    try{
+      const resp=await fetch('/api/dream/chat/stream', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          message:text, user:'stock-trader', history:history.slice(-10),
+          sessionId: localStorage.getItem('lantern_chat_session') || undefined,
+        }),
+      });
+      if(!resp.ok||!resp.body) throw new Error('HTTP '+resp.status);
+      const reader=resp.body.getReader(), dec=new TextDecoder(); let buf='';
+      while(true){
+        const {done,value}=await reader.read(); if(done) break;
+        buf+=dec.decode(value,{stream:true});
+        const lines=buf.split('\n'); buf=lines.pop()||'';
+        for(const line of lines){
+          if(!line.startsWith('data: ')) continue;
+          let evt; try{ evt=JSON.parse(line.slice(6)); }catch(_e){ continue; }
+          if(evt.type==='route' && !routed){
+            routed=true;
+            const r=document.createElement('div'); r.className='dc-route';
+            r.textContent=evt.label||((evt.agentName||'')+' · '+(evt.surface||'')); log.insertBefore(r, typing);
+          } else if(evt.type==='token' && evt.text){
+            full+=evt.text; ensureBubble().textContent=full; log.scrollTop=log.scrollHeight;
+          } else if(evt.type==='error'){
+            errored=true; if(evt.text) full=evt.text;
+          } else if(evt.type==='done'){
+            if(evt.cleanText) full=evt.cleanText;
+          }
+        }
+      }
+    }catch(err){ errored=true; if(!full) full='Couldn’t reach the assistant ('+esc(err.message)+'). Is the server running?'; }
+
+    if(typing.parentNode) typing.remove();
+    const b=ensureBubble(); b.textContent=full||'(no response)';
+    if(errored) b.classList.add('err'); else history.push({role:'assistant', content:full});
+    log.scrollTop=log.scrollHeight;
+    busy=false; send.disabled=false; input.focus();
+  });
+})();
+
 </script>
 <!-- Global header (#1579) + theme toggle (#1577). site-chrome injects the shared
      <nav class="site-nav"> at the top of <body>; theme-toggle defines toggleTheme()
@@ -3648,17 +4010,6 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 <script>
   /* Mobile view switch (#2255): toggle between the charts and the ticker list, since both
      can't fit at phone width. Chart is the default; the tab bar only shows on mobile. */
-  function setMobileView(view) {
-    var layout = document.querySelector('.layout');
-    if (!layout) return;
-    layout.classList.toggle('mobile-tickers', view === 'tickers');
-    document.querySelectorAll('.mvt-btn').forEach(function (b) {
-      var on = b.getAttribute('data-view') === view;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
-    });
-  }
-  window.setMobileView = setMobileView;
 </script>
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>
