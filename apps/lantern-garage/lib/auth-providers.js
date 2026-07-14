@@ -16,26 +16,65 @@
 const fetchFn = typeof fetch !== "undefined" ? fetch : require("node-fetch");
 const { roleLevel } = require("./role-hierarchy");
 
-// Patreon tier → role (campaign "Dream Journal By Lantern OS"). Kept here so all
-// provider-specific role logic lives in the registry.
-const PATREON_TIER_TO_ROLE = {
-  "28764312": "supporter", // Wanderer ($5)
-  "28740619": "deep_dreamer", // Deep Dreamer ($20)
-  "28764307": "admin", // Synthesasia Guild ($200)
+// Patreon tier → role by PLEDGE AMOUNT, not campaign-specific tier IDs. The old
+// numeric tier IDs were bound to a single campaign ("Dream Journal by Lantern OS"),
+// so moving to a new campaign (patreon.com/cw/UnisonaAI) silently broke gating —
+// the new campaign's tiers have different IDs. Gating by the dollar amount the
+// member is entitled to is campaign-agnostic: any campaign that keeps the same price
+// points maps correctly. Thresholds are env-overridable (cents) so a re-pricing is a
+// config change, not code.
+//
+// SECURITY: a PURCHASABLE tier can NEVER grant the operator `admin` role. `admin`
+// (role-hierarchy level 3) gates provider-key writes, GPU dispatch, feature flags and
+// the /api/accounts console (reset any password, grant admin, delete accounts) — i.e.
+// account takeover. Patreon allows custom pledges of any size on a public campaign, so
+// mapping a price point to `admin` = "buy site takeover for $X". The top paid tier
+// therefore maps to `deep_dreamer` (all paid features incl. trading); real admin comes
+// ONLY from LANTERN_ADMIN_IDS (isAdminOverride) or an explicit setUserRole.
+const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+const TIER_CENTS = {
+  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5  Wanderer
+  deep_dreamer: num(process.env.PATREON_DEEP_DREAMER_CENTS, 2000), // $20+ (trading + all paid features; the $200 top tier lands here too)
 };
 
+/** Highest PURCHASABLE role for the max pledge amount (cents). Never returns `admin`. */
+function roleForAmountCents(maxCents) {
+  if (maxCents >= TIER_CENTS.deep_dreamer) return "deep_dreamer";
+  if (maxCents >= TIER_CENTS.supporter) return "supporter";
+  return null;
+}
+
 // Per-provider admin overrides, keyed by "<provider>:<providerId>". The Patreon
-// owner id retains admin regardless of tier (was OWNER_IDS in patreon-auth.js).
-const ADMIN_OVERRIDES = new Set([
-  "patreon:49294581",
-  ...String(process.env.LANTERN_ADMIN_IDS || "")
+// OWNER's user id retains admin regardless of tier. This is account-bound (the
+// person's Patreon user id), NOT campaign-bound — so a move to a new Patreon
+// ACCOUNT changes it. Set it via LANTERN_ADMIN_IDS (comma-separated). A bare id
+// (e.g. "12345678") is interpreted as a PATREON id — "patreon:12345678" — so the
+// owner just drops in their Patreon user id; qualify other providers explicitly
+// ("google:123"). Keeping the stored key provider-qualified prevents a bare id
+// from cross-granting admin to a same-numbered id on a different provider.
+const ADMIN_OVERRIDES = new Set(
+  String(process.env.LANTERN_ADMIN_IDS || "")
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean),
-]);
+    .filter(Boolean)
+    .map((entry) => (entry.includes(":") ? entry : `patreon:${entry}`))
+);
 
 function isAdminOverride(provider, providerId) {
+  // Strict provider-qualified match. Bare LANTERN_ADMIN_IDS entries were already
+  // normalized to "patreon:<id>" at load, so a bare owner id can't cross-grant admin
+  // to a same-numbered id on a different provider.
   return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
+}
+
+// Operational guard: with Patreon auth enabled but no admin override, NO ONE can be admin
+// (no tier grants it), so the owner is locked out of every admin/staff surface. Warn loudly
+// at startup so a fresh deploy doesn't silently ship with an unreachable admin.
+if (process.env.PATREON_CLIENT_ID && ADMIN_OVERRIDES.size === 0) {
+  console.warn(
+    "[auth] Patreon OAuth is configured but LANTERN_ADMIN_IDS is empty — no account can be admin " +
+      "(paid tiers never grant admin). Set LANTERN_ADMIN_IDS to the owner's Patreon user id."
+  );
 }
 
 /**
@@ -130,32 +169,76 @@ const PROVIDERS = {
     usePkce: true,
     extraAuthorizeParams: {},
     async fetchUser(accessToken) {
+      // `include=memberships.campaign` is REQUIRED for scoping: with the
+      // identity.memberships scope, /identity returns the user's memberships to EVERY
+      // creator they back — not just ours — so we must filter to our own campaign or an
+      // unrelated pledge would drive (or block) the role. currently_entitled_tiers gives
+      // the entitled tier ids; fields[tier]=amount_cents gives the price we gate on.
       const url =
         "https://www.patreon.com/api/oauth2/v2/identity" +
-        "?include=memberships.currently_entitled_tiers" +
+        "?include=memberships.campaign,memberships.currently_entitled_tiers" +
+        "&fields%5Buser%5D=email,full_name" + // sparse fieldsets: request user attrs explicitly
         "&fields%5Btier%5D=title,amount_cents";
       const r = await fetchFn(url, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!r.ok) throw new Error(`Patreon userinfo failed: ${r.status} ${await r.text()}`);
       const j = await r.json();
-      const { data, included } = j;
-      const membership = (included || []).find((x) => x.type === "member");
+      const data = j.data || {};
+      const attrs = data.attributes || {}; // JSON:API may omit attributes — never deref undefined
+      const inc = j.included || [];
+      const members = inc.filter((x) => x.type === "member");
+      // Scope to OUR campaign. With a configured PATREON_CAMPAIGN_ID, take only the
+      // membership whose campaign matches. Without one, proceed ONLY if there is exactly
+      // one membership (unambiguous single-campaign app); if multiple and no id is set we
+      // fail CLOSED (no membership => guest) rather than pick an arbitrary campaign.
+      const campaignId = process.env.PATREON_CAMPAIGN_ID
+        ? String(process.env.PATREON_CAMPAIGN_ID)
+        : null;
+      let membership = null;
+      if (campaignId) {
+        membership = members.find((m) => m?.relationships?.campaign?.data?.id === campaignId) || null;
+      } else if (members.length === 1) {
+        membership = members[0];
+      }
       const tierIds =
         membership?.relationships?.currently_entitled_tiers?.data?.map((t) => t.id) || [];
+      // Resolve each entitled tier's pledge amount from the included `tier` objects. Treat
+      // null AND missing amount_cents identically as "unknown" (dropped) — do not coerce
+      // null to 0, which would look like a real $0 tier.
+      const tierAttrsById = {};
+      for (const x of inc) if (x.type === "tier") tierAttrsById[x.id] = x.attributes || {};
+      const entitledAmountsCents = tierIds
+        .map((id) => tierAttrsById[id]?.amount_cents)
+        .filter((c) => c != null)
+        .map(Number)
+        .filter((n) => Number.isFinite(n));
+      // Whether this read AUTHORITATIVELY determined the paid entitlement for OUR campaign —
+      // true iff we found our membership AND either it entitles no tiers (a former/free
+      // patron: confirmed no paid entitlement → safe to demote) or we resolved ≥1 amount.
+      // It is FALSE when no membership matched (cancelled-vs-misconfigured campaign id are
+      // indistinguishable) or a membership entitles tiers whose amounts we couldn't read.
+      // The role lifecycle only DEMOTES on an authoritative read, so a wrong PATREON_CAMPAIGN_ID
+      // or a partial API response can't mass-downgrade paying members.
+      const entitlementResolved =
+        membership != null && (tierIds.length === 0 || entitledAmountsCents.length > 0);
       return {
         providerId: data.id,
-        email: data.attributes.email || null,
+        email: attrs.email || null,
         emailVerified: false, // Patreon does not assert email verification
-        name: data.attributes.full_name || "",
+        name: attrs.full_name || "",
         avatar: null,
         tier: tierIds[0] || null,
-        memberships: tierIds,
+        memberships: tierIds, // tier ids for OUR campaign (kept for storage/back-compat)
+        entitledAmountsCents, // pledge amounts (cents) for OUR campaign — the role source of truth
+        entitlementResolved, // gates the login re-baseline demotion (see user-profiles.js)
       };
     },
     mapRole(user) {
-      for (const tierId of user.memberships || []) {
-        if (PATREON_TIER_TO_ROLE[tierId]) return PATREON_TIER_TO_ROLE[tierId];
-      }
-      return (user.memberships || []).length > 0 ? "supporter" : "guest";
+      // Gate strictly on PAID amount: a $0 free-tier membership (amount_cents 0) and an
+      // entitlement whose amount couldn't be resolved both yield NO paid role. Fail closed
+      // to guest rather than grant the default paid `supporter` gate for free.
+      const amounts = (user.entitledAmountsCents || []).filter((n) => Number.isFinite(n) && n > 0);
+      const maxCents = amounts.length ? Math.max(...amounts) : 0;
+      return roleForAmountCents(maxCents) || "guest";
     },
   },
 };
@@ -177,7 +260,11 @@ function isConfigured(id) {
  */
 function resolveRole(provider, user) {
   if (isAdminOverride(provider.id, String(user.providerId))) return "admin";
-  const role = provider.mapRole(user) || "guest";
+  let role = provider.mapRole(user) || "guest";
+  // Defense in depth: a PROVIDER (a paid tier, a federated login) may NEVER resolve to
+  // the operator `admin` role — that comes only from isAdminOverride above (or an
+  // explicit setUserRole). Cap any stray `admin` from a mapper down to the top paid role.
+  if (role === "admin") role = "deep_dreamer";
   return roleLevel(role) >= 0 ? role : "guest";
 }
 
@@ -202,5 +289,6 @@ module.exports = {
   isAdminOverride,
   profileHasAdminOverride,
   listEnabledProviders,
-  PATREON_TIER_TO_ROLE,
+  TIER_CENTS,
+  roleForAmountCents,
 };

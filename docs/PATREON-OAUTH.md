@@ -6,7 +6,7 @@ Lantern OS includes a built-in Patreon OAuth login system that gates the entire 
 
 - **OAuth 2.0 with PKCE** — Secure authentication without storing passwords
 - **Session Management** — Server-side session cookies with 7-day TTL
-- **Role-Based Access Control** — Four access tiers: guest, supporter, founder, admin
+- **Role-Based Access Control** — Access tiers: guest, supporter, deep_dreamer (paid), admin (owner only)
 - **Profile Page** — User can view their Patreon info and logout from `/profile.html`
 - **Auto-Redirect** — Unauthenticated users redirected to `/auth.html`
 - **No Vendor Lock-in** — Pure Node.js implementation, no external auth services
@@ -22,11 +22,20 @@ Lantern OS includes a built-in Patreon OAuth login system that gates the entire 
 3. Accept terms and submit
 4. Copy your **Client ID** and **Client Secret** — keep the secret safe!
 
-### 2. Get Your Campaign ID
+### 2. Get Your Campaign ID (required)
 
-Your Campaign ID is in the URL of your Patreon campaign:
-- URL: `https://www.patreon.com/c/{campaign_id}`
-- Example: If your URL is `https://www.patreon.com/c/16143763`, your Campaign ID is `16143763`
+`PATREON_CAMPAIGN_ID` is the **numeric API campaign id**, used to scope role gating to *your*
+campaign (a member's pledges to other creators must not count). It is **not** the vanity slug
+in the page URL — `patreon.com/cw/UnisonaAI` has no numeric id in it. Get it from the API while
+authenticated as the campaign owner:
+
+```bash
+curl -s https://www.patreon.com/api/oauth2/v2/campaigns \
+  -H "Authorization: Bearer <owner-access-token>"   # → data[].id is your PATREON_CAMPAIGN_ID
+```
+
+If unset, gating only works for a user who backs exactly one campaign; anyone who also backs
+another creator fails closed to `guest`.
 
 ### 3. Configure `.env`
 
@@ -60,19 +69,36 @@ The server will now:
 
 ## Role Mapping
 
-Patreon tiers are mapped to Lantern roles automatically based on tier IDs. The mapping is defined in `apps/lantern-garage/lib/patreon-auth.js`:
+Patreon tiers are mapped to roles by **pledge amount** (not campaign-specific tier IDs),
+so moving to a new campaign — e.g. `patreon.com/cw/UnisonaAI` — never breaks gating. The
+mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmountCents`),
+and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pledges to
+*other* creators can't grant (or block) a role here.
 
-| Tier Name | Tier ID | Lantern Role | Access |
-|-----------|---------|--------------|--------|
-| Free | (not a member) | `guest` | Public pages only |
-| Wanderer | 28764312 | `supporter` | Chat + features |
-| Deep Dreamer | 28740619 | `founder` | All features |
-| Synthesasia Guild | 28764307 | `admin` | Admin tools |
+| Entitled pledge (this campaign) | Role | Access |
+|-----------|--------------|--------|
+| Free / not a paying member | `guest` | Public pages only |
+| ≥ $5 | `supporter` | Chat + features (the default paid gate) |
+| ≥ $20 (incl. the $200 top tier) | `deep_dreamer` | All paid features + trading unlock |
 
-To customize tier mapping:
-1. Edit `TIER_TO_ROLE` in `apps/lantern-garage/lib/patreon-auth.js`
-2. Get tier IDs from your Patreon campaign settings → Tier management
-3. Restart the server
+Notes:
+- **A purchasable tier NEVER grants `admin`.** `admin` is full operator/staff access
+  (provider keys, GPU dispatch, feature flags, and the accounts console that can reset any
+  password / grant admin), so tying it to a price point would let anyone buy site takeover.
+  The $200 top tier therefore maps to `deep_dreamer`; `admin` comes **only** from
+  `LANTERN_ADMIN_IDS`. If you want the $200 tier to unlock something beyond `deep_dreamer`,
+  add a distinct non-admin paid role — don't map it to `admin`.
+- **Fail-closed:** a $0 free-tier member, a below-$5 custom pledge, or an entitlement whose
+  amount can't be resolved all yield `guest` (never a free paid role).
+- **Re-pricing?** Override the two thresholds (cents): `PATREON_SUPPORTER_CENTS`,
+  `PATREON_DEEP_DREAMER_CENTS`.
+- **Demotion:** logging in via Patreon re-baselines the paid role to the *current*
+  entitlement, so a cancelled/downgraded membership loses the tier (staff roles set via
+  `setUserRole`/override are never demoted by a login).
+- **Owner admin** is account-bound: set `LANTERN_ADMIN_IDS` to the campaign owner's Patreon
+  **user id** (numeric, from `/api/oauth2/v2/identity` while logged in as the owner). It
+  changes when you move to a new Patreon account. If unset, **no one is admin.**
+- Restart the server after changing any of these.
 
 ## API Endpoints
 
@@ -90,7 +116,7 @@ Returns current session info.
     "id": "12345",
     "name": "John Doe",
     "email": "john@example.com",
-    "tier": "28764312"
+    "tier": "<entitled-tier-id>"
   }
 }
 ```
@@ -203,6 +229,6 @@ Should return your user info and role.
 
 For issues or questions:
 1. Check the server logs for `[AUTH]` debug messages
-2. Review `.env` configuration (especially tier IDs)
+2. Review `.env` configuration (PATREON_CAMPAIGN_ID + LANTERN_ADMIN_IDS)
 3. Verify Patreon app settings match your redirect URI
 4. Open an issue on GitHub with full error logs
