@@ -1,3 +1,110 @@
+## [1.10.0] - 2026-07-14
+
+### Fixed
+- radio: trim 248 dangling (404) tracks from stations.json so the player stops silently failing ~88% of its playlist; preserved with Internet-Archive ids in stations-pending-restore.json (#2329)
+- trader: live quotes self-heal — MCP bridge resolves a live checkout when launched from a pruned worktree, and market-data tools fall back to the direct keyless feed when no loopback server is listening (supersedes #2408 core)
+- Chat: trivial code requests ("write a python function that reverses a string") are answered directly with code instead of being mis-routed into the Bash shell tool or the coding backend and refused with a restriction message ("the Bash tool is restricted to allowlisted commands…"). The router/persona prompts now state that authoring code is a direct answer (never a tool task), the Bash/PowerShell/propose_coding_change tool descriptions steer the model away from using them to write code, blocked shell commands and unavailable coding backends return a model-facing recovery hint instead of a bare error, and a live chat regression case covers the behavior. (#2077)
+
+### Changed
+- changelog gate now accepts a timestamped changelog.d fragment instead of a per-PR version bump + CHANGELOG.MD edit (kills version churn)
+- self-healing worktree janitor: autowork sweeps merged+clean .claude/worktrees stragglers so local grep/Glob stays fast (#2308)
+- feat(trader): ForecastEx NYC port grounded — KLGA oracle fit (30% OOS RPS gain) + public board reader
+- The #2217 port premise is now settled with primary evidence, and the station model
+- it actually needs is fitted, validated, and committed.
+- **Settlement grounded (primary sources):** ForecastEx's only live NYC daily-high
+-   is the U-series `UHLGA` — CFTC 40.2(a) filing (2026-01-23) defines product code
+-   `U[H/L/A][region]` settling on **Weather Underground's** daily high for the
+-   designated station, and the venue's own product summary lists **zero** DH
+-   (NWS-CLI/Central-Park) products. Kalshi↔ForecastEx NYC is a *basis* pair
+-   (KNYC vs LGA), not an arb — confirmed, no longer inferred from symbols.
+- **Settlement semantics measured:** exceed = strictly-greater; settled high =
+-   clean-flip threshold; equals `round(max METAR tmpf)` for LGA **14/14** settled
+-   days (Jun 2026). The NWS CLI disagreed 6/13 days (up to 4°F) → CLI is the wrong
+-   settled leg for this venue; ASOS-max is the right one.
+- **Public data feed discovered:** `forecastex.com/api/download` serves the full
+-   board (EOD prices incl. settlements, pairs, product summary) with **no auth /
+-   IBKR entitlement**, dates back to ≥2026-02-03 — unblocks the Observe leg that
+-   the CPAPI EC-entitlement gap (#2216) had blocked. New `lib/forecastex-board.js`
+-   (pure parsing + fail-soft fetch, 9 tests).
+- **KLGA oracle fit (the "re-fit, not fee-swap" the probe called for):**
+-   `validate-weather-oracle-fit.js` is now station-generic (`--mos-station
+-   --asos-station --settled cli|asos --normals-cli-year --out`; KNYC default path
+-   byte-identical, all existing tests green). KLGA run: n=1825 pairs (summers
+-   2021-2025), normals from the station's own CLI `high_normal`; **OOS fitted
+-   beats defaults RPS 0.0356 vs 0.0508 (30% gain), PIT χ² 81.75→21.25** →
+-   promoted to `data/kalshi/weather-oracle-params-klga.json`.
+- **Honest ceiling result:** `ceilingSupport: []` — five summers give NO
+-   measurable ≥100°F ceiling for LGA, so the Kalshi ≥100-fade edge **does not
+-   transfer as fitted**. New `lib/forecastex-weather.js` venue registry forces a
+-   non-binding ceiling when the fit has none (the KNYC table can never leak in and
+-   fabricate an edge) and stays `certified:false` (7 tests).
+- Remaining blockers are explicit: EC entitlement on a ForecastEx-permissioned
+-   IBKR account (human/IBKR action), forward paper verification, ADR-gated Act.
+- Research note: docs/research/2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md.
+- Loop stages: Observe (board feed) + Reason (station fit) + Verify (OOS gate, settlement joins).
+- fix(ci): make releases fully hands-free and keep the deployed version label correct.
+- (1) auto-tag.yml now dispatches release.yml via workflow_dispatch — a GITHUB_TOKEN-pushed
+- tag never triggers release.yml (recursion guard), so the Release build never auto-fired
+- before. (2) assemble-changelog.js now also refreshes the SERVED
+- apps/lantern-garage/public/version.json (not just the root version.json), so the footer
+- stops showing a stale version after a release rolls (the v1.8.0 "shows old build" report).
+- fix(nav): hide Settings (orchestration) + Work header tabs and footer links for the guest role
+- Guests (not signed in, or accounts assigned the `guest` role) no longer see
+- the Settings (/orchestration.html) and Work (/work.html) links in the header
+- nav or the footer sitemap. auth-gate.js gains `hideGuestNav()` mirroring the
+- existing `hideTradeNav()` pattern; covers `<nav>` + `.site-footer` (the same
+- coverage as applyNavVisibility), and fail-open on transient session errors
+- like the rest of the nav wiring. Pages stay reachable by URL (orchestration
+- is public read-only, work is server-gated) — this only trims links guests
+- can't meaningfully use. Improves Act (role-appropriate guest surface).
+- chore(brand): sweep "Keystone" / "Keystone OS" → unisona.ai across prose and user-visible copy
+- Completes the #2250 rebrand: the user-visible brand was already Unisona on the
+- HTML surfaces, but ~700 prose mentions of "Keystone"/"Keystone OS" survived in
+- docs, system prompts, SSE route labels, generated-document metadata, and the
+- Knowledge Center doc titles. All are now **unisona.ai**.
+- Case-sensitive, standalone-word sweep (722 replacements, 209 files) + hand
+-   polish of the chat identity prompts (`stream-chat.js` KEYSTONE_IDENTITY /
+-   ROUTER_PROMPT / debug prompt, `personas.json`, `dream-chat.js` fallback).
+- Left intact, by design: `keystone-*` code ids, file names, env vars
+-   (`KEYSTONE_*`), the `keystone` persona id and `keystone-ft` model tag, the
+-   Three Doors in-game character "Keystone" (fiction, not brand), append-only
+-   data logs, and dated historical records (handoffs/worklogs/research/CHANGELOG).
+- `data/knowledge/doc-catalog.json` retitled and the Knowledge Center +
+-   RAG index regenerated with the repo's own builders (`build_doc_library.js`,
+-   `build_knowledge_index.py`).
+- Brand guidelines now codify the rule ("Keystone" retired like "Lantern OS");
+-   brand-guard allowlist comments updated; GitHub release display name renamed.
+- Also swept the #2250 residue "Unisona OS" → unisona.ai (footer copyright,
+-   page titles, PWA manifest, all four locale files, update banner).
+- Lockstep test updates (route labels, identity strings, fixtures). Verified:
+-   brand guard green across 41 surfaces, `node --check` on server + libs, the
+-   touched offline node tests, and the affected pytest files.
+- Loop stage: Verify — one honest brand across every surface the user (and the
+- model itself) reads; the identity block no longer teaches the assistant a name
+- the UI never shows.
+- Add SPY-benchmarked strategy research package for the Σ₀ trader: a daily
+- total-return leaderboard harness (CAGR / Sharpe±CI / maxDD / YoY / correlation
+- matrix vs SPY), an intraday cross-sectional microstructure probe (empirical √N
+- breadth scaling + transaction-cost break-even), and event-driven sleeve harnesses
+- (sell-the-news reversal and real earnings-surprise PEAD). Adds the Unisona Sharpe
+- Certificate (docs/UNISONA-SHARPE-CERTIFICATE.md, Status: Proposed) with proved
+- theorems, a two-condition sleeve-admission gate, and a measured evidence table
+- (E2 VERIFIED: COMBO3 = SPY+multi-market-trend+gold, Sharpe 1.12 vs SPY 0.89,
+- maxDD −34%→−12%). All figures are historical/backtested decision-support; no live
+- capital path. Operator ratification pending.
+
+### Research — local cross-encoder reranker measured on our own corpus (#2355)
+- Built and measured a local cross-encoder rerank stage over BM25 (`cross-encoder/ms-marco-MiniLM-L-6-v2`, 23M, CPU, via `transformers`). Harness: `experiments/rerank_lift_eval.py` — Okapi BM25 top-50 → cross-encoder rescore, evaluated on our own 1000-doc arXiv corpus with a high-overlap title control set and a low-overlap natural-language question set. **Result: the lift lives entirely in the low-lexical-overlap band — MRR@10 0.635→0.846 (+21pt), R@5 0.769→0.846 (+7.7pp); ~zero on keyword queries where BM25 is already at ceiling.** This converts the borrowed +17.2pp reranker figure into a measurement on our stack (report: `data/eval/retrieval/rerank_lift_report.json`). Ranking-only (recall still capped by first-stage BM25); production wiring is the `RERANKER_ENDPOINT` seam. Closes the measurement gate on #2355.
+
+### Fix — screenshot reporter captures the whole page, after it settles
+- The 📷 issue reporter fired `html2canvas` synchronously the instant the modal opened and shot only the scrolled viewport — the two symptoms #2412 described ("the screenshot is too fast" and "isn't showing the whole page"). Capture now (1) waits for `document.fonts.ready` plus two animation frames (hard-capped at 350 ms) so a data-heavy page like the trading terminal is painted before it's photographed, and (2) renders the full scrollable document from the top-left (`x/y/scrollX/scrollY = 0`, sized to `documentElement.scrollHeight`, capped at 6× viewport) so content below the fold on scrolling pages (home, dream-chat) is no longer cut off. Fixed full-screen apps (`body{overflow:hidden}`, scrollHeight ≈ viewport) are unaffected. Verified in a real DOM: capture is deferred, not synchronous, and covers an 850×3000 page from the top. Part of #2412.
+
+### Trade — focused single-symbol view reaches Yahoo Finance quote parity
+- The stock trader's focused symbol panel (`wl-info`) showed only returns, a technical read, volume and SMA50 — a fraction of what a trader expects on a quote page. It now carries a **Quote** section with the above-the-fold fundamentals the Yahoo Finance summary shows: previous close, open, bid/ask, day range, 52-week range, market cap, beta, trailing + forward P/E, EPS, dividend yield, and the mean 1-year analyst target. Data comes from a new keyless `getQuoteSummary()` in `market-data-yahoo` (Yahoo `quoteSummary` `price,summaryDetail,defaultKeyStatistics,financialData` modules; same cookie+crumb path as the earnings feed, cached 10 min) and rides along in the existing `/api/trading/symbol-stats` response. Verified live against TSLA — every value matches the Yahoo quote page (prev close 406.55, day 402.81–413.16, 52wk 297.82–498.83, mkt cap 1.53T, beta 1.80, P/E 370.69, EPS 1.10, target 424.56). Crypto and any fetch failure degrade to the prior panel (null → em-dash). Closes #2412.
+
+### Trade — honest signal confidence on the stock trader
+- The stock-trader card's `conf-badge` showed the model's *raw* confidence as if it were an edge (`▼ SHORT 98%`). It now renders a coloured directional **call** only when that signal type is **calibrated** — i.e. it carries a settled-trade hit-rate + n (`last_signal.sigma0.calibration`). Until that per-signal calibration feed exists, the badge shows `▼ SHORT · model 98% · uncalibrated` in neutral styling: the signal is visible but never dressed up as an actionable edge. Grounded in the trust-calibration UX research (an unbacked confidence number is the fastest way to lose a user's trust the first time it's wrong). Frontend-only, degrades gracefully, and lights up automatically when the calibration bookkeeping lands.
+
 ## [1.9.6] - 2026-07-11
 ### Added
 - **SPY-benchmarked Sharpe strategy research package for the Σ₀ trader (decision-support; no live capital path).** The intraday R-multiple backtest could not answer "does this beat SPY total return over years?", so this adds a reproducible, evidence-grounded research suite. `scripts/daily-backtest-harness.js` pulls multi-year daily total-return (Yahoo `adjclose`, dividends reinvested) and reports CAGR, annualized Sharpe ±95% CI (Lo 2002), max drawdown, per-calendar-year YoY, a strategy correlation matrix, and an inverse-vol COMBO — all benchmarked vs SPY buy-&-hold. Measured result: **COMBO3 (SPY + multi-market trend + gold) Sharpe 1.12 vs SPY 0.89, maxDD −34%→−12%, sleeve ρ̄ 0.36** — the diversification (√N) free lunch, verified on real numbers. `scripts/intraday-microstructure-harness.js` demonstrates √N breadth scaling on intraday cross-sectional reversal and quantifies the ~6bps transaction-cost break-even (the wall between daily-sleeve and HFT Sharpe). `scripts/sell-the-news-harness.js` falsifies the fade (post-event drift/PEAD dominates). `scripts/earnings-pead-harness.js` backtests real Nasdaq earnings surprises (event study + market-neutral sleeve). Adds `docs/UNISONA-SHARPE-CERTIFICATE.md` (+ `.sha256`, Status: Proposed) — proved theorems, a two-condition sleeve-admission gate (ρ<0.4 AND edge CI>0), and a measured evidence table (E2 VERIFIED). Operator ratification pending; all figures historical/backtested. Improves **Verify** (grounds trader strategy claims in reproducible, SPY-benchmarked evidence).
