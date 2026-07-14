@@ -7,6 +7,28 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+const fs = require("fs");
+const path = require("path");
+const LIVE_LEDGER = path.join(process.cwd(), "data", "kalshi", "kalshi-live-ledger.jsonl");
+
+/** Sum today's ACCEPTED live-order deployed notional (cents) from the ledger (P0-7 daily cap). */
+function ledgerDeployedNotionalTodayCents() {
+  try {
+    if (!fs.existsSync(LIVE_LEDGER)) return 0;
+    const today = new Date().toISOString().slice(0, 10);
+    let sum = 0;
+    for (const line of fs.readFileSync(LIVE_LEDGER, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      let r; try { r = JSON.parse(line); } catch { continue; }
+      const accepted = r.mode === "live" && (r.event === "live_order_accepted" ||
+        (r.event === "live_order_submitted" && String(r.status).startsWith("20")));
+      if (!accepted || !String(r.ts || "").startsWith(today)) continue;
+      sum += Math.max(0, Number(r.limitCents ?? 100)) * Math.max(0, Number(r.count ?? 0));
+    }
+    return sum;
+  } catch { return 0; }
+}
+
 module.exports = async function kalshiRoutes(req, res, url, ctx) {
   const { deps, sendJson, collectRequestBody, bridge, getStrategyFitness, logPerformance } = ctx;
 
@@ -549,22 +571,36 @@ module.exports = async function kalshiRoutes(req, res, url, ctx) {
         const body = await collectRequestBody(req);
         const o = body ? JSON.parse(body) : {};
 
-        // Cash check before order (#434)
-        try {
-          const balance = await kalshi.getBalance();
-          const availableCash = balance?.buying_power || balance?.cash || 0;
-          const orderCost = (o.price || 0) * (o.quantity || 0);
-
-          if (orderCost > 0 && availableCash < orderCost) {
-            return sendJson(res, {
-              error: 'INSUFFICIENT_FUNDS',
-              message: `Insufficient cash: need ${(orderCost / 100).toFixed(2)}, have ${(availableCash / 100).toFixed(2)}`,
-              required_cents: orderCost,
-              available_cents: availableCash
-            }, 402), true;
+        // Pre-trade risk gates (P0-7, docs/TRADER-ANALYSIS-2026-07.md). The order body uses
+        // limitCents/count — the old cash check read absent o.price/o.quantity so orderCost was
+        // ALWAYS 0 and never fired. Compute the real cost and add a per-day deployed-notional cap.
+        {
+          const orderCents = Math.max(0, Number(o.limitCents ?? 100)) * Math.max(0, Number(o.count ?? o.quantity ?? 0));
+          const MAX_DAILY = Number(process.env.KALSHI_MAX_DAILY_NOTIONAL_CENTS) || 20000; // $200/day default
+          try {
+            // (a) cash check (fixed)
+            const bal = await kalshi.getBalance();
+            const p = (bal && bal.data) ? bal.data : bal || {};
+            const availableCash = Number(p.balance ?? p.buying_power ?? p.cash ?? 0);
+            if (orderCents > 0 && availableCash > 0 && availableCash < orderCents) {
+              return sendJson(res, {
+                error: 'INSUFFICIENT_FUNDS',
+                message: `Insufficient cash: need $${(orderCents / 100).toFixed(2)}, have $${(availableCash / 100).toFixed(2)}`,
+                required_cents: orderCents, available_cents: availableCash,
+              }, 402), true;
+            }
+            // (b) daily deployed-notional cap — sum today's ACCEPTED live orders from the ledger
+            const deployedToday = ledgerDeployedNotionalTodayCents();
+            if (orderCents > 0 && deployedToday + orderCents > MAX_DAILY) {
+              return sendJson(res, {
+                error: 'DAILY_NOTIONAL_CAP',
+                message: `daily deployed $${(deployedToday / 100).toFixed(2)} + this order would exceed the $${(MAX_DAILY / 100).toFixed(2)} cap`,
+                cap_cents: MAX_DAILY, deployed_today_cents: deployedToday, order_cents: orderCents,
+              }, 429), true;
+            }
+          } catch (e) {
+            console.warn('[trading] pre-trade risk check failed (order proceeds to placeOrder gates):', e.message);
           }
-        } catch (e) {
-          console.warn('[trading] Cash check failed:', e.message);
         }
 
         const result = await kalshi.placeOrder(o);
