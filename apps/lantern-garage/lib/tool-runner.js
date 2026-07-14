@@ -1258,7 +1258,7 @@ const REGISTRY = {
   trading_gate_explain: {
     policy: "read",
     guest_safe: true, // public market data + engine verdicts; no account info
-    desc: "Explain the trading EV gate: for each live signal (or one ticker), show the Riley conviction vs the 65-point floor, the Σ₀ expected-value verdict (ENTER or SKIP) with p_win vs the 0.45 minimum and EV vs the +0.15R minimum, the weighted evidence behind it (zone, structure, candle, news, volume, earnings, sector), and the trade plan levels. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did the gate skip X', or wants the statistical case for/against an entry. The gate's abstention is a real answer — report SKIPs honestly, never upgrade them to recommendations. Pair with trader_quote for price context and recall_memory for the strategy's history.",
+    desc: "Explain the trading decision gate in PLAIN ENGLISH: for each live signal (or one ticker), what the system would bet, its estimated chance of working, what $1 of risk expects to earn, the everyday-words evidence (price at a floor/ceiling, momentum, news, earnings), and the exact plan (entry, get-out price, profit targets). Technical values (p_win, EV in R, conviction) ride along in parentheses for experts. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did it skip X', or wants the statistical case explained. Narrate for someone who has never traded unless they're clearly expert; a SKIP is a real answer — never upgrade it to a recommendation. Pair with trader_quote for price context and recall_memory for the strategy's history.",
     schema: {
       type: "object",
       properties: {
@@ -1287,44 +1287,80 @@ const REGISTRY = {
             ? `[trading_gate_explain: no live signal for ${want} — the Riley gate did not mark it actionable this scan (below the proximity/RSI/structure bar, or insufficient data). That IS the explanation: it never reached the EV layer.]`
             : "[trading_gate_explain: no actionable signals on the board this scan. The gate's silence is the verdict — nothing cleared the Riley bar to even be EV-scored.]";
         }
-        entries.sort((a, b) => (b.sig.confidence || 0) - (a.sig.confidence || 0));
+        entries.sort((a, b) => (b.sig.convergence ? b.sig.convergence.ev_r || 0 : -9) - (a.sig.convergence ? a.sig.convergence.ev_r || 0 : -9));
         const fmt = (v, n = 2) => (v == null || !Number.isFinite(Number(v)) ? "n/a" : Number(v).toFixed(n));
+        // Plain-English translators — every jargon term becomes everyday words,
+        // with the technical value kept in parentheses for experts.
+        const zoneWords = (r) => {
+          const m = String(r || "").match(/in (SUPPORT|RESISTANCE) zone \(str (\d+)\)(?: \| (\d+) touches)?/i);
+          if (!m) return null;
+          const floorCeil = m[1].toUpperCase() === "SUPPORT" ? "a price floor" : "a price ceiling";
+          const touches = m[3] ? ` it has bounced off ${m[3]} time${m[3] === "1" ? "" : "s"} before` : "";
+          return `the price is sitting at ${floorCeil}${touches}`;
+        };
+        const structWords = (s) => {
+          const k = String(s || "").toUpperCase();
+          if (!k || k === "NONE") return null;
+          if (k.includes("BULLISH")) return "the most recent price action has turned upward";
+          if (k.includes("BEARISH")) return "the most recent price action has turned downward";
+          if (k === "CONFIRM") return "recent price action agrees with the bet";
+          return null;
+        };
+        const candleWords = (c) => {
+          const k = String(c || "").toUpperCase();
+          if (!k) return null;
+          const map = {
+            DOUBLE_BOTTOM: "a 'double bottom' formed (price tested a low twice and held — often a turning point)",
+            DOUBLE_TOP: "a 'double top' formed (price tested a high twice and failed — often a turning point)",
+            HAMMER: "a 'hammer' candle printed (sellers pushed price down but buyers took it back)",
+          };
+          return map[k] || `a '${k.toLowerCase().replace(/_/g, " ")}' chart pattern appeared`;
+        };
         const head = mkt
-          ? `Session ${mkt.market_open ? "OPEN" : "CLOSED"} · VIX ${mkt.vix} (${mkt.vix_regime}) · SPY regime ${mkt.market}. Gate thresholds: conviction ≥${FLOOR}, p_win ≥${P_MIN}, EV ≥ +${EV_MIN}R.`
-          : `Gate thresholds: conviction ≥${FLOOR}, p_win ≥${P_MIN}, EV ≥ +${EV_MIN}R.`;
+          ? `Market is ${mkt.market_open ? "OPEN" : "CLOSED"} right now · overall mood: ${String(mkt.market || "?").toLowerCase()} · fear gauge (VIX) ${mkt.vix} = ${String(mkt.vix_regime || "").toLowerCase()}.`
+          : "";
         const enterCount = entries.filter((e) => e.sig.convergence && e.sig.convergence.decision === "ENTER").length;
-        const lines = [head, `Signals above the Riley bar: ${entries.length} · EV-certified ENTER: ${enterCount}`, ""];
+        const lines = [
+          "HOW TO READ THIS: the system scores every stock's setup 0-100. Strong setups get a second, stricter test — the estimated chance the trade works, and whether the likely profit outweighs the risk. Only when BOTH pass does it say ENTER. A SKIP is the system protecting you, not failing.",
+          head,
+          `Setups strong enough to evaluate: ${entries.length} · passed the final test (ENTER): ${enterCount}`,
+        ].filter(Boolean);
+        lines.push("");
         for (const { t, sig } of entries.slice(0, want ? 1 : 8)) {
           const conv = sig.convergence || null;
-          const convOK = (sig.confidence || 0) >= FLOOR;
-          lines.push(`${t} ${sig.direction === "BULLISH" ? "▲" : "▼"} ${sig.direction} — conviction ${sig.confidence} (floor ${FLOOR} ${convOK ? "✓" : "✗ — stand down"}) · quality ${sig.quality || "?"}${sig.confidence >= 96 ? " [uncalibrated score, not a win probability]" : ""}`);
+          lines.push(`${t} — the system's bet: the price will go ${sig.direction === "BULLISH" ? "UP 📈" : "DOWN 📉"}`);
+          lines.push(`  Setup strength: ${sig.confidence}/100 (needs 65+)${sig.confidence >= 96 ? " — note: this measures how textbook the setup looks, NOT the odds of winning" : ""}`);
           if (conv) {
             const pOK = conv.p_win >= P_MIN, evOK = conv.ev_r >= EV_MIN;
-            lines.push(`  EV gate: ${conv.decision} — p_win ${fmt(conv.p_win)} (min ${P_MIN} ${pOK ? "✓" : "✗"}) · EV ${conv.ev_r >= 0 ? "+" : ""}${fmt(conv.ev_r)}R (min +${EV_MIN}R ${evOK ? "✓" : "✗"}) at target ${fmt(conv.target_r, 1)}R${conv.decision === "ENTER" ? ` · size ×${fmt(conv.size_mult)}` : ""}`);
-            if (conv.decision !== "ENTER") {
-              const gaps = [];
-              if (!pOK) gaps.push(`needs +${fmt((P_MIN - conv.p_win) * 100, 1)}pts of win-probability`);
-              if (!evOK) gaps.push(`EV short by ${fmt(EV_MIN - conv.ev_r)}R`);
-              if (gaps.length) lines.push(`  Shortfall: ${gaps.join(" and ")} — the odds don't pay for the risk at these levels.`);
+            if (conv.decision === "ENTER") {
+              lines.push(`  Verdict: ✅ ENTER — estimated ${Math.round(conv.p_win * 100)}% chance this trade works out (p_win ${fmt(conv.p_win)}), and for every $1 put at risk the math expects about $${fmt(conv.ev_r)} of profit on average (EV +${fmt(conv.ev_r)}R; needs at least $${EV_MIN} to be worth doing).`);
+            } else {
+              const why = [];
+              if (!pOK) why.push(`the estimated chance of it working is ${Math.round(conv.p_win * 100)}% — below the ${Math.round(P_MIN * 100)}% bar`);
+              if (!evOK) why.push(`for every $1 risked it only expects $${fmt(conv.ev_r)} back — below the $${EV_MIN} minimum`);
+              lines.push(`  Verdict: ❌ SKIP — ${why.join(", and ")}. The possible profit doesn't justify the risk, so the system stands aside.`);
             }
           } else {
-            lines.push("  EV gate: not run (insufficient evidence this scan) — treat as SKIP.");
+            lines.push("  Verdict: ❌ SKIP — not enough evidence this scan to even estimate the odds.");
           }
-          const ev2 = [];
-          if (sig.rsi != null) ev2.push(`RSI ${sig.rsi}`);
-          if (sig.structure) ev2.push(`structure ${sig.structure}`);
-          if (sig.candle) ev2.push(`candle ${sig.candle}`);
-          if (sig.volume_ratio != null) ev2.push(`vol ${fmt(sig.volume_ratio, 1)}×`);
-          if (sig.news && sig.news.n) ev2.push(`news ${sig.news.label} (${sig.news.n} items, ${sig.news.score >= 0 ? "+" : ""}${sig.news.score})`);
-          if (sig.earnings) ev2.push(`EPS surprise ${sig.earnings.surprise_pct >= 0 ? "+" : ""}${sig.earnings.surprise_pct}%`);
-          if (sig.sector && sig.sector.trend_pct != null) ev2.push(`sector ${sig.sector.etf} ${sig.sector.trend_pct >= 0 ? "+" : ""}${sig.sector.trend_pct}%`);
-          if (ev2.length) lines.push(`  Evidence: ${ev2.join(" · ")}`);
-          if (sig.plan) lines.push(`  Plan if entered: entry ~$${fmt(sig.entry_price)}, stop $${fmt(sig.plan.stop)}, T1 $${fmt(sig.plan.target1)}, T2 $${fmt(sig.plan.target2)}, hold ~${sig.plan.hold_days}d`);
-          if (sig.reasons) lines.push(`  Riley notes: ${String(sig.reasons).slice(0, 160)}`);
+          const why2 = [];
+          const zw = zoneWords(sig.reasons); if (zw) why2.push(zw);
+          const sw = structWords(sig.structure); if (sw) why2.push(sw);
+          const cw = candleWords(sig.candle); if (cw) why2.push(cw);
+          if (sig.volume_ratio != null && sig.volume_ratio >= 1.5) why2.push(`trading activity is ${fmt(sig.volume_ratio, 1)}× its normal level — a lot of interest right now`);
+          if (sig.news && sig.news.n) why2.push(`recent news leans ${sig.news.label} (${sig.news.n} stor${sig.news.n === 1 ? "y" : "ies"})`);
+          if (sig.earnings && sig.earnings.surprise_pct != null) why2.push(`last earnings came in ${Math.abs(sig.earnings.surprise_pct)}% ${sig.earnings.surprise_pct >= 0 ? "better" : "worse"} than expected`);
+          if (sig.sector && sig.sector.trend_pct != null) why2.push(`its industry group has been ${sig.sector.trend_pct >= 0 ? "strong" : "weak"} lately (${sig.sector.trend_pct >= 0 ? "+" : ""}${sig.sector.trend_pct}%)`);
+          if (why2.length) lines.push(`  Why: ${why2.join("; ")}.`);
+          if (sig.plan) {
+            const riskPerShare = Math.abs((sig.entry_price || 0) - (sig.plan.stop || 0));
+            lines.push(`  The plan: get in near $${fmt(sig.entry_price)} · if it goes the wrong way, get out at $${fmt(sig.plan.stop)} (caps the loss at ~$${fmt(riskPerShare)}/share) · take profit at $${fmt(sig.plan.target1)}, then $${fmt(sig.plan.target2)} · expect to hold ~${sig.plan.hold_days} day${sig.plan.hold_days === 1 ? "" : "s"}.`);
+          }
           lines.push("");
         }
-        if (!want && entries.length > 8) lines.push(`(+${entries.length - 8} more signals — ask for a specific ticker for detail)`);
-        if (mkt && !mkt.market_open) lines.push("Session is CLOSED: these verdicts are from the last scan and re-evaluate when ticks resume.");
+        if (!want && entries.length > 8) lines.push(`(+${entries.length - 8} more — ask about a specific ticker for its full story)`);
+        if (mkt && !mkt.market_open) lines.push("⚠ The market is CLOSED — these verdicts are from the last scan and will be re-checked when trading resumes. Nothing here is financial advice; it is the system's own math, shown with its work.");
+        else lines.push("Nothing here is financial advice — it is the system's own math, shown with its work.");
         return lines.join("\n");
       } catch (e) {
         return `[trading_gate_explain error: ${e.message} — the signal engine is unreachable; say so rather than inventing a verdict.]`;

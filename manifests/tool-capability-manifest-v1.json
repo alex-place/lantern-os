@@ -864,7 +864,7 @@
     },
     {
       "name": "trading_gate_explain",
-      "description": "Explain the trading EV gate: for each live signal (or one ticker), show the Riley conviction vs the 65-point floor, the Σ₀ expected-value verdict (ENTER or SKIP) with p_win vs the 0.45 minimum and EV vs the +0.15R minimum, the weighted evidence behind it (zone, structure, candle, news, volume, earnings, sector), and the trade plan levels. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did the gate skip X', or wants the statistical case for/against an entry. The gate's abstention is a real answer — report SKIPs honestly, never upgrade them to recommendations. Pair with trader_quote for price context and recall_memory for the strategy's history.",
+      "description": "Explain the trading decision gate in PLAIN ENGLISH: for each live signal (or one ticker), what the system would bet, its estimated chance of working, what $1 of risk expects to earn, the everyday-words evidence (price at a floor/ceiling, momentum, news, earnings), and the exact plan (entry, get-out price, profit targets). Technical values (p_win, EV in R, conviction) ride along in parentheses for experts. Use whenever the user asks 'what should I trade', 'what's the best position', 'why is there no trade', 'why did it skip X', or wants the statistical case explained. Narrate for someone who has never traded unless they're clearly expert; a SKIP is a real answer — never upgrade it to a recommendation. Pair with trader_quote for price context and recall_memory for the strategy's history.",
       "input_schema": {
         "type": "object",
         "properties": {
