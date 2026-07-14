@@ -123,6 +123,8 @@
   .hmenu .hgroup{flex-wrap:wrap;justify-content:center;gap:6px}
   .hmenu .hgroup-sep{display:none}
   .hmenu .nav-link{display:block;text-align:center}
+  .hmenu .hmenu-keys{order:99;font-family:var(--mono);font-size:10px;color:var(--text2);text-align:center;
+    border-top:1px solid var(--border);padding-top:8px;line-height:1.7}
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
@@ -155,6 +157,11 @@
   .tp-sym{font-weight:700;color:var(--text0);cursor:pointer}
   .tp-sym:hover{color:var(--blue)}
   .tp-empty{font-family:var(--mono);font-size:12px;color:var(--text2);padding:24px;text-align:center}
+  /* #2437: one-click exits */
+  .tp-actions{display:flex;justify-content:flex-end;padding:6px 10px 2px}
+  .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
+    border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
+  .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -833,6 +840,7 @@
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
 <div class="hmenu" id="hmenu" hidden role="menu" aria-label="Chart controls and actions"></div>
+<!-- Keyboard hint appended into the menu at runtime (kept out of the mover's way) -->
 
 <!-- Dream-chat rail — right-side dock, reflows the deck (#trader-chat) -->
 <div class="dc-bg hidden" id="dcPanel">
@@ -1467,6 +1475,45 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.beginPath();
     ctx.rect(0, 0, pw, ph);
     ctx.clip();
+    // ── Volume histogram (#2436) — bottom band of the plot, TradingView-style.
+    // Bars already carry volume (the regime engine consumes it); day traders need
+    // to SEE it. Skipped gracefully when the feed ships no volume (e.g. indices).
+    const maxVol = Math.max(0, ...bars.map(b=>Number(b.volume)||0));
+    if(maxVol > 0){
+      const bandH = ph * 0.16;                     // bottom ~16% of the plot
+      const bw2 = Math.max(1, Math.min(slotW*0.6, 14));
+      for(let i=0;i<n;i++){
+        const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
+        const x=i*slotW + slotW/2;
+        const hgt=(v/maxVol)*bandH;
+        ctx.fillStyle=_chartRgba(b.close>=b.open ? CHART_CANDLE_UP : CHART_CANDLE_DOWN, .28);
+        ctx.fillRect(x-bw2/2, ph-hgt, bw2, hgt);
+      }
+      // ── VWAP overlay (#2436) — cumulative Σ(typical·vol)/Σ(vol) over the visible
+      // window. THE intraday reference line; amber so it never collides with the
+      // up/down candle colors.
+      let cpv=0, cv=0;
+      ctx.beginPath();
+      let started=false;
+      for(let i=0;i<n;i++){
+        const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
+        cpv += ((b.high+b.low+b.close)/3)*v; cv += v;
+        const vx=i*slotW + slotW/2, vy=y(cpv/cv);
+        if(!started){ ctx.moveTo(vx,vy); started=true; } else ctx.lineTo(vx,vy);
+      }
+      if(started){
+        ctx.strokeStyle='#f5a623';
+        ctx.lineWidth=1.4;
+        ctx.setLineDash([5,3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Tag the line so the amber dash is self-explanatory.
+        ctx.fillStyle='#f5a623';
+        ctx.font='9px '+'ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign='left'; ctx.textBaseline='bottom';
+        ctx.fillText('VWAP', 3, y(cpv/cv)-3);
+      }
+    }
     if(type==='candle'){
       // Bad-tick wick clamp (#trader-candles): the auto-range already IGNORES any
       // wick >10× the median bar span, but we still drew it raw — so glitch wicks
@@ -2572,6 +2619,34 @@ document.addEventListener('keydown', e=>{
   else closeFullscreenChart();
 });
 
+// ── Keyboard-first trading (#2438) ───────────────────────────────────────────
+// `/` jump-to-symbol · B/S buy/sell ticket for the focused symbol · ←/→ move
+// focus through the visible deck · 1-6 set the chart layout. Never fires while
+// typing (input/textarea/select/contenteditable) or with modifier keys held.
+document.addEventListener('keydown', e=>{
+  const t=e.target;
+  if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const guest=document.body.classList.contains('guest');
+  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>focusTicker(sym), {title:'Jump to symbol'}); return; }
+  if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault(); openOrderTicket(activeTicker,'buy'); } return; }
+  if(e.key==='s'||e.key==='S'){ if(activeTicker && !guest){ e.preventDefault(); openOrderTicket(activeTicker,'sell'); } return; }
+  if(e.key==='ArrowLeft' || e.key==='ArrowRight'){
+    const list=visibleTickers(); if(!list.length) return;
+    e.preventDefault();
+    const i=Math.max(0, list.indexOf(activeTicker));
+    const next=list[(i + (e.key==='ArrowRight'?1:list.length-1)) % list.length];
+    selectChart(next, null);
+    const card=document.getElementById('card-'+next);
+    if(card && card.scrollIntoView) card.scrollIntoView({block:'nearest'});
+    return;
+  }
+  if(/^[0-6]$/.test(e.key) && e.key!=='5'){   // 0=all · 1/2/3/4/6 charts (5 isn't a layout)
+    const sel=document.getElementById('chartLayoutSelect');
+    if(sel && [...sel.options].some(o=>o.value===e.key)){ sel.value=e.key; setSlotCount(e.key); }
+  }
+});
+
 // ── Chart zoom/pan/reset interactions ────────────────────────────────────────
 // Resolve a .zone-ladder element to its data ticker, chartView key, and
 // canvas. 'ladder-fs' (the fullscreen chart) maps to fullscreenTicker.
@@ -3377,12 +3452,38 @@ function renderTpSummary(a){
     cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today)) +
     cell('Buying power', money(a.buying_power));
 }
+// #2437: one-click exits. Flatten = market order for the opposite side, full size.
+let _lastPositions = [];
+async function flattenPosition(symbol, side, qty, skipConfirm){
+  const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
+  const q = Math.abs(Number(qty)||0);
+  if(!q) return false;
+  if(!skipConfirm && !confirm(`FLATTEN ${symbol}: ${exitSide.toUpperCase()} ${q} at market (paper account)?`)) return false;
+  try{
+    const r = await fetch('/api/trading/orders/place', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market' })
+    });
+    const result = await r.json();
+    if(!r.ok || result.status!=='placed'){ alert('Flatten failed: '+(result.error||result.reason||r.statusText)); return false; }
+    await Promise.all([loadOrders(), loadPortfolio()]);
+    return true;
+  }catch(e){ alert('Flatten failed: '+e.message); return false; }
+}
+async function flattenAll(){
+  if(!_lastPositions.length) return;
+  const lines=_lastPositions.map(p=>`  ${(p.side||'long').toUpperCase()} ${Math.abs(p.qty)} ${p.symbol}`).join('\n');
+  if(!confirm(`CLOSE ALL ${_lastPositions.length} position(s) at market (paper account)?\n${lines}`)) return;
+  for(const p of _lastPositions) await flattenPosition(p.symbol, p.side, p.qty, true);
+}
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
+  _lastPositions = positions||[];
   const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).length;
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
-  el.innerHTML = `<table class="tp-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th></tr></thead><tbody>`+
+  el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll()" title="Market-close every open position">✕ Close all</button></div>`+
+    `<table class="tp-table"><thead><tr>
+    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
       const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
@@ -3393,7 +3494,8 @@ function renderPositionsTable(positions){
         <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
-        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td></tr>`;
+        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
+        <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)})" title="Market-close this position">✕ Flatten</button></td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET
@@ -3898,6 +4000,11 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // the MediaQueryList 'change' event — re-apply on debounced resize too.
   let _hmRz;
   window.addEventListener('resize', ()=>{ clearTimeout(_hmRz); _hmRz=setTimeout(apply, 120); });
+  // Keyboard cheat-sheet (#2438), pinned to the menu bottom via order:99.
+  const keys=document.createElement('div');
+  keys.className='hmenu-keys';
+  keys.innerHTML='⌨ <b>/</b> jump · <b>B</b> buy · <b>S</b> sell · <b>←→</b> focus · <b>0-6</b> layout';
+  menu.appendChild(keys);
   apply();
 })();
 
