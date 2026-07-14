@@ -84,11 +84,16 @@ function _globToRe(glob) {
 // the exact live data path (and caches) the trader UI hits — no second data
 // source, no Python spawn of its own. Bounded timeout so a slow feed degrades to
 // an honest "unavailable" instead of hanging the chat turn (#1434 / #1560).
-function _localTradingGet(pathAndQuery, timeoutMs = 9000) {
+function _localTradingGet(pathAndQuery, timeoutMs = 9000, extraHeaders = null) {
   const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
+  const headers = { "x-keystone-internal": "1", ...(extraHeaders || {}) };
+  // Desktop hardening (ADR-0014 G4): when the launcher gates operator trust on a
+  // per-boot token, this in-process hop must carry it too or the forwarded user
+  // id (below) would be refused by request-auth.internalUserId.
+  if (process.env.UNISONA_LOCAL_TOKEN) headers["x-unisona-token"] = process.env.UNISONA_LOCAL_TOKEN;
   return new Promise((resolve, reject) => {
     const req = http.get(
-      { host: "127.0.0.1", port, path: pathAndQuery, headers: { "x-keystone-internal": "1" } },
+      { host: "127.0.0.1", port, path: pathAndQuery, headers },
       (res) => {
         let data = "";
         res.on("data", (c) => (data += c));
@@ -118,6 +123,15 @@ async function _tradingDataOrDirect(pathAndQuery, directFn) {
     }
     throw loopbackErr;
   }
+}
+
+// The in-process loopback hop above carries no session cookie, so account-reading
+// tools forward the chat user's id (from runTool ctx) as x-keystone-user. The
+// trading routes honor it only on operator-trusted requests (request-auth.
+// internalUserId) — this is what lets "my portfolio" in chat resolve the SAME
+// per-user IBKR connection (ADR-0022) the trader UI shows.
+function _userHeaders(ctx) {
+  return ctx && ctx.userId ? { "x-keystone-user": encodeURIComponent(String(ctx.userId)) } : null;
 }
 
 // ── portfolio-tool formatting (portfolio_analysis / portfolio_whatif /
@@ -1231,9 +1245,9 @@ const REGISTRY = {
     policy: "read", // operator-only (no guest_safe): private account data
     desc: "Get the operator's current paper-trading positions and account (equity, cash, buying power, day P&L). Use whenever the user asks about 'my positions', 'my portfolio', 'how am I doing', or their P&L. If the broker isn't connected, report that honestly — never invent holdings.",
     schema: { type: "object", properties: {} },
-    async run() {
+    async run(_i, ctx) {
       try {
-        const d = await _localTradingGet("/api/trading/positions");
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         const acct = (d && d.account) || {};
         if (!d || d.available === false) {
           return `[trader_positions: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no live positions. Say so honestly; don't invent holdings.]`;
@@ -1266,9 +1280,9 @@ const REGISTRY = {
     policy: "read", // operator-only (no guest_safe): reads the connected broker account
     desc: "Analyze the operator's ACTUAL broker holdings for risk-adjusted quality: current weights, per-holding and whole-portfolio annualized Sharpe with 95% CI, volatility, worst drawdown over the window, pairwise correlation matrix, and concentration (largest position, effective N, avg pairwise correlation). Use when the user asks how diversified or risky their portfolio is, what its Sharpe is, or whether their holdings overlap. Cite the window and CIs as evidence — this is historical measurement, never a promise, and never personalized advice.",
     schema: { type: "object", properties: { years: { type: "number", description: "history window in years (2–10, default 5)" } } },
-    async run(i) {
+    async run(i, ctx) {
       try {
-        const d = await _localTradingGet("/api/trading/positions");
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         if (!d || d.available === false) {
           return `[portfolio_analysis: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no positions to analyze. Say so honestly.]`;
         }
@@ -1347,9 +1361,9 @@ const REGISTRY = {
         max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
       },
     },
-    async run(i) {
+    async run(i, ctx) {
       try {
-        const d = await _localTradingGet("/api/trading/positions");
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         if (!d || d.available === false) {
           return `[propose_rebalance: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — nothing to rebalance. Say so honestly.]`;
         }
@@ -1520,7 +1534,9 @@ async function runTool(name, input, ctx = {}) {
 
   try {
     // run() may be sync (returns a string) or async (returns a Promise); await covers both.
-    let out = String((await entry.run(input || {})) || "");
+    // ctx is passed through so account-reading tools can forward the requesting
+    // user's identity (ctx.userId) on their internal loopback hops.
+    let out = String((await entry.run(input || {}, ctx)) || "");
     const outputLength = out.length;
     if (out.length > MAX_OUT) out = out.slice(0, MAX_OUT) + "\n…[truncated]";
 

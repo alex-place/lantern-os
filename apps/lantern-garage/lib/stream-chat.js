@@ -2386,7 +2386,7 @@ async function handleStreamChat(req, url, res) {
               let toolAnswer = "";
               const MAX_TOOL_ITERS = 5;
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
-                const result = await toolRunner.runTool(tc.name, tc.input, { operator });
+                const result = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
                 const out = result.ok ? result.result : (result.error || `ERROR(${result.reason || "error"})`);
                 sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
                   ok: result.ok, status: result.status, reason: result.reason_code || null,
@@ -2534,7 +2534,7 @@ async function handleStreamChat(req, url, res) {
               toolCalls++;
               const input = fc.args || {};
               sse.writeData(res, { type: "tool", phase: "call", name: fc.name, input });
-              const r = await toolRunner.runTool(fc.name, input, { operator });
+              const r = await toolRunner.runTool(fc.name, input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: fc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -2761,7 +2761,7 @@ async function handleStreamChat(req, url, res) {
               for (const tu of toolUses) {
                 toolCalls++;
                 sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
-                const r = await toolRunner.runTool(tu.name, tu.input, { operator });
+                const r = await toolRunner.runTool(tu.name, tu.input, { operator, userId: getEffectiveUserId(req) });
                 const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
                 sse.writeData(res, { type: "tool", phase: "result", name: tu.name,
                   ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -2959,7 +2959,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -3110,7 +3110,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -3235,7 +3235,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
