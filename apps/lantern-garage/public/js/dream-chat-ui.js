@@ -97,7 +97,7 @@ function sanitizePersonalContext(context) {
 
 async function loadPersonalCube() {
   try {
-    const resp = await fetch('/api/cubes/alex/personal');
+    const resp = await fetch('/api/cubes/alex/personal', { signal: AbortSignal.timeout(8000) });
     if (resp.ok) {
       personalContext = await resp.json();
       updatePersonalInsights(personalContext);
