@@ -482,6 +482,103 @@ async function proposeRebalance(positions, opts = {}) {
 }
 
 /**
+ * Buy-only contribution PLAN: route new cash toward the holdings most under
+ * their shrunk-tangency target weight, without selling anything. This is the
+ * "where should this month's deposit go" question — deterministic, fractional-
+ * share aware, and NEVER an order placement (Act stays behind ADR-0020 gates).
+ *
+ * Method: compute the same long-only capped tangency target as
+ * proposeRebalance, then fill per-symbol dollar deficits vs the
+ * post-contribution total. If the cash more than covers all deficits, the
+ * remainder is spread at target weights. A single holding degenerates to
+ * "all cash to it" (with the concentration note the analysis already carries).
+ *
+ * opts: { years, maxWeight, covShrink, muShrink, history?, fetchFn? }
+ */
+async function planContribution(positions, cash, opts = {}) {
+  const amount = Math.round(Number(cash) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, reason: "contribution must be a positive dollar amount" };
+  }
+  const analysis = await analyzeHoldings(positions, opts);
+  if (!analysis.ok) return analysis;
+  const { symbols, weights, totalValue, _aligned: aligned, perSymbol } = analysis;
+
+  let target = [1];
+  let tangFallback = null;
+  if (symbols.length >= 2) {
+    const mu = symbols.map((s) => _mean(aligned.returns[s]));
+    const cov = covarianceMatrix(aligned.returns, symbols);
+    const tang = tangencyWeights({
+      symbols, mu, cov,
+      maxWeight: Math.min(1, Math.max(0.1, Number(opts.maxWeight) || 0.35)),
+      covShrink: opts.covShrink != null ? opts.covShrink : 0.35,
+      muShrink: opts.muShrink != null ? opts.muShrink : 0.5,
+    });
+    target = tang.weights;
+    tangFallback = tang.fallback || null;
+  }
+
+  // Deficits vs the target on the post-contribution total; buy-only fill.
+  const newTotal = totalValue + amount;
+  const deficits = symbols.map((s, i) => Math.max(0, target[i] * newTotal - weights[i] * totalValue));
+  const defSum = deficits.reduce((a, b) => a + b, 0);
+  const alloc = defSum >= amount
+    ? deficits.map((d) => (defSum > 0 ? amount * (d / defSum) : 0))
+    : deficits.map((d, i) => d + (amount - defSum) * target[i]);
+
+  // Dust floor: skip slices under $1 or 2% of the contribution — a $0.40 buy
+  // is fee/spread noise at retail scale. Skipped dollars are reported, not lost.
+  const dust = Math.max(1, amount * 0.02);
+  const orders = [];
+  let planned = 0;
+  symbols.forEach((s, i) => {
+    const dollars = Math.round(alloc[i] * 100) / 100;
+    if (dollars < dust) return;
+    const price = perSymbol[i].price;
+    orders.push({
+      symbol: s,
+      action: "BUY",
+      dollars,
+      estShares: price > 0 ? Math.round((dollars / price) * 10000) / 10000 : null,
+      price,
+    });
+    planned += dollars;
+  });
+  orders.sort((a, b) => b.dollars - a.dollars);
+
+  const afterWeights = symbols.map((s, i) => (weights[i] * totalValue + alloc[i]) / newTotal);
+  const notes = [...analysis.notes,
+    "buy-only: the contribution is routed toward underweight holdings; nothing is sold",
+    "share counts assume fractional-share support — whole-share brokers round down"];
+  if (tangFallback) notes.push(tangFallback);
+  if (planned < amount - 0.01) {
+    notes.push(`$${(amount - planned).toFixed(2)} left unallocated (slices under the $${dust.toFixed(2)} dust floor)`);
+  }
+
+  return {
+    ok: true,
+    window: analysis.window,
+    symbols,
+    totalValue,
+    contribution: amount,
+    currentWeights: weights,
+    targetWeights: target,
+    afterWeights,
+    current: analysis.portfolio,
+    after: _windowStats(afterWeights, aligned.returns, symbols),
+    orders,
+    excluded: analysis.excluded,
+    notes,
+    method: {
+      objective: "fill dollar deficits vs the shrunk tangency target (w ∝ Σ⁻¹μ), buy-only",
+      constraints: `long-only; max weight ${Math.round((Math.min(1, Math.max(0.1, Number(opts.maxWeight) || 0.35))) * 100)}%; existing holdings only; nothing sold`,
+      shrinkage: `cov off-diagonal ×${1 - (opts.covShrink != null ? opts.covShrink : 0.35)}, μ pulled ${((opts.muShrink != null ? opts.muShrink : 0.5) * 100)}% toward cross-sectional mean`,
+    },
+  };
+}
+
+/**
  * Score an arbitrary weight allocation (what-if). Weights may be fractions or
  * percents — they are normalized by their sum. Public market data only.
  * opts: { years, history?, fetchFn? }
@@ -529,7 +626,7 @@ async function scoreWeights(weightsBySym, opts = {}) {
 
 module.exports = {
   // orchestrators
-  analyzeHoldings, proposeRebalance, scoreWeights,
+  analyzeHoldings, proposeRebalance, scoreWeights, planContribution,
   // primitives (exported for tests + reuse)
   fetchDailyHistory, alignReturns, sharpeCI, maxDrawdown, annualizedReturn,
   correlationMatrix, covarianceMatrix, portfolioReturns,
