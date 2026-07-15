@@ -116,12 +116,10 @@ async function _autoscanTick() {
         // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
         const wl = new Set(watchlistStore.getWatchlist(uid).map((s) => String(s).toUpperCase()));
         const userScan = { ...scan, signals: (scan.signals || []).filter((s) => wl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
-        const at = await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours });
-        const tag = `${resolved.broker}:${resolved.accountId}`;
-        for (const e of (at.executed || [])) {
-          console.log(`[AutoTrader:${tag}] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
-        }
-        if ((at.enabled || at.manageExits) && !(at.executed || []).length && at.reason) console.log(`[AutoTrader:${tag}] no action — ${at.reason}`);
+        // Every execution is already appended to the durable autopilot-trades.jsonl by
+        // auto-trader.logTrade() — that append-only file is the record of what the
+        // autopilot did, so a per-tick console echo here would only duplicate it.
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);

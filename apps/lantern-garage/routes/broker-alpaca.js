@@ -19,6 +19,10 @@ const crypto = require('crypto');
 const https = require('https');
 const { getEffectiveUserId } = require('../lib/session-identity');
 const store = require('../lib/alpaca-credentials');
+// The signed short-TTL state cookie is the same primitive every other OAuth2 provider
+// here already uses, so reuse it rather than keeping a second copy of the HMAC: one
+// signer, one secret resolution, one place to harden. (lib/oauth-core, ADR-0016.)
+const { signOauth, verifyOauth, readCookie } = require('../lib/oauth-core');
 
 const AUTHORIZE_URL = 'https://app.alpaca.markets/oauth/authorize';
 const TOKEN_HOST = 'api.alpaca.markets';
@@ -29,30 +33,7 @@ const SCOPE = 'account:write trading';   // read account + place trades on the u
 function _clientId() { return process.env.ALPACA_OAUTH_CLIENT_ID || ''; }
 function _clientSecret() { return process.env.ALPACA_OAUTH_CLIENT_SECRET || ''; }
 function _configured() { return !!(_clientId() && _clientSecret()); }
-function _secret() { return process.env.SESSION_SECRET || 'lantern-alpaca-oauth-secret'; }
 
-function _sign(payload) {
-  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const sig = crypto.createHmac('sha256', _secret()).update(data).digest('base64url');
-  return `${data}.${sig}`;
-}
-function _verify(token) {
-  if (!token || !token.includes('.')) return null;
-  const [data, sig] = token.split('.');
-  const expect = crypto.createHmac('sha256', _secret()).update(data).digest('base64url');
-  const a = Buffer.from(sig), b = Buffer.from(expect);
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
-  try { const p = JSON.parse(Buffer.from(data, 'base64url').toString('utf8')); return p && p.exp && Date.now() <= p.exp ? p : null; } catch { return null; }
-}
-function _readCookie(req, name) {
-  const raw = req.headers && req.headers.cookie;
-  if (!raw) return null;
-  for (const part of raw.split(';')) {
-    const i = part.indexOf('=');
-    if (i !== -1 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
-  }
-  return null;
-}
 function _origin(req) {
   const host = (req.headers && req.headers.host) || '127.0.0.1';
   const proto = ((req.headers && req.headers['x-forwarded-proto']) || '').split(',')[0].trim()
@@ -139,7 +120,7 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
     const env = url.searchParams.get('env') === 'live' ? 'live' : 'paper';
     const returnTo = url.searchParams.get('returnTo') || '/orchestration.html#broker';
     const state = crypto.randomBytes(16).toString('hex');
-    const cookie = _sign({ state, env, userId, returnTo, redirectUri, exp: Date.now() + 10 * 60 * 1000 });
+    const cookie = signOauth({ state, env, userId, returnTo, redirectUri, exp: Date.now() + 10 * 60 * 1000 });
     const secure = redirectUri.startsWith('https://') ? '; Secure' : '';
     const authUrl = `${AUTHORIZE_URL}?${new URLSearchParams({
       response_type: 'code',
@@ -157,7 +138,7 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
   // GET /callback — Alpaca redirects here with ?code&state (or ?error)
   if (method === 'GET' && p === '/api/broker/alpaca/callback') {
     const clear = `${COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`;
-    const ck = _verify(_readCookie(req, COOKIE));
+    const ck = verifyOauth(readCookie(req, COOKIE));
     const back = (msg) => { res.writeHead(302, { 'Set-Cookie': clear, Location: `${(ck && ck.returnTo) || '/orchestration.html#broker'}${((ck && ck.returnTo) || '').includes('?') ? '&' : '?'}alpaca=${msg}` }); return res.end(), true; };
     const err = url.searchParams.get('error');
     if (err) return back(`error&reason=${encodeURIComponent(err)}`);
