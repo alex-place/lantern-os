@@ -246,6 +246,15 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
+      // No IBKR account → try the user's one-click Alpaca account (ADR-0027).
+      const alpaca = require('../../lib/alpaca-adapter');
+      const alpacaAccount = await alpaca.getAccount(uid).catch(() => null);
+      if (alpacaAccount) {
+        const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
+        alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
+        sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
+        return true;
+      }
     } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);

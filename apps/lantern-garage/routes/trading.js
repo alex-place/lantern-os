@@ -96,6 +96,9 @@ async function _autoscanTick() {
       // `extended` routes pre/post-market fills through LMT + outsideRTH orders.
       const ibkrCreds = require('../lib/ibkr-credentials');
       const watchlistStore = require('../lib/watchlist-store');
+      // NOTE: the autopilot loop executes via bridge.placeIBKROrder (IBKR-bound).
+      // Alpaca one-click accounts (ADR-0027) trade manually + show positions today;
+      // making runAutoTrade broker-agnostic so it also drives Alpaca is a follow-up.
       const users = process.env.TRADER_AUTO_USER ? [process.env.TRADER_AUTO_USER] : ibkrCreds.listUsers();
       const _seenAccts = new Set();
       for (const uid of users) {
