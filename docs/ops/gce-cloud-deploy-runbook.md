@@ -50,8 +50,34 @@ The VM's default compute SA `843848914143-compute@developer.gserviceaccount.com`
 granted `roles/aiplatform.user` and runs with `--scopes=cloud-platform`, so Gemini
 reaches Vertex through the metadata server — no key files. Enabled by these env vars
 (see drop-ins below): `GEMINI_USE_VERTEX=1`, `VERTEX_PROJECT=project-2f747c41-d0f3-4de9-b48`,
-`VERTEX_LOCATION=us-central1`. Only `gemini-2.5-flash` is currently valid in-region
-(the 1.5/2.0 model ids 404 on Vertex).
+`VERTEX_LOCATION=us-central1`.
+
+**Vertex is the wire that spends the Cloud credits.** The AI-Studio key
+(`generativelanguage.googleapis.com?key=…`) is free-tier and bills nothing; Vertex
+(`LOCATION-aiplatform.googleapis.com`, Bearer ADC) bills the project. `gemini-transport`
+picks Vertex whenever either env var above is set, so no key needs to be present here.
+
+**Gemini leads by default here.** When Vertex is configured and the operator has not set
+`KEYSTONE_PREFERRED_PROVIDER`, the dispatch order puts Gemini first — spending the credits
+is the reason Vertex is on (`lib/stream-chat/provider-order.js`). Set
+`KEYSTONE_PREFERRED_PROVIDER` explicitly to override; the rest of the chain still
+backstops, so a Vertex outage never dead-ends a turn.
+
+### Models valid in-region
+
+Probed against Vertex `us-central1` on **2026-07-15** (`:generateContent`, real calls):
+
+| model | result |
+|-------|--------|
+| `gemini-2.5-flash` (default, `GEMINI_MODEL`) | 200 |
+| `gemini-2.5-flash-lite` | 200 |
+| `gemini-2.5-pro` | 200 |
+| `gemini-3.5-flash`, `gemini-3.1-flash-lite` | **404 — these ids do not exist** |
+
+The 1.5/2.0 ids also 404. The chat's fallback chain lives in
+`lib/provider-models.js` (`GEMINI_FALLBACK_MODELS`) — re-probe before editing it. It
+previously listed the two `gemini-3.x` ids above, which meant every fallback hop was a
+guaranteed 404 and this box had no working chat fallback at all.
 
 ## Environment (systemd drop-ins)
 
