@@ -113,8 +113,10 @@
   /* ── Hamburger (sandwich) menu: on narrow screens the chart controls + secondary
      actions collapse into a ☰ dropdown instead of a long sideways-scrolling row.
      The SAME elements move into the panel (JS), so ids/handlers/state survive. ── */
-  /* The ☰ is PERMANENT: Pre/After + Kalshi live in it at every width; on narrow
-     screens it additionally swallows the chart controls, Explore, and broker link. */
+  /* The ☰ is PERMANENT: the feed stamp, Pre/After, Kalshi, Explore, Connect broker,
+     and Chat live in it at every width; on narrow screens it additionally swallows
+     the chart controls. Only the tiny pulse dot stays inline — a staleness signal
+     is useless hidden inside a closed menu. */
   .hmenu-btn{font-size:15px;line-height:1;padding:6px 11px}
   .hmenu{position:fixed;top:104px;right:8px;z-index:1300;background:var(--bg1);border:1px solid var(--border);
     border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.5);padding:12px;display:flex;flex-direction:column;
@@ -123,6 +125,14 @@
   .hmenu .hgroup{flex-wrap:wrap;justify-content:center;gap:6px}
   .hmenu .hgroup-sep{display:none}
   .hmenu .nav-link{display:block;text-align:center}
+  .hmenu .hmenu-keys{order:99;font-family:var(--mono);font-size:10px;color:var(--text2);text-align:center;
+    border-top:1px solid var(--border);padding-top:8px;line-height:1.7}
+  /* Inside the ☰ each action explains itself: a caption rendered from
+     data-hmenu-desc. CSS-only (::after), so when an element moves back to the
+     inline toolbar on wide screens the caption vanishes with no DOM cleanup. */
+  .hmenu [data-hmenu-desc]::after{content:attr(data-hmenu-desc);display:block;font-size:10px;
+    font-weight:400;letter-spacing:0;text-transform:none;color:var(--text2);white-space:normal;
+    line-height:1.35;margin-top:3px;max-width:260px}
   /* #1693: flex column — add box on top, watchlist scrolls in the middle, the
      selected-symbol info is its OWN pinned, scrollable section at the bottom. */
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
@@ -155,6 +165,11 @@
   .tp-sym{font-weight:700;color:var(--text0);cursor:pointer}
   .tp-sym:hover{color:var(--blue)}
   .tp-empty{font-family:var(--mono);font-size:12px;color:var(--text2);padding:24px;text-align:center}
+  /* #2437: one-click exits */
+  .tp-actions{display:flex;justify-content:flex-end;padding:6px 10px 2px}
+  .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
+    border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
+  .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -169,6 +184,25 @@
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
+     Stale data must never look live (Σ₀ external-reality rule, applied to the UI). */
+  .feed-stamp{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;color:var(--green);white-space:nowrap}
+  .feed-stamp.stale{color:var(--red);font-weight:700}
+  .pulse.stale{background:var(--red);animation:none}
+  /* #2439: session clock pill — label carries the phase, value the countdown */
+  #mktClockWrap .l.open{color:var(--green)} #mktClockWrap .l.pre,#mktClockWrap .l.after{color:var(--amber)}
+  /* #2439: RVOL chip in symbol info */
+  .wi-rvol{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:9px;margin-left:8px;border:1px solid var(--border);color:var(--text2)}
+  .wi-rvol.hot{border-color:rgba(245,166,35,.5);color:var(--amber);background:rgba(245,166,35,.08)}
+  /* #2439: price alerts */
+  .wi-alerts{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .wi-alert-add{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;border:1px solid var(--border);background:var(--bg1);color:var(--text1);cursor:pointer}
+  .wi-alert-add:hover{border-color:var(--accent);color:var(--text0)}
+  .wi-alert-chip{font-family:var(--mono);font-size:10.5px;padding:2px 7px;border-radius:9px;border:1px solid rgba(245,166,35,.45);background:rgba(245,166,35,.08);color:var(--amber);white-space:nowrap}
+  .wi-alert-chip button{background:none;border:none;color:inherit;cursor:pointer;padding:0 0 0 4px;font-size:10.5px}
+  .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  /* #2439: watchlist sort control */
+  .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
   .nav-link{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
@@ -733,14 +767,15 @@
 <!-- Header -->
 <h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Trading toolbar">
-  <div class="logo">Unisona<span>Trader</span></div>
-  <div class="badge badge-paper">PAPER</div>
-  <div class="badge guest-badge" id="guestBadge" style="display:none">READ-ONLY</div>
-  <div class="hstat acct"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
-  <div class="hstat acct"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
-  <div class="hstat"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
-  <div class="hstat acct"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
-  <div class="hstat"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+  <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
+  <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
+  <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
+  <div class="hstat acct" title="Total account value — cash plus open positions"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
+  <div class="hstat acct" title="Profit or loss so far today"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
+  <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
+  <div class="hstat acct" title="How many positions are currently open"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
+  <div class="hstat" title="US equity session status — open, closed, or pre/after hours"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
+  <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
@@ -752,7 +787,7 @@
     <option value="6">6 charts</option>
     <option value="10">10 charts</option>
   </select>
-  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)">
+  <select id="chartTypeSelect" class="chart-ctrl" aria-label="Chart type" onchange="changeChartType(this.value)" title="Draw charts as a line or as candlesticks">
     <option value="line">Line</option>
     <option value="candle">Candles</option>
   </select>
@@ -761,7 +796,7 @@
     onclick="togglePatternMenu(this)"
     title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
   <span class="hgroup-sep" aria-hidden="true"></span>
-  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)">
+  <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)" title="Bar interval — how much time each candle covers">
     <option value="1m">1m</option>
     <option value="5m" selected>5m</option>
     <option value="15m">15m</option>
@@ -782,15 +817,33 @@
     <option value="5Y">5Y</option>
     <option value="All">All</option>
   </select>
+  <span class="hgroup-sep" aria-hidden="true"></span>
+  <select id="drawToolSel" class="chart-ctrl" aria-label="Drawing tools" onchange="setDrawTool(this.value)" title="Draw on charts — click to place; alt-click a drawing to delete; Esc to stop. Persists per symbol.">
+    <option value="">✏ Draw</option>
+    <option value="h">─ Level</option>
+    <option value="l">╱ Trend</option>
+    <option value="clear">🗑 Clear symbol</option>
+  </select>
   </div><!-- /hgroup -->
-  <div class="pulse"></div>
-  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()" title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only.">⏰ Pre/After —</button>
-  <a href="/kalshi-terminal.html" class="nav-link">Kalshi →</a>
-  <a href="/explore.html?topic=finance" class="nav-link">Explore →</a>
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none" title="Connect your Interactive Brokers account to place real trades">🔗 <span id="brokerLabel">Connect broker</span></a>
-  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none">Sign in to trade →</a>
-  <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()" title="Ask the Unisona assistant about markets, symbols, and your positions">💬 Chat</button>
-  <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu" title="Chart controls and more">☰</button>
+  <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
+  <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
+  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()"
+    title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only."
+    data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
+  <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
+    data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
+  <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
+    data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
+  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none"
+    title="Connect your Interactive Brokers account so trades route to your own paper or live account"
+    data-hmenu-desc="Link your own Interactive Brokers account — trades then route to it instead of the shared paper account.">🔗 <span id="brokerLabel">Connect broker</span></a>
+  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
+  <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
+    title="Ask the Unisona assistant about markets, symbols, and your positions"
+    data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
+  <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
+    aria-label="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat"
+    title="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat">☰</button>
 </div>
 
 <!-- Sidebar -->
@@ -798,6 +851,11 @@
   <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
+    <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
+      <option value="">⇅</option>
+      <option value="chg">Δ%</option>
+      <option value="rvol">RVOL</option>
+    </select>
   </div>
   <div id="wlList"></div>
   <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
@@ -816,15 +874,17 @@
   <div class="tp-summary" id="tpSummary"></div>
   <!-- Tabs -->
   <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
-    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')">Orders</button>
-    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')">Order history</button>
+    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
+    <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
     <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -833,6 +893,7 @@
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
 <div class="hmenu" id="hmenu" hidden role="menu" aria-label="Chart controls and actions"></div>
+<!-- Keyboard hint appended into the menu at runtime (kept out of the mover's way) -->
 
 <!-- Dream-chat rail — right-side dock, reflows the deck (#trader-chat) -->
 <div class="dc-bg hidden" id="dcPanel">
@@ -898,8 +959,8 @@
         <option value="All">All</option>
       </select>
       <div class="order-ticket fs-order-ticket">
-        <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')">BUY</button>
-        <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')">SELL</button>
+        <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')" title="Open a buy order ticket for this symbol (paper trade)">BUY</button>
+        <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')" title="Open a sell order ticket for this symbol (paper trade)">SELL</button>
       </div>
       <span class="fs-close" onclick="closeFullscreenChart()">✕ Close</span>
     </div>
@@ -965,6 +1026,13 @@
         <input type="number" class="ot-field" id="otQty" aria-label="Quantity" value="1" min="1" step="1" oninput="renderOrderTicket()">
       </div>
       <div class="ot-row"><span></span><span class="ot-usd" id="otUsdEquiv">≈ $0.00 USD</span></div>
+      <!-- #2439: risk-based sizing — "risk $X to my stop" → units. Pros size positions
+           by dollars at risk, not share counts. Needs the stop-loss exit enabled. -->
+      <div class="ot-row">
+        <span class="ot-label" title="Auto-size units from dollars risked to the stop">Risk $ → units</span>
+        <input type="number" class="ot-field" id="otRiskUsd" aria-label="Dollars to risk to the stop" placeholder="—" min="0" step="1" oninput="otSizeFromRisk()">
+      </div>
+      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">enable a stop loss to auto-size</span></div>
 
       <div class="ot-section">
         <div class="ot-section-title">Exits</div>
@@ -989,7 +1057,7 @@
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
-              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl')">
+              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl');otSizeFromRisk()">
             </label>
             <label class="ot-fieldcell"><span>Ticks</span>
               <input type="number" class="ot-field" id="otSlTicks" aria-label="Stop-loss ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('sl')">
@@ -1003,6 +1071,12 @@
         <div class="ot-info-row"><span>Tick size</span><span>$0.01</span></div>
         <div class="ot-info-row"><span>Tick value</span><span id="otTickValue">$0.00</span></div>
         <div class="ot-info-row"><span>Trade value</span><span id="otTradeValue">$0.00</span></div>
+      </div>
+
+      <!-- #2445: rapid mode — explicit opt-in; skips confirms + arms Shift+B/S -->
+      <div class="ot-exit-head" style="margin-top:2px">
+        <input type="checkbox" id="otRapid" aria-label="Rapid mode — skip order confirmations" onchange="setRapidMode(this.checked)">
+        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">⚡ Rapid mode — no confirms</span>
       </div>
 
       <div class="ot-submit" id="otSubmit" onclick="submitOrderTicket()">Buy 1 — MARKET</div>
@@ -1467,23 +1541,76 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.beginPath();
     ctx.rect(0, 0, pw, ph);
     ctx.clip();
+    // ── Feed-glitch wick sanitizer (#trader-candles v2) ──────────────────────
+    // Yahoo ships bars with tiny bodies and monstrous ONE-SIDED wicks (measured
+    // on AAPL: 96/2024 hourly bars with $14–26 spikes on ~$0.30 bodies — normal
+    // high, bogus low, or vice versa). The previous total-span>10×median test
+    // missed one-sided spikes whenever the window's median crept up. New rule,
+    // per wick SIDE: anything longer than 4× the median bar span is a feed
+    // glitch → clamp it to body ± one median span so it reads as a normal bar.
+    // (Parameters measured on the corrupt cluster: range 22→12.2, tallest bar
+    // 37% of plot, real ≤4× wicks untouched.) renderZoneLadder's auto-range
+    // mirrors the same rule so range and drawing always agree.
+    // INTRADAY ONLY: a watchlist-wide sweep showed the contamination lives in the
+    // pre/after-hours bars of every equity (META 12.8%, MSFT 12.3% of 1h bars;
+    // crypto ~0%), while daily+ bars are clean — and on dailies a >4× wick can be
+    // a REAL crash day that must render honestly. So dailies pass through raw.
+    const _sanitizing = ['1m','5m','15m','1h','4h'].indexOf(timeframe) !== -1;
+    const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
+    const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
+    const _wdet = (_sanitizing && _med2>0) ? _med2*4 : Infinity;
+    const saneHiLo = b => {
+      const bh=Math.max(b.open,b.close), bl=Math.min(b.open,b.close);
+      return { hi:(b.high-bh>_wdet)? bh+_med2 : b.high, lo:(bl-b.low>_wdet)? bl-_med2 : b.low };
+    };
+    // ── Volume histogram (#2436) — bottom band of the plot, TradingView-style.
+    // Bars already carry volume (the regime engine consumes it); day traders need
+    // to SEE it. Skipped gracefully when the feed ships no volume (e.g. indices).
+    const maxVol = Math.max(0, ...bars.map(b=>Number(b.volume)||0));
+    if(maxVol > 0){
+      const bandH = ph * 0.16;                     // bottom ~16% of the plot
+      const bw2 = Math.max(1, Math.min(slotW*0.6, 14));
+      for(let i=0;i<n;i++){
+        const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
+        const x=i*slotW + slotW/2;
+        const hgt=(v/maxVol)*bandH;
+        ctx.fillStyle=_chartRgba(b.close>=b.open ? CHART_CANDLE_UP : CHART_CANDLE_DOWN, .28);
+        ctx.fillRect(x-bw2/2, ph-hgt, bw2, hgt);
+      }
+      // ── VWAP overlay (#2436) — cumulative Σ(typical·vol)/Σ(vol) over the visible
+      // window. THE intraday reference line; amber so it never collides with the
+      // up/down candle colors.
+      let cpv=0, cv=0;
+      ctx.beginPath();
+      let started=false;
+      for(let i=0;i<n;i++){
+        const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
+        const sv=saneHiLo(b);                       // glitch wicks must not skew VWAP
+        cpv += ((sv.hi+sv.lo+b.close)/3)*v; cv += v;
+        const vx=i*slotW + slotW/2, vy=y(cpv/cv);
+        if(!started){ ctx.moveTo(vx,vy); started=true; } else ctx.lineTo(vx,vy);
+      }
+      if(started){
+        ctx.strokeStyle='#f5a623';
+        ctx.lineWidth=1.4;
+        ctx.setLineDash([5,3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // Tag the line so the amber dash is self-explanatory.
+        ctx.fillStyle='#f5a623';
+        ctx.font='9px '+'ui-monospace, Menlo, Consolas, monospace';
+        ctx.textAlign='left'; ctx.textBaseline='bottom';
+        ctx.fillText('VWAP', 3, y(cpv/cv)-3);
+      }
+    }
     if(type==='candle'){
-      // Bad-tick wick clamp (#trader-candles): the auto-range already IGNORES any
-      // wick >10× the median bar span, but we still drew it raw — so glitch wicks
-      // slammed into the plot ceiling/floor as full-height streaks. Clamp the DRAWN
-      // wick to the body ± one median span so a bogus tick reads as a normal bar.
-      const _spans2 = bars.map(b=>Math.abs(b.high-b.low)).filter(v=>v>0).sort((a,b)=>a-b);
-      const _med2 = _spans2.length ? _spans2[Math.floor(_spans2.length/2)] : 0;
       for(let i=0;i<n;i++){
         const b = bars[i];
         const x = i*slotW + slotW/2;
         const up = b.close >= b.open;
         const color = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
-        let wHi = b.high, wLo = b.low;
-        if(_med2>0 && (wHi-wLo) > _med2*10){
-          wHi = Math.max(b.open,b.close) + _med2;
-          wLo = Math.min(b.open,b.close) - _med2;
-        }
+        const sw = saneHiLo(b);                     // per-side glitch clamp (v2)
+        const wHi = sw.hi, wLo = sw.lo;
         ctx.strokeStyle = color;
         ctx.fillStyle   = color;
         ctx.lineWidth   = 1;
@@ -1536,6 +1663,32 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       ctx.beginPath(); ctx.arc(lx, ly, 9, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle = dc;
       ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI*2); ctx.fill();
+    }
+    // ── User drawings (#2444): purple levels + trendlines, per-symbol persisted.
+    {
+      const tk = _canvasTicker(canvas);
+      const list = (tk && _drawings[tk]) || [];
+      if(list.length || (_drawPending && _drawPending.tk===tk)){
+        const ts0=+new Date(bars[0].timestamp), ts1=+new Date(bars[n-1].timestamp)||ts0+1;
+        const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
+        ctx.lineWidth=1.2;
+        for(const d of list){
+          ctx.strokeStyle='#a78bfa';
+          if(d.t==='h'){
+            const yy=y(d.price);
+            ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(pw,yy); ctx.stroke();
+            ctx.fillStyle='#a78bfa'; ctx.font='9px ui-monospace, Menlo, Consolas, monospace';
+            ctx.textAlign='right'; ctx.textBaseline='bottom';
+            ctx.fillText('$'+d.price, pw-3, yy-2);
+          } else if(d.t==='l'){
+            ctx.beginPath(); ctx.moveTo(xOf(d.aTs), y(d.aPrice)); ctx.lineTo(xOf(d.bTs), y(d.bPrice)); ctx.stroke();
+          }
+        }
+        if(_drawPending && _drawPending.tk===tk){   // first trendline point: anchor dot
+          ctx.fillStyle='#a78bfa';
+          ctx.beginPath(); ctx.arc(xOf(_drawPending.ts), y(_drawPending.price), 3, 0, Math.PI*2); ctx.fill();
+        }
+      }
     }
     ctx.restore();
   }
@@ -1667,23 +1820,29 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   if(view.yMin != null && view.yMax != null){
     rMin = view.yMin; rMax = view.yMax;
   } else {
-    // Robust auto-fit: the keyless Yahoo feed occasionally ships a bad tick — a single
-    // bar whose high/low (or open/close) is wildly off — and fitting to the raw min/max
-    // let one glitch blow the whole price range open, rendering that candle huge and
-    // squashing the rest. Ignore the bogus extreme of any bar whose span is >10× the
-    // median bar span (use its body, or skip it), so the range fits the REAL action and
-    // the outlier's excess wick is simply clipped to the plot. #trader-candles
+    // Robust auto-fit (#trader-candles v2): the keyless Yahoo feed regularly ships
+    // bars with a tiny body and a monstrous ONE-SIDED wick (measured on AAPL:
+    // 96/2024 hourly bars with $14–26 spikes on ~$0.30 bodies). The old test used
+    // TOTAL span >10× median, which missed one-sided spikes whenever the median
+    // crept up — the range blew open and the corrupt candle rendered full-height.
+    // Per wick SIDE: longer than 4× the median span = feed glitch → treat as
+    // body ± one median (the same rule renderChart draws with, so range and
+    // drawing always agree); a bar whose BODY alone exceeds 10× median is
+    // skipped as wholly bogus.
     let lo = Infinity, hi = -Infinity;
     const _spans = viewBars.map(b=>Math.abs(b.high-b.low)).filter(x=>x>0).sort((a,b)=>a-b);
     const _medSpan = _spans.length ? _spans[Math.floor(_spans.length/2)] : 0;
-    const _glitch = _medSpan>0 ? _medSpan*10 : Infinity;
+    // Intraday only (mirrors renderChart): dailies are clean and a >4× daily wick
+    // can be a real crash day — it must set the range honestly.
+    const _saneTf = ['1m','5m','15m','1h','4h'].indexOf(chartTimeframe) !== -1;
+    const _wickDet = (_saneTf && _medSpan>0) ? _medSpan*4 : Infinity;
+    const _glitch  = (_saneTf && _medSpan>0) ? _medSpan*10 : Infinity;
     let _kept = 0;
     for(const b of viewBars){
-      let bl = b.low, bh = b.high;
-      if(_medSpan>0 && (bh-bl) > _glitch){                 // bad-tick wick — fall back to the body
-        bl = Math.min(b.open, b.close); bh = Math.max(b.open, b.close);
-        if((bh-bl) > _glitch) continue;                    // body is bogus too → skip the bar entirely
-      }
+      const bodyHi = Math.max(b.open, b.close), bodyLo = Math.min(b.open, b.close);
+      if((bodyHi-bodyLo) > _glitch) continue;              // bogus body → skip the bar entirely
+      const bh = (b.high-bodyHi > _wickDet) ? bodyHi+_medSpan : b.high;
+      const bl = (bodyLo-b.low  > _wickDet) ? bodyLo-_medSpan : b.low;
       if(bl < lo) lo = bl; if(bh > hi) hi = bh; _kept++;
     }
     if(!_kept) for(const b of viewBars){ if(b.low < lo) lo = b.low; if(b.high > hi) hi = b.high; }
@@ -2153,7 +2312,7 @@ function renderSymResults(){
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     const ph=`<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
     const logo = cr ? ph
-      : `<img class="sym-logo${_logoBg[a.symbol]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${esc(a.symbol)}" src="/api/trading/logo?symbol=${encodeURIComponent(a.symbol)}" alt="" onload="adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph.replace(/"/g,'&quot;')}&quot;">`;
+      : `<img class="sym-logo${_logoBg[a.symbol]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${esc(a.symbol)}" src="/api/trading/logo?symbol=${encodeURIComponent(a.symbol)}" alt="" onload="window.adaptLogoBg&&adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph.replace(/"/g,'&quot;')}&quot;">`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
@@ -2323,6 +2482,164 @@ function renderOrderTicket(){
   submit.className = 'ot-submit ' + otSide;
 }
 
+// ── Drawing tools (#2444) — price levels + trendlines, persisted per symbol ──
+// ✏ Draw select arms a tool: Level = one click places a horizontal line at that
+// price; Trend = two clicks make a segment. Alt-click near a drawing deletes it
+// (armed or not). Esc disarms. Stored in localStorage, rendered inside
+// renderChart so drawings survive zoom/pan/timeframe/theme changes.
+const _drawings=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.drawings')||'{}'); }catch(e){ return {}; } })();
+function _saveDrawings(){ try{ localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); }catch(e){} }
+let _drawTool='', _drawPending=null;   // pending = first click of a trendline
+function setDrawTool(v){
+  if(v==='clear'){
+    const tk=fullscreenTicker||activeTicker;
+    if(tk && _drawings[tk] && _drawings[tk].length && confirm(`Remove all ${_drawings[tk].length} drawing(s) on ${tk}?`)){
+      delete _drawings[tk]; _saveDrawings(); renderTicker(tk);
+    }
+    v='';
+  }
+  _drawTool=v; _drawPending=null;
+  const s=document.getElementById('drawToolSel'); if(s) s.value=v;
+}
+function _canvasTicker(canvas){ return canvas.id==='chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/,''); }
+// Delete the drawing nearest the click (within 9px), in the same pixel space it renders in.
+function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph){
+  const list=_drawings[tk]||[]; if(!list.length) return false;
+  const rng=data.rMax-data.rMin; if(rng<=0) return false;
+  const yOf=p=>((data.rMax-p)/rng)*ph;
+  const n=data.bars.length, slotW=pw/n;
+  const ts0=+new Date(data.bars[0].timestamp), ts1=+new Date(data.bars[n-1].timestamp)||ts0+1;
+  const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
+  const segDist=(px,py,x1,y1,x2,y2)=>{ const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy||1;
+    const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/L2));
+    return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); };
+  let best=-1, bestD=9;
+  list.forEach((d,i)=>{
+    const dist = d.t==='h' ? Math.abs(yOf(d.price)-yPx)
+      : segDist(xPx,yPx,xOf(d.aTs),yOf(d.aPrice),xOf(d.bTs),yOf(d.bPrice));
+    if(dist<bestD){ bestD=dist; best=i; }
+  });
+  if(best<0) return false;
+  list.splice(best,1); if(!list.length) delete _drawings[tk];
+  _saveDrawings(); return true;
+}
+// Capture-phase so an armed tool wins over the card's own click-to-focus.
+document.addEventListener('click', e=>{
+  if(!_drawTool && !e.altKey) return;
+  const lad=e.target.closest('.zone-ladder'); if(!lad) return;
+  const canvas=lad.querySelector('.chart-canvas'); if(!canvas) return;
+  const data=_crossData[canvas.id]; if(!data||!data.bars||!data.bars.length) return;
+  const rect=canvas.getBoundingClientRect();
+  const xPx=e.clientX-rect.left, yPx=e.clientY-rect.top;
+  const pw=Math.max(0, canvas.clientWidth-AXIS_W), ph=Math.max(0, canvas.clientHeight-AXIS_H);
+  if(xPx>pw||yPx>ph) return;                                  // axis strips: hands off
+  const tk=_canvasTicker(canvas); if(!tk) return;
+  const price=data.rMax-(yPx/ph)*(data.rMax-data.rMin);
+  const n=data.bars.length, slotW=pw/n;
+  const idx=Math.max(0,Math.min(n-1,Math.round(xPx/slotW-0.5)));
+  const ts=+new Date(data.bars[idx].timestamp);
+  if(e.altKey){                                               // delete (works with tool off)
+    if(_deleteNearestDrawing(tk,data,xPx,yPx,pw,ph)){ e.stopPropagation(); e.preventDefault(); renderTicker(tk); }
+    return;
+  }
+  e.stopPropagation(); e.preventDefault();
+  if(_drawTool==='h'){
+    (_drawings[tk]=_drawings[tk]||[]).push({t:'h', price:+price.toFixed(4)});
+    _saveDrawings();
+  } else if(_drawTool==='l'){
+    if(!_drawPending || _drawPending.tk!==tk){ _drawPending={tk, ts, price:+price.toFixed(4)}; }
+    else {
+      (_drawings[tk]=_drawings[tk]||[]).push({t:'l', aTs:_drawPending.ts, aPrice:_drawPending.price, bTs:ts, bPrice:+price.toFixed(4)});
+      _drawPending=null; _saveDrawings();
+    }
+  }
+  renderTicker(tk);
+}, true);
+
+// ── Trade journal auto-tag (#2446) ────────────────────────────────────────────
+// Every order placed from THIS device gets a context snapshot at the moment of
+// placement: signal direction+confidence, detected pattern, RVOL, session phase.
+// Post-session review is the human Converge stage. localStorage, capped at 500.
+const _journal=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.journal')||'[]'); }catch(e){ return []; } })();
+function journalLog(o){
+  try{
+    const d=zonesData[o.symbol]||{}, sig=d.last_signal||{};
+    const reg=(typeof marketRegime==='function' ? marketRegime(o.symbol) : {})||{};
+    _journal.unshift({
+      ts:new Date().toISOString(),
+      symbol:o.symbol, side:o.side, qty:o.qty, type:o.type||'market', source:o.source||'ticket',
+      price:getCurrentPrice(o.symbol)||null,
+      signal:(d.direction||sig.direction||'')+(d.confidence||sig.confidence?(' '+(d.confidence||sig.confidence)+'%'):''),
+      pattern:sig.candle||'',
+      rvol:reg.volumeRatio?+reg.volumeRatio.toFixed(2):null,
+      session:(document.getElementById('mktClockLabel')||{}).textContent||'',
+    });
+    if(_journal.length>500) _journal.length=500;
+    localStorage.setItem('trader.journal', JSON.stringify(_journal));
+  }catch(e){}
+}
+function renderJournal(){
+  const el=document.getElementById('tp-journal'); if(!el) return;
+  if(!_journal.length){ el.innerHTML='<div class="tp-empty">No trades journaled on this device yet — place an order and its signal context is captured automatically.</div>'; return; }
+  el.innerHTML = `<table class="tp-table"><thead><tr>
+    <th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Px</th><th>Signal</th><th>Pattern</th><th>RVOL</th><th>Session</th><th>Via</th></tr></thead><tbody>`+
+    _journal.map(j=>`<tr>
+      <td style="color:var(--text2)">${_fmtOrderTime(j.ts)}</td>
+      <td><span class="tp-sym" onclick="focusTicker('${j.symbol}')">${j.symbol}</span></td>
+      <td class="tp-side ${j.side==='buy'?'long':'short'}">${(j.side||'').toUpperCase()}</td>
+      <td>${j.qty}</td><td>${j.price?'$'+fmt(j.price,2):'—'}</td>
+      <td>${j.signal||'—'}</td><td>${j.pattern||'—'}</td>
+      <td>${j.rvol!=null?j.rvol+'×':'—'}</td><td>${j.session||'—'}</td>
+      <td style="color:var(--text2)">${j.source}</td></tr>`).join('')+'</tbody></table>';
+}
+
+// ── Rapid order mode (#2445) — explicit, persisted opt-in ─────────────────────
+// ON: ticket submits + flatten skip the confirm dialog, and Shift+B / Shift+S
+// fire an instant market order for the focused symbol at the last-used quantity.
+// OFF (default): everything confirms, Shift+B/S do nothing extra.
+let _rapid = (()=>{ try{ return localStorage.getItem('trader.rapidMode')==='1'; }catch(e){ return false; } })();
+let _lastQty = (()=>{ try{ return Math.max(1, Number(localStorage.getItem('trader.lastQty'))||1); }catch(e){ return 1; } })();
+function setRapidMode(on){
+  _rapid = !!on;
+  try{ localStorage.setItem('trader.rapidMode', on?'1':'0'); }catch(e){}
+  const cb=document.getElementById('otRapid'); if(cb) cb.checked=_rapid;
+}
+document.addEventListener('DOMContentLoaded', ()=>{ const cb=document.getElementById('otRapid'); if(cb) cb.checked=_rapid; });
+async function placeMarketOrder(sym, side, qty, source){
+  try{
+    const r = await fetch('/api/trading/orders/place', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker:sym, side, qty, type:'market' })
+    });
+    const result = await r.json();
+    if(!r.ok || result.status!=='placed'){ _alertToast('⚠ '+sym+' order failed: '+(result.error||result.reason||r.statusText)); return false; }
+    _alertToast(`⚡ ${side.toUpperCase()} ${qty} ${sym} @ market — placed`);
+    journalLog({ symbol:sym, side, qty, type:'market', source: source||'rapid' });
+    await Promise.all([loadOrders(), loadPortfolio()]);
+    return true;
+  }catch(e){ _alertToast('⚠ order failed: '+e.message); return false; }
+}
+
+// #2439: risk-based sizing — units = floor(risk$ / |entry − stop|). Entry is the
+// limit price when set, else the live price. Requires the stop-loss exit enabled.
+function otSizeFromRisk(){
+  const hint=document.getElementById('otRiskHint');
+  const risk=Number(document.getElementById('otRiskUsd').value);
+  if(!risk || risk<=0){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  const slOn=document.getElementById('otSlEnabled').checked;
+  const stop=Number(document.getElementById('otSlPrice').value);
+  const entry=(otOrderType==='limit' && Number(document.getElementById('otLimitPrice').value)>0)
+    ? Number(document.getElementById('otLimitPrice').value)
+    : getCurrentPrice(otTicker);
+  if(!slOn || !(stop>0)){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  const perShare=Math.abs(entry-stop);
+  if(!(perShare>0)){ if(hint) hint.textContent='stop equals entry — no distance to size from'; return; }
+  const qty=Math.max(1, Math.floor(risk/perShare));
+  document.getElementById('otQty').value=qty;
+  if(hint) hint.textContent=`${qty} units · $${fmt(perShare,2)}/unit to stop · risks $${fmt(qty*perShare,2)}`;
+  renderOrderTicket();
+}
+
 async function submitOrderTicket(){
   if(!otTicker) return;
   const qty = Math.max(1, Number(document.getElementById('otQty').value) || 1);
@@ -2345,7 +2662,8 @@ async function submitOrderTicket(){
   let msg = `${otSide.toUpperCase()} ${qty} ${otTicker} ${otOrderType === 'limit' ? 'at $'+body.limitPrice : 'at market'} (paper account)?`;
   if(body.takeProfit) msg += `\nTake profit: $${body.takeProfit}`;
   if(body.stopLoss)   msg += `\nStop loss: $${body.stopLoss}`;
-  if(!confirm(msg)) return;
+  if(!_rapid && !confirm(msg)) return;   // #2445: rapid mode skips the confirm
+  _lastQty = qty; try{ localStorage.setItem('trader.lastQty', String(qty)); }catch(e){}
 
   try{
     const r = await fetch('/api/trading/orders/place', {
@@ -2358,6 +2676,7 @@ async function submitOrderTicket(){
       alert('Order failed: ' + (result.error || result.reason || r.statusText));
       return;
     }
+    journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
     closeOrderTicket();
     await Promise.all([loadOrders(), loadPortfolio()]);
   }catch(e){
@@ -2372,11 +2691,13 @@ const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
 function tickerLogoHtml(ticker){
   const ph = `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
   if(_wlIsCrypto(ticker)) return ph;
-  return `<img class="wl-logo${_logoBg[ticker]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${ticker}" src="/api/trading/logo?symbol=${encodeURIComponent(ticker)}" alt="" onload="adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph}&quot;">`;
+  return `<img class="wl-logo${_logoBg[ticker]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${ticker}" src="/api/trading/logo?symbol=${encodeURIComponent(ticker)}" alt="" onload="window.adaptLogoBg&&adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph}&quot;">`;
 }
 // Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
 // everything else keeps the dark badge so colour logos pop. Cached in localStorage.
+// The inline onload callers guard with `window.adaptLogoBg&&` — the issue reporter's
+// html2canvas clone re-fires onload in a script-less iframe where this isn't defined.
 const _logoBg = (()=>{ try{ return JSON.parse(localStorage.getItem('logoBg')||'{}'); }catch(e){ return {}; } })();
 function adaptLogoBg(img){
   const sym = img.dataset.sym;
@@ -2399,7 +2720,7 @@ function adaptLogoBg(img){
 const _wlPx = (p)=> p>100 ? p.toLocaleString() : (p!=null ? p.toFixed(4) : '—');
 
 function renderWatchlist(){
-  document.getElementById('wlList').innerHTML = wlPrices.map(t=>{
+  document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
     const d  = zonesData[t.ticker]||{};
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
@@ -2440,11 +2761,14 @@ function renderSymbolInfo(ticker){
   const st = _symStats[ticker];
   const retCell = (lbl,v)=>`<div class="wi-ret ${v==null?'':v>=0?'up':'dn'}"><div class="wi-ret-v">${v==null?'—':(v>=0?'+':'')+v+'%'}</div><div class="wi-ret-l">${lbl}</div></div>`;
   const techCls = st&&st.technical ? (st.technical.includes('Buy')?'up':st.technical.includes('Sell')?'dn':'') : '';
+  // #2439: RVOL — recent volume vs its own average (the regime engine already
+  // computes this; finally surface it). ≥1.5× reads as "in play" for day traders.
+  const rvol = (marketRegime(ticker)||{}).volumeRatio || 0;
   el.className = 'wl-info show';
   el.innerHTML = `
     <div class="wi-sym">${ticker}</div>
     <div class="wi-name">${_symNames[ticker]||kind}</div>
-    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span></div>
+    <div class="wi-px">$${_wlPx(t.price)} <span class="wl-chg ${cl}">${chg>=0?'+':''}${chg}%</span>${rvol>0?`<span class="wi-rvol${rvol>=1.5?' hot':''}" title="Relative volume — recent bar volume vs its average">RVOL ${rvol.toFixed(2)}×</span>`:''}</div>
     ${(st&&st.available)?`
     <div class="wi-sect">Technicals</div>
     <div class="wi-tech ${techCls}">${st.technical}</div>
@@ -2470,7 +2794,9 @@ function renderSymbolInfo(ticker){
       <span><b>1y Target</b> ${_fmtPx(q.targetMeanPrice)}</span>
     </div>`)(st.quote):''}
     <div class="wi-sect">About</div>
-    <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>`;
+    <div class="wi-meta"><span><b>Type</b> ${kind}</span>${dir?`<span><b>Signal</b> ${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'} ${conf}%</span>`:''}</div>
+    <div class="wi-sect">Alerts</div>
+    <div class="wi-alerts" id="wiAlerts">${_alertChipsHtml(ticker)}<button class="wi-alert-add" onclick="addPriceAlert('${ticker}')" title="One-shot alert when the price crosses a level">+ 🔔 Alert</button></div>`;
   if(!_symNames[ticker] && kind==='Equity'){
     fetch('/api/trading/symbol-info?ticker='+encodeURIComponent(ticker)).then(r=>r.json()).then(j=>{
       if(j&&j.name){ _symNames[ticker]=j.name + (j.exchange?(' · '+j.exchange):''); if(activeTicker===ticker) renderSymbolInfo(ticker); }
@@ -2568,8 +2894,41 @@ function renderFullscreenChart(){
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
+  if(_drawTool || _drawPending){ setDrawTool(''); return; }   // #2444: Esc disarms drawing first
   if(!document.getElementById('otBg').classList.contains('hidden')) closeOrderTicket();
   else closeFullscreenChart();
+});
+
+// ── Keyboard-first trading (#2438) ───────────────────────────────────────────
+// `/` jump-to-symbol · B/S buy/sell ticket for the focused symbol · ←/→ move
+// focus through the visible deck · 1-6 set the chart layout. Never fires while
+// typing (input/textarea/select/contenteditable) or with modifier keys held.
+document.addEventListener('keydown', e=>{
+  const t=e.target;
+  if(t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if(e.ctrlKey || e.metaKey || e.altKey) return;
+  const guest=document.body.classList.contains('guest');
+  if(e.key==='/'){ e.preventDefault(); openSymbolSearch(sym=>focusTicker(sym), {title:'Jump to symbol'}); return; }
+  // #2445: Shift+B/S in rapid mode = instant market order at the last-used qty.
+  // Plain B/S (or rapid mode off) = open the ticket as before.
+  if(e.key==='b'||e.key==='B'){ if(activeTicker && !guest){ e.preventDefault();
+    if(e.shiftKey && _rapid) placeMarketOrder(activeTicker,'buy',_lastQty,'rapid-key'); else openOrderTicket(activeTicker,'buy'); } return; }
+  if(e.key==='s'||e.key==='S'){ if(activeTicker && !guest){ e.preventDefault();
+    if(e.shiftKey && _rapid) placeMarketOrder(activeTicker,'sell',_lastQty,'rapid-key'); else openOrderTicket(activeTicker,'sell'); } return; }
+  if(e.key==='ArrowLeft' || e.key==='ArrowRight'){
+    const list=visibleTickers(); if(!list.length) return;
+    e.preventDefault();
+    const i=Math.max(0, list.indexOf(activeTicker));
+    const next=list[(i + (e.key==='ArrowRight'?1:list.length-1)) % list.length];
+    selectChart(next, null);
+    const card=document.getElementById('card-'+next);
+    if(card && card.scrollIntoView) card.scrollIntoView({block:'nearest'});
+    return;
+  }
+  if(/^[0-6]$/.test(e.key) && e.key!=='5'){   // 0=all · 1/2/3/4/6 charts (5 isn't a layout)
+    const sel=document.getElementById('chartLayoutSelect');
+    if(sel && [...sel.options].some(o=>o.value===e.key)){ sel.value=e.key; setSlotCount(e.key); }
+  }
 });
 
 // ── Chart zoom/pan/reset interactions ────────────────────────────────────────
@@ -3100,12 +3459,156 @@ async function loadCouncil(){
 }
 
 let pricesLoading = false;
+// ── P1 trust + workflow bundle (#2439) ────────────────────────────────────────
+// Feed honesty: flip the LIVE stamp red after 2 consecutive failed polls (~6s of
+// silence) so stale prices never masquerade as live. Restores on the next success.
+let _feedFails = 0;
+function _feedStatus(ok){
+  _feedFails = ok ? 0 : _feedFails+1;
+  const stale = _feedFails >= 2;
+  const stamp=document.getElementById('feedStamp'), dot=document.getElementById('feedPulse');
+  if(stamp){ stamp.textContent = stale ? 'STALE — reconnecting' : 'LIVE · 3s'; stamp.classList.toggle('stale', stale); }
+  if(dot) dot.classList.toggle('stale', stale);
+}
+
+// Session clock: US equities phases in ET (pre 4:00–9:30 · open 9:30–16:00 ·
+// after 16:00–20:00 · closed). Countdown to the next phase edge. Weekends roll to
+// Monday. (Exchange holidays are out of scope — the label is a clock, not an oracle.)
+function _updateMktClock(){
+  const lab=document.getElementById('mktClockLabel'), val=document.getElementById('mktClock');
+  if(!lab||!val) return;
+  const now=new Date();
+  const et=new Date(now.toLocaleString('en-US',{timeZone:'America/New_York'}));
+  const mins=et.getHours()*60+et.getMinutes(), day=et.getDay();
+  const fmtC=(m)=>{ const h=Math.floor(m/60), mm=m%60; return (h>0? h+'h ' : '')+String(mm).padStart(2,'0')+'m'; };
+  let phase, cls, left;
+  if(day===0||day===6){ phase='Closed'; cls=''; left=null; }
+  else if(mins<240){ phase='Closed'; cls=''; left=240-mins; }
+  else if(mins<570){ phase='Pre-mkt'; cls='pre'; left=570-mins; }
+  else if(mins<960){ phase='Open'; cls='open'; left=960-mins; }
+  else if(mins<1200){ phase='After-hrs'; cls='after'; left=1200-mins; }
+  else { phase='Closed'; cls=''; left=null; }
+  lab.textContent=phase; lab.className='l '+cls;
+  const suffix = phase==='Open' ? ' to close' : phase==='Pre-mkt' ? ' to open' : phase==='After-hrs' ? ' left' : ' to pre';
+  val.textContent = left!=null ? fmtC(left)+suffix : 'wknd';
+}
+setInterval(_updateMktClock, 30000); _updateMktClock();
+
+// One-shot price alerts: stored per symbol in localStorage, checked on every
+// price poll, fire a toast + browser Notification, then self-remove.
+const _alerts=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.alerts')||'{}'); }catch(e){ return {}; } })();
+function _saveAlerts(){ try{ localStorage.setItem('trader.alerts', JSON.stringify(_alerts)); }catch(e){} }
+function _alertChipsHtml(ticker){
+  return (_alerts[ticker]||[]).map((a,i)=>
+    `<span class="wi-alert-chip">${a.dir==='above'?'≥':'≤'} $${a.price}<button onclick="removePriceAlert('${ticker}',${i})" aria-label="Remove alert" title="Remove">✕</button></span>`).join('');
+}
+function addPriceAlert(ticker){
+  const cur=getCurrentPrice(ticker);
+  const raw=prompt(`Alert when ${ticker} crosses… (now $${fmt(cur, cur>=100?2:4)})`, '');
+  const p=Number(raw); if(!raw || !isFinite(p) || p<=0) return;
+  (_alerts[ticker]=_alerts[ticker]||[]).push({ price:p, dir: p>=cur?'above':'below' });
+  _saveAlerts(); renderSymbolInfo(ticker);
+  if(window.Notification && Notification.permission==='default') Notification.requestPermission().catch(()=>{});
+}
+function removePriceAlert(ticker,i){ (_alerts[ticker]||[]).splice(i,1); _saveAlerts(); renderSymbolInfo(ticker); }
+function _alertToast(msg){
+  const t=document.createElement('div'); t.className='alert-toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 6000);
+}
+function checkPriceAlerts(){
+  for(const [ticker, list] of Object.entries(_alerts)){
+    const px=getCurrentPrice(ticker); if(!px) continue;
+    for(let i=list.length-1;i>=0;i--){
+      const a=list[i];
+      if((a.dir==='above' && px>=a.price) || (a.dir==='below' && px<=a.price)){
+        const msg=`🔔 ${ticker} ${a.dir==='above'?'≥':'≤'} $${a.price} (now $${fmt(px, px>=100?2:4)})`;
+        _alertToast(msg);
+        if(window.Notification && Notification.permission==='granted') try{ new Notification('Unisona Trader', {body:msg}); }catch(e){}
+        list.splice(i,1); _saveAlerts();
+        if(activeTicker===ticker) renderSymbolInfo(ticker);
+      }
+    }
+  }
+}
+
+// Watchlist sort: none (server order) · day % · RVOL. Persisted.
+let _wlSort=(()=>{ try{ return localStorage.getItem('trader.wlSort')||''; }catch(e){ return ''; } })();
+function setWlSort(v){ _wlSort=v; try{ localStorage.setItem('trader.wlSort', v); }catch(e){} renderWatchlist(); }
+document.addEventListener('DOMContentLoaded',()=>{ const s=document.querySelector('.wl-sort'); if(s) s.value=_wlSort; });
+function _sortedWlPrices(){
+  if(_wlSort==='chg')  return wlPrices.slice().sort((a,b)=>(b.chg_pct||0)-(a.chg_pct||0));
+  if(_wlSort==='rvol') return wlPrices.slice().sort((a,b)=>(marketRegime(b.ticker).volumeRatio||0)-(marketRegime(a.ticker).volumeRatio||0));
+  return wlPrices;
+}
+
+// ── Live candle ticking (Robinhood-style) ─────────────────────────────────────
+// Bars refresh from the server every 15s, but prices poll every 3s — splice each
+// price tick into the IN-PROGRESS bar so the last candle moves live: close tracks
+// the tick, high/low stretch when exceeded, and a fresh bar opens when the clock
+// crosses a bar boundary. Server bars remain the truth — each loadBars() replaces
+// the whole array, so synthesis only ever fills the 15s gap (no fabricated data:
+// same feed, finer cadence). Feed gaps >1 bar are left alone rather than invented.
+const _TF_MS = { '1m':6e4, '5m':3e5, '15m':9e5, '1h':36e5, '4h':144e5, '1d':864e5 };
+// Ease the open candle's close between REAL ticks (Robinhood-style motion): the
+// canvas repaints each frame with an interpolated close, converging on the true
+// tick in ~450ms. Interpolation between actual prices only — no fabricated
+// wiggle. Canvas-only repaint (no overlay/DOM rebuild), one short rAF loop per
+// tick per ticker, skipped for reduced-motion users and oversized bar windows.
+const _liveAnims = {};   // tk → rAF handle
+function _animateLastBar(tk, fromClose, toClose){
+  const bars = barsData[tk]; if(!bars || !bars.length) return;
+  const last = bars[bars.length-1];
+  const cardCv = document.getElementById('chart-'+tk);
+  const fsCv   = fullscreenTicker===tk ? document.getElementById('chart-fs') : null;
+  const targets = [cardCv, fsCv].filter(c=>c && _crossData[c.id]);
+  const tooBig  = targets.some(c=>(_crossData[c.id].bars||[]).length>400);   // paint cost guard
+  if(!targets.length || tooBig || matchMedia('(prefers-reduced-motion: reduce)').matches){
+    last.close = toClose; return;                            // honest jump, no animation
+  }
+  if(_liveAnims[tk]) cancelAnimationFrame(_liveAnims[tk]);
+  const t0 = performance.now(), dur = 450;
+  const ease = x => 1 - Math.pow(1-x, 3);
+  const step = (now)=>{
+    const p = Math.min(1, (now-t0)/dur);
+    last.close = fromClose + (toClose-fromClose)*ease(p);
+    for(const c of targets){
+      const d = _crossData[c.id];
+      renderChart(c, d.bars, d.rMin, d.rMax, chartType, chartTimeframe);
+    }
+    if(p < 1) _liveAnims[tk] = requestAnimationFrame(step);
+    else { last.close = toClose; delete _liveAnims[tk]; }
+  };
+  _liveAnims[tk] = requestAnimationFrame(step);
+}
+function _tickLastBar(tk, px){
+  const bars = barsData[tk];
+  const dur = _TF_MS[chartTimeframe];
+  if(!bars || !bars.length || !(px>0) || !dur) return;      // 1w/1mo: no live synthesis
+  const last = bars[bars.length-1];
+  const t0 = +new Date(last.timestamp);
+  const now = Date.now();
+  if(now < t0 + dur){                                        // tick belongs to the open bar
+    if(px > last.high) last.high = px;
+    if(px < last.low)  last.low  = px;
+    if(px !== last.close) _animateLastBar(tk, last.close, px);
+  } else if(now < t0 + 2*dur){                               // boundary crossed → open the next bar
+    // New candle opens at the PREVIOUS close (standard synthesis) and glides to
+    // the tick, so the boundary reads as continuous motion, not a teleport.
+    const prevClose = last.close;
+    bars.push({ timestamp:new Date(t0+dur).toISOString(), open:prevClose,
+                high:Math.max(prevClose,px), low:Math.min(prevClose,px), close:prevClose, volume:0 });
+    _animateLastBar(tk, prevClose, px);
+  }                                                          // older gap → wait for real server bars
+}
+
 async function loadWatchlistPrices(){
   if(pricesLoading) return;
   pricesLoading = true;
   try{
     const r = await fetch('/api/trading/watchlist-prices');
     wlPrices = await r.json();
+    _feedStatus(true);
+    checkPriceAlerts();
     renderWatchlist();
     wlPrices.forEach(t=>{
       updateCardChg(t);
@@ -3124,11 +3627,12 @@ async function loadWatchlistPrices(){
         }
         _lastCardPrice[t.ticker] = t.price;
       }
+      _tickLastBar(t.ticker, t.price);   // live candle: splice the tick into the open bar
       renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price);
     });
     updateRegimeBadges();
     renderFullscreenChart();
-  }catch(e){}
+  }catch(e){ _feedStatus(false); }   // #2439: a failed poll must not look live
   finally{ pricesLoading = false; }
 }
 
@@ -3383,12 +3887,39 @@ function renderTpSummary(a){
     cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today)) +
     cell('Buying power', money(a.buying_power));
 }
+// #2437: one-click exits. Flatten = market order for the opposite side, full size.
+let _lastPositions = [];
+async function flattenPosition(symbol, side, qty, skipConfirm){
+  const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
+  const q = Math.abs(Number(qty)||0);
+  if(!q) return false;
+  if(!skipConfirm && !_rapid && !confirm(`FLATTEN ${symbol}: ${exitSide.toUpperCase()} ${q} at market (paper account)?`)) return false;   // #2445: rapid mode skips confirm
+  try{
+    const r = await fetch('/api/trading/orders/place', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market' })
+    });
+    const result = await r.json();
+    if(!r.ok || result.status!=='placed'){ alert('Flatten failed: '+(result.error||result.reason||r.statusText)); return false; }
+    journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
+    await Promise.all([loadOrders(), loadPortfolio()]);
+    return true;
+  }catch(e){ alert('Flatten failed: '+e.message); return false; }
+}
+async function flattenAll(){
+  if(!_lastPositions.length) return;
+  const lines=_lastPositions.map(p=>`  ${(p.side||'long').toUpperCase()} ${Math.abs(p.qty)} ${p.symbol}`).join('\n');
+  if(!confirm(`CLOSE ALL ${_lastPositions.length} position(s) at market (paper account)?\n${lines}`)) return;
+  for(const p of _lastPositions) await flattenPosition(p.symbol, p.side, p.qty, true);
+}
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
+  _lastPositions = positions||[];
   const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).length;
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
-  el.innerHTML = `<table class="tp-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th></tr></thead><tbody>`+
+  el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll()" title="Market-close every open position">✕ Close all</button></div>`+
+    `<table class="tp-table"><thead><tr>
+    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
       const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
@@ -3399,7 +3930,8 @@ function renderPositionsTable(positions){
         <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
-        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td></tr>`;
+        <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
+        <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)})" title="Market-close this position">✕ Flatten</button></td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET
@@ -3867,12 +4399,17 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   const mq=matchMedia('(max-width:760px)');
   // narrowOnly:false → lives in the ☰ at EVERY width (secondary toggles/links);
   // narrowOnly:true  → collapses in only when the toolbar is too tight.
+  // Missing selectors are skipped, so #feedStamp (the LIVE·3s feed-honesty label,
+  // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
+  // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
     {sel:'.header .hgroup',            narrowOnly:true },
+    {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
-    {sel:'.header a[href*="explore"]', narrowOnly:true },
-    {sel:'#brokerLink',                narrowOnly:true },
+    {sel:'.header a[href*="explore"]', narrowOnly:false},
+    {sel:'#brokerLink',                narrowOnly:false},
+    {sel:'#dcToggle',                  narrowOnly:false},
   ];
   const items=[];   // {el, marker, narrowOnly} — marker = comment left in the header slot
   picks.forEach(p=>{
@@ -3898,12 +4435,24 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     btn.setAttribute('aria-expanded', menu.hidden?'false':'true');
   });
   document.addEventListener('click', e=>{ if(!menu.hidden && !menu.contains(e.target)) close(); });
+  // Choosing an action from the menu closes it (chat toggle, links, Pre/After) so
+  // the result is visible immediately. Chart controls (.hgroup) keep it open —
+  // layout/type/timeframe are usually adjusted together.
+  menu.addEventListener('click', e=>{
+    if(e.target.closest('.hgroup')) return;
+    if(e.target.closest('a,button')) close();
+  });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
   mq.addEventListener('change', apply);
   // Fallback: some environments (viewport emulation, older WebViews) never fire
   // the MediaQueryList 'change' event — re-apply on debounced resize too.
   let _hmRz;
   window.addEventListener('resize', ()=>{ clearTimeout(_hmRz); _hmRz=setTimeout(apply, 120); });
+  // Keyboard cheat-sheet (#2438), pinned to the menu bottom via order:99.
+  const keys=document.createElement('div');
+  keys.className='hmenu-keys';
+  keys.innerHTML='⌨ <b>/</b> jump · <b>B</b> buy · <b>S</b> sell · <b>←→</b> focus · <b>0-6</b> layout';
+  menu.appendChild(keys);
   apply();
 })();
 
