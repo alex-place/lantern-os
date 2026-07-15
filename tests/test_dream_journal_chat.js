@@ -69,40 +69,37 @@ async function run() {
     assert.ok(Array.isArray(r.body.suggestions), "suggestions should be array");
   });
 
-  await test("selected agent matches dream content keywords", async () => {
-    const r = await request("POST", "/api/dream/chat", {
-      message: "I saw a waterfall",
-    });
-    const agentName = r.body.agent;
-    assert.ok(agentName, "should have agent name");
-    // Waterfall keyword should trigger Waterfall/Mary
-    assert.ok(
-      agentName.includes("Waterfall") || agentName.includes("Mary") || agentName.includes("Blinkbug") || agentName.includes("Xenon"),
-      `unexpected agent: ${agentName}`
+  // #1664 one-assistant refactor: the chat is ONE assistant. selectAgent() always
+  // resolves the single keystone/unisona.ai assistant — there is NO keyword persona
+  // routing anymore (the old Waterfall/Mary/Founder/Xenon RP personas were removed).
+  // These assert the current invariant; the previous keyword-routing assertions were
+  // stale (they expected removed personas and had silently failed since this file
+  // isn't in the CI node-test list).
+  await test("agent is the SAME single assistant regardless of message content", async () => {
+    const messages = [
+      "I saw a waterfall",
+      "I want to remember the story of my anchor",
+      "Tell me about the wish and returning home",
+    ];
+    const agents = [];
+    for (const message of messages) {
+      const r = await request("POST", "/api/dream/chat", { message });
+      assert.ok(typeof r.body.agent === "string" && r.body.agent.length > 0, `agent name for "${message}"`);
+      agents.push(r.body.agent);
+    }
+    // One assistant → every message resolves to the identical agent (no keyword routing).
+    assert.strictEqual(
+      new Set(agents).size, 1,
+      `expected one stable assistant across all messages, got: ${[...new Set(agents)].join(", ")}`
     );
   });
 
-  await test("keystone keyword selects keystone agent", async () => {
-    const r = await request("POST", "/api/dream/chat", {
-      message: "I want to remember the story of my anchor",
-    });
-    const agentName = r.body.agent;
-    assert.ok(agentName, "should have agent name");
+  await test("the single assistant is the keystone / unisona.ai agent", async () => {
+    const r = await request("POST", "/api/dream/chat", { message: "hello" });
+    const agentName = r.body.agent || "";
     assert.ok(
-      agentName.includes("unisona.ai") || agentName.includes("Founder") || agentName.includes("Blinkbug"),
-      `anchor/memory should select keystone-ish agent, got: ${agentName}`
-    );
-  });
-
-  await test("founder keyword selects founder agent", async () => {
-    const r = await request("POST", "/api/dream/chat", {
-      message: "Tell me about the wish and returning home",
-    });
-    const agentName = r.body.agent;
-    assert.ok(agentName, "should have agent name");
-    assert.ok(
-      agentName.includes("Founder") || agentName.includes("Alex") || agentName.includes("Blinkbug"),
-      `wish/home should select founder-ish agent, got: ${agentName}`
+      /unisona\.ai|keystone/i.test(agentName),
+      `expected the keystone/unisona.ai assistant, got: ${agentName}`
     );
   });
 
