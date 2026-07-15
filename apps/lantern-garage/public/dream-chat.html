@@ -335,9 +335,9 @@
    */
   const LANTERN_ROLES = {
     guest:        { label: "Guest",        canChat: true,  dailyMessages: 10,  modelAccess: ["public"] }, // #739: limited guest chat (no account)
-    supporter:    { label: "Supporter",    canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
-    deep_dreamer: { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
-    founder:      { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    supporter:    { label: "Free",         canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
+    deep_dreamer: { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
+    founder:      { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
     admin:        { label: "Admin",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
   };
 
