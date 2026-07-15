@@ -481,9 +481,12 @@ async function testWebSearch() {
   const badge = document.getElementById('search-badge');
   badge.textContent = 'Testing…';
   try {
-    await fetch('/api/web-search?q=lantern', { signal: AbortSignal.timeout(5000) });
+    const r = await fetch('/api/web-search?q=lantern', { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (!data || !data.count) throw new Error('no results');
     badge.className = 'conn-badge ready'; badge.textContent = 'Ready';
-    toast('✓ Web search OK');
+    toast('✓ Web search OK (' + data.count + ' via ' + (data.source || 'web') + ')');
   } catch(e) {
     badge.className = 'conn-badge disconnected'; badge.textContent = 'Error';
     toast('Web search error: ' + e.message);
