@@ -71,7 +71,7 @@ const PUBLIC_PAGES = {
 const PROTECTED_PAGES = {
   "/profile.html":        { file: "profile.html",           role: "guest" },
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
-  "/trading.html":        { file: "trading.html",           entitlement: "trade" },
+  // /trading.html retired → 302s to /stock-trader.html (see REDIRECTS, #2488).
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
@@ -90,6 +90,8 @@ const PROTECTED_PAGES = {
 // redirect is not a public surface — it must not inflate the Σ₀ surface count).
 const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
+  "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
+  "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
 };
 
 function renderDisabledPage(pathname) {

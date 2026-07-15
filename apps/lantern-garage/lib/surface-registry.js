@@ -55,7 +55,7 @@ const CORE = {
 // { surface: [module, flag|null] }
 const EXTENSION = {
   // trading terminal cluster
-  "trading.html":                  ["trading", "TRADING_ENABLED"],
+  // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
@@ -76,7 +76,7 @@ const EXTENSION = {
   "accounts.html":                 ["account", null], // staff account-support console (admin/tech_support): multi-auth + password fixes
   "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],
-  "upgrade-lab.html":              ["account", null],
+  // upgrade-lab.html retired (#2473) — 302s to /pricing.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "api-keys-settings.html":        ["account", null],
   // project meta
   "changelog.html":                ["meta", null],
