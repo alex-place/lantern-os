@@ -81,6 +81,15 @@ module.exports = async function ibkrRoutes(req, res, url) {
   if (req.method === 'POST' && path === '/api/trading/ibkr/connect') {
     const body = await _readJson(req);
     if (!body) { _json(res, 400, { error: 'invalid_json' }); return true; }
+    // The form shows "saved — leave blank to keep" on the six credential fields
+    // once creds exist, so honor it: fill blank fields from the stored creds.
+    // Users with nothing saved must still supply every field.
+    const saved = store.load(userId);
+    if (saved) {
+      for (const k of store.REQUIRED) {
+        if (body[k] == null || String(body[k]).trim() === '') body[k] = saved[k];
+      }
+    }
     const norm = store.normalize(body);
     if (norm.error) { _json(res, 400, { error: norm.error }); return true; }
     store.save(userId, norm.creds);
