@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>unisona.ai — Founder Roadmap</title>
+<style>
+  /* ============ tokens ============ */
+  :root, :root[data-theme="dark"]{
+    --bg:#0e1119; --bg2:#0b0e15; --panel:#161b26; --panel-hi:#1c2331;
+    --line:#2a3242; --line-hi:#39445a;
+    --ink:#f4f7fc; --text:#dbe3f0; --sub:#9fb0c8; --muted:#6f7f97;
+    --amber:#f4a94a; --amber-dim:#b9812f; --amber-wash:rgba(244,169,74,.12);
+    --code:#f4a94a;
+    --glow:rgba(244,169,74,.55);
+    --done:#54c99a; --done-wash:rgba(84,201,154,.14);
+    --active:#f4a94a; --active-wash:rgba(244,169,74,.14);
+    --next:#63b0f0; --next-wash:rgba(99,176,240,.14);
+    --later:#8493ab; --later-wash:rgba(132,147,171,.13);
+    --stop:#ef6b64;
+    color-scheme:dark;
+  }
+  :root[data-theme="light"]{
+    --bg:#eef1f6; --bg2:#e4e9f1; --panel:#ffffff; --panel-hi:#f4f7fc;
+    --line:#d6dde8; --line-hi:#c2ccda;
+    --ink:#111725; --text:#26324a; --sub:#4a5a76; --muted:#748298;
+    --amber:#b26a10; --amber-dim:#8a5209; --amber-wash:rgba(178,106,16,.10);
+    --code:#7a4a06;
+    --glow:rgba(178,106,16,.30);
+    --done:#1a875b; --done-wash:rgba(26,135,91,.12);
+    --active:#b26a10; --active-wash:rgba(178,106,16,.12);
+    --next:#1d6fb8; --next-wash:rgba(29,111,184,.12);
+    --later:#5c6a82; --later-wash:rgba(92,106,130,.12);
+    --stop:#c0392f;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme]){
+      --bg:#eef1f6; --bg2:#e4e9f1; --panel:#ffffff; --panel-hi:#f4f7fc;
+      --line:#d6dde8; --line-hi:#c2ccda;
+      --ink:#111725; --text:#26324a; --sub:#4a5a76; --muted:#748298;
+      --amber:#b26a10; --amber-dim:#8a5209; --amber-wash:rgba(178,106,16,.10);
+      --glow:rgba(178,106,16,.30);
+      --done:#1a875b; --done-wash:rgba(26,135,91,.12);
+      --active:#b26a10; --active-wash:rgba(178,106,16,.12);
+      --next:#1d6fb8; --next-wash:rgba(29,111,184,.12);
+      --later:#5c6a82; --later-wash:rgba(92,106,130,.12);
+      --stop:#c0392f;
+      color-scheme:light;
+    }
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1100px 520px at 82% -8%, var(--amber-wash), transparent 60%),
+      linear-gradient(180deg, var(--bg2), var(--bg) 220px);
+    color:var(--text);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; min-height:100vh;
+  }
+  .mono{font-family:ui-monospace,"Cascadia Code","SFMono-Regular",Consolas,"Courier New",monospace}
+  .wrap{max-width:1000px; margin:0 auto; padding:0 clamp(16px,4vw,30px)}
+
+  /* ============ masthead ============ */
+  header.top{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:22px 0 0}
+  .brand{display:flex; align-items:center; gap:11px}
+  .lantern{width:30px; height:30px; flex:0 0 auto}
+  .brand .bt{font-size:12px; letter-spacing:.15em; text-transform:uppercase; color:var(--sub); font-weight:700}
+  .brand .bt b{color:var(--amber)}
+  .themebtn{background:transparent; border:1px solid var(--line); border-radius:9px; color:var(--sub); width:36px; height:32px; cursor:pointer; display:grid; place-items:center; font-size:15px; line-height:1}
+  .themebtn:hover{border-color:var(--amber); color:var(--amber)}
+  .themebtn:focus-visible{outline:2px solid var(--amber); outline-offset:2px}
+
+  .hero{padding:26px 0 8px}
+  .eyebrow{font-size:11.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); font-weight:700; margin:0}
+  h1{font-weight:800; color:var(--ink); font-size:clamp(29px,5.4vw,46px); line-height:1.04; letter-spacing:-.02em; margin:10px 0 0; text-wrap:balance}
+  .deck{color:var(--sub); font-size:clamp(15px,1.7vw,17px); max-width:62ch; margin:14px 0 0}
+  .meta{display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 0}
+  .meta .m{font-family:ui-monospace,Consolas,monospace; font-size:11px; letter-spacing:.03em; color:var(--sub); background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:4px 10px}
+  .meta .m b{color:var(--ink)}
+
+  /* ============ now / next / later ============ */
+  .focus{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:30px 0 0}
+  @media (max-width:720px){ .focus{grid-template-columns:1fr} }
+  .col{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:15px 17px}
+  .col.now{border-color:color-mix(in srgb,var(--amber) 55%,var(--line)); box-shadow:0 0 0 1px var(--amber-wash), 0 14px 34px rgba(0,0,0,.28)}
+  .col h3{margin:0 0 3px; font-size:12px; letter-spacing:.13em; text-transform:uppercase}
+  .col.now h3{color:var(--amber)} .col.next h3{color:var(--next)} .col.later h3{color:var(--later)}
+  .col .win{font-size:11px; color:var(--muted); margin:0 0 11px}
+  .col ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px}
+  .col li{font-size:13.5px; color:var(--text); display:flex; gap:9px; align-items:flex-start; line-height:1.4}
+  .col li::before{content:""; width:7px; height:7px; border-radius:50%; margin-top:6px; flex:0 0 auto; background:var(--muted)}
+  .col.now li::before{background:var(--amber)} .col.next li::before{background:var(--next)} .col.later li::before{background:var(--later)}
+  .col li .blk{color:var(--stop); font-weight:700; font-size:10px; letter-spacing:.05em; margin-left:4px; white-space:nowrap; align-self:center}
+
+  /* ============ section head ============ */
+  .sec{padding:44px 0 0}
+  .sec-h{display:flex; align-items:baseline; gap:13px; margin:0 0 6px}
+  .sec-h .n{font-family:ui-monospace,Consolas,monospace; font-size:12px; font-weight:700; color:var(--amber); letter-spacing:.1em}
+  .sec-h h2{margin:0; color:var(--ink); font-size:clamp(19px,2.7vw,25px); font-weight:800; letter-spacing:-.01em}
+  .sec-sub{color:var(--sub); font-size:14.5px; max-width:64ch; margin:0 0 4px}
+
+  /* legend */
+  .legend{display:flex; flex-wrap:wrap; gap:14px; margin:16px 0 0; font-size:12px; color:var(--sub)}
+  .legend span{display:inline-flex; align-items:center; gap:6px}
+  .swatch{width:11px; height:11px; border-radius:3px; display:inline-block}
+  .sw-done{background:var(--done)} .sw-active{background:var(--active)} .sw-next{background:var(--next)} .sw-later{background:var(--later)}
+
+  /* ============ timeline ============ */
+  .tl{margin:22px 0 0; display:flex; flex-direction:column}
+  .phase{display:grid; grid-template-columns:38px 1fr; gap:16px}
+  .rail{display:flex; flex-direction:column; align-items:center}
+  .node{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-family:ui-monospace,Consolas,monospace; font-weight:700; font-size:14px; flex:0 0 auto; border:1.5px solid var(--line); background:var(--panel); color:var(--sub)}
+  .phase.active .node{border-color:var(--amber); color:var(--bg); background:var(--amber)}
+  .phase.finish .node{border-color:var(--done); color:var(--done); border-radius:50%}
+  .stem{flex:1; width:2px; min-height:14px; background:linear-gradient(var(--line-hi),var(--line)); margin:6px 0}
+  .phase:last-child .stem{display:none}
+
+  .pcard{background:var(--panel); border:1px solid var(--line); border-radius:13px; padding:16px 19px; margin-bottom:16px; position:relative; overflow:hidden}
+  .phase.active .pcard{border-color:color-mix(in srgb,var(--amber) 45%,var(--line))}
+  .phase.finish .pcard{border-color:color-mix(in srgb,var(--done) 45%,var(--line)); background:linear-gradient(180deg,var(--done-wash),transparent 60%)}
+  .pcard .stripe{position:absolute; left:0; top:0; bottom:0; width:3px}
+  .st-done{background:var(--done)} .st-active{background:var(--active)} .st-next{background:var(--next)} .st-later{background:var(--later)}
+
+  .ph{display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 12px; margin-bottom:3px}
+  .ph .pt{font-size:16.5px; font-weight:800; color:var(--ink); letter-spacing:-.01em}
+  .ph .pq{font-family:ui-monospace,Consolas,monospace; font-size:11px; color:var(--muted); letter-spacing:.04em}
+  .status{font-family:ui-monospace,Consolas,monospace; font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; padding:2px 8px; border-radius:5px; margin-left:auto}
+  .s-active{color:var(--active); background:var(--active-wash)} .s-next{color:var(--next); background:var(--next-wash)} .s-later{color:var(--later); background:var(--later-wash)} .s-done{color:var(--done); background:var(--done-wash)}
+  .pgoal{font-size:13.5px; color:var(--sub); margin:0 0 12px}
+
+  /* workstream rows */
+  .lanes{display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:9px; overflow:hidden; margin:2px 0 13px}
+  .lane{display:grid; grid-template-columns:132px 1fr; gap:12px; background:var(--panel-hi); padding:9px 13px}
+  @media (max-width:620px){ .lane{grid-template-columns:1fr; gap:3px} }
+  .lane .lk{font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:700; padding-top:2px; display:flex; align-items:flex-start; gap:6px}
+  .lane .lk .d{width:8px; height:8px; border-radius:2px; margin-top:3px; flex:0 0 auto}
+  .lane .lv{font-size:13px; color:var(--text); line-height:1.5}
+  .lane .lv .flag{color:var(--stop); font-weight:600}
+
+  /* gate */
+  .gate{display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; padding:11px 14px; border-radius:9px; background:var(--bg2); border:1px dashed var(--line-hi)}
+  .gate .gl{font-family:ui-monospace,Consolas,monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--amber); font-weight:700; white-space:nowrap}
+  .gate .gv{font-size:12.5px; color:var(--text)}
+  .gate .gv b{color:var(--ink); font-variant-numeric:tabular-nums}
+  .phase.finish .gate .gl{color:var(--done)}
+
+  /* dependency rail */
+  .deps{margin-top:8px; border-top:1px solid var(--line); padding-top:11px; display:flex; flex-wrap:wrap; gap:7px; align-items:center}
+  .deps .dl{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-right:2px}
+  .adr{font-family:ui-monospace,Consolas,monospace; font-size:10.5px; color:var(--sub); background:var(--bg2); border:1px solid var(--line); border-radius:5px; padding:2px 7px; white-space:nowrap}
+  .adr b{color:var(--code); font-weight:700}
+  .adr.prop b{color:var(--next)}
+
+  /* ============ callout / foot ============ */
+  .callout{margin:26px 0 0; padding:16px 20px; border-radius:11px; background:var(--amber-wash); border:1px solid color-mix(in srgb,var(--amber) 34%,var(--line)); border-left:3px solid var(--amber); font-size:14px; color:var(--text)}
+  .callout b{color:var(--ink)}
+  footer{margin:38px 0 46px; padding-top:16px; border-top:1px solid var(--line); display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; font-family:ui-monospace,Consolas,monospace; font-size:11px; color:var(--muted); letter-spacing:.03em}
+
+  @media (prefers-reduced-motion:no-preference){
+    .phase.active .node{animation:glow 2.8s ease-in-out infinite}
+    @keyframes glow{0%,100%{box-shadow:0 0 0 0 var(--glow)}50%{box-shadow:0 0 16px 2px var(--glow)}}
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="lantern" viewBox="0 0 32 32" aria-hidden="true">
+        <defs><radialGradient id="lg" cx="50%" cy="45%" r="55%">
+          <stop offset="0%" stop-color="#f4a94a"/><stop offset="100%" stop-color="#f4a94a" stop-opacity="0"/>
+        </radialGradient></defs>
+        <circle cx="16" cy="15" r="12" fill="url(#lg)"/>
+        <path d="M11 6 h10 M12 6 v2 a4 4 0 0 0 8 0 v-2 M10.5 8 h11 l-1 15 h-9 z" fill="none" stroke="#f4a94a" stroke-width="1.4" stroke-linejoin="round"/>
+        <path d="M13.5 12 h5 M13 16 h6 M13.5 20 h5" stroke="#f4a94a" stroke-width="1.1" stroke-linecap="round"/>
+      </svg>
+      <div class="bt">unisona<b>.</b>ai <span style="color:var(--muted)">/</span> Founder Roadmap</div>
+    </div>
+    <button class="themebtn" id="themebtn" type="button" aria-label="Toggle light or dark mode" title="Toggle light / dark">🌙</button>
+  </header>
+
+  <div class="hero">
+    <p class="eyebrow">The operating plan — what we build, and in what order</p>
+    <h1>One year, four gates, one loop</h1>
+    <p class="deck">The founder's build order for unisona.ai. Each phase has a clear-condition measured from real usage — no phase starts until the last one's numbers pass. This is the working document behind the product plan: honest floors, not dream ceilings.</p>
+    <div class="meta">
+      <span class="m">Rev <b>v1</b></span>
+      <span class="m">Horizon <b>12 months</b></span>
+      <span class="m">Anchored to <b>docs/product-plan.html</b></span>
+      <span class="m">Loop <b>Observe → Remember → Reason → Act → Verify → Converge</b></span>
+    </div>
+  </div>
+
+  <!-- NOW / NEXT / LATER -->
+  <div class="sec" style="padding-top:34px">
+    <div class="sec-h"><span class="n mono">01</span><h2>Where the work is right now</h2></div>
+    <p class="sec-sub">The founder's real focus, split three ways. <em>Now</em> is what's on the bench this month; <em>Later</em> only starts once the gates below clear.</p>
+    <div class="focus">
+      <div class="col now">
+        <h3>Now — on the bench</h3>
+        <p class="win">This month</p>
+        <ul>
+          <li>Fix broken bring-your-own AI keys <span class="blk">BLOCKER</span></li>
+          <li>Repair the guest experience — a first-timer should get each page instantly</li>
+          <li>Finish the trading desk: live charts, one-click exit, alerts, auto journal</li>
+          <li>Ship the 31-fix cleanup from the top-to-bottom app review</li>
+        </ul>
+      </div>
+      <div class="col next">
+        <h3>Next — queued</h3>
+        <p class="win">Once Now clears</p>
+        <ul>
+          <li>Turn on real market data through the user's own brokerage login</li>
+          <li>Lawyer's review before marketing real-money trading</li>
+          <li>Stand up honest usage measurement — count only what's real</li>
+          <li>Switch on the four-plan pricing</li>
+        </ul>
+      </div>
+      <div class="col later">
+        <h3>Later — parked</h3>
+        <p class="win">After product–market fit</p>
+        <ul>
+          <li>Signed desktop app — own your AI locally</li>
+          <li>Refer-a-friend</li>
+          <li>Investor materials built from measured usage</li>
+          <li>Pilot a high-touch $500–1,000/mo advisor seat</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="sec">
+    <div class="sec-h"><span class="n mono">02</span><h2>The four gates</h2></div>
+    <p class="sec-sub">Read top to bottom. Each card carries its workstreams, the architecture decisions it depends on, and the clear-condition that unlocks the next gate.</p>
+    <div class="legend" aria-hidden="true">
+      <span><i class="swatch sw-done"></i> Shipped</span>
+      <span><i class="swatch sw-active"></i> In progress</span>
+      <span><i class="swatch sw-next"></i> Next up</span>
+      <span><i class="swatch sw-later"></i> Later</span>
+    </div>
+
+    <div class="tl">
+      <!-- Phase 1 -->
+      <div class="phase active">
+        <div class="rail"><div class="node">1</div><div class="stem"></div></div>
+        <div class="pcard">
+          <span class="stripe st-active"></span>
+          <div class="ph"><span class="pt">Make it honest</span><span class="pq mono">Q1 · Months 1–3</span><span class="status s-active">You are here</span></div>
+          <p class="pgoal">Fix what's broken and start counting real usage. Nothing to sell until the core actually works and the numbers are true.</p>
+          <div class="lanes">
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--amber)"></i>Product &amp; UX</span><span class="lv"><span class="flag">Fix bring-your-own-keys (it silently fails to save)</span>, rebuild guest onboarding, land the 31-fix cleanup.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--next)"></i>Trading desk</span><span class="lv">Live charts, one-click exit, price alerts, an automatic trade journal, and real market data via the user's own brokerage.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--later)"></i>Legal &amp; measure</span><span class="lv">Lawyer's read before marketing real-money trading; instrument honest usage counting from day one.</span></div>
+          </div>
+          <div class="gate"><span class="gl mono">Clear when</span><span class="gv"><b>50</b> active · <b>15</b> paying · <b>40%</b> of newcomers still around after a month</span></div>
+          <div class="deps"><span class="dl">Depends on</span>
+            <span class="adr mono"><b>ADR-0027</b> broker connect</span>
+            <span class="adr mono"><b>ADR-0022</b> user-held keys</span>
+            <span class="adr mono prop"><b>ADR-0020</b> orders dry-run by default</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div class="phase">
+        <div class="rail"><div class="node">2</div><div class="stem"></div></div>
+        <div class="pcard">
+          <span class="stripe st-next"></span>
+          <div class="ph"><span class="pt">Prove they'll pay &amp; stay</span><span class="pq mono">Q2 · Months 4–6</span><span class="status s-next">Next up</span></div>
+          <p class="pgoal">Turn on pricing and test whether people would miss it. If the fit check fails, improve the product — don't buy ads.</p>
+          <div class="lanes">
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--amber)"></i>Product &amp; UX</span><span class="lv">Show off the honesty features — evidence shown on every claim, unsure moments flagged.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--next)"></i>Growth &amp; pricing</span><span class="lv">Switch on the four-plan pricing (Free / ~$20 Pro / $200 Business). Run the product–market-fit survey.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--later)"></i>Legal &amp; measure</span><span class="lv">Weekly honest review of active-usage numbers; hold the line on the "active" definition.</span></div>
+          </div>
+          <div class="gate"><span class="gl mono">Clear when</span><span class="gv">fit check passes (<b>40%</b> "very disappointed" without it) · <b>30–60</b> paying · <b>$1k–2.5k</b>/mo</span></div>
+          <div class="deps"><span class="dl">Depends on</span>
+            <span class="adr mono"><b>ADR-0016</b> sign-in your way</span>
+            <span class="adr mono"><b>ADR-0017</b> check before answering</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div class="phase">
+        <div class="rail"><div class="node">3</div><div class="stem"></div></div>
+        <div class="pcard">
+          <span class="stripe st-later"></span>
+          <div class="ph"><span class="pt">Double down on what sticks</span><span class="pq mono">Q3 · Months 7–9</span><span class="status s-later">Later</span></div>
+          <p class="pgoal">Pour effort into whichever surface people keep returning to; pause the weakest. Ship the thing people asked to own.</p>
+          <div class="lanes">
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--amber)"></i>Product &amp; UX</span><span class="lv">Ship the signed desktop app — own your AI locally, same core as the hosted web version.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--next)"></i>Growth &amp; pricing</span><span class="lv">Add refer-a-friend; collect 25+ recorded user stories with consent.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--later)"></i>Focus call</span><span class="lv">Cut or freeze the least-used feature each quarter — spreading thin is a named risk.</span></div>
+          </div>
+          <div class="gate"><span class="gl mono">Clear when</span><span class="gv"><b>60–150</b> paying · <b>$3k–6k</b>/mo · under <b>5%</b> leaving each month · <b>25+</b> stories</span></div>
+          <div class="deps"><span class="dl">Depends on</span>
+            <span class="adr mono"><b>ADR-0018</b> web + desktop, one core</span>
+            <span class="adr mono"><b>ADR-0014</b> thin signed launcher</span>
+            <span class="adr mono"><b>ADR-0026</b> 1.58-bit local model</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4 -->
+      <div class="phase">
+        <div class="rail"><div class="node">4</div><div class="stem"></div></div>
+        <div class="pcard">
+          <span class="stripe st-later"></span>
+          <div class="ph"><span class="pt">Raise-ready — if the numbers say so</span><span class="pq mono">Q4 · Months 10–12</span><span class="status s-later">Later</span></div>
+          <p class="pgoal">Only once the app earns a real income and people demonstrably stick around. Investor talks from a position of proof — or keep growing on our own money.</p>
+          <div class="lanes">
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--next)"></i>Growth &amp; pricing</span><span class="lv">Build investor materials from real, measured usage — never from projections.</span></div>
+            <div class="lane"><span class="lk"><i class="d" style="background:var(--later)"></i>Revenue test</span><span class="lv">Pilot a high-touch $500–1,000/mo advisor seat with a few partners — proven first, never promised up front.</span></div>
+          </div>
+          <div class="gate"><span class="gl mono">Clear when</span><span class="gv"><b>120–300</b> paying · <b>$4k–15k</b>/mo · roughly <b>$100k–180k</b>/yr earned on its own</span></div>
+          <div class="deps"><span class="dl">Depends on</span>
+            <span class="adr mono"><b>ADR-0008</b> personal AI you own</span>
+            <span class="adr mono"><b>ADR-0004</b> append-only memory</span>
+            <span class="adr mono"><b>ADR-0005</b> any model, with fallback</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Finish -->
+      <div class="phase finish">
+        <div class="rail"><div class="node">🏁</div></div>
+        <div class="pcard">
+          <span class="stripe st-done"></span>
+          <div class="ph"><span class="pt">A fundable company</span><span class="pq mono">the win condition</span><span class="status s-done">Year-end</span></div>
+          <p class="pgoal" style="margin:0">One clearly-loved thing people keep paying for, honest numbers to back it, and a real choice: raise, or stay independent and profitable.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout"><b>Why the gates come before the ambition.</b> We can't honestly count our own users yet — two people pay us and they're real, but their usage isn't measured. Until it is, every growth number is a guess, which is why measurement is the first job of Gate 1. Beating a gate early just means starting the next one sooner.</div>
+  </div>
+
+  <footer>
+    <span>unisona.ai · Founder Roadmap · Rev v1 · 2026-07-15</span>
+    <span>Companion to docs/product-plan.html — anchored to the live product</span>
+  </footer>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('themebtn'), KEY='unisona-roadmap-theme';
+  function apply(t){
+    root.setAttribute('data-theme',t);
+    btn.textContent=(t==='light')?'☀️':'🌙';
+    btn.setAttribute('aria-pressed', t==='light');
+  }
+  var saved=null;
+  try{ saved=localStorage.getItem(KEY); }catch(e){}
+  if(saved==='light'||saved==='dark'){ apply(saved); }
+  else{
+    var prefLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+    apply(prefLight?'light':'dark');
+  }
+  btn.addEventListener('click',function(){
+    var next=(root.getAttribute('data-theme')==='light')?'dark':'light';
+    apply(next);
+    try{ localStorage.setItem(KEY,next); }catch(e){}
+  });
+})();
+</script>
+
+</body>
+</html>
