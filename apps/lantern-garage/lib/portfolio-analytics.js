@@ -418,9 +418,14 @@ function ciOverlap(a, b) {
 // The operator's standing target is a GATE, not a promise: strategies report where
 // their measured Sharpe stands against it, with CI evidence. Only `meets_ci`
 // (CI lower bound clears the mandate) is eligible for live capital per ADR-0028.
+// Default = 0.79, the "Buffett bar": Berkshire's lifetime Sharpe (Frazzini,
+// Kabiller & Pedersen, "Buffett's Alpha", FAJ 2018) — the best long-horizon track
+// record on record. Recalibrated from 2.0 by operator direction 2026-07-15:
+// "do better than Buffett" is the meaningful, evidence-clearable bar; 2.0 belongs
+// to capacity-constrained high-frequency machines, not portfolios.
 function sharpeMandate() {
   const v = Number(process.env.KEYSTONE_SHARPE_MANDATE);
-  return Number.isFinite(v) && v > 0 ? v : 2.0;
+  return Number.isFinite(v) && v > 0 ? v : 0.79;
 }
 
 function mandateVerdict(s, target) {
@@ -588,7 +593,7 @@ async function proposeRebalance(positions, opts = {}) {
       target,
       current: mandateVerdict(current.sharpe, target),
       proposed: mandateVerdict(proposed.sharpe, target),
-      note: "only meets_ci (CI lower bound clears the mandate) is eligible for live capital — ADR-0028",
+      note: "target = the Buffett bar (Berkshire lifetime Sharpe 0.79, Frazzini et al. 2018); only meets_ci (CI lower bound clears it) is eligible for live capital — ADR-0028",
     },
     tax: {
       rate: taxRate,

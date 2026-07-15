@@ -1,3 +1,7 @@
+### Changed
+
+- trading (ADR-0028 recalibration, operator-directed): the Sharpe mandate default drops from 2.0 to **0.79 — the "Buffett bar"** (Berkshire's verified lifetime Sharpe, Frazzini/Kabiller/Pedersen FAJ 2018). Rationale in the ADR: a gate above every long-horizon portfolio in history selects nothing; beating the best investor on record with CI evidence is the meaningful bar. Within the gate, proposals maximize return. Measured against it (`experiments/leverage_buffett_bar_opt.py`): the return-max overlay (35% vol target) makes +$17,249 vs SPY at −36% maxDD and scores `meets_point` on the 2013+ validation window (0.90 vs 0.79); nothing yet achieves `meets_ci` — live capital stays gated.
+
 ### Added
 
 - experiments (ADR-0028 Phase-2 evidence): walk-forward $20/mo DCA simulator 2000→2026 (`experiments/dca_walkforward_sim.py` — four objectives incl. 2× margin book with funding/borrow costs and wipeout floor) and the daily leverage-overlay research (`leverage_daily_overlay.py`, `leverage_overlay_opt2.py`, `leverage_risk_2022.py`): train/validation-split tuning, 2022 daily margin-cushion drill-down, and a 1,000-path crisis-only block-bootstrap stress test. Validated Phase-2 spec now recorded in the ADR: daily vol-target 20%/yr + 6-mo trend gate + 15% drawdown brake at 2× cap → +$10,856 vs SPY DCA on the real 26y, −28% max drawdown (vs −51% static/SPY), 0/1,000 crisis margin calls, P(<$10k from $25k) 1.6% vs 70.2% unmanaged.

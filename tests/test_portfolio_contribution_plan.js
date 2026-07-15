@@ -134,6 +134,11 @@ async function main() {
   assert.strictEqual(pa.mandateVerdict({ sharpe: 2.5, lo: 2.1, hi: 2.9 }, 2), "meets_ci");
   assert.strictEqual(pa.mandateVerdict({ sharpe: 2.2, lo: 1.4, hi: 3.0 }, 2), "meets_point");
   assert.strictEqual(pa.mandateVerdict({ sharpe: 0.8, lo: 0.1, hi: 1.5 }, 2), "below");
+  // default target = the Buffett bar (Berkshire lifetime Sharpe, ADR-0028 recalibration)
+  const prevMandate = process.env.KEYSTONE_SHARPE_MANDATE;
+  delete process.env.KEYSTONE_SHARPE_MANDATE;
+  assert.strictEqual(pa.sharpeMandate(), 0.79, "default mandate must be the Buffett bar (0.79)");
+  if (prevMandate != null) process.env.KEYSTONE_SHARPE_MANDATE = prevMandate;
 
   // 9) proposeRebalance carries objective, mandate + tax; SELL rows carry est. gains
   const posOverweight = [

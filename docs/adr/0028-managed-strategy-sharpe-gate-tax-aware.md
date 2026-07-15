@@ -28,11 +28,20 @@ operator's primary brokerage account.
 ## Decision
 
 1. **The mandate is a gate, not a promise.** Every strategy/proposal reports measured Sharpe with a Lo-CI
-   against the mandate (`KEYSTONE_SHARPE_MANDATE`, default 2.0) in three honest states:
+   against the mandate (`KEYSTONE_SHARPE_MANDATE`) in three honest states:
    `meets_ci` (CI lower bound ≥ mandate) · `meets_point` (point estimate ≥ mandate, CI does not clear) ·
    `below`. **Only `meets_ci` strategies are eligible for live capital.** Everything else runs paper/dry-run.
    No strategy is promoted on backtest alone: promotion additionally requires the IS–WFA–OOS protocol
    (purged walk-forward, majority-pass, parameter lock — arXiv 2603.09219).
+
+   **Default target = 0.79, the "Buffett bar"** (recalibrated from 2.0 by operator direction, 2026-07-15:
+   *"lower the gate to maximize an optimal return but our bar is to do better than Buffett"*). 0.79 is
+   Berkshire Hathaway's verified lifetime Sharpe — the best long-horizon track record on record (Frazzini,
+   Kabiller & Pedersen, "Buffett's Alpha", Financial Analysts Journal 2018). Rationale: 2.0 was above every
+   long-horizon portfolio in history and belongs to capacity-constrained high-frequency machines; a gate
+   nothing can ever pass selects nothing. Beating the best investor who ever lived, with CI evidence, is
+   the meaningful bar. Within the eligible set, proposals then **maximize expected return** (the
+   `max_return` objective) — the gate bounds risk-adjusted quality; the objective chases return.
 2. **Objectives are explicit.** The one analytics engine (`lib/portfolio-analytics.js`) supports
    `objective: "sharpe"` (default, shrunk tangency) and `objective: "max_return"` (maximize expected
    return subject to a volatility ceiling, long-only, per-position cap) — the true efficient-frontier
@@ -50,6 +59,16 @@ operator's primary brokerage account.
    tax-advantaged or dedicated agentic accounts only**, once per-lot tax tracking and intra-day risk
    monitoring exist.
 
+   **Buffett-bar measurement (2026-07-15, `experiments/leverage_buffett_bar_opt.py`):** with the gate at
+   0.79 and return-maximizing selection (max train final among configs beating SPY's train Sharpe), the
+   winner is the aggressive overlay (vol-target 35%, 6-mo trend, 30% brake): full-period **$55,852
+   (+$17,249 vs SPY)**, maxDD −36%, Sharpe 0.61 [0.22, 0.99] → still `below` on the full sample; validation
+   2013+ Sharpe 0.90 [0.37, 1.44] → **`meets_point`** (beats Buffett's 0.79 point-wise; CI does not clear).
+   The risk-preferred 20%-vol config also meets_point on validation (0.97) with +$10,856 and far better
+   stress (P(<$10k) 1.6% vs 9.2%). NOTHING yet achieves `meets_ci` — CI half-widths are ≈±0.4 even on
+   26 years, so live-capital promotion requires either a longer live track record or genuinely higher
+   Sharpe machinery. Note the regime caveat: SPY itself scores 0.91 on the 2013+ validation window —
+   point-beats of the bar in bull-heavy windows are cheap; full-cycle windows are where the bar bites.
    **Phase-2 overlay spec (validated 2026-07-15, `experiments/leverage_overlay_opt2.py`):** leverage is
    never static — it is reset **daily** as `gross = min(2.0, 0.20/vol20d) × trendGate(6mo) × brake(dd>15% → 1×)`,
    where vol20d is annualized 20-day realized vol of the tangency direction. Tuned on 2000–2012 ONLY,
