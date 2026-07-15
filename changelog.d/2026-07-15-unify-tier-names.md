@@ -1,0 +1,3 @@
+### Changed
+
+- tiers: unified the tier vocabulary to the canonical **Guest / Free / Pro / Business** across the pricing page, the gate/"unlock" walls, and the role-label maps (auth, accounts, profile, chat). The app previously showed a different name on nearly every surface — pricing said Public/Operator/Supporter/Pilot, gates said "Deep Dreamer"/"Wanderer"/"Synthesasia Guild" — so a guest hitting a gate that named a tier absent from the pricing page hit a dead end ("See plans" → no matching card). Now gates name "the Pro tier" and the pricing page has a Pro card. The retired $5 tier displays as Free (grandfathered); the $200 tier is Business. Staff (`admin`) gates now show "Staff access required" with no buy-a-plan CTA instead of naming a purchasable tier. (#2470)

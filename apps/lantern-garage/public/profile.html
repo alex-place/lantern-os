@@ -371,18 +371,18 @@ const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin:
 
 const TIER_LABELS = {
   guest:        { label: 'Free',              emoji: '🔓' },
-  supporter:    { label: 'Wanderer — $5/mo',  emoji: '🌀' },
-  deep_dreamer: { label: 'Deep Dreamer — $20/mo', emoji: '✦' },
-  founder:      { label: 'Deep Dreamer — $20/mo', emoji: '✦' }, // legacy alias (#698)
-  admin:        { label: 'Synthesasia Guild — $200/mo', emoji: '⬡' },
+  supporter:    { label: 'Free (legacy supporter)', emoji: '🌀' },
+  deep_dreamer: { label: 'Pro — $20/mo', emoji: '✦' },
+  founder:      { label: 'Pro — $20/mo', emoji: '✦' }, // legacy alias (#698)
+  admin:        { label: 'Admin (staff)', emoji: '⬡' },
 };
 
 // Feature access is role-laddered EXCEPT Trader, which is a per-account
 // opt-in entitlement (entitlements.trade), independent of tier — see
 // user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
 // Feature access is tier-laddered. Trader (manual stocks + Kalshi + AI
-// suggestions) unlocks at the $20 Deep Dreamer tier; the autonomous AI Trader
-// unlocks at the $200 Synthesasia Guild tier.
+// suggestions) unlocks at the $20 Pro tier; the autonomous AI Trader
+// unlocks at the $200 Business tier.
 const FEATURES = [
   { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
   { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
