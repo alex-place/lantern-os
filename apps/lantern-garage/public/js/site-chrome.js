@@ -79,6 +79,58 @@
     return tpl.content.firstElementChild;
   }
 
+  // Reflect real server + local-model health in the injected footer dot/label.
+  // Mirrors index.html's loadState() classification (green/gold/red) so the two
+  // never disagree. Fails safe: any fetch error → red "server unreachable".
+  function startStatusUpdater() {
+    var dot = document.getElementById("status-dot");
+    var label = document.getElementById("status-label");
+    if (!dot || !label) return;
+
+    function getJson(url) {
+      return fetch(url, { credentials: "include" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; });
+    }
+
+    function apply() {
+      Promise.all([getJson("/api/health"), getJson("/api/serving/status")]).then(
+        function (res) {
+          var health = res[0];
+          var serving = res[1];
+          var serverOnline = !!(health && health.ok);
+          var lm = serving && serving.local_model;
+          var ollamaUp = !!(lm && lm.serving);
+          var pinnedConfigured = !!(lm && lm.pinned);
+          var modelUp = !!(lm && lm.pinned_served);
+          var state, text, title;
+          if (!serverOnline || !ollamaUp) {
+            state = "offline";
+            text = serverOnline ? "ollama offline" : "server unreachable";
+            title = serverOnline
+              ? "Ollama down" + (lm && lm.base ? " (" + lm.base + ")" : "")
+              : "Server unreachable";
+          } else if (pinnedConfigured && !modelUp) {
+            state = "warn";
+            text = "ollama online · model not loaded";
+            title = "Ollama up · pinned model " + lm.pinned + " not served";
+          } else {
+            state = "online";
+            text = "ollama online";
+            var active = (lm && (lm.active_model || lm.pinned)) || "";
+            title = "Ollama up" + (active ? " · " + active : "");
+          }
+          dot.className = "dot " + state;
+          dot.title = title;
+          label.textContent = text;
+        }
+      );
+    }
+
+    apply();
+    setInterval(apply, 30000);
+  }
+
   function injectChrome() {
     var body = document.body;
     if (!body) return;
@@ -96,8 +148,20 @@
     }
 
     // Footer — append as the last layout element.
+    var footerInjected = false;
     if (!document.querySelector("footer.site-footer")) {
       body.appendChild(nodeFrom(footerHtml()));
+      footerInjected = true;
+    }
+
+    // Live footer status (#2482): the injected footer ships a hardcoded green dot
+    // + "connecting…" label. Only index.html / dream-chat drove it before, so on
+    // every other shared-chrome page the dot stayed misleadingly green forever.
+    // Poll /api/health (+ /api/serving/status for the local-model tint) and reflect
+    // the real state. A page can opt out by setting window.__ownStatusUpdater; we
+    // only touch footers WE injected.
+    if (footerInjected && !window.__ownStatusUpdater) {
+      startStatusUpdater();
     }
 
     // Per-page extra action buttons (e.g. trading's settings, the terminal's skin toggle):
