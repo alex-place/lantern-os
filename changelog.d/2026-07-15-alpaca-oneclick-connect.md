@@ -17,3 +17,6 @@
 - trader: paper trading now uses a REAL Alpaca paper account, not a local sim. The Alpaca adapter takes two auth modes: the user's own OAuth token (one-click), or operator-set server keys (ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY, PAPER endpoint by default). Broker precedence is IBKR -> Alpaca (OAuth or server keys). No broker at all -> an honest "connect Alpaca" error, never a silent dry-run.
 - trader: PAPER orders are no longer guard-blocked. Alpaca paper is simulated money, so paper orders send straight to Alpaca (the "paper trade silently fails" bug); only LIVE orders pass trading-guard AND need TRADER_ALLOW_LIVE_ACCOUNT=1.
 - trader: removed the half-baked native browser popups. Order placement, Flatten, and Close-all use an inline two-step confirm (the button arms — "Confirm BUY 5 NVDA ->" — then a second click sends), and every result is a styled toast instead of a native alert(). A dry-run from a connected-but-unarmed live broker reads "not armed", not "Order failed".
+### Added (profile)
+
+- profile: a Brokerage section — one-click ⚡ Connect Alpaca with live status (Connect / connected+Disconnect for OAuth, "shared paper account" for server keys, "setup pending" when unconfigured) plus the Interactive Brokers link. The "Connect broker" feature card now names both brokers.
