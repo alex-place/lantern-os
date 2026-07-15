@@ -30,7 +30,7 @@
   const isPublic = PUBLIC.includes(pathname);
 
   // Hide nav links to trade-only pages for accounts without trade access, so a
-  // non-entitled user (e.g. Deep Dreamer) never sees a link that would 403.
+  // non-entitled user (e.g. Pro) never sees a link that would 403.
   function hideTradeNav() {
     document.querySelectorAll('a[href]').forEach((a) => {
       const href = (a.getAttribute('href') || '').split('?')[0];
