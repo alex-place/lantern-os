@@ -295,8 +295,23 @@
     #broker a.bgo{display:inline-block;text-decoration:none;margin:4px 0 2px}
   </style>
   <section class="panel" id="broker">
-    <h2>🔗 Broker Connection <span class="section-meta">Interactive Brokers · your account</span></h2>
-    <p class="panel-sub">Trade your own IBKR account through unisona (self-service OAuth). Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
+    <h2>🔗 Broker Connection <span class="section-meta">connect your account</span></h2>
+
+    <!-- One-click tier (ADR-0027): Alpaca OAuth2 — no keys, paper by default -->
+    <div class="bgen" id="alpacaCard" style="border-color:var(--accent)">
+      <div class="bgen-head"><strong>⚡ Connect Alpaca</strong> <span class="bgen-sub">one click · recommended · paper by default</span></div>
+      <p class="bgen-p">Sign in to Alpaca and approve — that's it. No keys to generate, nothing to paste. unisona never sees your Alpaca password or API keys; it receives a scoped token you can revoke anytime. Commission-free stocks &amp; options. Starts on a <strong>paper</strong> account so you can trade risk-free.</p>
+      <div class="broker-status"><span class="bdot" id="adot"></span><span id="astatusText">Checking…</span></div>
+      <div class="bactions">
+        <a class="btn-primary bgo" id="aconnect" href="/api/broker/alpaca/connect?returnTo=%2Forchestration.html%23broker">⚡ Connect Alpaca (paper)</a>
+        <button type="button" class="btn-secondary" id="adisconnect" hidden>Disconnect</button>
+      </div>
+      <div class="bbanner" id="abanner"></div>
+      <p class="bhint" id="anotconfig" hidden>One-click Alpaca isn't set up on this server yet. Use the Interactive Brokers option below, or ask an admin to register the Alpaca OAuth app.</p>
+    </div>
+
+    <div class="bgen-head" style="margin:18px 0 6px"><strong>Interactive Brokers</strong> <span class="bgen-sub">power tier · your own keys · best execution</span></div>
+    <p class="panel-sub">Prefer IBKR (better fills, margin, full options)? Connect your own IBKR account via self-service OAuth. Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
     <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
     <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Deep Dreamer ($20/mo)</strong> tier. <a href="https://www.patreon.com/cw/UnisonaAI" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
 
@@ -1550,6 +1565,35 @@ openssl dhparam -out dhparam.pem 2048</pre>
 </script>
 
 <script>
+// ── One-click Alpaca (ADR-0027) — OAuth2, no keys ──
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const card=$('alpacaCard'); if(!card) return;
+  // Surface the callback result (?alpaca=connected|error&reason=…) as a banner.
+  const qs=new URLSearchParams(location.search);
+  if(qs.get('alpaca')){
+    const b=$('abanner'); const ok=qs.get('alpaca')==='connected';
+    b.textContent = ok ? 'Alpaca connected — your paper account is linked.' : ('Couldn’t connect Alpaca: '+(qs.get('reason')||'unknown')+'. Try again.');
+    b.className='bbanner show '+(ok?'ok':'err');
+  }
+  async function refresh(){
+    let s=null; try{ s=await (await fetch('/api/broker/alpaca/status',{cache:'no-store'})).json(); }catch(_e){}
+    const connected=s&&s.connected;
+    $('adot').className='bdot '+(connected?'on':'');
+    $('astatusText').textContent=connected
+      ? `Connected · ${s.accountNumber||'account'} (${s.env||'paper'})`
+      : (s&&s.configured===false ? 'One-click setup pending' : 'Not connected');
+    $('adisconnect').hidden=!connected;
+    $('aconnect').textContent=connected?'Reconnect Alpaca':'⚡ Connect Alpaca (paper)';
+    if(s&&s.configured===false){ $('anotconfig').hidden=false; $('aconnect').setAttribute('aria-disabled','true'); $('aconnect').style.opacity='.55'; $('aconnect').style.pointerEvents='none'; }
+  }
+  $('adisconnect').addEventListener('click', async ()=>{
+    try{ await fetch('/api/broker/alpaca/disconnect',{method:'POST'}); }catch(_e){}
+    refresh();
+  });
+  refresh();
+})();
+
 // ── Broker connection (IBKR) — per-user (ADR-0022) ──
 (function(){
   const $=(id)=>document.getElementById(id);

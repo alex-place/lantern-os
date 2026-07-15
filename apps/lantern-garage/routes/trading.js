@@ -95,24 +95,31 @@ async function _autoscanTick() {
       // Runs sequentially; every order still passes the per-account hard guard, and
       // `extended` routes pre/post-market fills through LMT + outsideRTH orders.
       const ibkrCreds = require('../lib/ibkr-credentials');
+      const alpacaCreds = require('../lib/alpaca-credentials');
       const watchlistStore = require('../lib/watchlist-store');
-      const users = process.env.TRADER_AUTO_USER ? [process.env.TRADER_AUTO_USER] : ibkrCreds.listUsers();
+      const { brokerFacadeFor } = require('../lib/broker-facade');
+      // Drive EVERY connected account — IBKR (ADR-0022) or one-click Alpaca (ADR-0027),
+      // deduped. TRADER_AUTO_USER pins to one user (back-compat/testing). Per user the
+      // broker facade resolves to their actual broker (IBKR preferred), so runAutoTrade
+      // is broker-agnostic; every order still passes the per-account hard guard.
+      const users = process.env.TRADER_AUTO_USER
+        ? [process.env.TRADER_AUTO_USER]
+        : [...new Set([...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()])];
       const _seenAccts = new Set();
       for (const uid of users) {
-        const acct = await _autoBridge.getIBKRAccount(uid).catch(() => null);
-        if (!acct || !acct.account_id) continue;                 // not connected/authenticated
-        if (_seenAccts.has(acct.account_id)) continue;            // alias → same account, skip
-        _seenAccts.add(acct.account_id);
+        const resolved = await brokerFacadeFor(uid, _autoBridge).catch(() => null);
+        if (!resolved || !resolved.accountId) continue;          // neither broker connected
+        if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
+        _seenAccts.add(resolved.accountId);
         // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
         // so entries/signal-exits only touch names they curated. Held-position exits
         // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
         const wl = new Set(watchlistStore.getWatchlist(uid).map((s) => String(s).toUpperCase()));
         const userScan = { ...scan, signals: (scan.signals || []).filter((s) => wl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
-        const at = await runAutoTrade(userScan, { bridge: _autoBridge, userId: uid, extended: !marketHours });
-        for (const e of (at.executed || [])) {
-          console.log(`[AutoTrader:${acct.account_id}] ${e.action} ${e.symbol} x${e.qty} → ${e.result && e.result.status}${e.reason ? ` (${e.reason})` : ''}`);
-        }
-        if ((at.enabled || at.manageExits) && !(at.executed || []).length && at.reason) console.log(`[AutoTrader:${acct.account_id}] no action — ${at.reason}`);
+        // Every execution is already appended to the durable autopilot-trades.jsonl by
+        // auto-trader.logTrade() — that append-only file is the record of what the
+        // autopilot did, so a per-tick console echo here would only duplicate it.
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);

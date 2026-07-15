@@ -116,13 +116,18 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         sendJson(res, { status: 'error', error: 'takeProfit must be a positive number' }, 400);
         return true;
       }
-      // Prefer the user's connected IBKR account (per-user OAuth) so BUY/SELL on the
-      // trader page trades the account shown in the header. Falls back to the legacy
-      // agent when no IBKR account is linked. Order is HARD-GATED inside placeOrder.
+      // Broker precedence: the user's connected IBKR account (ADR-0022), then their
+      // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
+      // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      const alpaca = require('../../lib/alpaca-adapter');
+      // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
+      // else the operator's server paper keys). Alpaca PAPER fills for real without
+      // arming — so a paper trade actually happens instead of a dry-run dead end.
       const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
-        || await traderAgent.placeOrder(orderReq);
+        || (await alpaca.placeOrder(uid, orderReq).catch(() => null))
+        || { status: 'error', ticker, side, qty, reason: 'No broker connected. Connect Alpaca (one click) or ask an admin to set Alpaca paper keys to trade.' };
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,

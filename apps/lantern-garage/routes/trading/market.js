@@ -246,6 +246,16 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
+      // No IBKR account → Alpaca (the user's own OAuth account, else the operator's
+      // server paper keys). This is the real paper account, not a local sim.
+      const alpaca = require('../../lib/alpaca-adapter');
+      const alpacaAccount = await alpaca.getAccount(uid).catch(() => null);
+      if (alpacaAccount) {
+        const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
+        alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
+        sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
+        return true;
+      }
     } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);
