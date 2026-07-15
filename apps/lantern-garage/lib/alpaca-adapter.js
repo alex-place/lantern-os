@@ -98,7 +98,7 @@ async function getPositions(userId) {
 /** Place an order on the user's OWN Alpaca account. HARD-GATED by trading-guard
  *  (dry unless TRADER_LIVE=1); returns the normalized shape the UI consumes:
  *  { status:'placed'|'dry_run'|'error', order_id, ticker, ... }. */
-async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopLoss, equity }) {
+async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, equity }) {
   const c = store.load(userId);
   if (!c || !c.access_token) return null;               // not connected → caller falls back
   const mode = c.env === 'live' ? 'live' : 'paper';
@@ -115,15 +115,19 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopLos
   if (!gate.allowed) return { ...base, status: 'dry_run', dry: true, reason: gate.reason };
 
   const t = String(type || 'market').toLowerCase();
+  const stopPx = stopPrice || (t === 'stop' ? limitPrice : null);
+  const tif = String(timeInForce || 'day').toLowerCase() === 'gtc' ? 'gtc' : 'day';
   const order = {
     symbol: ticker,
     qty: String(Math.abs(Number(qty) || 0)),
     side: String(side).toLowerCase(),
-    type: t === 'limit' ? 'limit' : 'market',
-    time_in_force: 'day',
+    type: t === 'limit' ? 'limit' : t === 'stop' ? 'stop' : 'market',
+    time_in_force: tif,
     ...(t === 'limit' && limitPrice ? { limit_price: String(limitPrice) } : {}),
-    // Attach a protective stop as a one-cancels-other bracket when a stop is given.
-    ...(stopLoss ? { order_class: 'oto', stop_loss: { stop_price: String(stopLoss) } } : {}),
+    // A standalone protective stop (the autopilot's GTC SELL STP) uses stop_price.
+    ...(t === 'stop' && stopPx ? { stop_price: String(stopPx) } : {}),
+    // A market/limit entry can carry a protective stop as a one-triggers-other bracket.
+    ...(t !== 'stop' && stopLoss ? { order_class: 'oto', stop_loss: { stop_price: String(stopLoss) } } : {}),
   };
   const r = await _req(_hostFor(c), c.access_token, 'POST', '/v2/orders', order);
   if (r.ok && r.json && r.json.id) {
@@ -133,4 +137,32 @@ async function placeOrder(userId, { ticker, side, qty, type, limitPrice, stopLos
   return { ...base, status: 'error', dry: false, reason, error: reason };
 }
 
-module.exports = { getAccount, getPositions, placeOrder, _hostFor };
+/** Open (working) orders, normalized to the shape the autopilot's guards expect:
+ *  { symbol, side, orderType, status }. Alpaca's working statuses (new/accepted/
+ *  pending_new/partially_filled/held) are mapped to 'submitted' so the autopilot's
+ *  /submit|pending|presubmit|working/ regexes match the same way they do for IBKR. */
+async function getOpenOrders(userId) {
+  const c = store.load(userId);
+  if (!c || !c.access_token) return [];
+  const r = await _req(_hostFor(c), c.access_token, 'GET', '/v2/orders?status=open&limit=200');
+  if (!r.ok || !Array.isArray(r.json)) return [];
+  const WORKING = new Set(['new', 'accepted', 'pending_new', 'partially_filled', 'held', 'accepted_for_bidding']);
+  return r.json.map((o) => ({
+    symbol: o.symbol,
+    side: o.side,                                   // buy | sell
+    orderType: o.type,                              // market | limit | stop | stop_limit
+    status: WORKING.has(String(o.status)) ? 'submitted' : String(o.status),
+    qty: Number(o.qty) || 0,
+    order_id: o.id,
+  }));
+}
+
+/** Day P&L in the shape the autopilot reads ({ dailyPnl }). Alpaca gives it as
+ *  equity − last_equity on the account. */
+async function getDayPnl(userId) {
+  const acct = await getAccount(userId).catch(() => null);
+  if (!acct) return null;
+  return { dailyPnl: acct.pnl_today, unrealizedPnl: acct.unrealized, realizedPnl: acct.realized_today };
+}
+
+module.exports = { getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, _hostFor };

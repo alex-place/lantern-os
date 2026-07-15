@@ -7,3 +7,7 @@
 ### Changed
 
 - docs: ADR-0027 Accepted (Alex approved) — tiered broker connect: Alpaca one-click now, IBKR self-service as the power tier, IBKR partner OAuth pursued in parallel behind one adapter seam.
+
+### Changed (follow-up)
+
+- broker: the autopilot is now broker-agnostic (broker-facade.js) — the autonomous scan loop drives a connected Alpaca account too, not just IBKR. Per user the facade resolves to their actual broker (IBKR preferred for execution quality); every order still passes the per-account hard guard (dry unless TRADER_LIVE=1). alpaca-adapter gains standalone stop orders (GTC SELL STP) + open-orders/day-P&L so the re-protect and trailing-exit logic works identically across brokers.
