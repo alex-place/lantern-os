@@ -11,3 +11,8 @@
 ### Changed (follow-up)
 
 - broker: the autopilot is now broker-agnostic (broker-facade.js) — the autonomous scan loop drives a connected Alpaca account too, not just IBKR. Per user the facade resolves to their actual broker (IBKR preferred for execution quality); every order still passes the per-account hard guard (dry unless TRADER_LIVE=1). alpaca-adapter gains standalone stop orders (GTC SELL STP) + open-orders/day-P&L so the re-protect and trailing-exit logic works identically across brokers.
+
+### Fixed (paper testing)
+
+- trader: the PAPER badge is now real. A new local paper-trading simulator (stock-paper-ledger.js) gives every unconnected user a virtual $100k account that FILLS orders at the live feed price and shows the resulting positions — replacing the dry-run dead end where a paper order silently "failed". Broker precedence is now IBKR → Alpaca → local paper sim.
+- trader: removed the half-baked native browser popups. Order placement, Flatten, and Close-all use an inline two-step confirm (the button arms — "Confirm BUY 5 NVDA →" — then a second click sends), and every result is a styled toast ("✓ BUY 5 NVDA @ $211.80 (paper) — filled") instead of a native alert(). A dry-run from a connected-but-unarmed broker now reads as "not armed", not "Order failed".

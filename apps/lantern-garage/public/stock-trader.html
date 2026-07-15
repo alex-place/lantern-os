@@ -170,6 +170,7 @@
   .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
     border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
+  .tp-flat-btn.armed,.tp-flatten-all.armed{background:rgba(255,95,109,.32);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
   .logo span{color:var(--text1);font-weight:400}
@@ -591,6 +592,10 @@
   .ot-submit{font-family:var(--mono);font-size:13px;font-weight:600;padding:10px;border-radius:4px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;text-transform:uppercase;text-align:center}
   .ot-submit.buy{background:rgba(0,212,170,.15);color:var(--green);border-color:var(--green)}
   .ot-submit.buy:hover{background:rgba(0,212,170,.28)}
+  /* Two-step confirm (order-ux): the armed state pulses so the "click again to
+     confirm" step reads as deliberate, not a stuck button. */
+  .ot-submit.armed{animation:otArmPulse 1s ease-in-out infinite;box-shadow:0 0 0 2px currentColor inset}
+  @keyframes otArmPulse{0%,100%{opacity:1}50%{opacity:.62}}
   .ot-submit.sell{background:rgba(255,95,109,.15);color:var(--red);border-color:var(--red)}
   .ot-submit.sell:hover{background:rgba(255,95,109,.28)}
   /* ── Footer panels ── */
@@ -2393,6 +2398,9 @@ function closeOrderTicket(){
   otUserClosed = true;                 // #1694: stays closed until reopened via BUY/SELL
   document.getElementById('otBg').classList.add('hidden');
   document.body.classList.remove('ot-open');
+  // Disarm any pending two-step confirm so a reopened ticket starts clean.
+  _otArmed=false; clearTimeout(_otArmTimer);
+  const sub=document.getElementById('otSubmit'); if(sub) sub.classList.remove('armed');
   requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 
@@ -2647,7 +2655,7 @@ async function submitOrderTicket(){
 
   if(otOrderType === 'limit'){
     const lp = Number(document.getElementById('otLimitPrice').value);
-    if(!lp || lp <= 0){ alert('Enter a valid limit price'); return; }
+    if(!lp || lp <= 0){ _alertToast('Enter a valid limit price'); return; }
     body.limitPrice = lp;
   }
   if(document.getElementById('otTpEnabled').checked){
@@ -2659,30 +2667,53 @@ async function submitOrderTicket(){
     if(sl > 0) body.stopLoss = sl;
   }
 
-  let msg = `${otSide.toUpperCase()} ${qty} ${otTicker} ${otOrderType === 'limit' ? 'at $'+body.limitPrice : 'at market'} (paper account)?`;
-  if(body.takeProfit) msg += `\nTake profit: $${body.takeProfit}`;
-  if(body.stopLoss)   msg += `\nStop loss: $${body.stopLoss}`;
-  if(!_rapid && !confirm(msg)) return;   // #2445: rapid mode skips the confirm
+  // Inline two-step confirm (no native popup): the first click ARMS the submit
+  // button ("Confirm BUY 10 AAPL"); a second click within 5s sends. Rapid mode
+  // skips straight to sending. #2445 / order-ux
+  const submit = document.getElementById('otSubmit');
+  if(!_rapid && !_otArmed){
+    _otArmed = true;
+    const label = `Confirm ${otSide.toUpperCase()} ${qty} ${otTicker} →`;
+    submit.dataset.prev = submit.textContent;
+    submit.textContent = label;
+    submit.classList.add('armed');
+    clearTimeout(_otArmTimer);
+    _otArmTimer = setTimeout(()=>{ _otArmed=false; submit.classList.remove('armed'); if(submit.dataset.prev){ submit.textContent=submit.dataset.prev; } }, 5000);
+    return;
+  }
+  _otArmed=false; clearTimeout(_otArmTimer); submit.classList.remove('armed');
   _lastQty = qty; try{ localStorage.setItem('trader.lastQty', String(qty)); }catch(e){}
 
   try{
+    submit.textContent='Placing…'; submit.style.pointerEvents='none';
     const r = await fetch('/api/trading/orders/place', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify(body)
     });
     const result = await r.json();
-    if(!r.ok || result.status !== 'placed'){
-      alert('Order failed: ' + (result.error || result.reason || r.statusText));
-      return;
+    submit.style.pointerEvents='';
+    if(result && result.status === 'placed'){
+      const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
+      const sim = result.source==='paper-sim' ? ' (paper)' : '';
+      _alertToast(`✓ ${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — filled`);
+      journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
+      closeOrderTicket();
+      await Promise.all([loadOrders(), loadPortfolio()]);
+    } else if(result && result.status === 'dry_run'){
+      // Real broker connected but not armed — NOT a failure; explain plainly.
+      _alertToast(`⚠ Not placed — your broker isn’t armed for real orders. ${result.reason||''}`.trim());
+      if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
+    } else {
+      _alertToast('⚠ Order didn’t go through: ' + (result.reason || result.error || r.statusText));
+      if(submit.dataset.prev) submit.textContent=submit.dataset.prev;
     }
-    journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
-    closeOrderTicket();
-    await Promise.all([loadOrders(), loadPortfolio()]);
   }catch(e){
-    alert('Order failed: ' + e.message);
+    submit.style.pointerEvents='';
+    _alertToast('⚠ Order didn’t go through: ' + e.message);
   }
 }
+let _otArmed=false, _otArmTimer=null;
 
 // ── Watchlist sidebar ─────────────────────────────────────────────────────────
 const _symNames = {};   // ticker → "Company Name · EXCHANGE", lazily fetched (#1631)
@@ -3260,12 +3291,12 @@ async function addWatchlistTicker(){
       body: JSON.stringify({ ticker })
     });
     const result = await r.json();
-    if(!r.ok){ alert('Failed to add ticker: ' + (result.error || r.statusText)); return; }
+    if(!r.ok){ _alertToast('Couldn’t add ticker: ' + (result.error || r.statusText)); return; }
     input.value = '';
     await Promise.all([loadWatchlistPrices(), loadZones()]);
     renderCards();
   }catch(e){
-    alert('Failed to add ticker: ' + e.message);
+    _alertToast('Couldn’t add ticker: ' + e.message);
   }
 }
 
@@ -3284,11 +3315,11 @@ async function removeWatchlistTicker(ticker, evt){
   try{
     const r = await fetch('/api/trading/watchlist/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
-    if(!r.ok){ alert('Failed to remove ticker: ' + (result.error || r.statusText)); return; }
+    if(!r.ok){ _alertToast('Couldn’t remove ticker: ' + (result.error || r.statusText)); return; }
     await Promise.all([loadWatchlistPrices(), loadZones()]);
     renderCards();
   }catch(e){
-    alert('Failed to remove ticker: ' + e.message);
+    _alertToast('Couldn’t remove ticker: ' + e.message);
   }
 }
 
@@ -3887,35 +3918,52 @@ function renderTpSummary(a){
 }
 // #2437: one-click exits. Flatten = market order for the opposite side, full size.
 let _lastPositions = [];
-async function flattenPosition(symbol, side, qty, skipConfirm){
+// Two-step inline confirm on a button (no native popup): first click arms it
+// ("label → confirm text") for 4s; second click runs `action`. Rapid mode runs
+// immediately. Returns true when it actually fired.
+let _armedBtn=null, _armedTimer=null;
+function _twoStep(btn, confirmText, action){
+  if(_rapid || (btn && btn===_armedBtn)){
+    if(btn){ btn.textContent=btn.dataset.orig||btn.textContent; btn.classList.remove('armed'); }
+    clearTimeout(_armedTimer); _armedBtn=null; action(); return true;
+  }
+  if(_armedBtn && _armedBtn!==btn){ _armedBtn.textContent=_armedBtn.dataset.orig||_armedBtn.textContent; _armedBtn.classList.remove('armed'); }
+  if(btn){ btn.dataset.orig=btn.textContent; btn.textContent=confirmText; btn.classList.add('armed'); }
+  _armedBtn=btn; clearTimeout(_armedTimer);
+  _armedTimer=setTimeout(()=>{ if(btn){ btn.textContent=btn.dataset.orig||btn.textContent; btn.classList.remove('armed'); } _armedBtn=null; }, 4000);
+  return false;
+}
+async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
   const q = Math.abs(Number(qty)||0);
   if(!q) return false;
-  if(!skipConfirm && !_rapid && !confirm(`FLATTEN ${symbol}: ${exitSide.toUpperCase()} ${q} at market (paper account)?`)) return false;   // #2445: rapid mode skips confirm
+  if(!skipConfirm && !_twoStep(btn, 'Confirm ✕', ()=>flattenPosition(symbol, side, qty, true, btn))) return false;
   try{
     const r = await fetch('/api/trading/orders/place', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market' })
     });
     const result = await r.json();
-    if(!r.ok || result.status!=='placed'){ alert('Flatten failed: '+(result.error||result.reason||r.statusText)); return false; }
+    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||r.statusText)); return false; }
+    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.source==='paper-sim'?' (paper)':''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
-  }catch(e){ alert('Flatten failed: '+e.message); return false; }
+  }catch(e){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+e.message); return false; }
 }
-async function flattenAll(){
+async function flattenAll(btn){
   if(!_lastPositions.length) return;
-  const lines=_lastPositions.map(p=>`  ${(p.side||'long').toUpperCase()} ${Math.abs(p.qty)} ${p.symbol}`).join('\n');
-  if(!confirm(`CLOSE ALL ${_lastPositions.length} position(s) at market (paper account)?\n${lines}`)) return;
-  for(const p of _lastPositions) await flattenPosition(p.symbol, p.side, p.qty, true);
+  if(!_twoStep(btn, `Confirm — close all ${_lastPositions.length}?`, ()=>flattenAll(btn))) return;
+  const snapshot=_lastPositions.slice();
+  for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
+  _alertToast(`✓ Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
   _lastPositions = positions||[];
   const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).length;
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
-  el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll()" title="Market-close every open position">✕ Close all</button></div>`+
+  el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button></div>`+
     `<table class="tp-table"><thead><tr>
     <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
     positions.map(p=>{
@@ -3929,7 +3977,7 @@ function renderPositionsTable(positions){
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
         <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
-        <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)})" title="Market-close this position">✕ Flatten</button></td></tr>`;
+        <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button></td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET

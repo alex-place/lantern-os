@@ -255,6 +255,14 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
         return true;
       }
+      // No broker → the LOCAL paper simulator, but only once the user has actually
+      // placed a paper trade (so a brand-new visitor still sees a clean empty state).
+      const paper = require('../../lib/stock-paper-ledger');
+      if (paper.has(uid)) {
+        const [pAcct, pPos] = await Promise.all([paper.getAccount(uid), paper.getPositions(uid)]);
+        sendJson(res, { positions: (pPos && pPos.positions) || [], account: pAcct }, 200);
+        return true;
+      }
     } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);
