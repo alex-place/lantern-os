@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<title>unisona.ai — The Plan, in Plain English</title>
+<style>
+  /* ===== COMET LEAP report identity — dark by default, with a light theme ===== */
+  :root, :root[data-theme="dark"]{
+    --navy:#0b1220; --panel:#0f1a2b; --panel-hi:#17314d;
+    --row-a:#13263d; --row-b:#17314d; --th:#1c3f63; --th-ink:#ffffff; --cell-ink:#ffffff;
+    --grid:#6aa9d8; --sky:#7cc7ff; --lattice:#6e8fb1;
+    --ink:#ffffff; --text:#f3f7ff; --sub:#c8dcf4; --callout:#eaf2ff;
+    --callout-bg:rgba(28,63,99,.35); --callout-bd:#2b5079;
+    --muted:#8fa8c4; --banner:#e6f1ff; --card-bd:#24425f;
+    --keep:#5fd0a8; --change:#f0a94a; --drop:#f0736f;
+    --keep-bg:#5fd0a8; --keep-tx:#062018; --change-bg:#f0a94a; --change-tx:#241203; --drop-bg:#f0736f; --drop-tx:#2a0d12;
+    color-scheme:dark;
+  }
+  :root[data-theme="light"]{
+    --navy:#eef3f9; --panel:#ffffff; --panel-hi:#e6eefb;
+    --row-a:#f5f9fd; --row-b:#e9f1fa; --th:#d6e6f5; --th-ink:#0c2033; --cell-ink:#16283c;
+    --grid:#a9c6e0; --sky:#0c6ba1; --lattice:#9cbcd8;
+    --ink:#0b1a2b; --text:#1a2c40; --sub:#33506e; --callout:#123049;
+    --callout-bg:#e4eefa; --callout-bd:#bcd6ee;
+    --muted:#4d6683; --banner:#0c2033; --card-bd:#cfe0f0;
+    --keep:#0f6b49; --change:#b0741a; --drop:#c0453f;
+    --keep-bg:#c7efdd; --keep-tx:#0b5c40; --change-bg:#fbe6c2; --change-tx:#7a4a06; --drop-bg:#f7d5d2; --drop-tx:#8f2521;
+    color-scheme:light;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--navy); color:var(--text);
+    font-family:Helvetica,Arial,"Segoe UI",system-ui,sans-serif;
+    line-height:1.55; -webkit-font-smoothing:antialiased; overflow-x:hidden; min-height:100vh;
+  }
+  .mono{font-family:"Courier New",ui-monospace,Menlo,Consolas,monospace}
+  img{max-width:100%}
+
+  #lattice{position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:.9}
+
+  .sheet{
+    position:relative; z-index:1; max-width:940px; margin:34px auto;
+    background:color-mix(in srgb, var(--panel) 92%, transparent);
+    border:1px solid var(--card-bd); border-radius:10px;
+    box-shadow:0 24px 70px rgba(0,0,0,.45), inset 0 1px 0 rgba(124,199,255,.08);
+    overflow:hidden;
+  }
+  .pad{padding:clamp(22px,4vw,46px)}
+
+  .banner{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:12px clamp(22px,4vw,46px); border-bottom:1.3px solid var(--sky);
+    background:linear-gradient(180deg, color-mix(in srgb, var(--sky) 14%, transparent), transparent);
+  }
+  .banner .tag{font-weight:700; font-size:11px; letter-spacing:.18em; color:var(--banner); text-transform:uppercase}
+  .banner .tag span{color:var(--sky); margin:0 6px}
+  .banner .right{display:flex; align-items:center; gap:12px}
+  .themebtn{background:transparent; border:1px solid var(--card-bd); border-radius:8px; color:var(--sub); width:34px; height:30px; cursor:pointer; display:grid; place-items:center; font-size:15px; line-height:1}
+  .themebtn:hover{border-color:var(--sky); color:var(--sky)}
+  .themebtn:focus-visible{outline:2px solid var(--sky); outline-offset:2px}
+  .glyph{width:28px; height:28px; flex:0 0 auto}
+
+  h1{font-weight:700; color:var(--ink); font-size:clamp(26px,4.6vw,40px); line-height:1.06; letter-spacing:-.01em; margin:4px 0 10px; text-wrap:balance}
+  .kicker{font-size:11px; letter-spacing:.26em; text-transform:uppercase; color:var(--sky); margin:0; font-weight:700}
+  .lede{color:var(--text); font-size:clamp(15px,1.7vw,17px); max-width:66ch; margin:12px 0 0}
+  .rule{height:1px; background:linear-gradient(90deg, var(--sky), transparent 70%); border:0; margin:22px 0 0}
+
+  .nav{display:flex; flex-wrap:wrap; gap:6px; margin:22px 0 0}
+  .nav a{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--sub); border:1px solid var(--card-bd); border-radius:999px; padding:5px 12px; text-decoration:none}
+  .nav a:hover{border-color:var(--sky); color:var(--sky)}
+
+  .sec{padding:clamp(28px,4vw,42px) 0 4px}
+  .sec-head{display:flex; align-items:baseline; gap:14px; margin-bottom:18px}
+  .sec-head .no{font-weight:700; font-size:12px; letter-spacing:.16em; color:var(--sky); white-space:nowrap}
+  .sec-head h2{font-weight:700; color:var(--ink); font-size:clamp(18px,2.6vw,24px); margin:0; letter-spacing:-.005em}
+  .sec-head .note{margin-left:auto; font-size:12px; color:var(--muted); max-width:32ch; text-align:right}
+
+  p{max-width:68ch; margin:11px 0}
+  .lead{font-size:16px; color:var(--text); max-width:68ch}
+  strong,b{color:var(--ink); font-weight:700}
+  em{font-style:normal; color:var(--sky); font-weight:600}
+  ul,ol{max-width:68ch; padding-left:20px}
+  li{margin:6px 0}
+  .muted{color:var(--muted)}
+
+  .tbl-wrap{overflow-x:auto; border-radius:8px; border:1px solid var(--grid); margin:16px 0}
+  table{border-collapse:collapse; width:100%; min-width:560px; font-size:13.5px}
+  thead th{background:var(--th); color:var(--th-ink); text-align:left; font-weight:700; padding:11px 14px; letter-spacing:.04em; border:.5px solid var(--grid)}
+  tbody td{padding:11px 14px; border:.5px solid var(--grid); color:var(--cell-ink); vertical-align:top}
+  tbody tr:nth-child(odd) td{background:var(--row-a)}
+  tbody tr:nth-child(even) td{background:var(--row-b)}
+  td.c{white-space:nowrap; font-variant-numeric:tabular-nums; font-family:"Courier New",monospace; color:var(--sky)}
+  .matrix td .yes{color:var(--keep); font-weight:700}
+  .matrix td .no{color:var(--muted)}
+  .matrix td small{display:block; color:var(--muted); font-size:10.5px; letter-spacing:.02em; font-family:Helvetica,Arial,sans-serif}
+  .matrix th:not(:first-child), .matrix td:not(:first-child){text-align:center}
+
+  .verdict{font-family:"Courier New",monospace; font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:2px 8px; border-radius:4px; white-space:nowrap}
+  .v-keep{color:var(--keep-tx); background:var(--keep-bg)}
+  .v-change{color:var(--change-tx); background:var(--change-bg)}
+  .v-drop{color:var(--drop-tx); background:var(--drop-bg)}
+
+  .callout{margin:20px 0 0; padding:16px 20px; border-radius:8px; background:var(--callout-bg); border:1px solid var(--callout-bd); border-left:3px solid var(--sky); color:var(--callout); font-size:14.5px; line-height:1.55}
+  .callout b{color:var(--ink)}
+  .callout.flag{border-left-color:var(--change)}
+
+  /* plan functionality tier-list */
+  .plans{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin:18px 0 0}
+  @media (max-width:760px){ .plans{grid-template-columns:1fr} }
+  .plan{background:var(--panel); border:1px solid var(--card-bd); border-radius:10px; padding:15px 17px}
+  .plan.hi{border-color:var(--sky); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sky) 22%, transparent)}
+  .plan-top{display:flex; align-items:baseline; justify-content:space-between; gap:8px; border-bottom:1px solid var(--card-bd); padding-bottom:8px; margin-bottom:9px}
+  .plan-top h3{margin:0; font-size:16px; color:var(--ink)}
+  .plan-top .price{font-family:"Courier New",monospace; font-size:11.5px; color:var(--sky); font-weight:700; white-space:nowrap}
+  .plan .who{font-size:10.5px; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); margin:0 0 8px}
+  .plan p{font-size:13px; color:var(--text); margin:0}
+
+  /* gamified year-ahead campaign map */
+  .map{margin-top:20px}
+  .lvl{display:grid; grid-template-columns:56px 1fr; gap:16px; position:relative}
+  .rail{display:flex; flex-direction:column; align-items:center}
+  .medal{width:46px; height:46px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:17px; color:var(--sky); border:1.5px solid var(--card-bd); background:var(--panel); z-index:1; flex:0 0 auto}
+  .lvl.here .medal{color:var(--navy); background:var(--sky); border-color:var(--sky)}
+  .lvl.finish .medal{font-size:20px; border-color:var(--keep); color:var(--keep)}
+  .line{flex:1; width:2px; min-height:20px; background:linear-gradient(var(--sky), var(--card-bd)); margin:4px 0}
+  .lvl:last-child .line{display:none}
+  .lvlcard{background:var(--panel); border:1px solid var(--card-bd); border-radius:10px; padding:14px 18px; margin-bottom:14px}
+  .lvl.here .lvlcard{border-color:var(--sky); box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sky) 16%, transparent)}
+  .lvl.finish .lvlcard{border-color:var(--keep)}
+  .lh{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; margin-bottom:4px}
+  .lh .lt{font-size:15.5px; font-weight:700; color:var(--ink)}
+  .lh .lm{font-size:10.5px; letter-spacing:.06em; text-transform:uppercase; color:var(--muted)}
+  .here-tag{font-size:9.5px; font-weight:700; letter-spacing:.08em; color:var(--navy); background:var(--sky); border-radius:999px; padding:2px 9px; text-transform:uppercase}
+  .row{display:grid; grid-template-columns:78px 1fr; gap:10px; margin-top:8px; align-items:start}
+  .row .k{font-family:"Courier New",monospace; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--sky); padding-top:3px}
+  .row .v{font-size:12.5px; color:var(--sub)}
+  .row .v b{color:var(--ink)}
+  .tasks{margin:9px 0 0; padding-left:18px}
+  .tasks li{font-size:12.5px; color:var(--sub); margin:3px 0}
+  @keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(124,199,255,.35)}50%{box-shadow:0 0 20px rgba(124,199,255,.7)}}
+  .lvl.here .medal{animation:pulse 2.6s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){ .lvl.here .medal{animation:none} #lattice{display:none} }
+
+  /* differentiation cards + testimonials */
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:16px 0 0}
+  .card{background:var(--panel); border:1px solid var(--card-bd); border-radius:10px; padding:14px 18px}
+  .card h4{margin:0 0 6px; font-size:14.5px; color:var(--ink)}
+  .card p{font-size:13.5px; margin:4px 0; color:var(--sub); max-width:none}
+  .quotes{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:18px}
+  @media (max-width:760px){ .grid2, .quotes{grid-template-columns:1fr} }
+  .quote{background:var(--panel); border:1px solid var(--card-bd); border-left:3px solid var(--sky); border-radius:8px; padding:14px 16px}
+  .quote p{font-size:13.5px; color:var(--text); margin:0 0 9px; font-style:italic; max-width:none}
+  .quote .by{font-size:11px; color:var(--sub); letter-spacing:.02em}
+  .quote .by b{color:var(--sky); font-style:normal}
+
+  .qa{margin-top:14px}
+  .qa .q{font-weight:700; color:var(--ink); margin:16px 0 2px}
+  .qa .a{color:var(--text); margin:2px 0; max-width:70ch}
+
+  .foot{display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; padding:14px clamp(22px,4vw,46px); border-top:1.3px solid var(--sky); font-size:11px; color:var(--sub); letter-spacing:.03em}
+
+  @media (max-width:760px){
+    .sec-head{flex-wrap:wrap}
+    .sec-head .note{margin-left:0; text-align:left; flex-basis:100%}
+  }
+  @media (max-width:480px){ .sheet{margin:14px 12px} }
+</style>
+
+</head>
+<body>
+<canvas id="lattice" aria-hidden="true"></canvas>
+
+<div class="sheet">
+  <div class="banner">
+    <div class="tag">unisona.ai <span>/</span> Product Plan <span>/</span> Plain-English Edition</div>
+    <div class="right">
+      <button class="themebtn" id="themebtn" type="button" aria-label="Toggle light or dark mode" title="Toggle light / dark">🌙</button>
+      <svg class="glyph" viewBox="0 0 40 40" aria-hidden="true">
+        <g fill="none" stroke="#7cc7ff" stroke-width="1">
+          <rect x="6" y="6" width="20" height="20"/><rect x="14" y="14" width="20" height="20"/>
+          <line x1="6" y1="6" x2="14" y2="14"/><line x1="26" y1="6" x2="34" y2="14"/>
+          <line x1="6" y1="26" x2="14" y2="34"/><line x1="26" y1="26" x2="34" y2="34"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="pad">
+    <p class="kicker">What we're building &amp; how we grow it</p>
+    <h1>A personal AI you actually own — with an honest trading desk inside</h1>
+    <p class="lede">unisona.ai remembers you, keeps your data on your own machine, and can do real work — including trading through your own brokerage. This is the whole plan in plain language: what each plan includes, how we grow it over the next year, and the honest answers behind it. No jargon.</p>
+    <hr class="rule">
+    <nav class="nav">
+      <a href="#who">The plans</a><a href="#year">The year ahead</a><a href="#why">Why people pick it</a><a href="#money">How we earn</a><a href="#first50">First 50 people</a><a href="#hard">Hard questions</a><a href="#word">Getting the word out</a><a href="#appendix">Appendix</a>
+    </nav>
+
+    <div class="sec" id="who">
+      <div class="sec-head"><span class="no mono">01</span><h2>The plans, and what each one does</h2><span class="note">Free covers guests and signed-in users; you pay to go further.</span></div>
+      <p class="lead">Guest and signed-in use are one free experience — a guest looks around read-only, and signing in saves your work. You pay when you want to trade for real with your own accounts, and again for an AI advisor that studies the market with you.</p>
+
+      <div class="plans">
+        <div class="plan">
+          <div class="plan-top"><h3>Free</h3><span class="price">$0 · guest → signed-in</span></div>
+          <p class="who">Look around, then practice</p>
+          <p>Watch a live demo account trade in real time (read-only, no sign-up), then create an account to get your own Alpaca paper-trading account, charts you personalize, and a chat that remembers you.</p>
+        </div>
+        <div class="plan hi">
+          <div class="plan-top"><h3>Pro</h3><span class="price">~$20 / mo</span></div>
+          <p class="who">The real thing, your way</p>
+          <p>Everything in Free, plus connect your own brokerage to trade real money and plug in your own AI keys — with price alerts and an automatic journal that logs and tags every trade so you improve.</p>
+        </div>
+        <div class="plan hi">
+          <div class="plan-top"><h3>Business</h3><span class="price">$200 / mo</span></div>
+          <p class="who">An AI advisor in your corner</p>
+          <p>Everything in Pro, plus <em>UnisonaTrader</em> — an AI stock-and-options advisor that researches the market with you and shows its evidence — and backer status: a say in what we build next.</p>
+        </div>
+      </div>
+
+      <p class="lead" style="margin-top:22px">Here's exactly what each plan can do:</p>
+      <div class="tbl-wrap"><table class="matrix">
+        <thead><tr>
+          <th style="width:40%">What you can do</th>
+          <th>Free<br><small class="mono" style="color:inherit;font-weight:400">guest → signed-in</small></th>
+          <th>Pro<br><small class="mono" style="color:inherit;font-weight:400">~$20/mo</small></th>
+          <th>Business<br><small class="mono" style="color:inherit;font-weight:400">$200/mo</small></th>
+        </tr></thead>
+        <tbody>
+          <tr><td>Watch the live demo trading account</td><td><span class="yes">✓</span><small>no account</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Try the chat</td><td><span class="yes">✓</span><small>preview</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Your own paper-trading account (Alpaca)</td><td><span class="yes">✓</span><small>sign in</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Personalized charts</td><td><span class="yes">✓</span><small>sign in</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>A chat that remembers you</td><td><span class="yes">✓</span><small>sign in</small></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Trade real money through your own broker</td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Bring your own AI keys</td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>Price alerts + automatic trade journal</td><td><span class="no">—</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>UnisonaTrader AI stock/options advisor</td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
+          <tr><td>A say in what we build next</td><td><span class="no">—</span></td><td><span class="no">—</span></td><td><span class="yes">✓</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="font-size:12.5px">Maps onto the existing Patreon tiers ($5 / $20 / $200), so current supporters keep their spot. UnisonaTrader shows its reasoning and leaves the decision to you — a research partner, not a licensed advisor, and you always trade through your own account.</p>
+
+      <div class="callout flag"><b>One straight fact before anyone pays:</b> the "bring your own AI keys" feature that Pro depends on is currently broken — it quietly fails to save your keys. It's the first thing on the fix list, because Pro isn't worth paying for until it works. (The full clean-up — 31 fixes from a top-to-bottom review of the live app — is written down and scheduled; see the Appendix.)</div>
+    </div>
+
+    <div class="sec" id="year">
+      <div class="sec-head"><span class="no mono">02</span><h2>The year ahead</h2><span class="note">Four levels to clear. Beat each one before moving on.</span></div>
+      <p class="lead">Think of year one as a campaign with four levels. You can't skip a level — each one has a clear-condition, and you only advance when the numbers say you did. <em>You are here</em> at Level 1.</p>
+
+      <div class="map">
+        <div class="lvl here">
+          <div class="rail"><div class="medal">1</div><div class="line"></div></div>
+          <div class="lvlcard">
+            <div class="lh"><span class="lt">Make it honest</span><span class="lm">Months 1–3</span><span class="here-tag">▶ You are here</span></div>
+            <div class="row"><span class="k">Clear when</span><span class="v"><b>50</b> people actively using it · <b>15</b> paying · <b>40 of every 100</b> newcomers still around a month later</span></div>
+            <div class="row"><span class="k">Unlocks</span><span class="v">honest usage numbers + a Pro plan that actually works</span></div>
+            <ul class="tasks">
+              <li>Fix the guest experience so a first-timer instantly gets each page and what paying adds</li>
+              <li>Fix the broken "bring your own keys" so Pro is real</li>
+              <li>Finish the trading desk: live charts, one-click exit, alerts, auto journal</li>
+              <li>Turn on real market data through your own brokerage login</li>
+              <li>Get a lawyer's read before marketing real-money trading; start counting real usage</li>
+            </ul>
+          </div>
+        </div>
+        <div class="lvl">
+          <div class="rail"><div class="medal">2</div><div class="line"></div></div>
+          <div class="lvlcard">
+            <div class="lh"><span class="lt">Prove they'll pay &amp; stay</span><span class="lm">Months 4–6</span></div>
+            <div class="row"><span class="k">Clear when</span><span class="v">the fit check passes (<b>40 of 100</b> would be "very disappointed" without it) · <b>30–60</b> paying · about <b>$1,000–2,500</b> a month</span></div>
+            <div class="row"><span class="k">Unlocks</span><span class="v">pricing turned on + creator tools packaged</span></div>
+            <ul class="tasks">
+              <li>Switch on the four-plan pricing</li>
+              <li>If the fit check fails, improve the product — don't spend on ads</li>
+              <li>Show off the honesty features: evidence shown, unsure moments flagged</li>
+            </ul>
+          </div>
+        </div>
+        <div class="lvl">
+          <div class="rail"><div class="medal">3</div><div class="line"></div></div>
+          <div class="lvlcard">
+            <div class="lh"><span class="lt">Double down on what sticks</span><span class="lm">Months 7–9</span></div>
+            <div class="row"><span class="k">Clear when</span><span class="v"><b>60–150</b> paying · about <b>$3,000–6,000</b> a month · fewer than <b>5 in 100</b> leaving each month · 25+ recorded user stories</span></div>
+            <div class="row"><span class="k">Unlocks</span><span class="v">desktop app (own your AI) + refer-a-friend</span></div>
+            <ul class="tasks">
+              <li>Pour effort into whichever side people keep returning to; pause the weakest</li>
+              <li>Ship the desktop app; add referrals</li>
+            </ul>
+          </div>
+        </div>
+        <div class="lvl">
+          <div class="rail"><div class="medal">4</div><div class="line"></div></div>
+          <div class="lvlcard">
+            <div class="lh"><span class="lt">Raise-ready — if the numbers say so</span><span class="lm">Months 10–12</span></div>
+            <div class="row"><span class="k">Clear when</span><span class="v"><b>120–300</b> paying · <b>$4,000–15,000</b> a month · roughly <b>$100k–180k a year</b> earned on its own</span></div>
+            <div class="row"><span class="k">Unlocks</span><span class="v">investor conversations from a position of proof — or keep growing on our own income</span></div>
+            <ul class="tasks">
+              <li>Build investor materials from real, measured usage</li>
+              <li>Test a high-touch $500–1,000/mo advisor seat with a few partners</li>
+            </ul>
+          </div>
+        </div>
+        <div class="lvl finish">
+          <div class="rail"><div class="medal">🏁</div></div>
+          <div class="lvlcard">
+            <div class="lh"><span class="lt">Year-end: a fundable company</span><span class="lm">the win condition</span></div>
+            <div class="row"><span class="k">Reward</span><span class="v">one clearly-loved thing people keep paying for, honest numbers to back it, and a real choice: raise, or stay independent and profitable.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="callout"><b>Why the targets are modest.</b> An earlier draft promised 600–900 members and $15,000–25,000 a month by year-end — above what companies starting where we are actually reach in a year. These are the honest floor, not the dream ceiling. Beating a level early just means starting the next one sooner.</div>
+    </div>
+
+    <div class="sec" id="why">
+      <div class="sec-head"><span class="no mono">03</span><h2>Why people pick it</h2><span class="note">What makes someone choose us — in their words.</span></div>
+      <div class="grid2">
+        <div class="card"><h4>vs. ChatGPT / Claude / Gemini</h4><p>They're brilliant, but they forget you and live in someone else's cloud. unisona is <em>yours</em>: your memory stays on your machine, any AI can power it, and it can actually <em>do</em> things — trade, handle files, hunt for jobs — the big providers won't touch.</p></div>
+        <div class="card"><h4>vs. Robinhood + a chatbot</h4><p>Robinhood makes trading a game and never says when it's unsure. Our desk shows live prices, flags stale or shaky data, rates how confident a signal is, and keeps a journal that makes you better.</p></div>
+        <div class="card"><h4>vs. Perplexity / research tools</h4><p>They cite sources for answers. We carry the evidence all the way through actions — a trade idea comes with its receipts, and the app flags anything it's only guessing at.</p></div>
+        <div class="card"><h4>vs. build-it-yourself open source</h4><p>Same "you own it" spirit, but it's a finished product — broker connection, document tools, job search, creator tools — not a kit you assemble yourself.</p></div>
+      </div>
+
+      <p class="lead" style="margin-top:22px">The kind of thing people tell us:</p>
+      <div class="quotes">
+        <div class="quote"><p>"I finally trust a chart. It shows a live price and flat-out tells me when a tick looks wrong — my old app just drew the bad candle and moved on."</p><span class="by"><b>A self-directed trader</b> · paper-trading</span></div>
+        <div class="quote"><p>"It remembers what I'm working on. I come back two days later and it already has the context — I'm not re-explaining myself every time."</p><span class="by"><b>A creator</b> · everyday chat</span></div>
+        <div class="quote"><p>"The journal tags every trade for me. Reviewing my week actually makes me better instead of just feeling bad about it."</p><span class="by"><b>A paper-league player</b> · trade journal</span></div>
+      </div>
+      <p class="muted" style="font-size:11.5px; margin-top:10px">Illustrative — representative of the feedback the product gets and grounded in real filed issues. We don't put words in real users' mouths; named, consented quotes are collected as members onboard (§05).</p>
+    </div>
+
+    <div class="sec" id="money">
+      <div class="sec-head"><span class="no mono">04</span><h2>How we earn</h2><span class="note">Memberships are the engine; the rest stays small.</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:20%">Where money comes from</th><th style="width:26%">Today</th><th>A year from now</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Memberships</strong></td><td>The engine — two paying supporters, not yet measured.</td><td><b>The core income:</b> 120–300 paying members bringing in $4,000–15,000 a month.</td></tr>
+          <tr><td><strong>Trading fees</strong></td><td>$0 — we're not a broker and take no cut. You connect your own account.</td><td>Still about $0, with maybe a broker referral deal starting to trickle in. Never our main story.</td></tr>
+          <tr><td><strong>AI running costs</strong></td><td>A cost we pay to run the AI, not income.</td><td>A smaller slice as more runs on local machines; heavy users cover their overage at our cost.</td></tr>
+          <tr><td><strong>High-touch advisor seat</strong></td><td>Doesn't exist yet.</td><td>A handful of partners testing a $500–1,000/month seat — proven first, never promised up front.</td></tr>
+          <tr><td><strong>Merch &amp; content</strong></td><td>Marketing only — plushies, prints, stickers.</td><td>Still marketing: small merch drops tied to the podcast and contest prizes.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+
+    <div class="sec" id="first50">
+      <div class="sec-head"><span class="no mono">05</span><h2>Getting the first 50 people</h2><span class="note">Prove it works before inviting anyone in.</span></div>
+      <p class="lead">Not an ad campaign — a hands-on program. And it starts by making sure nothing is broken.</p>
+      <ol>
+        <li><b>First: clear the roadblocks and prove the whole thing works.</b> Before a single real person is invited, fix the known blockers (the broken "bring your own keys," the guest-experience papercuts) and run the entire journey end-to-end for <b>10 demo accounts</b>: sign up → open a paper account → set up a watchlist → place a paper trade → chat about it → hit an upgrade prompt → (on Pro) connect a test broker and your own keys → see the journal log the trade. Every step has to pass green on all 10 accounts. We don't invite people onto a broken path.</li>
+        <li><b>Open the doors.</b> Anyone can sign up without a paywall; every new account starts with a practice trading account and a demo watchlist.</li>
+        <li><b>Ten founding members.</b> Hand-picked from the trader and creator circles we already know. Each gets a 30-minute welcome call, a founding-member badge, and three free months for weekly feedback.</li>
+        <li><b>One community at a time.</b> Post the live-trading clip in one paper-trading Discord and one relevant subreddit — "connect your own brokerage, we never touch your money." No spamming five channels.</li>
+        <li><b>A four-week paper-trading contest.</b> Practice accounts, a live leaderboard, small prizes. Everyone who plays ends up using both the trading desk and the chat.</li>
+        <li><b>Count only what's real.</b> "Active" means: set up a watchlist, had ten real chats, made one practice trade. Measured honestly, reviewed every week.</li>
+      </ol>
+    </div>
+
+    <div class="sec" id="hard">
+      <div class="sec-head"><span class="no mono">06</span><h2>The hard questions, answered straight</h2><span class="note">What a sharp investor asks — and the honest reply.</span></div>
+      <div class="qa">
+        <p class="q">“How many real users do you have?”</p>
+        <p class="a">Two paying supporters, and honestly zero we've measured properly yet. Measuring it is the first month's work. An investor who sees us refuse to count fake usage trusts every other number we show.</p>
+        <p class="q">“Won't OpenAI or Google just build this?”</p>
+        <p class="a">They'll copy pieces. They won't let you own your data, won't route across their competitors, and won't connect to your brokerage — the first two hurt their business, the third is a risk they won't take.</p>
+        <p class="q">“Trading plus AI sounds like a legal minefield.”</p>
+        <p class="a">People trade their own accounts with their own login; we never hold anyone's money. The app shows evidence, it doesn't shout “buy.” We're getting a lawyer's review before we market real-money trading.</p>
+        <p class="q">“What stops this from being just a wrapper?”</p>
+        <p class="a">Three things that grow over time: a memory of you that's painful to leave behind, a trust layer that shows its work, and an app you install and own rather than a browser tab.</p>
+        <p class="q">“Just one founder?”</p>
+        <p class="a">A small human team plus an unusually productive set of AI assistants that ship work every day. The process itself is written down, so it doesn't live in one person's head.</p>
+        <p class="q">“What could kill it?”</p>
+        <p class="a">A trading-rules misstep (so we get the legal review first), spreading too thin (so we cut the weakest feature each quarter), or AI costs running away (so we push more of it local).</p>
+      </div>
+      <div class="callout flag"><b>A heads-up on feedback we received.</b> One review described “Humanize Intelligence,” a University of Kansas partnership, and “expert AI companions.” That's a different company with a similar name — none of it is us, and anything built on that description should be ignored.</div>
+    </div>
+
+    <div class="sec" id="word">
+      <div class="sec-head"><span class="no mono">07</span><h2>Getting the word out</h2><span class="note">The app can help make its own marketing.</span></div>
+      <p class="lead">Three cheap, on-brand channels — all of which double as live demos.</p>
+      <ul>
+        <li><b>A podcast</b>, one episode per theme: the paper-trading contest recap; why your AI should remember you; teaching an AI to say “I don't know”; the Three Doors game; a weekly news roundup the app writes on camera; a “watch us build” episode; why charting apps lie; a creator-tools episode; a real user's first session, unedited; and the origin story — two people in a garage, and we lean into that.</li>
+        <li><b>A 24/7 stream</b> the app generates itself — market open and close summaries, AI news read-outs, lo-fi in between — running as an always-on demo that feeds short clips to TikTok and Shorts.</li>
+        <li><b>Merch</b> — a plushie of the lantern-bug mascot, signed prints of the hand-drawn game art, stickers, a “party on” tee, tied to podcast episodes and contest prizes. Marketing, not a money-maker.</li>
+      </ul>
+    </div>
+
+    <!-- ================= APPENDIX ================= -->
+    <div class="sec" id="appendix">
+      <div class="sec-head"><span class="no mono">A</span><h2>Appendix — how this plan was edited</h2><span class="note">The original growth plan, kept / changed / cut.</span></div>
+      <p class="lead">The handed-over plan had the right shape — start small, welcome each early user by hand, grow by word of mouth. But it was written for a generic AI company, not this one. Here's the honest edit.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:44%">The idea</th><th style="width:13%">Call</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Grow step by step, welcome each early user personally, write down what works</td><td><span class="verdict v-keep">keep</span></td><td>Right for where we are — every welcome call doubles as customer research.</td></tr>
+          <tr><td>Post useful content a few times a week</td><td><span class="verdict v-keep">keep</span></td><td>Easy for us: the app can help make its own content.</td></tr>
+          <tr><td>Chase real-estate agents, law firms, accountants, universities</td><td><span class="verdict v-change">change</span></td><td>Too scattered. The people already paying us are a trader and a creator. Aim there first.</td></tr>
+          <tr><td>A $1,000-a-month plan</td><td><span class="verdict v-change">change</span></td><td>Nothing today justifies that price. The real ladder is Free / $20 Pro / $200 Business.</td></tr>
+          <tr><td>1,000 paying members and $100,000 a month within a year</td><td><span class="verdict v-drop">drop</span></td><td>That needs five times our price and a sales team we don't have. Realistic is 120–300 members.</td></tr>
+          <tr><td>Raise investor money at the end</td><td><span class="verdict v-change">change</span></td><td>Right idea, wrong trigger — only once the app earns a real income and people demonstrably stick around.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout"><b>The one thing that matters most:</b> we can't honestly count our own users yet. Two people pay us and they're real, but we haven't measured how they use the app. Until we do, every growth number is a guess — which is why measuring real usage is Level 1's first job.</div>
+
+      <div class="sec-head" style="margin-top:40px"><span class="no mono">B</span><h2>Architecture decisions on record</h2><span class="note">The choices the product is built on. 27 in total; the ones that shape this plan below.</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:12%">Decision</th><th style="width:16%">Status</th><th>What it means, plainly</th></tr></thead>
+        <tbody>
+          <tr><td class="c">ADR-0008</td><td>Accepted</td><td>The product is a personal AI you own — every feature is a tool inside one loop, not a separate app.</td></tr>
+          <tr><td class="c">ADR-0004</td><td>Accepted</td><td>Your data is an append-only log plus one archive — nothing is ever overwritten.</td></tr>
+          <tr><td class="c">ADR-0005</td><td>Accepted</td><td>Any AI model can power it, with automatic fallback if one is down.</td></tr>
+          <tr><td class="c">ADR-0016</td><td>Accepted</td><td>Sign in your way — local account, Google, Discord, or Patreon.</td></tr>
+          <tr><td class="c">ADR-0027</td><td>Accepted</td><td>One-click broker connect — Alpaca today, Interactive Brokers when they're ready.</td></tr>
+          <tr><td class="c">ADR-0022</td><td>Accepted</td><td>Everyone connects their own brokerage with their own login — we never hold anyone's keys.</td></tr>
+          <tr><td class="c">ADR-0019</td><td>Accepted</td><td>Interactive Brokers connects read-only through a local gateway.</td></tr>
+          <tr><td class="c">ADR-0020</td><td>Proposed</td><td>Placing real orders stays gated and dry-run by default until signed off.</td></tr>
+          <tr><td class="c">ADR-0018</td><td>Accepted</td><td>Two ways to run it — a hosted web version and a full local desktop app — same core.</td></tr>
+          <tr><td class="c">ADR-0014</td><td>Accepted</td><td>The desktop app is a thin, signed launcher over that core, not a bloated repackage.</td></tr>
+          <tr><td class="c">ADR-0017</td><td>Accepted</td><td>When the AI is unsure, it checks memory, the web, or a tool before answering.</td></tr>
+          <tr><td class="c">ADR-0026</td><td>Accepted</td><td>A tiny 1.58-bit model is the target so it can run on modest local hardware.</td></tr>
+        </tbody>
+      </table></div>
+
+      <div class="sec-head" style="margin-top:40px"><span class="no mono">C</span><h2>Revision history</h2><span class="note">How this document got here.</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th style="width:12%">Version</th><th>What changed</th></tr></thead>
+        <tbody>
+          <tr><td class="c">v1</td><td>Original review of the handed-over growth plan + a 12-month roadmap.</td></tr>
+          <tr><td class="c">v2</td><td>Targets re-anchored to published benchmarks (a separate working doc).</td></tr>
+          <tr><td class="c">v3</td><td>Added the four-plan roadmap, reconciled the targets, flagged the mistaken-identity feedback.</td></tr>
+          <tr><td class="c">v4</td><td>Rewritten in plain English and restyled in the COMET LEAP report look; plans set to Guest / Free / Pro / Business.</td></tr>
+          <tr><td class="c">v5</td><td>Guest &amp; Free combined into one functionality tier-list; the year ahead turned into a four-level campaign map; testimonials added; a "year from now" column added to earnings; the first-50 plan now starts by clearing roadblocks and verifying 10 demo accounts end-to-end; this appendix (edit-log + architecture decisions) moved to the bottom; a light/dark toggle added and checked for readable contrast.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div class="foot mono">
+    <span>unisona.ai · Product Plan · Plain-English Edition</span>
+    <span>Rev v5 · 2026-07-15 · anchored to the live product</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ---- light / dark toggle (index.html style) ---- */
+  var root = document.documentElement, btn = document.getElementById('themebtn');
+  var KEY = 'unisona-plan-theme';
+  function apply(t){
+    root.setAttribute('data-theme', t);
+    btn.textContent = (t === 'light') ? '☀️' : '🌙';
+    btn.setAttribute('aria-pressed', t === 'dark');
+    if (window.__drawLattice) window.__drawLattice();
+  }
+  var saved;
+  try { saved = localStorage.getItem(KEY); } catch(e){}
+  apply(saved === 'light' ? 'light' : 'dark');
+  btn.addEventListener('click', function(){
+    var next = (root.getAttribute('data-theme') === 'light') ? 'dark' : 'light';
+    apply(next);
+    try { localStorage.setItem(KEY, next); } catch(e){}
+  });
+
+  /* ---- signature tesseract lattice background ---- */
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function hex2rgb(h){h=h.replace('#','');if(h.length===3)h=h[0]+h[0]+h[1]+h[1]+h[2]+h[2];var n=parseInt(h,16);return[(n>>16)&255,(n>>8)&255,n&255];}
+  function rgba(h,a){var c=hex2rgb(h);return 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';}
+  var latC=document.getElementById('lattice'), latX=latC.getContext('2d');
+  function drawLattice(){
+    if (reduce) { latX.clearRect(0,0,latC.width,latC.height); return; }
+    var light = root.getAttribute('data-theme') === 'light';
+    var LAT = light ? '#9cbcd8' : '#6e8fb1';
+    var aDot = light ? 0.16 : 0.20, aLine = light ? 0.10 : 0.14;
+    var dpr=Math.min(window.devicePixelRatio||1,2);
+    var lw=window.innerWidth, lh=window.innerHeight;
+    latC.width=Math.round(lw*dpr); latC.height=Math.round(lh*dpr);
+    latX.setTransform(dpr,0,0,dpr,0,0); latX.clearRect(0,0,lw,lh);
+    var cx=lw*0.5, cy=lh*0.44, scale=Math.min(lw,lh)/620;
+    var layers=[240,180,128,88].map(function(r){return r*Math.max(scale,0.7);});
+    var pts=[];
+    for(var ri=0;ri<layers.length;ri++){
+      var ring=[];
+      for(var i=0;i<12;i++){
+        var a=(Math.PI*2*i/12)+(ri*0.19);
+        var x=cx+Math.cos(a)*layers[ri], y=cy+Math.sin(a)*layers[ri];
+        ring.push([x,y]);
+        latX.beginPath(); latX.fillStyle=rgba(LAT,aDot);
+        latX.arc(x,y, ri<2?1.5:1.1, 0, Math.PI*2); latX.fill();
+      }
+      pts.push(ring);
+    }
+    latX.strokeStyle=rgba(LAT,aLine); latX.lineWidth=0.6;
+    pts.forEach(function(ring){for(var i=0;i<ring.length;i++){var p=ring[i],q=ring[(i+1)%ring.length];latX.beginPath();latX.moveTo(p[0],p[1]);latX.lineTo(q[0],q[1]);latX.stroke();}});
+    for(var i=0;i<12;i++){for(var ri=0;ri<pts.length-1;ri++){var p=pts[ri][i],q=pts[ri+1][(i+2)%12];latX.beginPath();latX.moveTo(p[0],p[1]);latX.lineTo(q[0],q[1]);latX.stroke();}}
+  }
+  window.__drawLattice = drawLattice;
+  window.addEventListener('resize', drawLattice);
+  drawLattice();
+})();
+</script>
+</body>
+</html>
