@@ -88,6 +88,30 @@
       <a href="/orchestration.html" style="color:var(--accent);">Orchestration</a> page.</p>
   </div>
 
+  <!-- ── Broker connect (ADR-0027): one-click Alpaca or IBKR ── -->
+  <section class="panel" id="brokerConnectPanel">
+    <h2>🔗 Connect a Broker <span class="section-meta" id="brokerConnectMeta">trade your own account</span></h2>
+    <p class="panel-sub">Link a brokerage to let unisona trade on your behalf (paper by default — risk-free). <strong>Alpaca</strong> is one click, no keys. Prefer <strong>Interactive Brokers</strong>? Connect it on the <a href="/orchestration.html#broker" style="color:var(--accent);">broker page</a>.</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:8px">
+      <a class="btn-primary" id="workAlpacaConnect" href="/api/broker/alpaca/connect?returnTo=%2Fwork.html">⚡ Connect Alpaca (paper)</a>
+      <a class="btn-secondary" href="/orchestration.html#broker">Interactive Brokers →</a>
+      <span id="workBrokerStatus" style="font-family:var(--mono,monospace);font-size:.8rem;color:var(--muted)">Checking…</span>
+    </div>
+  </section>
+  <script>
+  (function(){
+    const qs=new URLSearchParams(location.search);
+    const st=document.getElementById('workBrokerStatus'); const btn=document.getElementById('workAlpacaConnect');
+    if(qs.get('alpaca')==='connected' && st) st.textContent='✓ Alpaca connected';
+    fetch('/api/broker/alpaca/status',{cache:'no-store'}).then(r=>r.json()).then(s=>{
+      if(!st) return;
+      if(s.connected){ st.textContent='✓ Connected · '+(s.accountNumber||'account')+' ('+(s.env||'paper')+')'; if(btn) btn.textContent='Reconnect Alpaca'; }
+      else if(s.configured===false){ st.textContent='Alpaca one-click setup pending — use IBKR'; if(btn){ btn.style.opacity='.55'; btn.style.pointerEvents='none'; } }
+      else st.textContent='Not connected';
+    }).catch(()=>{ if(st) st.textContent=''; });
+  })();
+  </script>
+
   <!-- ── Pull Work (manual issue selection) ── -->
   <section class="panel" id="researchHandoffPanel">
     <h2>📥 Pull Work <span class="section-meta" id="researchSummary">live GitHub issues</span></h2>

@@ -301,6 +301,12 @@
     <div class="auth-divider">or</div>
     <button type="button" id="continue-guest" class="btn-ghost">Continue without an account</button>
 
+    <!-- Trading on-ramp (ADR-0027): sign in, then land on the broker connect page
+         so a new trader can link Alpaca in one click right after auth. -->
+    <p class="local-toggle" id="trade-onramp" style="margin-top:14px">
+      💹 Here to trade? <a id="trade-onramp-link">Sign in and connect your broker →</a>
+    </p>
+
     <!-- ── Dev/test role picker — shown ONLY when the server reports testMode
          (LANTERN_TEST_AUTH_TOKEN set + direct, un-proxied hit). Signs in as the one
          seeded test account with the chosen role. Never present in production. -->
@@ -747,6 +753,16 @@
     setLocalMode("login");
     document.getElementById("local-form").addEventListener("submit", submitLocal);
     document.getElementById("forgot-link").addEventListener("click", requestPasswordReset);
+
+    // Trading on-ramp (ADR-0027): reload sign-in with returnTo=/work.html so the
+    // existing safeReturnTo() flow lands the user on the broker connect after auth.
+    const onramp = document.getElementById("trade-onramp-link");
+    if (onramp) onramp.addEventListener("click", (e) => {
+      e.preventDefault();
+      const u = new URL(location.href);
+      u.searchParams.set("returnTo", "/work.html");
+      location.href = u.toString();
+    });
 
     // ── Confirm-email screen controls ──
     // Go back to the previous (sign-in) screen without confirming.

@@ -221,6 +221,7 @@
     }
     .link-row.linked { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
     .link-name { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--text); }
+    .link-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
     .link-emoji { font-size: 18px; }
     .link-state { display: flex; align-items: center; gap: 10px; }
     .link-badge {
@@ -386,7 +387,7 @@ const FEATURES = [
   { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
   { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
   { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'admin',        note: 'Autonomous AI trading' },
-  { emoji: '🔗', label: 'Connect broker', href: '/orchestration.html#broker', req: 'deep_dreamer', note: 'Link your IBKR account' },
+  { emoji: '🔗', label: 'Connect broker', href: '/orchestration.html#broker', req: 'deep_dreamer', note: 'Link Alpaca (one click) or IBKR' },
   { emoji: '✏️', label: 'Create',     href: '/create.html',          req: 'deep_dreamer', note: '' },
   { emoji: '🗺️', label: 'Explore',    href: '/explore.html',         req: 'guest',        note: '' },
   { emoji: '📚', label: 'Knowledge',  href: '/knowledgecenter.html', req: 'guest',        note: '' },
@@ -563,6 +564,21 @@ function renderProfile(profile) {
     </div>
 
     <div>
+      <div class="section-title">Brokerage</div>
+      <div class="link-list" id="broker-list">
+        <div class="link-row">
+          <span class="link-name">⚡ Alpaca <span class="link-sub" id="alpaca-sub">Checking…</span></span>
+          <span class="link-state" id="alpaca-state"></span>
+        </div>
+        <div class="link-row">
+          <span class="link-name">🔗 Interactive Brokers <span class="link-sub">your own keys · best execution</span></span>
+          <span class="link-state"><a class="link-btn connect" href="/orchestration.html#broker">Connect</a></span>
+        </div>
+      </div>
+      <p class="link-note">Link a broker to trade your own account in the <a href="/stock-trader.html">Trader</a>. Alpaca is one click, paper by default.</p>
+    </div>
+
+    <div>
       <div class="section-title">Security</div>
       <div class="link-list">${securityRows}</div>
     </div>
@@ -576,6 +592,38 @@ function renderProfile(profile) {
     </div><!-- /col -->
     </div><!-- /profile-cols -->
   `;
+  refreshAlpacaBroker();   // fill the Brokerage → Alpaca row (async, after paint)
+}
+
+// ── Brokerage: Alpaca one-click status/connect/disconnect (ADR-0027) ──
+async function refreshAlpacaBroker() {
+  const sub = document.getElementById('alpaca-sub');
+  const state = document.getElementById('alpaca-state');
+  if (!sub || !state) return;
+  let s = null;
+  try { s = await (await fetch('/api/broker/alpaca/status', { cache: 'no-store' })).json(); } catch (_e) {}
+  if (!s) { sub.textContent = 'status unavailable'; state.innerHTML = ''; return; }
+  const row = state.closest('.link-row');
+  if (s.connected) {
+    if (row) row.classList.add('linked');
+    const acct = s.accountNumber ? ` · ${s.accountNumber}` : (s.via === 'server-keys' ? ' · shared paper account' : '');
+    sub.textContent = `connected (${s.env || 'paper'})${acct}`;
+    // A server-keys connection isn't per-user, so it has nothing to disconnect.
+    state.innerHTML = '<span class="link-badge">Connected</span>'
+      + (s.via === 'server-keys' ? '' : '<button class="link-btn unlink" onclick="disconnectAlpaca()">Disconnect</button>');
+  } else if (s.configured === false) {
+    if (row) row.classList.remove('linked');
+    sub.textContent = 'one-click setup pending';
+    state.innerHTML = '<a class="link-btn connect" href="/orchestration.html#broker">Set up</a>';
+  } else {
+    if (row) row.classList.remove('linked');
+    sub.textContent = 'one click · paper by default';
+    state.innerHTML = '<a class="link-btn connect" href="/api/broker/alpaca/connect?returnTo=%2Fprofile.html">Connect</a>';
+  }
+}
+async function disconnectAlpaca() {
+  try { await fetch('/api/broker/alpaca/disconnect', { method: 'POST' }); } catch (_e) {}
+  refreshAlpacaBroker();
 }
 
 function showEditError(msg) {
