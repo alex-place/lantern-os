@@ -29,6 +29,11 @@ kalshi.getMarket = async (t) => {
 };
 
 const L = require("../lib/kalshi-paper-ledger");
+const fees = require("../lib/kalshi-fees");
+// P1-5: paper realized P&L is NET of fees. Both closes below are early sell-backs, so each
+// pays the round-trip (entry + exit) taker fee — settlement would pay entry-side only.
+const rt1 = fees.roundTripFeeCents(80, 95, 1);  // MANUAL sell winner: 80¢→95¢
+const rt2 = fees.roundTripFeeCents(80, 50, 1);  // STOP-LOSS exit:     80¢→50¢
 
 let failures = 0;
 function check(name, fn) { try { fn(); console.log("  ok  -", name); } catch (e) { failures++; console.error("  FAIL-", name, "\n      ", e.message); } }
@@ -54,10 +59,11 @@ function check(name, fn) { try { fn(); console.log("  ok  -", name); } catch (e)
 
   // Sell for PROFIT: bid rose to 95¢.
   L.closePosition(p1.id, { exitTag: "MANUAL", exitPriceCents: 95, pnlPct: 19 });
-  check("sell @95¢ → cash back to $1.35, realized +15¢, 0 open (sell-for-profit)", () => {
+  check("sell @95¢ → realized net = +15¢ gross − round-trip fee, 0 open (sell-for-profit)", () => {
     const w = L.getWallet();
-    assert.strictEqual(w.cashCents, 120 + 15);   // start + realized(95-80)
-    assert.strictEqual(w.realizedCents, 15);
+    const netWin = 15 - rt1;                     // gross(95−80) minus both-leg taker fee
+    assert.strictEqual(w.realizedCents, netWin);
+    assert.strictEqual(w.cashCents, 120 + netWin);
     assert.strictEqual(w.openCount, 0);
   });
 
@@ -73,12 +79,13 @@ function check(name, fn) { try { fn(); console.log("  ok  -", name); } catch (e)
     assert.ok(!L.getOpen().some(p => p.ticker === "STOPME-TEST"), "no longer open");
   });
 
-  check("wallet reflects the realized stop-loss (cash back minus the loss)", () => {
+  check("wallet reflects the realized stop-loss (net of round-trip fees)", () => {
     const w = L.getWallet();
-    // realized so far: +15 (winner) + (50-80) (stop) = 15 - 30 = -15
-    assert.strictEqual(w.realizedCents, -15);
+    // realized net = winner(+15−rt1) + stop((50−80)−rt2). Both are early sell-backs.
+    const expected = (15 - rt1) + ((50 - 80) - rt2);
+    assert.strictEqual(w.realizedCents, expected);
     assert.strictEqual(w.openCount, 0);
-    assert.strictEqual(w.cashCents, 120 - 15);
+    assert.strictEqual(w.cashCents, 120 + expected);
   });
 
   // "buy until no cash": with $1.05 left, an 80¢ buy is fine, a second is refused

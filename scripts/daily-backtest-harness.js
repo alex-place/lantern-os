@@ -125,6 +125,63 @@ function sharpeCI(dailyRets) {
     t: T,
   };
 }
+// Sample skewness and excess kurtosis of a return stream (used to deflate the
+// Sharpe for non-normality — fat left tails inflate a naive Sharpe).
+function moments(rets) {
+  const T = rets.length;
+  if (T < 4) return { skew: 0, kurt: 3, perPeriodSharpe: 0 };
+  const mean = rets.reduce((s, r) => s + r, 0) / T;
+  const m2 = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / T;
+  const m3 = rets.reduce((s, r) => s + (r - mean) ** 3, 0) / T;
+  const m4 = rets.reduce((s, r) => s + (r - mean) ** 4, 0) / T;
+  const sd = Math.sqrt(m2);
+  return {
+    skew: sd > 0 ? m3 / sd ** 3 : 0,
+    kurt: m2 > 0 ? m4 / m2 ** 2 : 3,   // raw (non-excess) kurtosis; normal = 3
+    perPeriodSharpe: sd > 0 ? mean / (sd * Math.sqrt(T / (T - 1))) : 0,
+  };
+}
+// Standard normal CDF (Abramowitz & Stegun 7.1.26) — used by the DSR probability.
+function normCdf(x) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989422804014327 * Math.exp(-x * x / 2);
+  const p = d * t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+  return x >= 0 ? 1 - p : p;
+}
+// Inverse standard normal CDF (Acklam's rational approximation) — for the SR0 benchmark.
+function normInv(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pl = 0.02425, ph = 1 - pl;
+  let q, r;
+  if (p < pl) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+  if (p <= ph) { q = p - 0.5; r = q * q; return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+  q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+}
+// Deflated Sharpe Ratio (Bailey & López de Prado 2014). Given a strategy's observed
+// per-period Sharpe `sr`, its return skew/kurtosis, sample length T, the number of
+// INDEPENDENT trials N that were run to find it, and the cross-trial variance of the
+// Sharpes, returns P(true Sharpe > 0) after correcting for BOTH multiple-testing
+// selection bias and non-normality. A naive Sharpe that looks great can have DSR≈0.5
+// (i.e. no better than luck) once you account for how many sleeves were tried.
+function deflatedSharpe(sr, skew, kurt, T, nTrials, varAcrossTrials) {
+  if (T < 4 || nTrials < 1) return null;
+  // SR0: expected maximum Sharpe under nTrials independent null strategies.
+  const emc = 0.5772156649015329; // Euler–Mascheroni
+  const sigmaSR = Math.sqrt(Math.max(varAcrossTrials, 1e-12));
+  const N = Math.max(nTrials, 1);
+  const z1 = normInv(1 - 1 / N);
+  const z2 = normInv(1 - 1 / (N * Math.E));
+  const sr0 = sigmaSR * ((1 - emc) * z1 + emc * z2);
+  // DSR: probability the observed SR beats SR0, with the non-normality-adjusted SE.
+  const denom = Math.sqrt(Math.max(1 - skew * sr + ((kurt - 1) / 4) * sr * sr, 1e-9));
+  const dsr = normCdf(((sr - sr0) * Math.sqrt(T - 1)) / denom);
+  return { dsr, sr0, sigmaSR };
+}
 // Pearson correlation of two equal-length daily-return streams.
 function correlation(a, b) {
   const n = Math.min(a.length, b.length);
@@ -307,6 +364,7 @@ function pct(x) { return (x * 100).toFixed(1) + '%'; }
 function summarize(name, category, res, spyCagr) {
   const c = cagr(res.equity);
   const sci = sharpeCI(res.dailyRets);
+  const mom = moments(res.dailyRets);
   return {
     name, category,
     cagr: c,
@@ -317,10 +375,37 @@ function summarize(name, category, res, spyCagr) {
     switches: res.switches,
     final_mult: res.equity[res.equity.length - 1].eq,
     yoy: yoyReturns(res.equity),
+    // fields consumed by the post-hoc Deflated-Sharpe pass (needs all sleeves first)
+    _perPeriodSharpe: mom.perPeriodSharpe,
+    _skew: mom.skew,
+    _kurt: mom.kurt,
+    _obs: sci.t,
   };
 }
+// Post-hoc Deflated Sharpe across the whole sleeve set. Each sleeve tested is a trial;
+// the DSR asks whether the WINNER's Sharpe survives once you pay for having searched.
+function attachDeflatedSharpe(rows) {
+  const srs = rows.map((r) => r._perPeriodSharpe).filter((s) => Number.isFinite(s));
+  const n = srs.length;
+  if (n < 2) { rows.forEach((r) => { r.deflated_sharpe = null; }); return rows; }
+  const mean = srs.reduce((s, x) => s + x, 0) / n;
+  const varAcross = srs.reduce((s, x) => s + (x - mean) ** 2, 0) / (n - 1);
+  for (const r of rows) {
+    const d = deflatedSharpe(r._perPeriodSharpe, r._skew, r._kurt, r._obs, n, varAcross);
+    r.deflated_sharpe = d ? Number(d.dsr.toFixed(4)) : null;
+    r.dsr_trials = n;
+    r.dsr_sr0_annualized = d ? Number((d.sr0 * Math.sqrt(TRADING_DAYS)).toFixed(3)) : null;
+  }
+  return rows;
+}
 
-(async () => {
+// Export the statistics primitives so they can be unit-tested without a live data
+// fetch. The full backtest only runs when this file is executed directly.
+module.exports = { sharpe, sharpeCI, moments, normCdf, normInv, deflatedSharpe, attachDeflatedSharpe };
+
+if (require.main !== module) {
+  // Required as a library (e.g. by a unit test) — skip the network-bound backtest.
+} else (async () => {
   const CORE = ['SPY', 'VXUS', 'BIL', 'TLT', 'GLD', 'DBC', '^PUT'];
   const SECTORS = ['XLK', 'XLF', 'XLE', 'XLV', 'XLI', 'XLY', 'XLP', 'XLB', 'XLU'];
   // Single-stock universe for cross-sectional momentum. NOTE: these are large-caps
@@ -426,7 +511,7 @@ function summarize(name, category, res, spyCagr) {
   ];
   const sleeves = sleeves4; // the verdict evaluates the COMBO4 sleeve set
   const ls = lsStock;       // the admission gate evaluates the single-stock L/S candidate
-  const rows = defs.map((d) => summarize(d.name, d.category, d.res, spyCagr)).sort((a, b) => b.sharpe - a.sharpe);
+  const rows = attachDeflatedSharpe(defs.map((d) => summarize(d.name, d.category, d.res, spyCagr))).sort((a, b) => b.sharpe - a.sharpe);
 
   // ── leaderboard table ──
   console.log(`\nΣ₀ meta-strategy leaderboard — ${dates[0]} → ${dates[dates.length - 1]}  (adjclose / total return, ${COST_BPS}bps/switch)\n`);
@@ -444,6 +529,19 @@ function summarize(name, category, res, spyCagr) {
     const ci = r.sharpe_ci95;
     const sig = ci.lo > 0 ? 'yes (>0)' : 'no (spans 0)';
     console.log('  ' + r.name.padEnd(34) + r.sharpe.toFixed(2).padStart(8) + `  [${ci.lo.toFixed(2)}, ${ci.hi.toFixed(2)}]`.padStart(20) + '   ' + sig);
+  }
+
+  // ── Deflated Sharpe Ratio (Bailey & López de Prado 2014) ──
+  // Pays for the multiple-testing bias of having tried N sleeves and reporting the best,
+  // and for non-normal (fat-tailed) returns. DSR = P(true Sharpe > 0). A leaderboard
+  // winner with DSR < 0.95 is NOT a discovery — it's within reach of luck given the search.
+  console.log(`\n  Deflated Sharpe — corrects the winner for ${rows[0].dsr_trials || defs.length} trials + non-normality:\n`);
+  console.log('  ' + 'strategy'.padEnd(34) + 'Sharpe'.padStart(8) + 'DSR=P(SR>0)'.padStart(13) + 'SR0(exp.max)'.padStart(14) + '   verdict');
+  for (const r of rows) {
+    if (r.category === 'benchmark') continue;
+    const d = r.deflated_sharpe;
+    const verdict = d == null ? 'n/a' : (d >= 0.95 ? '✓ survives' : (d >= 0.90 ? '~ marginal' : '✗ likely luck'));
+    console.log('  ' + r.name.padEnd(34) + r.sharpe.toFixed(2).padStart(8) + (d == null ? 'n/a' : d.toFixed(3)).padStart(13) + String(r.dsr_sr0_annualized ?? 'n/a').padStart(14) + '   ' + verdict);
   }
 
   // ── correlation matrix of daily return streams (Theorem 1 gate) ──

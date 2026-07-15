@@ -623,6 +623,31 @@ module.exports = async function kalshiRoutes(req, res, url, ctx) {
         const paperLedger = require('../../lib/kalshi-paper-ledger');
         const body = await collectRequestBody(req);
         const o = body ? JSON.parse(body) : {};
+        // P1-3 (docs/TRADER-ANALYSIS-2026-07.md): close the calibration loop for ALL open
+        // paths, not just the terminal UI (which already forwards pPredicted). If a weather
+        // position is opened without the model prob stamped (e.g. an autonomous daemon or a
+        // client that omits it), the row is silently ungradeable and kalshi-calibration never
+        // learns the bias. Best-effort backfill the REAL model prob from the live deck by
+        // ticker — never fabricated, never blocking: on any miss we leave it unstamped and the
+        // calibrator honestly skips the row.
+        try {
+          const ticker = String(o.ticker || o.market_ticker || '');
+          if (ticker.startsWith('KXHIGH') && !Number.isFinite(Number(o.pPredicted))) {
+            const series = ticker.split('-')[0];
+            const { getWeatherEdgeDeck } = require('../../lib/kalshi-weather-edge-deck');
+            const deck = await getWeatherEdgeDeck({ series, limit: 200, minEdgeCents: 0 });
+            const card = (deck.cards || []).find((c) => c.ticker === ticker);
+            if (card && Number.isFinite(Number(card.pPredicted))) {
+              o.pPredicted = card.pPredicted;
+              if (o.pPredictedRaw == null && card.pPredictedRaw != null) o.pPredictedRaw = card.pPredictedRaw;
+              if (o.dist == null && card.dist != null) o.dist = card.dist;
+              if (o.ladder == null && card.ladder != null) o.ladder = card.ladder;
+              o.pPredictedBackfilled = true;
+            }
+          }
+        } catch (e) {
+          console.warn('[trading] pPredicted backfill skipped:', e.message);
+        }
         // Cash gate: the tinder game spends a virtual bankroll down to zero. Refuse the
         // buy when the paper wallet can't cover the entry cost (entry¢ × contracts).
         const qty = Number(o.qty ?? o.count ?? 1) || 1;

@@ -260,4 +260,71 @@ async function groundMany(markets, { concurrency = 4, force = false } = {}) {
   return out;
 }
 
-module.exports = { groundMarket, groundMany, peek, CACHE_FILE, TTL_MS };
+/**
+ * P1-5 (docs/TRADER-ANALYSIS-2026-07.md): score the grounded LLM P(YES) against reality.
+ * The module emits a web-grounded probability per market but nothing ever graded it, so a
+ * persistently over/under-confident model went uncorrected — the same Verify-stage gap the
+ * weather calibrator closes for the forecast model.
+ *
+ * Reads the persisted predictions, joins each with its settled outcome (YES=1 / NO=0), and
+ * returns Brier score, hit-rate (P>0.5 vs outcome), and the reliability-curve decomposition
+ * (reused from kalshi-calibration). Honest by construction: predictions whose market hasn't
+ * settled are skipped, and n=0 returns nulls rather than a fabricated score.
+ *
+ * `resolveOutcome(ticker) -> 1 | 0 | null` is injectable so this is unit-testable offline;
+ * the default reads the live settled `market.result` via the Kalshi client.
+ */
+async function scoreGrounded({ file = CACHE_FILE, resolveOutcome = null, latestPerTicker = true } = {}) {
+  let rows = [];
+  try {
+    rows = fs.readFileSync(file, "utf8").split("\n").filter(Boolean)
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter((r) => r && r.ticker && Number.isFinite(Number(r.p_yes)));
+  } catch { rows = []; }
+
+  // Keep the most recent prediction per ticker (a market grounded twice shouldn't count twice).
+  if (latestPerTicker) {
+    const byTicker = new Map();
+    for (const r of rows) {
+      const prev = byTicker.get(r.ticker);
+      if (!prev || String(r.ts || "") > String(prev.ts || "")) byTicker.set(r.ticker, r);
+    }
+    rows = [...byTicker.values()];
+  }
+
+  const resolver = resolveOutcome || (async (ticker) => {
+    try {
+      const kalshi = require("./kalshi-api");
+      const r = await kalshi.getMarket(ticker);
+      const result = String(r.data?.market?.result || "").toLowerCase();
+      return result === "yes" ? 1 : result === "no" ? 0 : null;
+    } catch { return null; }
+  });
+
+  const pairs = [];
+  for (const r of rows) {
+    const outcome = await resolver(r.ticker);
+    if (outcome !== 0 && outcome !== 1) continue;   // unsettled / unknown — skip, don't guess
+    pairs.push({ p: _clamp01(Number(r.p_yes)), outcome, ticker: r.ticker });
+  }
+
+  const n = pairs.length;
+  if (!n) return { n: 0, brier: null, hitRate: null, base: null, reliability: null,
+    note: `no settled grounded predictions to score (of ${rows.length} cached)` };
+
+  const brier = pairs.reduce((s, x) => s + (x.p - x.outcome) ** 2, 0) / n;
+  const hits = pairs.filter((x) => (x.p >= 0.5 ? 1 : 0) === x.outcome).length;
+  const base = pairs.reduce((s, x) => s + x.outcome, 0) / n;
+  const { reliability } = require("./kalshi-calibration");
+  return {
+    n,
+    brier: Number(brier.toFixed(4)),
+    hitRate: Number((hits / n).toFixed(4)),
+    base: Number(base.toFixed(4)),
+    skillVsBase: Number((base * (1 - base) - brier).toFixed(4)), // >0 ⇒ beats always-predicting the base rate
+    reliability: reliability(pairs),
+    note: `scored ${n} settled grounded predictions · Brier ${brier.toFixed(3)} · hit-rate ${(hits / n * 100).toFixed(1)}%`,
+  };
+}
+
+module.exports = { groundMarket, groundMany, peek, scoreGrounded, CACHE_FILE, TTL_MS };

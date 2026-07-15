@@ -92,6 +92,40 @@ function isPositiveEv(priceCents, winProb, { roundTrip = false, multiplier = STA
   return w > breakevenWinProb(priceCents, { roundTrip, multiplier }) + marginFrac;
 }
 
+/**
+ * Total fee (cents, rounded up per order per side) for a round trip: taker fee on entry
+ * at `entryCents` PLUS taker fee on exit at `exitCents`. Kalshi rounds each order to the
+ * cent independently, so we sum the two rounded legs rather than rounding the sum.
+ */
+function roundTripFeeCents(entryCents, exitCents, contracts = 1, multiplier = STANDARD_MULTIPLIER) {
+  return takerFeeCents(entryCents, contracts, multiplier) + takerFeeCents(exitCents, contracts, multiplier);
+}
+
+/**
+ * Realized net P&L in cents for a closed position — the honest number after fees.
+ *
+ *   gross = (exitCents − entryCents) × contracts
+ *
+ * Fee treatment (Kalshi Feb-2026 schedule):
+ *   - Entry is a taker buy → always charged.
+ *   - `settled:true`  (held to expiry, exit resolves to 0¢/100¢): settlement is FEE-FREE,
+ *     so only the entry fee is subtracted.
+ *   - `settled:false` (sold back into the book early — stop-loss, take-profit, manual):
+ *     the exit is a second taker order → charge the round-trip (entry + exit) fee.
+ *
+ * This is the correction the 2026-07 analysis flagged: an early-exit strategy that books
+ * gross P&L overstates EV by the exit-side fee (~1.75¢/contract near 50¢) on every trade.
+ */
+function realizedNetPnlCents({ entryCents, exitCents, contracts = 1, settled = false, multiplier = STANDARD_MULTIPLIER } = {}) {
+  const entry = Number(entryCents), exit = Number(exitCents), n = Number(contracts) || 1;
+  if (!Number.isFinite(entry) || !Number.isFinite(exit)) return null;
+  const gross = (exit - entry) * n;
+  const fee = settled
+    ? takerFeeCents(entry, n, multiplier)                       // entry only; settlement free
+    : roundTripFeeCents(entry, exit, n, multiplier);            // early sale pays both legs
+  return { grossCents: gross, feeCents: fee, netCents: gross - fee, settled: !!settled };
+}
+
 module.exports = {
   STANDARD_MULTIPLIER,
   feeFraction,
@@ -99,4 +133,6 @@ module.exports = {
   breakevenWinProb,
   netEvCents,
   isPositiveEv,
+  roundTripFeeCents,
+  realizedNetPnlCents,
 };
