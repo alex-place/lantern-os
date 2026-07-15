@@ -26,9 +26,14 @@ const ACCESS_TOKEN_SECRET = crypto.publicEncrypt(
   { key: enc.publicKey, padding: crypto.constants.RSA_PKCS1_PADDING }, SECRET_PLAIN).toString('base64');
 
 function dhChallengeFromAuth(authHeader) {
-  const m = /diffie_hellman_challenge="([0-9a-fA-F]+)"/.exec(authHeader || '');
+  const m = String(authHeader || '').match(/diffie_hellman_challenge="([0-9a-fA-F]+)"/);
   return m ? m[1] : null;
 }
+
+// Real IBKR returns `live_session_token_expiration` as an ABSOLUTE epoch-ms
+// timestamp ~24h out. Mutable so one test can serve a malformed value instead.
+let lstExpiration = () => Date.now() + 24 * 60 * 60 * 1000;
+let lstHandshakes = 0;
 
 const mock = http.createServer((req, res) => {
   let body = '';
@@ -38,13 +43,14 @@ const mock = http.createServer((req, res) => {
     const path = req.url.split('?')[0];
 
     if (path === '/v1/api/oauth/live_session_token') {
+      lstHandshakes++;
       const A = BigInt('0x' + dhChallengeFromAuth(req.headers.authorization));
       const b = BigInt('0x' + crypto.randomBytes(32).toString('hex'));
       const B = modPow(2n, b, P);
       const K = modPow(A, b, P);                                   // shared secret, server side
       const lst = crypto.createHmac('sha1', Buffer.from(toBigEndianBytes(K))).update(SECRET_PLAIN).digest('base64');
       const lstSig = crypto.createHmac('sha1', Buffer.from(lst, 'base64')).update(CONSUMER, 'utf8').digest('hex');
-      return send({ diffie_hellman_response: B.toString(16), live_session_token_signature: lstSig, live_session_token_expiration: 600000 });
+      return send({ diffie_hellman_response: B.toString(16), live_session_token_signature: lstSig, live_session_token_expiration: lstExpiration() });
     }
     if (path === '/v1/api/iserver/auth/ssodh/init') return send({ authenticated: true, connected: true });
     if (path === '/v1/api/tickle') {
@@ -81,6 +87,22 @@ const mock = http.createServer((req, res) => {
 
   const accts = await client.getAccounts();
   ok(Array.isArray(accts) && accts.some((a) => (a.accountId || a) === 'DU1234567'), 'getAccounts() returns the paper account (HMAC-signed request accepted)');
+
+  // Expiration is an absolute epoch-ms deadline: the ~24h token must be cached
+  // as-is (not clamped to 10 minutes) and reused across requests.
+  ok(client._lst && client._lst.expiresAt > Date.now() + 23 * 60 * 60 * 1000,
+    'live_session_token_expiration treated as absolute epoch-ms (~24h cached, not clamped to 10 min)');
+  ok(lstHandshakes === 1, 'LST reused across probe()+getAccounts() — exactly one handshake');
+
+  // A malformed expiration (past / duration-style value) must fall back to a
+  // 10-minute deadline instead of caching a token that looks already-expired.
+  lstExpiration = () => 600000; // epoch 1970 — what a duration-style server bug would send
+  const fbClient = new IbkrCpapi({ oauth1, baseUrl: `http://127.0.0.1:${port}/v1/api`, timeoutMs: 4000 });
+  const before = Date.now();
+  await fbClient.probe();
+  ok(fbClient._lst && fbClient._lst.expiresAt > before && fbClient._lst.expiresAt <= Date.now() + 10 * 60 * 1000,
+    'malformed expiration falls back to a 10-minute deadline');
+  lstExpiration = () => Date.now() + 24 * 60 * 60 * 1000;
 
   // A tampered signer (wrong encryption key → wrong prepend → wrong LST) must FAIL.
   const badEnc = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });

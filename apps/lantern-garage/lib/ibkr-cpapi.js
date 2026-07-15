@@ -252,8 +252,14 @@ class IbkrCpapi {
       this._lstError = { code: 'lst_signature_mismatch' }; // key/prime/consumer mismatch
       return null;
     }
-    const ttl = Number(r.json.live_session_token_expiration) || 10 * 60 * 1000;
-    this._lst = { token: lst, expiresAt: Date.now() + Math.min(ttl, 10 * 60 * 1000) };
+    // `live_session_token_expiration` is an ABSOLUTE epoch-ms timestamp (the LST
+    // lives ~24h), not a duration. Trust it only if it lands in (now, now+24h];
+    // anything else (past, absurdly far out, missing) falls back to a 10-minute
+    // deadline so a malformed value can never pin a stale token.
+    const now = Date.now();
+    const exp = Number(r.json.live_session_token_expiration);
+    const expiresAt = exp > now && exp <= now + 24 * 60 * 60 * 1000 ? exp : now + 10 * 60 * 1000;
+    this._lst = { token: lst, expiresAt };
     // Best-effort brokerage session init (needed for /iserver reads + orders).
     try {
       const initHeaders = this.oauth1.signRequest(
