@@ -1099,7 +1099,20 @@ let activeTicker   = null;
 let barsData       = {};
 // Persisted chart type. Candles are the default the first time a user visits.
 let chartType      = (()=>{ try{ return localStorage.getItem('trader.chartType') || 'candle'; }catch(e){ return 'candle'; } })();
-let chartTimeframe = (()=>{ try{ return localStorage.getItem('trader.tf') || '5m'; }catch(e){ return '5m'; } })();
+// Escape text before interpolating it into an innerHTML string. Anything that
+// originates outside this code (stored prefs, a <select> value) must go through
+// this on its way into markup — CodeQL js/xss-through-dom flagged the chart
+// overlay's timeframe badge as a live sink (#466).
+function escHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+// The only bar intervals the chart supports. chartTimeframe reaches the overlay
+// markup, and both of its sources (localStorage, the timeframe <select>) are
+// caller-controlled text, so pin it to this set rather than trusting the input.
+const TF_ALLOWED = ['1m','5m','15m','1h','4h','1d','1w','1mo'];
+function normalizeTf(tf){ return TF_ALLOWED.includes(String(tf)) ? String(tf) : '5m'; }
+let chartTimeframe = (()=>{ try{ return normalizeTf(localStorage.getItem('trader.tf') || '5m'); }catch(e){ return '5m'; } })();
 // Pattern overlays (S/R zone bands, P&L fill, entry/stop/TP markers) — the alternative
 // technical view for serious trading. Off by default (the clean price-line look from
 // #2123), opt-in per user and remembered. #trader-patterns
@@ -1925,7 +1938,7 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
   if(chartTimeframe){
     html += `<div style="position:absolute;left:4px;top:2px;z-index:7;
       font-family:var(--mono);font-size:10px;font-weight:600;color:var(--tv-axis);
-      background:var(--bg1);padding:1px 4px;border-radius:2px;pointer-events:none;">${chartTimeframe.toUpperCase()}</div>`;
+      background:var(--bg1);padding:1px 4px;border-radius:2px;pointer-events:none;">${escHtml(chartTimeframe.toUpperCase())}</div>`;
   }
 
   overlay.innerHTML = html;
@@ -3817,6 +3830,7 @@ document.addEventListener('mousedown', (e)=>{
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') _closePatternMenu(); });
 
 function changeTimeframe(tf, winBars){
+  tf = normalizeTf(tf);   // the <select> value is caller-controlled text (#466)
   chartTimeframe = tf;
   try{ localStorage.setItem('trader.tf', tf); }catch(e){}   // remember for next reload
   document.getElementById('chartTfSelect').value = tf;
