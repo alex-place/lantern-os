@@ -84,11 +84,16 @@ function _globToRe(glob) {
 // the exact live data path (and caches) the trader UI hits — no second data
 // source, no Python spawn of its own. Bounded timeout so a slow feed degrades to
 // an honest "unavailable" instead of hanging the chat turn (#1434 / #1560).
-function _localTradingGet(pathAndQuery, timeoutMs = 9000) {
+function _localTradingGet(pathAndQuery, timeoutMs = 9000, extraHeaders = null) {
   const port = process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177;
+  const headers = { "x-keystone-internal": "1", ...(extraHeaders || {}) };
+  // Desktop hardening (ADR-0014 G4): when the launcher gates operator trust on a
+  // per-boot token, this in-process hop must carry it too or the forwarded user
+  // id (below) would be refused by request-auth.internalUserId.
+  if (process.env.UNISONA_LOCAL_TOKEN) headers["x-unisona-token"] = process.env.UNISONA_LOCAL_TOKEN;
   return new Promise((resolve, reject) => {
     const req = http.get(
-      { host: "127.0.0.1", port, path: pathAndQuery, headers: { "x-keystone-internal": "1" } },
+      { host: "127.0.0.1", port, path: pathAndQuery, headers },
       (res) => {
         let data = "";
         res.on("data", (c) => (data += c));
@@ -119,6 +124,39 @@ async function _tradingDataOrDirect(pathAndQuery, directFn) {
     throw loopbackErr;
   }
 }
+
+// The in-process loopback hop above carries no session cookie, so account-reading
+// tools forward the chat user's id (from runTool ctx) as x-keystone-user. The
+// trading routes honor it only on operator-trusted requests (request-auth.
+// internalUserId) — this is what lets "my portfolio" in chat resolve the SAME
+// per-user IBKR connection (ADR-0022) the trader UI shows.
+function _userHeaders(ctx) {
+  return ctx && ctx.userId ? { "x-keystone-user": encodeURIComponent(String(ctx.userId)) } : null;
+}
+
+// ── portfolio-tool formatting (portfolio_analysis / portfolio_whatif /
+// propose_rebalance) — shared so all three speak the same evidence language. ──
+function _pfPct(x, dp = 1) {
+  return `${(x * 100).toFixed(dp)}%`;
+}
+function _pfSharpe(s) {
+  return `${s.sharpe.toFixed(2)} [${s.lo.toFixed(2)}, ${s.hi.toFixed(2)}]`;
+}
+function _pfWindow(w) {
+  return `${w.years}y daily total-return window, ${w.obs} trading days${w.from ? ` (${w.from} → ${w.to})` : ""}`;
+}
+function _pfExcluded(ex) {
+  return ex && ex.length ? `Excluded: ${ex.map((e) => `${e.symbol} (${e.reason})`).join("; ")}` : "";
+}
+function _pfCorrMatrix(symbols, matrix, cap = 10) {
+  const syms = symbols.slice(0, cap);
+  const w = Math.max(6, ...syms.map((s) => s.length + 1));
+  const head = " ".repeat(w + 2) + syms.map((s) => s.padStart(w)).join("");
+  const rows = syms.map((s, i) => "  " + s.padStart(w) + syms.map((_x, j) => matrix[i][j].toFixed(2).padStart(w)).join(""));
+  const more = symbols.length > cap ? `\n  (truncated to the top ${cap} holdings by weight)` : "";
+  return head + "\n" + rows.join("\n") + more;
+}
+const PF_DISCLAIMER = "Evidence basis: historical daily total returns (Yahoo adjclose, dividends reinvested); CI is an i.i.d. floor (Lo 2002); taxes/slippage not modeled. Backtest ≠ future performance. Decision support only, NOT personalized investment advice — present the evidence and let the user decide.";
 
 function _runShell(command) {
   const cmd = String(command || "").trim();
@@ -1207,9 +1245,9 @@ const REGISTRY = {
     policy: "read", // operator-only (no guest_safe): private account data
     desc: "Get the operator's current paper-trading positions and account (equity, cash, buying power, day P&L). Use whenever the user asks about 'my positions', 'my portfolio', 'how am I doing', or their P&L. If the broker isn't connected, report that honestly — never invent holdings.",
     schema: { type: "object", properties: {} },
-    async run() {
+    async run(_i, ctx) {
       try {
-        const d = await _localTradingGet("/api/trading/positions");
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         const acct = (d && d.account) || {};
         if (!d || d.available === false) {
           return `[trader_positions: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no live positions. Say so honestly; don't invent holdings.]`;
@@ -1227,6 +1265,137 @@ const REGISTRY = {
         return `${head}\nOpen positions (${pos.length}):\n${rows.join("\n")}`;
       } catch (e) {
         return `[trader_positions error: ${e.message}]`;
+      }
+    },
+  },
+
+  // ── Portfolio analytics (UNISONA-SHARPE-CERTIFICATE applied to real holdings) ──
+  // Reason-stage tools: measured Sharpe/correlation evidence over the operator's
+  // ACTUAL broker positions (ADR-0022 per-user IBKR), plus a covariance-aware
+  // rebalance PROPOSAL. None of these place orders — Act stays behind
+  // lib/trading-guard.js and the ADR-0020 gates. Every number carries its 95% CI
+  // so overlapping allocations are reported as statistically indistinguishable,
+  // never as directives.
+  portfolio_analysis: {
+    policy: "read", // operator-only (no guest_safe): reads the connected broker account
+    desc: "Analyze the operator's ACTUAL broker holdings for risk-adjusted quality: current weights, per-holding and whole-portfolio annualized Sharpe with 95% CI, volatility, worst drawdown over the window, pairwise correlation matrix, and concentration (largest position, effective N, avg pairwise correlation). Use when the user asks how diversified or risky their portfolio is, what its Sharpe is, or whether their holdings overlap. Cite the window and CIs as evidence — this is historical measurement, never a promise, and never personalized advice.",
+    schema: { type: "object", properties: { years: { type: "number", description: "history window in years (2–10, default 5)" } } },
+    async run(i, ctx) {
+      try {
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[portfolio_analysis: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no positions to analyze. Say so honestly.]`;
+        }
+        const pos = Array.isArray(d.positions) ? d.positions : [];
+        if (!pos.length) return "[portfolio_analysis: no open positions — nothing to analyze.]";
+        const pa = require("./portfolio-analytics");
+        const a = await pa.analyzeHoldings(pos, { years: i.years });
+        if (!a.ok) return `[portfolio_analysis: ${a.reason}.${a.excluded && a.excluded.length ? ` ${_pfExcluded(a.excluded)}` : ""}]`;
+        const c = a.concentration;
+        const rows = a.perSymbol.map((p) =>
+          `  ${p.symbol.padEnd(6)} ${_pfPct(p.weight).padStart(6)}  vol ${_pfPct(p.volAnnual)}/yr  Sharpe ${_pfSharpe(p.sharpe)}`);
+        return [
+          `Portfolio analysis — ${_pfWindow(a.window)}:`,
+          `Holdings (weight by market value; total ~$${Math.round(a.totalValue).toLocaleString("en-US")}):`,
+          ...rows,
+          `Portfolio at current weights (constant-mix): ex-ante Sharpe ${_pfSharpe(a.portfolio.sharpe)} · vol ${_pfPct(a.portfolio.volAnnual)}/yr · worst drawdown ${_pfPct(a.portfolio.maxDD)} · annualized return ${_pfPct(a.portfolio.annReturn)}`,
+          `Concentration: largest position ${c.maxWeight.symbol} at ${_pfPct(c.maxWeight.weight)} · effective N ${c.effectiveN.toFixed(1)} of ${a.symbols.length} · avg pairwise ρ ${a.correlations.avgPairwise.toFixed(2)}`,
+          "Correlation matrix (diversification only pays when off-diagonals are small — Thm 1):",
+          _pfCorrMatrix(a.symbols, a.correlations.matrix),
+          ...(a.notes.length ? [`Notes: ${a.notes.join("; ")}`] : []),
+          _pfExcluded(a.excluded),
+          PF_DISCLAIMER,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[portfolio_analysis error: ${e.message}]`;
+      }
+    },
+  },
+
+  portfolio_whatif: {
+    policy: "read",
+    guest_safe: true, // public market data only — reads no account
+    desc: "Score a hypothetical weight allocation over public tickers: annualized Sharpe with 95% CI, volatility, worst drawdown, per-symbol stats, and the correlation matrix, measured on daily total-return history. Use whenever the user proposes their own mix ('what if I went 60/20/20 SPY/GLD/TLT?') so they can compare THEIR idea against alternatives on equal evidence. When comparing allocations, check the CIs: if they overlap, say the options are statistically indistinguishable on this window — never oversell a small point-estimate gap.",
+    schema: {
+      type: "object",
+      properties: {
+        weights: {
+          type: "object",
+          description: "ticker → weight map, e.g. {\"SPY\": 60, \"GLD\": 20, \"TLT\": 20}. Percents or fractions — normalized by their sum. Max 15 symbols.",
+          additionalProperties: { type: "number" },
+        },
+        years: { type: "number", description: "history window in years (2–10, default 5)" },
+      },
+      required: ["weights"],
+    },
+    async run(i) {
+      try {
+        const pa = require("./portfolio-analytics");
+        const r = await pa.scoreWeights(i.weights, { years: i.years });
+        if (!r.ok) return `[portfolio_whatif: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
+        const rows = r.perSymbol.map((p) =>
+          `  ${p.symbol.padEnd(6)} ${_pfPct(p.weight).padStart(6)}  vol ${_pfPct(p.volAnnual)}/yr  Sharpe ${_pfSharpe(p.sharpe)}`);
+        return [
+          `What-if allocation scored — ${_pfWindow(r.window)}:`,
+          ...rows,
+          `Blend (constant-mix): ex-ante Sharpe ${_pfSharpe(r.portfolio.sharpe)} · vol ${_pfPct(r.portfolio.volAnnual)}/yr · worst drawdown ${_pfPct(r.portfolio.maxDD)} · annualized return ${_pfPct(r.portfolio.annReturn)}`,
+          `Avg pairwise ρ ${r.correlations.avgPairwise.toFixed(2)}:`,
+          _pfCorrMatrix(r.symbols, r.correlations.matrix),
+          ...(r.notes.length ? [`Notes: ${r.notes.join("; ")}`] : []),
+          _pfExcluded(r.excluded),
+          PF_DISCLAIMER,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[portfolio_whatif error: ${e.message}]`;
+      }
+    },
+  },
+
+  propose_rebalance: {
+    policy: "read", // operator-only; computes a PROPOSAL — places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Compute a covariance-aware rebalance PROPOSAL over the operator's existing holdings: shrunk tangency weights (w ∝ Σ⁻¹μ, long-only, per-position cap), ex-ante Sharpe of current vs proposed weights (both with 95% CIs), and a dry-run order list of whole-share deltas. It only reallocates among symbols already held — it never suggests new purchases and NEVER places orders; execution is a separate, human-gated action. If the two Sharpe CIs overlap, report the allocations as statistically indistinguishable on this window and say the user's other preferences (taxes, simplicity) may reasonably decide. The user always decides.",
+    schema: {
+      type: "object",
+      properties: {
+        years: { type: "number", description: "history window in years (2–10, default 5)" },
+        max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+      },
+    },
+    async run(i, ctx) {
+      try {
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[propose_rebalance: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — nothing to rebalance. Say so honestly.]`;
+        }
+        const pos = Array.isArray(d.positions) ? d.positions : [];
+        if (!pos.length) return "[propose_rebalance: no open positions — nothing to rebalance.]";
+        const pa = require("./portfolio-analytics");
+        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight });
+        if (!r.ok) return `[propose_rebalance: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
+        const wRows = r.symbols.map((s, idx) =>
+          `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.proposedWeights[idx]).padStart(6)}`);
+        const oRows = r.orders.length
+          ? r.orders.map((o) => `  ${o.action} ${o.shares} ${o.symbol} (~$${o.estDollars.toLocaleString("en-US")} @ $${o.price.toFixed(2)})`)
+          : ["  none — current weights are already within 1% of the proposal"];
+        const verdict = r.distinguishable
+          ? "the proposed allocation's Sharpe CI clears the current one on this window — a measurable improvement"
+          : "the 95% CIs OVERLAP — current and proposed are statistically indistinguishable on this window; taxes, simplicity, or preference may reasonably decide";
+        return [
+          `Rebalance PROPOSAL — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
+          `Current : ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
+          `Proposed: ex-ante Sharpe ${_pfSharpe(r.proposed.sharpe)} · vol ${_pfPct(r.proposed.volAnnual)}/yr · worst drawdown ${_pfPct(r.proposed.maxDD)}`,
+          `Verdict: ${verdict}.`,
+          "Weights (current → proposed):",
+          ...wRows,
+          "Dry-run order list (NOT placed):",
+          ...oRows,
+          `Method: ${r.method.objective}; ${r.method.constraints}; shrinkage: ${r.method.shrinkage}.`,
+          ...(r.notes.length ? [`Notes: ${r.notes.join("; ")}`] : []),
+          _pfExcluded(r.excluded),
+          PF_DISCLAIMER,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[propose_rebalance error: ${e.message}]`;
       }
     },
   },
@@ -1365,7 +1534,9 @@ async function runTool(name, input, ctx = {}) {
 
   try {
     // run() may be sync (returns a string) or async (returns a Promise); await covers both.
-    let out = String((await entry.run(input || {})) || "");
+    // ctx is passed through so account-reading tools can forward the requesting
+    // user's identity (ctx.userId) on their internal loopback hops.
+    let out = String((await entry.run(input || {}, ctx)) || "");
     const outputLength = out.length;
     if (out.length > MAX_OUT) out = out.slice(0, MAX_OUT) + "\n…[truncated]";
 

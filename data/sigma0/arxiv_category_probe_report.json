@@ -1,0 +1,27 @@
+{
+  "task": "query->arXiv-category probe on Ouro-1.4B hidden states (#2381 gate)",
+  "model": "ByteDance/Ouro-1.4B",
+  "n_queries": 475,
+  "topk": 4,
+  "labels": [
+    "cs.AI",
+    "cs.CL",
+    "cs.CV",
+    "cs.LG",
+    "other"
+  ],
+  "label_distribution": {
+    "cs.AI": 55,
+    "cs.LG": 145,
+    "cs.CL": 89,
+    "other": 122,
+    "cs.CV": 64
+  },
+  "majority_baseline_acc": 0.305,
+  "cv_accuracy": 0.417,
+  "cv_macro_f1": 0.409,
+  "accuracy_lift_over_baseline": 0.112,
+  "verdict": "WEAK signal, hard prefilter NOT worth building: probe acc 0.417 beats majority 0.305 (+0.112, real above-chance category signal) but 0.417 absolute is far too low for a HARD prefilter \u2014 it would prune the gold paper ~58% of the time (the issue's stated risk). Viable only as a SOFT category prior (down-weight, never exclude); the hard bm25+prefilter arm (#2381 step 3) should NOT be built.",
+  "evidence_class": "MEASURED",
+  "caveats": "last-token last-layer hidden state; top-K+other collapse; the dominant AI categories (cs.LG/CL/AI/CV) overlap heavily so even a real signal may not survive a hard prefilter; 5-fold stratified CV; base Ouro-1.4B fp16."
+}

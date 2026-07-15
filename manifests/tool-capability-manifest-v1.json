@@ -114,7 +114,7 @@
     },
     {
       "name": "Bash",
-      "description": "Run an allowlisted shell command (git/tests/file-reads). Operator only.",
+      "description": "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -138,7 +138,7 @@
     },
     {
       "name": "PowerShell",
-      "description": "Run an allowlisted command (same allowlist as Bash). Operator only.",
+      "description": "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -269,7 +269,7 @@
     },
     {
       "name": "propose_coding_change",
-      "description": "Propose a code change for a task using the accountable coding backend. Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
+      "description": "Propose a change to a repository's EXISTING code using the accountable coding backend. Use only when the user asked for a repo change — never to write example/new code the user just wants to see (answer that directly in your reply). Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -851,6 +851,86 @@
       "input_schema": {
         "type": "object",
         "properties": {}
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "portfolio_analysis",
+      "description": "Analyze the operator's ACTUAL broker holdings for risk-adjusted quality: current weights, per-holding and whole-portfolio annualized Sharpe with 95% CI, volatility, worst drawdown over the window, pairwise correlation matrix, and concentration (largest position, effective N, avg pairwise correlation). Use when the user asks how diversified or risky their portfolio is, what its Sharpe is, or whether their holdings overlap. Cite the window and CIs as evidence — this is historical measurement, never a promise, and never personalized advice.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "years": {
+            "type": "number",
+            "description": "history window in years (2–10, default 5)"
+          }
+        }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "portfolio_whatif",
+      "description": "Score a hypothetical weight allocation over public tickers: annualized Sharpe with 95% CI, volatility, worst drawdown, per-symbol stats, and the correlation matrix, measured on daily total-return history. Use whenever the user proposes their own mix ('what if I went 60/20/20 SPY/GLD/TLT?') so they can compare THEIR idea against alternatives on equal evidence. When comparing allocations, check the CIs: if they overlap, say the options are statistically indistinguishable on this window — never oversell a small point-estimate gap.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "weights": {
+            "type": "object",
+            "description": "ticker → weight map, e.g. {\"SPY\": 60, \"GLD\": 20, \"TLT\": 20}. Percents or fractions — normalized by their sum. Max 15 symbols.",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "years": {
+            "type": "number",
+            "description": "history window in years (2–10, default 5)"
+          }
+        },
+        "required": [
+          "weights"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "propose_rebalance",
+      "description": "Compute a covariance-aware rebalance PROPOSAL over the operator's existing holdings: shrunk tangency weights (w ∝ Σ⁻¹μ, long-only, per-position cap), ex-ante Sharpe of current vs proposed weights (both with 95% CIs), and a dry-run order list of whole-share deltas. It only reallocates among symbols already held — it never suggests new purchases and NEVER places orders; execution is a separate, human-gated action. If the two Sharpe CIs overlap, report the allocations as statistically indistinguishable on this window and say the user's other preferences (taxes, simplicity) may reasonably decide. The user always decides.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "years": {
+            "type": "number",
+            "description": "history window in years (2–10, default 5)"
+          },
+          "max_weight": {
+            "type": "number",
+            "description": "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)"
+          }
+        }
       },
       "policy": "read",
       "operator_required": false,

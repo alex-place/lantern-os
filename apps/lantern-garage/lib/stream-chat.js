@@ -24,6 +24,7 @@ const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
 const { runCanaries } = require("./canary");
+const { providedSourceGrounding } = require("./groundedness-canary");
 const streamSurprise = require("./stream-surprise");
 const surpriseIntervene = require("./surprise-intervene"); // ADR-0017 — flag-gated, default OFF
 const { councilReview } = require("./council-review");
@@ -1670,8 +1671,12 @@ async function handleStreamChat(req, url, res) {
     // No behavior change when healthy; scoring never mutates a reply.
     try {
       if (fullReply) {
+        // #2322: for a provided-text transformation (summarize/rewrite/translate of pasted
+        // source), fold that source in as the grounding anchor so a faithful summary isn't
+        // scored as an unanchored 42-state. Only when no external grounding already fired.
+        const canaryGroundingContext = groundingContext || providedSourceGrounding(message);
         const { collapse, grounded, signaturePatch } = runCanaries(fullReply, {
-          groundingContext,
+          groundingContext: canaryGroundingContext,
           tokenSurprise: surprise.value(), // #1678: model-internal uncertainty (null when none captured)
           surpriseModel: signature.model,  // #1681: calibrate the uncertainty magnitude to this model
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
@@ -1698,7 +1703,7 @@ async function handleStreamChat(req, url, res) {
             }
           }
           const c = councilReview(fullReply, {
-            groundingContext,
+            groundingContext: canaryGroundingContext,
             execVerdict,
             dissent: Array.isArray(signature.dissent) ? signature.dissent : [],
             context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
@@ -2381,7 +2386,7 @@ async function handleStreamChat(req, url, res) {
               let toolAnswer = "";
               const MAX_TOOL_ITERS = 5;
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
-                const result = await toolRunner.runTool(tc.name, tc.input, { operator });
+                const result = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
                 const out = result.ok ? result.result : (result.error || `ERROR(${result.reason || "error"})`);
                 sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
                   ok: result.ok, status: result.status, reason: result.reason_code || null,
@@ -2529,7 +2534,7 @@ async function handleStreamChat(req, url, res) {
               toolCalls++;
               const input = fc.args || {};
               sse.writeData(res, { type: "tool", phase: "call", name: fc.name, input });
-              const r = await toolRunner.runTool(fc.name, input, { operator });
+              const r = await toolRunner.runTool(fc.name, input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: fc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -2756,7 +2761,7 @@ async function handleStreamChat(req, url, res) {
               for (const tu of toolUses) {
                 toolCalls++;
                 sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
-                const r = await toolRunner.runTool(tu.name, tu.input, { operator });
+                const r = await toolRunner.runTool(tu.name, tu.input, { operator, userId: getEffectiveUserId(req) });
                 const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
                 sse.writeData(res, { type: "tool", phase: "result", name: tu.name,
                   ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -2954,7 +2959,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -3105,7 +3110,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -3230,7 +3235,7 @@ async function handleStreamChat(req, url, res) {
             for (const tc of turn.toolCalls) {
               toolCalls++;
               sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator });
+              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
               const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
               sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
                 ok: !!r.ok, status: r.status, reason_code: r.reason_code,
@@ -3318,6 +3323,13 @@ async function handleStreamChat(req, url, res) {
 
   // Provider: Ollama (streaming) — last-resort
   if (_p === "ollama") {
+    // The direct-HTTP fallback below (Attempt 2) references `ollamaModel`, but that name
+    // only existed as the loop variable of the earlier local-first `for (const ollamaModel
+    // of modelChain)` block — it is NOT in scope here. Reaching this last-resort path (every
+    // cloud provider failed) therefore threw `ReferenceError: ollamaModel is not defined`,
+    // which escaped to the process-level uncaughtException handler and could crash the
+    // server mid-stream. Bind it to the same lead local model the first-pass used.
+    const ollamaModel = modelChain[0] || process.env.OLLAMA_MODEL || "qwen2.5-coder";
     // Attempt 1: Unified Agent Connector (health-checked, provider-ranked, Python-side SSE)
     if (!requestedProvider || requestedProvider === "ollama" || requestedProvider === "local") {
       try {

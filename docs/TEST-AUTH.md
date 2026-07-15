@@ -25,6 +25,11 @@ Set a token in the server's environment (any non-empty string):
 LANTERN_TEST_AUTH_TOKEN=my-dev-token
 # optional: change the seeded account's password (default: test-account-1234)
 LANTERN_TEST_PASSWORD=some-password
+# optional: emulate a SPECIFIC profile id (default: test-user) — lets a dev boot
+# exercise per-user state saved under that id, e.g. an IBKR connection whose
+# encrypted creds file is keyed by profile id (point IBKR_CRED_DIR at the dir
+# that holds it; reads are file-name-keyed so no credential copying is needed)
+LANTERN_TEST_USER_ID=some-profile-id
 ```
 
 When set (and **only** then), the server:

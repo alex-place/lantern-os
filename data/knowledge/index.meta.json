@@ -53,7 +53,7 @@
     "docs/adr/0005-interchangeable-model-providers.md",
     "docs/adr/0007-monoworkstream-one-pr-lane-per-agent.md",
     "docs/adr/0009-one-routing-contract-cloud-primary-coding.md",
-    "docs/convergence-routing-architecture.md",
+    "docs/CONVERGENCE-ROUTING-ARCHITECTURE.md",
     "docs/CSF-FORMAT-SPECIFICATION.md",
     "docs/adr/0010-verify-gated-continual-learning-last-resort.md",
     "docs/MCP-DREAM-CHAT-TOOL-PARITY.md",

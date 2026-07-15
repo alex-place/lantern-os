@@ -1,6 +1,6 @@
 {
   "name": "lantern-garage-app",
-  "version": "1.9.5",
+  "version": "1.10.0",
   "private": true,
   "description": "Local-first Lantern OS garage full-stack app.",
   "scripts": {
@@ -42,6 +42,8 @@
     "test:mcp-msg": "node test/chat-mcp-message.test.js",
     "test:finnhub-gate": "node test/finnhub-legal-gate.test.js",
     "test:trade-gate": "node test/kalshi-fees-ev.test.js",
+    "test:portfolio": "node test/portfolio-analytics.test.js",
+    "test:tool-identity": "node test/chat-tool-user-identity.test.js",
     "test:grounded": "node test/kalshi-grounded.test.js",
     "test:verify-llm": "node test/verify-llm.test.js",
     "test:hooks": "node test/git-hooks-repo-managed.test.js",

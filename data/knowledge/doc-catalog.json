@@ -732,7 +732,7 @@
     "reason": "Router+endpoints still live but persona list (lantern/blinkbug/etc.) is post-removal stale"
   },
   {
-    "path": "docs/convergence-routing-architecture.md",
+    "path": "docs/CONVERGENCE-ROUTING-ARCHITECTURE.md",
     "title": "Convergence Routing Architecture",
     "category": "architecture",
     "description": "Explains the deterministic intent router + pattern cache; provider-chain section lists Claude/OpenAI/Grok as live though only Gemini is funded.",

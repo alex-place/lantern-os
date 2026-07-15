@@ -7,7 +7,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { higherRole } = require("./role-hierarchy");
+const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
 
 // Data directory for user profiles
 const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
@@ -496,13 +496,26 @@ function getOrCreateFromIdentity(provider, u, role) {
   // 1. Same identity logging in again.
   const existing = getProfileByIdentity(provider, providerId);
   if (existing) {
-    // Role resolution is MONOTONIC across a profile's linked sign-in methods: a
-    // login never downgrades the role already earned on this account. Without
-    // this, signing in with a guest-mapping provider (Google/Discord both map to
-    // "guest") clobbered a Patreon-earned tier back down to Free on every login.
-    // Tier authority (Patreon) still RAISES the role via `role`; explicit
-    // downgrades are an admin action (setUserRole), not a silent login side effect.
-    const nextRole = higherRole(existing.role || "guest", role || "guest");
+    // Role resolution is MONOTONIC across linked sign-in methods so a guest-mapping
+    // provider (Google/Discord both map to "guest") never clobbers a Patreon-earned tier
+    // back to Free on login. EXCEPTION — the tier AUTHORITY (Patreon) re-attesting a
+    // NON-staff role re-baselines to the live entitlement, so a lapsed/downgraded paid
+    // membership actually loses the paid tier (otherwise pay-once = keep-forever, incl.
+    // the trading unlock after a cancellation/chargeback). Staff roles (admin,
+    // tech_support) are granted out-of-band (setUserRole / admin-override) and are NEVER
+    // demoted by a login; the owner's admin-override is re-applied by the caller.
+    //
+    // Only re-baseline when the provider read AUTHORITATIVELY resolved the entitlement
+    // (u.entitlementResolved). A wrong PATREON_CAMPAIGN_ID or a partial API response yields
+    // an EMPTY-but-unresolved read; demoting on that would mass-lock-out paying members, so
+    // it's a no-op (keep the existing role) instead of persisting a downgrade to guest.
+    const tierAuthorityReattesting =
+      provider === "patreon" &&
+      !STAFF_ROLES.includes(existing.role || "guest") &&
+      u.entitlementResolved === true;
+    const nextRole = tierAuthorityReattesting
+      ? role || "guest"
+      : higherRole(existing.role || "guest", role || "guest");
     const updates = { role: nextRole, tier: u.tier != null ? u.tier : existing.tier };
     if (u.name && !existing.name) updates.name = u.name;
     if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
