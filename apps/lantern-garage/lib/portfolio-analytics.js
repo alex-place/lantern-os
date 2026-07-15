@@ -323,7 +323,8 @@ function parseHoldings(positions) {
       || (Number(p.market_value) > 0 ? Number(p.market_value) / qty : 0)
       || Number(p.avg_entry_price) || Number(p.avg_price) || 0;
     if (!(price > 0)) { skipped.push({ symbol, reason: "no usable price on the position row" }); continue; }
-    holdings.push({ symbol, qty, price, value: qty * price });
+    const avgEntry = Number(p.avg_entry_price) || Number(p.avg_price) || 0;
+    holdings.push({ symbol, qty, price, value: qty * price, avgEntry });
   }
   holdings.sort((a, b) => b.value - a.value);
   if (holdings.length > MAX_SYMBOLS) {
@@ -381,6 +382,7 @@ async function analyzeHoldings(positions, opts = {}) {
     const r = aligned.returns[h.symbol];
     return {
       symbol: h.symbol, qty: h.qty, price: h.price, value: h.value, weight: weights[i],
+      avgEntry: h.avgEntry || 0,
       sharpe: sharpeCI(r), volAnnual: _stdev(r) * Math.sqrt(TRADING_DAYS), annReturn: annualizedReturn(r),
     };
   });
@@ -412,6 +414,89 @@ function ciOverlap(a, b) {
   return !(a.lo > b.hi || b.lo > a.hi);
 }
 
+// ── Sharpe mandate (ADR-0028) ─────────────────────────────────────────────────
+// The operator's standing target is a GATE, not a promise: strategies report where
+// their measured Sharpe stands against it, with CI evidence. Only `meets_ci`
+// (CI lower bound clears the mandate) is eligible for live capital per ADR-0028.
+function sharpeMandate() {
+  const v = Number(process.env.KEYSTONE_SHARPE_MANDATE);
+  return Number.isFinite(v) && v > 0 ? v : 2.0;
+}
+
+function mandateVerdict(s, target) {
+  if (!s || !Number.isFinite(s.sharpe)) return "below";
+  if (s.lo >= target) return "meets_ci";
+  if (s.sharpe >= target) return "meets_point";
+  return "below";
+}
+
+// ── long-only efficient-frontier point: max return under a vol ceiling ───────
+// Deterministic λ-bisected projected gradient on the mean-variance family
+// max w·μ − λ w'Σw over {w ≥ 0, Σw = 1, w ≤ cap}; picks the λ whose solution sits
+// at the vol ceiling (the true max-return point on the constrained frontier).
+// Same shrinkage as tangencyWeights so the two objectives share inputs.
+function _projectCappedSimplex(v, cap) {
+  let lo = Math.min(...v) - 1, hi = Math.max(...v);
+  for (let i = 0; i < 60; i++) {
+    const tau = (lo + hi) / 2;
+    let s = 0;
+    for (const x of v) s += Math.min(cap, Math.max(0, x - tau));
+    if (s > 1) lo = tau; else hi = tau;
+  }
+  const tau = (lo + hi) / 2;
+  return v.map((x) => Math.min(cap, Math.max(0, x - tau)));
+}
+
+function maxReturnWeights({ symbols, mu, cov, maxVolDaily, maxWeight = 0.35, covShrink = 0.35, muShrink = 0.5 }) {
+  const n = symbols.length;
+  const cap = Math.max(Math.min(1, Math.max(0.1, maxWeight)), 1 / n + 1e-9);
+  const c = cov.map((row, i) => row.map((x, j) => (i === j ? x : x * (1 - covShrink))));
+  const mbar = mu.reduce((a, b) => a + b, 0) / n;
+  const m = mu.map((x) => muShrink * mbar + (1 - muShrink) * x);
+  const maxAbsC = Math.max(1e-12, ...c.map((r) => Math.max(...r.map(Math.abs))));
+  const matVec = (w) => c.map((row) => row.reduce((s, x, j) => s + x * w[j], 0));
+  const vol = (w) => {
+    const cw = matVec(w);
+    return Math.sqrt(Math.max(w.reduce((s, x, i) => s + x * cw[i], 0), 0));
+  };
+  // λ=0 is a plain LP on the capped simplex — the exact solution is greedy
+  // cap-filling in shrunk-μ order (no iteration needed).
+  const corner = () => {
+    const order = m.map((x, i) => [x, i]).sort((a, b) => b[0] - a[0]);
+    const w = new Array(n).fill(0);
+    let rem = 1;
+    for (const [, i] of order) {
+      const take = Math.min(cap, rem);
+      w[i] = take;
+      rem -= take;
+      if (rem <= 1e-12) break;
+    }
+    return w;
+  };
+  const solve = (lam) => {
+    if (lam <= 0) return corner();
+    let w = new Array(n).fill(1 / n);
+    for (let it = 0; it < 400; it++) {
+      const cw = matVec(w);
+      const g = m.map((x, i) => x - 2 * lam * cw[i]);
+      // gradient-normalized step: daily μ/Σ are ~1e-4-scale, so a fixed step
+      // never converges — normalize so each iteration moves ≤0.25 in weight space
+      const gmax = Math.max(1e-12, ...g.map(Math.abs));
+      w = _projectCappedSimplex(w.map((x, i) => x + (0.25 / gmax) * g[i]), cap);
+    }
+    return w;
+  };
+  const w0 = solve(0); // max-return corner (caps filled in shrunk-μ order)
+  if (vol(w0) <= maxVolDaily) return { weights: w0, binding: "corner" };
+  let lo = 0, hi = 1, guard = 0;
+  while (vol(solve(hi)) > maxVolDaily && hi < 1e6 && guard++ < 25) hi *= 10;
+  for (let i = 0; i < 30; i++) {
+    const mid = (lo + hi) / 2;
+    if (vol(solve(mid)) > maxVolDaily) lo = mid; else hi = mid;
+  }
+  return { weights: solve(hi), binding: "vol_ceiling" };
+}
+
 /**
  * Covariance-aware rebalance PROPOSAL over the existing holdings only.
  * Never touches a broker: the order list is a computed diff, not an action.
@@ -428,55 +513,95 @@ async function proposeRebalance(positions, opts = {}) {
   const mu = symbols.map((s) => _mean(aligned.returns[s]));
   const cov = covarianceMatrix(aligned.returns, symbols);
   const maxWeight = Math.min(1, Math.max(0.1, Number(opts.maxWeight) || 0.35));
-  const tang = tangencyWeights({
-    symbols, mu, cov, maxWeight,
-    covShrink: opts.covShrink != null ? opts.covShrink : 0.35,
-    muShrink: opts.muShrink != null ? opts.muShrink : 0.5,
-  });
+  const covShrink = opts.covShrink != null ? opts.covShrink : 0.35;
+  const muShrink = opts.muShrink != null ? opts.muShrink : 0.5;
+
+  // Objective (ADR-0028): "sharpe" (shrunk tangency, default) or "max_return"
+  // (max expected return s.t. an annualized vol ceiling — the frontier point).
+  const objective = opts.objective === "max_return" ? "max_return" : "sharpe";
+  let targetW;
+  let objectiveLabel;
+  const notes = [...analysis.notes];
+  if (objective === "max_return") {
+    const maxVolA = Math.min(0.6, Math.max(0.05, Number(opts.maxVol) || 0.20));
+    const mr = maxReturnWeights({
+      symbols, mu, cov, maxWeight, covShrink, muShrink,
+      maxVolDaily: maxVolA / Math.sqrt(TRADING_DAYS),
+    });
+    targetW = mr.weights;
+    objectiveLabel = `max expected return s.t. vol ≤ ${Math.round(maxVolA * 100)}%/yr (long-only efficient-frontier point)`;
+    if (mr.binding === "corner") notes.push("the vol ceiling is not binding — the max-return corner is already inside it");
+  } else {
+    const tang = tangencyWeights({ symbols, mu, cov, maxWeight, covShrink, muShrink });
+    targetW = tang.weights;
+    objectiveLabel = "max ex-ante Sharpe (w ∝ Σ⁻¹μ, UNISONA-SHARPE-CERTIFICATE Thm 2)";
+    if (tang.fallback) notes.push(tang.fallback);
+  }
 
   const current = analysis.portfolio;
-  const proposed = _windowStats(tang.weights, aligned.returns, symbols);
+  const proposed = _windowStats(targetW, aligned.returns, symbols);
   const holdingsBySym = Object.fromEntries(analysis.perSymbol.map((p) => [p.symbol, p]));
 
   // Dry-run order diff: dollar deltas → whole-share orders, skipping dust
-  // (< 1% of portfolio value) so the proposal doesn't churn pennies.
+  // (< 1% of portfolio value) so the proposal doesn't churn pennies. SELL rows
+  // carry an estimated realized gain so after-tax merit is visible (ADR-0028).
   const threshold = Math.max(totalValue * 0.01, 1);
+  const taxRate = Math.min(0.6, Math.max(0, opts.taxRate != null ? Number(opts.taxRate) : 0.37));
   const orders = [];
+  let estRealizedGain = 0;
   symbols.forEach((s, i) => {
     const h = holdingsBySym[s];
-    const delta = tang.weights[i] * totalValue - h.value;
+    const delta = targetW[i] * totalValue - h.value;
     if (Math.abs(delta) < threshold) return;
     const shares = Math.floor(Math.abs(delta) / h.price);
     if (shares < 1) return;
-    orders.push({
+    const order = {
       symbol: s,
       action: delta > 0 ? "BUY" : "SELL",
       shares,
       estDollars: Math.round(shares * h.price * 100) / 100,
       price: h.price,
-    });
+    };
+    if (order.action === "SELL" && h.avgEntry > 0) {
+      order.estGain = Math.round((h.price - h.avgEntry) * shares * 100) / 100;
+      estRealizedGain += order.estGain;
+    }
+    orders.push(order);
   });
+  const estTaxCost = Math.round(Math.max(0, estRealizedGain) * taxRate * 100) / 100;
 
-  const notes = [...analysis.notes];
-  if (tang.fallback) notes.push(tang.fallback);
+  const target = sharpeMandate();
 
   return {
     ok: true,
     window: analysis.window,
     symbols,
     totalValue,
+    objective,
     currentWeights: weights,
-    proposedWeights: tang.weights,
+    proposedWeights: targetW,
     current,
     proposed,
     distinguishable: !ciOverlap(current.sharpe, proposed.sharpe),
     orders,
+    mandate: {
+      target,
+      current: mandateVerdict(current.sharpe, target),
+      proposed: mandateVerdict(proposed.sharpe, target),
+      note: "only meets_ci (CI lower bound clears the mandate) is eligible for live capital — ADR-0028",
+    },
+    tax: {
+      rate: taxRate,
+      estRealizedGain: Math.round(estRealizedGain * 100) / 100,
+      estTaxCost,
+      basis: "avg-cost basis; short-term rate assumed (per-lot dates untracked) — an upper-bound estimate",
+    },
     excluded: analysis.excluded,
     notes,
     method: {
-      objective: "max ex-ante Sharpe (w ∝ Σ⁻¹μ, UNISONA-SHARPE-CERTIFICATE Thm 2)",
+      objective: objectiveLabel,
       constraints: `long-only; max weight ${Math.round(maxWeight * 100)}%; existing holdings only`,
-      shrinkage: `cov off-diagonal ×${1 - (opts.covShrink != null ? opts.covShrink : 0.35)}, μ pulled ${((opts.muShrink != null ? opts.muShrink : 0.5) * 100)}% toward cross-sectional mean`,
+      shrinkage: `cov off-diagonal ×${1 - covShrink}, μ pulled ${muShrink * 100}% toward cross-sectional mean`,
     },
   };
 }
@@ -630,6 +755,7 @@ module.exports = {
   // primitives (exported for tests + reuse)
   fetchDailyHistory, alignReturns, sharpeCI, maxDrawdown, annualizedReturn,
   correlationMatrix, covarianceMatrix, portfolioReturns,
-  solveLinear, capWeights, tangencyWeights, parseHoldings, ciOverlap,
+  solveLinear, capWeights, tangencyWeights, maxReturnWeights, parseHoldings, ciOverlap,
+  sharpeMandate, mandateVerdict,
   TRADING_DAYS,
 };

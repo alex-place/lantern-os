@@ -89,6 +89,10 @@ module.exports = async function portfolioRoutes(req, res, url, ctx) {
   const opts = {
     years: _num(url, 'years', 5),
     maxWeight: _num(url, 'max_weight', 0.35),
+    // ADR-0028: objective selection + vol ceiling + tax-rate assumption
+    objective: url.searchParams.get('objective') === 'max_return' ? 'max_return' : 'sharpe',
+    maxVol: _num(url, 'max_vol', 0.20),
+    taxRate: _num(url, 'tax_rate', 0.37),
   };
 
   try {

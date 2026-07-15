@@ -4022,6 +4022,16 @@ let _advisorAt = 0;
 const _advEsc = (s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const _advPct = (x,dp=1)=>(x*100).toFixed(dp)+'%';
 const _advSharpe = (s)=>`${s.sharpe.toFixed(2)} <span style="color:var(--text2)">[${s.lo.toFixed(2)}, ${s.hi.toFixed(2)}]</span>`;
+// Objective state (ADR-0028): 'sharpe' (default) or 'max_return' + annual vol cap %.
+function _advObjective(){
+  try{ return JSON.parse(localStorage.getItem('advObjective'))||{o:'sharpe',v:20}; }catch(e){ return {o:'sharpe',v:20}; }
+}
+function setAdvisorObjective(o,v){
+  const cur=_advObjective();
+  const next={o:o||cur.o, v:Math.min(60,Math.max(5,Number(v)||cur.v))};
+  try{ localStorage.setItem('advObjective',JSON.stringify(next)); }catch(e){}
+  loadAdvisor(true);
+}
 
 async function loadAdvisor(force){
   const el=document.getElementById('tp-advisor'); if(!el) return;
@@ -4029,9 +4039,11 @@ async function loadAdvisor(force){
   if(!force && Date.now()-_advisorAt<60000 && el.dataset.loaded) return;   // 60s cache
   el.innerHTML='<div class="tp-empty">Measuring holdings… (daily history fetch, a few seconds)</div>';
   try{
+    const obj=_advObjective();
+    const q=obj.o==='max_return'?`?objective=max_return&max_vol=${(obj.v/100).toFixed(2)}`:'';
     const [a,r] = await Promise.all([
       fetch('/api/trading/portfolio/analysis').then(x=>x.json()),
-      fetch('/api/trading/portfolio/rebalance').then(x=>x.json()),
+      fetch('/api/trading/portfolio/rebalance'+q).then(x=>x.json()),
     ]);
     _advisorAt=Date.now(); el.dataset.loaded='1';
     renderAdvisor(el,a,r);
@@ -4071,17 +4083,33 @@ function renderAdvisor(el,a,r){
     <span>Value: <b>$${fmt(a.totalValue,0)}</b></span>
   </div>`;
   const ordRows=(r&&r.ok&&r.orders.length)
-    ? `<table class="tp-table"><thead><tr><th>Action</th><th>Symbol</th><th>Shares</th><th>≈ Value</th></tr></thead><tbody>`+
-      r.orders.map(o=>`<tr><td class="tp-side ${o.action==='BUY'?'long':'short'}">${o.action}</td><td><span class="tp-sym" onclick="focusTicker('${_advEsc(o.symbol)}')">${_advEsc(o.symbol)}</span></td><td>${o.shares}</td><td>$${fmt(o.estDollars,0)}</td></tr>`).join('')+
+    ? `<table class="tp-table"><thead><tr><th>Action</th><th>Symbol</th><th>Shares</th><th>≈ Value</th><th>Est. gain</th></tr></thead><tbody>`+
+      r.orders.map(o=>`<tr><td class="tp-side ${o.action==='BUY'?'long':'short'}">${o.action}</td><td><span class="tp-sym" onclick="focusTicker('${_advEsc(o.symbol)}')">${_advEsc(o.symbol)}</span></td><td>${o.shares}</td><td>$${fmt(o.estDollars,0)}</td><td>${o.estGain!=null?(o.estGain>=0?'+':'−')+'$'+fmt(Math.abs(o.estGain),0):'—'}</td></tr>`).join('')+
       `</tbody></table>`
     : `<div class="adv-note">No rebalance orders suggested — current weights are within 1% of the proposal.</div>`;
+  const obj=_advObjective();
+  const mandate=(r&&r.ok&&r.mandate)
+    ? `<div class="adv-note">Sharpe mandate (ADR-0028, target ${r.mandate.target}): current <b>${_advEsc(r.mandate.current)}</b>, proposed <b>${_advEsc(r.mandate.proposed)}</b> — only meets_ci (CI lower bound above target) is eligible for live capital; everything else stays paper/dry-run.</div>` : '';
+  const tax=(r&&r.ok&&r.tax&&r.orders.some(o=>o.action==='SELL'))
+    ? `<div class="adv-note">Tax estimate: selling realizes ≈$${fmt(r.tax.estRealizedGain,0)} of gains → ~$${fmt(r.tax.estTaxCost,0)} at ${Math.round(r.tax.rate*100)}% (${_advEsc(r.tax.basis)}). Buy-only contributions realize nothing.</div>` : '';
+  const controls=`<div class="adv-row" role="group" aria-label="Optimization objective">
+      <label for="advObj">Objective</label>
+      <select id="advObj" class="adv-btn" onchange="setAdvisorObjective(this.value,null)" aria-label="Optimization objective">
+        <option value="sharpe"${obj.o!=='max_return'?' selected':''}>Max Sharpe (risk-adjusted)</option>
+        <option value="max_return"${obj.o==='max_return'?' selected':''}>Max return @ vol cap</option>
+      </select>
+      ${obj.o==='max_return'?`<label for="advVol">Vol cap %/yr</label><input type="number" id="advVol" min="5" max="60" step="1" value="${obj.v}" aria-label="Annualized volatility ceiling percent" onchange="setAdvisorObjective(null,this.value)">`:''}
+    </div>`;
   const excluded=(a.excluded&&a.excluded.length)?`<div class="adv-note">Excluded: ${a.excluded.map(e=>`${_advEsc(e.symbol)} (${_advEsc(e.reason)})`).join('; ')}</div>`:'';
   el.innerHTML=`<div class="adv-wrap">
     ${stats}
     <div class="adv-h">Suggestions (computed, not AI)</div>
     <ul class="adv-list">${_advSuggestions(a,r).join('')}</ul>
     <div class="adv-h">Rebalance proposal — dry run, nothing placed</div>
+    ${controls}
     ${ordRows}
+    ${mandate}
+    ${tax}
     <div class="adv-h">Contribution planner</div>
     <div class="adv-row">
       <label for="advCash">Adding new cash?</label>

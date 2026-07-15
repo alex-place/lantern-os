@@ -1359,6 +1359,8 @@ const REGISTRY = {
       properties: {
         years: { type: "number", description: "history window in years (2–10, default 5)" },
         max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+        objective: { type: "string", enum: ["sharpe", "max_return"], description: "optimization objective: 'sharpe' (default, shrunk tangency) or 'max_return' (max expected return under the vol ceiling — ADR-0028)" },
+        max_vol: { type: "number", description: "annualized volatility ceiling for objective=max_return, as a fraction (0.05–0.60, default 0.20)" },
       },
     },
     async run(i, ctx) {
@@ -1370,7 +1372,7 @@ const REGISTRY = {
         const pos = Array.isArray(d.positions) ? d.positions : [];
         if (!pos.length) return "[propose_rebalance: no open positions — nothing to rebalance.]";
         const pa = require("./portfolio-analytics");
-        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight });
+        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight, objective: i.objective, maxVol: i.max_vol });
         if (!r.ok) return `[propose_rebalance: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
         const wRows = r.symbols.map((s, idx) =>
           `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.proposedWeights[idx]).padStart(6)}`);
@@ -1380,10 +1382,15 @@ const REGISTRY = {
         const verdict = r.distinguishable
           ? "the proposed allocation's Sharpe CI clears the current one on this window — a measurable improvement"
           : "the 95% CIs OVERLAP — current and proposed are statistically indistinguishable on this window; taxes, simplicity, or preference may reasonably decide";
+        const taxLine = r.tax && r.orders.some((o) => o.action === "SELL")
+          ? `Tax (est.): realized gain $${r.tax.estRealizedGain.toLocaleString("en-US")} → ~$${r.tax.estTaxCost.toLocaleString("en-US")} at ${Math.round(r.tax.rate * 100)}% (${r.tax.basis}).`
+          : "Tax: no sells in this proposal — nothing realized.";
         return [
-          `Rebalance PROPOSAL — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
+          `Rebalance PROPOSAL (objective: ${r.objective}) — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
           `Current : ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
           `Proposed: ex-ante Sharpe ${_pfSharpe(r.proposed.sharpe)} · vol ${_pfPct(r.proposed.volAnnual)}/yr · worst drawdown ${_pfPct(r.proposed.maxDD)}`,
+          `Sharpe mandate (ADR-0028, target ${r.mandate.target}): current ${r.mandate.current}, proposed ${r.mandate.proposed} — ${r.mandate.note}.`,
+          taxLine,
           `Verdict: ${verdict}.`,
           "Weights (current → proposed):",
           ...wRows,

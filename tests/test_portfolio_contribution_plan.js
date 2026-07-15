@@ -103,6 +103,56 @@ async function main() {
   }
 
   console.log("ok - planContribution: buy-only fill, cash conservation, weight convergence, degenerate + invalid inputs");
+
+  // ── ADR-0028: max-return objective, Sharpe mandate, tax estimates ──────────
+
+  // 7) maxReturnWeights: long-only, capped, vol ceiling respected, sums to 1
+  const symbols = ["AAA", "BBB", "CCC"];
+  const aligned = pa.alignReturns({ AAA: history.AAA, BBB: history.BBB, CCC: history.CCC });
+  const mu = symbols.map((s) => aligned.returns[s].reduce((a, b) => a + b, 0) / aligned.returns[s].length);
+  const cov = pa.covarianceMatrix(aligned.returns, symbols);
+  const tightCapDaily = 0.05 / Math.sqrt(pa.TRADING_DAYS); // 5%/yr — must bind
+  const mr = pa.maxReturnWeights({ symbols, mu, cov, maxVolDaily: tightCapDaily, maxWeight: 0.6 });
+  const wsum = mr.weights.reduce((a, b) => a + b, 0);
+  assert.ok(Math.abs(wsum - 1) < 1e-6, `max-return weights must sum to 1 (got ${wsum})`);
+  assert.ok(mr.weights.every((w) => w >= -1e-9 && w <= 0.6 + 1e-6), "long-only + cap respected");
+  const shrunk = cov.map((row, i2) => row.map((x, j) => (i2 === j ? x : x * 0.65)));
+  const volOf = (w) => {
+    let v = 0;
+    for (let a2 = 0; a2 < w.length; a2++) for (let b2 = 0; b2 < w.length; b2++) v += w[a2] * shrunk[a2][b2] * w[b2];
+    return Math.sqrt(Math.max(v, 0));
+  };
+  assert.ok(volOf(mr.weights) <= tightCapDaily * 1.05, "the vol ceiling must bind (within solver tolerance)");
+  // loose ceiling → corner solution, expected return ≥ tangency's
+  const loose = pa.maxReturnWeights({ symbols, mu, cov, maxVolDaily: 1, maxWeight: 0.6 });
+  const tang = pa.tangencyWeights({ symbols, mu, cov, maxWeight: 0.6 });
+  const eret = (w) => w.reduce((s2, x, i2) => s2 + x * mu[i2], 0);
+  assert.ok(eret(loose.weights) >= eret(tang.weights) - 1e-9,
+    "with a loose ceiling, max-return must earn at least the tangency expected return");
+
+  // 8) mandate verdicts (ADR-0028)
+  assert.strictEqual(pa.mandateVerdict({ sharpe: 2.5, lo: 2.1, hi: 2.9 }, 2), "meets_ci");
+  assert.strictEqual(pa.mandateVerdict({ sharpe: 2.2, lo: 1.4, hi: 3.0 }, 2), "meets_point");
+  assert.strictEqual(pa.mandateVerdict({ sharpe: 0.8, lo: 0.1, hi: 1.5 }, 2), "below");
+
+  // 9) proposeRebalance carries objective, mandate + tax; SELL rows carry est. gains
+  const posOverweight = [
+    { symbol: "AAA", qty: 1, current_price: 100, avg_entry_price: 90 },
+    { symbol: "BBB", qty: 40, current_price: 50, avg_entry_price: 20 },  // huge overweight, big gain
+    { symbol: "CCC", qty: 8, current_price: 25, avg_entry_price: 30 },
+  ];
+  const reb = await pa.proposeRebalance(posOverweight, { years: 2, history, objective: "max_return", maxVol: 0.10 });
+  assert.strictEqual(reb.ok, true, `rebalance should succeed: ${reb.reason}`);
+  assert.strictEqual(reb.objective, "max_return");
+  assert.ok(reb.mandate && reb.mandate.target > 0 && ["meets_ci", "meets_point", "below"].includes(reb.mandate.current),
+    "mandate block present with a valid verdict");
+  const sells = reb.orders.filter((o) => o.action === "SELL");
+  assert.ok(sells.length >= 1, "the overweight winner must be trimmed");
+  assert.ok(sells.every((o) => typeof o.estGain === "number"), "SELL rows carry estimated realized gain");
+  assert.ok(reb.tax && reb.tax.estTaxCost >= 0 && reb.tax.rate > 0, "tax block present with non-negative cost");
+  assert.ok(reb.tax.estRealizedGain > 0, "trimming a 150% winner must realize a positive est. gain");
+
+  console.log("ok - ADR-0028: max-return frontier solver, mandate verdicts, tax-aware rebalance proposals");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
