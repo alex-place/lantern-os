@@ -673,6 +673,13 @@
      re-expands automatically once the account has equity or an open position. */
   body.acct-empty .footer{ height:auto!important; min-height:0!important; max-height:none!important; flex:0 0 auto; box-shadow:none; }
   body.acct-empty .tp-body{ display:none; }
+  /* Σ₀ Signals and Journal carry content even with an EMPTY account (they're
+     engine/device data, not broker data) — when one of them is the active tab,
+     un-collapse the footer so the pane is actually visible. */
+  body.acct-empty .footer:has(#tp-signals.active),
+  body.acct-empty .footer:has(#tp-journal.active){ height:var(--footer-h, clamp(220px,34vh,460px))!important; min-height:180px!important; }
+  body.acct-empty .footer:has(#tp-signals.active) .tp-body,
+  body.acct-empty .footer:has(#tp-journal.active) .tp-body{ display:block; }
   body.acct-empty .footer-resize{ display:none; }
   body.acct-empty .tp-tabs{ border-bottom:0; opacity:.8; }
   body.acct-empty .hstat.acct{ opacity:.45; }
