@@ -17,7 +17,6 @@
  */
 
 const alpaca = require('./alpaca-adapter');
-const alpacaStore = require('./alpaca-credentials');
 
 /**
  * @param {string} userId
@@ -30,8 +29,9 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     const acct = await ibkrBridge.getIBKRAccount(userId).catch(() => null);
     if (acct && acct.account_id) return { broker: 'ibkr', accountId: acct.account_id, facade: ibkrBridge };
   }
-  // Else the user's one-click Alpaca account, wrapped to present the IBKR-named surface.
-  if (alpacaStore.has(userId)) {
+  // Else an Alpaca account (user's own OAuth, or the operator's server paper keys),
+  // wrapped to present the IBKR-named surface.
+  if (alpaca.available(userId)) {
     const acct = await alpaca.getAccount(userId).catch(() => null);
     if (acct) {
       const facade = {

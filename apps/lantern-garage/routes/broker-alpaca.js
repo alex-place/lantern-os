@@ -117,7 +117,18 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
 
   // GET /status — redacted connection state (safe for guests to poll)
   if (method === 'GET' && p === '/api/broker/alpaca/status') {
-    return _json(res, 200, { ...store.publicStatus(userId), configured: _configured() }), true;
+    const st = store.publicStatus(userId);
+    // If the user has no OAuth token but the operator set server paper keys, the
+    // trader still trades a real Alpaca paper account — report that as connected.
+    if (!st.connected) {
+      const adapter = require('../lib/alpaca-adapter');
+      if (adapter.available(userId)) {
+        return _json(res, 200, { connected: true, hasCredentials: true, provider: 'alpaca',
+          env: process.env.ALPACA_ENV === 'live' ? 'live' : 'paper', mode: 'paper',
+          via: 'server-keys', accountNumber: null, configured: _configured() }), true;
+      }
+    }
+    return _json(res, 200, { ...st, configured: _configured() }), true;
   }
 
   // GET /connect — start OAuth2. ?env=live opts into the live account; default paper.

@@ -2695,8 +2695,9 @@ async function submitOrderTicket(){
     submit.style.pointerEvents='';
     if(result && result.status === 'placed'){
       const fill = result.fill_price ? ` @ $${result.fill_price}` : '';
-      const sim = result.source==='paper-sim' ? ' (paper)' : '';
-      _alertToast(`✓ ${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — filled`);
+      const sim = result.mode==='paper' ? ' (paper)' : '';
+      const verb = result.fill_price ? 'filled' : 'placed';
+      _alertToast(`✓ ${otSide.toUpperCase()} ${qty} ${otTicker}${fill}${sim} — ${verb}`);
       journalLog({ symbol:otTicker, side:otSide, qty, type:otOrderType, source:'ticket' });   // #2446
       closeOrderTicket();
       await Promise.all([loadOrders(), loadPortfolio()]);
@@ -3945,7 +3946,7 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
     });
     const result = await r.json();
     if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||r.statusText)); return false; }
-    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.source==='paper-sim'?' (paper)':''}`);
+    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;

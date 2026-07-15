@@ -122,13 +122,12 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       const uid = getEffectiveUserId(req);
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
       const alpaca = require('../../lib/alpaca-adapter');
-      const paper = require('../../lib/stock-paper-ledger');
-      // Broker precedence: connected IBKR → connected Alpaca → the LOCAL paper
-      // simulator (so the PAPER badge is real — an unconnected user gets a
-      // virtual account that actually fills, instead of a dry-run dead end).
+      // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
+      // else the operator's server paper keys). Alpaca PAPER fills for real without
+      // arming — so a paper trade actually happens instead of a dry-run dead end.
       const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
         || (await alpaca.placeOrder(uid, orderReq).catch(() => null))
-        || await paper.placeOrder(uid, orderReq);
+        || { status: 'error', ticker, side, qty, reason: 'No broker connected. Connect Alpaca (one click) or ask an admin to set Alpaca paper keys to trade.' };
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
