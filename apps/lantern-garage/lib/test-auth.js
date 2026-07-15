@@ -58,7 +58,11 @@ const PROXY_HEADERS = [
 // The one seeded test identity. Stable id so per-user state (conversations, IBKR
 // creds, …) is consistent across runs. Password is only used for the real
 // form-login path; override with LANTERN_TEST_PASSWORD.
-const TEST_ID = "test-user";
+// LANTERN_TEST_USER_ID lets a dev boot emulate a SPECIFIC profile id so per-user
+// state saved under that id (e.g. an IBKR connection, pointed at read-only via
+// IBKR_CRED_DIR) can be exercised without duplicating credential files. Same
+// token + direct-only gates apply; production never sets any of this.
+const TEST_ID = process.env.LANTERN_TEST_USER_ID || "test-user";
 const TEST_EMAIL = "test@unisona.local";
 const TEST_NAME = "Test User";
 const TEST_DEFAULT_PASSWORD = "test-account-1234";

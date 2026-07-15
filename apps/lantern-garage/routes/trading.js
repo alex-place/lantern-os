@@ -12,6 +12,11 @@ const tradingStore = require('../lib/trading-store');
 const { readJsonCached } = require('../lib/jsonl-cache');
 const tradingNews = require('../lib/trading-news');
 const { getEffectiveUserId } = require("../lib/session-identity"); // per-user IBKR (ADR-0022)
+const { internalUserId } = require("../lib/request-auth");
+// Chat tools reach these routes via a session-less in-process loopback GET, so the
+// session resolver alone would drop the requesting user (and with it their per-user
+// IBKR connection). Fall back to the operator-trusted forwarded id (x-keystone-user).
+const effectiveUserId = (req) => getEffectiveUserId(req) || internalUserId(req) || null;
 const { recordOrder, recordSignal, queryRecentTradingRecords } = tradingMemory;
 const { TradingPriceFeed } = require('../lib/trader-price-feed');
 const { getStrategyFitness, logPerformance } = require('../lib/strategy-performance-logger');
@@ -268,7 +273,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   const ctx = {
     req, res, url, deps, sendJson, collectRequestBody, bridge,
     traderAgent, getPriceFeed, callAITrader, callDashboard,
-    tradingMemory, tradingStore, tradingNews, readJsonCached, getEffectiveUserId,
+    tradingMemory, tradingStore, tradingNews, readJsonCached, getEffectiveUserId: effectiveUserId,
     recordOrder, recordSignal, queryRecentTradingRecords,
     getStrategyFitness, logPerformance, tradeHistory,
     DASHBOARD_PROXY_ROUTES, DIRECT_DASHBOARD_PROXY_PATHS,
