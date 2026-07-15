@@ -49,6 +49,22 @@ operator's primary brokerage account.
    tax-hostile. Phase 2 (env-gated, dry-run only): levered max-return proposals for **margin-approved,
    tax-advantaged or dedicated agentic accounts only**, once per-lot tax tracking and intra-day risk
    monitoring exist.
+
+   **Phase-2 overlay spec (validated 2026-07-15, `experiments/leverage_overlay_opt2.py`):** leverage is
+   never static — it is reset **daily** as `gross = min(2.0, 0.20/vol20d) × trendGate(6mo) × brake(dd>15% → 1×)`,
+   where vol20d is annualized 20-day realized vol of the tangency direction. Tuned on 2000–2012 ONLY,
+   validated untouched on 2013–2026 (Sharpe 0.97; the 15%-vol variant reaches 1.00 but surrenders the
+   SPY beat — a real frontier trade-off, both recorded). Evidence, $20/mo walk-forward 2000–2026:
+   final **$49,460 vs SPY DCA $38,604 (+$10,856)**, worst drawdown **−28%** (vs −51% static 2× and SPY),
+   min Reg-T maintenance cushion +22.9% (never near a call). Stress: 1,000 two-year block-bootstrap
+   paths built only from the four worst downturns (dot-com, GFC, COVID, 2022), starting $25k:
+   **0/1,000 margin calls, P(ending < $10k) 1.6% vs 70.2% for static 2×**, median $15.6k vs $7.6k,
+   worst path $6.4k vs $337. Conclusion encoded here: margin calls are not the binding risk at 2× with
+   frequent rebalancing — wipeout-grade drawdowns are, and the daily overlay is what removes them, so
+   **Phase 2 ships with the overlay or not at all**. Day-level corrections only (4:1 intraday PDT leverage
+   is not simulatable from daily bars and is out of scope); taxes still unmodeled → dry-run/IRA/dedicated
+   accounts remain the boundary; 27 configs were searched, so deflated-Sharpe skepticism applies at the
+   margin (2603.09219).
 5. **Execution containment.** Agent-managed live capital, when a strategy earns it, goes through a
    **dedicated account the agent can reach and nothing else** — Robinhood Agentic Trading MCP (equities
    beta) or an isolated IBKR sub-account — with operator-set deposit limits, per-trade notifications, and
