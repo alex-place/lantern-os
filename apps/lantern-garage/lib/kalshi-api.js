@@ -251,6 +251,13 @@ async function placeOrder(o) {
   if (process.env.KALSHI_TRADING_ENABLED !== "1") blockers.push("trading_disabled (set KALSHI_TRADING_ENABLED=1)");
   if (!liveTradingFlagEnabled()) blockers.push("live_flag_off (enable admin flag 'kalshi_live_trading' at /admin-flags.html)");
   if (killSwitchActive()) blockers.push("kill_switch_active (data/kalshi/LIVE-KILL-SWITCH)");
+  // PROVE-OR-PAUSE (docs/TRADER-ANALYSIS-2026-07.md P0-1): no strategy has a settlement-graded,
+  // out-of-sample, net-of-fee positive EV yet. Live orders are hard-paused until the owner runs
+  // the fee-inclusive backtest (kalshi_pnl_backtest.py) and DELIBERATELY asserts a proven edge by
+  // setting KALSHI_LIVE_EDGE_PROVEN=1. Fail-closed: default (unset) blocks every live order.
+  if (process.env.KALSHI_LIVE_EDGE_PROVEN !== "1") {
+    blockers.push("edge_unproven (no OOS net-of-fee settlement-graded EV; set KALSHI_LIVE_EDGE_PROVEN=1 only after a positive backtest — see docs/TRADER-ANALYSIS-2026-07.md)");
+  }
   if (!hasCredentials()) blockers.push("credentials_required");
 
   // Scope gate: restrict live orders to the allowlisted source(s). An unsourced or
@@ -276,7 +283,15 @@ async function placeOrder(o) {
   const maxN = liveMaxContracts();
   const cappedCount = Math.min(o.count || 1, maxN);
 
-  const clientOrderId = crypto.randomUUID();
+  // P0-8: DETERMINISTIC client_order_id from the order params + a 10s time bucket, so an
+  // accidental retry/double-click within the window reuses the id and Kalshi dedups it (409 =
+  // already-placed, safe) instead of a fresh UUID that silently places a SECOND contract.
+  const idBucket = Math.floor(Date.now() / 10000);
+  const clientOrderId = crypto
+    .createHash("sha256")
+    .update([o.ticker, o.side, o.action, o.count, o.limitCents, o.source, idBucket].join("|"))
+    .digest("hex")
+    .slice(0, 32);
   const base = {
     ticker: o.ticker, side: o.side, action: o.action, count: cappedCount,
     type: o.type || "limit", clientOrderId, source: o.source || null,
@@ -298,8 +313,18 @@ async function placeOrder(o) {
     if (o.side === "yes") body.yes_price = o.limitCents; else body.no_price = o.limitCents;
   }
   const res = await request("POST", "/portfolio/orders", { auth: true, body });
-  logLedger({ event: "live_order_submitted", mode: "live", environment: ENV, status: res.status, ...base });
-  return { mode: "live", status: res.status, result: res.data, order: base };
+  // P0-2: distinct events per OUTCOME (accepted vs rejected — the ledger used to log every
+  // attempt as "submitted", conflating rejects/dups with real fills), and capture Kalshi's
+  // order_id so a row is reconcilable against settlement later (P0-8).
+  const ok = res.status >= 200 && res.status < 300;
+  const orderId = (res.data && res.data.order && res.data.order.order_id) || null;
+  logLedger({
+    event: ok ? "live_order_accepted" : "live_order_rejected",
+    mode: "live", environment: ENV, status: res.status,
+    orderId, error: ok ? null : ((res.data && (res.data.error || res.data.message)) || null),
+    ...base,
+  });
+  return { mode: "live", status: res.status, ok, orderId, result: res.data, order: base };
 }
 
 async function cancelOrder(orderId) {

@@ -320,8 +320,11 @@ function getEnhancer() {
   return enhancer;
 }
 
+// P0-5 (docs/TRADER-ANALYSIS-2026-07.md): DISABLED. The enhancer's "web search" is a static
+// hardcoded dict and its input file doesn't exist — a self-referential loop entrenching a
+// heuristic. Inert no-op (called from boot AND the API route) until backed by a real signal.
 function startEnhancing() {
-  getEnhancer().start();
+  /* P0-5: inert no-op — the static-dict mock enhancement loop is never started. */
 }
 
 function stopEnhancing() {

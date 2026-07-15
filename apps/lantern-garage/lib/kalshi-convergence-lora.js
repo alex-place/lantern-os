@@ -383,12 +383,17 @@ function getLora() {
   return lora;
 }
 
+// P0-5 (docs/TRADER-ANALYSIS-2026-07.md): DISABLED. This "LoRA" made predictions with
+// Math.random() (see analyzeMarkets) and logged them as "HIGH CONF", and finetuneModel() is a
+// mock — a self-referential loop that presents random output + escalating cycle counts as if it
+// were learning. startAnalyzing is now an inert no-op (called from boot AND the API route) so the
+// mock loop cannot run anywhere. Re-enable only when backed by a real, settlement-graded model.
 function startAnalyzing() {
-  getLora().start();
+  /* P0-5: inert no-op — the mock Math.random predictor loop is never started. */
 }
 
 function stopAnalyzing() {
-  getLora().stop();
+  try { getLora().stop(); } catch (_) { /* nothing running */ }
 }
 
 module.exports = {

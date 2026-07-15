@@ -786,15 +786,15 @@ server.listen(port, host, () => {
     newsCollector.start(300000); // 5-min interval
     deps.newsCollector = newsCollector; // Make available to routes
 
-    // ── Kalshi Position Monitor (10s polling) + Convergence Trainer ──
+    // ── Kalshi Position Monitor (10s polling) ──
     const { startMonitoring } = require("./lib/kalshi-position-monitor");
-    const { trainModel } = require("./lib/kalshi-convergence-trainer");
-    const { startEnhancing } = require("./lib/kalshi-convergence-enhancer");
-    const { startAnalyzing } = require("./lib/kalshi-convergence-lora");
     startMonitoring();   // Start automated stop-loss monitoring
-    trainModel().catch(e => console.error("[Server] Convergence training failed:", e.message));
-    startEnhancing();    // Start continuous convergence improvement loop
-    startAnalyzing();    // Start LoRA fine-tuning (proactive, no trades needed)
+    // P0-5 (docs/TRADER-ANALYSIS-2026-07.md): the "convergence" trainer/enhancer/LoRA loops are
+    // NOT booted. They were a self-referential mock — the LoRA predictor returned Math.random()
+    // labeled "HIGH CONF", the enhancer's "web search" was a static dict, and the trainer's label
+    // was a hand rule over the current spread (not a realized outcome) — running 24/7 and logging
+    // escalating cycle counts as if it were learning. They stay inert no-ops until backed by a
+    // real, settlement-graded model.
   }
 
   // ── Crypto CIO Live Trader (15-min market observer + paper-trade signal log) ──
