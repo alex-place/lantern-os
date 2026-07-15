@@ -33,7 +33,7 @@ const mock = http.createServer((req, res) => {
     const send = (o, c = 200) => { res.writeHead(c, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
     const p = req.url.split('?')[0];
     if (p === '/v1/api/oauth/live_session_token') {
-      const A = BigInt('0x' + /diffie_hellman_challenge="([0-9a-f]+)"/.exec(req.headers.authorization)[1]);
+      const A = BigInt('0x' + req.headers.authorization.match(/diffie_hellman_challenge="([0-9a-f]+)"/)[1]);
       const b = BigInt('0x' + crypto.randomBytes(32).toString('hex'));
       const B = modPow(2n, b, P), K = modPow(A, b, P);
       const lst = crypto.createHmac('sha1', Buffer.from(toBigEndianBytes(K))).update(SECRET_PLAIN).digest('base64');
@@ -84,6 +84,19 @@ const harness = http.createServer(async (req, res) => {
   const st = await (await fetch(`${base}/api/trading/ibkr/connection`)).json();
   ok(st.hasCredentials === true && st.live && st.live.connected === true, 'GET connection reports connected');
 
+  console.log('leave-blank-to-keep (saved creds fill blank fields)');
+  const partial = {
+    consumerKey: '', accessToken: 'PH3TOKEN2', accessTokenSecret: '',
+    signaturePem: '', encryptionPem: '', dhPrime: '', realm: '', accountId: 'DU1234567',
+  };
+  const pr = await (await fetch(`${base}/api/trading/ibkr/connect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(partial) })).json();
+  ok(pr.ok === true && pr.live && pr.live.connected === true, 'partial update (blanks) succeeds and still probes connected');
+  const kept = store.load(USER);
+  ok(kept.signaturePem === creds.signaturePem && kept.encryptionPem === creds.encryptionPem
+     && kept.consumerKey === CONSUMER && kept.dhPrime === DH_PRIME,
+     'blank fields kept the previously saved values');
+  ok(kept.accessToken === 'PH3TOKEN2', 'non-blank field was updated');
+
   console.log('bad-credentials probe fails soft (no fabrication)');
   const badCreds = { ...creds, encryptionPem: crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey.export({ type: 'pkcs1', format: 'pem' }) };
   const br = await (await fetch(`${base}/api/trading/ibkr/connect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(badCreds) })).json();
@@ -94,6 +107,11 @@ const harness = http.createServer(async (req, res) => {
   ok(dr.ok === true && dr.removed === true, 'disconnect removes the stored credentials');
   const st2 = await (await fetch(`${base}/api/trading/ibkr/connection`)).json();
   ok(st2.hasCredentials === false, 'after disconnect, no credentials remain');
+
+  console.log('blank field with NO saved creds still fails validation');
+  const mrRes = await fetch(`${base}/api/trading/ibkr/connect`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...creds, signaturePem: '' }) });
+  const mr = await mrRes.json();
+  ok(mrRes.status === 400 && mr.error === 'missing_signaturePem', 'no saved creds → blank field is rejected with missing_<field>');
 
   try { fs.unlinkSync(store._file(USER)); } catch {}
   mock.close(); harness.close();
