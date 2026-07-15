@@ -361,7 +361,16 @@ function withSession(req, res, handler) {
 }
 
 async function route(req, res) {
-  const url = new URL(req.url, `http://${req.headers.host}`);
+  // A malformed request target throws in the URL parser — most commonly a leading
+  // "//", which `new URL` reads as a protocol-relative authority with an empty host
+  // ("Invalid URL"). That is a bad request, not a server fault: parse defensively and
+  // answer 400 instead of letting it bubble to the unhandled-error 500 handler.
+  let url;
+  try {
+    url = new URL(req.url, `http://${req.headers.host}`);
+  } catch {
+    return sendJson(res, { error: "bad_request", detail: "malformed request target" }, 400);
+  }
 
   // #1946 G4 desktop loopback token: when the launcher-opened page carries the
   // per-boot ?__lt=<token> matching UNISONA_LOCAL_TOKEN, hand the browser a
