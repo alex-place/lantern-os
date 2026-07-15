@@ -10,6 +10,12 @@ const _PROVIDER_ALIASES = {
   cohere: "cohere", command: "cohere",
 };
 
+// True when this deployment is pointed at Vertex. Mirrors gemini-transport.useVertex()
+// (kept as a bare env read so ordering never pulls in google-auth-library).
+function _vertexConfigured() {
+  return process.env.GEMINI_USE_VERTEX === "1" || !!process.env.VERTEX_PROJECT;
+}
+
 function _dispatchHasKey(p) {
   const e = process.env;
   switch (p) {
@@ -49,8 +55,15 @@ function buildBrainOrder({ requestedProvider, hintProvider }) {
   // Operator preference (KEYSTONE_PREFERRED_PROVIDER) leads Auto mode — e.g. set to
   // "gemini" to spend Google credits first. Only biases the lead; the brain hint and
   // the full backstop chain still follow, so a down/rate-limited preferred provider
-  // never dead-ends the turn. Empty/unset → unchanged (brain hint leads).
-  push(process.env.KEYSTONE_PREFERRED_PROVIDER);
+  // never dead-ends the turn. Empty/unset → the Vertex default below decides.
+  //
+  // Vertex being configured means Google Cloud credits are funding this deployment,
+  // and Vertex is the ONLY wire that draws them (the AI-Studio key is free-tier and
+  // bills nothing — see lib/gemini-transport). So absent an explicit preference,
+  // Gemini leads there: spending the credits is the reason Vertex was turned on.
+  // Still only a lead bias — the backstop chain follows, so a Vertex outage or
+  // rate-limit never dead-ends the turn.
+  push(process.env.KEYSTONE_PREFERRED_PROVIDER || (_vertexConfigured() ? "gemini" : null));
   push(hintProvider);                  // the brain's pick leads next
   for (const p of DISPATCH) push(p);   // stable backstop chain after it
   return order.filter(_dispatchHasKey);

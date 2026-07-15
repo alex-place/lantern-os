@@ -10,7 +10,7 @@ const path = require("path");
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
-const { modelFor: defaultModelFor, isAllowedModel } = require("./provider-models");
+const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getEffectiveUserId } = require("./session-identity");
@@ -2563,23 +2563,23 @@ async function handleStreamChat(req, url, res) {
         // else: fall through to grounded single-shot / model chain
       }
     }
-    // Gemini model fallback chain: primary -> fallbacks on 429/quota
-    // Note: gemini-2.0-flash-lite shut down June 1 2026; gemini-3.5-flash is GA with free grounding
-    const GEMINI_MODEL_CHAIN = [
-      modelFor("gemini"),
-      "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-    ];
+    // Gemini model fallback chain: primary -> fallbacks on 429/quota. The ids come
+    // from provider-models.js (the single source of truth) and are probe-verified on
+    // Vertex — the previous inline `gemini-3.x` fallbacks 404'd on every wire.
+    const GEMINI_MODEL_CHAIN = [...new Set([modelFor("gemini"), ...GEMINI_FALLBACK_MODELS])];
     for (const geminiModel of (requestedProvider && requestedProvider.startsWith("gemini-")
       ? [requestedProvider]
       : GEMINI_MODEL_CHAIN)) {
     try {
-      // Grounding: Google Search enabled by default on gemini-3.x models (5K free/month)
-      // Disable with GEMINI_GROUNDING=false if needed
+      // Grounding: Google Search, on by default. Disable with GEMINI_GROUNDING=false.
       const { geminiTransport, useVertex } = require("./gemini-transport");
       // Google Search grounding only on the AI Studio wire (Vertex uses a different
       // grounding schema; keep Vertex calls plain so they just work + spend credits).
-      const isGroundable = geminiModel.startsWith("gemini-3") && !useVertex();
+      // The model test tracks the googleSearch tool schema, which 2.5+ speaks (1.5/2.0
+      // used googleSearchRetrieval). It previously read startsWith("gemini-3") — no
+      // gemini-3 has ever reached this chain, so grounding was silently off for every
+      // turn on every wire.
+      const isGroundable = /^gemini-(2\.5|3)/.test(geminiModel) && !useVertex();
       const groundingEnabled = process.env.GEMINI_GROUNDING !== "false" && isGroundable;
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {

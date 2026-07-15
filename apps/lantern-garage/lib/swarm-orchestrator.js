@@ -37,7 +37,9 @@ const PROVIDER_CONFIG = {
     baseUrl: "generativelanguage.googleapis.com",
     path: (model) => `/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     defaultModel: "gemini-2.5-flash",
-    modelChain: ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.1-flash-lite"],
+    // Probe-verified on Vertex us-central1 (2026-07-15). The gemini-3.x ids that sat
+    // here 404 on every wire — they do not exist.
+    modelChain: ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"],
     strengths: ["chat", "summarize", "vision"],
     costTier: "free/cheap",
     streamFormat: "gemini",

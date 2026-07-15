@@ -32,6 +32,15 @@ const ENV_VAR = {
   cohere: "COHERE_MODEL",
 };
 
+// Ordered quota/429 fallbacks tried after modelFor("gemini"). This lives here rather
+// than inline in a caller because that is precisely how the previous chain rotted: it
+// listed `gemini-3.5-flash` and `gemini-3.1-flash-lite`, which do not exist on any
+// wire. Every fallback hop was a guaranteed 404 — and on Vertex, where a 404 is not a
+// retryable quota error, the cloud box had no working fallback at all.
+// Probed live against Vertex us-central1 (2026-07-15): 2.5-flash, 2.5-flash-lite and
+// 2.5-pro all answer 200; both gemini-3.x ids 404. Re-probe before editing this list.
+const GEMINI_FALLBACK_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-pro"];
+
 /** Resolve the effective model for a provider: env override if set, else the default. */
 function modelFor(provider) {
   const key = ENV_VAR[provider];
@@ -72,4 +81,4 @@ function isAllowedModel(provider, model) {
   return (CHAT_MODEL_OPTIONS[provider] || []).some((m) => m.id === model);
 }
 
-module.exports = { DEFAULTS, ENV_VAR, modelFor, CHAT_MODEL_OPTIONS, isAllowedModel };
+module.exports = { DEFAULTS, ENV_VAR, modelFor, CHAT_MODEL_OPTIONS, isAllowedModel, GEMINI_FALLBACK_MODELS };
