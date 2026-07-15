@@ -208,12 +208,21 @@ class SlotManager:
         self._cache = data
         self._dirty = True
 
+    def _flush_locked(self) -> None:
+        """Write the dirty cache to disk. The CALLER must already hold self._lock.
+
+        This is the lock-free body of flush(), factored out so a method that already
+        holds the (non-reentrant) self._lock can persist WITHOUT calling flush() and
+        re-acquiring the same lock — which would self-deadlock. See purge_released().
+        """
+        if self._dirty and self._cache is not None:
+            with open(self.path, "w", encoding="utf-8") as f:
+                json.dump(self._cache, f, indent=2)
+            self._dirty = False
+
     def flush(self) -> None:
         with self._lock:
-            if self._dirty and self._cache is not None:
-                with open(self.path, "w", encoding="utf-8") as f:
-                    json.dump(self._cache, f, indent=2)
-                self._dirty = False
+            self._flush_locked()
 
     def claim(self, slot_type: str, request_id: str, context: Optional[Dict[str, Any]] = None) -> Optional[str]:
         with self._lock:
@@ -261,7 +270,9 @@ class SlotManager:
             removed = before - len(data["slots"])
             if removed > 0:
                 self._write(data)
-                self.flush()
+                # We already hold self._lock; calling flush() here would re-acquire the
+                # non-reentrant lock and deadlock. Persist via the lock-free body.
+                self._flush_locked()
             return removed
 
     def active_count(self, slot_type: str) -> int:
