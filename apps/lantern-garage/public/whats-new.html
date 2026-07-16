@@ -5,9 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#7c6af7">
-  <title>What's New — Unisona 1.8 — unisona.ai</title>
-  <meta name="description" content="Unisona 1.8 — the personal reasoning cockpit goes public. One front door, one loop, a cockpit at every stage.">
-  <meta property="og:title" content="Unisona 1.8 — the personal reasoning cockpit goes public">
+  <title>What's New — Unisona 1.10 — unisona.ai</title>
+  <meta name="description" content="Unisona 1.10 — the reasoning cockpit gets grounded. A SPY-benchmarked trader, honest degrade, and a loop you can watch cite itself.">
+  <meta property="og:title" content="Unisona 1.10 — the reasoning cockpit gets grounded">
   <meta property="og:description" content="One name, one loop, a user-facing cockpit at every stage: Observe, Remember, Reason, Act, Verify, Converge.">
   <meta property="og:type" content="website">
   <link rel="stylesheet" href="/css/site.css">
@@ -63,19 +63,75 @@
   <div class="wn-page">
 
     <header class="wn-hero">
-      <span class="wn-eyebrow">★ Unisona 1.8</span>
-      <h1>The personal reasoning cockpit goes public.</h1>
-      <p class="lede">1.8 isn't new architecture — it's the loop, finally legible. The project is now
-        <strong>unisona.ai</strong> end to end, and <strong>Observe → Remember → Reason → Act → Verify → Converge</strong>
-        now has a user-facing cockpit at <em>every</em> stage. One name, one front door, one loop you can watch
-        ground itself.</p>
-      <div class="wn-meta">Released <strong>June 30, 2026</strong> · latest <strong>1.8.6</strong> (July 1, 2026) · codename <em>one front door</em></div>
+      <span class="wn-eyebrow">★ Unisona 1.10</span>
+      <h1>The reasoning cockpit gets grounded.</h1>
+      <p class="lede">1.10 is about honesty under load. The trader now benchmarks itself against SPY and
+        degrades its confidence badges instead of bluffing, chat routes code requests to a real answer,
+        and <strong>Observe → Remember → Reason → Act → Verify → Converge</strong> has a user-facing cockpit
+        at <em>every</em> stage — one loop you can watch cite itself.</p>
+      <div class="wn-meta">Latest <strong>1.10.0</strong> (July 14, 2026) · the 1.9 line landed July 10–11, 2026</div>
     </header>
+
+    <section class="wn-section">
+      <h2>New in 1.9 &amp; 1.10</h2>
+      <p class="sub">The most recent releases — measured, not asserted. Every number below is backed by a
+        reproducible harness or a live regression test in the <a href="/changelog.html">changelog</a>.</p>
+      <div class="wn-grid">
+
+        <div class="wn-card">
+          <span class="stage">📈 Reason · Verify</span>
+          <h3>SPY-benchmarked trader research</h3>
+          <p>A reproducible daily backtest suite grades the Σ₀ trader against SPY total return: the COMBO3 sleeve
+            measured <strong>Sharpe 1.12 vs SPY 0.89</strong> with max drawdown cut from −34% to −12%. Decision-support
+            only — historical figures, no live-capital path. <span class="pr">1.9.0 · Jul 10, 2026</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">🎯 Converge</span>
+          <h3>Honest-degrade confidence badges</h3>
+          <p>The stock trader only shows a coloured directional call when the signal is calibrated; uncalibrated
+            signals now surface raw model confidence labelled <em>uncalibrated</em> instead of a false green.
+            <span class="pr">1.9.x · Jul 11, 2026</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">💭 Reason</span>
+          <h3>Chat answers code directly</h3>
+          <p>"Write a python function that reverses a string" used to be mis-routed into a shell tool and refused
+            with an allowlist error. Now trivial code requests are answered with code — no tool call — covered by a
+            live chat regression test. <span class="pr">1.10.0 · #2077</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">🌦️ Observe · Verify</span>
+          <h3>ForecastEx NYC grounded</h3>
+          <p>The weather-oracle fit is now station-generic and validated out-of-sample (KLGA: 30% RPS gain over
+            defaults), fed by a public ForecastEx board reader — settlement semantics measured against primary
+            sources, not inferred. <span class="pr">1.10.0 · #2398</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">🚪 Act</span>
+          <h3>Role-appropriate guest nav</h3>
+          <p>Guests no longer see the Settings and Work links they can't use — header tabs and footer sitemap both
+            trim via a fail-open <code>hideGuestNav()</code>. The pages stay reachable by URL. <span class="pr">1.9.x</span></p>
+        </div>
+
+        <div class="wn-card">
+          <span class="stage">📻 Observe</span>
+          <h3>Radio playlist repaired</h3>
+          <p>248 dead (404) tracks were trimmed from the station list so the player stops silently failing most of
+            its playlist; the removed tracks are preserved with Internet-Archive ids for restoration.
+            <span class="pr">1.10.0 · #2329</span></p>
+        </div>
+
+      </div>
+    </section>
 
     <section class="wn-section">
       <h2>A cockpit at every stage</h2>
       <p class="sub">The system is one loop with four core objects — Memory, Task, Tool, Convergence Record.
-        1.8 gives each stage a surface you can see and drive — all shipped in <strong>1.8.0</strong> (June 30, 2026).</p>
+        Each stage has a surface you can see and drive.</p>
       <div class="wn-grid">
 
         <div class="wn-card">
@@ -118,8 +174,9 @@
     </section>
 
     <section class="wn-section">
-      <h2>Under the hood</h2>
-      <p class="sub">The brand, the model, the trader, and the chat all moved with it — all in <strong>1.8.0</strong> (June 30, 2026).</p>
+      <h2>The foundation</h2>
+      <p class="sub">The public launch moved the brand, the model, the trader, and the chat onto one loop —
+        the base every release since has built on.</p>
       <div class="wn-grid">
         <div class="wn-card">
           <h3>Brand: unisona.ai</h3>
@@ -141,45 +198,11 @@
     </section>
 
     <section class="wn-section">
-      <h2>Shipped since launch</h2>
-      <p class="sub">1.8 landed on June 30, 2026 and kept moving. Point releases 1.8.1–1.8.6 added
-        real user-facing surface — and tightened the dev loop underneath.</p>
-      <div class="wn-grid">
-
-        <div class="wn-card">
-          <span class="stage">🚪 Explore</span>
-          <h3>Three Doors, regenerated</h3>
-          <p>The Kingdome of Hearts game is reborn: every scene keeps a fixed theme + meta-lesson, but the prose is regenerated per visit, each turn offers exactly three randomized doors, and scenes render real art — curated concept scenes with a <em>gpt-image-2</em> fallback — instead of placeholders. <span class="pr">1.8.6 · Jul 1, 2026</span></p>
-        </div>
-
-        <div class="wn-card">
-          <span class="stage">📈 Act · Verify</span>
-          <h3>The grounded Kalshi trader</h3>
-          <p>Momentum has no edge after fees, so the profitable arm chases information the thin market hasn't priced: it web-grounds a cited P(YES) on near-term event markets and takes a position only when the edge clears the fee hurdle — graded forward by Brier score, not asserted. <span class="pr">1.8.4 · Jun 30, 2026</span></p>
-        </div>
-
-        <div class="wn-card">
-          <span class="stage">🎛️ Act</span>
-          <h3>Kalshi terminal reskin</h3>
-          <p>The swipe deck now wears the shared unisona.ai chrome, a polished device-console frame, and a collapsible account · profile · positions HUD carrying the live Σ₀ council verdict. Passes the WCAG a11y audit. <span class="pr">1.8.5 · Jun 30, 2026</span></p>
-        </div>
-
-        <div class="wn-card">
-          <span class="stage">🏠 Brand</span>
-          <h3>One brand, cleaner home</h3>
-          <p>Shared chrome, the Create page, and stale body copy all read <strong>unisona.ai</strong> now; the home demotes its heavy panels to a compact link row; and a WCAG font/style contract runs in CI so contrast regressions can't ship. <span class="pr">1.8.3 · Jun 30, 2026</span></p>
-        </div>
-
-      </div>
-      <p class="sub" style="margin-top:16px;margin-bottom:0;">Under the surface, <strong>1.8.1–1.8.2</strong> (June 30, 2026) hardened the contributor workflow — dynamic per-person PR lanes and an assigned-issue convergence merge gate.</p>
-    </section>
-
-    <section class="wn-section">
       <h2>The principle behind it</h2>
       <div class="wn-principle">
         <blockquote>“Nothing is accepted without evidence. Every important claim carries
           <strong>[claim, evidence, confidence, source]</strong>.”</blockquote>
-        <p>Every cockpit in 1.8 ships under that External Reality Rule. None of them assert — they cite,
+        <p>Every cockpit ships under that External Reality Rule. None of them assert — they cite,
           or they abstain. That's the whole product: a loop you can watch ground itself.</p>
       </div>
 
@@ -187,7 +210,6 @@
         <a class="primary" href="/dream-chat.html">Open the chat →</a>
         <a href="/explore.html">Browse Explore</a>
         <a href="/changelog.html">Full changelog</a>
-        <a href="/repo/docs/UNISONA-1.8.md">Release notes</a>
       </div>
     </section>
 

@@ -14,7 +14,7 @@ Source: `apps/lantern-garage/lib/{research-task,wide-search,arxiv-index,arxiv-fu
 One search answers one question. A research **task** keeps going — each round targets the gaps the last round left open — until nothing's left or a round ceiling hits, and it survives across chat turns and server restarts because it's a plain JSON file. There is **one** research engine, and it grounds on **two** source classes at once:
 
 - **Web** — dependable keyless fan-out (MCP → DuckDuckGo → Wikipedia), escalating fidelity.
-- **Local arXiv corpus** — ~100k post-cutoff AI/ML papers (abstracts + metadata, 2025-07 onward) on drive F:, retrieved by BM25 and cited by arXiv id. This is how the assistant answers AI-research questions with papers published *after* the model's training cutoff.
+- **Local arXiv corpus** — ~115k post-cutoff papers (abstracts + metadata, 2025-07 onward) on drive F:, retrieved by BM25 and cited by arXiv id: the AI/ML core (cs.CL/LG/AI/NE, stat.ML) plus quantitative finance (q-fin.* — Sharpe/portfolio/trading-strategy research for the trading lane). This is how the assistant answers research questions with papers published *after* the model's training cutoff.
 
 When you want the **actual report** (not just the abstract), the skill fetches the paper's full text on demand. This is the four-object `Task` (goal + status), scoped to research, improving the **Remember** and **Verify** stages of the loop — not a new memory system.
 
@@ -71,7 +71,7 @@ Use the CLI when researching from Claude Code / an agent that can't hit the chat
 - `node --check` clean on `arxiv-fulltext.js`, `wide-search.js`, `arxiv_query.js`.
 
 **Held / knobs:**
-- Local grounding fires only on AI/ML questions (the `queryArxiv` keyword gate) — by design, since the corpus is AI-only. Non-AI research is web-only.
+- Local grounding fires only on AI/ML or quant-finance questions (the `queryArxiv` keyword gate) — by design, matching the corpus categories. Other topics are web-only.
 - `WIDE_SEARCH_ARXIV=0` disables local grounding; `WIDE_SEARCH_ARXIV_K` (default 4) sets how many papers to fold in.
 - Full-text fetch needs network egress and only works for papers with an arXiv HTML rendering (most 2023+); otherwise you get the PDF link, not extracted text.
 - The plain-chat context injection (`csf-memory.js`, gated `KEYSTONE_ARXIV_RETRIEVAL=1`) is a *separate, lighter* path that drops top-3 papers into the prompt for ordinary chat turns — the research engine's grounding here is independent of that flag.
