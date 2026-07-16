@@ -34,6 +34,17 @@
       --line: #2a343d;
     }
     [data-theme="dark"] body { background: var(--paper); }
+    /* Secondary (Patreon) CTA sits quieter beneath the primary card checkout. */
+    .pricing-alt { background: transparent; border: 1px solid var(--line); }
+    .stripe-cta { cursor: pointer; font: inherit; }
+    .stripe-cta[disabled] { opacity: .6; cursor: progress; }
+    #billing-banner {
+      margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    }
+    #billing-banner[data-kind="success"] { border-color: #2e7d32; }
+    #billing-banner[data-kind="error"] { border-color: #c0392b; }
+    #billing-banner[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -51,6 +62,8 @@
         </nav>
       </div>
     </header>
+
+    <div id="billing-banner" role="status" hidden></div>
 
     <section class="grid pricing-grid" aria-label="Pricing tiers">
       <article class="panel pricing-card">
@@ -88,8 +101,9 @@
           <li>Supporter badge</li>
           <li>Early access to new features</li>
         </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Become a Member</a>
-        <p class="pricing-note">Billed via Patreon. Cancel anytime.</p>
+        <button type="button" class="pricing-cta stripe-cta" data-tier="member" hidden>Subscribe with card</button>
+        <a class="pricing-cta pricing-alt" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Become a Member</a>
+        <p class="pricing-note">Billed securely by Stripe or Patreon. Cancel anytime.</p>
       </article>
 
       <article class="panel pricing-card pricing-featured">
@@ -102,8 +116,9 @@
           <li>Image, vision &amp; document generation</li>
           <li>Wide multi-model research + persistent memory</li>
         </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
-        <p class="pricing-note">Billed via Patreon. Cancel anytime.</p>
+        <button type="button" class="pricing-cta stripe-cta" data-tier="pro" hidden>Subscribe with card</button>
+        <a class="pricing-cta pricing-alt" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
+        <p class="pricing-note">Billed securely by Stripe or Patreon. Cancel anytime.</p>
       </article>
 
       <article class="panel pricing-card">
@@ -116,8 +131,9 @@
           <li>Custom skill integration</li>
           <li>Priority support + invoicing</li>
         </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
-        <p class="pricing-note">Billed monthly via Patreon. Invoice available.</p>
+        <button type="button" class="pricing-cta stripe-cta" data-tier="pilot" hidden>Subscribe with card</button>
+        <a class="pricing-cta pricing-alt" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
+        <p class="pricing-note">Billed monthly by Stripe or Patreon. Invoice available.</p>
       </article>
     </section>
 
@@ -126,12 +142,61 @@
       <dl>
         <div><dt>Is this equity or an investment?</dt><dd>No. These are service subscriptions. No equity, tokens, or profit share.</dd></div>
         <div><dt>Can I cancel?</dt><dd>Yes. Cancel anytime. Your local data stays yours.</dd></div>
-        <div><dt>What payment methods?</dt><dd>Billing is handled by Patreon (cards, PayPal, Apple Pay, Google Pay). Invoice available for Pilot tier.</dd></div>
+        <div><dt>What payment methods?</dt><dd>Pay by card directly (Stripe — cards, Apple Pay, Google Pay) or via Patreon. Card details go straight to Stripe; we never see or store them. Invoice available for Pilot tier.</dd></div>
         <div><dt>Where does the money go?</dt><dd>Recorded in the Unisona wallet ledger. Used for infrastructure, development, and operator time.</dd></div>
         <div><dt>Is my data private?</dt><dd>Yes. Local-first by default. Private notes are stored on your machine by design.</dd></div>
       </dl>
     </section>
   </main>
+<script>
+  /* Native Stripe subscription checkout (#2568). Buttons stay hidden until the
+     server confirms billing is live AND that tier has a configured Price, so a
+     deploy without Stripe keys shows only the Patreon CTA — no broken button. */
+  (function () {
+    var banner = document.getElementById('billing-banner');
+    function show(kind, msg) {
+      if (!banner) return;
+      banner.dataset.kind = kind; banner.textContent = msg; banner.hidden = false;
+    }
+    // Post-checkout return flags (set by /billing/success and the cancel_url).
+    var q = new URLSearchParams(location.search);
+    if (q.get('checkout') === 'success') show('success', 'Subscription active — your new tier is unlocked. Thank you for supporting unisona.ai.');
+    else if (q.get('checkout') === 'cancel') show('info', 'Checkout canceled — no charge was made.');
+
+    fetch('/api/billing/config', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (cfg) {
+        if (!cfg || !cfg.configured) return; // Stripe off → Patreon-only, buttons stay hidden
+        document.querySelectorAll('.stripe-cta').forEach(function (btn) {
+          var tier = btn.getAttribute('data-tier');
+          if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
+        });
+      })
+      .catch(function () { /* config probe failed → leave Patreon-only */ });
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('.stripe-cta');
+      if (!btn) return;
+      e.preventDefault();
+      btn.disabled = true;
+      fetch('/api/billing/checkout', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: btn.getAttribute('data-tier') }),
+      }).then(function (r) {
+        return r.json().then(function (data) { return { status: r.status, data: data }; });
+      }).then(function (res) {
+        if (res.status === 200 && res.data.url) { location.href = res.data.url; return; }
+        btn.disabled = false;
+        if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+        show('error', res.data && res.data.detail ? ('Could not start checkout: ' + res.data.detail) : 'Could not start checkout. Please try Patreon or try again.');
+      }).catch(function () {
+        btn.disabled = false;
+        show('error', 'Network error starting checkout. Please try again.');
+      });
+    });
+  })();
+</script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>

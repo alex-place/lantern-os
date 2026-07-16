@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
+const { effectiveRole } = require("./stripe-billing");
 
 // Data directory for user profiles
 const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
@@ -43,6 +44,16 @@ function createProfile(userId, data = {}) {
     // unless explicitly granted. `admin` is allowed implicitly (see auth-middleware).
     entitlements: { trade: false, ...(data.entitlements || {}) },
     patreonId: data.patreonId || null,
+    // ── Dual-source role provenance (ADR: Patreon + Stripe both feed one role) ──
+    // The effective `role` above is MAX(patreonRole, stripeRole). We snapshot each
+    // source separately so revoking one never over-demotes the other: cancelling a
+    // Stripe sub must not strip a Patreon patron's tier, and vice-versa.
+    patreonRole: data.patreonRole || null,   // last role Patreon attested (null = never)
+    stripeRole: data.stripeRole || null,     // role the active Stripe sub grants (null = none)
+    stripeCustomerId: data.stripeCustomerId || null,
+    stripeSubscriptionId: data.stripeSubscriptionId || null,
+    stripeStatus: data.stripeStatus || null, // last webhook subscription status
+    stripeCurrentPeriodEnd: data.stripeCurrentPeriodEnd || null, // unix seconds
     discordId: data.discordId || null, // linked Discord snowflake (#697), if any
     // Provider-agnostic linked identities (ADR-0016). Each entry:
     //   { provider, providerId, email, emailVerified, linkedAt }
@@ -126,7 +137,7 @@ function updateProfile(userId, updates) {
 function setUserRole(userId, newRole) {
   // deep_dreamer is the $20 web tier (renamed from "founder", #698); "founder"
   // stays accepted as a legacy alias so older callers/profiles don't break.
-  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "tech_support", "admin"];
+  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "pilot", "tech_support", "admin"];
   if (!validRoles.includes(newRole)) {
     throw new Error(`Invalid role: ${newRole}`);
   }
@@ -143,6 +154,55 @@ function setEntitlement(userId, key, value) {
   if (!profile) return null;
   const entitlements = { ...(profile.entitlements || {}), [key]: !!value };
   return updateProfile(userId, { entitlements });
+}
+
+/**
+ * Apply a Stripe subscription state change to a profile (the webhook's ONLY write seam).
+ *
+ * Persists the Stripe snapshot fields and recomputes the effective role as
+ * MAX(patreonRole floor, stripeRole) — never demoting a Patreon patron or a staff role.
+ * `ai_trader` is set in the SAME write so a Pilot Stripe sub unlocks the autonomous
+ * trader and a downgrade removes it, atomically (no second read-modify-write to race).
+ *
+ * @param {object} patch — any of { stripeRole, status, customerId, subscriptionId,
+ *   currentPeriodEnd }. stripeRole===null revokes (drops to the Patreon/base floor).
+ *   Fields left undefined are preserved.
+ */
+function applyStripeState(userId, patch = {}) {
+  const profile = getProfile(userId);
+  if (!profile) return null;
+
+  // The Patreon/base floor: the role the user has from every NON-Stripe source. Seed it
+  // from the current role on first Stripe touch (at that point `role` is entirely
+  // non-Stripe, so it IS the floor); thereafter trust the stored snapshot. Staff roles
+  // are never lowered below themselves.
+  const patreonFloor = profile.patreonRole != null ? profile.patreonRole : (profile.role || "guest");
+  const nextStripeRole = patch.stripeRole !== undefined ? patch.stripeRole : (profile.stripeRole || null);
+
+  let nextRole = effectiveRole(patreonFloor, nextStripeRole);
+  if (STAFF_ROLES.includes(profile.role)) nextRole = higherRole(profile.role, nextRole);
+
+  // pilot-or-higher (compare via higherRole so we don't depend on an exported level map)
+  const isPilotPlus = higherRole(nextRole, "pilot") === nextRole;
+
+  const updates = {
+    role: nextRole,
+    patreonRole: patreonFloor,
+    stripeRole: nextStripeRole,
+    entitlements: { ...(profile.entitlements || {}), ai_trader: isPilotPlus },
+  };
+  if (patch.customerId !== undefined) updates.stripeCustomerId = patch.customerId;
+  if (patch.subscriptionId !== undefined) updates.stripeSubscriptionId = patch.subscriptionId;
+  if (patch.status !== undefined) updates.stripeStatus = patch.status;
+  if (patch.currentPeriodEnd !== undefined) updates.stripeCurrentPeriodEnd = patch.currentPeriodEnd;
+
+  return updateProfile(userId, updates);
+}
+
+/** Look up a profile by its Stripe customer id (webhooks arrive keyed by customer). */
+function getProfileByStripeCustomer(customerId) {
+  if (!customerId) return null;
+  return listProfiles().find((p) => p.stripeCustomerId === customerId) || null;
 }
 
 /**
@@ -513,10 +573,20 @@ function getOrCreateFromIdentity(provider, u, role) {
       provider === "patreon" &&
       !STAFF_ROLES.includes(existing.role || "guest") &&
       u.entitlementResolved === true;
-    const nextRole = tierAuthorityReattesting
+    // Patreon-source role after this login: re-baseline to the live read when the tier
+    // authority re-attests, else the monotonic max of prior state + this provider read.
+    const patreonNext = tierAuthorityReattesting
       ? role || "guest"
       : higherRole(existing.role || "guest", role || "guest");
+    // Fold in any independent Stripe grant so a paid Stripe sub survives a Patreon
+    // downgrade (and vice-versa). effectiveRole() whitelists stripeRole, so a bad
+    // snapshot can never mint admin here.
+    const nextRole = effectiveRole(patreonNext, existing.stripeRole);
     const updates = { role: nextRole, tier: u.tier != null ? u.tier : existing.tier };
+    // Snapshot the Patreon-attested role separately (only on an authoritative re-attest)
+    // so a later Stripe revoke recomputes MAX(patreonRole, none) instead of dropping the
+    // patron to guest. Staff roles are excluded by tierAuthorityReattesting above.
+    if (tierAuthorityReattesting) updates.patreonRole = role || "guest";
     if (u.name && !existing.name) updates.name = u.name;
     if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
     if (emailVerified && u.email) {
@@ -673,6 +743,8 @@ module.exports = {
   updateProfile,
   setUserRole,
   setEntitlement,
+  applyStripeState,
+  getProfileByStripeCustomer,
   listProfiles,
   deleteProfile,
   getOrCreateFromPatreon,
