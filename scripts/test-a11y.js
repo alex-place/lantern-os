@@ -175,7 +175,7 @@ async function runA11yTests() {
     path.join(PUBLIC_DIR, 'explore.html'),
     path.join(PUBLIC_DIR, 'stock-trader.html'),
     path.join(PUBLIC_DIR, 'kalshi-terminal.html'),
-    path.join(PUBLIC_DIR, 'api-keys-settings.html')
+    path.join(PUBLIC_DIR, 'settings.html')
   ].filter(f => fs.existsSync(f));
 
   let totalPassed = 0;

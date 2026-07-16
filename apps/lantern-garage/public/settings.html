@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -19,7 +19,7 @@
   <title>Settings — unisona.ai</title>
   <style>
     .settings-shell {
-      max-width: 580px;
+      max-width: 940px;
       margin: 0 auto;
       padding: 28px 20px 80px;
     }
@@ -28,7 +28,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 24px;
+      margin-bottom: 18px;
     }
     .settings-header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
     .settings-header .close-btn {
@@ -38,11 +38,39 @@
     }
     .settings-header .close-btn:hover { color: var(--text); background: var(--surface2); }
 
+    /* ── Tabs (WAI-ARIA tabs pattern) ── */
+    .tabbar {
+      display: flex; gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 20px;
+    }
+    .tab {
+      background: none; border: none; cursor: pointer;
+      padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
+      color: var(--muted); border-bottom: 2px solid transparent;
+      margin-bottom: -1px; border-radius: 6px 6px 0 0;
+    }
+    .tab:hover { color: var(--text); background: var(--surface2); }
+    .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    [role="tabpanel"][hidden] { display: none; }
+    [role="tabpanel"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Two-column grid (collapses on small screens) ── */
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
+
     .section-label {
       font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
       text-transform: uppercase; color: var(--muted);
-      margin: 24px 0 8px;
+      margin: 20px 0 8px;
     }
+    .section-label:first-child { margin-top: 0; }
 
     /* ── Provider dropdown ── */
     .provider-select {
@@ -60,10 +88,8 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin-bottom: 8px;
       overflow: hidden;
     }
-
     .key-card-head {
       display: flex; align-items: center; gap: 10px;
       padding: 14px 16px 0;
@@ -116,16 +142,13 @@
     .btn-pill:hover { border-color: var(--accent); color: var(--text); }
     .btn-pill.clear:hover { color: #ef4444; border-color: #ef4444; }
 
-    /* ── Connectors ── */
-    .connector-list { display: flex; flex-direction: column; gap: 1px; }
-    .connector-row {
+    /* ── Connector cards (grid-friendly) ── */
+    .connector-card {
       display: flex; align-items: center; gap: 12px;
       padding: 13px 16px;
       background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
-    .connector-row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
-    .connector-row:last-child  { border-radius: 0 0 var(--radius) var(--radius); }
-    .connector-row + .connector-row { border-top: none; }
     .connector-icon { font-size: 1.05rem; width: 24px; text-align: center; flex-shrink: 0; }
     .connector-meta { flex: 1; min-width: 0; }
     .connector-name { font-size: 0.88rem; font-weight: 600; }
@@ -138,18 +161,16 @@
     .conn-badge.ready        { background: rgba(34,197,94,0.15); color: #22c55e; }
     .conn-badge.disconnected { background: rgba(107,114,128,0.12); color: var(--muted); }
 
-    /* ── Context toggles ── */
-    .toggle-list { display: flex; flex-direction: column; gap: 1px; }
-    .toggle-row {
+    /* ── Context toggles (grid-friendly) ── */
+    .toggle-card {
       display: flex; align-items: center; justify-content: space-between;
       padding: 12px 16px;
       background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius);
     }
-    .toggle-row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
-    .toggle-row:last-child  { border-radius: 0 0 var(--radius) var(--radius); }
-    .toggle-row + .toggle-row { border-top: none; }
     .toggle-label { font-size: 0.88rem; font-weight: 500; }
-    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 21px; }
+    .toggle-sub { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 21px; flex-shrink: 0; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
     .toggle-slider {
       position: absolute; inset: 0; background: var(--border);
@@ -162,6 +183,7 @@
     }
     input:checked + .toggle-slider { background: var(--accent); }
     input:checked + .toggle-slider::before { transform: translateX(17px); }
+    .toggle-switch input:focus-visible + .toggle-slider { outline: 2px solid var(--accent); outline-offset: 2px; }
 
     /* ── Toast ── */
     #toast {
@@ -182,157 +204,172 @@
 
   <div class="settings-header">
     <h1>Settings</h1>
-    <button class="close-btn" onclick="history.back()" title="Close">✕</button>
+    <button class="close-btn" onclick="history.back()" title="Close" aria-label="Close settings">✕</button>
   </div>
 
-  <!-- AI Provider -->
-  <div class="section-label">AI Provider</div>
-  <select class="provider-select" id="provider-select">
-    <option value="auto">Auto (pick best)</option>
-    <option value="anthropic">Claude</option>
-    <option value="gemini">Gemini</option>
-    <option value="openai">ChatGPT</option>
-    <option value="xai">Grok</option>
-    <option value="ollama">Ollama (local)</option>
-  </select>
-
-  <!-- API Keys -->
-  <div class="section-label">API Keys</div>
-
-  <!-- Claude -->
-  <div class="key-card">
-    <div class="key-card-head">
-      <div class="key-icon">✦</div>
-      <div class="key-name">Claude</div>
-      <span class="key-badge disconnected" id="status-anthropic">disconnected</span>
-    </div>
-    <div class="key-card-body">
-      <div class="key-input-row">
-        <input type="password" id="input-anthropic" aria-label="Claude API key" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-        <button class="eye-btn" onclick="toggleEye('anthropic')" aria-label="Show or hide Claude API key" title="Show/hide">👁</button>
-        <button class="save-btn" onclick="saveKey('anthropic')" aria-label="Save Claude API key">Save</button>
-      </div>
-      <div class="key-actions-row">
-        <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Get key →</a>
-        <button class="btn-pill" onclick="testKey('anthropic')" aria-label="Test Claude API key">Test</button>
-        <button class="btn-pill clear" onclick="clearKey('anthropic')" aria-label="Clear Claude API key">Clear</button>
-      </div>
-    </div>
+  <!-- Tabs -->
+  <div class="tabbar" role="tablist" aria-label="Settings sections">
+    <button class="tab" role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="true">API keys</button>
+    <button class="tab" role="tab" id="tab-connectors" aria-controls="panel-connectors" aria-selected="false" tabindex="-1">Connectors</button>
+    <button class="tab" role="tab" id="tab-context" aria-controls="panel-context" aria-selected="false" tabindex="-1">Context</button>
   </div>
 
-  <!-- Gemini -->
-  <div class="key-card">
-    <div class="key-card-head">
-      <div class="key-icon">🌐</div>
-      <div class="key-name">Gemini</div>
-      <span class="key-badge disconnected" id="status-gemini">disconnected</span>
-    </div>
-    <div class="key-card-body">
-      <div class="key-input-row">
-        <input type="password" id="input-gemini" aria-label="Gemini API key" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
-        <button class="eye-btn" onclick="toggleEye('gemini')" aria-label="Show or hide Gemini API key" title="Show/hide">👁</button>
-        <button class="save-btn" onclick="saveKey('gemini')" aria-label="Save Gemini API key">Save</button>
-      </div>
-      <div class="key-actions-row">
-        <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get key →</a>
-        <button class="btn-pill" onclick="testKey('gemini')" aria-label="Test Gemini API key">Test</button>
-        <button class="btn-pill clear" onclick="clearKey('gemini')" aria-label="Clear Gemini API key">Clear</button>
-      </div>
-    </div>
-  </div>
+  <!-- ── Panel: API keys ─────────────────────────────────────────────────── -->
+  <div role="tabpanel" id="panel-keys" aria-labelledby="tab-keys" tabindex="0">
+    <div class="section-label">AI Provider</div>
+    <select class="provider-select" id="provider-select" aria-label="Preferred AI provider">
+      <option value="auto">Auto (pick best)</option>
+      <option value="anthropic">Claude</option>
+      <option value="gemini">Gemini</option>
+      <option value="openai">ChatGPT</option>
+      <option value="xai">Grok</option>
+      <option value="ollama">Ollama (local)</option>
+    </select>
 
-  <!-- ChatGPT -->
-  <div class="key-card">
-    <div class="key-card-head">
-      <div class="key-icon">◈</div>
-      <div class="key-name">ChatGPT</div>
-      <span class="key-badge disconnected" id="status-openai">disconnected</span>
-    </div>
-    <div class="key-card-body">
-      <div class="key-input-row">
-        <input type="password" id="input-openai" aria-label="ChatGPT API key" placeholder="sk-…" autocomplete="off" spellcheck="false">
-        <button class="eye-btn" onclick="toggleEye('openai')" aria-label="Show or hide ChatGPT API key" title="Show/hide">👁</button>
-        <button class="save-btn" onclick="saveKey('openai')" aria-label="Save ChatGPT API key">Save</button>
-      </div>
-      <div class="key-actions-row">
-        <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get key →</a>
-        <button class="btn-pill" onclick="testKey('openai')" aria-label="Test ChatGPT API key">Test</button>
-        <button class="btn-pill clear" onclick="clearKey('openai')" aria-label="Clear ChatGPT API key">Clear</button>
-      </div>
-    </div>
-  </div>
+    <div class="section-label">API Keys</div>
+    <div class="grid2">
 
-  <!-- Grok -->
-  <div class="key-card">
-    <div class="key-card-head">
-      <div class="key-icon">𝕏</div>
-      <div class="key-name">Grok</div>
-      <span class="key-badge disconnected" id="status-xai">disconnected</span>
-    </div>
-    <div class="key-card-body">
-      <div class="key-input-row">
-        <input type="password" id="input-xai" aria-label="Grok API key" placeholder="xai-…" autocomplete="off" spellcheck="false">
-        <button class="eye-btn" onclick="toggleEye('xai')" aria-label="Show or hide Grok API key" title="Show/hide">👁</button>
-        <button class="save-btn" onclick="saveKey('xai')" aria-label="Save Grok API key">Save</button>
+      <!-- Claude -->
+      <div class="key-card">
+        <div class="key-card-head">
+          <div class="key-icon">✦</div>
+          <div class="key-name">Claude</div>
+          <span class="key-badge disconnected" id="status-anthropic">disconnected</span>
+        </div>
+        <div class="key-card-body">
+          <div class="key-input-row">
+            <input type="password" id="input-anthropic" aria-label="Claude API key" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+            <button class="eye-btn" onclick="toggleEye('anthropic')" aria-label="Show or hide Claude API key" title="Show/hide">👁</button>
+            <button class="save-btn" onclick="saveKey('anthropic')" aria-label="Save Claude API key">Save</button>
+          </div>
+          <div class="key-actions-row">
+            <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Get key →</a>
+            <button class="btn-pill" onclick="testKey('anthropic')" aria-label="Test Claude API key">Test</button>
+            <button class="btn-pill clear" onclick="clearKey('anthropic')" aria-label="Clear Claude API key">Clear</button>
+          </div>
+        </div>
       </div>
-      <div class="key-actions-row">
-        <a href="https://console.x.ai/" target="_blank" rel="noopener">Get key →</a>
-        <button class="btn-pill" onclick="testKey('xai')" aria-label="Test Grok API key">Test</button>
-        <button class="btn-pill clear" onclick="clearKey('xai')" aria-label="Clear Grok API key">Clear</button>
-      </div>
-    </div>
-  </div>
 
-  <!-- Connectors -->
-  <div class="section-label">Connectors</div>
-  <div class="connector-list">
-    <div class="connector-row">
-      <div class="connector-icon">🔌</div>
-      <div class="connector-meta">
-        <div class="connector-name">MCP Server</div>
-        <div class="connector-sub" id="mcp-sub">OAuth 2.0 · Port 8772</div>
+      <!-- Gemini -->
+      <div class="key-card">
+        <div class="key-card-head">
+          <div class="key-icon">🌐</div>
+          <div class="key-name">Gemini</div>
+          <span class="key-badge disconnected" id="status-gemini">disconnected</span>
+        </div>
+        <div class="key-card-body">
+          <div class="key-input-row">
+            <input type="password" id="input-gemini" aria-label="Gemini API key" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
+            <button class="eye-btn" onclick="toggleEye('gemini')" aria-label="Show or hide Gemini API key" title="Show/hide">👁</button>
+            <button class="save-btn" onclick="saveKey('gemini')" aria-label="Save Gemini API key">Save</button>
+          </div>
+          <div class="key-actions-row">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get key →</a>
+            <button class="btn-pill" onclick="testKey('gemini')" aria-label="Test Gemini API key">Test</button>
+            <button class="btn-pill clear" onclick="clearKey('gemini')" aria-label="Clear Gemini API key">Clear</button>
+          </div>
+        </div>
       </div>
-      <div class="connector-actions">
-        <span class="conn-badge disconnected" id="mcp-badge">Disconnected</span>
-        <button class="btn-pill" onclick="testMcp()">Connect</button>
+
+      <!-- ChatGPT -->
+      <div class="key-card">
+        <div class="key-card-head">
+          <div class="key-icon">◈</div>
+          <div class="key-name">ChatGPT</div>
+          <span class="key-badge disconnected" id="status-openai">disconnected</span>
+        </div>
+        <div class="key-card-body">
+          <div class="key-input-row">
+            <input type="password" id="input-openai" aria-label="ChatGPT API key" placeholder="sk-…" autocomplete="off" spellcheck="false">
+            <button class="eye-btn" onclick="toggleEye('openai')" aria-label="Show or hide ChatGPT API key" title="Show/hide">👁</button>
+            <button class="save-btn" onclick="saveKey('openai')" aria-label="Save ChatGPT API key">Save</button>
+          </div>
+          <div class="key-actions-row">
+            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get key →</a>
+            <button class="btn-pill" onclick="testKey('openai')" aria-label="Test ChatGPT API key">Test</button>
+            <button class="btn-pill clear" onclick="clearKey('openai')" aria-label="Clear ChatGPT API key">Clear</button>
+          </div>
+        </div>
       </div>
-    </div>
-    <div class="connector-row">
-      <div class="connector-icon">🔍</div>
-      <div class="connector-meta">
-        <div class="connector-name">Web Search</div>
-        <div class="connector-sub">DuckDuckGo · No key needed</div>
+
+      <!-- Grok -->
+      <div class="key-card">
+        <div class="key-card-head">
+          <div class="key-icon">𝕏</div>
+          <div class="key-name">Grok</div>
+          <span class="key-badge disconnected" id="status-xai">disconnected</span>
+        </div>
+        <div class="key-card-body">
+          <div class="key-input-row">
+            <input type="password" id="input-xai" aria-label="Grok API key" placeholder="xai-…" autocomplete="off" spellcheck="false">
+            <button class="eye-btn" onclick="toggleEye('xai')" aria-label="Show or hide Grok API key" title="Show/hide">👁</button>
+            <button class="save-btn" onclick="saveKey('xai')" aria-label="Save Grok API key">Save</button>
+          </div>
+          <div class="key-actions-row">
+            <a href="https://console.x.ai/" target="_blank" rel="noopener">Get key →</a>
+            <button class="btn-pill" onclick="testKey('xai')" aria-label="Test Grok API key">Test</button>
+            <button class="btn-pill clear" onclick="clearKey('xai')" aria-label="Clear Grok API key">Clear</button>
+          </div>
+        </div>
       </div>
-      <div class="connector-actions">
-        <span class="conn-badge ready" id="search-badge">Ready</span>
-        <button class="btn-pill" onclick="testWebSearch()">Test</button>
-      </div>
+
     </div>
   </div>
 
-  <!-- Context Modes -->
-  <div class="section-label">Context Modes</div>
-  <div class="toggle-list">
-    <div class="toggle-row">
-      <span class="toggle-label">Web Search (MCP)</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="ctx-web" onchange="saveCtx('web',this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
+  <!-- ── Panel: Connectors ───────────────────────────────────────────────── -->
+  <div role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors" tabindex="0" hidden>
+    <div class="section-label">Connectors</div>
+    <div class="grid2">
+      <div class="connector-card">
+        <div class="connector-icon">🔌</div>
+        <div class="connector-meta">
+          <div class="connector-name">MCP Server</div>
+          <div class="connector-sub" id="mcp-sub">OAuth 2.0 · Port 8772</div>
+        </div>
+        <div class="connector-actions">
+          <span class="conn-badge disconnected" id="mcp-badge">Disconnected</span>
+          <button class="btn-pill" onclick="testMcp()" aria-label="Connect to MCP server">Connect</button>
+        </div>
+      </div>
+      <div class="connector-card">
+        <div class="connector-icon">🔍</div>
+        <div class="connector-meta">
+          <div class="connector-name">Web Search</div>
+          <div class="connector-sub">DuckDuckGo · No key needed</div>
+        </div>
+        <div class="connector-actions">
+          <span class="conn-badge ready" id="search-badge">Ready</span>
+          <button class="btn-pill" onclick="testWebSearch()" aria-label="Test web search">Test</button>
+        </div>
+      </div>
     </div>
-    <div class="toggle-row">
-      <span class="toggle-label">CSF Memory / Symbols</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="ctx-csf" onchange="saveCtx('csf',this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="toggle-row">
-      <span class="toggle-label">Trading Context (IBKR)</span>
-      <label class="toggle-switch">
-        <input type="checkbox" id="ctx-trading" onchange="saveCtx('trading',this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
+  </div>
+
+  <!-- ── Panel: Context ──────────────────────────────────────────────────── -->
+  <div role="tabpanel" id="panel-context" aria-labelledby="tab-context" tabindex="0" hidden>
+    <div class="section-label">Context Modes</div>
+    <div class="grid2">
+      <div class="toggle-card">
+        <span class="toggle-label" id="lbl-ctx-web">Web Search (MCP)</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ctx-web" aria-labelledby="lbl-ctx-web" onchange="saveCtx('web',this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="toggle-card">
+        <span class="toggle-label" id="lbl-ctx-csf">CSF Memory / Symbols</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ctx-csf" aria-labelledby="lbl-ctx-csf" onchange="saveCtx('csf',this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="toggle-card">
+        <span class="toggle-label" id="lbl-ctx-trading">Trading Context (IBKR)</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="ctx-trading" aria-labelledby="lbl-ctx-trading" onchange="saveCtx('trading',this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
   </div>
 
@@ -343,6 +380,40 @@
 
 <script>
 // Theme toggle is wired by the injected site-chrome nav's onclick + js/theme-toggle.js (#2254).
+
+// ── Tabs (WAI-ARIA tabs pattern: arrow keys move + select, Home/End jump) ──
+(function initTabs() {
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  const panels = { 'tab-keys':'panel-keys', 'tab-connectors':'panel-connectors', 'tab-context':'panel-context' };
+  const hashes = { '#keys':'tab-keys', '#connectors':'tab-connectors', '#context':'tab-context' };
+
+  function select(tab, focus) {
+    tabs.forEach(t => {
+      const on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(panels[t.id]).hidden = !on;
+    });
+    if (focus) tab.focus();
+    const hash = Object.keys(hashes).find(h => hashes[h] === tab.id);
+    if (hash) history.replaceState(null, '', hash);
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(tab, false));
+    tab.addEventListener('keydown', (e) => {
+      let j = null;
+      if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = tabs.length - 1;
+      if (j !== null) { e.preventDefault(); select(tabs[j], true); }
+    });
+  });
+
+  const fromHash = hashes[location.hash];
+  if (fromHash) select(document.getElementById(fromHash), false);
+})();
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 let _tt;
