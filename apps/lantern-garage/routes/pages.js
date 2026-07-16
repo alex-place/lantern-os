@@ -57,6 +57,10 @@ const PUBLIC_PAGES = {
   // client-side; the trade-gated data endpoints stay blocked server-side by
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
+  // Public read-only spectator view of the demo (paper) account (#2548): a
+  // logged-out visitor can watch it trade live. No order controls exist on the
+  // page and its feed endpoint is a sanitized public read (PUBLIC_TRADING_READS).
+  "/demo.html":           "demo.html",
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
