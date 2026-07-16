@@ -73,11 +73,16 @@
         <path class="arch-ring" style="--ring-op:0.65;stroke:var(--accent)" d="M154,300 V174 A46,46 0 0 1 246,174 V300" fill="none" stroke-width="1.75"/>
       </svg>
       <p class="landing-premise" style="text-align:center">A seven-gate dream loop. Every door you take reshapes the one after it — no wrong choices, and no two loops the same.</p>
+      <!-- Cast references load from the KOH CDN (manifest.json `base`) — the four
+           reference-*.webp scans are named in the manifest but were never uploaded
+           (they 404 on CDN and never existed in the repo, #2494), so each card hides
+           itself on error instead of rendering a broken-image icon, and the strip
+           lights up automatically once the scans are uploaded to media.lantern-os.net. -->
       <div class="cast-strip" aria-label="The companions, as Alex draws them">
-        <img class="cast-card" src="/assets/content/koh/reference-lantern-t.webp" alt="Lantern — hand-drawn reference" loading="lazy">
-        <img class="cast-card" src="/assets/content/koh/reference-eclipse-t.webp" alt="Eclipse — hand-drawn reference" loading="lazy">
-        <img class="cast-card" src="/assets/content/koh/reference-keystone-t.webp" alt="Keystone — hand-drawn reference" loading="lazy">
-        <img class="cast-card" src="/assets/content/koh/reference-blinkbug-t.webp" alt="Blinkbug — hand-drawn reference" loading="lazy">
+        <img class="cast-card" src="https://media.lantern-os.net/koh/reference-lantern-t.webp" alt="Lantern — hand-drawn reference" loading="lazy" onerror="this.style.display='none'">
+        <img class="cast-card" src="https://media.lantern-os.net/koh/reference-eclipse-t.webp" alt="Eclipse — hand-drawn reference" loading="lazy" onerror="this.style.display='none'">
+        <img class="cast-card" src="https://media.lantern-os.net/koh/reference-keystone-t.webp" alt="Keystone — hand-drawn reference" loading="lazy" onerror="this.style.display='none'">
+        <img class="cast-card" src="https://media.lantern-os.net/koh/reference-blinkbug-t.webp" alt="Blinkbug — hand-drawn reference" loading="lazy" onerror="this.style.display='none'">
       </div>
       <button class="start-btn" onclick="startGame()">Enter the Kingdome</button>
     </section>
