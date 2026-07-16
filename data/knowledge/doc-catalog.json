@@ -672,18 +672,6 @@
     "reason": "Tested Python contracts with honest live-vs-design status; the canonical convergence-io index."
   },
   {
-    "path": "docs/CONVERGENCE-KINGDOME-STATUS.md",
-    "title": "Three-Doors Kingdome Convergence Loop — Status Report",
-    "category": "reports",
-    "description": "Historical Jun-11 phase status for the Three-Doors RP game (6 personas, Railway deploy plan); personas since removed, feature is Lore.",
-    "status": "Historical",
-    "updated": "2026-06-11",
-    "grounding": "Partial",
-    "action": "archive",
-    "mergeInto": "",
-    "reason": "Dated phase report for removed RP feature; references dead personas (lantern/xenon/founder)"
-  },
-  {
     "path": "docs/CONVERGENCE-LOOP.md",
     "title": "unisona.ai Convergence Loop",
     "category": "guides",
@@ -2422,42 +2410,6 @@
     "action": "archive",
     "mergeInto": "",
     "reason": "Consolidation essay; core claim is a mapping, novelty refuted per frontier canon"
-  },
-  {
-    "path": "docs/THREE-DOORS-SD-API-INTEGRATION.md",
-    "title": "Three Doors Kingdome: Stable Diffusion API Integration Guide",
-    "category": "creator",
-    "description": "Reference code guide for wiring local Automatic1111 Stable Diffusion image gen into the Three Doors game.",
-    "status": "Reference",
-    "updated": "2026-06-20",
-    "grounding": "Ungrounded",
-    "action": "archive",
-    "mergeInto": "",
-    "reason": "One-off SD integration guide for a lore/game feature; not the live image path (Vertex Imagen)."
-  },
-  {
-    "path": "docs/THREE-DOORS-SD-PROMPT-USER-GUIDE.md",
-    "title": "Three Doors Kingdome: Stable Diffusion Prompt User Guide",
-    "category": "creator",
-    "description": "How-to for generating canon-aligned Three Doors imagery locally via Automatic1111/ComfyUI + DreamShaper XL, with per-stage prompts.",
-    "status": "Reference",
-    "updated": "2026-06-20",
-    "grounding": "Ungrounded",
-    "action": "keep",
-    "mergeInto": "",
-    "reason": "Accurate self-contained SD setup guide; procedural, no claims to verify; ties to fiction sandbox but usable."
-  },
-  {
-    "path": "docs/THREE-DOORS-SD-SETUP-CHECKLIST.md",
-    "title": "Three Doors Kingdome: SD Setup Checklist",
-    "category": "creator",
-    "description": "Historical setup checklist for a local Automatic1111/DreamShaper image pipeline tied to the removed Three-Doors RP feature; Vertex Imagen is the live generator.",
-    "status": "Historical",
-    "updated": "2026-06-11",
-    "grounding": "Ungrounded",
-    "action": "archive",
-    "mergeInto": "",
-    "reason": "One-off setup guide for lore/RP feature (removed personas); live gen is Vertex, not A1111"
   },
   {
     "path": "docs/TRADER-INTEGRATION-ANALYSIS.md",

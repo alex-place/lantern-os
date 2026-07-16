@@ -277,7 +277,6 @@ const routes = [
   require("./routes/explore"),         // Explore: single-pane PCSF-ranked feed + interaction logging (#1211)
   require("./routes/convergence-dispatch"),
   require("./routes/metrics"),          // #1411: outcome metrics (verified-patch / honesty / route-quality)
-  require("./routes/doors"),            // Three Doors: canon + journey + Σ₀ turns (1.8.18)
   require("./routes/factcheck"),        // #1430: personal fact-check button
   require("./routes/drift"),            // #1428: drift-canary observability
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger

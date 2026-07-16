@@ -124,7 +124,6 @@ The route architecture is modular. **The authoritative list of what's registered
 | [`apps/lantern-garage/routes/files.js`](apps/lantern-garage/routes/files.js) | `/repo/*`, `/view` (markdown) |
 | [`apps/lantern-garage/routes/dreamer.js`](apps/lantern-garage/routes/dreamer.js) | `/api/dreamer`, `/api/agents` |
 | [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) | ALL `/api/dream/*` + `/api/settings/providers` + SSE stream |
-| [`apps/lantern-garage/routes/doors.js`](apps/lantern-garage/routes/doors.js) | Three Doors: server-authoritative canon + journey API |
 | [`apps/lantern-garage/routes/trading.js`](apps/lantern-garage/routes/trading.js) | Kalshi terminal — 60+ `/api/trading/*` endpoints |
 | [`apps/lantern-garage/routes/surfaces.js`](apps/lantern-garage/routes/surfaces.js) | `/hub`, `/surfaces/*`, static catch-all |
 | [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) | SSE streaming (Gemini→Claude→OpenAI→Grok→Ollama) |
@@ -143,7 +142,6 @@ The route architecture is modular. **The authoritative list of what's registered
 ```bash
 node tests/test_dream_journal_api.js       # 18 API tests — requires running server
 node tests/test_dream_chat_multiturns.js   # 11 multi-turn tests — requires running server
-node tests/test_doors_routes.js            # Three Doors route unit tests — no server required
 python -m pytest tests/test_dashboard_ux.py tests/test_dreamer_integration.py -q  # 26 Python tests
 ```
 
@@ -174,7 +172,6 @@ python src/convergence_io_engine.py health  # confirm everything healthy
 ```bash
 node tests/test_dream_journal_api.js        # 18 API tests
 node tests/test_dream_chat_multiturns.js    # 11 multi-turn tests
-node tests/test_doors_routes.js             # Three Doors route unit tests — no server required
 python -m pytest tests/ -q --tb=short       # Python unit tests
 ```
 
@@ -217,7 +214,7 @@ The convergence loop has been upgraded from 12 phases to 20 phases with tesserac
 - **animal**: HFF world model tracking
 - **ecosystem**: HFF integration
 - **economy**: Wallet ledger, cash loop
-- **culture**: Lore, three doors
+- **culture**: Lore
 
 **External Grounding (inspired by ArXiv 2601.05280v2):**
 Zenil et al. prove that recursive self-training without persistent external signal (αt → 0) leads to entropy decay and variance drift. The convergence loop uses this as a design principle — not a quantitative recipe. The repo does not instrument αt, so collapse risk cannot be quantified.
@@ -290,13 +287,10 @@ const applied = gate.escalate;  // Dust flows; decision has teeth
 
 ### Three-Doors Kingdome Connection
 
-Three Doors are the visible manifestation of this principle:
-- Each door is a **measurement choice** offered to the user
-- User chooses → dust flows through that door
-- Choice is **logged and fed back** to future routing (door_state.json)
-- Each choice **grounds the system** by providing external signal
-
-The Kingdome works because choices are *observed and acted upon*. Convergence routing breaks because observations exist but are ignored.
+The Three Doors game — the original visible manifestation of this principle
+(each door a measurement choice, logged and fed back) — migrated to its own
+repo: <https://github.com/alex-place/three-doors>. The principle stands:
+routing breaks when observations exist but are ignored.
 
 ### Measurement Checklist for New Features
 
@@ -575,7 +569,6 @@ echo "GEMINI_API_KEY=your_key" > apps/lantern-garage/.env.local
 ```bash
 node tests/test_dream_journal_api.js        # 18 API tests — requires running server
 node tests/test_dream_chat_multiturns.js    # 11 multi-turn tests — requires running server
-node tests/test_doors_routes.js             # Three Doors route unit tests — no server required
 python -m pytest tests/ -q --tb=short       # Python unit tests
 ```
 
@@ -609,4 +602,3 @@ python src/convergence_io_engine.py inspect
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 
-**Last Updated:** 2026-07-10 — removed the per-lane open-PR cap for both AI-agent and human lanes (the `WORKSTREAM_MAX_OPEN_PRS` cap + CI "Single-workstream check" were removed in #2367; auto-merge now lands green + review-APPROVE PRs). Prior (2026-07-01): entry-point audit (Σ₀ council-grounded): server.js supervisor role, dual GET/POST stream route, routes[] as authoritative registry, doors.js/trading.js routes, test_doors_routes.js, provider.pcsf.json manifest, single-persona reality.

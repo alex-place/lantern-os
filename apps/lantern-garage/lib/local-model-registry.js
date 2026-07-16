@@ -114,7 +114,7 @@ const DEFAULTS = [
     // The SOLE local coder/default. It serves on its own ollama-compatible shim
     // (models/keystone-sigma0-plt/serve_keystone_plt.py → :11435), separate from the
     // kernel/dream ollama on :11434. Per-model routing (endpointFor) honors this so the
-    // kernel (Ouro) and Three Doors (lantern-csf-dream) keep working on :11434.
+    // kernel (Ouro) and dream (lantern-csf-dream) keep working on :11434.
     endpoint: process.env.KEYSTONE_PLT_ENDPOINT || "http://127.0.0.1:11435",
     selfConverges: false,         // PLT loops internally (fixed 2-loop) but that is NOT a
                                   // Q-exit convergence certificate → Core still wraps it in
@@ -171,7 +171,7 @@ const DEFAULTS = [
     taskTypes: ["creative", "csf"],
     rank: 0,
     capabilityScore: 0.3,
-    note: "Dream/RP-tuned model — Three Doors surface only (never a tool assistant).",
+    note: "Dream/RP-tuned model — served the Three Doors RP surface (game migrated to the three-doors repo); never a tool assistant.",
   },
   {
     // Time-series foundation-model route — the numeric-forecasting SPECIALIST.

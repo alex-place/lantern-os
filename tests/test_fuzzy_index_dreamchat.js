@@ -1,10 +1,9 @@
 /**
- * Fuzzy tests — index.html APIs + dream-chat Three Doors endpoint
+ * Fuzzy tests — index.html APIs + dream-chat stream endpoint
  *
  * Covers today's changes:
  *   - index.html: all 8 API calls it fires on load
  *   - dream-chat.js: bang-command routing edge cases
- *   - /api/dream/doors: Three Doors game (expanded today — new scenes, fox, image prompt)
  *   - /api/dream/doors/image: image suggestion endpoint
  *
  * Run: node tests/test_fuzzy_index_dreamchat.js
@@ -193,11 +192,6 @@ async function runDreamChatTests() {
     "!",
     "!unknown-command",
     "!swarm",
-    "!three-doors",
-    "!threedoors",
-    "!doors",
-    "!DOORS",
-    "!three-doors extra args here",
     "!<script>alert(1)</script>",
     "!constructor",
     "!__proto__",
@@ -236,122 +230,6 @@ async function runDreamChatTests() {
     await test(`dream/stream fuzz history: ${label}`, async () => {
       const r = await req("POST", "/api/dream/stream", { message: "hello", history });
       assert.ok(r.status < 500, `Crashed with ${r.status}`);
-    });
-  }
-}
-
-// ── Three Doors: /api/dream/doors ────────────────────────────────────────────
-
-process.stdout.write("\n=== THREE DOORS GAME — /api/dream/doors ===\n");
-
-async function runThreeDoorsTests() {
-  // Valid baseline
-  await test("baseline: start game", async () => {
-    const r = await req("POST", "/api/dream/doors", { userId: "fuzz-player", action: "start" });
-    assert.ok(r.status < 500, `Crashed: ${r.status}`);
-  });
-
-  // Fuzz userId
-  for (const userId of FUZZ_USER_IDS) {
-    const label = userId == null ? "null" : String(userId).slice(0, 40);
-    await test(`doors userId fuzz: ${JSON.stringify(label)}`, async () => {
-      const r = await req("POST", "/api/dream/doors", { userId, action: "start" });
-      assert.ok(r.status < 500, `Crashed with ${r.status}: ${r.raw.slice(0, 150)}`);
-    });
-  }
-
-  // Fuzz action
-  for (const action of FUZZ_ACTIONS) {
-    const label = action == null ? "null" : String(action).slice(0, 40);
-    await test(`doors action fuzz: ${JSON.stringify(label)}`, async () => {
-      const r = await req("POST", "/api/dream/doors", { userId: "fuzz-a", action });
-      assert.ok(r.status < 500, `Crashed with ${r.status}`);
-    });
-  }
-
-  // Fuzz choice (on a choose action)
-  for (const choice of FUZZ_CHOICES) {
-    const label = choice == null ? "null" : String(choice).slice(0, 40);
-    await test(`doors choice fuzz: ${JSON.stringify(label)}`, async () => {
-      const r = await req("POST", "/api/dream/doors", { userId: "fuzz-c", action: "choose", choice });
-      assert.ok(r.status < 500, `Crashed with ${r.status}`);
-    });
-  }
-
-  // Malformed bodies
-  const MALFORMED = [
-    "",
-    "null",
-    "[]",
-    "not-json{{{",
-    '{"userId":}',
-    "true",
-    "0",
-  ];
-  for (const raw of MALFORMED) {
-    await test(`doors malformed body: ${raw.slice(0, 30)}`, async () => {
-      const r = await req("POST", "/api/dream/doors", null, raw);
-      assert.ok(r.status < 500, `Crashed with ${r.status}`);
-    });
-  }
-
-  // Wrong HTTP methods
-  await test("doors GET — should not 500", async () => {
-    const r = await req("GET", "/api/dream/doors");
-    assert.ok(r.status < 500, `Crashed with ${r.status}`);
-  });
-
-  await test("doors DELETE — should not 500", async () => {
-    const r = await req("DELETE", "/api/dream/doors");
-    assert.ok(r.status < 500, `Crashed with ${r.status}`);
-  });
-
-  // Extra unexpected fields
-  await test("doors extra fields ignored", async () => {
-    const r = await req("POST", "/api/dream/doors", {
-      userId: "fuzz-extra",
-      action: "start",
-      __proto__: { admin: true },
-      constructor: "evil",
-      evil: "<script>alert(1)</script>",
-      nested: { a: { b: { c: "deep" } } },
-    });
-    assert.ok(r.status < 500, `Crashed with ${r.status}`);
-  });
-
-  // Oversized payload (100KB)
-  await test("doors oversized payload — should not crash", async () => {
-    const r = await req("POST", "/api/dream/doors", {
-      userId: "fuzz-big",
-      action: "start",
-      garbage: "x".repeat(100000),
-    });
-    assert.ok(r.status < 500, `Crashed with ${r.status}`);
-  });
-}
-
-// ── Three Doors image endpoint ────────────────────────────────────────────────
-
-process.stdout.write("\n=== THREE DOORS IMAGE — /api/dream/doors/image ===\n");
-
-async function runDoorsImageTests() {
-  const IMAGE_FUZZ = [
-    { userId: "fuzz-img", doorIndex: 0 },
-    { userId: "fuzz-img", doorIndex: -1 },
-    { userId: "fuzz-img", doorIndex: 999 },
-    { userId: "fuzz-img", doorIndex: "A" },
-    { userId: "fuzz-img", doorIndex: null },
-    { userId: "<script>", doorIndex: 0 },
-    { userId: "", doorIndex: 0 },
-    { doorIndex: 0 },  // missing userId
-    {},
-    null,
-  ];
-  for (const body of IMAGE_FUZZ) {
-    const label = JSON.stringify(body).slice(0, 50);
-    await test(`doors/image fuzz: ${label}`, async () => {
-      const r = await req("POST", "/api/dream/doors/image", body);
-      assert.ok(r.status < 500, `Crashed with ${r.status}: ${r.raw.slice(0, 150)}`);
     });
   }
 }
@@ -400,8 +278,6 @@ async function runStaticLoadTests() {
   try {
     await runIndexTests();
     await runDreamChatTests();
-    await runThreeDoorsTests();
-    await runDoorsImageTests();
     await runStaticLoadTests();
   } catch (err) {
     process.stdout.write(`\nFATAL: ${err.message}\n`);

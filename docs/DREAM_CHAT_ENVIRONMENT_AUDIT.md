@@ -104,7 +104,6 @@ Dream Chat is the conversational AI interface of Lantern OS, providing multi-age
 | `LANTERN_CLOUD_MIRROR_URLS` | Cloud backup mirrors | Optional | — | getCloudMirrorStatus() |
 | `LANTERN_IMAGE_LORA` | Image generation LoRA model | Optional | `models/csf-image/checkpoints/lantern-door-lora-final.safetensors` | image generation |
 | `CHILD_OF_LEVISTUS_PATH` | Special model path | Optional | — | (research use) |
-| `THREE_DOORS_IMAGE_POOL_DIR` | Image pool directory | Optional | — | routes/three-doors-image-pool.js |
 | `HFF_REPO_PATH` | Human Flourishing Frameworks repo | Optional | — | startup script |
 
 ---

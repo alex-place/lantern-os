@@ -1,5 +1,5 @@
 {
-  "built_at": 1784208718.0274875,
+  "built_at": 1784216107.066113,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -150,7 +150,6 @@
     "docs/FACECAM_DETECTION.md",
     "docs/creator-v10/research-dataset-schema.md",
     "docs/creator-v10/safe-zone-v2.md",
-    "docs/THREE-DOORS-SD-PROMPT-USER-GUIDE.md",
     "docs/creator-v10/variant-engine-v2.md",
     "docs/CHATGPT-CONNECTOR-SETUP.md",
     "docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md",
@@ -186,6 +185,7 @@
     "docs/KNOWLEDGE-CENTER-AUDIT-2026-06-30.md",
     "docs/EDITOR_LEARNING_AUDIT.md",
     "docs/memory-recall-benchmark.md",
+    "docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md",
     "docs/caad/architecture/grounding/grounding-manifest.md",
     "docs/adr/0012-nested-adaptive-reason.md",
     "docs/adr/0014-unisona-desktop-launcher.md",
@@ -195,6 +195,7 @@
     "docs/adr/0023-default-profile-foregrounds-the-loop.md",
     "docs/adr/0017-surprise-gated-decoding.md",
     "docs/adr/0025-rlvr-dreaming-continual-updates-double-gated.md",
+    "docs/adr/0028-managed-strategy-sharpe-gate-tax-aware.md",
     "docs/research/2026-07-01-hff-500y-merge-convergence.md",
     "docs/research/2026-07-01-image-adapter-oss-cdn-phase1.md",
     "docs/research/2026-07-10-tsar-cpu-ternary.md",
@@ -646,7 +647,7 @@
       ]
     }
   },
-  "sections": 2629,
+  "sections": 2541,
   "external": 34,
-  "sha256": "5276aaeff60a5665148d31b342fae2e46ffdba23cacfac48d940d08e071693c6"
+  "sha256": "825ea7e0cddecc02a37bb3a79c4b9f9ebd18ab94be804dd97029a4b53d76ed85"
 }

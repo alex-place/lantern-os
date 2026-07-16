@@ -15,7 +15,7 @@ const BRAND = /\b(Keystone|Lantern)\w*/g;
 //    keystone-context.js) — paths are ids, not brand copy.
 //  - three-doors-game.html has in-game CHARACTERS named "Lantern"/"Keystone" (hand-drawn
 //    reference art + dialogue) — fiction, not the product brand.
-const BODY_ALLOWLIST = new Set(["knowledgecenter.html", "three-doors-game.html"]);
+const BODY_ALLOWLIST = new Set(["knowledgecenter.html"]);
 
 const stripCode = (s) => s
   .replace(/<script[\s\S]*?<\/script>/gi, "")

@@ -16,7 +16,7 @@ Complete navigation map of unisona.ai local-first personal operating system. All
 - **Home Page** — `/index.html`
   - Main landing page with hero, feature overview, and status dashboard
   - Primary CTA: Open Journal
-  - Secondary panels: Kingdome, System Status, Agent Leaderboard, Dashboard, Trading, Settings, Help
+  - Secondary panels: System Status, Agent Leaderboard, Dashboard, Trading, Settings, Help
 
 ---
 
@@ -38,23 +38,7 @@ Complete navigation map of unisona.ai local-first personal operating system. All
 ## 🏯 Interactive Experiences
 
 ### 2. Three-Doors Kingdome
-- **Main Interface** — `/three-doors.html`
-  - Seven-stage infinitely replayable dream journey
-  - Three doors per scene — no wrong choices
-  - Personalized by archetype/agent/symbols
-  - Convergence loop integration
-  - Phase 4 complete: narration, SD prompts, full integration
-
-**Phases Completed:**
-- Phase 0: Initialization
-- Phase 1: CSF Backend Integration
-- Phase 2: Breadcrumbs & stage tracking
-- Phase 3: Personalized Door Generation
-- Phase 4: Narration & SD image prompts
-
----
-
-## 📊 Data & Monitoring
+- **Migrated** — the game now lives in its own repo: <https://github.com/alex-place/three-doors>
 
 ### 3. Dashboard
 - **Main Dashboard** — `/flourishing`
@@ -171,12 +155,6 @@ Complete navigation map of unisona.ai local-first personal operating system. All
 - `GET /api/trading/dashboard/zones` — Dashboard zones
 - `GET /api/trading/dashboard/watchlist-prices` — Dashboard prices
 
-#### Kingdome APIs
-- `GET /api/three-doors/state` — Current game state
-- `POST /api/three-doors/choice` — Record door choice
-- `GET /api/three-doors/image` — Generated door images
-- `POST /api/three-doors/narration` — Get AI narration
-
 #### CSF (Convergence-Fitted Searchable Format) APIs
 - `GET /api/csf/search` — Search CSF memory database
 - `POST /api/csf/ingest` — Ingest data into CSF
@@ -192,10 +170,6 @@ Complete navigation map of unisona.ai local-first personal operating system. All
 - `GET /view?path={path}` — View markdown/text files
 - `GET /api/rag/house` — RAG document house builder
 - `POST /api/operator/queue` — Task intake
-
-#### Three-Doors Image Pool
-- `GET /api/three-doors/image-pool` — Image pool status
-- `POST /api/three-doors/image-pool` — Add images to pool
 
 #### Self-Edit APIs
 - `GET /api/self-edit/status` — Self-edit status
@@ -253,8 +227,6 @@ Home (/)
 ├── Start Here
 │   └── Dream Journal (/dream-chat.html)
 │
-├── Kingdome
-│   ├── Three-Doors Journey (/three-doors.html)
 │   ├── System Status (/agent-status.html)
 │   ├── Agent Leaderboard (/leaderboard)
 │   ├── Dashboard (/flourishing)
@@ -295,7 +267,6 @@ All pages are built with:
 ### Load Times
 - Home page: <100ms (static HTML)
 - Journal chat: ~200ms (SSE streaming)
-- Kingdome: <500ms (offline capable)
 - Trader dashboard: 3-5s first call (Python startup), <100ms cached
 
 ---
@@ -307,7 +278,7 @@ All pages are built with:
 - **Conversations**: JSONL lines (timestamp, agent, text, model, tokens)
 - **CSF Memory**: Binary searchable format with Tier system
 - **Markdown**: Rendered in `/repo/` and `/view` endpoints
-- **Images**: Three-Doors image pool, generated via SD/DALL-E
+- **Images**: generated via SD/DALL-E
 
 ---
 

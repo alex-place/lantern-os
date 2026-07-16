@@ -912,7 +912,7 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
   // ── Convergence Models 3 — live status from Ollama ────────────────────
   if (url.pathname === "/api/dream/lantern-models" && req.method === "GET") {
     const LANTERN_MODELS = [
-      { id: "lantern-csf-dream",   role: "dream",       icon: "🌙", base: "mistral",        description: "Kingdome of Hearts game · Elephant Oasis · dream narrative" },
+      { id: "lantern-csf-dream",   role: "dream",       icon: "🌙", base: "mistral",        description: "Elephant Oasis · dream narrative" },
       { id: "lantern-convergance", role: "convergence", icon: "◈",  base: "qwen2.5-coder",  description: "Convergence receipts · AAPF provenance · structured output" },
       { id: "lantern-pcsf",        role: "pcsf",        icon: "⌖",  base: "qwen2.5-coder",  description: "PCSF state manifests · system receipts · agent declarations" },
     ];
