@@ -45,6 +45,21 @@ A focused guide for AI coding agents. **Read this before touching anything.**
 
 **For immediate testing:** Use the dev server (4178) or manually restart the stable server after pushing.
 
+### Never branch-switch the primary checkout (2026-07-16 incident)
+
+The main checkout is the **human operator's** working directory: their uncommitted WIP
+and the untracked runtime data under `data/` live there. An agent session that runs
+`git stash` + `git checkout <branch>` on it switches that work out from under the
+operator (this actually happened — trading WIP + the autopilot ledger were swept).
+
+**Rule for every agent session (`claude/*`, `gemini/*`, …):** do isolated work in a
+**git worktree** (`git worktree add <dir> -b <branch> origin/master`, or the
+`local_worktree_create` MCP tool) and leave the primary checkout's branch alone.
+Enforcement: the MCP `local_git_create_branch` tool refuses to switch a dirty
+primary checkout, and the repo `post-checkout` hook detects an agent (`CLAUDECODE=1`)
+branch-switching the main tree, warns loudly, and logs the event to
+`data/ops/main-tree-checkouts.jsonl`.
+
 ### Non-Destructive Deployment (2026-06-24)
 
 The stable auto-deploy uses `git merge --ff-only` instead of destructive `git reset --hard`. This means:
