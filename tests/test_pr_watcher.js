@@ -121,6 +121,17 @@ ok("verdict: VERDICT: tag beats later bare token", PrWatcher._parseVerdict("VERD
 ok("verdict: tagged REQUEST CHANGES (spaced) normalizes", PrWatcher._parseVerdict("verdict: request changes\nbody") === "REQUEST_CHANGES");
 ok("verdict: fleet header before tag still parses", PrWatcher._parseVerdict("🤖 **Fleet Auto-Review**\n\nVERDICT: COMMENT\nnotes") === "COMMENT");
 
+// ── _verdictTag (#2577): explicit tag only, no bare-token fallback, no fail-closed ──
+// Distinguishes "review concluded COMMENT" from "review never concluded" — the
+// rambling tool-plan reviews must NOT be adopted cross-host or treated as verdicts.
+ok("tag: explicit APPROVE", PrWatcher._verdictTag("VERDICT: APPROVE\nbody") === "APPROVE");
+ok("tag: spaced REQUEST CHANGES normalizes", PrWatcher._verdictTag("verdict: request changes") === "REQUEST_CHANGES");
+ok("tag: mid-body tag still found", PrWatcher._verdictTag("🤖 header\n\nVERDICT: COMMENT\nnotes") === "COMMENT");
+ok("tag: bare APPROVE without tag -> null (no fallback)", PrWatcher._verdictTag("APPROVED — ship it") === null);
+ok("tag: rambling no-conclusion review -> null", PrWatcher._verdictTag("I will now inspect the relevant files. Let's start by looking at the diff.") === null);
+ok("tag: empty -> null (not COMMENT)", PrWatcher._verdictTag("") === null);
+ok("tag: verdict word alone without colon-tag -> null", PrWatcher._verdictTag("My verdict is that this is fine") === null);
+
 // ── protected-path gate: sensitive surfaces need a human, even when green (#1251) ──
 const greenPv = (files) => ({ isDraft: false, mergeable: "MERGEABLE", statusCheckRollup: green, files });
 ok("merge: no files -> true (back-compat)", m._shouldMerge(greenPv(undefined), reviewed, now).merge === true);

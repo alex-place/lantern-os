@@ -330,7 +330,9 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
           : selectAgent(message);
         result = await handleConvergenceCommand(recentDreams, agent, message);
       } else {
-        result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "");
+        // body.mode: allowlisted one-shot mode (#2577, e.g. "review" from pr-watcher) —
+        // no tools narrative, no context injection; unknown values are ignored.
+        result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "", body.mode || "");
         // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists)
         if (result.reply && isVerifyEnabled()) {
           try {
