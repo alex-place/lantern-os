@@ -10,11 +10,14 @@ says which path was used**. Premiums are quote MARKS ((bid+ask)/2), never
 fills; the half-spread is an explicit cost line (real option spreads are the
 dominant execution cost, arXiv:2511.02518); assignment risk is a labeled proxy
 (|delta| or moneyness), and every proposal carries a decision-support
-disclaimer. Exposed at `GET /api/trading/options/strategies?symbol=&strategy=`
-(underlying price inferred from the chain via put-call parity at the ATM
-strike, or `price=` explicit) and as the `options_strategy` chat tool
-(loopback, honest when `ALPHAVANTAGE_API_KEY` is missing). ADVISORY ONLY:
-nothing is placed, simulated, or recommended for execution — Act stays behind
-the ADR-0020 gates. Offline suite `tests/test_options_strategies.js`; verified
-end-to-end against the real IBM chain (2,350 contracts). (Improves Reason —
-strategy proposals grounded in real chain evidence.)
+disclaimer. When the delta came from the keyless Yahoo path it is labeled
+`model(bs-from-iv)` (vs `provider` for real feed greeks) on the proposal, its
+legs, and the risk proxy. Exposed at
+`GET /api/trading/options/strategies?symbol=&strategy=` (underlying price:
+explicit `price=`, else the provider's own quote, else put-call parity at the
+ATM strike) and as the `options_strategy` chat tool (loopback; NO API key
+required — provider failures are relayed honestly). ADVISORY ONLY: nothing is
+placed, simulated, or recommended for execution — Act stays behind the
+ADR-0020 gates. Offline suite `tests/test_options_strategies.js`; verified
+end-to-end against the real keyless SPY Yahoo chain (1,945 contracts).
+(Improves Reason — strategy proposals grounded in real chain evidence.)

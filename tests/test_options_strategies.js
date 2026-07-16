@@ -258,6 +258,38 @@ async function main() {
     console.log("ok - junk chains: refused with { ok:false, reason }, never a throw");
   }
 
+  // 9) delta SOURCE is stated: provider greeks vs model(bs-from-iv) (Yahoo path)
+  {
+    // Provider-labeled greeks (Alpaca / Alpha Vantage rows)
+    const provChain = GREEKS_CHAIN.map((r) => ("delta" in r ? { ...r, delta_source: "provider" } : r));
+    const prov = os.proposeCoveredCall(provChain, { shares: 100, price: PX, now: NOW });
+    assert.strictEqual(prov.ok, true);
+    assert.strictEqual(prov.selectionPath, "delta");
+    assert.strictEqual(prov.deltaSource, "provider", "feed greeks are reported as provider");
+    assert.strictEqual(prov.assignmentRiskProxy.deltaSource, "provider");
+
+    // Model-labeled delta (the data layer's BS-from-IV on the keyless Yahoo path)
+    const modelChain = GREEKS_CHAIN.map((r) => ("delta" in r ? { ...r, delta_source: "model(bs-from-iv)" } : r));
+    const model = os.proposeCoveredCall(modelChain, { shares: 100, price: PX, now: NOW });
+    assert.strictEqual(model.ok, true);
+    assert.strictEqual(model.selectionPath, "delta", "a model delta still enables the delta path");
+    assert.strictEqual(model.deltaSource, "model(bs-from-iv)", "model delta is NEVER passed off as provider data");
+    assert.strictEqual(model.assignmentRiskProxy.deltaSource, "model(bs-from-iv)");
+    assert.ok(/bs-from-iv/.test(model.assignmentRiskProxy.note), "the proxy note explains the delta is IV-derived");
+    assert.strictEqual(model.strike, prov.strike, "same deltas → same strike; only the label differs");
+
+    // Unlabeled legacy rows default to provider (the pre-chain row shape)
+    const legacy = os.proposeCoveredCall(GREEKS_CHAIN, { shares: 100, price: PX, now: NOW });
+    assert.strictEqual(legacy.deltaSource, "provider");
+
+    // Collar legs carry their per-leg source too
+    const col = os.proposeCollar(modelChain, { shares: 100, price: PX, now: NOW });
+    assert.strictEqual(col.ok, true);
+    assert.strictEqual(col.put.deltaSource, "model(bs-from-iv)");
+    assert.strictEqual(col.call.deltaSource, "model(bs-from-iv)");
+    console.log("ok - delta source: provider vs model(bs-from-iv) stated on proposals, legs, and the risk proxy");
+  }
+
   console.log("ok - options-strategies: all offline suites passed");
 }
 

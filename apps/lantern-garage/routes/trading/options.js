@@ -4,8 +4,9 @@
  * for the trader surfaces.
  *
  * Loop stages: Observe (chain) + Reason (strategies). Thin HTTP surface over
- * lib/options-data.js (Alpha Vantage HISTORICAL_OPTIONS, env-gated by
- * ALPHAVANTAGE_API_KEY) and lib/options-strategies.js (pure, deterministic
+ * lib/options-data.js — the NO-NEW-KEYS provider chain (the user's connected
+ * Alpaca account when available → keyless Yahoo → Alpha Vantage only if a key
+ * already exists) — and lib/options-strategies.js (pure, deterministic
  * proposal engine). ADVISORY ONLY: no orders are placed, simulated, or
  * recommended for execution — Act stays behind the ADR-0020 trading gates.
  * Covered / cash-secured structures only; naked shorts are refused upstream.
@@ -15,10 +16,15 @@
  *       |cash_secured_put|collar&shares=&cash=&target_delta=&put_delta=
  *       &call_delta=&min_dte=&max_dte=&price=&date=
  *
- * Responses are always 200. Keyless / rate-limited / upstream-error states come
- * back as { available: false, reason } — honest degradation, never fake rows.
- * Engine refusals (no qualifying strike, shares < 100, cash can't secure one
- * contract) come back inside proposal as { ok: false, reason }.
+ * The requesting user's id is forwarded to the data layer the same way the
+ * portfolio routes do (ctx.getEffectiveUserId: session user, else the
+ * operator-trusted x-keystone-user loopback id) so a connected Alpaca account
+ * is picked up automatically — no configuration on this surface.
+ *
+ * Responses are always 200. All-providers-failed / rate-limited / upstream
+ * errors come back as { available: false, reason } — honest degradation,
+ * never fake rows. Engine refusals (no qualifying strike, shares < 100, cash
+ * can't secure one contract) come back inside proposal as { ok:false, reason }.
  */
 
 const optionsData = require('../../lib/options-data');
@@ -33,12 +39,19 @@ function _num(v) {
 }
 
 module.exports = async function optionsRoutes(req, res, url, ctx) {
-  const { sendJson } = ctx;
+  const { sendJson, getEffectiveUserId } = ctx;
+  const _uid = () => {
+    try { return typeof getEffectiveUserId === 'function' ? getEffectiveUserId(req) : null; }
+    catch (_e) { return null; }
+  };
 
   if (url.pathname === '/api/trading/options/chain' && req.method === 'GET') {
     const symbol = url.searchParams.get('symbol') || '';
     const date = url.searchParams.get('date') || null;
-    const out = await optionsData.getOptionsChain(symbol, date ? { date } : {});
+    const out = await optionsData.getOptionsChain(symbol, {
+      ...(date ? { date } : {}),
+      userId: _uid(),
+    });
     sendJson(res, out, 200);
     return true;
   }
@@ -56,17 +69,32 @@ module.exports = async function optionsRoutes(req, res, url, ctx) {
       return true;
     }
 
-    const chain = await optionsData.getOptionsChain(symbol, date ? { date } : {});
+    const minDte = _num(url.searchParams.get('min_dte'));
+    const maxDte = _num(url.searchParams.get('max_dte'));
+    const chain = await optionsData.getOptionsChain(symbol, {
+      ...(date ? { date } : {}),
+      userId: _uid(),
+      // Make the Yahoo path fetch expirations that actually COVER the engine's
+      // DTE window (daily-expiry symbols like SPY would otherwise cluster the
+      // fetched expiries inside the next week).
+      minDays: minDte !== undefined ? minDte : strategies.DEFAULT_MIN_DTE,
+      horizonDays: (maxDte !== undefined ? maxDte : strategies.DEFAULT_MAX_DTE) + 10,
+    });
     if (!chain || chain.available === false) {
-      // Honest passthrough: keyless / rate-limited / upstream error, verbatim.
+      // Honest passthrough: every provider's failure reason, verbatim.
       sendJson(res, chain || { available: false, reason: 'options data unavailable' }, 200);
       return true;
     }
 
-    // Resolve underlying price: explicit ?price= wins; else infer from the
-    // chain via put-call parity at the ATM strike. Never invented.
+    // Resolve underlying price: explicit ?price= wins; else the provider's own
+    // underlying quote (Yahoo carries it); else put-call parity at the ATM
+    // strike. Never invented.
     let price = _num(url.searchParams.get('price'));
     let priceSource = 'explicit price param';
+    if (price === undefined && Number.isFinite(chain.underlying_price) && chain.underlying_price > 0) {
+      price = chain.underlying_price;
+      priceSource = `provider quote (${chain.source})`;
+    }
     if (price === undefined) {
       const inferred = strategies.inferUnderlyingPrice(chain.contracts);
       if (inferred) {
@@ -92,7 +120,7 @@ module.exports = async function optionsRoutes(req, res, url, ctx) {
         ...base,
         proposal: {
           ok: false,
-          reason: 'could not infer the underlying price from the chain (no strike with both call and put marks) — pass price= explicitly',
+          reason: 'could not resolve the underlying price (no provider quote and no strike with both call and put marks) — pass price= explicitly',
         },
       }, 200);
       return true;
@@ -101,8 +129,8 @@ module.exports = async function optionsRoutes(req, res, url, ctx) {
     const common = {
       price,
       targetDelta: _num(url.searchParams.get('target_delta')),
-      minDte: _num(url.searchParams.get('min_dte')),
-      maxDte: _num(url.searchParams.get('max_dte')),
+      minDte,
+      maxDte,
     };
     // Drop undefined keys so the engine's own defaults apply.
     for (const k of Object.keys(common)) if (common[k] === undefined) delete common[k];

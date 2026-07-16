@@ -41,9 +41,9 @@ const SPREAD_COST_NOTE =
   "marks are quotes, not fills.";
 
 const OPT_DISCLAIMER =
-  "Evidence basis: previous-session listed-option quotes (Alpha Vantage HISTORICAL_OPTIONS); " +
+  "Evidence basis: latest-session listed-option quotes from the reported chain source (connected Alpaca account, keyless Yahoo chain, or Alpha Vantage); " +
   "premiums are quote marks ((bid+ask)/2), not fills — real spreads are the dominant cost (arXiv:2511.02518); " +
-  "assignment/greek figures are model proxies, not forecasts; taxes, dividends, and early assignment not modeled. " +
+  "assignment/greek figures are model proxies (delta source is labeled provider vs model(bs-from-iv)), not forecasts; taxes, dividends, and early assignment not modeled. " +
   "Decision support only, NOT personalized investment advice — this proposes and prices; it never places or executes anything. The user always decides.";
 
 // ── small helpers ────────────────────────────────────────────────────────────
@@ -133,10 +133,14 @@ function _selectLeg(cands, { targetDelta, price, otmSign }) {
 /** Labeled assignment-risk PROXY: |delta| when present, raw moneyness otherwise. */
 function _assignmentRiskProxy(row, price) {
   if (Number.isFinite(row.delta)) {
+    const src = _deltaSourceOf(row);
     return {
       basis: "delta",
+      deltaSource: src,
       value: _round(Math.abs(row.delta), 4),
-      note: "|delta| ≈ risk-neutral probability of finishing in the money — a model PROXY, not a forecast",
+      note:
+        "|delta| ≈ risk-neutral probability of finishing in the money — a model PROXY, not a forecast" +
+        (src === "provider" ? "" : `; this delta is ${src}, derived from the feed's own IV because the feed carries no greeks`),
     };
   }
   return {
@@ -173,10 +177,20 @@ function _legQuote(row) {
     premium: _round(_markOf(row), 4), // MARK = (bid+ask)/2, per share
     spreadCost: _round(_halfSpread(row), 4), // per share
     spreadCostPerContract: _round(_halfSpread(row) * 100, 2),
-    ...(Number.isFinite(row.delta) ? { delta: row.delta } : {}),
+    ...(Number.isFinite(row.delta) ? { delta: row.delta, deltaSource: _deltaSourceOf(row) } : {}),
     ...(Number.isFinite(row.implied_volatility) ? { implied_volatility: row.implied_volatility } : {}),
     ...(Number.isFinite(row.open_interest) ? { open_interest: row.open_interest } : {}),
   };
+}
+
+/**
+ * Where a row's delta came from: "provider" (real feed greeks) or
+ * "model(bs-from-iv)" (Black–Scholes from the provider's own IV — a labeled
+ * selection proxy the data layer computes when the feed has no greeks).
+ * Unlabeled deltas are treated as provider data (the pre-chain row shape).
+ */
+function _deltaSourceOf(row) {
+  return row && typeof row.delta_source === "string" ? row.delta_source : "provider";
 }
 
 // ── public API ───────────────────────────────────────────────────────────────
@@ -226,6 +240,7 @@ function proposeCoveredCall(chain, opts = {}) {
     ok: true,
     strategy: "covered_call",
     selectionPath: sel.selectionPath, // "delta" | "moneyness" — which ranking picked the strike
+    ...(sel.selectionPath === "delta" ? { deltaSource: _deltaSourceOf(row) } : {}),
     targetDelta,
     price: px,
     ...(sel.selectionPath === "delta"
@@ -296,6 +311,7 @@ function proposeCashSecuredPut(chain, opts = {}) {
     ok: true,
     strategy: "cash_secured_put",
     selectionPath: sel.selectionPath,
+    ...(sel.selectionPath === "delta" ? { deltaSource: _deltaSourceOf(row) } : {}),
     targetDelta,
     price: px,
     ...(sel.selectionPath === "delta"
