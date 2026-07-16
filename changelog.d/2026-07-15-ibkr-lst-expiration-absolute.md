@@ -1,0 +1,3 @@
+### Fixed
+
+- trading: the IBKR Live Session Token expiry (`live_session_token_expiration`) is now handled as the absolute epoch-ms timestamp IBKR's OAuth 1.0a docs specify, instead of being misread as a duration. The old code's 10-minute cap masked the misread but forced a full DH handshake against `/oauth/live_session_token` every 10 minutes; the ~24h token is now cached and reused for its real lifetime, with a 10-minute fallback deadline whenever the value is missing, in the past, or implausibly far out. Protocol-faithful mock in `test/ibkr-cpapi-oauth.test.js` now serves an absolute timestamp and asserts single-handshake reuse plus the malformed-value fallback.
