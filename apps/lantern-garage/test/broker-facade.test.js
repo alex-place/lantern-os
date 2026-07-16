@@ -85,3 +85,55 @@ test('preferredBroker(): env parsing — only "alpaca" flips it', () => {
   process.env.BROKER_PREFER = 'nonsense';
   assert.strictEqual(preferredBroker(), 'ibkr');
 });
+
+// ── Per-user preference (broker-preference.js) — uses the REAL store in a temp dir ──
+
+const os = require('os');
+const fs = require('fs');
+const PREFS = require.resolve('../lib/broker-preference');
+
+function withPrefStore(fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'broker-pref-test-'));
+  process.env.BROKER_PREF_DIR = dir;
+  delete require.cache[PREFS];
+  try { return fn(require(PREFS)); }
+  finally {
+    delete process.env.BROKER_PREF_DIR; delete require.cache[PREFS];
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_e) { /* temp */ }
+  }
+}
+
+test('per-user preference beats the env default in both directions', () => {
+  withPrefStore((prefs) => {
+    const { preferredBroker } = loadFacadeWith(aliveAlpaca);
+    process.env.BROKER_PREFER = 'alpaca';          // server default: alpaca
+    assert.ok(prefs.set('u-ibkr', 'ibkr'));
+    assert.strictEqual(preferredBroker('u-ibkr'), 'ibkr');       // user overrides TO ibkr
+    delete process.env.BROKER_PREFER;              // server default: ibkr
+    assert.ok(prefs.set('u-alp', 'alpaca'));
+    assert.strictEqual(preferredBroker('u-alp'), 'alpaca');      // user overrides TO alpaca
+    assert.ok(prefs.set('u-auto', 'auto'));
+    assert.strictEqual(preferredBroker('u-auto'), 'ibkr');       // auto = follow default
+    assert.strictEqual(preferredBroker('u-unset'), 'ibkr');      // no file = follow default
+  });
+});
+
+test('broker-preference store: rejects invalid values, round-trips valid ones', () => {
+  withPrefStore((prefs) => {
+    assert.strictEqual(prefs.set('u1', 'robinhood'), false);
+    assert.strictEqual(prefs.get('u1'), 'auto');                 // invalid never stored
+    assert.ok(prefs.set('u1', 'alpaca'));
+    assert.strictEqual(prefs.get('u1'), 'alpaca');
+    assert.ok(prefs.set('u1', 'auto'));
+    assert.strictEqual(prefs.get('u1'), 'auto');
+  });
+});
+
+test('broker-preference store: anonymous (null) identity can never store or resolve a choice', () => {
+  withPrefStore((prefs) => {
+    assert.strictEqual(prefs.set(null, 'alpaca'), false);        // no shared null.json
+    assert.strictEqual(prefs.set(undefined, 'ibkr'), false);
+    assert.strictEqual(prefs.get(null), 'auto');
+    assert.strictEqual(prefs.get(undefined), 'auto');
+  });
+});

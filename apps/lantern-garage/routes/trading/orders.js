@@ -128,7 +128,7 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // Either order keeps the other broker as fallback. Alpaca PAPER fills for
       // real without arming — so a paper trade actually happens instead of a
       // dry-run dead end.
-      const attempts = preferredBroker() === 'alpaca'
+      const attempts = preferredBroker(uid) === 'alpaca'
         ? [() => alpaca.placeOrder(uid, orderReq), () => bridge.placeIBKROrder(uid, orderReq)]
         : [() => bridge.placeIBKROrder(uid, orderReq), () => alpaca.placeOrder(uid, orderReq)];
       let result = null;
