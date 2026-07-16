@@ -1,3 +1,0 @@
-### Added
-
-- providers: user BYOK keys now persist server-side (#2505). `POST/DELETE/GET /api/providers/set-key` stores each signed-in user's provider keys AES-256-GCM-encrypted at rest (`lib/user-provider-keys.js`; key scrypt-derived from `LANTERN_KEYSTORE_SECRET` or the session secret), and `POST /api/providers/test/<id>` validates a key with a real provider call. The tenant seam (`lib/tenant.js`) now falls back to the per-user store — below env/vault in the local profile (owner-funded behaviour unchanged), below the session bag in cloud (host env still never used). The API-keys settings page shows keys saved on other devices.
