@@ -20,7 +20,18 @@
  */
 function getSessionUser(req) {
   const s = req && req.session;
-  if (s && s.user && s.user.id) return s.user;
+  if (s && s.user && s.user.id) {
+    // Fail closed on a DELETED account: a live cookie session must not outlive the
+    // account it names. deleteProfile writes a tombstone; honor it per-request so a
+    // deleted user is immediately logged out of every gate (#2608). Only a POSITIVE
+    // tombstone denies — a merely-missing id (dev store reset) is left alone. Lazy
+    // require avoids a load-order cycle (user-profiles never imports this module).
+    try {
+      const { isProfileDeleted } = require("./user-profiles");
+      if (isProfileDeleted(s.user.id)) return null;
+    } catch (_) { /* if the check is unavailable, don't break auth */ }
+    return s.user;
+  }
   // Test-auth fallback (OFF unless LANTERN_TEST_AUTH_TOKEN is set, direct hits only).
   // This is the ONE seam the whole test-auth mechanism plugs into: every gate reads
   // identity through getSessionUser, so honoring the emulated role here makes

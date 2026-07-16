@@ -21,15 +21,14 @@ const {
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
 const { createToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail } = require("../lib/mailer");
+const { canonicalOrigin } = require("../lib/base-url");
 
 const ACCOUNT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ACCOUNT_MIN_PW = 8;
+// Email-confirmation links use the operator-configured canonical origin, not the
+// spoofable Host header (host-header poisoning, #2604).
 function accountOrigin(req) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
-  return `${proto}://${host}`;
+  return canonicalOrigin(req);
 }
 function readBody(req) {
   return new Promise((resolve) => {
@@ -76,14 +75,17 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     req.on("end", () => {
       try {
         const updates = JSON.parse(body);
-        // Users can only update their own profile, not role or tier
-        const safeUpdates = {
-          name: updates.name,
-          bio: updates.bio,
-          avatar: updates.avatar,
-          preferences: updates.preferences,
-          settings: updates.settings,
-        };
+        // Users can only update their own profile, not role or tier. Copy ONLY the
+        // fields the request actually sent — an absent key must not spread `undefined`
+        // over the stored value (updateProfile merges by spread), which previously
+        // wiped avatar/preferences/settings on every save that omitted them (#2607).
+        const ALLOWED = ["name", "bio", "avatar", "preferences", "settings"];
+        const safeUpdates = {};
+        for (const key of ALLOWED) {
+          if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
+            safeUpdates[key] = updates[key];
+          }
+        }
 
         const profile = updateProfile(userId, safeUpdates);
         res.writeHead(200, { "Content-Type": "application/json" });

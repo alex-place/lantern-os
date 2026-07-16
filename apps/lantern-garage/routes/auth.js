@@ -27,6 +27,7 @@ const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
 const { isLoopback } = require("../lib/request-auth");
+const { canonicalOrigin } = require("../lib/base-url");
 const { recordTractionEvent } = require("../lib/traction");
 const {
   getProfile,
@@ -35,13 +36,12 @@ const {
   setLocalPassword,
 } = require("../lib/user-profiles");
 
-// Absolute origin of the current request (honors the tunnel's forwarded proto).
+// Absolute origin for links emailed to the user (verify-email, password reset).
+// Built from the operator-configured canonical origin, NOT the raw Host header, so
+// a forged Host can't point a genuine security email at an attacker's domain
+// (reset poisoning, #2604). Falls back to Host only for loopback dev.
 function originOf(req) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
-  return `${proto}://${host}`;
+  return canonicalOrigin(req);
 }
 
 function readJsonBody(req) {
@@ -201,7 +201,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
       res.writeHead(302, { Location: `${dest}?verify=invalid` });
       return res.end();
     }
-    const updates = { emailVerified: true, pendingEmail: null };
+    const updates = { emailVerified: true, emailAssumed: false, pendingEmail: null };
     // If the token was minted for a pending email change, apply it now (unless
     // someone else claimed that email in the meantime).
     if (payload.email && payload.email !== profile.email) {

@@ -64,6 +64,11 @@ function createProfile(userId, data = {}) {
     // asserts it (Google/Discord). Local sign-ups are unverified until an email
     // verification flow lands. Governs safe auto-linking (ADR-0016).
     emailVerified: data.emailVerified === true,
+    // `emailVerified` was ADMITTED without proof (a no-mailer deploy couldn't send a
+    // confirmation, see local-auth). Ownership-gated actions — claiming a Stripe
+    // subscription by email — must not trust it (#2606). Cleared by a real
+    // verification (link click or provider assertion).
+    emailAssumed: data.emailAssumed === true,
     // Local email+password credential (scrypt), or null. Never sent to the client;
     // stripped by publicProfile(). Shape: { algo:'scrypt', salt, hash, n, r, p }.
     credential: data.credential || null,
@@ -205,10 +210,11 @@ function applyStripeState(userId, patch = {}) {
   return updateProfile(userId, updates);
 }
 
-/** Look up a profile by its Stripe customer id (webhooks arrive keyed by customer). */
+/** Look up a profile by its Stripe customer id (webhooks arrive keyed by customer).
+ *  Uses allProfiles() so a tombstoned account never receives a billing grant (#2608). */
 function getProfileByStripeCustomer(customerId) {
   if (!customerId) return null;
-  return listProfiles().find((p) => p.stripeCustomerId === customerId) || null;
+  return allProfiles().find((p) => p.stripeCustomerId === customerId) || null;
 }
 
 /**
@@ -344,9 +350,13 @@ function clearProfileCache(userId) {
 }
 
 function loadProfileFromIndex(userId) {
-  // Check cache first
+  // A tombstoned (deleted) profile resolves to null everywhere it matters — a
+  // deleted account must not authenticate, receive billing grants, or reset its
+  // password (#2608). deleteProfile appends { deleted:true } as the latest record.
+  // Check cache first.
   if (profileCache.has(userId)) {
-    return profileCache.get(userId);
+    const cached = profileCache.get(userId);
+    return cached && cached.deleted ? null : cached;
   }
 
   ensureDirectories();
@@ -374,7 +384,26 @@ function loadProfileFromIndex(userId) {
     updateProfileCache(latest);
   }
 
-  return latest;
+  return latest && latest.deleted ? null : latest;
+}
+
+/**
+ * True iff the latest record for this id is a delete tombstone. Distinguishes a
+ * DELETED account (deny/lockout) from a simply-missing id, which getProfile can't
+ * (both read as null). Used by the session gate and the anti-resurrection guard.
+ */
+function isProfileDeleted(userId) {
+  if (!userId) return false;
+  const cached = profileCache.get(userId);
+  if (cached) return cached.deleted === true;
+  ensureDirectories();
+  if (!fs.existsSync(PROFILES_INDEX)) return false;
+  const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
+  let latest = null;
+  for (const line of lines) {
+    try { const p = JSON.parse(line); if (p.id === userId) latest = p; } catch (e) { /* skip */ }
+  }
+  return !!(latest && latest.deleted);
 }
 
 // ── Patreon <-> Discord account linking (#697) ──
@@ -506,9 +535,11 @@ function linkIdentity(profileId, provider, providerId, email, emailVerified) {
       JSON.stringify({ patreonId: String(profileId), discordId: pid, linkedAt: new Date().toISOString() }) + "\n"
     );
   }
-  // If the linked identity is verified, the profile's email becomes verified too.
+  // If the linked identity is verified, the profile's email becomes verified too
+  // (and no longer merely "assumed" — a provider asserted it, #2606).
   if (emailVerified === true && email) {
     updates.emailVerified = true;
+    updates.emailAssumed = false;
     if (!profile.email) updates.email = email;
   }
   return updateProfile(profileId, updates);
@@ -597,6 +628,7 @@ function getOrCreateFromIdentity(provider, u, role) {
     if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
     if (emailVerified && u.email) {
       updates.emailVerified = true;
+      updates.emailAssumed = false; // a provider ASSERTED this address → upgrade from assumed (#2606)
       if (!existing.email) updates.email = u.email;
     }
     // Ensure the identity is recorded even for legacy profiles that predate identities[].
@@ -617,8 +649,13 @@ function getOrCreateFromIdentity(provider, u, role) {
   }
 
   // 3. Fresh profile. Patreon keeps its providerId as the profile id for on-disk
-  // continuity with existing index.jsonl records; others get a random id.
-  const newId = provider === "patreon" ? providerId : crypto.randomBytes(12).toString("hex");
+  // continuity with existing index.jsonl records; others get a random id. BUT if
+  // that Patreon id was deleted, reusing it would silently void the tombstone
+  // (resurrecting the account on re-login, #2608) — so mint a fresh random id
+  // instead, leaving the delete intact and giving the returning user a new profile.
+  const newId = (provider === "patreon" && !isProfileDeleted(providerId))
+    ? providerId
+    : crypto.randomBytes(12).toString("hex");
   const profile = createProfile(newId, {
     name: u.name || "",
     email: u.email || "",
@@ -653,6 +690,30 @@ function hashPassword(plaintext) {
     .scryptSync(String(plaintext), salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P })
     .toString("hex");
   return { algo: "scrypt", salt, hash, n: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P };
+}
+
+/**
+ * Async, non-blocking verify — same contract as verifyPassword but runs scrypt off
+ * the event loop (crypto.scrypt worker) so an unauthenticated login flood can't pin
+ * the main thread (#2609). Use on the login hot path; the sync version stays for
+ * authenticated one-off callers (change-password).
+ */
+function verifyPasswordAsync(plaintext, credential) {
+  return new Promise((resolve) => {
+    if (!credential || credential.algo !== "scrypt" || !credential.salt || !credential.hash) return resolve(false);
+    crypto.scrypt(
+      String(plaintext),
+      credential.salt,
+      SCRYPT_KEYLEN,
+      { N: credential.n || SCRYPT_N, r: credential.r || SCRYPT_R, p: credential.p || SCRYPT_P },
+      (err, derived) => {
+        if (err) return resolve(false);
+        const stored = Buffer.from(credential.hash, "hex");
+        if (stored.length !== derived.length) return resolve(false);
+        try { resolve(crypto.timingSafeEqual(stored, derived)); } catch { resolve(false); }
+      }
+    );
+  });
 }
 
 /** Constant-time verify a plaintext against a stored scrypt credential. */
@@ -734,6 +795,26 @@ function verifyLocalLogin(email, plaintext) {
 }
 
 /**
+ * Async twin of verifyLocalLogin — same enumeration-safe behavior (always runs one
+ * scrypt, dummy credential when the email is unknown) but off the event loop (#2609).
+ */
+async function verifyLocalLoginAsync(email, plaintext) {
+  const needle = String(email).toLowerCase();
+  let profile = null;
+  for (const p of allProfiles()) {
+    if (!p.credential) continue;
+    const match =
+      (p.email && p.email.toLowerCase() === needle) ||
+      (p.identities || []).some((i) => i.email && i.email.toLowerCase() === needle);
+    if (match) { profile = p; break; }
+  }
+  const credential = (profile && profile.credential) || _DUMMY_CREDENTIAL;
+  const okPassword = await verifyPasswordAsync(plaintext, credential); // always runs scrypt
+  if (!profile) return null;
+  return okPassword ? profile : null;
+}
+
+/**
  * The email address this profile has PROVEN ownership of, or null — the root
  * email when `emailVerified === true`, else the first verified identity email.
  * This is the same trust gate ADR-0016 uses for cross-provider auto-linking,
@@ -742,7 +823,12 @@ function verifyLocalLogin(email, plaintext) {
  */
 function verifiedEmailOf(profile) {
   if (!profile) return null;
-  if (profile.emailVerified === true && profile.email) return profile.email;
+  // An `emailAssumed` root email was admitted WITHOUT proof (a no-mailer deploy
+  // couldn't send a confirmation — see local-auth). It must not prove ownership of
+  // a Stripe subscription, or an attacker registers a victim's email and claims
+  // their sub via /api/billing/link (#2606). A provider-verified identity email
+  // (OAuth) or a real link-confirmed root email still counts.
+  if (profile.emailVerified === true && profile.emailAssumed !== true && profile.email) return profile.email;
   const hit = (profile.identities || []).find((i) => i.emailVerified === true && i.email);
   return hit ? hit.email : null;
 }
@@ -767,6 +853,7 @@ module.exports = {
   getProfileByStripeCustomer,
   listProfiles,
   deleteProfile,
+  isProfileDeleted,
   getOrCreateFromPatreon,
   linkDiscordAccount,
   getLinkByDiscordId,
@@ -781,9 +868,11 @@ module.exports = {
   getOrCreateFromIdentity,
   hashPassword,
   verifyPassword,
+  verifyPasswordAsync,
   setLocalPassword,
   createLocalAccount,
   verifyLocalLogin,
+  verifyLocalLoginAsync,
   verifiedEmailOf,
   publicProfile,
 };
