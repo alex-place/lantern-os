@@ -1,3 +1,7 @@
+## [1.11.4] - 2026-07-16
+### Fixed
+- Remove a stray empty runtime file (`apps/lantern-garage/data/profiles/index.jsonl`) committed by accident in #2595 and gitignore the per-user `data/profiles/` store — flagged by the Boilerplate/duplication CI check.
+
 ## [1.11.3] - 2026-07-16
 ### Added
 - **Per-user broker switch — "Broker: Auto / ⚡ Alpaca / 🔗 IBKR" in the trader ☰ (ADR-0027).** Each signed-in trader can now flip which connected broker executes their trades, any time, from the header/hamburger: the choice persists per user (`lib/broker-preference.js`, one tiny JSON per user, gitignored), is served by `GET/POST /api/broker/preference` (`{preference, effective, connected:{alpaca,ibkr}}`), and is honored by every broker-resolution site via `preferredBroker(userId)` — autopilot facade, manual orders, positions. "Auto" follows the server default (`BROKER_PREFER` env, else IBKR-first); the non-preferred broker always remains the automatic fallback, so switching can never strand a working account. Tests: `test/broker-facade.test.js` grows to 8 (per-user beats env both directions, auto/unset follow default, store rejects invalid values). Strengthens **Act**.
