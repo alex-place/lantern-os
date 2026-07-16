@@ -33,7 +33,7 @@ Scores updated per-run in `data/agi-benchmark.jsonl`.
 
 ## Live Skills (real implementations)
 
-> **Audit (2026-06-29):** 7 design-only relic skills were deleted and the design-only ones banner-flagged in a Σ₀ scope-discipline pass — see [docs/SKILLS-AUDIT-2026-06-29.md](docs/SKILLS-AUDIT-2026-06-29.md). The `convergence` skill (below) was added to give the Converge loop stage a real contract.
+> **Audit (2026-06-29):** 7 design-only relic skills were deleted and the design-only ones banner-flagged in a Σ₀ scope-discipline pass — see git history of docs/SKILLS-AUDIT-2026-06-29.md](docs/SKILLS-AUDIT-2026-06-29.md). The `convergence` skill (below) was added to give the Converge loop stage a real contract.
 
 ### convergence
 The Converge stage as a skill — grounded synthesis + Convergence Records. Backs the `!convergance` chat command.

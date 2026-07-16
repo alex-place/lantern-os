@@ -56,6 +56,28 @@ For production, set:
 - `PATREON_REDIRECT_URI=https://your-domain.com/api/auth/patreon/callback`
 - `NODE_ENV=production` (enables secure cookies over HTTPS)
 
+#### Local dev (`.env.local`, dual-boot ports)
+
+For local development put the credentials in `.env.local` at repo root
+(gitignored — do **not** commit). The `redirect_uri` auto-derives from the
+request host, but Patreon requires an **exact match**, so register both
+dual-boot ports in the Patreon app's Redirect URIs:
+
+```text
+http://localhost:4178/api/auth/patreon/callback   (dev server)
+http://localhost:4177/api/auth/patreon/callback   (stable server)
+```
+
+Smoke test after restart:
+
+```bash
+# should redirect to patreon.com with your real client_id:
+curl -s -i "http://localhost:4178/api/auth/patreon/start?returnTo=%2F" | grep -i location
+```
+
+Then click **Connect with Patreon** on `/auth.html`, complete consent, and
+confirm `/api/auth/session` shows `provider:"patreon"` and the mapped role.
+
 ### 4. Restart the Server
 
 ```bash
@@ -151,8 +173,11 @@ Clears session and logs out user.
 
 | File | Purpose |
 |------|---------|
-| `apps/lantern-garage/lib/patreon-auth.js` | Core OAuth logic: token exchange, user fetch, role mapping |
-| `apps/lantern-garage/routes/auth.js` | Express-like route handlers for OAuth endpoints |
+| `apps/lantern-garage/lib/oauth-core.js` | Provider-agnostic flow engine: `handleOAuthStart` / `handleOAuthCallback` (exchange → fetchUser → role → profile → session) |
+| `apps/lantern-garage/lib/auth-providers.js` | Per-provider config incl. the `patreon` block (authorize/token URLs, scope, `fetchUser`, `roleForAmountCents` mapping) |
+| `apps/lantern-garage/lib/user-profiles.js` | `getOrCreateFromIdentity` — profile creation (records `patreonId` + tier) |
+| `apps/lantern-garage/lib/patreon-auth.js` | Legacy Patreon-specific OAuth logic (superseded by the provider-agnostic pair above) |
+| `apps/lantern-garage/routes/auth.js` | Route handlers for OAuth endpoints |
 | `apps/lantern-garage/public/auth.html` | Patreon login page with tier cards |
 | `apps/lantern-garage/public/profile.html` | User profile page with logout button |
 | `apps/lantern-garage/public/js/auth-gate.js` | Client-side auth enforcement script |

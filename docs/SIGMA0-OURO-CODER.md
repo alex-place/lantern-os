@@ -22,16 +22,15 @@ updated: 2026-06-25
 > So: two looped families, distinct roles, one Convergence Core — **not** parallel product coders.
 > Everything below still accurately describes the Ouro kernel path and the loop mechanism. For the
 > owned-PLT coder, see [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) and
-> [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md) /
-> [`HANDOFF`](SIGMA0-PLT-HANDOFF.md).
+> [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md).
 
 > **This is the one doc for the local Σ₀ coder — then and now.** It supersedes and folds
 > in two older pages:
 > - **`LANTERN-SIGMA0-CODER.md`** — *what we had then*: the Qwen2.5-Coder-3B QLoRA model
->   served via the Ollama binary (deprecated, kept as a tombstone).
+>   served via the Ollama binary (tombstone removed 2026-07-16; in git history).
 > - **`OURO-LOOPLM.md`** — the **loop mechanism** (Q-exit math + the two loop
 >   implementations), now described in [§The loop mechanism](#the-loop-mechanism) below
->   (deprecated, kept as a redirect).
+>   (tombstone removed 2026-07-16; in git history).
 >
 > If you landed on one of those, you're in the right place now.
 
@@ -322,7 +321,7 @@ the **Reason/Act** stages; every turn still emits a PCSF receipt + Convergence R
 - **Can't yet *drive* Claude Code** — the protocol bridge round-trips cleanly, but the 1.4B
   adapter under-triggers tools and is overwhelmed by CC's ~20k-token system prompt. The reliable
   surfaces are the in-app chat and the standalone agent loop. See
-  [SIGMA0-CODER-CLAUDE-CODE-STATUS.md](SIGMA0-CODER-CLAUDE-CODE-STATUS.md).
+  the former SIGMA0-CODER-CLAUDE-CODE-STATUS note (removed; in git history).
 - **Deep-mode depth is now logged; bench-grade numbers still aren't** — the served native path
   appends realized `mean_depth` + contraction to the eval leaderboard (`_persist_loop_meta`,
   #777), but the `python -m sigma0.loop_lm` probe output remains a live observation, not a
@@ -370,9 +369,9 @@ function-call outputs is no longer truncated — fits an A10/local-RTX without s
 ## Related
 - [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel that improves this adapter
 - [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) · [SIGMA0-COLLAPSE-EXPLAINER.md](SIGMA0-COLLAPSE-EXPLAINER.md) — the safety foundation; why `accel` exit is the certificate-consistent policy
-- [SIGMA0-CODER-CLAUDE-CODE-STATUS.md](SIGMA0-CODER-CLAUDE-CODE-STATUS.md) — can it drive Claude Code? (bridge solved, model-reliability blocked)
+- former SIGMA0-CODER-CLAUDE-CODE-STATUS (removed; in git history) — can it drive Claude Code? (bridge solved, model-reliability blocked)
 - [research/gpu-training-pipeline-diagnosis-2026-06-25.md](research/gpu-training-pipeline-diagnosis-2026-06-25.md) — the 5-bug chain + Kaggle-is-pre-Ampere finding
 - [SUPERFLEET-SWARM-DESIGN.md](SUPERFLEET-SWARM-DESIGN.md) — the worker swarm that runs this loop on Tasks
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the architecture North Star
 - [CSF-FORMAT-SPECIFICATION.md](CSF-FORMAT-SPECIFICATION.md) — §2.9 KB grounding index + near routing
-- [LANTERN-SIGMA0-CODER.md](LANTERN-SIGMA0-CODER.md) · [OURO-LOOPLM.md](OURO-LOOPLM.md) — the two superseded pages this consolidates (tombstones)
+- `LANTERN-SIGMA0-CODER.md` · `OURO-LOOPLM.md` — the two superseded pages this consolidates (removed 2026-07-16; in git history)

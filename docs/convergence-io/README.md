@@ -52,7 +52,7 @@ capability proven), NAP the *must-not*, AAPF the *what-happened*.
   [`lib/convergence-adapter.js`](../../apps/lantern-garage/lib/convergence-adapter.js)) for the
   parts it uses (notably the dilation→grounding policy). **Not every primitive is on the hot
   path** — treat these docs as the design + tested contract, and check the adapters for what's
-  actually live. See [CODEMAP.md](../CODEMAP.md) for the wiring map.
+  actually live. See [ARCHITECTURE.md](../ARCHITECTURE.md) for the wiring map.
 
 ## Source
 - Code: [`src/convergence_io/`](../../src/convergence_io/)

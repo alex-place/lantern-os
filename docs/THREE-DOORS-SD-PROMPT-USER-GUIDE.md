@@ -1023,9 +1023,7 @@ Negative: blurry, low quality, text, watermark, deformed, ugly
 
 ### Documentation Files
 
-- **Quick Reference:** `data/prompts/SD-QUICK-REFERENCE.md` (copy-paste prompts)
-- **Technical Deep-Dive:** `data/prompts/SD-PROMPT-IMPLEMENTATION.md` (full settings guide)
-- **Validation Report:** `data/prompts/VALIDATION-REPORT.md` (canon compliance)
+- **Prompt library (source of truth):** `data/prompts/sd-prompt-library-kingdome-v1.json`
 - **This Guide:** `docs/THREE-DOORS-SD-PROMPT-USER-GUIDE.md` (you are here)
 
 ### Canon Reference
@@ -1053,8 +1051,7 @@ Negative: blurry, low quality, text, watermark, deformed, ugly
 
 **Related Files:**
 - Prompt library: `data/prompts/sd-prompt-library-kingdome-v1.json`
-- Implementation guide: `data/prompts/SD-PROMPT-IMPLEMENTATION.md`
-- Validation report: `data/prompts/VALIDATION-REPORT.md`
+- Prompt library: `data/prompts/sd-prompt-library-kingdome-v1.json`
 - Canon source: `csf/ingest/2026-06-11-full-door-canon-v2.md`
 
 **Next Update:** Post-Three-Doors integration (feedback from real usage)

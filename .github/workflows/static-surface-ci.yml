@@ -48,7 +48,6 @@ jobs:
           test -f manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md
           test -f manifests/foundry-shareholder-repos.md
           test -f manifests/open-issues.md
-          test -f docs/SONS-PC-READINESS.md
 
   html-links:
     name: HTML link integrity
