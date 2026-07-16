@@ -167,6 +167,19 @@
   .tp-empty{font-family:var(--mono);font-size:12px;color:var(--text2);padding:24px;text-align:center}
   /* #2437: one-click exits */
   .tp-actions{display:flex;justify-content:flex-end;padding:6px 10px 2px}
+  /* Advisor tab — deterministic portfolio suggestions (#advisor) */
+  .adv-wrap{font-family:var(--mono);font-size:12px;padding:6px 10px;display:flex;flex-direction:column;gap:10px}
+  .adv-stats{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--text2)}
+  .adv-stats b{color:var(--text);font-weight:600}
+  .adv-h{font-size:11px;color:var(--tv-text-secondary);letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+  .adv-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+  .adv-list li{line-height:1.45}
+  .adv-warn{color:var(--amber)}
+  .adv-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .adv-row input[type=number]{width:110px;background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 8px;font-family:var(--mono);font-size:12px}
+  .adv-btn{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 12px;font-family:var(--mono);font-size:12px;cursor:pointer}
+  .adv-btn:hover{border-color:var(--tv-text-secondary)}
+  .adv-note{color:var(--text2);font-size:11px;line-height:1.5}
   .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
     border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
@@ -883,6 +896,7 @@
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
+    <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -890,6 +904,7 @@
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -3997,6 +4012,139 @@ function renderPositionsTable(positions){
         <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button></td></tr>`;
     }).join('') + '</tbody></table>';
 }
+// ── Advisor tab: deterministic portfolio suggestions (no LLM, no orders) ──
+// Same engine as the chat tools (lib/portfolio-analytics.js via
+// /api/trading/portfolio/*): measured Sharpe/vol/drawdown at current weights,
+// a shrunk-tangency rebalance PROPOSAL, and a buy-only contribution planner.
+// Everything rendered here is computed math over the same positions the
+// Positions tab shows — suggestions, never actions.
+let _advisorAt = 0;
+const _advEsc = (s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const _advPct = (x,dp=1)=>(x*100).toFixed(dp)+'%';
+const _advSharpe = (s)=>`${s.sharpe.toFixed(2)} <span style="color:var(--text2)">[${s.lo.toFixed(2)}, ${s.hi.toFixed(2)}]</span>`;
+// Objective state (ADR-0028): 'sharpe' (default) or 'max_return' + annual vol cap %.
+function _advObjective(){
+  try{ return JSON.parse(localStorage.getItem('advObjective'))||{o:'sharpe',v:20}; }catch(e){ return {o:'sharpe',v:20}; }
+}
+function setAdvisorObjective(o,v){
+  const cur=_advObjective();
+  const next={o:o||cur.o, v:Math.min(60,Math.max(5,Number(v)||cur.v))};
+  try{ localStorage.setItem('advObjective',JSON.stringify(next)); }catch(e){}
+  loadAdvisor(true);
+}
+
+async function loadAdvisor(force){
+  const el=document.getElementById('tp-advisor'); if(!el) return;
+  if(window.GUEST){ el.innerHTML='<div class="tp-empty">Advisor reads your broker positions — sign in and connect a broker to use it</div>'; return; }
+  if(!force && Date.now()-_advisorAt<60000 && el.dataset.loaded) return;   // 60s cache
+  el.innerHTML='<div class="tp-empty">Measuring holdings… (daily history fetch, a few seconds)</div>';
+  try{
+    const obj=_advObjective();
+    const q=obj.o==='max_return'?`?objective=max_return&max_vol=${(obj.v/100).toFixed(2)}`:'';
+    const [a,r] = await Promise.all([
+      fetch('/api/trading/portfolio/analysis').then(x=>x.json()),
+      fetch('/api/trading/portfolio/rebalance'+q).then(x=>x.json()),
+    ]);
+    _advisorAt=Date.now(); el.dataset.loaded='1';
+    renderAdvisor(el,a,r);
+  }catch(e){
+    el.innerHTML=`<div class="tp-empty">Advisor unavailable (${_advEsc(e.message)})</div>`;
+  }
+}
+
+function _advSuggestions(a,r){
+  const items=[];
+  // Concentration (measured, vs the proposal's cap)
+  const top=a.concentration&&a.concentration.maxWeight;
+  if(top&&top.weight>0.35) items.push(`<li class="adv-warn">Concentration: <b>${_advEsc(top.symbol)}</b> is ${_advPct(top.weight)} of the portfolio — above the 35% cap the proposal enforces.</li>`);
+  if(a.concentration) items.push(`<li>Diversification: ${a.symbols.length} holdings behave like <b>${a.concentration.effectiveN.toFixed(1)}</b> independent ones (avg pairwise correlation ${(a.correlations.avgPairwise).toFixed(2)}).</li>`);
+  // Rebalance verdict (CI-honest)
+  if(r&&r.ok){
+    const verdict = r.distinguishable
+      ? `a <b>measurable</b> improvement on this window`
+      : `the 95% CIs <b>overlap</b> — statistically indistinguishable on this window; taxes or simplicity may reasonably decide`;
+    items.push(`<li>Rebalance: proposed weights move ex-ante Sharpe ${r.current.sharpe.sharpe.toFixed(2)} → ${r.proposed.sharpe.sharpe.toFixed(2)}, ${verdict}.</li>`);
+    const shifts=r.symbols.map((s,i)=>({s,d:r.proposedWeights[i]-r.currentWeights[i]}))
+      .filter(x=>Math.abs(x.d)>=0.02).sort((x,y)=>Math.abs(y.d)-Math.abs(x.d)).slice(0,4);
+    if(shifts.length) items.push(`<li>Largest shifts: ${shifts.map(x=>`${_advEsc(x.s)} ${x.d>0?'+':''}${_advPct(x.d)}`).join(' · ')}.</li>`);
+  } else if(r&&r.reason){ items.push(`<li>Rebalance proposal unavailable: ${_advEsc(r.reason)}.</li>`); }
+  for(const n of (a.notes||[])) items.push(`<li class="adv-warn">${_advEsc(n)}</li>`);
+  return items;
+}
+
+function renderAdvisor(el,a,r){
+  if(!a||!a.ok){ el.innerHTML=`<div class="tp-empty">${_advEsc((a&&a.reason)||'analysis unavailable')}</div>`; return; }
+  const p=a.portfolio;
+  const stats=`<div class="adv-stats">
+    <span>Sharpe (${a.window.years}y): <b>${_advSharpe(p.sharpe)}</b></span>
+    <span>Vol: <b>${_advPct(p.volAnnual)}/yr</b></span>
+    <span>Worst drawdown: <b>${_advPct(p.maxDD)}</b></span>
+    <span>Ann. return: <b>${_advPct(p.annReturn)}</b></span>
+    <span>Value: <b>$${fmt(a.totalValue,0)}</b></span>
+  </div>`;
+  const ordRows=(r&&r.ok&&r.orders.length)
+    ? `<table class="tp-table"><thead><tr><th>Action</th><th>Symbol</th><th>Shares</th><th>≈ Value</th><th>Est. gain</th></tr></thead><tbody>`+
+      r.orders.map(o=>`<tr><td class="tp-side ${o.action==='BUY'?'long':'short'}">${o.action}</td><td><span class="tp-sym" onclick="focusTicker('${_advEsc(o.symbol)}')">${_advEsc(o.symbol)}</span></td><td>${o.shares}</td><td>$${fmt(o.estDollars,0)}</td><td>${o.estGain!=null?(o.estGain>=0?'+':'−')+'$'+fmt(Math.abs(o.estGain),0):'—'}</td></tr>`).join('')+
+      `</tbody></table>`
+    : `<div class="adv-note">No rebalance orders suggested — current weights are within 1% of the proposal.</div>`;
+  const obj=_advObjective();
+  const mandate=(r&&r.ok&&r.mandate)
+    ? `<div class="adv-note">Sharpe mandate (ADR-0028, target ${r.mandate.target}): current <b>${_advEsc(r.mandate.current)}</b>, proposed <b>${_advEsc(r.mandate.proposed)}</b> — only meets_ci (CI lower bound above target) is eligible for live capital; everything else stays paper/dry-run.</div>` : '';
+  const tax=(r&&r.ok&&r.tax&&r.orders.some(o=>o.action==='SELL'))
+    ? `<div class="adv-note">Tax estimate: selling realizes ≈$${fmt(r.tax.estRealizedGain,0)} of gains → ~$${fmt(r.tax.estTaxCost,0)} at ${Math.round(r.tax.rate*100)}% (${_advEsc(r.tax.basis)}). Buy-only contributions realize nothing.</div>` : '';
+  const controls=`<div class="adv-row" role="group" aria-label="Optimization objective">
+      <label for="advObj">Objective</label>
+      <select id="advObj" class="adv-btn" onchange="setAdvisorObjective(this.value,null)" aria-label="Optimization objective">
+        <option value="sharpe"${obj.o!=='max_return'?' selected':''}>Max Sharpe (risk-adjusted)</option>
+        <option value="max_return"${obj.o==='max_return'?' selected':''}>Max return @ vol cap</option>
+      </select>
+      ${obj.o==='max_return'?`<label for="advVol">Vol cap %/yr</label><input type="number" id="advVol" min="5" max="60" step="1" value="${obj.v}" aria-label="Annualized volatility ceiling percent" onchange="setAdvisorObjective(null,this.value)">`:''}
+    </div>`;
+  const excluded=(a.excluded&&a.excluded.length)?`<div class="adv-note">Excluded: ${a.excluded.map(e=>`${_advEsc(e.symbol)} (${_advEsc(e.reason)})`).join('; ')}</div>`:'';
+  el.innerHTML=`<div class="adv-wrap">
+    ${stats}
+    <div class="adv-h">Suggestions (computed, not AI)</div>
+    <ul class="adv-list">${_advSuggestions(a,r).join('')}</ul>
+    <div class="adv-h">Rebalance proposal — dry run, nothing placed</div>
+    ${controls}
+    ${ordRows}
+    ${mandate}
+    ${tax}
+    <div class="adv-h">Contribution planner</div>
+    <div class="adv-row">
+      <label for="advCash">Adding new cash?</label>
+      <input type="number" id="advCash" min="1" step="1" value="20" aria-label="Contribution amount in dollars">
+      <button class="adv-btn" onclick="planAdvisorContribution(this)">Plan buys</button>
+      <button class="adv-btn" onclick="loadAdvisor(true)" title="Refetch positions and recompute">↻ Recompute</button>
+    </div>
+    <div id="advContribOut"></div>
+    ${excluded}
+    <div class="adv-note">Method: long-only shrunk tangency (w ∝ Σ⁻¹μ), max weight 35%, existing holdings only. Evidence: historical daily total returns; CI is an i.i.d. floor (Lo 2002); taxes/slippage not modeled. Backtest ≠ future performance — decision support, not personalized investment advice. The same numbers are available to the chat assistant via the portfolio_analysis / propose_rebalance / contribution_plan tools.</div>
+  </div>`;
+}
+
+async function planAdvisorContribution(btn){
+  const out=document.getElementById('advContribOut'); if(!out) return;
+  const cash=Number(document.getElementById('advCash').value);
+  if(!(cash>0)){ out.innerHTML='<div class="adv-note">Enter a positive dollar amount.</div>'; return; }
+  if(btn) btn.disabled=true;
+  out.innerHTML='<div class="adv-note">Computing…</div>';
+  try{
+    const d=await fetch(`/api/trading/portfolio/contribution?cash=${encodeURIComponent(cash)}`).then(x=>x.json());
+    if(!d.ok){ out.innerHTML=`<div class="adv-note">${_advEsc(d.reason||'plan unavailable')}</div>`; return; }
+    const rows=d.orders.length
+      ? `<table class="tp-table"><thead><tr><th>Buy</th><th>Amount</th><th>≈ Shares</th><th>Last</th></tr></thead><tbody>`+
+        d.orders.map(o=>`<tr><td><span class="tp-sym" onclick="focusTicker('${_advEsc(o.symbol)}')">${_advEsc(o.symbol)}</span></td><td>$${o.dollars.toFixed(2)}</td><td>${o.estShares!=null?o.estShares:'—'}</td><td>$${fmt(o.price,2)}</td></tr>`).join('')+
+        `</tbody></table>`
+      : '<div class="adv-note">Amount too small to split — every slice fell under the dust floor.</div>';
+    out.innerHTML=`${rows}<div class="adv-note">Buy-only toward the tangency target; nothing sold, nothing placed. Ex-ante Sharpe ${d.current.sharpe.sharpe.toFixed(2)} → ${d.after.sharpe.sharpe.toFixed(2)} (fractional-share estimates).</div>`;
+  }catch(e){
+    out.innerHTML=`<div class="adv-note">plan failed (${_advEsc(e.message)})</div>`;
+  }finally{
+    if(btn) btn.disabled=false;
+  }
+}
+
 // Broker timestamps arrive in UTC ("2026-06-30 13:33:19+00:00"); show them in ET
 // so they line up with the agent feed. Time-only for today, +date for older.
 function _fmtOrderTime(s){

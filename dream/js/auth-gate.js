@@ -21,7 +21,7 @@
   // bounce here either.
   const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
-  const TRADE_PAGES = ['/trading.html', '/kalshi-terminal.html'];
+  const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest
   // role — the pages themselves stay reachable by URL (orchestration is public
   // read-only, work is server-gated); this only trims links guests can't use.
