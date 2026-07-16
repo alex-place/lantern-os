@@ -528,3 +528,6 @@ data/lantern-garage/trading/watchlist.json
 reports/sigma0-issue-audit.md
 reports/button-audit.md
 reports/creator-dashboard-audit.md
+
+# server session store — runtime state, never commit (leaked once via #2575)
+data/sessions/
