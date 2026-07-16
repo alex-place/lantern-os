@@ -123,9 +123,12 @@ function renderUpgradePage(page) {
   const message = isStaff
     ? `This page is limited to unisona staff. If you think you should have access, contact the team.`
     : `Unlocking this feature requires <strong>${need}</strong>. Your current plan doesn't include it yet.`;
+  // The upgrade page is only reachable signed-in (signed-out visitors are
+  // redirected to sign-in before any tier check, #2471) — so the extra CTA is
+  // "switch account", covering the user whose OTHER account holds the tier.
   const actions = isStaff
     ? `<a class="btn ghost" href="/">Return home</a>`
-    : `<a class="btn primary" href="/pricing.html">See plans</a><a class="btn ghost" href="/">Return home</a>`;
+    : `<a class="btn primary" href="/pricing.html">See plans</a><a class="btn ghost" href="/auth.html">Sign in with another account</a><a class="btn ghost" href="/">Return home</a>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="/css/site.css"><title>${isStaff ? "Staff only" : "Unlock this feature"} — unisona.ai</title>
@@ -190,8 +193,15 @@ module.exports = async function pagesRoute(req, res, url, deps) {
       // Staff gate writes its own 302/403 — do NOT run requireAuth first (that would
       // 302 a signed-in non-staff user to login instead of returning a clean 403).
       if (!requireStaff(req, res)) return true;
-    } else if (!requireAuth(req, res)) {
-      return true; // unauthenticated → 302 to login (handled by requireAuth)
+    } else if (!getSessionUser(req)?.id) {
+      // Signed out → the correct action is signing in, so send them there with a
+      // way back. This must run BEFORE any tier check: letting a sessionless guest
+      // fall through to meetsRole() rendered a self-contradictory "requires the
+      // guest tier" upgrade wall when the auth gate is off (#2471) — requireAuth
+      // returns true for everyone in that mode and never redirects.
+      res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
+      res.end();
+      return true;
     } else {
       // Authenticated but possibly under-tier: check WITHOUT emitting a raw JSON 403,
       // and render a friendly "unlock" page instead when access is short.
