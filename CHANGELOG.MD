@@ -1,3 +1,7 @@
+## [1.11.2] - 2026-07-16
+### Added
+- **BROKER_PREFER — operator-set broker precedence (ADR-0027).** When a user has BOTH IBKR (ADR-0022) and Alpaca (ADR-0027) connected, `BROKER_PREFER=alpaca` makes all three resolution sites (autopilot broker-facade, manual order placement, positions/account endpoint) try Alpaca first, with IBKR kept as the automatic fallback — and the default remains IBKR-first, byte-compatible with the old behavior. A preference can never strand a working account: the non-preferred broker always stays the fallback. Tests: `test/broker-facade.test.js` (6 — default order, flipped order, both fallback directions, none-connected null, env parsing). Strengthens **Act**.
+
 ## [1.11.1] - 2026-07-16
 ### Added
 - **One-click ⚡ Connect Alpaca in the trader ☰ menu (ADR-0027).** The stock-trader header/hamburger now starts Alpaca OAuth directly — sign in, approve, bounced back to the trader — instead of routing through the orchestration setup card. Status-aware label (connected / connect / setup pending), guest-gated like the IBKR link, OAuth return param announced once then scrubbed. Strengthens **Act**.

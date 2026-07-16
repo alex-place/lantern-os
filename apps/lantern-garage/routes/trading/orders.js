@@ -122,11 +122,21 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       const uid = getEffectiveUserId(req);
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
       const alpaca = require('../../lib/alpaca-adapter');
+      const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
-      // else the operator's server paper keys). Alpaca PAPER fills for real without
-      // arming — so a paper trade actually happens instead of a dry-run dead end.
-      const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
-        || (await alpaca.placeOrder(uid, orderReq).catch(() => null))
+      // else the operator's server paper keys), flipped by BROKER_PREFER=alpaca.
+      // Either order keeps the other broker as fallback. Alpaca PAPER fills for
+      // real without arming — so a paper trade actually happens instead of a
+      // dry-run dead end.
+      const attempts = preferredBroker() === 'alpaca'
+        ? [() => alpaca.placeOrder(uid, orderReq), () => bridge.placeIBKROrder(uid, orderReq)]
+        : [() => bridge.placeIBKROrder(uid, orderReq), () => alpaca.placeOrder(uid, orderReq)];
+      let result = null;
+      for (const attempt of attempts) {
+        result = await attempt().catch(() => null);
+        if (result) break;
+      }
+      result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Connect Alpaca (one click) or ask an admin to set Alpaca paper keys to trade.' };
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
