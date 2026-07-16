@@ -30,13 +30,15 @@ if [ -n "$SKIP_ALL_CHECKS" ]; then
     exit 0
 fi
 
-# 1. Version/Changelog validation
+# 1. Change-record (changelog fragment) validation — the retired version-bump
+#    validator (validate-version-changelog.py) was removed with #2527; the
+#    fragment gate is the same one pre-push enforces.
 if [ -z "$SKIP_VERSION_CHECK" ]; then
-    echo "[*] 1/4: Version & Changelog validation..."
-    if python3 "$SCRIPT_DIR/validate-version-changelog.py"; then
-        echo "[✓] Version/Changelog: PASS"
+    echo "[*] 1/4: Change-record (changelog fragment) validation..."
+    if python3 "$SCRIPT_DIR/validate-prepush-version-changelog.py"; then
+        echo "[✓] Change record: PASS"
     else
-        echo "[✗] Version/Changelog: FAIL"
+        echo "[✗] Change record: FAIL"
         FAILED=1
     fi
     echo ""

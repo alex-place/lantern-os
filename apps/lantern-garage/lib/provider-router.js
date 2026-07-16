@@ -89,6 +89,10 @@ const PROVIDER_CHAINS = {
   creative: [
     { provider: "mistral", models: ["mistral-large-latest"] },
     { provider: "openai", models: ["gpt-4o"] },
+    // Grok's documented niche (PROVIDERS.md §4): creative tasks, humor/personality.
+    // Wired 2026-07-16 (#2531) — the stream-chat transport (OpenAI-compatible,
+    // native tool loop) existed but no chain ever dispatched it; key verified live.
+    { provider: "xai", models: ["grok-3-mini"] },
     { provider: "gemini", models: ["gemini-2.5-flash"] },
     { provider: "cohere", models: ["command-a-plus-05-2026"] },
     { provider: "ollama", models: ["lantern-csf-dream"] },
@@ -99,6 +103,7 @@ const PROVIDER_CHAINS = {
     { provider: "anthropic", models: ["claude-sonnet-4-6"] },
     { provider: "openai", models: ["gpt-4o-mini"] },
     { provider: "mistral", models: ["mistral-large-latest"] },
+    { provider: "xai", models: ["grok-3-mini"] }, // #2531 — cloud tail before the local backstop
     { provider: "ollama", models: ["lantern-csf-dream", "qwen2.5-coder"] },
   ],
 };
@@ -320,7 +325,7 @@ async function callProvider(provider, model, payload, taskType = "default", cont
   );
 
   if (nextProviderStep && fallbackState.attemptCount < MAX_FALLBACK_ATTEMPTS) {
-    console.log(`[provider-router] Fallback: ${provider} failed, trying ${nextProviderStep.provider} (attempt ${fallbackState.attemptCount}/${MAX_FALLBACK_ATTEMPTS})`);
+    console.info(`[provider-router] Fallback: ${provider} failed, trying ${nextProviderStep.provider} (attempt ${fallbackState.attemptCount}/${MAX_FALLBACK_ATTEMPTS})`);
     // #897: record Claude escalation as a convergence event so the rollover dashboard
     // (#898) can track unisona.ai win/loss rate without grepping logs.
     if (nextProviderStep.provider === "anthropic" && provider !== "anthropic") {
