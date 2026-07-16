@@ -536,3 +536,4 @@ data/sessions/
 apps/lantern-garage/data/ibkr-credentials/
 apps/lantern-garage/data/alpaca-credentials/
 apps/lantern-garage/data/broker-preference/
+apps/lantern-garage/data/profiles/
