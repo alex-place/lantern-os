@@ -531,3 +531,8 @@ reports/creator-dashboard-audit.md
 
 # server session store — runtime state, never commit
 data/sessions/
+
+# Per-user runtime stores (never commit): broker creds + broker choice
+apps/lantern-garage/data/ibkr-credentials/
+apps/lantern-garage/data/alpaca-credentials/
+apps/lantern-garage/data/broker-preference/

@@ -23,9 +23,15 @@
 
 const alpaca = require('./alpaca-adapter');
 
-/** Which broker to try first when a user has both connected. Env-driven so the
- *  operator can flip it without a code change; default keeps IBKR-first. */
-function preferredBroker() {
+/** Which broker to try first when a user has both connected. The user's own
+ *  stored choice wins (broker-preference.js, set from the trader ☰); 'auto' or
+ *  no userId falls through to the operator's BROKER_PREFER env; default keeps
+ *  IBKR-first. */
+function preferredBroker(userId) {
+  if (userId != null) {
+    const own = require('./broker-preference').get(userId);
+    if (own === 'alpaca' || own === 'ibkr') return own;
+  }
   return process.env.BROKER_PREFER === 'alpaca' ? 'alpaca' : 'ibkr';
 }
 
@@ -55,7 +61,7 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     };
     return { broker: 'alpaca', accountId: acct.account_id, facade };
   };
-  const order = preferredBroker() === 'alpaca' ? [tryAlpaca, tryIbkr] : [tryIbkr, tryAlpaca];
+  const order = preferredBroker(userId) === 'alpaca' ? [tryAlpaca, tryIbkr] : [tryIbkr, tryAlpaca];
   for (const attempt of order) {
     const resolved = await attempt();
     if (resolved) return resolved;

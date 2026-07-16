@@ -693,6 +693,7 @@
   body.guest .badge-paper,
   body.guest #brokerLink,          /* broker connect — only for entitled traders */
   body.guest #alpacaLink,          /* one-click Alpaca connect — same gate */
+  body.guest #brokerPrefBtn,       /* broker switch — trading-only control */
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
@@ -870,6 +871,9 @@
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
     data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
+  <button type="button" class="nav-link" id="brokerPrefBtn" style="display:none" onclick="cycleBrokerPref()"
+    title="Which connected broker executes your trades. Auto = server default. Click to switch — the other broker stays the automatic fallback."
+    data-hmenu-desc="Switch which broker executes your trades — Auto, Alpaca, or IBKR. The other stays the fallback.">Broker: <span id="brokerPrefLabel">Auto</span></button>
   <a href="/api/broker/alpaca/connect?returnTo=%2Fstock-trader.html" class="nav-link" id="alpacaLink" style="display:none"
     title="One-click: sign in to Alpaca and approve — trades route to your own paper account. No keys to paste."
     data-hmenu-desc="One-click broker connect — sign in to Alpaca, approve, done. Starts on a paper account.">⚡ <span id="alpacaLabel">Connect Alpaca</span></a>
@@ -4611,7 +4615,37 @@ async function detectGuestMode(){
       refreshBrokerStatus();
     }
     refreshAlpacaStatus();
+    refreshBrokerPref();
   }
+}
+// ── Broker switch (per-user, ADR-0027): Auto → Alpaca → IBKR → Auto. The choice
+// re-routes ALL trading surfaces (autopilot, manual orders, positions) at once;
+// the non-preferred broker always stays the automatic fallback server-side.
+let _brokerPref = 'auto';
+function _paintBrokerPref(pref, effective){
+  const btn=document.getElementById('brokerPrefBtn'), lbl=document.getElementById('brokerPrefLabel');
+  if(!btn || !lbl) return;
+  _brokerPref = pref;
+  const name = pref==='alpaca' ? '⚡ Alpaca' : pref==='ibkr' ? '🔗 IBKR' : `Auto (${effective==='alpaca'?'Alpaca':'IBKR'})`;
+  lbl.textContent = name;
+  btn.style.display='';
+}
+async function refreshBrokerPref(){
+  try{
+    const s = await (await fetch('/api/broker/preference',{cache:'no-store'})).json();
+    if(s && s.preference) _paintBrokerPref(s.preference, s.effective);
+  }catch(e){ /* leave hidden */ }
+}
+async function cycleBrokerPref(){
+  const next = _brokerPref==='auto' ? 'alpaca' : _brokerPref==='alpaca' ? 'ibkr' : 'auto';
+  try{
+    const s = await (await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:next})})).json();
+    if(s && s.ok){
+      _paintBrokerPref(s.preference, s.effective);
+      // Positions/equity now come from the newly preferred broker — refetch soon.
+      if(typeof loadPositions==='function') setTimeout(loadPositions, 300);
+    }
+  }catch(e){ /* keep old label */ }
 }
 // One-click Alpaca connect state (ADR-0027). Three states:
 //  connected        → green "Alpaca · <acct>", click manages it on orchestration#broker
@@ -4710,6 +4744,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
     {sel:'.header a[href*="explore"]', narrowOnly:false},
+    {sel:'#brokerPrefBtn',             narrowOnly:false},
     {sel:'#alpacaLink',                narrowOnly:false},
     {sel:'#brokerLink',                narrowOnly:false},
     {sel:'#dcToggle',                  narrowOnly:false},

@@ -193,7 +193,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         return true;
       };
       // BROKER_PREFER=alpaca → Alpaca first; the IBKR path below stays the fallback.
-      if (preferredBroker() === 'alpaca' && await serveAlpaca()) return true;
+      if (preferredBroker(uid) === 'alpaca' && await serveAlpaca()) return true;
       const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
       if (ibkrAccount) {
         // IBKR keeps just-closed names in the portfolio snapshot as qty:0 rows; they're
