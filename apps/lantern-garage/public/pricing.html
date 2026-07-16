@@ -34,10 +34,17 @@
       --line: #2a343d;
     }
     [data-theme="dark"] body { background: var(--paper); }
-    /* Secondary (Patreon) CTA sits quieter beneath the primary card checkout. */
-    .pricing-alt { background: transparent; border: 1px solid var(--line); }
+    /* Secondary (Patreon) CTA sits quieter beneath the primary card checkout.
+       styles.css colors .pricing-cta text for a FILLED button (#fff) — on this
+       transparent variant that's invisible in light mode, so re-ink it. */
+    .pricing-alt { background: transparent; border: 1px solid var(--line); color: var(--ink); }
     .stripe-cta { cursor: pointer; font: inherit; }
     .stripe-cta[disabled] { opacity: .6; cursor: progress; }
+    /* styles.css gives .pricing-cta `display: grid`, which defeats the UA's
+       [hidden] rule — without this, "hidden" card-checkout buttons render and
+       503 on click when no Price is configured (same fix as auth.html's
+       .tos-consent[hidden]). */
+    .pricing-cta[hidden] { display: none; }
     #billing-banner {
       margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 8px;
       border: 1px solid var(--line); background: var(--panel); color: var(--ink);
