@@ -1,0 +1,3 @@
+### Removed
+
+- chat: three vestigial surfaces whose markup was cut long ago but whose JS lived on (#2476) — the Observer side panel (permanently hidden, opener-less; its 30s `/api/csf/*` poll and per-reply `/api/convergence/status` refresh ran forever into dead DOM), the Performance monitor (invisible; its orphaned init could throw on load, and a global `window.fetch` wrapper taxed every request to feed it), and the `#model-select` sub-picker (early-returned forever; `requestedModel` was always empty). All dead markup, functions, polls, and the fetch wrapper are gone; remaining writers are null-guarded no-ops.
