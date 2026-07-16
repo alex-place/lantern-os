@@ -30,7 +30,7 @@ body:
       label: Files expected to change
       placeholder: |
         src/discord_lounge_bot/bot_v2.py
-        lore/doors/...
+        data/three-doors/canon.json
     validations:
       required: true
   - type: input
@@ -43,12 +43,12 @@ body:
   - type: textarea
     id: csf
     attributes:
-      label: CSF sources (lore canon this task must honor)
+      label: Canon sources (game canon this task must honor)
       placeholder: |
-        csf/ingest/three-doors/2026-06-09-kingdome-of-hearts-lore-expansion.md
+        data/three-doors/canon.json
   - type: checkboxes
     id: gates
     attributes:
       label: Gates
       options:
-        - label: Touches lore canon (lore/ directory) — requires `needs-founder` review per LORE.md promotion gate
+        - label: Touches game canon (data/three-doors/) — requires `needs-founder` review

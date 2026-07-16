@@ -149,24 +149,6 @@ python -m pytest tests/test_dashboard_ux.py tests/test_dreamer_integration.py -q
 
 **Rule: Run tests, read failures. Don't glob for test files or read test code to understand what's covered.**
 
-### 6. CSF ingestion docs ARE the task queue
-
-| File | What it defines |
-|------|----------------|
-| [`csf/ingest/2026-06-07-hff-mcp-integration-fixes.md`](csf/ingest/2026-06-07-hff-mcp-integration-fixes.md) | Human Flourishing Frameworks + MCP integration |
-| [`csf/ingest/2026-06-06-elephant-door-memories.md`](csf/ingest/2026-06-06-elephant-door-memories.md) | Elephant Door anchor memories + Three Doors state |
-| [`csf/ingest/convergence-kvcache-compression.md`](csf/ingest/convergence-kvcache-compression.md) | FlowKV tiered history compression |
-| [`csf/ingest/convergence-stable-diffusion-doors.md`](csf/ingest/convergence-stable-diffusion-doors.md) | Local SD image gen per door |
-| [`csf/ingest/convergence-asmr-tts-chain.md`](csf/ingest/convergence-asmr-tts-chain.md) | ElevenLabs/OpenAI TTS provider chain |
-| [`csf/ingest/convergence-conversation-tree.md`](csf/ingest/convergence-conversation-tree.md) | Branch-per-door session tree |
-| [`csf/ingest/convergence-model-training.md`](csf/ingest/convergence-model-training.md) | QLoRA fine-tune roadmap |
-| [`csf/ingest/convergence-web-refinement.md`](csf/ingest/convergence-web-refinement.md) | UI/web surface convergence |
-| [`csf/ingest/convergence-webrtc-voice.md`](csf/ingest/convergence-webrtc-voice.md) | WebRTC voice integration |
-| [`csf/ingest/convergence-patreon-tiers.md`](csf/ingest/convergence-patreon-tiers.md) | Patreon tier design |
-| [`csf/ingest/ROOT-DOCS-CONSOLIDATION.md`](csf/ingest/ROOT-DOCS-CONSOLIDATION.md) | Docs pending CSF ingest then delete |
-
-Each file has: problem, proposed implementation with code sketch, files to change, effort estimate. **Pick one and implement it — don't re-research what's already documented.**
-
 ---
 
 ## Quick Start
@@ -466,7 +448,7 @@ Full doctrine: [docs/AGENT-SWARM-OPERATIONS.md](docs/AGENT-SWARM-OPERATIONS.md)
 - **No issue, no work.** Agents only work GitHub issues labeled `agent-task` plus a stream label (`convergence-io` or `dream-journal`). Unlabeled issues are invisible to agents.
 - **Pull top-of-queue by priority** (`p0` → `p1` → `p2`) **within your lane's assigned stream.** Never browse for work, never invent tasks, never reorder the queue.
 - **Lane → stream routing:** `claude/` → dream-journal; `gemini/` + `codex/` → convergence-io; other lanes are human-assigned flex.
-- **Definition of done is mechanical:** acceptance criteria met, the issue's test command passes, PR references the issue number, CSF session note ingested to `csf/ingest/`.
+- **Definition of done is mechanical:** acceptance criteria met, the issue's test command passes, PR references the issue number.
 - **Agents never:** add/remove issue labels, set priorities, edit `.claude/agent-slots.json`, or merge PRs. Humans do all routing and merging.
 - New tasks enter via the issue forms in `.github/ISSUE_TEMPLATE/` (blank issues are disabled).
 
@@ -623,7 +605,6 @@ python src/convergence_io_engine.py inspect
 | MemOS bridge | [`src/convergence_io/memos_bridge.py`](src/convergence_io/memos_bridge.py) |
 | PCSF state files | [`data/pcsf/`](data/pcsf/) |
 | Work queue | [`manifests/dream-journal-v1-agent-slots.json`](manifests/dream-journal-v1-agent-slots.json) |
-| CSF task docs | [`csf/ingest/`](csf/ingest/) |
 | CI pipeline | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |

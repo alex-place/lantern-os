@@ -65,7 +65,6 @@ One-stop reference for every runnable script in the repo. Skip the archaeology n
 |--------|---------|-----------|
 | `scripts/start-ngrok-tunnels.sh` | Launches ngrok tunnels for all services. | `bash scripts/start-ngrok-tunnels.sh` |
 | `scripts/restart-headless.sh` | Docker Compose restart for headless services (CSF, proxy). | `bash scripts/restart-headless.sh` |
-| `scripts/sync-agent-slots.sh` | Syncs agent slots (claude/codex/gemini/devin) with master. | `bash scripts/sync-agent-slots.sh` |
 | `scripts/install-rust.sh` | Installs Rust + builds `src/csf_rust`. | `bash scripts/install-rust.sh` |
 
 ---
