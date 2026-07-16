@@ -45,6 +45,9 @@
     #billing-banner[data-kind="success"] { border-color: #2e7d32; }
     #billing-banner[data-kind="error"] { border-color: #c0392b; }
     #billing-banner[hidden] { display: none; }
+    #manage-sub { margin: 0 0 1.25rem; padding: 1rem 1.25rem; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+    #manage-sub[hidden] { display: none; }
+    #manage-sub p { margin: 0 0 .75rem; color: var(--ink); }
   </style>
 </head>
 <body>
@@ -64,6 +67,10 @@
     </header>
 
     <div id="billing-banner" role="status" hidden></div>
+    <div id="manage-sub" hidden>
+      <p>You have an active subscription. Change plan, update your card, or cancel in the customer portal.</p>
+      <button type="button" class="btn primary" id="manage-btn">Manage subscription</button>
+    </div>
 
     <section class="grid pricing-grid" aria-label="Pricing tiers">
       <article class="panel pricing-card">
@@ -163,10 +170,28 @@
     if (q.get('checkout') === 'success') show('success', 'Subscription active — your new tier is unlocked. Thank you for supporting unisona.ai.');
     else if (q.get('checkout') === 'cancel') show('info', 'Checkout canceled — no charge was made.');
 
+    function openPortal() {
+      fetch('/api/billing/portal', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          if (res.status === 200 && res.data.url) { location.href = res.data.url; return; }
+          if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+          show('error', 'Could not open the customer portal. Please try again.');
+        })
+        .catch(function () { show('error', 'Network error opening the portal.'); });
+    }
+    var manageBtn = document.getElementById('manage-btn');
+    if (manageBtn) manageBtn.addEventListener('click', openPortal);
+
     fetch('/api/billing/config', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (cfg) {
         if (!cfg || !cfg.configured) return; // Stripe off → Patreon-only, buttons stay hidden
+        if (cfg.subscribed) {
+          // Already subscribed → don't offer a second checkout (double-billing); show Manage.
+          var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
+          return;
+        }
         document.querySelectorAll('.stripe-cta').forEach(function (btn) {
           var tier = btn.getAttribute('data-tier');
           if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
@@ -189,6 +214,10 @@
         if (res.status === 200 && res.data.url) { location.href = res.data.url; return; }
         btn.disabled = false;
         if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+        if (res.status === 409 && res.data.error === 'already_subscribed') {
+          show('info', 'You already have an active subscription — opening the portal to change your plan.');
+          openPortal(); return;
+        }
         show('error', res.data && res.data.detail ? ('Could not start checkout: ' + res.data.detail) : 'Could not start checkout. Please try Patreon or try again.');
       }).catch(function () {
         btn.disabled = false;

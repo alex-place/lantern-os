@@ -35,6 +35,14 @@ function tierPrices() {
 /** Is Stripe billing turned on for this deploy? */
 function isConfigured() { return !!(process.env.STRIPE_SECRET_KEY || "").trim(); }
 
+/**
+ * Is this a LIVE-mode secret key? Drives the webhook livemode gate. Matches BOTH standard
+ * (`sk_live_`) and restricted (`rk_live_`) keys, and trims — a stray space or a restricted
+ * key must not make a live server misclassify itself as test and silently drop every real
+ * webhook. A non-live (test / empty / malformed) key is treated as test mode.
+ */
+function isLiveKey(key) { return /^(sk|rk)_live_/.test(String(key || "").trim()); }
+
 /** The UI sends a tier keyword ("member"/"pro"/"pilot"); resolve it to a role. */
 function tierToRole(tier) {
   const t = String(tier || "").toLowerCase().trim();
@@ -112,8 +120,10 @@ const HANDLED_EVENTS = new Set([
 ]);
 
 // ── Idempotency ledger — Stripe retries for ~3 days with no ordering guarantee ──
+// Lives under the cwd-relative data store (same root as data/profiles), so it shares the
+// deployment's data dir and is correctly isolated per checkout — NOT module-relative.
 function ledgerPath() {
-  return path.resolve(__dirname, "..", "..", "..", "data", "billing", "processed-events.jsonl");
+  return path.resolve(process.cwd(), "data", "billing", "processed-events.jsonl");
 }
 function alreadyProcessed(eventId, ledger = ledgerPath()) {
   if (!eventId) return false;
@@ -139,7 +149,7 @@ function effectiveRole(patreonRole, stripeRole) {
 }
 
 module.exports = {
-  isConfigured, tierToRole, priceIdForRole, roleForPrice, accessForStatus,
+  isConfigured, isLiveKey, tierToRole, priceIdForRole, roleForPrice, accessForStatus,
   effectiveRole, alreadyProcessed, markProcessed, ledgerPath,
   HANDLED_EVENTS, PURCHASABLE, AMOUNT_CENTS, tierPrices,
 };

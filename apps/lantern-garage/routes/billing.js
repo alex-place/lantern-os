@@ -19,7 +19,7 @@
  */
 
 const {
-  isConfigured, roleForPrice, accessForStatus, tierToRole, priceIdForRole,
+  isConfigured, isLiveKey, roleForPrice, accessForStatus, tierToRole, priceIdForRole,
   alreadyProcessed, markProcessed, HANDLED_EVENTS,
 } = require("../lib/stripe-billing");
 const {
@@ -32,14 +32,23 @@ let _stripe = null;
 function stripe() {
   if (_stripe) return _stripe;
   const Stripe = require("stripe"); // lazy — absent-package error is caught by callers
-  _stripe = Stripe((process.env.STRIPE_SECRET_KEY || "").trim());
+  // Test-only seam: point the SDK at a local mock host so the outbound API calls
+  // (checkout/subscriptions/portal) can be exercised end-to-end without a Stripe
+  // account. No-op in prod (env unset). Webhook signature verification is unaffected —
+  // it only uses STRIPE_WEBHOOK_SECRET, never reaches the network.
+  const host = (process.env.STRIPE_API_HOST || "").trim();
+  const opts = host
+    ? { host, port: Number(process.env.STRIPE_API_PORT) || 443, protocol: process.env.STRIPE_API_PROTOCOL || "https" }
+    : undefined;
+  _stripe = Stripe((process.env.STRIPE_SECRET_KEY || "").trim(), opts);
   return _stripe;
 }
 
 // Test vs live isolation: a live-keyed server must ignore test-mode webhooks (and the
 // dual-boot 4177/4178 pair shares the profiles JSONL, so a Stripe CLI test event must
-// not mutate prod state). Derived from the secret-key prefix.
-function expectLivemode() { return (process.env.STRIPE_SECRET_KEY || "").startsWith("sk_live"); }
+// not mutate prod state). isLiveKey() trims + matches sk_/rk_ so a stray space or a
+// restricted key can't misclassify a live server as test and silently drop real events.
+function expectLivemode() { return isLiveKey(process.env.STRIPE_SECRET_KEY); }
 
 // Read the raw request body as a Buffer for signature verification. Own reader (not
 // collectRequestBody) so the bytes are byte-exact and uncapped-but-bounded.
@@ -57,9 +66,17 @@ function readRawBody(req, limit = 1_000_000) {
   });
 }
 
+// Base URL for Stripe redirect targets (success/cancel/portal-return). These are baked
+// into the Checkout Session, so they must NOT be attacker-controllable: prefer the
+// operator-configured PUBLIC_BASE_URL, and only fall back to request headers for local
+// dev. This closes a host-header / open-redirect hole in the money path (a forged
+// X-Forwarded-Host would otherwise point the post-payment redirect off-domain).
 function baseUrl(req) {
-  const proto = (req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
-  const host = req.headers["x-forwarded-host"] || req.headers.host || "127.0.0.1:4177";
+  const configured = (process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  const host = req.headers.host || "127.0.0.1:4177";
+  // Only trust request headers for loopback dev; anything else needs PUBLIC_BASE_URL.
+  const proto = /^(127\.0\.0\.1|localhost)(:|$)/.test(host) ? "http" : "https";
   return `${proto}://${host}`;
 }
 
@@ -78,14 +95,17 @@ function syncSubscription(sub, hintId) {
   const userId = resolveUserId(customerId, hintId);
   if (!userId) { console.error("[BILLING] no profile for stripe customer", customerId); return; }
 
-  const price = sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].price;
+  const item = sub.items && sub.items.data && sub.items.data[0];
+  const price = item && item.price;
   const role = roleForPrice(price);
   const decision = accessForStatus(sub.status);
   const common = {
     customerId,
     subscriptionId: sub.id,
     status: sub.status,
-    currentPeriodEnd: sub.current_period_end || null,
+    // Stripe Basil (2025-04+) moved current_period_end off the subscription onto the
+    // item; read the item first with a legacy fallback so the period end isn't null.
+    currentPeriodEnd: (item && item.current_period_end) || sub.current_period_end || null,
   };
 
   if (decision === "revoke") {
@@ -98,6 +118,18 @@ function syncSubscription(sub, hintId) {
     // so a transient decline never strips the paid role mid-retry.
     applyStripeState(userId, common);
   }
+}
+
+// The subscription id on an invoice, across API versions: legacy invoice.subscription,
+// or Basil's invoice.parent.subscription_details.subscription / the first line's parent.
+function invoiceSubscriptionId(inv) {
+  if (!inv) return null;
+  if (inv.subscription) return typeof inv.subscription === "string" ? inv.subscription : inv.subscription.id;
+  const psd = inv.parent && inv.parent.subscription_details && inv.parent.subscription_details.subscription;
+  if (psd) return typeof psd === "string" ? psd : psd.id;
+  const line = inv.lines && inv.lines.data && inv.lines.data[0];
+  const lsub = line && line.parent && line.parent.subscription_item_details && line.parent.subscription_item_details.subscription;
+  return lsub ? (typeof lsub === "string" ? lsub : lsub.id) : null;
 }
 
 // Revoke by customer for money-reversal events (refund / chargeback) that don't carry a
@@ -132,20 +164,37 @@ async function handleEvent(event) {
     case "invoice.paid":
     case "invoice.payment_failed": {
       // Re-sync from the authoritative subscription so status/period stay current.
-      if (obj.subscription) {
-        const sub = await stripe().subscriptions.retrieve(
-          typeof obj.subscription === "string" ? obj.subscription : obj.subscription.id
-        );
+      // Basil (2025-04+) removed invoice.subscription → it now lives under
+      // invoice.parent.subscription_details.subscription (fall back for both shapes).
+      const subId = invoiceSubscriptionId(obj);
+      if (subId) {
+        const sub = await stripe().subscriptions.retrieve(subId);
         syncSubscription(sub, null);
       }
       break;
     }
-    case "charge.refunded":
-      revokeByCustomer(typeof obj.customer === "string" ? obj.customer : (obj.customer && obj.customer.id), "refunded");
+    case "charge.refunded": {
+      // Only a FULL refund revokes — a partial/goodwill refund leaves the sub active and
+      // must not strip a paying subscriber's tier. `refunded` is true only when fully
+      // refunded; otherwise compare amounts.
+      const fully = obj.refunded === true || (Number(obj.amount_refunded) >= Number(obj.amount) && Number(obj.amount) > 0);
+      if (fully) revokeByCustomer(typeof obj.customer === "string" ? obj.customer : (obj.customer && obj.customer.id), "refunded");
       break;
-    case "charge.dispute.created":
-      revokeByCustomer(typeof obj.customer === "string" ? obj.customer : (obj.customer && obj.customer.id), "disputed");
+    }
+    case "charge.dispute.created": {
+      // event.data.object is a DISPUTE, which has NO .customer — resolve it from the
+      // disputed charge, else a chargeback silently keeps access.
+      const chargeId = typeof obj.charge === "string" ? obj.charge : (obj.charge && obj.charge.id);
+      let customerId = null;
+      if (chargeId) {
+        try {
+          const ch = await stripe().charges.retrieve(chargeId);
+          customerId = typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id);
+        } catch (e) { console.error("[BILLING] dispute charge lookup failed", e.message); }
+      }
+      revokeByCustomer(customerId, "disputed");
       break;
+    }
     default:
       break; // acked, ignored
   }
@@ -192,7 +241,11 @@ module.exports = async function billingRoutes(req, res, url, deps) {
   // Lets pricing.html reveal the "Subscribe with card" buttons only when billing is
   // live, and fall back to the Patreon CTA otherwise.
   if (url.pathname === "/api/billing/config" && req.method === "GET") {
-    const { priceIdForRole } = require("../lib/stripe-billing");
+    const uid = getEffectiveUserId(req);
+    const prof = uid ? getProfile(uid) : null;
+    // Only an ACTIVE Stripe sub means "manage in portal" — a Patreon-only patron has no
+    // Stripe customer and should still see the Subscribe buttons.
+    const subscribed = !!(prof && prof.stripeCustomerId && accessForStatus(prof.stripeStatus) === "grant");
     sendJson(res, {
       configured: isConfigured(),
       tiers: {
@@ -200,6 +253,8 @@ module.exports = async function billingRoutes(req, res, url, deps) {
         pro: !!priceIdForRole("deep_dreamer"),
         pilot: !!priceIdForRole("pilot"),
       },
+      subscribed,                                  // has a live Stripe subscription
+      stripeStatus: (prof && prof.stripeStatus) || null,
     });
     return true;
   }
@@ -220,6 +275,13 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     if (!price) { sendJson(res, { error: "price_not_configured", detail: `set STRIPE_PRICE_${role.toUpperCase()}` }, 503); return true; }
 
     const profile = getProfile(userId);
+    // Guard against a SECOND concurrent subscription: a user with an active Stripe sub who
+    // clicks another tier would otherwise be billed twice (subscription-mode Checkout does
+    // not dedupe). Tier changes must go through the Customer Portal, not a new checkout.
+    if (profile && profile.stripeCustomerId && accessForStatus(profile.stripeStatus) === "grant") {
+      sendJson(res, { error: "already_subscribed", detail: "Manage or change your plan from the customer portal.", portal: "/api/billing/portal" }, 409);
+      return true;
+    }
     try {
       const session = await stripe().checkout.sessions.create({
         mode: "subscription",
@@ -258,23 +320,43 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     return true;
   }
 
-  // ── Post-checkout return: refresh the cached session role from the profile ───
-  // The webhook already granted the role on the profile, but the logged-in session
-  // still holds the pre-purchase role snapshot; re-read it so the UI reflects the
-  // new tier immediately instead of on next login. (The webhook, not this, is the
-  // source of truth — this only re-reads what the webhook persisted.)
+  // ── Post-checkout return: eager-sync the grant, then refresh the session role ──
+  // Stripe redirects the browser here BEFORE it delivers checkout.session.completed, so
+  // the profile role is still pre-purchase at this moment. We use the session_id to
+  // retrieve the Checkout Session and apply the grant NOW (idempotent — the later webhook
+  // re-applies the same absolute state), so the user sees their new tier immediately
+  // instead of only after the webhook lands / a re-login. The webhook remains the source
+  // of truth; this is a best-effort eager mirror gated to THIS user's own session.
   if (url.pathname === "/billing/success" && req.method === "GET") {
     const userId = getEffectiveUserId(req);
     if (userId) {
+      const sessionId = url.searchParams.get("session_id");
+      if (sessionId) {
+        try {
+          const cs = await stripe().checkout.sessions.retrieve(sessionId);
+          if (cs && cs.client_reference_id === userId) { // only sync the caller's own checkout
+            const customerId = typeof cs.customer === "string" ? cs.customer : (cs.customer && cs.customer.id);
+            if (customerId) applyStripeState(userId, { customerId });
+            if (cs.subscription) {
+              const sub = await stripe().subscriptions.retrieve(
+                typeof cs.subscription === "string" ? cs.subscription : cs.subscription.id
+              );
+              syncSubscription(sub, userId);
+            }
+          }
+        } catch (e) { console.error("[BILLING] success eager-sync failed", e.message); }
+      }
       const fresh = getProfile(userId);
       const sess = getSessionUser(req);
       if (fresh && sess) {
         setSessionUser(req, { ...sess, role: fresh.role, entitlements: fresh.entitlements || {} });
-        if (typeof req.session.save === "function") { try { req.session.save(() => {}); } catch { /* non-fatal */ } }
       }
     }
-    res.writeHead(302, { Location: "/pricing.html?checkout=success" });
-    res.end();
+    // Persist the session BEFORE redirecting so the next page load reads the fresh role
+    // (avoids a redirect-vs-save race). Fall back to an immediate redirect if no store.
+    const go = () => { res.writeHead(302, { Location: "/pricing.html?checkout=success" }); res.end(); };
+    if (req.session && typeof req.session.save === "function") { try { req.session.save(go); } catch { go(); } }
+    else go();
     return true;
   }
 

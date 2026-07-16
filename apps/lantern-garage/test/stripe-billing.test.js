@@ -94,6 +94,17 @@ check("markProcessed / alreadyProcessed dedupe by event id", () => {
   assert.equal(B.alreadyProcessed("evt_2", led), false);
 });
 
+check("isLiveKey: live iff sk_/rk_live (trimmed); test/empty/garbage → false", () => {
+  assert.equal(B.isLiveKey("sk_live_abc"), true);
+  assert.equal(B.isLiveKey("rk_live_abc"), true);           // restricted live key still live-mode
+  assert.equal(B.isLiveKey("  sk_live_abc  "), true);       // stray whitespace can't misclassify
+  assert.equal(B.isLiveKey("sk_test_abc"), false);
+  assert.equal(B.isLiveKey("rk_test_abc"), false);
+  assert.equal(B.isLiveKey(""), false);
+  assert.equal(B.isLiveKey(undefined), false);
+  assert.equal(B.isLiveKey("pk_live_abc"), false);          // publishable key is not a secret key
+});
+
 check("isConfigured reflects STRIPE_SECRET_KEY", () => {
   const prev = process.env.STRIPE_SECRET_KEY;
   delete process.env.STRIPE_SECRET_KEY;

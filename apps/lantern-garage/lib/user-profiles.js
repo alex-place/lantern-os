@@ -185,9 +185,15 @@ function applyStripeState(userId, patch = {}) {
   // pilot-or-higher (compare via higherRole so we don't depend on an exported level map)
   const isPilotPlus = higherRole(nextRole, "pilot") === nextRole;
 
+  // NEVER persist a staff role into the floor snapshot. Staff preservation is handled
+  // LIVE by the STAFF_ROLES guard above (reading profile.role); if we also froze the
+  // staff role into patreonRole, a later legitimate setUserRole() demotion would be
+  // silently reverted by the next webhook (re-minting admin). Store only a non-staff
+  // floor (or keep the prior snapshot / null).
+  const patreonFloorSnapshot = STAFF_ROLES.includes(patreonFloor) ? (profile.patreonRole || null) : patreonFloor;
   const updates = {
     role: nextRole,
-    patreonRole: patreonFloor,
+    patreonRole: patreonFloorSnapshot,
     stripeRole: nextStripeRole,
     entitlements: { ...(profile.entitlements || {}), ai_trader: isPilotPlus },
   };

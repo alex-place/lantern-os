@@ -97,6 +97,20 @@ check("applyStripeState NEVER demotes a staff/admin role", () => {
   assert.equal(get(id).role, "admin", "cancel doesn't demote admin either");
 });
 
+check("a staff role is NOT frozen into the patreonRole floor (demotion sticks; no re-mint)", () => {
+  const id = seed("admin");
+  // Admin touches Stripe while holding the staff role.
+  profiles.applyStripeState(id, { stripeRole: "pilot", status: "active", customerId: "cus_STAFF" });
+  assert(get(id).role === "admin", "admin preserved live");
+  assert(get(id).patreonRole !== "admin", "staff role must NOT be persisted as the floor snapshot: " + get(id).patreonRole);
+  // Legitimate demotion.
+  profiles.setUserRole(id, "guest");
+  assert(get(id).role === "guest", "demotion applied");
+  // A later ordinary billing webhook must NOT resurrect admin.
+  profiles.applyStripeState(id, { status: "active" });
+  assert(get(id).role !== "admin", "webhook re-minted admin (privilege re-escalation): " + get(id).role);
+});
+
 check("a bad stripeRole snapshot can never mint admin", () => {
   const id = seed("guest");
   profiles.applyStripeState(id, { stripeRole: "admin", status: "active", customerId: "cus_EVIL" });
