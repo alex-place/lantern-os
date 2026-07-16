@@ -570,8 +570,7 @@
   }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
-  .ot-close{cursor:pointer;font-size:12px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
-  .ot-close:hover{color:var(--text0)}
+  .ot-head-quote{font-family:var(--mono);font-size:12px;color:var(--text1);white-space:nowrap}
   .ot-body{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
   .ot-side-row{display:flex;gap:6px}
   .ot-side-btn{flex:1;text-align:center;padding:8px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:13px;cursor:pointer;line-height:1.6}
@@ -580,14 +579,12 @@
   .ot-side-btn.active.sell .ot-side-label{color:var(--red)}
   .ot-side-btn.active.buy{background:rgba(0,212,170,.15);border-color:var(--green);color:var(--green)}
   .ot-side-btn.active.buy .ot-side-label{color:var(--green)}
-  .ot-spread{font-size:11px;color:var(--text2);text-align:center;margin-top:4px}
   .ot-tabs{display:flex;gap:6px}
   .ot-tab{flex:1;text-align:center;padding:5px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
   .ot-tab.active{background:var(--bg3);color:var(--text0);border-color:var(--text1)}
   .ot-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .ot-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
   .ot-field{background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:13px;padding:5px 7px;border-radius:3px;width:100px;text-align:right}
-  .ot-field:disabled{opacity:.4}
   .ot-usd{font-size:11px;color:var(--text2);text-align:right;flex:1}
   .ot-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
   .ot-section-title{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.15em}
@@ -1016,7 +1013,7 @@
   <div class="ot-modal">
     <div class="ot-header">
       <span class="ot-ticker" id="otTickerLabel">—</span>
-      <span class="ot-close" onclick="closeOrderTicket()">✕</span>
+      <span class="ot-head-quote" id="otHeadQuote" title="Last price · day change">—</span>
     </div>
     <div class="ot-body">
       <div>
@@ -1028,7 +1025,6 @@
             <div class="ot-side-label">Buy</div><div id="otBuyPrice">—</div>
           </div>
         </div>
-        <div class="ot-spread" id="otSpread">Spread 0.00</div>
       </div>
 
       <div class="ot-tabs">
@@ -1052,14 +1048,14 @@
         <span class="ot-label" title="Auto-size units from dollars risked to the stop">Risk $ → units</span>
         <input type="number" class="ot-field" id="otRiskUsd" aria-label="Dollars to risk to the stop" placeholder="—" min="0" step="1" oninput="otSizeFromRisk()">
       </div>
-      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">enable a stop loss to auto-size</span></div>
+      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">Enable a stop loss to auto-size</span></div>
 
       <div class="ot-section">
         <div class="ot-section-title">Exits</div>
         <div class="ot-exit-row">
           <div class="ot-exit-head">
             <input type="checkbox" id="otTpEnabled" aria-label="Enable take-profit" onchange="otToggleExit('Tp')">
-            <span class="ot-label">Take profit, price</span>
+            <span class="ot-label">Take profit</span>
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
@@ -1073,7 +1069,7 @@
         <div class="ot-exit-row">
           <div class="ot-exit-head">
             <input type="checkbox" id="otSlEnabled" aria-label="Enable stop-loss" onchange="otToggleExit('Sl')">
-            <span class="ot-label">Stop loss, price</span>
+            <span class="ot-label">Stop loss</span>
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
@@ -2371,7 +2367,7 @@ function otCurrentPrice(){
   return price;
 }
 
-let otUserClosed = false;   // #1694: respect an explicit X — don't auto-reopen
+let otUserClosed = false;   // #1694: respect an explicit dismiss (Esc / backdrop tap) — don't auto-reopen
 // #1695: retarget the order panel to a symbol WITHOUT changing its open/closed state.
 function setOrderSymbol(ticker){
   if(!ticker) return;
@@ -2502,7 +2498,12 @@ function renderOrderTicket(){
 
   document.getElementById('otSellPrice').textContent = price ? fmt(price) : '—';
   document.getElementById('otBuyPrice').textContent  = price ? fmt(price) : '—';
-  document.getElementById('otSpread').textContent = 'Spread 0.00';
+  // Header quote: last price + day change, same chg_pct the watchlist shows.
+  const wl  = wlPrices.find(x=>x.ticker===otTicker);
+  const chg = wl && wl.chg_pct!=null ? Number(wl.chg_pct) : null;
+  document.getElementById('otHeadQuote').innerHTML = price
+    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${chg}%</span>`}`
+    : '—';
 
   document.getElementById('otSellBtn').classList.toggle('active', otSide === 'sell');
   document.getElementById('otBuyBtn').classList.toggle('active', otSide === 'buy');
@@ -2513,9 +2514,12 @@ function renderOrderTicket(){
   document.getElementById('otTickValue').textContent = `$${fmt(TICK_SIZE * qty, 2)}`;
   document.getElementById('otTradeValue').textContent = `$${fmt(qty * tradePrice)}`;
 
+  // Live re-renders must not clobber the armed "Confirm …" label or "Placing…".
   const submit = document.getElementById('otSubmit');
-  submit.textContent = `${otSide === 'buy' ? 'Buy' : 'Sell'} ${qty} ${otTicker} — ${otOrderType.toUpperCase()}`;
-  submit.className = 'ot-submit ' + otSide;
+  if(!_otArmed && submit.style.pointerEvents !== 'none'){
+    submit.textContent = `${otSide === 'buy' ? 'Buy' : 'Sell'} ${qty} ${otTicker} — ${otOrderType.toUpperCase()}`;
+    submit.className = 'ot-submit ' + otSide;
+  }
 }
 
 // ── Drawing tools (#2444) — price levels + trendlines, persisted per symbol ──
@@ -2661,15 +2665,15 @@ async function placeMarketOrder(sym, side, qty, source){
 function otSizeFromRisk(){
   const hint=document.getElementById('otRiskHint');
   const risk=Number(document.getElementById('otRiskUsd').value);
-  if(!risk || risk<=0){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  if(!risk || risk<=0){ if(hint) hint.textContent='Enable a stop loss to auto-size'; return; }
   const slOn=document.getElementById('otSlEnabled').checked;
   const stop=Number(document.getElementById('otSlPrice').value);
   const entry=(otOrderType==='limit' && Number(document.getElementById('otLimitPrice').value)>0)
     ? Number(document.getElementById('otLimitPrice').value)
     : getCurrentPrice(otTicker);
-  if(!slOn || !(stop>0)){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  if(!slOn || !(stop>0)){ if(hint) hint.textContent='Enable a stop loss to auto-size'; return; }
   const perShare=Math.abs(entry-stop);
-  if(!(perShare>0)){ if(hint) hint.textContent='stop equals entry — no distance to size from'; return; }
+  if(!(perShare>0)){ if(hint) hint.textContent='Stop equals entry — no distance to size from'; return; }
   const qty=Math.max(1, Math.floor(risk/perShare));
   document.getElementById('otQty').value=qty;
   if(hint) hint.textContent=`${qty} units · $${fmt(perShare,2)}/unit to stop · risks $${fmt(qty*perShare,2)}`;
@@ -2880,8 +2884,8 @@ function focusTicker(t){
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-    // Desktop: keep the docked panel open unless the user X'd it. Phone: don't auto-open —
-    // it's a bottom sheet that would cover the chart we're about to show.
+    // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
+    // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
   }
   openFullscreenChart(t);
@@ -3692,6 +3696,9 @@ async function loadWatchlistPrices(){
     });
     updateRegimeBadges();
     renderFullscreenChart();
+    // Keep the docked order ticket's quote ticking with the feed (it has no
+    // poll of its own — without this its prices freeze at open time).
+    if(otTicker && !document.getElementById('otBg').classList.contains('hidden')) renderOrderTicket();
   }catch(e){ _feedStatus(false); }   // #2439: a failed poll must not look live
   finally{ pricesLoading = false; }
 }
@@ -4473,7 +4480,7 @@ function startDashboard(){
   initColumnResizers();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
-  // loads, unless the user closes it with X.
+  // loads, unless the user dismissed it (Esc / backdrop tap).
   setTimeout(()=>{
     // Default the symbol-info sidebar to SPY (or the first watchlist symbol) so it
     // shows real data on load instead of being blank until a chart is clicked.
