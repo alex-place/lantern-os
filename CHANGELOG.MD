@@ -1,3 +1,7 @@
+## [1.8.103] - 2026-07-16
+### Added
+- **One-click ⚡ Connect Alpaca in the trader ☰ menu (ADR-0027).** The stock-trader header/hamburger now starts Alpaca OAuth directly — sign in, approve, bounced back to the trader — instead of routing through the orchestration setup card. Status-aware label (connected / connect / setup pending), guest-gated like the IBKR link, OAuth return param announced once then scrubbed. Strengthens **Act**.
+
 ## [1.10.0] - 2026-07-14
 
 ### Fixed
