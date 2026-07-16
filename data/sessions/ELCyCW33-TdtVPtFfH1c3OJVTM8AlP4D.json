@@ -1,0 +1,1 @@
+{"__expires":1784836676997,"sess":{"cookie":{"originalMaxAge":604800000,"expires":"2026-07-23T19:57:56.997Z","secure":false,"httpOnly":true,"path":"/","sameSite":"lax"},"user":{"id":"test-user","name":"Test User","email":"test@unisona.local","emailVerified":true,"role":"admin","tier":"dev","provider":"local","entitlements":{"trade":true},"isTest":true},"authenticated":true}}

@@ -6,6 +6,44 @@
 # reminder, or the opt-in convergence loop from `npm run setup:convergance`). Chain
 # to it if present so switching to repo-managed hooks doesn't silently drop it.
 # No-op for anyone without a legacy hook.
+
+# ── Agent main-tree branch-switch tripwire (2026-07-16 incident) ──────────────
+# An agent session (CLAUDECODE=1) ran `git stash` + `git checkout` on the PRIMARY
+# checkout, switching a human's dirty tree out from under them and sweeping the
+# untracked runtime data in data/lantern-garage/trading/. git has no pre-checkout
+# hook, so the switch can't be blocked here — instead: detect it the moment it
+# lands, shout at the agent (agents read hook output as feedback), and append an
+# audit line so the incident is attributable. Isolated work belongs in a
+# `git worktree` (local_worktree_create / `git worktree add`), never in a
+# branch-switch of the main tree.
+#   $1 = previous HEAD   $2 = new HEAD   $3 = 1 for a branch checkout (0 = file)
+# ($3=1 alone is the test: `git checkout -b` keeps the same HEAD sha but still
+#  moves the operator's branch context, so a $1!=$2 check would miss it.)
+if [ "$3" = "1" ] && [ -n "$CLAUDECODE" ]; then
+  gitdir=$(git rev-parse --git-dir 2>/dev/null)
+  common=$(git rev-parse --git-common-dir 2>/dev/null)
+  # Main tree only: in a linked worktree --git-dir is .git/worktrees/<name> while
+  # --git-common-dir stays .git — they differ. Equal ⇒ primary checkout.
+  if [ "$gitdir" = "$common" ]; then
+    branch=$(git branch --show-current 2>/dev/null)
+    stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null)
+    mkdir -p data/ops 2>/dev/null
+    printf '{"ts":"%s","event":"agent_main_tree_checkout","from":"%s","to":"%s","branch":"%s"}\n' \
+      "$stamp" "$1" "$2" "$branch" >> data/ops/main-tree-checkouts.jsonl 2>/dev/null
+    echo "" >&2
+    echo "!!================================================================!!" >&2
+    echo "!! AGENT SESSION SWITCHED THE PRIMARY CHECKOUT'S BRANCH.          !!" >&2
+    echo "!! The main working tree belongs to the human operator — their    !!" >&2
+    echo "!! WIP and untracked runtime data live here. Switch back NOW and  !!" >&2
+    echo "!! do your work in an isolated worktree instead:                  !!" >&2
+    echo "!!   git worktree add <dir> -b <branch> origin/master             !!" >&2
+    echo "!! (or the local_worktree_create MCP tool).                       !!" >&2
+    echo "!! Recorded in data/ops/main-tree-checkouts.jsonl                 !!" >&2
+    echo "!!================================================================!!" >&2
+    echo "" >&2
+  fi
+fi
+
 legacy="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/post-checkout"
 if [ -x "$legacy" ] && [ "$legacy" != "$0" ]; then
   exec "$legacy" "$@"
