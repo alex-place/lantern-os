@@ -178,7 +178,6 @@ Complete navigation map of unisona.ai local-first personal operating system. All
 - `POST /api/three-doors/narration` — Get AI narration
 
 #### CSF (Convergence-Fitted Searchable Format) APIs
-- `GET /api/csf/search` — Search CSF memory database
 - `POST /api/csf/ingest` — Ingest data into CSF
 - `GET /api/csf/export` — Export CSF records
 
