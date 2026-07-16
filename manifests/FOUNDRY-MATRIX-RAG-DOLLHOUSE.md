@@ -99,5 +99,5 @@ FOUNDRY Matrix
 |---|---|---|
 | Server farm inventory schema | `manifests/foundry-server-farm-inventory.md` | next |
 | iPhone edge-node checklist | `manifests/iphone-edge-node.md` | next |
-| Son's PC dual-boot readiness packet | `dual-boot/SONS-PC-READINESS.md` | next |
+| Son's PC dual-boot readiness packet | retired 2026-07-16 (in git history) | retired |
 | Local RAG ingest script | `scripts/Invoke-FoundryRagIngest.ps1` | candidate |

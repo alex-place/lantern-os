@@ -129,7 +129,7 @@ Centered brand + nav links + GitHub, `--surface` background, muted text. Consist
 
 ## 6. Voice & tone — unisona.ai Chat
 
-The chat is where most people meet unisona.ai, so its voice **is** the brand. The governing principle (from [`docs/KEYSTONE-UX-NORMIE-PLAN.md`](KEYSTONE-UX-NORMIE-PLAN.md)): **a non-technical person must understand every word.**
+The chat is where most people meet unisona.ai, so its voice **is** the brand. The governing principle (from the former KEYSTONE-UX-NORMIE plan, removed 2026-07-16 — in git history): **a non-technical person must understand every word.**
 
 ### Principles
 1. **Plain English, no jargon.** In user-facing copy, hide the internals. The words **Σ₀, Convergence, CSF, Ouro, tesseract, LoopLM** do not belong on a normie surface. When a technical term is unavoidable, attach a `.gloss` with a one-line definition. (Deep docs live behind an explicit "Under the hood" disclosure — opt-in, never first.)
@@ -177,4 +177,4 @@ The chat is where most people meet unisona.ai, so its voice **is** the brand. Th
 
 ---
 
-*Cross-references:* [README](../README.md) · [KEYSTONE-UX-NORMIE-PLAN](KEYSTONE-UX-NORMIE-PLAN.md) · [SECURITY](../SECURITY.md) · brand tokens in [`site.css`](../apps/lantern-garage/public/css/site.css).
+*Cross-references:* [README](../README.md) · [SECURITY](../SECURITY.md) · brand tokens in [`site.css`](../apps/lantern-garage/public/css/site.css).
