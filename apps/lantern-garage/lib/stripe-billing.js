@@ -148,8 +148,27 @@ function effectiveRole(patreonRole, stripeRole) {
   return higherRole(patreonRole || "guest", s || "guest");
 }
 
+/**
+ * From a customer's subscription list, the one worth linking to an account —
+ * an active/trialing sub first, else a dunning one (past_due/incomplete: the
+ * webhook keeps access through Smart Retries, so linking it is consistent), and
+ * never a terminal one. A sub with NO status is skipped outright: accessForStatus
+ * maps unknown → "keep" as a fail-closed default for webhooks, but for LINKING the
+ * conservative direction is the opposite — don't claim what we can't classify.
+ */
+function pickLinkableSubscription(subs) {
+  let dunning = null;
+  for (const s of subs || []) {
+    if (!s || !s.status) continue;
+    const decision = accessForStatus(s.status);
+    if (decision === "grant") return s;
+    if (decision === "keep" && !dunning) dunning = s;
+  }
+  return dunning;
+}
+
 module.exports = {
   isConfigured, isLiveKey, tierToRole, priceIdForRole, roleForPrice, accessForStatus,
-  effectiveRole, alreadyProcessed, markProcessed, ledgerPath,
+  effectiveRole, pickLinkableSubscription, alreadyProcessed, markProcessed, ledgerPath,
   HANDLED_EVENTS, PURCHASABLE, AMOUNT_CENTS, tierPrices,
 };

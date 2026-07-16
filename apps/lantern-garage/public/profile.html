@@ -580,6 +580,17 @@ function renderProfile(profile) {
       <p class="link-note">Link a broker to trade your own account in the <a href="/stock-trader.html">Trader</a>. Alpaca is one click, paper by default.</p>
     </div>
 
+    <div id="billing-section" hidden>
+      <div class="section-title">Billing</div>
+      <div class="link-list">
+        <div class="link-row">
+          <span class="link-name">💳 Card subscription <span class="link-sub" id="stripe-sub">Checking…</span></span>
+          <span class="link-state" id="stripe-state"></span>
+        </div>
+      </div>
+      <p class="link-note">Subscribed by card before creating this account? Link it to unlock your tier here — we match the subscription by your verified email. Patreon tiers apply when you connect Patreon above.</p>
+    </div>
+
     <div>
       <div class="section-title">Security</div>
       <div class="link-list">${securityRows}</div>
@@ -595,6 +606,71 @@ function renderProfile(profile) {
     </div><!-- /profile-cols -->
   `;
   refreshAlpacaBroker();   // fill the Brokerage → Alpaca row (async, after paint)
+  refreshStripeBilling();  // fill the Billing → Card subscription row (async, after paint)
+}
+
+// ── Billing: Stripe subscription status / link / manage (#2568 follow-up) ──
+// Hidden entirely unless the server reports billing configured; then shows either
+// "Manage" (live sub, opens the customer portal) or "Link subscription" (claims an
+// existing card sub by the account's VERIFIED email via POST /api/billing/link).
+const STRIPE_STATUS_LABELS = {
+  active: 'active', trialing: 'trial', past_due: 'payment issue — fix in portal',
+  incomplete: 'payment issue — fix in portal',
+};
+async function refreshStripeBilling() {
+  const section = document.getElementById('billing-section');
+  const sub = document.getElementById('stripe-sub');
+  const state = document.getElementById('stripe-state');
+  if (!section || !sub || !state) return;
+  let cfg = null;
+  try { cfg = await (await fetch('/api/billing/config', { credentials: 'include', cache: 'no-store' })).json(); } catch (_e) {}
+  if (!cfg || !cfg.configured) { section.hidden = true; return; }
+  section.hidden = false;
+  const row = state.closest('.link-row');
+  if (cfg.subscribed) {
+    if (row) row.classList.add('linked');
+    sub.textContent = STRIPE_STATUS_LABELS[cfg.stripeStatus] || cfg.stripeStatus || 'active';
+    state.innerHTML = '<span class="link-badge">Linked</span><button class="link-btn connect" onclick="openStripePortal()">Manage</button>';
+  } else {
+    if (row) row.classList.remove('linked');
+    sub.textContent = 'not linked';
+    state.innerHTML = '<button class="link-btn connect" onclick="linkStripeSubscription(this)">Link subscription</button>'
+      + '<a class="link-btn" href="/pricing.html">Plans</a>';
+  }
+}
+async function linkStripeSubscription(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking…'; }
+  try {
+    const res = await fetch('/api/billing/link', { method: 'POST', credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.linked) {
+      showToast(data.already ? 'Your card subscription is already linked. ✓' : 'Card subscription linked — your tier is unlocked. ✓', 'ok');
+      // Role/tier may have changed — re-pull the profile so the badge + features update.
+      try {
+        const pr = await fetch('/api/profiles/me', { credentials: 'include' });
+        if (pr.ok) { currentProfile = await pr.json(); renderProfile(currentProfile); return; }
+      } catch (_) {}
+      refreshStripeBilling();
+      return;
+    }
+    if (res.ok && data.linked === false) { showToast('No card subscription found for your verified email.', 'error'); }
+    else if (data.error === 'email_unverified') { showToast('Confirm your email first — that\'s how we prove the subscription is yours.', 'error'); }
+    else if (data.error === 'customer_already_linked') { showToast('That subscription is already linked to a different account.', 'error'); }
+    else if (data.error === 'too_many_attempts') { showToast('Please wait a few seconds and try again.', 'error'); }
+    else { showToast('Could not link right now — please try again.', 'error'); }
+  } catch (_) {
+    showToast('Network error — please try again.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Link subscription'; }
+  }
+}
+async function openStripePortal() {
+  try {
+    const res = await fetch('/api/billing/portal', { method: 'POST', credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) { location.href = data.url; return; }
+    showToast('Could not open the customer portal.', 'error');
+  } catch (_) { showToast('Network error — please try again.', 'error'); }
 }
 
 // ── Brokerage: Alpaca one-click status/connect/disconnect (ADR-0027) ──

@@ -45,9 +45,9 @@
     #billing-banner[data-kind="success"] { border-color: #2e7d32; }
     #billing-banner[data-kind="error"] { border-color: #c0392b; }
     #billing-banner[hidden] { display: none; }
-    #manage-sub { margin: 0 0 1.25rem; padding: 1rem 1.25rem; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
-    #manage-sub[hidden] { display: none; }
-    #manage-sub p { margin: 0 0 .75rem; color: var(--ink); }
+    #manage-sub, #link-sub { margin: 0 0 1.25rem; padding: 1rem 1.25rem; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); }
+    #manage-sub[hidden], #link-sub[hidden] { display: none; }
+    #manage-sub p, #link-sub p { margin: 0 0 .75rem; color: var(--ink); }
   </style>
 </head>
 <body>
@@ -70,6 +70,10 @@
     <div id="manage-sub" hidden>
       <p>You have an active subscription. Change plan, update your card, or cancel in the customer portal.</p>
       <button type="button" class="btn primary" id="manage-btn">Manage subscription</button>
+    </div>
+    <div id="link-sub" hidden>
+      <p>Already subscribed by card? If you paid with the email on this account (verified), link the subscription to unlock your tier here.</p>
+      <button type="button" class="btn" id="link-btn">Link my subscription</button>
     </div>
 
     <section class="grid pricing-grid" aria-label="Pricing tiers">
@@ -192,12 +196,41 @@
           var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
           return;
         }
+        // Not linked on THIS account — offer to claim a sub bought with the same
+        // (verified) email before signing up, instead of a double-billing re-buy.
+        var l = document.getElementById('link-sub'); if (l) l.hidden = false;
         document.querySelectorAll('.stripe-cta').forEach(function (btn) {
           var tier = btn.getAttribute('data-tier');
           if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
         });
       })
       .catch(function () { /* config probe failed → leave Patreon-only */ });
+
+    // "Link my subscription" — claim an existing card sub by verified email.
+    var linkBtn = document.getElementById('link-btn');
+    if (linkBtn) linkBtn.addEventListener('click', function () {
+      linkBtn.disabled = true;
+      fetch('/api/billing/link', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          linkBtn.disabled = false;
+          if (res.status === 200 && res.data.linked) {
+            show('success', res.data.already
+              ? 'Your card subscription is already linked to this account.'
+              : 'Card subscription linked — your tier is unlocked on this account. ✓');
+            document.getElementById('link-sub').hidden = true;
+            var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
+            document.querySelectorAll('.stripe-cta').forEach(function (b) { b.hidden = true; });
+            return;
+          }
+          if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+          if (res.data && res.data.error === 'email_unverified') { show('error', 'Confirm your email first (see your profile) — that\'s how we prove the subscription is yours.'); return; }
+          if (res.data && res.data.error === 'customer_already_linked') { show('error', 'That subscription is already linked to a different account.'); return; }
+          if (res.status === 200 && res.data.linked === false) { show('info', 'No card subscription found for your account\'s verified email.'); return; }
+          show('error', 'Could not link right now — please try again.');
+        })
+        .catch(function () { linkBtn.disabled = false; show('error', 'Network error — please try again.'); });
+    });
 
     document.addEventListener('click', function (e) {
       var btn = e.target.closest && e.target.closest('.stripe-cta');

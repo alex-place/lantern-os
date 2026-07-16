@@ -20,10 +20,10 @@
 
 const {
   isConfigured, isLiveKey, roleForPrice, accessForStatus, tierToRole, priceIdForRole,
-  alreadyProcessed, markProcessed, HANDLED_EVENTS,
+  pickLinkableSubscription, alreadyProcessed, markProcessed, HANDLED_EVENTS,
 } = require("../lib/stripe-billing");
 const {
-  getProfile, applyStripeState, getProfileByStripeCustomer,
+  getProfile, applyStripeState, getProfileByStripeCustomer, verifiedEmailOf,
 } = require("../lib/user-profiles");
 const { getEffectiveUserId, getSessionUser, setSessionUser } = require("../lib/session-identity");
 
@@ -78,6 +78,46 @@ function baseUrl(req) {
   // Only trust request headers for loopback dev; anything else needs PUBLIC_BASE_URL.
   const proto = /^(127\.0\.0\.1|localhost)(:|$)/.test(host) ? "http" : "https";
   return `${proto}://${host}`;
+}
+
+// Does this profile hold a Stripe subscription that still confers (or dunning-preserves)
+// access? "keep" counts: a past_due subscriber must manage/fix payment in the portal,
+// not be offered a SECOND checkout (double billing). A bare customer link with no
+// status (link established, sub never synced) does not count.
+function hasLiveSubscription(profile) {
+  return !!(profile && profile.stripeCustomerId && profile.stripeStatus &&
+    accessForStatus(profile.stripeStatus) !== "revoke");
+}
+
+// Find a Stripe customer with a linkable subscription for a PROVEN-owned email
+// (see verifiedEmailOf). Customers already claimed by a DIFFERENT profile are
+// skipped — a subscription can only ever attach to one account. Returns
+// { customerId, sub } on a match, { conflict: true } when the only candidates
+// belong to someone else, or null when there is nothing to link.
+async function findLinkableCustomer(email, userId) {
+  const customers = await stripe().customers.list({ email, limit: 100 });
+  let sawForeign = false;
+  for (const c of customers.data || []) {
+    const owner = getProfileByStripeCustomer(c.id);
+    if (owner && owner.id !== userId) { sawForeign = true; continue; }
+    const subs = await stripe().subscriptions.list({ customer: c.id, status: "all", limit: 100 });
+    const sub = pickLinkableSubscription(subs.data || []);
+    if (sub) return { customerId: c.id, sub };
+  }
+  return sawForeign ? { conflict: true } : null;
+}
+
+// Per-user cooldown on explicit link attempts — each one is 1-2 outbound Stripe API
+// calls, so don't let a mashed button turn into a request storm. In-memory is fine
+// (worst case after a restart: one extra attempt).
+const _linkAttempts = new Map();
+function linkCooldownOk(userId, windowMs = 5000) {
+  const now = Date.now();
+  const last = _linkAttempts.get(userId) || 0;
+  if (now - last < windowMs) return false;
+  if (_linkAttempts.size > 1000) _linkAttempts.clear(); // bound the map
+  _linkAttempts.set(userId, now);
+  return true;
 }
 
 // Resolve the local profile id a Stripe object belongs to: prefer an explicit hint
@@ -243,9 +283,10 @@ module.exports = async function billingRoutes(req, res, url, deps) {
   if (url.pathname === "/api/billing/config" && req.method === "GET") {
     const uid = getEffectiveUserId(req);
     const prof = uid ? getProfile(uid) : null;
-    // Only an ACTIVE Stripe sub means "manage in portal" — a Patreon-only patron has no
-    // Stripe customer and should still see the Subscribe buttons.
-    const subscribed = !!(prof && prof.stripeCustomerId && accessForStatus(prof.stripeStatus) === "grant");
+    // A live (active OR dunning) Stripe sub means "manage in portal" — a past_due
+    // subscriber fixes payment there rather than seeing Subscribe buttons again. A
+    // Patreon-only patron has no Stripe customer and still sees the buttons.
+    const subscribed = hasLiveSubscription(prof);
     sendJson(res, {
       configured: isConfigured(),
       tiers: {
@@ -275,12 +316,31 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     if (!price) { sendJson(res, { error: "price_not_configured", detail: `set STRIPE_PRICE_${role.toUpperCase()}` }, 503); return true; }
 
     const profile = getProfile(userId);
-    // Guard against a SECOND concurrent subscription: a user with an active Stripe sub who
+    // Guard against a SECOND concurrent subscription: a user with a live Stripe sub who
     // clicks another tier would otherwise be billed twice (subscription-mode Checkout does
     // not dedupe). Tier changes must go through the Customer Portal, not a new checkout.
-    if (profile && profile.stripeCustomerId && accessForStatus(profile.stripeStatus) === "grant") {
+    if (hasLiveSubscription(profile)) {
       sendJson(res, { error: "already_subscribed", detail: "Manage or change your plan from the customer portal.", portal: "/api/billing/portal" }, 409);
       return true;
+    }
+    // Same guard for the NOT-YET-LINKED case: a customer who subscribed by card before
+    // creating this account (or on another device, signed out) has a live sub under
+    // their email that this profile doesn't know about — a fresh checkout would bill
+    // them twice. Look it up by the PROVEN-owned email, adopt it, and bounce to the
+    // portal instead. Best-effort: a Stripe hiccup here must not block a normal buy.
+    if (profile && !profile.stripeCustomerId) {
+      const email = verifiedEmailOf(profile);
+      if (email) {
+        try {
+          const found = await findLinkableCustomer(email, userId);
+          if (found && found.sub) {
+            applyStripeState(userId, { customerId: found.customerId });
+            syncSubscription(found.sub, userId);
+            sendJson(res, { error: "already_subscribed", detail: "We found your existing card subscription and linked it to this account. Manage it from the customer portal.", portal: "/api/billing/portal", linked: true }, 409);
+            return true;
+          }
+        } catch (e) { console.error("[BILLING] pre-checkout link probe failed", e.message); }
+      }
     }
     try {
       const session = await stripe().checkout.sessions.create({
@@ -297,6 +357,52 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     } catch (e) {
       console.error("[BILLING] checkout create failed", e.message);
       sendJson(res, { error: "checkout_failed", detail: e.message }, 502);
+    }
+    return true;
+  }
+
+  // ── Link an existing Stripe subscription to the signed-in account ────────────
+  // For the customer who paid by card BEFORE this account existed (or while signed
+  // out): find their Stripe customer by the email this profile has PROVEN it owns
+  // (verified — the ADR-0016 gate; an unverified email can never claim someone
+  // else's sub), adopt the subscription through the same syncSubscription seam the
+  // webhook uses, and refresh the session role so the tier applies immediately.
+  // auth.html auto-calls this right after sign-in; profile.html and pricing.html
+  // expose it as an explicit "Link my subscription" action.
+  if (url.pathname === "/api/billing/link" && req.method === "POST") {
+    const userId = getEffectiveUserId(req);
+    const profile = userId ? getProfile(userId) : null;
+    if (!profile) { sendJson(res, { error: "auth_required" }, 401); return true; }
+    if (hasLiveSubscription(profile)) {
+      sendJson(res, { linked: true, already: true, role: profile.role, status: profile.stripeStatus });
+      return true;
+    }
+    const email = verifiedEmailOf(profile);
+    if (!email) {
+      sendJson(res, { error: "email_unverified", detail: "Confirm your email first — linking uses your verified email to prove the subscription is yours." }, 403);
+      return true;
+    }
+    if (!linkCooldownOk(userId)) { sendJson(res, { error: "too_many_attempts" }, 429); return true; }
+    try {
+      const found = await findLinkableCustomer(email, userId);
+      if (found && found.conflict) {
+        sendJson(res, { error: "customer_already_linked", detail: "A subscription for this email is already linked to a different account." }, 409);
+        return true;
+      }
+      if (!found) { sendJson(res, { linked: false, reason: "no_subscription_found" }); return true; }
+      applyStripeState(userId, { customerId: found.customerId });
+      syncSubscription(found.sub, userId);
+      // Mirror /billing/success: refresh the session role NOW (and persist the
+      // session before responding) so the caller's very next page load sees the tier.
+      const fresh = getProfile(userId);
+      const sess = getSessionUser(req);
+      if (fresh && sess) setSessionUser(req, { ...sess, role: fresh.role, entitlements: fresh.entitlements || {} });
+      const respond = () => sendJson(res, { linked: true, role: fresh.role, status: fresh.stripeStatus });
+      if (req.session && typeof req.session.save === "function") { try { req.session.save(respond); } catch { respond(); } }
+      else respond();
+    } catch (e) {
+      console.error("[BILLING] link failed", e.message);
+      sendJson(res, { error: "link_failed", detail: e.message }, 502);
     }
     return true;
   }

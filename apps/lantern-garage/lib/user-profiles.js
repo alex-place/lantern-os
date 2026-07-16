@@ -733,6 +733,20 @@ function verifyLocalLogin(email, plaintext) {
   return okPassword ? profile : null;
 }
 
+/**
+ * The email address this profile has PROVEN ownership of, or null — the root
+ * email when `emailVerified === true`, else the first verified identity email.
+ * This is the same trust gate ADR-0016 uses for cross-provider auto-linking,
+ * reused for Stripe subscription linking: an UNVERIFIED email must never be able
+ * to claim someone else's paid subscription (entitlement theft).
+ */
+function verifiedEmailOf(profile) {
+  if (!profile) return null;
+  if (profile.emailVerified === true && profile.email) return profile.email;
+  const hit = (profile.identities || []).find((i) => i.emailVerified === true && i.email);
+  return hit ? hit.email : null;
+}
+
 /** Strip secrets (credential) before sending a profile to any client. */
 function publicProfile(profile) {
   if (!profile) return profile;
@@ -770,5 +784,6 @@ module.exports = {
   setLocalPassword,
   createLocalAccount,
   verifyLocalLogin,
+  verifiedEmailOf,
   publicProfile,
 };
