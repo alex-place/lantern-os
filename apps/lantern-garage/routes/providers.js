@@ -15,6 +15,9 @@ const { loadClaudeSessionUsage } = require("../lib/claude-session-usage");
 // validity — a key that 400s every call (depleted credits, revoked key) is
 // "hasKey:true" but failing. Folding these records in is the #calm-while-wrong fix.
 const { getProviderStatus } = require("../lib/provider-router");
+const { getSessionUser } = require("../lib/session-identity");
+const userKeys = require("../lib/user-provider-keys");
+const { resolveTenant } = require("../lib/tenant");
 
 // Normalize a leaderboard agentId (a model OR provider name) to a provider
 // bucket so local models and cloud providers consolidate into one reliance
@@ -434,6 +437,100 @@ module.exports = async function providerRoutes(req, res, url, deps) {
       providers: rows,
       note: claude ? null : "No Claude Code transcripts found on this host — Claude reliance unavailable here.",
     });
+    return true;
+  }
+
+  // ── Per-user BYOK keys (#2505): set-key / clearKey / test ─────────────────
+  // These are PER-APP-USER (lib/user-provider-keys.js, encrypted at rest) and
+  // deliberately separate from the admin-only host-env routes below. All three
+  // require a signed-in session: keys must never be stored for (or validated on
+  // behalf of) an anonymous visitor.
+  if (url.pathname === "/api/providers/set-key" && (req.method === "GET" || req.method === "POST" || req.method === "DELETE")) {
+    const userId = getSessionUser(req)?.id;
+    if (!userId) {
+      sendJson(res, { error: "sign_in_required", detail: "Sign in to save provider keys to your account." }, 401);
+      return true;
+    }
+    if (req.method === "GET") {
+      // Which providers have a server-stored key (set/savedAt only — never values),
+      // so the settings page reflects saves made on other devices.
+      sendJson(res, { keys: userKeys.listStatus(userId) });
+      return true;
+    }
+    let data;
+    try {
+      data = JSON.parse((await collectRequestBody(req)) || "{}");
+    } catch {
+      sendJson(res, { error: "invalid_json" }, 400);
+      return true;
+    }
+    const provider = String(data.provider || "").toLowerCase();
+    try {
+      if (req.method === "DELETE") {
+        const removed = userKeys.clearKey(userId, provider);
+        sendJson(res, { ok: true, provider, removed });
+      } else {
+        userKeys.setKey(userId, provider, data.key);
+        sendJson(res, { ok: true, provider, masked: maskValue(String(data.key).trim()) });
+      }
+    } catch (err) {
+      // Only our own validation sentinels reach here — safe to echo, never the key.
+      sendJson(res, { error: err.message }, 400);
+    }
+    return true;
+  }
+
+  // POST /api/providers/test/<id> — validate a key with a REAL provider call.
+  // Key precedence: explicit body override → whatever the tenant seam would give
+  // this request (per-user stored key / env / vault per profile — tenant.js).
+  const testMatch = req.method === "POST" && url.pathname.match(/^\/api\/providers\/test\/([a-z0-9_-]+)$/);
+  if (testMatch) {
+    if (!getSessionUser(req)?.id) {
+      sendJson(res, { error: "sign_in_required", detail: "Sign in to test provider keys." }, 401);
+      return true;
+    }
+    const provider = testMatch[1];
+    if (!userKeys.BYOK_PROVIDERS.includes(provider)) {
+      sendJson(res, { ok: false, error: "unknown_provider" }, 400);
+      return true;
+    }
+    let data;
+    try {
+      data = JSON.parse((await collectRequestBody(req)) || "{}");
+    } catch {
+      data = {};
+    }
+    const override = typeof data.key === "string" && data.key.trim() ? data.key.trim() : null;
+    const key = override || resolveTenant(req).resolveKey(provider);
+    if (!key) {
+      sendJson(res, { ok: false, error: "No key to test — paste one or save it first." }, 400);
+      return true;
+    }
+    const PROBES = {
+      anthropic: (k) => fetch("https://api.anthropic.com/v1/models?limit=1", {
+        headers: { "x-api-key": k, "anthropic-version": "2023-06-01" }, signal: AbortSignal.timeout(10_000) }),
+      openai: (k) => fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: "Bearer " + k }, signal: AbortSignal.timeout(10_000) }),
+      gemini: (k) => fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=" + encodeURIComponent(k), {
+        signal: AbortSignal.timeout(10_000) }),
+      xai: (k) => fetch("https://api.x.ai/v1/models", {
+        headers: { Authorization: "Bearer " + k }, signal: AbortSignal.timeout(10_000) }),
+    };
+    try {
+      const r = await PROBES[provider](key);
+      if (r.ok) {
+        sendJson(res, { ok: true, provider, source: override ? "input" : "resolved" });
+      } else {
+        const rejected = r.status === 401 || r.status === 403;
+        sendJson(res, {
+          ok: false,
+          provider,
+          error: rejected ? `${provider} rejected the key (HTTP ${r.status})` : `${provider} returned HTTP ${r.status}`,
+        });
+      }
+    } catch (err) {
+      sendJson(res, { ok: false, provider, error: "Could not reach " + provider + ": " + (err.name === "TimeoutError" ? "timeout" : err.message) }, 502);
+    }
     return true;
   }
 
