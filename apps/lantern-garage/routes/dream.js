@@ -346,6 +346,21 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
   }
 
   if (url.pathname === "/api/dream/chat" && req.method === "POST") {
+    // Same server-side daily cap as the stream path (#tier-caps). Internal/operator
+    // callers (bang commands, pr-watcher, the proxy to /stream) are exempt; a real
+    // end-user direct POST is metered once here (its internal proxy to /stream is
+    // loopback → exempt there, so no double count).
+    if (!require("../lib/request-auth").isOperatorRequest(req)) {
+      const q = require("../lib/chat-quota").consume(req);
+      if (!q.allowed) {
+        sendJson(res, {
+          error: "daily_limit_reached", tier: q.tier, cap: q.cap,
+          detail: `Daily limit reached: ${q.cap} messages/day on the ${q.tier} tier. Upgrade for more capacity.`,
+          upgrade: true,
+        }, 429);
+        return true;
+      }
+    }
     try {
       const raw = await collectRequestBody(req);
       const body = JSON.parse(raw || "{}");
@@ -459,6 +474,22 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
   if ((url.pathname === "/api/dream/stream" && req.method === "GET") ||
       (url.pathname === "/api/dream/chat/stream" && req.method === "POST")) {
+    // Server-side daily message cap by tier (Guest 10 / Free 50 / Member 100 / Pro 250 /
+    // Pilot ∞) — the UI declared these but never enforced them, so any tier could send
+    // unlimited paid LLM calls. Only real end-user POSTs are metered; internal/operator
+    // calls (loopback automation, the non-stream handler's own proxy, bang commands) are
+    // exempt so they never consume a user's quota. #tier-caps
+    if (req.method === "POST" && !require("../lib/request-auth").isOperatorRequest(req)) {
+      const q = require("../lib/chat-quota").consume(req);
+      if (!q.allowed) {
+        sendJson(res, {
+          error: "daily_limit_reached", tier: q.tier, cap: q.cap,
+          detail: `Daily limit reached: ${q.cap} messages/day on the ${q.tier} tier. Upgrade for more capacity.`,
+          upgrade: true,
+        }, 429);
+        return true;
+      }
+    }
     const { appendConvergenceRecord } = require("../lib/dream-chat");
 
     // Intercept SSE writes so we can log every model interaction as a convergence

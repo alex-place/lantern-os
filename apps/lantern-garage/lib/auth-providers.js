@@ -25,20 +25,26 @@ const { roleLevel } = require("./role-hierarchy");
 // config change, not code.
 //
 // SECURITY: a PURCHASABLE tier can NEVER grant the operator `admin` role. `admin`
-// (role-hierarchy level 3) gates provider-key writes, GPU dispatch, feature flags and
-// the /api/accounts console (reset any password, grant admin, delete accounts) — i.e.
+// (the TOP role-hierarchy level) gates provider-key writes, GPU dispatch, feature flags
+// and the /api/accounts console (reset any password, grant admin, delete accounts) — i.e.
 // account takeover. Patreon allows custom pledges of any size on a public campaign, so
-// mapping a price point to `admin` = "buy site takeover for $X". The top paid tier
-// therefore maps to `deep_dreamer` (all paid features incl. trading); real admin comes
+// mapping a price point to `admin` = "buy site takeover for $X". The top PURCHASABLE tier
+// is `pilot` ($200) — it unlocks the autonomous AI trader but NOT admin; real admin comes
 // ONLY from LANTERN_ADMIN_IDS (isAdminOverride) or an explicit setUserRole.
+//
+// The three live Patreon tiers map by pledge amount: $5 Member → supporter, $20 Pro →
+// deep_dreamer, $200 Pilot → pilot. Thresholds are env-overridable (cents) so a re-price
+// is config, not code.
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const TIER_CENTS = {
-  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5  Wanderer
-  deep_dreamer: num(process.env.PATREON_DEEP_DREAMER_CENTS, 2000), // $20+ (trading + all paid features; the $200 top tier lands here too)
+  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5  Member
+  deep_dreamer: num(process.env.PATREON_DEEP_DREAMER_CENTS, 2000), // $20  Pro (trading + all Pro features)
+  pilot: num(process.env.PATREON_PILOT_CENTS, 20000), // $200  Pilot (adds the autonomous AI trader)
 };
 
 /** Highest PURCHASABLE role for the max pledge amount (cents). Never returns `admin`. */
 function roleForAmountCents(maxCents) {
+  if (maxCents >= TIER_CENTS.pilot) return "pilot";
   if (maxCents >= TIER_CENTS.deep_dreamer) return "deep_dreamer";
   if (maxCents >= TIER_CENTS.supporter) return "supporter";
   return null;
@@ -263,8 +269,9 @@ function resolveRole(provider, user) {
   let role = provider.mapRole(user) || "guest";
   // Defense in depth: a PROVIDER (a paid tier, a federated login) may NEVER resolve to
   // the operator `admin` role — that comes only from isAdminOverride above (or an
-  // explicit setUserRole). Cap any stray `admin` from a mapper down to the top paid role.
-  if (role === "admin") role = "deep_dreamer";
+  // explicit setUserRole). Cap any stray `admin` from a mapper down to the top PAID role
+  // (`pilot`, $200) — never admin, but don't skip the tier a paid patron earned.
+  if (role === "admin") role = "pilot";
   return roleLevel(role) >= 0 ? role : "guest";
 }
 

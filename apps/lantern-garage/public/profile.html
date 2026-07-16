@@ -366,15 +366,17 @@
 
 <script src="/js/theme-toggle.js"></script>
 <script>
-// deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
-const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
+// Patreon tiers by pledge amount: supporter $5 Member, deep_dreamer $20 Pro,
+// pilot $200 Pilot. `founder` kept as a legacy alias for deep_dreamer (#698).
+const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, pilot: 3, admin: 4 };
 
 const TIER_LABELS = {
   guest:        { label: 'Free',              emoji: '🔓' },
-  supporter:    { label: 'Free (legacy supporter)', emoji: '🌀' },
-  deep_dreamer: { label: 'Pro — $20/mo', emoji: '✦' },
-  founder:      { label: 'Pro — $20/mo', emoji: '✦' }, // legacy alias (#698)
-  admin:        { label: 'Admin (staff)', emoji: '⬡' },
+  supporter:    { label: 'Member — $5/mo',    emoji: '🌀' },
+  deep_dreamer: { label: 'Pro — $20/mo',      emoji: '✦' },
+  founder:      { label: 'Pro — $20/mo',      emoji: '✦' }, // legacy alias (#698)
+  pilot:        { label: 'Pilot — $200/mo',   emoji: '🛩️' },
+  admin:        { label: 'Admin (staff)',     emoji: '⬡' },
 };
 
 // Feature access is role-laddered EXCEPT Trader, which is a per-account
@@ -382,11 +384,11 @@ const TIER_LABELS = {
 // user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
 // Feature access is tier-laddered. Trader (manual stocks + Kalshi + AI
 // suggestions) unlocks at the $20 Pro tier; the autonomous AI Trader
-// unlocks at the $200 Business tier.
+// unlocks at the $200 Pilot tier.
 const FEATURES = [
   { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
   { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
-  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'admin',        note: 'Autonomous AI trading' },
+  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'pilot',        note: 'Autonomous AI trading' },
   { emoji: '🔗', label: 'Connect broker', href: '/orchestration.html#broker', req: 'deep_dreamer', note: 'Link Alpaca (one click) or IBKR' },
   { emoji: '✏️', label: 'Create',     href: '/create.html',          req: 'deep_dreamer', note: '' },
   { emoji: '🗺️', label: 'Explore',    href: '/explore.html',         req: 'guest',        note: '' },

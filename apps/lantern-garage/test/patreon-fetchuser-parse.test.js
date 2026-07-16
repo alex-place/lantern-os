@@ -85,9 +85,9 @@ async function resolve(payload) {
     assert.deepEqual(user.entitledAmountsCents, [2000]);
     assert.equal(role, "deep_dreamer");
   });
-  await check("$200 top tier → deep_dreamer, NOT admin", async () => {
+  await check("$200 Pilot tier → pilot, NOT admin", async () => {
     const { role } = await resolve(identity("4", [membership(OUR, [{ id: "t200", amount: 20000 }])]));
-    assert.equal(role, "deep_dreamer");
+    assert.equal(role, "pilot");
   });
 
   // ── fail-closed edge cases ─────────────────────────────────────────────────────

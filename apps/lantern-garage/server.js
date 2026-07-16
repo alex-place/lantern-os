@@ -163,7 +163,7 @@ const deps = {
 // non-entitled account (e.g. Deep Dreamer/founder without trade access) cannot
 // reach /api/trading/* directly. Runs before routes/trading. Admins and the
 // local bypass pass through (see auth-middleware.requireEntitlement).
-const { requireEntitlement, isAdmin } = require("./lib/auth-middleware");
+const { requireEntitlement, isAdmin, requireAuth, requireRole } = require("./lib/auth-middleware");
 // Read-only market-data GETs with NO account/order state — served to everyone so
 // the logged-out chart view (guest-mode stock-trader.html) renders from the exact
 // same endpoints the live terminal uses (a true 1:1 copy, no duplicated data
@@ -224,30 +224,82 @@ function orchestrationControlGuard(req, res, url) {
   return true;                                      // blocked
 }
 
-// ── Autonomous AI-trader gate ($200 Synthesasia Guild tier / admin) ──────────
-// The $20 Deep Dreamer tier unlocks manual trading + AI *suggestions* (the whole
-// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
-// system records/executes trades on the user's behalf — is a $200 capability, so
-// its execution endpoint requires admin (the $200 Synthesasia Guild role; the
-// a dev/test session via test-auth passes, keeping the server-side autonomous loop
-// working). Runs after tradeApiGuard, so $20 users are already past the trade gate
-// and only get stopped here for autonomous execution.
-const AI_TRADER_ADMIN = {
-  "/api/trading/ai-trader/trades": "POST", // record/execute an autonomous trade
+// ── Autonomous AI-trader gate ($200 Pilot tier / admin) ──────────────────────
+// The $20 Pro tier (deep_dreamer) unlocks manual trading + AI *suggestions* (the whole
+// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the system
+// STARTS/STOPS the scanner and RECORDS/EXECUTES trades on the user's behalf — is a $200
+// Pilot capability, gated on the `ai_trader` entitlement (granted at role `pilot`+; admin
+// passes implicitly). Runs AFTER tradeApiGuard, so Pro users are already past the trade
+// gate and are only stopped here for autonomous CONTROL. (Previously only the cosmetic
+// `/trades` log-write was gated — the real scanner-control endpoints were reachable by any
+// $20 user; this closes that.) Read-only AI-trader status (GET signals/status/watchlist/
+// zones) intentionally stays at the Pro trade tier — only the control/execution POSTs here
+// require Pilot.
+const AI_TRADER_GATED = {
+  "/api/trading/ai-trader/scanner/start": "POST",    // resume autonomous execution
+  "/api/trading/ai-trader/scanner/stop": "POST",     // pause autonomous execution
+  "/api/trading/ai-trader/signals/generate": "POST", // trigger a live market scan
+  "/api/trading/ai-trader/trades": "POST",           // record/execute an autonomous trade
 };
 function aiTraderGuard(req, res, url) {
-  const rule = AI_TRADER_ADMIN[url.pathname];
-  if (!rule || rule !== req.method) return false;   // not a gated autonomous op → continue
-  if (isAdmin(req)) return false;                    // $200 tier / local owner → allow
-  res.writeHead(403, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "tier_required", detail: "The autonomous AI trader requires the $200 tier." }));
-  return true;                                        // blocked
+  const rule = AI_TRADER_GATED[url.pathname];
+  if (!rule || rule !== req.method) return false;         // not a gated autonomous op → continue
+  if (requireEntitlement(req, res, "ai_trader")) return false; // Pilot ($200) / admin → allow
+  return true;                                            // blocked → 403/302 already sent
+}
+
+// ── Premium feature gate (subscription-tier enforcement) ─────────────────────
+// Default-DENY for the premium API prefixes. The app historically registered every
+// /api/* route "open" and relied on three narrow guards (trade / ai-trader /
+// orchestration) plus PAGE-level gating; the premium DATA plane (Creator Suite,
+// image/vision/document generation, wide research, Alpaca broker connect, file ingest)
+// had NO server-side gate, so the paywall lived only in the UI and the endpoints were
+// reachable by a plain guest — or, on the 0.0.0.0 cloud deploy, an unauthenticated
+// caller. This guard enforces the subscription tier server-side, matching the tier map:
+//   • Pro ($20, deep_dreamer+ → "pro"): Creator Suite, image/vision/document generation,
+//     wide research. (Free callers of the shared image/vision endpoints — the guest-open
+//     Three Doors game, the issue reporter — degrade GRACEFULLY: they fall back to free
+//     Pollinations art / text-only, verified in three-doors-images.js + issue-reporter.js.)
+//   • Pro ($20 → "trade"): Alpaca broker connect (mirrors IBKR, which rides tradeApiGuard).
+//   • Signed-in (Free+ → requireAuth): file upload/extract — closes the anonymous
+//     key-spend / disk-fill / RAG-poisoning hole while keeping the chat file-attach free.
+//   • Admin: /api/code/apply — writes arbitrary repo files; must never be public.
+// Runs before the route modules. requireEntitlement/requireAuth/requireRole already send
+// the 403/302, so a blocked request returns true (handled) and never reaches the handler.
+const PREMIUM_PRO_PREFIXES = [
+  "/api/creator/", "/api/creator-entries", "/api/image/", "/api/vision/",
+  "/api/research/wide-search",
+];
+function premiumApiGuard(req, res, url) {
+  const p = url.pathname;
+  // Critical: arbitrary repo-file write was unauthenticated — admin only.
+  if (p === "/api/code/apply") {
+    return requireRole(req, res, "admin") ? false : true;
+  }
+  // Pro content features ($20+).
+  if (
+    p === "/api/document/generate" ||
+    p === "/api/dreamer/upload" ||
+    PREMIUM_PRO_PREFIXES.some((pre) => p === pre || p.startsWith(pre))
+  ) {
+    return requireEntitlement(req, res, "pro") ? false : true;
+  }
+  // Alpaca broker connect → same trade gate as IBKR ($20 Pro+).
+  if (p.startsWith("/api/broker/alpaca/")) {
+    return requireEntitlement(req, res, "trade") ? false : true;
+  }
+  // File upload/extract → any signed-in account (Free+); blocks anonymous callers.
+  if (p.startsWith("/api/files/")) {
+    return requireAuth(req, res) ? false : true;
+  }
+  return false; // not a premium path → continue
 }
 
 const routes = [
   tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
-  aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
+  aiTraderGuard,                        // gate autonomous AI-trader control/execution to Pilot ($200)/admin
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
+  premiumApiGuard,                      // gate premium data plane (creator/image/vision/doc/wide-search/alpaca/files/code-apply) by tier
   require("./routes/v1"),               // OpenAI-compatible /v1/chat/completions shim (before auth: API clients use bearer keys, not sessions)
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)

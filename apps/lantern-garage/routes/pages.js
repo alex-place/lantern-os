@@ -110,15 +110,18 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 // A signed-in user who lacks the tier/entitlement for a page gets a friendly HTML
 // "unlock" page instead of a raw JSON 403 filling the browser (a first-time-user
 // papercut). Unauthenticated users are still redirected to login upstream.
-// Canonical tier display names (Guest / Free / Pro / Business, #2470). The $5
-// "supporter" tier is retired → shown as Free (grandfathered); the $20 tier is
-// Pro. `admin` is a STAFF role, not a purchasable tier, so it's handled below as
-// a staff gate (no "See plans") rather than being named as a buyable tier.
-const TIER_LABEL = { supporter: "Free", deep_dreamer: "Pro" };
+// Canonical tier display names, mapped from the Patreon pledge amount:
+//   supporter ($5) → Member · deep_dreamer ($20) → Pro · pilot ($200) → Pilot.
+// `admin` is a STAFF role, not a purchasable tier, so it's handled below as a staff
+// gate (no "See plans") rather than being named as a buyable tier.
+const TIER_LABEL = { supporter: "Member", deep_dreamer: "Pro", pilot: "Pilot" };
+// Friendly name for the tier a per-feature ENTITLEMENT requires (used when a page
+// gates on an entitlement rather than a role).
+const ENTITLEMENT_TIER = { trade: "Pro", pro: "Pro", ai_trader: "Pilot" };
 const STAFF_ROLES = new Set(["admin", "tech_support"]);
 function renderUpgradePage(page) {
   const isStaff = page.staff === true || STAFF_ROLES.has(page.role);
-  const need = page.entitlement === "trade" ? "the Pro tier"
+  const need = page.entitlement ? `the ${ENTITLEMENT_TIER[page.entitlement] || "a higher"} tier`
     : page.role ? `the ${TIER_LABEL[page.role] || page.role} tier` : "a higher tier";
   const heading = isStaff ? "Staff access required" : "This feature needs an upgrade";
   // Staff pages aren't for sale — never show a buy-a-plan CTA on them (#2470).

@@ -149,14 +149,18 @@ function hasEntitlement(req, key) {
   if (!session?.id) return false;
   if (session.role === "admin") return true;
 
-  // Tier unlocks (product model):
-  //   • "trade"     — stocks + Kalshi + AI suggestions — unlocked by the $20
-  //                   Deep Dreamer tier and up.
-  //   • "ai_trader" — the autonomous AI trader — unlocked by the $200 tier
-  //                   (admin, handled by the role check above).
-  // The per-account entitlement below remains an override (admins can grant it
-  // to a specific free/lower-tier account).
-  if (key === "trade" && roleLevel(session.role) >= roleLevel("deep_dreamer")) return true;
+  // Tier unlocks (product model — keyed off role level, itself derived from the
+  // Patreon pledge amount in auth-providers.js):
+  //   • "pro"       — Pro content features (Creator Suite, image/vision/document
+  //                   generation, wide research) — the $20 Pro tier (deep_dreamer) and up.
+  //   • "trade"     — stocks + Kalshi + broker connect + AI suggestions — the $20 Pro
+  //                   tier (deep_dreamer) and up.
+  //   • "ai_trader" — the AUTONOMOUS AI trader (bot executes on your account) — the
+  //                   $200 Pilot tier (pilot) and up. Strictly above Pro.
+  // The per-account entitlement below remains an override (admins can grant any key
+  // to a specific lower-tier account).
+  if ((key === "trade" || key === "pro") && roleLevel(session.role) >= roleLevel("deep_dreamer")) return true;
+  if (key === "ai_trader" && roleLevel(session.role) >= roleLevel("pilot")) return true;
 
   const profile = getProfile(session.id);
   return !!(profile && profile.entitlements && profile.entitlements[key] === true);

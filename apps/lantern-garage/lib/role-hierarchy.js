@@ -20,16 +20,21 @@
  */
 const ROLE_HIERARCHY = Object.freeze({
   guest: 0, // authenticated free tier (see note above) — NOT anonymous
-  supporter: 1,
-  deep_dreamer: 2,
+  supporter: 1, // $5 Member Patreon tier
+  deep_dreamer: 2, // $20 Pro tier
   founder: 2, // legacy alias for deep_dreamer (#698)
   // Staff support role: can operate the account-support surface (accounts.html) to
   // fix multi-auth / password issues, but is NOT admin — level 2 keeps admin-only
-  // surfaces (level 3: feature flags, nav, real-money switches) closed. The support
-  // page gates on an EXPLICIT {admin, tech_support} set, not this level, so paid
-  // tiers at the same level never reach it. See auth-middleware.isStaff.
+  // surfaces (feature flags, nav, real-money switches) closed. The support page gates
+  // on an EXPLICIT {admin, tech_support} set, not this level, so paid tiers at the
+  // same level never reach it. See auth-middleware.isStaff.
   tech_support: 2,
-  admin: 3,
+  // $200 Pilot tier — the top PURCHASABLE tier. Sits above Pro so it can unlock
+  // Pilot-only capabilities (the autonomous AI trader, via the `ai_trader`
+  // entitlement) without granting the operator `admin` role, which is never
+  // purchasable (see auth-providers.resolveRole). Mapped from the $200 pledge amount.
+  pilot: 3,
+  admin: 4,
 });
 
 // The staff roles allowed on the account-support surface. Membership is exact —
