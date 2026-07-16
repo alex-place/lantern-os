@@ -26,6 +26,11 @@ private/**
 *.jpeg
 *.gif
 *.webp
+
+# Essential brand rasters — tracked in-repo (README hero + social unfurl, #2533).
+!apps/lantern-garage/public/og-image.png
+!docs/media/dream-chat-light.png
+!docs/media/dream-chat-dark.png
 *.pdf
 *.zip
 *.mp4
