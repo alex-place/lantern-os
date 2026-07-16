@@ -253,6 +253,36 @@
         })
         .catch(function () { linkBtn.disabled = false; show('error', 'Network error — please try again.'); });
     });
+
+    // "Upgrade to <tier>" — start native Stripe checkout for the clicked tier.
+    // Delegated so it works for whichever tier buttons config unhid.
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest && e.target.closest('.stripe-cta');
+      if (!btn) return;
+      e.preventDefault();
+      btn.disabled = true;
+      var prev = btn.textContent; btn.textContent = 'Redirecting…';
+      function reset() { btn.disabled = false; btn.textContent = prev; }
+      fetch('/api/billing/checkout', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: btn.getAttribute('data-tier') }),
+      }).then(function (r) {
+        return r.json().then(function (data) { return { status: r.status, data: data }; });
+      }).then(function (res) {
+        if (res.status === 200 && res.data.url) { location.href = res.data.url; return; }
+        reset();
+        if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+        if (res.status === 409 && res.data.error === 'already_subscribed') {
+          show('info', 'You already have an active subscription — opening the portal to change your plan.');
+          openPortal(); return;
+        }
+        show('error', res.data && res.data.detail ? ('Could not start checkout: ' + res.data.detail) : 'Could not start checkout. Please try Patreon or try again.');
+      }).catch(function () {
+        reset();
+        show('error', 'Network error starting checkout. Please try again.');
+      });
+    });
   })();
 </script>
 <script src="/js/theme-toggle.js"></script>
