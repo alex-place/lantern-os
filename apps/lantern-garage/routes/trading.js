@@ -87,7 +87,7 @@ async function _autoscanTick() {
       traderAgent.cache && (traderAgent.cache['market_scan'] = null); // force fresh each minute
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
-      if (n) console.log(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
+      if (n) console.info(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
       // Act stage: execute on EVERY connected IBKR account, not just one — so when a
       // second person links their account the autopilot trades both. TRADER_AUTO_USER,
       // if set, pins it to a single user (back-compat / testing). Dedupe by broker
@@ -129,7 +129,7 @@ async function _autoscanTick() {
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
-  console.log(`[Trading] autonomous scan loop started (every ${AUTOSCAN_MS}ms)`);
+  console.info(`[Trading] autonomous scan loop started (every ${AUTOSCAN_MS}ms)`);
 }
 
 const AI_TRADER_HOST = process.env.AI_TRADER_HOST || '127.0.0.1';
@@ -269,6 +269,7 @@ const kalshiRoutes = require('./trading/kalshi');
 const aiTraderRoutes = require('./trading/ai-trader');
 const newsRoutes = require('./trading/news');
 const miscRoutes = require('./trading/misc');
+const portfolioRoutes = require('./trading/portfolio');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -310,6 +311,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await kalshiRoutes(req, res, url, ctx)) return true;
   if (await aiTraderRoutes(req, res, url, ctx)) return true;
   if (await newsRoutes(req, res, url, ctx)) return true;
+  if (await portfolioRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;
