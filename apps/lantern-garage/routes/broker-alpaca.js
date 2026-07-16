@@ -113,6 +113,9 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       }), true;
     }
     if (method === 'POST') {
+      if (userId == null) {
+        return _json(res, 401, { error: 'not_signed_in', message: 'Sign in to choose a broker.' }), true;
+      }
       const body = await _readBody(req);
       const broker = String((body && body.broker) || '').toLowerCase();
       if (!prefs.set(userId, broker)) {

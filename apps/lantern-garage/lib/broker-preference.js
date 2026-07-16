@@ -28,17 +28,20 @@ const VALID = new Set(['alpaca', 'ibkr', 'auto']);
 
 function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)) + '.json'); }
 
-/** The user's stored choice: 'alpaca' | 'ibkr' | 'auto' (default when unset/unreadable). */
+/** The user's stored choice: 'alpaca' | 'ibkr' | 'auto' (default when unset/unreadable).
+ *  A null/undefined userId (anonymous request) is always 'auto' — anonymous visitors
+ *  share no identity, so a stored choice would leak between them. */
 function get(userId) {
+  if (userId == null) return 'auto';
   try {
     const v = JSON.parse(fs.readFileSync(_file(userId), 'utf8')).broker;
     return VALID.has(v) ? v : 'auto';
   } catch (_e) { return 'auto'; }
 }
 
-/** Persist a choice. Returns false on an invalid value (caller 400s). */
+/** Persist a choice. Returns false on an invalid value or missing identity (caller 4xxs). */
 function set(userId, broker) {
-  if (!VALID.has(broker)) return false;
+  if (userId == null || !VALID.has(broker)) return false;
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(_file(userId), JSON.stringify({ broker, updatedAt: new Date().toISOString() }));
   return true;

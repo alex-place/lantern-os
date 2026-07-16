@@ -128,3 +128,12 @@ test('broker-preference store: rejects invalid values, round-trips valid ones', 
     assert.strictEqual(prefs.get('u1'), 'auto');
   });
 });
+
+test('broker-preference store: anonymous (null) identity can never store or resolve a choice', () => {
+  withPrefStore((prefs) => {
+    assert.strictEqual(prefs.set(null, 'alpaca'), false);        // no shared null.json
+    assert.strictEqual(prefs.set(undefined, 'ibkr'), false);
+    assert.strictEqual(prefs.get(null), 'auto');
+    assert.strictEqual(prefs.get(undefined), 'auto');
+  });
+});
