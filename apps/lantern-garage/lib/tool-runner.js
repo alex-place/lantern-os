@@ -1453,6 +1453,77 @@ const REGISTRY = {
       }
     },
   },
+
+  options_strategy: {
+    policy: "read", // computes a covered/cash-secured options PROPOSAL from real chain data — places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Propose and price a covered options strategy from the REAL listed-options chain (Alpha Vantage; requires ALPHAVANTAGE_API_KEY configured on the server — if it isn't, the tool reports that honestly instead of inventing data). Strategies: covered_call (needs shares ≥ 100), cash_secured_put (needs cash — contracts limited to what the cash fully collateralizes), collar (matched-expiry put+call around shares ≥ 100). Strikes are picked by |delta| closest to target inside the DTE window, falling back to ~3-7% OTM moneyness when the chain has no greeks (the output says which path was used). Premiums are quote MARKS ((bid+ask)/2), never fills, with the half-spread reported as an explicit cost. ADVISORY ONLY: it never places, simulates placing, or recommends executing orders, and naked short options are permanently out of scope. The user always decides.",
+    schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "underlying ticker, e.g. IBM" },
+        strategy: { type: "string", enum: ["covered_call", "cash_secured_put", "collar"], description: "which covered structure to propose" },
+        shares: { type: "number", description: "shares held of the underlying (covered_call/collar; 100 per contract required)" },
+        cash: { type: "number", description: "cash available as collateral in dollars (cash_secured_put)" },
+        target_delta: { type: "number", description: "target |delta| for the short leg (default 0.30; collar put leg defaults to 0.25)" },
+        min_dte: { type: "number", description: "minimum days to expiration (default 21)" },
+        max_dte: { type: "number", description: "maximum days to expiration (default 60)" },
+        price: { type: "number", description: "underlying price override; omitted = inferred from the chain via put-call parity at the ATM strike" },
+      },
+      required: ["symbol", "strategy"],
+    },
+    async run(i, ctx) {
+      try {
+        const qs = new URLSearchParams({ symbol: String(i.symbol || ""), strategy: String(i.strategy || "") });
+        for (const [param, val] of [
+          ["shares", i.shares], ["cash", i.cash], ["target_delta", i.target_delta],
+          ["min_dte", i.min_dte], ["max_dte", i.max_dte], ["price", i.price],
+        ]) {
+          if (val !== undefined && val !== null) qs.set(param, String(val));
+        }
+        const d = await _localTradingGet(`/api/trading/options/strategies?${qs.toString()}`, 12000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[options_strategy: options chain unavailable${d && d.reason ? ` (${d.reason})` : ""} — if ALPHAVANTAGE_API_KEY is not configured on this server, say so honestly; never invent chain data.]`;
+        }
+        const p = d.proposal;
+        if (!p || p.ok === false) {
+          return `[options_strategy: ${p && p.reason ? p.reason : "no proposal"} — report this honestly; do not substitute a made-up strike or premium.]`;
+        }
+        const head = `${p.strategy} PROPOSAL for ${d.symbol} (chain session ${d.session || "unknown"}) — ADVISORY ONLY; nothing is or will be placed.`;
+        const px = `Underlying: $${p.price} (${d.priceSource}).`;
+        const lines = [head, px];
+        if (p.strategy === "collar") {
+          lines.push(
+            `Matched expiry ${p.expiration} (${p.dte} DTE), ${p.contractsWritable} contract(s) on ${p.sharesCovered} of the covered shares:`,
+            `  BUY put  ${p.put.contract} — strike $${p.put.strike} (floor, ${_pfPct(p.floorPct)} vs spot) @ mark $${p.put.premium}/sh [${p.put.selectionPath} path]`,
+            `  SELL call ${p.call.contract} — strike $${p.call.strike} (ceiling, +${_pfPct(p.ceilingPct)} vs spot) @ mark $${p.call.premium}/sh [${p.call.selectionPath} path]`,
+            `Net at marks: $${Math.abs(p.netCost).toFixed(2)}/sh ${p.netDirection} ($${Math.abs(p.netCostPerContract).toFixed(2)}/contract).`,
+            `Bounds per share: max loss $${p.maxLossPerShare} · max gain $${p.maxGainPerShare}.`,
+            `Half-spread cost both legs: $${p.spreadCost}/sh ($${p.spreadCostPerContract}/contract) — real option spreads are the dominant execution cost (arXiv:2511.02518).`,
+            p.tradeoffNote
+          );
+        } else {
+          const isCsp = p.strategy === "cash_secured_put";
+          lines.push(
+            `SELL ${p.contractsWritable}x ${p.contract} — ${p.type} strike $${p.strike}, exp ${p.expiration} (${p.dte} DTE). Strike picked by the ${p.selectionPath} path${p.selectionPath === "delta" ? ` (|Δ| ${p.assignmentRiskProxy.value} vs target ${p.targetDelta})` : " (chain has no greeks — ~3-7% OTM moneyness ranking)"}.`,
+            `Premium at MARK: $${p.premium}/sh ($${p.premiumPerContract}/contract; $${p.premiumTotal} total) · annualized yield ${_pfPct(p.premiumYieldAnnualized)} (${p.yieldBasis}).`,
+            `Breakeven: $${p.breakeven} · assignment-risk proxy: ${p.assignmentRiskProxy.value} (${p.assignmentRiskProxy.basis}) — ${p.assignmentRiskProxy.note}.`,
+            `Half-spread cost: $${p.spreadCost}/sh ($${p.spreadCostPerContract}/contract) — real option spreads are the dominant execution cost (arXiv:2511.02518).`,
+            isCsp
+              ? `Collateral: $${p.collateralPerContract}/contract → $${p.collateralRequired} committed, $${p.cashUncommitted} uncommitted. Fully cash-secured — never naked.`
+              : `Coverage: ${p.sharesCovered} shares back ${p.contractsWritable} contract(s). Fully covered — never naked.`
+          );
+        }
+        // p.disclaimer is this tool's PF_DISCLAIMER-tone line (same "decision
+        // support only, NOT personalized investment advice" contract) with the
+        // CORRECT evidence basis — PF_DISCLAIMER itself cites Yahoo adjclose
+        // return history, which would be false for option-chain quotes.
+        lines.push(p.disclaimer);
+        return lines.filter(Boolean).join("\n");
+      } catch (e) {
+        return `[options_strategy error: ${e.message}]`;
+      }
+    },
+  },
 };
 
 const TOOL_NAMES = Object.keys(REGISTRY);
