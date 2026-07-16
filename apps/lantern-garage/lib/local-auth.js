@@ -13,7 +13,7 @@
 
 const {
   createLocalAccount,
-  verifyLocalLogin,
+  verifyLocalLoginAsync,
   publicProfile,
   updateProfile,
 } = require("./user-profiles");
@@ -21,6 +21,7 @@ const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationEmail, smtpConfigured } = require("./mailer");
 const { isLoopback } = require("./request-auth");
+const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
 
 /** Build a fresh email-confirmation link (mints a verify_email token). */
 function verifyLinkFor(req, profile) {
@@ -103,6 +104,28 @@ function clearFailures(req, email) {
   attempts.delete(_key(req, email));
 }
 
+// Per-IP request budget, INDEPENDENT of email — the email-keyed throttle above is
+// trivially bypassed by varying the email, so one IP could still force unbounded
+// scrypt+profile-scan work and grow the map forever (#2609). Cap total auth writes
+// per IP per window and sweep both maps so neither grows without bound.
+const IP_MAX = 40;
+const ipAttempts = new Map(); // ip -> { count, first }
+function _ip(req) { return (req && req.socket && req.socket.remoteAddress) || "?"; }
+function ipBudgetExceeded(req) {
+  const ip = _ip(req);
+  const rec = ipAttempts.get(ip);
+  const now = Date.now();
+  if (!rec || now - rec.first > WINDOW_MS) { ipAttempts.set(ip, { count: 1, first: now }); return false; }
+  rec.count++;
+  return rec.count > IP_MAX;
+}
+const _sweep = setInterval(() => {
+  const now = Date.now();
+  for (const [k, rec] of attempts) if (now - rec.first > WINDOW_MS) attempts.delete(k);
+  for (const [k, rec] of ipAttempts) if (now - rec.first > WINDOW_MS) ipAttempts.delete(k);
+}, WINDOW_MS);
+if (_sweep.unref) _sweep.unref(); // never keep the process alive for the sweep
+
 function _readJson(req) {
   return new Promise((resolve) => {
     let body = "";
@@ -154,6 +177,7 @@ function _establish(req, res, profile, status) {
 /** POST /api/auth/local/register { email, password, name } */
 async function handleLocalRegister(req, res) {
   if (process.env.LANTERN_LOCAL_AUTH === "0") return _json(res, 403, { error: "local_auth_disabled" });
+  if (ipBudgetExceeded(req)) return _json(res, 429, { error: "too_many_attempts", detail: "try again later" }); // register also runs scrypt (#2609)
   const b = await _readJson(req);
   if (!b) return _json(res, 400, { error: "invalid_json" });
   const email = String(b.email || "").trim();
@@ -174,7 +198,12 @@ async function handleLocalRegister(req, res) {
   // (and dev link) so it stays testable locally.
   if (!smtpConfigured() && !isLoopback(req)) {
     warnNoMailerAdmit();
-    updateProfile(result.profile.id, { emailVerified: true });
+    // ASSUMED, not proven: with no mailer we can't confirm the address is the
+    // registrant's. Mark it so email-ownership-gated actions (claiming a Stripe
+    // subscription by email, /api/billing/link) don't trust it — otherwise an
+    // attacker registers a victim's email and adopts their sub (#2606). Login
+    // still works; only ownership proof is withheld until a real verification.
+    updateProfile(result.profile.id, { emailVerified: true, emailAssumed: true });
     return _establish(req, res, { ...result.profile, emailVerified: true }, 201);
   }
 
@@ -189,6 +218,7 @@ async function handleLocalRegister(req, res) {
 
 /** POST /api/auth/local/login { email, password } */
 async function handleLocalLogin(req, res) {
+  if (ipBudgetExceeded(req)) return _json(res, 429, { error: "too_many_attempts", detail: "try again later" });
   const b = await _readJson(req);
   if (!b) return _json(res, 400, { error: "invalid_json" });
   const email = String(b.email || "").trim();
@@ -196,8 +226,18 @@ async function handleLocalLogin(req, res) {
   if (!email || !password) return _json(res, 400, { error: "missing_credentials" });
   if (throttled(req, email)) return _json(res, 429, { error: "too_many_attempts", detail: "try again later" });
 
-  const profile = verifyLocalLogin(email, password);
+  const profile = await verifyLocalLoginAsync(email, password);
   if (!profile) {
+    recordFailure(req, email);
+    return _json(res, 401, { error: "invalid_credentials" });
+  }
+  // The seeded test account is an ADMIN with a repo-known default password. The
+  // test-auth mechanism gates its own endpoints on (token + direct-only), but the
+  // public local-login form did NOT — so a tunnelled deploy that set the token was
+  // one known password away from an admin session (#2603). Hold the same gates
+  // here: this account can only sign in via the form when test-auth is enabled AND
+  // the request is direct (un-proxied loopback), never from the internet.
+  if (profile.id === TEST_ID && !(testAuthEnabled() && testIsDirect(req))) {
     recordFailure(req, email);
     return _json(res, 401, { error: "invalid_credentials" });
   }
@@ -210,7 +250,7 @@ async function handleLocalLogin(req, res) {
     // so the operator keeps the testable confirm-email flow.
     if (!smtpConfigured() && !isLoopback(req)) {
       warnNoMailerAdmit();
-      updateProfile(profile.id, { emailVerified: true });
+      updateProfile(profile.id, { emailVerified: true, emailAssumed: true }); // assumed, not proven (#2606)
       return _establish(req, res, { ...profile, emailVerified: true }, 200);
     }
     const body = { error: "email_unverified", email };

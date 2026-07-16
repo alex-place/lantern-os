@@ -41,6 +41,10 @@ const PUBLIC_PAGES = {
   // Terms of Service + EULA — MUST be public so a signed-out user can read it
   // before agreeing during account creation (linked from auth.html).
   "/terms.html":          "terms.html",
+  // Pricing is a conversion page — it MUST be visible to signed-out prospects, who
+  // are exactly its audience. Auth-gating it bounced them to sign-in and dropped the
+  // destination (#2610). The Stripe checkout buttons still require auth server-side.
+  "/pricing.html":        "pricing.html",
   "/reset-password.html": "reset-password.html",
   "/":                    "index.html",
   "/index.html":          "index.html",
