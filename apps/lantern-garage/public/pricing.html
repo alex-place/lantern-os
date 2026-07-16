@@ -5,36 +5,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-store">
+  <script>
+    /* Theme bootstrap — set before first paint so dark-mode users don't get a
+       white flash (matches index.html / knowledgecenter.html, #2481). */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <title>unisona.ai — Pricing</title>
-  <link rel="stylesheet" href="styles.css?v=20260531-pricing-v1">
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="styles.css?v=20260715-pricing-v2">
   <style>
-    /* Pricing top nav — tokenized onto the page's own design system (#2256): no hardcoded
-       hex, hover via CSS (was inline styles + onmouseover handlers). */
-    .pricing-topnav {
-      position: sticky; top: 0; z-index: 100;
-      display: flex; align-items: center; gap: 4px;
-      padding: 0 16px; height: 44px;
-      background: var(--panel); border-bottom: 1px solid var(--line);
-      font-family: system-ui, sans-serif; font-size: 13px;
-      box-shadow: 0 1px 3px rgba(17, 25, 31, 0.06);
+    /* Dark-theme mapping for the legacy styles.css token set so this page honors
+       data-theme instead of forcing light (#2481). Scoped to this page. */
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --ink: #e6edf3;
+      --muted: #9aa7b2;
+      --paper: #0f151a;
+      --panel: #161d24;
+      --line: #2a343d;
     }
-    .pricing-topnav a { color: var(--muted); text-decoration: none; }
-    .pricing-topnav .pn-brand {
-      font-weight: 700; color: var(--ink); display: flex; align-items: center;
-      gap: 6px; margin-right: 8px;
-    }
-    .pricing-topnav .pn-link { padding: 5px 9px; border-radius: 6px; transition: background 0.15s; }
-    .pricing-topnav .pn-link:hover { background: var(--paper); }
-    .pricing-topnav .pn-home { margin-left: auto; font-size: 12px; transition: color 0.15s; }
-    .pricing-topnav .pn-home:hover { color: var(--ink); }
+    [data-theme="dark"] body { background: var(--paper); }
   </style>
 </head>
 <body>
-<nav class="pricing-topnav" aria-label="Primary">
-  <a href="/" class="pn-brand"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle"> unisona.ai</a>
-  <a href="/dream-chat.html" class="pn-link">Chat</a>
-  <a href="/" class="pn-home">← Home</a>
-</nav>
+<!-- Site nav + footer injected by /js/site-chrome.js (#2481) -->
   <a class="skip-link" href="#main">Skip to pricing</a>
   <main id="main" class="shell" tabindex="-1">
     <header class="hero os-hero compact-hero">
@@ -44,7 +47,7 @@
         <p class="subtitle">Start free. Pay when you need power. Every tier is real, documented, and cancellable.</p>
         <nav class="link-dock" aria-label="Navigation">
           <a href="/">Dashboard</a>
-          <a href="/pitch.html">Pitch</a>
+          <a href="/proof.html">Live Proof</a>
         </nav>
       </div>
     </header>
@@ -116,6 +119,8 @@
       </dl>
     </section>
   </main>
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
