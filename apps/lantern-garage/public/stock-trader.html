@@ -662,6 +662,7 @@
   body.guest .footer-resize,
   body.guest .badge-paper,
   body.guest #brokerLink,          /* broker connect — only for entitled traders */
+  body.guest #alpacaLink,          /* one-click Alpaca connect — same gate */
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
@@ -839,6 +840,9 @@
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
     data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
+  <a href="/api/broker/alpaca/connect?returnTo=%2Fstock-trader.html" class="nav-link" id="alpacaLink" style="display:none"
+    title="One-click: sign in to Alpaca and approve — trades route to your own paper account. No keys to paste."
+    data-hmenu-desc="One-click broker connect — sign in to Alpaca, approve, done. Starts on a paper account.">⚡ <span id="alpacaLabel">Connect Alpaca</span></a>
   <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none"
     title="Connect your Interactive Brokers account so trades route to your own paper or live account"
     data-hmenu-desc="Link your own Interactive Brokers account — trades then route to it instead of the shared paper account.">🔗 <span id="brokerLabel">Connect broker</span></a>
@@ -4413,13 +4417,43 @@ async function detectGuestMode(){
       }
     }
   } else {
-    // Entitled trader → surface the broker connection so they can link IBKR.
+    // Entitled trader → surface the broker connections (one-click Alpaca + IBKR).
     const link = document.getElementById('brokerLink');
     if(link){
       link.style.display='';
       refreshBrokerStatus();
     }
+    refreshAlpacaStatus();
   }
+}
+// One-click Alpaca connect state (ADR-0027). Three states:
+//  connected        → green "Alpaca · <acct>", click manages it on orchestration#broker
+//  ready to connect → the link IS the OAuth start (302 → Alpaca sign-in → approve → back here)
+//  not configured   → server missing ALPACA_OAUTH_CLIENT_ID/_SECRET; point at the setup card
+async function refreshAlpacaStatus(){
+  const link = document.getElementById('alpacaLink'), label = document.getElementById('alpacaLabel');
+  if(!link || !label) return;
+  try{
+    const s = await (await fetch('/api/broker/alpaca/status',{cache:'no-store'})).json();
+    if(s && s.connected && s.via !== 'server-keys'){
+      label.textContent = `Alpaca · ${s.accountNumber || 'connected'}${s.env === 'live' ? '' : ' (paper)'}`;
+      link.style.color = 'var(--green)';
+      link.href = '/orchestration.html#broker';
+      link.title = 'Alpaca connected — click to manage or disconnect';
+    } else if(s && s.configured){
+      label.textContent = 'Connect Alpaca';
+      link.style.color = '';
+      link.href = '/api/broker/alpaca/connect?returnTo=%2Fstock-trader.html';
+      link.title = 'One-click: sign in to Alpaca and approve — trades route to your own paper account. No keys to paste.';
+    } else {
+      // Server not configured for one-click yet → send to the broker card, which
+      // explains the pending setup and offers IBKR.
+      label.textContent = 'Connect Alpaca';
+      link.href = '/orchestration.html#broker';
+      link.title = 'One-click Alpaca is not set up on this server yet — opens the broker page (IBKR available).';
+    }
+    link.style.display = '';
+  }catch(e){ /* leave default */ }
 }
 // Live IBKR connection state in the header broker link.
 async function refreshBrokerStatus(){
@@ -4433,6 +4467,21 @@ async function refreshBrokerStatus(){
     else { label.textContent='Connect broker'; link.style.color=''; link.title='Connect your Interactive Brokers account to place real trades'; }
   }catch(e){ /* leave default */ }
 }
+// OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
+// or ?alpaca=error&reason=…. Announce it once, then scrub the param from the URL.
+(function(){
+  const q = new URLSearchParams(location.search);
+  const st = q.get('alpaca');
+  if(!st) return;
+  if(st === 'connected'){
+    setTimeout(()=>alert('⚡ Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
+  } else {
+    const reason = q.get('reason') || 'unknown';
+    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the ☰ menu.`), 300);
+  }
+  q.delete('alpaca'); q.delete('reason');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+})();
 // Re-render charts the instant the theme flips. The canvas grid/axis colors are
 // read from CSS at draw time (CHART_*_COLOR) and renderZoneLadder memoizes on
 // data/price, so without this the chart colors keep the old theme until the next
@@ -4471,6 +4520,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
     {sel:'.header a[href*="explore"]', narrowOnly:false},
+    {sel:'#alpacaLink',                narrowOnly:false},
     {sel:'#brokerLink',                narrowOnly:false},
     {sel:'#dcToggle',                  narrowOnly:false},
   ];
