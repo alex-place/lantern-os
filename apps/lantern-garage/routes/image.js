@@ -22,7 +22,9 @@
  *
  * GET /api/image/pool/serve?file=<name>&source=local|caadi — serve a pool image safely
  */
-const { execSync } = require("child_process");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
+const execFileAsync = promisify(execFile);
 const fs = require("fs");
 const path = require("path");
 const { saveImage, listImages, deleteImage } = require("../lib/image-handler");
@@ -103,64 +105,47 @@ module.exports = function imageRoutes(req, res, url, deps) {
     return true;
   }
 
+  // Legacy Python-subprocess path (the live UI uses /api/image/ai-generate). Two
+  // fixes landed together (#2500): the handler used the promise-style
+  // collectRequestBody as if it took a callback, so it NEVER responded (every POST
+  // hung to client timeout); and it shelled out via execSync, which both blocked
+  // the whole event loop for up to 120s and interpolated user input into a shell
+  // string. Now: awaited body, async execFile with an argv array (no shell).
   if (req.method === "POST" && url.pathname === "/api/image/generate") {
-    collectRequestBody(req, async (body) => {
+    (async () => {
       try {
+        const body = await collectRequestBody(req);
         const data = JSON.parse(body || "{}");
         const prompt = (data.prompt || "").slice(0, MAX_PROMPT_LEN).trim();
         const useApi = data.useApi === true && process.env.OPENAI_API_KEY;
-        const version = data.version || "v8";
-        const width = data.width || 1024;
-        const height = data.height || 768;
-        const seed = data.seed ?? Math.floor(Math.random() * 100000);
-
-        if (useApi) {
-          // Call Python script in API mode
-          const safePrompt = prompt.replace(/"/g, '\\"');
-          const cmd = `python scripts/image_generator.py --api --prompt "${safePrompt}"`;
-          const output = execSync(cmd, {
-            cwd: deps.repoRoot || process.cwd(),
-            encoding: "utf8",
-            timeout: 60000,
-            env: { ...process.env },
-          });
-          const match = output.match(/saved:\s*(.+)/);
-          const imgPath = match ? match[1].trim() : null;
-          sendJson(res, {
-            mode: "api",
-            prompt,
-            path: imgPath,
-            seed,
-            output: output.slice(-500),
-          });
+        const version = String(data.version || "v8");
+        const width = Number(data.width) || 1024;
+        const height = Number(data.height) || 768;
+        const seed = Number.isFinite(Number(data.seed)) ? Number(data.seed) : Math.floor(Math.random() * 100000);
+        if (!/^v\d{1,3}$/.test(version)) {
+          sendJson(res, { error: "invalid version" }, 400);
           return;
         }
 
-        // Procedural generation
-        const cmd = `python scripts/image_generator.py ${version} --width ${width} --height ${height} --seed ${seed}`;
-        const output = execSync(cmd, {
+        const args = useApi
+          ? ["scripts/image_generator.py", "--api", "--prompt", prompt]
+          : ["scripts/image_generator.py", version, "--width", String(width), "--height", String(height), "--seed", String(seed)];
+        const { stdout } = await execFileAsync("python", args, {
           cwd: deps.repoRoot || process.cwd(),
           encoding: "utf8",
-          timeout: 120000,
+          timeout: useApi ? 60000 : 120000,
           env: { ...process.env },
         });
-        const match = output.match(/saved:\s*(.+)/);
+        const match = stdout.match(/saved:\s*(.+)/);
         const imgPath = match ? match[1].trim() : null;
 
-        sendJson(res, {
-          mode: "procedural",
-          version,
-          width,
-          height,
-          seed,
-          prompt: prompt || null,
-          path: imgPath,
-          output: output.slice(-500),
-        });
+        sendJson(res, useApi
+          ? { mode: "api", prompt, path: imgPath, seed, output: stdout.slice(-500) }
+          : { mode: "procedural", version, width, height, seed, prompt: prompt || null, path: imgPath, output: stdout.slice(-500) });
       } catch (err) {
-        sendJson(res, { error: err.message, stderr: err.stderr?.toString() }, 500);
+        sendJson(res, { error: err.message, stderr: err.stderr?.toString().slice(-500) }, 500);
       }
-    });
+    })();
     return true;
   }
 
@@ -182,10 +167,13 @@ module.exports = function imageRoutes(req, res, url, deps) {
     return true;
   }
 
-  // Gallery API: Upload image from base64
+  // Gallery API: Upload image from base64. Same dead-callback fix as
+  // /api/image/generate above (#2500): collectRequestBody is promise-style, so the
+  // old callback form never ran and every upload hung. 16MB cap for image payloads.
   if (req.method === "POST" && url.pathname === "/api/image/upload") {
-    collectRequestBody(req, (body) => {
+    (async () => {
       try {
+        const body = await collectRequestBody(req, 16 * 1024 * 1024);
         const data = JSON.parse(body || "{}");
         const base64 = data.data || "";
         const name = data.name || "image.png";
@@ -202,7 +190,7 @@ module.exports = function imageRoutes(req, res, url, deps) {
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
-    });
+    })();
     return true;
   }
 
