@@ -67,7 +67,7 @@ const DEFAULT_FEATURES = [
   {
     id: "trading",
     label: "Trading",
-    href: "/trading.html",
+    href: "/stock-trader.html",
     icon: "📈",
     activation: { flag: "TRADING_ENABLED", minHealth: 0.3, maxLatencyMs: 10000, devOnly: false },
     implementation: "trading-v1",

@@ -1,8 +1,7 @@
 # Lantern Local Wallet
 
-Generated: 2026-05-26.
-
-Purpose: hold the factual cash state for the COMET LEAP 11-day sprint.
+Purpose: hold the factual local cash state (originally created 2026-05-26 for
+the COMET LEAP sprint).
 
 This is a local operating wallet, not a bank account, crypto wallet, Stripe
 account, or legal accounting system. It records only evidence-backed cash
@@ -25,6 +24,29 @@ events:
 - If a real payment provider is added later, store credentials outside this
   repo and record only non-secret references here.
 
+## Principles
+
+(Satoshi-style design *inspiration* — not an identity claim, not investment
+advice. Provenance: local `bitcoin.pdf`, SHA256
+`B1674191A88EC5CDD733E4240A81803105DC412D6C6708D53AB94FC248F4F553`, 184292 bytes.)
+
+1. Keep the ledger local-first and auditable.
+2. Separate identity claims from cryptographic or file evidence.
+3. Treat untouched balances as proof of discipline, not proof of ownership.
+4. Keep public proof assets separate from private keys, payment links, and
+   customer details.
+5. Prefer simple text ledgers, hashes, and reproducible artifacts before
+   complex financial infrastructure.
+6. Build trust through before/after work, invoices, and delivery evidence.
+7. Make every wallet state reproducible from local files and event history.
+
+## Not Included
+
+- No cryptocurrency wallet keys.
+- No speculative token issuance.
+- No fake revenue.
+- No customer secrets committed to Git.
+
 ## Current Wallet
 
 Primary state file:
@@ -45,10 +67,7 @@ Invoice drafts:
 data/wallet/invoices/
 ```
 
-## Payment Integration Documentation
+## Payment Integration
 
-For legal methods to load money into the Lantern OS wallet system, see:
-
-- [LEGITIMATE-WALLET-FUNDING-METHODS.md](./LEGITIMATE-WALLET-FUNDING-METHODS.md) - Overview of legal funding options
-- [PAYMENT-INTEGRATION-IMPLEMENTATION-GUIDE.md](./PAYMENT-INTEGRATION-IMPLEMENTATION-GUIDE.md) - Technical implementation guide
-- [WALLET-FUNDING-QUICK-START.md](./WALLET-FUNDING-QUICK-START.md) - Quick implementation checklist
+Stripe invoicing runs through the payment bridge — see
+[apps/lantern-garage/payment-bridge/README.md](../../apps/lantern-garage/payment-bridge/README.md).

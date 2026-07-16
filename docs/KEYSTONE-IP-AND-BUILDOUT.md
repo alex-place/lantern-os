@@ -67,7 +67,7 @@ Horizon: **2026-H2 → 2028-H1** (8 quarters). Solo developer; calendar is best-
 commitment. Every milestone names the **loop stage** it strengthens (per the
 [North Star](CONVERGANCE-SIGMA0-BRIEFING.md): Observe → Remember → Reason → Act → Verify →
 Converge) and the **IP** it touches. Engineering items are grounded in the existing
-roadmaps: the [Progress Report](KEYSTONE-PROGRESS-REPORT-2026-06-19.md) §6, the
+roadmaps: the former Progress Report (2026-06-19; removed, in git history) §6, the
 [Σ₀ serving portfolio](SIGMA0-AGENT-PORTFOLIO-UPDATE.md) §6, and the
 [Product serving contract](KEYSTONE-PRODUCT.md).
 
@@ -459,7 +459,7 @@ publication is strictly the better vehicle for those.
 - Convergence-IO — [`docs/convergence-io/README.md`](convergence-io/README.md) · [`src/convergence_io/`](../src/convergence_io/)
 - Convergence-exit — [`src/sigma0/loop_lm.py`](../src/sigma0/loop_lm.py)
 - Continual training — [`SIGMA0-CONTINUAL-TRAINING.md`](SIGMA0-CONTINUAL-TRAINING.md)
-- Buildout sources — [`KEYSTONE-PROGRESS-REPORT-2026-06-19.md`](KEYSTONE-PROGRESS-REPORT-2026-06-19.md) · [`SIGMA0-AGENT-PORTFOLIO-UPDATE.md`](SIGMA0-AGENT-PORTFOLIO-UPDATE.md) · [`KEYSTONE-PRODUCT.md`](KEYSTONE-PRODUCT.md)
+- Buildout sources — the former `KEYSTONE-PROGRESS-REPORT-2026-06-19.md` (removed; in git history) · [`SIGMA0-AGENT-PORTFOLIO-UPDATE.md`](SIGMA0-AGENT-PORTFOLIO-UPDATE.md) · [`KEYSTONE-PRODUCT.md`](KEYSTONE-PRODUCT.md)
 - North Star — [`CONVERGANCE-SIGMA0-BRIEFING.md`](CONVERGANCE-SIGMA0-BRIEFING.md)
 </content>
 </invoke>

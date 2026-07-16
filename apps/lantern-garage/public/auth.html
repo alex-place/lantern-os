@@ -294,7 +294,7 @@
     </div>
 
     <div class="auth-divider">support</div>
-    <a class="btn-ghost" href="https://www.patreon.com/cw/UnisonaAI" target="_blank" rel="noopener noreferrer">
+    <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">
       View Patreon Tiers &amp; Support
     </a>
 
@@ -369,9 +369,9 @@
   // misread. The role KEY stays `guest` (persisted on existing sessions).
   const LANTERN_ROLES = {
     guest:        { label: "Free",         canAccess: true },
-    supporter:    { label: "Supporter",    canAccess: true },
-    deep_dreamer: { label: "Deep Dreamer", canAccess: true },
-    founder:      { label: "Deep Dreamer", canAccess: true }, // legacy alias (#698)
+    supporter:    { label: "Free",         canAccess: true },
+    deep_dreamer: { label: "Pro",          canAccess: true },
+    founder:      { label: "Pro",          canAccess: true }, // legacy alias (#698)
     admin:        { label: "Admin",        canAccess: true }
   };
 
@@ -694,7 +694,7 @@
   // as the seeded test account with that role via /api/auth/test-login, then lands
   // on returnTo. Only ever rendered when the SERVER reports testMode.
   const TEST_ROLE_LABELS = {
-    supporter: "Supporter", deep_dreamer: "Deep Dreamer", founder: "Founder",
+    supporter: "Free", deep_dreamer: "Pro", founder: "Pro",
     admin: "Admin", tech_support: "Tech Support",
   };
   function renderTestPanel(session) {

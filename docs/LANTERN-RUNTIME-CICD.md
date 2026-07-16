@@ -99,7 +99,6 @@ stops posting `netlify/…` PR checks. Nothing in-repo depends on it.
    - `manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md`
    - `manifests/foundry-shareholder-repos.md`
    - `manifests/open-issues.md`
-   - `dual-boot/SONS-PC-READINESS.md`
 
 3. **html-links** — Validate all `href` links in shareholder-index resolve to real paths
 

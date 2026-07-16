@@ -269,6 +269,7 @@ const routes = [
   require("./routes/rollover"), // #898: unisona.ai-vs-Claude landed-work share
   require("./routes/image"),
   require("./routes/web-images"),
+  require("./routes/web-search"),      // GET /api/web-search — real web-search over HTTP (#2506)
   require("./routes/youtube"),
   require("./routes/github-activity"), // Explore: latest releases + commits (cached)
   require("./routes/github-issue"),    // Chat screenshot reporter → files a GitHub issue

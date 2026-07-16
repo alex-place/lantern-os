@@ -1,6 +1,6 @@
 {
   "name": "lantern-garage-app",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "description": "Local-first Lantern OS garage full-stack app.",
   "scripts": {
@@ -35,6 +35,7 @@
     "test:coding-verifier": "node test/coding-verifier.test.js",
     "test:coding-tool": "node test/coding-tool.test.js",
     "test:tenant": "node test/tenant.test.js",
+    "test:byok": "node test/user-provider-keys.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
     "test:appdata": "node test/appdata-migration.test.js",

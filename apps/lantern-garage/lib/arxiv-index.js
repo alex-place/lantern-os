@@ -14,7 +14,7 @@
  *   meta.json      {count, avgdl, k1, b}
  *
  * Fail-safe by design: any missing index / parse error yields [] so chat is never
- * blocked. Gated so it only fires on AI/ML-research questions.
+ * blocked. Gated so it only fires on AI/ML or quant-finance research questions.
  *
  * IMPORTANT: the tokenizer below must match scripts/arxiv_build_index.py exactly, or
  * query terms won't line up with indexed terms.
@@ -47,9 +47,11 @@ function tokenize(text) {
   return out;
 }
 
-// --- AI/ML-research gate -------------------------------------------------------
+// --- research gate ---------------------------------------------------------------
 // Cheap keyword gate so retrieval only fires on questions where recent papers help,
-// avoiding per-message cost and noise on unrelated chats.
+// avoiding per-message cost and noise on unrelated chats. Covers the two corpus
+// domains: AI/ML (cs.CL/LG/AI/NE, stat.ML) and quantitative finance (q-fin.*, the
+// Sharpe / portfolio / trading-strategy research that grounds the trading lane).
 const AI_GATE_TERMS = [
   "llm", "llms", "language model", "language models", "transformer", "transformers",
   "gpt", "claude", "gemini", "llama", "mistral", "qwen", "deepseek", "diffusion",
@@ -63,6 +65,13 @@ const AI_GATE_TERMS = [
   "machine learning", "deep learning", "reinforcement learning", "arxiv", "state space",
   "mamba", "inference", "alignment", "prompt", "prompting", "multimodal", "vision-language",
   "model", "models",
+  // Quantitative finance (q-fin.* corpus slice)
+  "sharpe", "sortino", "risk-adjusted", "portfolio", "backtest", "backtesting",
+  "trading strategy", "trading strategies", "market making", "market microstructure",
+  "hedge fund", "hedge funds", "drawdown", "prediction market", "prediction markets",
+  "quantitative trading", "quant trading", "algorithmic trading", "factor investing",
+  "momentum strategy", "mean reversion", "volatility", "option pricing", "order book",
+  "high-frequency trading", "statistical arbitrage", "kelly criterion",
 ];
 
 function looksLikeAIResearchQuestion(message) {

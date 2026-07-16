@@ -46,11 +46,18 @@ OAI_NS = "http://www.openarchives.org/OAI/2.0/"
 ARXIV_NS = "http://arxiv.org/OAI/arXiv/"
 
 # Sets to harvest (coarse arXiv OAI sets). Fine-grained category filtering is done
-# client-side against TARGET_CATEGORIES below.
-SETS = ["cs", "stat"]
+# client-side against TARGET_CATEGORIES below. Override per-run with --sets to
+# backfill one new set without re-crawling the others.
+SETS = ["cs", "stat", "q-fin"]
 
-# Only keep papers tagged with at least one of these categories — the AI/ML/LLM core.
-TARGET_CATEGORIES = {"cs.CL", "cs.LG", "cs.AI", "cs.NE", "stat.ML"}
+# Only keep papers tagged with at least one of these categories — the AI/ML/LLM core
+# plus the quantitative-finance categories that ground the trading lane (Sharpe /
+# portfolio / strategy research for the Kalshi terminal).
+TARGET_CATEGORIES = {
+    "cs.CL", "cs.LG", "cs.AI", "cs.NE", "stat.ML",
+    "q-fin.PM", "q-fin.TR", "q-fin.ST", "q-fin.RM",
+    "q-fin.CP", "q-fin.MF", "q-fin.PR", "q-fin.GN",
+}
 
 USER_AGENT = "keystone-os-arxiv-harvester/1.0 (https://lantern-os.net; founder@lantern-os.net)"
 
@@ -262,7 +269,8 @@ def keep(rec: dict, from_date: str | None) -> bool:
     return True
 
 
-def harvest(from_date: str, until_date: str | None, max_records: int | None) -> dict:
+def harvest(from_date: str, until_date: str | None, max_records: int | None,
+            sets: list[str] | None = None) -> dict:
     root = corpus_root()
     raw_dir = root / "raw"
     state_dir = root / "state"
@@ -275,7 +283,7 @@ def harvest(from_date: str, until_date: str | None, max_records: int | None) -> 
     writer = ShardWriter(raw_dir)
     fetched = kept = 0
     try:
-        for set_spec in SETS:
+        for set_spec in (sets or SETS):
             token = None
             first = True
             log(f"harvesting set={set_spec} from={from_date} until={until_date or 'now'}")
@@ -353,7 +361,11 @@ def main(argv=None) -> int:
     ap.add_argument("--until", dest="until_date", default=None, help="Optional end date (YYYY-MM-DD).")
     ap.add_argument("--overlap-days", type=int, default=2, help="Delta re-fetch overlap to catch late updates.")
     ap.add_argument("--max", dest="max_records", type=int, default=None, help="Cap new records (smoke test).")
+    ap.add_argument("--sets", default=None,
+                    help=f"Comma-separated OAI sets to harvest (default: {','.join(SETS)}). "
+                         "Use to backfill one new set without re-crawling the others.")
     args = ap.parse_args(argv)
+    sets = [s.strip() for s in args.sets.split(",") if s.strip()] if args.sets else None
 
     if args.delta:
         state = read_state()
@@ -367,7 +379,7 @@ def main(argv=None) -> int:
         from_date = args.from_date
 
     try:
-        harvest(from_date, args.until_date, args.max_records)
+        harvest(from_date, args.until_date, args.max_records, sets=sets)
     except KeyboardInterrupt:
         log("interrupted; partial corpus saved")
         return 130

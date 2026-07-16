@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole, requireStaff, requireEntitlement, hasEntitlement, meetsRole, isAdmin } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireEntitlement, hasEntitlement, meetsRole, isAdmin, isStaff } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 const { getSessionUser } = require("../lib/session-identity");
 const { parseCookies, isOperatorRequest } = require("../lib/request-auth");
@@ -67,11 +67,11 @@ const PUBLIC_PAGES = {
 // Protected pages — { file, role } where role is minimum required, OR
 // { file, entitlement } where a per-feature entitlement is required (admins pass
 // implicitly). Trade pages use the "trade" entitlement so a paid tier such as
-// Deep Dreamer (deep_dreamer) does NOT get trading access unless explicitly granted.
+// Pro (deep_dreamer) does NOT get trading access unless explicitly granted.
 const PROTECTED_PAGES = {
   "/profile.html":        { file: "profile.html",           role: "guest" },
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
-  "/trading.html":        { file: "trading.html",           entitlement: "trade" },
+  // /trading.html retired → 302s to /stock-trader.html (see REDIRECTS, #2488).
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
   // Admin control surface for feature flags + navigation visibility.
   "/admin-flags.html":    { file: "admin-flags.html",       role: "admin" },
@@ -90,6 +90,9 @@ const PROTECTED_PAGES = {
 // redirect is not a public surface — it must not inflate the Σ₀ surface count).
 const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
+  "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
+  "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
+  "/api-keys-settings.html": "/settings.html", // single-column key page retired → tabbed two-column settings
 };
 
 function renderDisabledPage(pathname) {
@@ -108,13 +111,30 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 // A signed-in user who lacks the tier/entitlement for a page gets a friendly HTML
 // "unlock" page instead of a raw JSON 403 filling the browser (a first-time-user
 // papercut). Unauthenticated users are still redirected to login upstream.
-const TIER_LABEL = { supporter: "Wanderer", deep_dreamer: "Deep Dreamer", admin: "Synthesasia Guild" };
+// Canonical tier display names (Guest / Free / Pro / Business, #2470). The $5
+// "supporter" tier is retired → shown as Free (grandfathered); the $20 tier is
+// Pro. `admin` is a STAFF role, not a purchasable tier, so it's handled below as
+// a staff gate (no "See plans") rather than being named as a buyable tier.
+const TIER_LABEL = { supporter: "Free", deep_dreamer: "Pro" };
+const STAFF_ROLES = new Set(["admin", "tech_support"]);
 function renderUpgradePage(page) {
-  const need = page.entitlement === "trade" ? "the Deep Dreamer tier"
+  const isStaff = page.staff === true || STAFF_ROLES.has(page.role);
+  const need = page.entitlement === "trade" ? "the Pro tier"
     : page.role ? `the ${TIER_LABEL[page.role] || page.role} tier` : "a higher tier";
+  const heading = isStaff ? "Staff access required" : "This feature needs an upgrade";
+  // Staff pages aren't for sale — never show a buy-a-plan CTA on them (#2470).
+  const message = isStaff
+    ? `This page is limited to unisona staff. If you think you should have access, contact the team.`
+    : `Unlocking this feature requires <strong>${need}</strong>. Your current plan doesn't include it yet.`;
+  // The upgrade page is only reachable signed-in (signed-out visitors are
+  // redirected to sign-in before any tier check, #2471) — so the extra CTA is
+  // "switch account", covering the user whose OTHER account holds the tier.
+  const actions = isStaff
+    ? `<a class="btn ghost" href="/">Return home</a>`
+    : `<a class="btn primary" href="/pricing.html">See plans</a><a class="btn ghost" href="/auth.html">Sign in with another account</a><a class="btn ghost" href="/">Return home</a>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/css/site.css"><title>Unlock this feature — unisona.ai</title>
+<link rel="stylesheet" href="/css/site.css"><title>${isStaff ? "Staff only" : "Unlock this feature"} — unisona.ai</title>
 <style>body{display:flex;min-height:90vh;align-items:center;justify-content:center;
 font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#0a0e17)}
 .box{text-align:center;max-width:440px;padding:32px}.box h1{font-size:1.4rem;margin:0 0 8px}
@@ -123,9 +143,9 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 .btn{display:inline-block;padding:10px 18px;border-radius:10px;font-weight:600;text-decoration:none}
 .btn.primary{background:var(--accent,#06b6d4);color:#fff}
 .btn.ghost{border:1px solid var(--border,#374151);color:var(--text,#e5e7eb)}</style>
-</head><body><div class="box"><h1>This feature needs an upgrade</h1>
-<p>Unlocking this feature requires <strong>${need}</strong>. Your current plan doesn't include it yet.</p>
-<div class="row"><a class="btn primary" href="/pricing.html">See plans</a><a class="btn ghost" href="/">Return home</a></div>
+</head><body><div class="box"><h1>${heading}</h1>
+<p>${message}</p>
+<div class="row">${actions}</div>
 </div></body></html>`;
 }
 
@@ -173,11 +193,30 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   const page = PROTECTED_PAGES[pathname];
   if (page) {
     if (page.staff) {
-      // Staff gate writes its own 302/403 — do NOT run requireAuth first (that would
-      // 302 a signed-in non-staff user to login instead of returning a clean 403).
-      if (!requireStaff(req, res)) return true;
-    } else if (!requireAuth(req, res)) {
-      return true; // unauthenticated → 302 to login (handled by requireAuth)
+      // Staff gate: a BROWSER page must never answer with raw JSON (#2472) — the
+      // old requireStaff() call wrote {"error":"Staff access required."} into the
+      // tab. Signed out → sign-in with a way back; signed in but not staff → the
+      // same styled gate page as every other protected page (its staff branch has
+      // no buy-a-plan CTA). /api/accounts/* keeps requireStaff's JSON contract.
+      if (!getSessionUser(req)?.id) {
+        res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
+        res.end();
+        return true;
+      }
+      if (!isStaff(req)) {
+        res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(renderUpgradePage(page));
+        return true;
+      }
+    } else if (!getSessionUser(req)?.id) {
+      // Signed out → the correct action is signing in, so send them there with a
+      // way back. This must run BEFORE any tier check: letting a sessionless guest
+      // fall through to meetsRole() rendered a self-contradictory "requires the
+      // guest tier" upgrade wall when the auth gate is off (#2471) — requireAuth
+      // returns true for everyone in that mode and never redirects.
+      res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
+      res.end();
+      return true;
     } else {
       // Authenticated but possibly under-tier: check WITHOUT emitting a raw JSON 403,
       // and render a friendly "unlock" page instead when access is short.

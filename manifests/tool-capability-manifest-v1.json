@@ -929,8 +929,53 @@
           "max_weight": {
             "type": "number",
             "description": "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)"
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "sharpe",
+              "max_return"
+            ],
+            "description": "optimization objective: 'sharpe' (default, shrunk tangency) or 'max_return' (max expected return under the vol ceiling — ADR-0028)"
+          },
+          "max_vol": {
+            "type": "number",
+            "description": "annualized volatility ceiling for objective=max_return, as a fraction (0.05–0.60, default 0.20)"
           }
         }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "contribution_plan",
+      "description": "Plan where a NEW cash contribution should go across the operator's existing holdings: buy-only, deterministic dollar fill toward the shrunk tangency target (most-underweight first), fractional-share estimates, and ex-ante Sharpe of the resulting weights vs current (both with 95% CIs). Use when the user asks where to put a deposit ('I'm adding $20/month — which holding should it buy?'). It never sells, never suggests new symbols, and NEVER places orders — execution is a separate, human-gated action. The user always decides.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cash": {
+            "type": "number",
+            "description": "the contribution in dollars (required, > 0)"
+          },
+          "years": {
+            "type": "number",
+            "description": "history window in years (2–10, default 5)"
+          },
+          "max_weight": {
+            "type": "number",
+            "description": "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)"
+          }
+        },
+        "required": [
+          "cash"
+        ]
       },
       "policy": "read",
       "operator_required": false,

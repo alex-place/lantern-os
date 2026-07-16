@@ -14,8 +14,8 @@ evidence (`file:line` / commit / PR) per the Σ₀ External Reality Rule. Where 
 intent diverge, that is called out in [§9 Known divergences](#9-known-divergences--debt) rather
 than papered over.
 
-> Supersedes the dated [ARCHITECTURE-AUDIT-2026-06-13.md](ARCHITECTURE-AUDIT-2026-06-13.md).
-> Companion docs: [CODEMAP.md](CODEMAP.md) (feature/status roadmap),
+> Supersedes the dated ARCHITECTURE-AUDIT-2026-06-13 (removed; in git history).
+> Companion docs: (feature/status roadmap retired 2026-07-16 — the GitHub milestone board is the roadmap),
 > [convergence-core-mapping.md](convergence-core-mapping.md) (code → core-object mapping),
 > [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) (immutable North Star).
 

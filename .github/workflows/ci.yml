@@ -145,6 +145,7 @@ jobs:
           node apps/lantern-garage/test/patreon-tier-amount.test.js
           node apps/lantern-garage/test/patreon-fetchuser-parse.test.js
           node apps/lantern-garage/test/patreon-role-demotion.test.js
+          node apps/lantern-garage/test/user-provider-keys.test.js
 
       - name: Start server
         run: node apps/lantern-garage/server.js &

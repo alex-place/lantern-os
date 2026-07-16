@@ -265,3 +265,28 @@ with `priority: HIGH` and `confidence: 0.1` for audit.
 ## Related
 - [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) — the looped local coder this trains (single source of truth, incl. the adaptive-depth Q-exit mechanism)
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star boundary
+
+---
+
+## Appendix: local QLoRA train→merge→deploy runbook (absorbed from `docs/handoffs/sigma0-coder-training-2026-06-18.md`)
+
+Reproducible recipe for training a local coder LoRA on past session pairs and
+serving it via Ollama. **Currency caveat:** this shipped `lantern-sigma0-coder-v2`
+on base Qwen2.5-Coder-3B (2026-06-18); the local-model direction has since moved
+to Ouro serving (`ouro_serve.py`, ADR-0021) — reuse the *pipeline*, re-verify the
+base/model names.
+
+1. **Extract pairs:** `scripts/extract-session-pairs.py` → session pairs JSONL →
+   `scripts/convert-pairs-to-alpaca.py` (both outputs gitignored — session-derived;
+   never commit weights or training data).
+2. **Train:** `scripts/train-qlora-peft.py` (QLoRA via peft+bitsandbytes; on the
+   8 GB RTX 3070 keep `max_seq_length=2048`, `batch_size=1` if OOM; unsloth on
+   native Windows is finicky — WSL2 + CUDA is the reliable fallback).
+   Reference run: 365 pairs, 3 epochs / 135 steps, loss 2.87 → 1.78.
+3. **Merge + deploy:** `scripts/merge-lora.py` (adapter → merged fp16) →
+   `ollama create <model>`; verify with `ollama list` and an end-to-end autowork
+   run showing `source: ollama`.
+4. **Runtime wiring:** `OLLAMA_MODELS=D:\ollama-models` (User env),
+   `OLLAMA_MODEL=<model>` (`.env.local`). Weights stay OFF-repo:
+   `D:\lantern-train\sigma0-adapters` (adapter), `D:\lantern-train\sigma0-merged`
+   (merged fp16), `D:\ollama-models` (GGUF).

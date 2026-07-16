@@ -1359,6 +1359,8 @@ const REGISTRY = {
       properties: {
         years: { type: "number", description: "history window in years (2–10, default 5)" },
         max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+        objective: { type: "string", enum: ["sharpe", "max_return"], description: "optimization objective: 'sharpe' (default, shrunk tangency) or 'max_return' (max expected return under the vol ceiling — ADR-0028)" },
+        max_vol: { type: "number", description: "annualized volatility ceiling for objective=max_return, as a fraction (0.05–0.60, default 0.20)" },
       },
     },
     async run(i, ctx) {
@@ -1370,7 +1372,7 @@ const REGISTRY = {
         const pos = Array.isArray(d.positions) ? d.positions : [];
         if (!pos.length) return "[propose_rebalance: no open positions — nothing to rebalance.]";
         const pa = require("./portfolio-analytics");
-        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight });
+        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight, objective: i.objective, maxVol: i.max_vol });
         if (!r.ok) return `[propose_rebalance: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
         const wRows = r.symbols.map((s, idx) =>
           `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.proposedWeights[idx]).padStart(6)}`);
@@ -1380,10 +1382,15 @@ const REGISTRY = {
         const verdict = r.distinguishable
           ? "the proposed allocation's Sharpe CI clears the current one on this window — a measurable improvement"
           : "the 95% CIs OVERLAP — current and proposed are statistically indistinguishable on this window; taxes, simplicity, or preference may reasonably decide";
+        const taxLine = r.tax && r.orders.some((o) => o.action === "SELL")
+          ? `Tax (est.): realized gain $${r.tax.estRealizedGain.toLocaleString("en-US")} → ~$${r.tax.estTaxCost.toLocaleString("en-US")} at ${Math.round(r.tax.rate * 100)}% (${r.tax.basis}).`
+          : "Tax: no sells in this proposal — nothing realized.";
         return [
-          `Rebalance PROPOSAL — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
+          `Rebalance PROPOSAL (objective: ${r.objective}) — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
           `Current : ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
           `Proposed: ex-ante Sharpe ${_pfSharpe(r.proposed.sharpe)} · vol ${_pfPct(r.proposed.volAnnual)}/yr · worst drawdown ${_pfPct(r.proposed.maxDD)}`,
+          `Sharpe mandate (ADR-0028, target ${r.mandate.target}): current ${r.mandate.current}, proposed ${r.mandate.proposed} — ${r.mandate.note}.`,
+          taxLine,
           `Verdict: ${verdict}.`,
           "Weights (current → proposed):",
           ...wRows,
@@ -1396,6 +1403,53 @@ const REGISTRY = {
         ].filter(Boolean).join("\n");
       } catch (e) {
         return `[propose_rebalance error: ${e.message}]`;
+      }
+    },
+  },
+
+  contribution_plan: {
+    policy: "read", // operator-only; computes a PLAN — places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Plan where a NEW cash contribution should go across the operator's existing holdings: buy-only, deterministic dollar fill toward the shrunk tangency target (most-underweight first), fractional-share estimates, and ex-ante Sharpe of the resulting weights vs current (both with 95% CIs). Use when the user asks where to put a deposit ('I'm adding $20/month — which holding should it buy?'). It never sells, never suggests new symbols, and NEVER places orders — execution is a separate, human-gated action. The user always decides.",
+    schema: {
+      type: "object",
+      properties: {
+        cash: { type: "number", description: "the contribution in dollars (required, > 0)" },
+        years: { type: "number", description: "history window in years (2–10, default 5)" },
+        max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+      },
+      required: ["cash"],
+    },
+    async run(i, ctx) {
+      try {
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[contribution_plan: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no holdings to allocate toward. Say so honestly.]`;
+        }
+        const pos = Array.isArray(d.positions) ? d.positions : [];
+        if (!pos.length) return "[contribution_plan: no open positions — there is no existing allocation to fill toward.]";
+        const pa = require("./portfolio-analytics");
+        const r = await pa.planContribution(pos, i.cash, { years: i.years, maxWeight: i.max_weight });
+        if (!r.ok) return `[contribution_plan: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
+        const wRows = r.symbols.map((s, idx) =>
+          `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.afterWeights[idx]).padStart(6)} (target ${_pfPct(r.targetWeights[idx])})`);
+        const oRows = r.orders.length
+          ? r.orders.map((o) => `  BUY $${o.dollars.toFixed(2)} ${o.symbol}${o.estShares != null ? ` (≈${o.estShares} sh @ $${o.price.toFixed(2)})` : ""}`)
+          : ["  none — every slice fell under the dust floor; the amount is too small to split"];
+        return [
+          `Contribution PLAN for $${r.contribution.toFixed(2)} — ${_pfWindow(r.window)}. Buy-only; nothing has been placed.`,
+          `Current: ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
+          `After  : ex-ante Sharpe ${_pfSharpe(r.after.sharpe)} · vol ${_pfPct(r.after.volAnnual)}/yr · worst drawdown ${_pfPct(r.after.maxDD)}`,
+          "Buy list (NOT placed):",
+          ...oRows,
+          "Weights (current → after contribution):",
+          ...wRows,
+          `Method: ${r.method.objective}; ${r.method.constraints}; shrinkage: ${r.method.shrinkage}.`,
+          ...(r.notes.length ? [`Notes: ${r.notes.join("; ")}`] : []),
+          _pfExcluded(r.excluded),
+          PF_DISCLAIMER,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[contribution_plan error: ${e.message}]`;
       }
     },
   },
