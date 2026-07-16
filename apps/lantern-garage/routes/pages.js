@@ -5,7 +5,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const { requireAuth, requireRole, requireStaff, requireEntitlement, hasEntitlement, meetsRole, isAdmin } = require("../lib/auth-middleware");
+const { requireAuth, requireRole, requireEntitlement, hasEntitlement, meetsRole, isAdmin, isStaff } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 const { getSessionUser } = require("../lib/session-identity");
 const { parseCookies, isOperatorRequest } = require("../lib/request-auth");
@@ -117,7 +117,7 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 const TIER_LABEL = { supporter: "Free", deep_dreamer: "Pro" };
 const STAFF_ROLES = new Set(["admin", "tech_support"]);
 function renderUpgradePage(page) {
-  const isStaff = STAFF_ROLES.has(page.role);
+  const isStaff = page.staff === true || STAFF_ROLES.has(page.role);
   const need = page.entitlement === "trade" ? "the Pro tier"
     : page.role ? `the ${TIER_LABEL[page.role] || page.role} tier` : "a higher tier";
   const heading = isStaff ? "Staff access required" : "This feature needs an upgrade";
@@ -192,9 +192,21 @@ module.exports = async function pagesRoute(req, res, url, deps) {
   const page = PROTECTED_PAGES[pathname];
   if (page) {
     if (page.staff) {
-      // Staff gate writes its own 302/403 — do NOT run requireAuth first (that would
-      // 302 a signed-in non-staff user to login instead of returning a clean 403).
-      if (!requireStaff(req, res)) return true;
+      // Staff gate: a BROWSER page must never answer with raw JSON (#2472) — the
+      // old requireStaff() call wrote {"error":"Staff access required."} into the
+      // tab. Signed out → sign-in with a way back; signed in but not staff → the
+      // same styled gate page as every other protected page (its staff branch has
+      // no buy-a-plan CTA). /api/accounts/* keeps requireStaff's JSON contract.
+      if (!getSessionUser(req)?.id) {
+        res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
+        res.end();
+        return true;
+      }
+      if (!isStaff(req)) {
+        res.writeHead(403, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(renderUpgradePage(page));
+        return true;
+      }
     } else if (!getSessionUser(req)?.id) {
       // Signed out → the correct action is signing in, so send them there with a
       // way back. This must run BEFORE any tier check: letting a sessionless guest
