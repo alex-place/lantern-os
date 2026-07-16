@@ -541,8 +541,27 @@ async function overlayServerKeys() {
   } catch(e) { /* server offline — localStorage still shown */ }
 }
 
+async function overlayUserKeys() {
+  // Per-user server-stored keys (#2505) — lets a save made on another device
+  // show as connected here. 401 = signed out; localStorage view stands.
+  try {
+    const r = await fetch('/api/providers/set-key', { cache:'no-store', signal: AbortSignal.timeout(4000) });
+    if (!r.ok) return;
+    const data = await r.json();
+    (data.keys || []).forEach(k => {
+      if (!k.set || !PROVIDERS.includes(k.provider)) return;
+      setStatus(k.provider, 'connected', 'connected');
+      const inp = document.getElementById('input-' + k.provider);
+      if (inp && !getStoredKey(k.provider) && inp.placeholder.indexOf('set') === -1) {
+        inp.placeholder = '•••••••• (saved to your account)';
+      }
+    });
+  } catch(e) { /* server offline — localStorage still shown */ }
+}
+
 initLocalKeys();
 overlayServerKeys();
+overlayUserKeys();
 </script>
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>
