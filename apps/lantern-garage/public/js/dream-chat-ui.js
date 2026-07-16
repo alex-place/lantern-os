@@ -369,6 +369,11 @@ function fillToolSlot(slot, evt) {
   slot.style.display = 'block';
 }
 function renderMarkdown(text) {
+  // The [DOORS:…] tag is a Three-Doors CONTROL marker (door chips are parsed from
+  // the raw text elsewhere) — never part of the prose. Strip it here, in the one
+  // renderer, so every path shows the same clean text: streaming, finalize, and
+  // history replay of persisted messages that still carry it (#2497).
+  text = String(text ?? '').replace(/\[DOORS:[^\]]*\]?/gi, '').trimEnd();
   // Extract tool-call blocks (closed, then a trailing unclosed one while streaming)
   // into placeholders that survive HTML-escaping; restore as cards at the very end.
   const _toolCards = [];
@@ -1335,7 +1340,7 @@ async function sendMessage(opts = {}) {
     fullText = blocks + '\n\n' + fullText;
   }
 
-  bubble.innerHTML = renderMarkdown(fullText);
+  bubble.innerHTML = renderMarkdown(fullText); // [DOORS:…] stripped inside renderMarkdown (#2497)
 
   // Convergence-agent action chips (Stage 3): the server streamed a deterministic
   // work/ask answer + actions through the one endpoint — render the chips here.
