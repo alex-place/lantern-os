@@ -238,7 +238,7 @@ The convergence loop has been upgraded from 12 phases to 20 phases with tesserac
 Zenil et al. prove that recursive self-training without persistent external signal (αt → 0) leads to entropy decay and variance drift. The convergence loop uses this as a design principle — not a quantitative recipe. The repo does not instrument αt, so collapse risk cannot be quantified.
 
 **Documentation:**
-- See [`docs/TESSERACT-CONVERGENCE-LOOP.md`](docs/TESSERACT-CONVERGENCE-LOOP.md) for full details
+- See [`docs/TESSERACT-CSF-SINGULARITY.md`](docs/TESSERACT-CSF-SINGULARITY.md) for full details
 - See [`docs/CONVERGENCE-LOOP.md`](docs/CONVERGENCE-LOOP.md) for original 12-step method
 
 Never claim a skill or fleet slot is active unless confirmed by implementation or status file.
@@ -458,7 +458,7 @@ and re-enable-able per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
 
 ## Task Intake: GitHub Issues ARE the Queue (Critical)
 
-Full doctrine: [docs/AGENT-SWARM-OPERATIONS.md](docs/AGENT-SWARM-OPERATIONS.md)
+Full doctrine: [docs/SUPERFLEET-SWARM-DESIGN.md](docs/SUPERFLEET-SWARM-DESIGN.md)
 
 - **No issue, no work.** Agents only work GitHub issues labeled `agent-task` plus a stream label (`convergence-io` or `dream-journal`). Unlabeled issues are invisible to agents.
 - **Pull top-of-queue by priority** (`p0` → `p1` → `p2`) **within your lane's assigned stream.** Never browse for work, never invent tasks, never reorder the queue.

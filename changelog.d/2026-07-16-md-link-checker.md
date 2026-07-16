@@ -1,0 +1,3 @@
+### Added
+
+- ci: markdown link-integrity gate (#2532). `scripts/check-md-links.mjs` (zero-dep) checks every relative link in README.md, root *.md, and docs/** — 1,152 links today. Ratchet design: the ROOT tier blocks (it starts clean — the 3 dead root links found at introduction are fixed in this change: two repointed to surviving docs, one bad `../` prefix); docs/** is warn-only until its 124 pre-existing dead links are burned down (tracked in a follow-up issue), then flips to blocking via `--strict`. Wired into pr-gates as its own job; code fences/inline code are ignored, external URLs are deliberately not fetched (flake), root-absolute `/x` targets are app routes owned by the Site Audit gate. Verified: passes on master, fails on an injected dead link.
