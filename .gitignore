@@ -518,3 +518,8 @@ data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md
 
 # Live trader watchlist — runtime user state; seeded from watchlist.seed.json
 data/lantern-garage/trading/watchlist.json
+
+# Generated QA report outputs (scripts/sigma0.js, qa-audit.js, qa-creator-dashboard.js)
+reports/sigma0-issue-audit.md
+reports/button-audit.md
+reports/creator-dashboard-audit.md

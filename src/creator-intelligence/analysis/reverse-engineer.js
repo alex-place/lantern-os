@@ -3,7 +3,7 @@
 // ACTUALLY EXIST. With an empty (or below-threshold) dataset it returns
 // insufficient_data — it never hardcodes "best cut rate = X".
 //
-// See docs/creator-v10/creator-dashboard-v10-plan.md (Phase 2)
+// See docs/creator-v10/creator-intelligence-architecture.md (feature flags + research report)
 
 "use strict";
 

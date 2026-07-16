@@ -55,3 +55,32 @@ Held issue:
 - `promoted`: copied into this repo with manifest evidence.
 - `retired`: intentionally removed from release path.
 
+
+## The `!convergance` chat command (Converge surface)
+
+(Absorbed from `skills/convergence/SKILL.md`, 2026-07-16. Implementation:
+`apps/lantern-garage/lib/dream-chat.js` — `handleConvergenceCommand`,
+`_deriveConvergenceQuery`, `_appendConvergenceRecord`.)
+
+- **`!convergance`** — synthesize recent entries into ONE grounded insight; the
+  query derives deterministically from salient themes (no extra LLM call), the
+  live web is searched (MCP → keyless DuckDuckGo/Wikipedia fallback), and the
+  synthesis cites `[n]` sources rather than inventing direction.
+- **`!convergance <topic>`** — same, grounded on an explicit topic.
+- **`!convergance log an issue <title>`** — file a GitHub issue shell-free via
+  `safeExec`.
+
+Every run appends a **Convergence Record** to `data/convergence/records.jsonl`:
+
+```json
+{ "hypothesis": "...", "evidence": ["entries…", "source URLs…"], "sources": [],
+  "grounded": true, "grounding_query": "...", "result": "...",
+  "confidence": 0.0, "verified": true, "loop_stage": "Converge", "tags": [] }
+```
+
+**Grounded vs. ungrounded is explicit:** with live sources the record is
+`grounded:true, verified:true` and earns higher confidence; when search fails
+the synthesis degrades honestly to `grounded:false, verified:false`, confidence
+capped low, tag `ungrounded` — a record never overstates an un-anchored claim.
+One synthesis path, one record store (records.jsonl + CSF archive) — this
+surface must not grow into a separate engine.

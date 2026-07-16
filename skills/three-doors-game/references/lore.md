@@ -1,6 +1,6 @@
 # Three Doors — lore & reference
 
-Detailed canon, loaded as needed. `SKILL.md` carries the operational loop and the
+Detailed canon, loaded as needed. `skills/three-doors/SKILL.md` carries the operational loop and the
 locked cast; this file carries the full creed, the door tree, and the export /
 import contract. Read it when a big moment, a major-gate transition, the Garden
 poem gate, or an export calls for it.

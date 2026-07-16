@@ -33,9 +33,10 @@ updated: 2026-06-20
 
 ## Archive to D:\tmp (Not Active)
 
-**Historical Docs:**
+**Historical Docs** (executed in the 2026-07-16 consolidation pass — these now
+live only in git history):
 - ALEX-ASI-ARCHITECTURE.md, ACTION-POOLING.md, AGENT-SWARM-OPERATIONS.md
-- BETTERSAFE*.md, CLEANUP.md, ARC-REACTOR*.md
+- BETTERSAFE*.md (merged into apps/bettersafe/README.md), CLEANUP.md, ARC-REACTOR*.md
 - benchmarks/, old CODEMAP versions
 
 **Generated Artifacts:**
