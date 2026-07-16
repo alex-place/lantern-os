@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -21,117 +21,240 @@
   </script>
   <title>unisona.ai — Pricing</title>
   <link rel="stylesheet" href="/css/site.css">
-  <link rel="stylesheet" href="styles.css?v=20260715-pricing-v2">
   <style>
-    /* Dark-theme mapping for the legacy styles.css token set so this page honors
-       data-theme instead of forcing light (#2481). Scoped to this page. */
-    [data-theme="dark"] {
-      color-scheme: dark;
-      --ink: #e6edf3;
-      --muted: #9aa7b2;
-      --paper: #0f151a;
-      --panel: #161d24;
-      --line: #2a343d;
+    /* Pricing page — built on the site.css token system (no legacy styles.css),
+       so it inherits both themes and matches the rest of the app (#2481). */
+    .hero { padding: 48px 0 28px; }
+
+    /* Status banner (post-checkout / link results). Semantic color via tokens. */
+    #billing-banner {
+      margin: 0 0 16px; padding: 12px 16px; border-radius: 12px; font-size: 14px;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
     }
-    [data-theme="dark"] body { background: var(--paper); }
+    #billing-banner[data-kind="success"] { border-color: color-mix(in srgb, var(--green) 50%, transparent); background: color-mix(in srgb, var(--green) 10%, var(--surface)); }
+    #billing-banner[data-kind="error"]   { border-color: color-mix(in srgb, var(--danger) 50%, transparent); background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+
+    /* Manage / link-existing-subscription cards */
+    #manage-sub, #link-sub {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+      margin: 0 0 16px; padding: 14px 18px; border-radius: 12px;
+      border: 1px solid var(--border); background: var(--surface);
+    }
+    #manage-sub p, #link-sub p { margin: 0; font-size: 14px; color: var(--muted); flex: 1 1 320px; }
+    /* [hidden] must win over the flex/inline-flex display above (same class of bug
+       as the old card-checkout buttons, fixed for good with !important). */
+    [hidden] { display: none !important; }
+
+    /* ── Tier cards ── */
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px; align-items: stretch; margin-top: 8px;
+    }
+    .tier-card {
+      display: flex; flex-direction: column;
+      border: 1px solid var(--border); border-radius: 16px;
+      background: var(--surface); padding: 24px 22px 20px;
+    }
+    .tier-card.featured {
+      border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent),
+                  0 12px 32px color-mix(in srgb, var(--accent) 10%, transparent);
+    }
+    .tier-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tier-head h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--text); }
+    .tier-price {
+      margin: 10px 0 2px; color: var(--text);
+      font-size: clamp(1.7rem, 3vw, 2.1rem); font-weight: 800; letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .tier-price span { font-size: 0.9rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+    .tier-blurb { margin: 2px 0 14px; font-size: 13px; color: var(--muted); }
+
+    .tier-features { list-style: none; margin: 0 0 20px; padding: 14px 0 0; border-top: 1px solid var(--border); flex: 1; }
+    .tier-features li {
+      position: relative; padding: 4px 0 4px 24px;
+      font-size: 13.5px; line-height: 1.5; color: var(--text);
+    }
+    .tier-features li::before {
+      content: "✓"; position: absolute; left: 2px; top: 4px;
+      color: var(--green); font-weight: 700;
+    }
+
+    .tier-actions { display: flex; flex-direction: column; gap: 8px; }
+    .tier-actions .btn-primary, .tier-actions .btn-ghost { justify-content: center; width: 100%; box-sizing: border-box; }
+    .tier-note { margin: 12px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+
+    /* ── FAQ ── */
+    .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 720px) { .faq-grid { grid-template-columns: 1fr; } }
+    .faq-card {
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--surface); padding: 16px 18px;
+    }
+    .faq-card h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: var(--text); }
+    .faq-card p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
   </style>
 </head>
 <body>
 <!-- Site nav + footer injected by /js/site-chrome.js (#2481) -->
   <a class="skip-link" href="#main">Skip to pricing</a>
-  <main id="main" class="shell" tabindex="-1">
-    <header class="hero os-hero compact-hero">
-      <div>
-        <p class="eyebrow">unisona.ai</p>
-        <h1>Pricing</h1>
-        <p class="subtitle">Start free. Pay when you need power. Every tier is real, documented, and cancellable.</p>
-        <nav class="link-dock" aria-label="Navigation">
-          <a href="/">Dashboard</a>
-          <a href="/proof.html">Live Proof</a>
-        </nav>
-      </div>
+  <main id="main" class="page" tabindex="-1">
+    <header class="hero">
+      <h1>Simple, honest <span>pricing</span></h1>
+      <p class="tagline">Start free. Pay when you need power. Every tier is real, documented, and cancellable.</p>
     </header>
 
-    <section class="grid pricing-grid" aria-label="Pricing tiers">
-      <article class="panel pricing-card">
-        <h2>Guest</h2>
-        <p class="pricing-price">Free</p>
-        <ul>
-          <li>Public health endpoint</li>
-          <li>Read-only docs, whitepaper, ADS</li>
-          <li>Cloud mirror visibility</li>
-          <li>Convergence loop reports</li>
-        </ul>
-        <a class="pricing-cta" href="/">Open Dashboard</a>
-        <p class="pricing-note">No account required. No data stored.</p>
-      </article>
+    <div id="billing-banner" role="status" hidden></div>
+    <div id="manage-sub" hidden>
+      <p>You have an active subscription. Change plan, update your card, or cancel any time in the customer portal.</p>
+      <button type="button" class="btn-primary" id="manage-btn">Manage subscription</button>
+    </div>
+    <div id="link-sub" hidden>
+      <p>Already subscribed by card? If you paid with the email on this account (verified), link the subscription to unlock your tier here.</p>
+      <button type="button" class="btn-ghost" id="link-btn">Link my subscription</button>
+    </div>
 
-      <article class="panel pricing-card">
-        <h2>Free</h2>
-        <p class="pricing-price">$0</p>
-        <ul>
-          <li>Signed-in workspace</li>
-          <li>Saved operator notes</li>
+    <section class="pricing-grid" aria-label="Pricing tiers">
+      <article class="tier-card">
+        <div class="tier-head"><h2>Free</h2></div>
+        <p class="tier-price">$0</p>
+        <p class="tier-blurb">Look around, sign in when you want to keep things.</p>
+        <ul class="tier-features">
+          <li>Browse as a guest — read-only docs, whitepaper, ADS</li>
+          <li>Public health endpoint + cloud mirror visibility</li>
+          <li>Convergence loop reports</li>
+          <li>Signed-in workspace with saved operator notes</li>
           <li>RAG intake queue visibility</li>
           <li>Chat with local context</li>
         </ul>
-        <a class="pricing-cta" href="/">Sign In</a>
-        <p class="pricing-note">Auth required. Data stays local.</p>
+        <div class="tier-actions">
+          <a class="btn-ghost" href="/">Sign In</a>
+        </div>
+        <p class="tier-note">No paywall. Data stays local.</p>
       </article>
 
-      <article class="panel pricing-card">
-        <h2>Member</h2>
-        <p class="pricing-price">$5 / month</p>
-        <ul>
+      <article class="tier-card featured">
+        <div class="tier-head"><h2>Pro</h2><span class="pill queued">Most popular</span></div>
+        <p class="tier-price">$20<span> / month</span></p>
+        <p class="tier-blurb">The real thing — trade and create with your own accounts.</p>
+        <ul class="tier-features">
           <li>Everything in Free</li>
-          <li>Higher daily chat limit</li>
-          <li>Supporter badge</li>
-          <li>Early access to new features</li>
-        </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Become a Member</a>
-        <p class="pricing-note">Billed via Patreon. Cancel anytime.</p>
-      </article>
-
-      <article class="panel pricing-card pricing-featured">
-        <h2>Pro</h2>
-        <p class="pricing-price">$20 / month</p>
-        <ul>
-          <li>Everything in Member</li>
           <li>Live trading terminal + broker connect (IBKR / Alpaca)</li>
           <li>Creator Suite — video → shorts pipeline</li>
           <li>Image, vision &amp; document generation</li>
           <li>Wide multi-model research + persistent memory</li>
         </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
-        <p class="pricing-note">Billed via Patreon. Cancel anytime.</p>
+        <div class="tier-actions">
+          <button type="button" class="btn-primary stripe-cta" data-tier="pro" hidden>Upgrade to Pro</button>
+          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Link Patreon</a>
+        </div>
+        <p class="tier-note">Billed securely by Stripe or Patreon. Cancel anytime.</p>
       </article>
 
-      <article class="panel pricing-card">
-        <h2>Pilot</h2>
-        <p class="pricing-price">$200 / month</p>
-        <ul>
+      <article class="tier-card">
+        <div class="tier-head"><h2>Pilot</h2></div>
+        <p class="tier-price">$200<span> / month</span></p>
+        <p class="tier-blurb">An autonomous AI advisor in your corner.</p>
+        <ul class="tier-features">
           <li>Everything in Pro</li>
           <li>Autonomous AI trader — hands-free execution</li>
           <li>1:1 operator review session</li>
           <li>Custom skill integration</li>
           <li>Priority support + invoicing</li>
         </ul>
-        <a class="pricing-cta" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
-        <p class="pricing-note">Billed monthly via Patreon. Invoice available.</p>
+        <div class="tier-actions">
+          <button type="button" class="btn-primary stripe-cta" data-tier="pilot" hidden>Upgrade to Pilot</button>
+          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Link Patreon</a>
+        </div>
+        <p class="tier-note">Billed monthly by Stripe or Patreon. Invoice available.</p>
       </article>
     </section>
 
-    <section class="panel pricing-faq">
-      <h2>What you are actually buying</h2>
-      <dl>
-        <div><dt>Is this equity or an investment?</dt><dd>No. These are service subscriptions. No equity, tokens, or profit share.</dd></div>
-        <div><dt>Can I cancel?</dt><dd>Yes. Cancel anytime. Your local data stays yours.</dd></div>
-        <div><dt>What payment methods?</dt><dd>Billing is handled by Patreon (cards, PayPal, Apple Pay, Google Pay). Invoice available for Pilot tier.</dd></div>
-        <div><dt>Where does the money go?</dt><dd>Recorded in the Unisona wallet ledger. Used for infrastructure, development, and operator time.</dd></div>
-        <div><dt>Is my data private?</dt><dd>Yes. Local-first by default. Private notes are stored on your machine by design.</dd></div>
-      </dl>
+    <section class="section" aria-label="Frequently asked questions">
+      <p class="section-label">What you are actually buying</p>
+      <div class="faq-grid">
+        <div class="faq-card"><h3>Is this equity or an investment?</h3><p>No. These are service subscriptions. No equity, tokens, or profit share.</p></div>
+        <div class="faq-card"><h3>Can I cancel?</h3><p>Yes. Cancel anytime. Your local data stays yours.</p></div>
+        <div class="faq-card"><h3>What payment methods?</h3><p>Pay by card directly (Stripe — cards, Apple Pay, Google Pay) or via Patreon. Card details go straight to Stripe; we never see or store them. Invoice available for Pilot tier.</p></div>
+        <div class="faq-card"><h3>Where does the money go?</h3><p>Recorded in the Unisona wallet ledger. Used for infrastructure, development, and operator time.</p></div>
+        <div class="faq-card"><h3>Is my data private?</h3><p>Yes. Local-first by default. Private notes are stored on your machine by design.</p></div>
+      </div>
     </section>
   </main>
+<script>
+  /* Native Stripe subscription checkout (#2568). Buttons stay hidden until the
+     server confirms billing is live AND that tier has a configured Price, so a
+     deploy without Stripe keys shows only the Patreon CTA — no broken button. */
+  (function () {
+    var banner = document.getElementById('billing-banner');
+    function show(kind, msg) {
+      if (!banner) return;
+      banner.dataset.kind = kind; banner.textContent = msg; banner.hidden = false;
+    }
+    // Post-checkout return flags (set by /billing/success and the cancel_url).
+    var q = new URLSearchParams(location.search);
+    if (q.get('checkout') === 'success') show('success', 'Subscription active — your new tier is unlocked. Thank you for supporting unisona.ai.');
+    else if (q.get('checkout') === 'cancel') show('info', 'Checkout canceled — no charge was made.');
+
+    function openPortal() {
+      fetch('/api/billing/portal', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          if (res.status === 200 && res.data.url) { location.href = res.data.url; return; }
+          if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+          show('error', 'Could not open the customer portal. Please try again.');
+        })
+        .catch(function () { show('error', 'Network error opening the portal.'); });
+    }
+    var manageBtn = document.getElementById('manage-btn');
+    if (manageBtn) manageBtn.addEventListener('click', openPortal);
+
+    fetch('/api/billing/config', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (cfg) {
+        if (!cfg || !cfg.configured) return; // Stripe off → Patreon-only, buttons stay hidden
+        if (cfg.subscribed) {
+          // Already subscribed → don't offer a second checkout (double-billing); show Manage.
+          var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
+          return;
+        }
+        // Not linked on THIS account — offer to claim a sub bought with the same
+        // (verified) email before signing up, instead of a double-billing re-buy.
+        var l = document.getElementById('link-sub'); if (l) l.hidden = false;
+        document.querySelectorAll('.stripe-cta').forEach(function (btn) {
+          var tier = btn.getAttribute('data-tier');
+          if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
+        });
+      })
+      .catch(function () { /* config probe failed → leave Patreon-only */ });
+
+    // "Link my subscription" — claim an existing card sub by verified email.
+    var linkBtn = document.getElementById('link-btn');
+    if (linkBtn) linkBtn.addEventListener('click', function () {
+      linkBtn.disabled = true;
+      fetch('/api/billing/link', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) { return r.json().then(function (d) { return { status: r.status, data: d }; }); })
+        .then(function (res) {
+          linkBtn.disabled = false;
+          if (res.status === 200 && res.data.linked) {
+            show('success', res.data.already
+              ? 'Your card subscription is already linked to this account.'
+              : 'Card subscription linked — your tier is unlocked on this account. ✓');
+            document.getElementById('link-sub').hidden = true;
+            var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
+            document.querySelectorAll('.stripe-cta').forEach(function (b) { b.hidden = true; });
+            return;
+          }
+          if (res.status === 401) { location.href = '/auth.html?returnTo=' + encodeURIComponent('/pricing.html'); return; }
+          if (res.data && res.data.error === 'email_unverified') { show('error', 'Confirm your email first (see your profile) — that\'s how we prove the subscription is yours.'); return; }
+          if (res.data && res.data.error === 'customer_already_linked') { show('error', 'That subscription is already linked to a different account.'); return; }
+          if (res.status === 200 && res.data.linked === false) { show('info', 'No card subscription found for your account\'s verified email.'); return; }
+          show('error', 'Could not link right now — please try again.');
+        })
+        .catch(function () { linkBtn.disabled = false; show('error', 'Network error — please try again.'); });
+    });
+  })();
+</script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>

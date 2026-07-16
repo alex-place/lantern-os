@@ -301,6 +301,7 @@ const routes = [
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
   premiumApiGuard,                      // gate premium data plane (creator/image/vision/doc/wide-search/alpaca/files/code-apply) by tier
   require("./routes/v1"),               // OpenAI-compatible /v1/chat/completions shim (before auth: API clients use bearer keys, not sessions)
+  require("./routes/billing"),          // Stripe subscription billing (checkout/portal/webhook); webhook must stay ungated — Stripe posts with no session (#2568)
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)

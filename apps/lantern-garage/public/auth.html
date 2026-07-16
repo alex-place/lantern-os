@@ -635,7 +635,14 @@
         // Signed in — confirm with a success banner, then continue to the app.
         signedIn = true;
         showSignedIn();
-        setTimeout(() => { location.href = safeReturnTo(); }, 1200);
+        // Best-effort: claim a card subscription bought with this (verified) email
+        // before entering the app, so a Stripe subscriber's sign-in lands with the
+        // right tier already applied. The server no-ops fast when billing is off or
+        // there's nothing to link; a slow/failed probe never blocks the redirect.
+        const link = await attemptBillingLink(2500);
+        const freshlyLinked = !!(link && link.linked && !link.already);
+        if (freshlyLinked) showNotice("Signed in ✓ — found your card subscription and linked it to this account. Taking you in…");
+        setTimeout(() => { location.href = safeReturnTo(); }, freshlyLinked ? 1800 : 1200);
         return;
       }
       // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
@@ -660,6 +667,20 @@
       // brief success banner shows and we redirect — don't re-enable it.
       if (!signedIn) { submit.disabled = false; submit.textContent = prev; }
     }
+  }
+
+  // POST /api/billing/link with a hard client timeout. Returns the parsed result
+  // ({ linked, already, role, … }) or null on any failure/timeout — callers treat
+  // null as "nothing linked" and move on.
+  async function attemptBillingLink(timeoutMs) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      const r = await fetch("/api/billing/link", { method: "POST", credentials: "include", signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) return null;
+      return await r.json().catch(() => null);
+    } catch (_) { return null; }
   }
 
   async function checkSession() {

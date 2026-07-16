@@ -80,6 +80,7 @@
     "playwright": "^1.61.0"
   },
   "optionalDependencies": {
-    "win-ca": "^3.5.1"
+    "win-ca": "^3.5.1",
+    "stripe": "^18.0.0"
   }
 }
