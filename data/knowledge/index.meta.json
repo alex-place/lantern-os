@@ -1,5 +1,5 @@
 {
-  "built_at": 1783720488.6463895,
+  "built_at": 1784208718.0274875,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -124,6 +124,7 @@
     "docs/research/2026-07-04-serving-and-rho-convergence.md",
     "docs/SIGMA0-READING-PACK.md",
     "docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md",
+    "docs/research/2026-07-13-ouro-mbpp-distillation.md",
     "docs/research/2026-07-04-serving-design-sota.md",
     "docs/SIGMA0-PLT-HANDOFF.md",
     "docs/SIGMA0-UPDATE-CERTIFICATE.md",
@@ -136,6 +137,7 @@
     "docs/KALSHI-API-SPEC.md",
     "docs/PORTFOLIO-SETUP.md",
     "docs/trading-api-reference.md",
+    "docs/TRADER-ANALYSIS-2026-07.md",
     "docs/research/2026-06-30-sigma0-weather-oracle-kalshi-edge.md",
     "docs/creator-v10/learning-pipeline-research.md",
     "docs/creator-v10/editing-analysis-model-research.md",
@@ -165,6 +167,7 @@
     "docs/adr/0019-ibkr-connectivity-client-portal-gateway.md",
     "docs/adr/0020-ibkr-live-order-placement.md",
     "docs/adr/0022-ibkr-per-user-self-service-oauth.md",
+    "docs/adr/0027-one-click-broker-oauth2.md",
     "docs/research/2026-07-03-node-ibkr-trader-audit.md",
     "docs/GOOGLE-OAUTH.md",
     "docs/ADMIN-FEATURE-FLAGS.md",
@@ -198,6 +201,7 @@
     "docs/research/2026-07-04-depth-accuracy-and-readout.md",
     "docs/research/2026-07-04-hidden-state-truth-probe.md",
     "docs/research/2026-07-08-forecastex-probe-findings.md",
+    "docs/research/2026-07-10-forecastex-uhlga-settlement-and-klga-fit.md",
     "docs/FRONTIER-DIRECTIONS-2026-H2.md",
     "docs/research/2026-07-08-gencast-g1-result.md",
     "docs/HOOKS.md",
@@ -225,14 +229,11 @@
     "docs/research/2026-07-05-grounding-deadline.md",
     "docs/research/2026-07-09-truth-probe-transfer.md",
     "docs/research/2026-07-09-honesty-calibration-adapter-trackB.md",
+    "docs/UNISONA-SHARPE-CERTIFICATE.md",
     "docs/v1.9-issue-list.md",
     "docs/research/2026-07-03-verso-competitive-analysis.md",
     "docs/SIGMA-THETA-ABC-HARNESS-SPEC.md",
     "docs/research/2026-07-02-weather-oracle-constant-fit.md",
-    "lore/LANTERN-CHARACTERS-AND-REALMS.md",
-    "lore/LORE.md",
-    "lore/quarantine/README.md",
-    "lore/SAFETY.md",
     "docs/lore/CAST.md",
     "hff/CONVERGENCE-EVIDENCE-REPORT.md",
     "hff/LOCAL-LLM-STORAGE-FORMAT.md",
@@ -645,7 +646,7 @@
       ]
     }
   },
-  "sections": 2623,
+  "sections": 2629,
   "external": 34,
-  "sha256": "c50f9a16dbdc0b29a9959f6332e7ed5aa5811f66b9b3a908d6787269bf5164d8"
+  "sha256": "5276aaeff60a5665148d31b342fae2e46ffdba23cacfac48d940d08e071693c6"
 }
