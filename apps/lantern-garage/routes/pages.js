@@ -119,11 +119,13 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 // A signed-in user who lacks the tier/entitlement for a page gets a friendly HTML
 // "unlock" page instead of a raw JSON 403 filling the browser (a first-time-user
 // papercut). Unauthenticated users are still redirected to login upstream.
-// Canonical tier display names, mapped from the Patreon pledge amount:
-//   supporter ($5) → Member · deep_dreamer ($20) → Pro · pilot ($200) → Pilot.
-// `admin` is a STAFF role, not a purchasable tier, so it's handled below as a staff
-// gate (no "See plans") rather than being named as a buyable tier.
-const TIER_LABEL = { supporter: "Member", deep_dreamer: "Pro", pilot: "Pilot" };
+// Upgrade-wall display names → the SOLD plan that satisfies the gate. The $5 Member tier
+// was retired (#2613): `supporter` survives only as a legacy Patreon role, not a buyable
+// plan, so a Free user who hits a supporter-level gate must be pointed at the cheapest
+// tier that STILL sells — Pro ($20) — never a "Member" plan that pricing.html no longer
+// offers (#2644). deep_dreamer → Pro ($20), pilot → Pilot ($200). `admin` is a STAFF role,
+// handled below as a staff gate (no "See plans"), not named as a buyable tier.
+const TIER_LABEL = { supporter: "Pro", deep_dreamer: "Pro", pilot: "Pilot" };
 // Friendly name for the tier a per-feature ENTITLEMENT requires (used when a page
 // gates on an entitlement rather than a role).
 const ENTITLEMENT_TIER = { trade: "Pro", pro: "Pro", ai_trader: "Pilot" };

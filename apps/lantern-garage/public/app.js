@@ -20,7 +20,7 @@ const fallbackAccessModel = {
     { id: "auth_20", label: "$20 Auth", priceUsdMonthly: 20, authRequired: true, summary: "Supporter lane for report packets, queue visibility, and weekly digest.", features: ["queue visibility", "report packets"] },
     { id: "auth_200", label: "$200 Auth", priceUsdMonthly: 200, authRequired: true, summary: "Pilot lane for guided cleanup, review, and operator scheduling.", features: ["pilot review", "cleanup session"] },
     { id: "founder", label: "Founder", priceUsdMonthly: null, authRequired: true, founderOnly: true, summary: "Founder-only local controls, dispatch, secrets, and release promotion gates.", features: ["local controls", "release gates"] },
-    { id: "supporter", label: "Supporter", priceUsdMonthly: 20, authRequired: true, summary: "$20/month. Weekly digest, report packs, Discord priority.", features: ["weekly digest", "report packs"], checkoutLink: "/pricing.html" },
+    { id: "deep_dreamer", label: "Pro", priceUsdMonthly: 20, authRequired: true, summary: "$20/month. Weekly digest, report packs, Discord priority.", features: ["weekly digest", "report packs"], checkoutLink: "/pricing.html" },
     { id: "pilot", label: "Pilot", priceUsdMonthly: 200, authRequired: true, summary: "$200/month. Guided cleanup sprint, 1:1 review, custom integration.", features: ["guided sprint", "1:1 review"], checkoutLink: "/pricing.html" },
   ],
 };

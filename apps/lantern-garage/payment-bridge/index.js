@@ -1,3 +1,14 @@
+/*
+ * ⚠️ RETIRED — DO NOT BOOT. NOT the canonical billing surface. (#2657)
+ *
+ * The live, guarded Stripe integration is `apps/lantern-garage/routes/billing.js`
+ * (checkout / portal / signature-verified webhook, role-whitelisted, tier-enforced).
+ * This standalone bridge predates both the $20 Pro tier and the Member-tier retirement
+ * (#2613): its ladder sells only the retired `supporter` tier + `pilot` and cannot sell
+ * Pro, and it bypasses routes/billing.js's guards and webhook role whitelisting. Nothing
+ * imports or boots it. Kept only as a reference until formally deleted — do not wire real
+ * price ids or a webhook to it.
+ */
 const express = require('express');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');

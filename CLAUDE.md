@@ -257,7 +257,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 - `PATREON_CLIENT_ID`, `PATREON_CLIENT_SECRET`, `PATREON_CAMPAIGN_ID`, `PATREON_REDIRECT_URI`, `SESSION_SECRET`
 - See **[PATREON-OAUTH.md](docs/PATREON-OAUTH.md)** for full setup guide
 - When configured, unauthenticated users redirect to `/auth.html` login page
-- Patreon tiers map to roles (guest → supporter → founder → admin)
+- Patreon pledge amount maps to roles. SOLD tiers: Free / $20 Pro (deep_dreamer) / $200 Pilot (pilot). The $5 Member→supporter tier is **retired** (#2613) — grandfathered patrons only, not offered on pricing.html. `admin` is a staff role, never purchasable.
 
 `pytest.ini` sets `pythonpath = apps src` so tests can import from both trees without install.
 

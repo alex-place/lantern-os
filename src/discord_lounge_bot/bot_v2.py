@@ -407,6 +407,15 @@ def _format_three_doors_embed(state: dict) -> discord.Embed:
     return embed
 
 
+# Display names = the ACTUAL Discord server role names (Wanderer / Deep Dreamer /
+# Synthesasia Guild), which deliberately DIVERGE from the web tier names — do not "fix"
+# them to match the web without also renaming the server roles (#2659). Cross-surface map:
+#   Discord "Deep Dreamer"  (canonical `supporter`) ── is NOT the web `deep_dreamer`/$20 Pro;
+#                                                       it is the entry paid Discord role.
+#   Discord "Synthesasia Guild" (canonical `pilot`)  ── the top Discord tier; Patreon backers
+#                                                       are also mapped here (see _ROLE_ALIASES).
+# The web ladder (guest / supporter[legacy $5] / deep_dreamer[$20 Pro] / pilot[$200]) is a
+# separate namespace; a member's Discord label and web tier can legitimately differ.
 _TIER_LABELS = {
     ROLE_PUBLIC: "Wanderer",
     ROLE_SUPPORTER: "Deep Dreamer",
