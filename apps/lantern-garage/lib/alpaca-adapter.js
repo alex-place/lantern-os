@@ -35,9 +35,36 @@ function _serverKeys() {
   return { id, secret, env };
 }
 
+// The Sigma Trader (the long-horizon allocation book) runs on its OWN account so it
+// never collides with the day-trader on the shared book. Its identity resolves ONLY
+// to a dedicated account — its own connected OAuth (stored under SIGMA_USER) or its
+// own SIGMA_ALPACA_* keys — and DELIBERATELY does NOT fall back to the shared server
+// keys. No dedicated account → null → the engine plans but refuses to trade.
+const SIGMA_USER = 'sigma-trader';
+function _sigmaKeys() {
+  const id = process.env.SIGMA_ALPACA_API_KEY_ID || '';
+  const secret = process.env.SIGMA_ALPACA_API_SECRET_KEY || '';
+  if (!id || !secret) return null;
+  const env = process.env.SIGMA_ALPACA_ENV === 'live' ? 'live' : 'paper';
+  return { id, secret, env };
+}
+
 /** Resolve auth for a user: their OAuth token first, else server keys. Returns
  *  { host, headers, env, accountLabel } or null when neither is configured. */
 function _authFor(userId) {
+  // Sigma Trader → its OWN account only (never the shared server keys).
+  if (userId === SIGMA_USER) {
+    const own = store.load(SIGMA_USER);
+    if (own && own.access_token) {
+      const env = own.env === 'live' ? 'live' : 'paper';
+      return { host: HOSTS[env], env, source: 'sigma-oauth', accountLabel: own.account_number || null,
+        headers: { Authorization: `Bearer ${own.access_token}` } };
+    }
+    const sk = _sigmaKeys();
+    if (sk) return { host: HOSTS[sk.env], env: sk.env, source: 'sigma-keys', accountLabel: null,
+      headers: { 'APCA-API-KEY-ID': sk.id, 'APCA-API-SECRET-KEY': sk.secret } };
+    return null;   // no dedicated account — do NOT borrow the day-trader's
+  }
   const c = store.load(userId);
   if (c && c.access_token) {
     const env = c.env === 'live' ? 'live' : 'paper';
@@ -210,4 +237,4 @@ async function cancelOpenOrders(userId, symbol) {
   return n;
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };

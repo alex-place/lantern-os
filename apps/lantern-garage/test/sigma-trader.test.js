@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const cb = require('../lib/champion-book');
+const cb = require('../lib/sigma-trader');
 
 test('solve: solves a small linear system', () => {
   const x = cb.solve([[2, 1], [1, 3]], [3, 5]);   // x=0.8, y=1.4
@@ -81,10 +81,10 @@ function loadChampionWith({ account, positions = [], placed }) {
   const A = require.resolve('../lib/alpaca-adapter');
   const Y = require.resolve('../lib/market-data-yahoo');
   const B = require.resolve('../lib/brake-monitor');
-  const C = require.resolve('../lib/champion-book');
+  const C = require.resolve('../lib/sigma-trader');
   const stub = (id, exports) => { require.cache[id] = { id, filename: id, loaded: true, exports }; };
   stub(A, {
-    getAccount: async () => account,
+    SIGMA_USER: 'sigma-trader', getAccount: async () => account,
     getPositions: async () => ({ positions }),
     getOpenOrders: async () => [],
     cancelOpenOrders: async () => 0,
@@ -98,41 +98,57 @@ function loadChampionWith({ account, positions = [], placed }) {
 
 test('rebalanceNow: DRY by default — computes but places NOTHING', async () => {
   const placed = [];
-  const cbm = loadChampionWith({ account: { equity: 100000, env: 'paper' }, positions: [], placed });
-  const saved = process.env.CHAMPION_ARM; process.env.CHAMPION_ARM = '1';   // even with env armed…
+  const cbm = loadChampionWith({ account: { equity: 100000, env: 'paper', account_id: 'SIGMA-PAPER' }, positions: [], placed });
+  const saved = process.env.SIGMA_ARM; process.env.SIGMA_ARM = '1';   // even with env armed…
   try {
-    const r = await cbm.rebalanceNow('u', { arm: false });                  // …arm:false stays dry
+    const r = await cbm.rebalanceNow({ arm: false });                  // …arm:false stays dry
     assert.strictEqual(r.executed, false);
     assert.strictEqual(r.dryRun, true);
     assert.strictEqual(placed.length, 0, 'placed nothing while dry');
-  } finally { if (saved === undefined) delete process.env.CHAMPION_ARM; else process.env.CHAMPION_ARM = saved; }
+  } finally { if (saved === undefined) delete process.env.SIGMA_ARM; else process.env.SIGMA_ARM = saved; }
 });
 
-test('rebalanceNow: requires BOTH arm:true AND CHAMPION_ARM=1 to trade', async () => {
+test('rebalanceNow: requires BOTH arm:true AND SIGMA_ARM=1 to trade', async () => {
   const placed = [];
-  const cbm = loadChampionWith({ account: { equity: 100000, env: 'paper' }, positions: [], placed });
-  const saved = process.env.CHAMPION_ARM; delete process.env.CHAMPION_ARM;   // env NOT armed
+  const cbm = loadChampionWith({ account: { equity: 100000, env: 'paper', account_id: 'SIGMA-PAPER' }, positions: [], placed });
+  const saved = process.env.SIGMA_ARM; delete process.env.SIGMA_ARM;   // env NOT armed
   try {
-    const r = await cbm.rebalanceNow('u', { arm: true });                    // arm:true alone is not enough
+    const r = await cbm.rebalanceNow({ arm: true });                    // arm:true alone is not enough
     assert.strictEqual(r.executed, false);
     assert.strictEqual(placed.length, 0);
-  } finally { if (saved === undefined) delete process.env.CHAMPION_ARM; else process.env.CHAMPION_ARM = saved; }
+  } finally { if (saved === undefined) delete process.env.SIGMA_ARM; else process.env.SIGMA_ARM = saved; }
 });
 
 test('rebalanceNow: armed on PAPER places orders; REFUSES a live account', async () => {
-  const saved = process.env.CHAMPION_ARM; process.env.CHAMPION_ARM = '1';
+  const saved = process.env.SIGMA_ARM; process.env.SIGMA_ARM = '1';
   try {
     const placedP = [];
-    const paper = loadChampionWith({ account: { equity: 100000, env: 'paper' }, positions: [], placed: placedP });
-    const rp = await paper.rebalanceNow('u', { arm: true });
+    const paper = loadChampionWith({ account: { equity: 100000, env: 'paper', account_id: 'SIGMA-PAPER' }, positions: [], placed: placedP });
+    const rp = await paper.rebalanceNow({ arm: true });
     assert.strictEqual(rp.executed, true);
     assert.ok(placedP.length > 0, 'armed paper placed orders');
 
     const placedL = [];
-    const live = loadChampionWith({ account: { equity: 100000, env: 'live' }, positions: [], placed: placedL });
-    const rl = await live.rebalanceNow('u', { arm: true });
+    const live = loadChampionWith({ account: { equity: 100000, env: 'live', account_id: 'SIGMA-LIVE' }, positions: [], placed: placedL });
+    const rl = await live.rebalanceNow({ arm: true });
     assert.strictEqual(rl.executed, false);
     assert.strictEqual(rl.refused, 'live_account_forbidden');
     assert.strictEqual(placedL.length, 0, 'never places on a live account');
-  } finally { if (saved === undefined) delete process.env.CHAMPION_ARM; else process.env.CHAMPION_ARM = saved; }
+  } finally { if (saved === undefined) delete process.env.SIGMA_ARM; else process.env.SIGMA_ARM = saved; }
+});
+
+test('rebalanceNow: NO dedicated account → refuses, places nothing (never touches the day-trader)', async () => {
+  const placed = [];
+  // getAccount → null models "no Sigma account configured".
+  const sig = loadChampionWith({ account: null, positions: [], placed });
+  const saved = process.env.SIGMA_ARM; process.env.SIGMA_ARM = '1';
+  try {
+    const plan = await sig.plan();
+    assert.strictEqual(plan.account, 'not_configured');
+    assert.ok(Array.isArray(plan.weights ? Object.keys(plan.weights) : []), 'still computes target weights');
+    const r = await sig.rebalanceNow({ arm: true });        // armed, but no account
+    assert.strictEqual(r.executed, false);
+    assert.strictEqual(r.refused, 'no_dedicated_account');
+    assert.strictEqual(placed.length, 0, 'never places without its own account');
+  } finally { if (saved === undefined) delete process.env.SIGMA_ARM; else process.env.SIGMA_ARM = saved; }
 });
