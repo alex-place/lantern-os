@@ -70,7 +70,7 @@ seedDailyActive("retained-ria", [30, 29, 2], NOW);   // first 30d ago, active da
 seedDailyActive("lapsed-lou", [31, 30], NOW);        // first 31d ago, nothing in the 28–35 window → churned
 seedDailyActive("young-yui", [5, 1], NOW);           // too young for an M1 verdict → excluded from cohort
 
-let pending = 7;
+let pending = 8;
 
 check("composite: only the all-three user is active, with per-user evidence", () => {
   const { users, actives } = metric.evaluateActiveUsers(O);
@@ -117,6 +117,18 @@ check("level1Snapshot carries targets + MEASURED provenance and no self-reported
   assert.strictEqual(s.provenance, "MEASURED");
   assert.strictEqual(s.actives.count, 1);
   assert.ok(Array.isArray(s.actives.users) && s.actives.users[0].evidence, "headline count carries per-user evidence");
+});
+
+check("paying: role-gated, operator excluded, missing email does NOT drop a payer", () => {
+  const fake = [
+    { id: "pro-pat", email: "pat@example.com", role: "deep_dreamer" },   // paying
+    { id: "no-email-ned", email: "", role: "deep_dreamer" },              // paying — email absent must not drop (#2660 review)
+    { id: "free-fred", email: "fred@example.com", role: "supporter" },    // retired $5 tier → not paying
+    { id: "alex-place", email: "founder@lantern-os.net", role: "deep_dreamer" }, // operator → excluded
+  ];
+  const paying = metric.payingUsers({ listProfiles: () => fake });
+  const ids = paying.map((p) => p.userId).sort();
+  assert.deepStrictEqual(ids, ["no-email-ned", "pro-pat"], `got ${ids}`);
 });
 
 check("weekly rollup appends once per ISO week (idempotent), MEASURED + verified", async () => {

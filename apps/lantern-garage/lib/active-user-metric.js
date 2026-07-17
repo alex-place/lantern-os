@@ -130,13 +130,18 @@ function evaluateActiveUsers(opts = {}) {
 }
 
 /** Paying users, MEASURED from the profiles store's role field. */
-function payingUsers() {
+function payingUsers(opts = {}) {
   const { classifyActor } = require("./traction");
   let profiles = [];
-  try { profiles = require("./user-profiles").listProfiles() || []; } catch { profiles = []; }
+  try {
+    profiles = (opts.listProfiles ? opts.listProfiles() : require("./user-profiles").listProfiles()) || [];
+  } catch { profiles = []; }
   return profiles
     .filter((p) => p && PAYING_ROLES.has(String(p.role || "").toLowerCase()))
-    .filter((p) => classifyActor(p.id) === "external" && classifyActor(p.email) === "external")
+    // Operator exclusion: the id must be external; the email check only applies when
+    // an email EXISTS — classifyActor("") is "unknown", so requiring external-email
+    // silently dropped paying users with no email on file (LlamaPReview P2 on #2660).
+    .filter((p) => classifyActor(p.id) === "external" && (!p.email || classifyActor(p.email) === "external"))
     .map((p) => ({ userId: p.id, role: p.role, evidence: "data/profiles/index.jsonl role=" + p.role }));
 }
 
