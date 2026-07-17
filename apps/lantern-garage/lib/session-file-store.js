@@ -81,4 +81,28 @@ class FileSessionStore extends session.Store {
   }
 }
 
-module.exports = { FileSessionStore };
+/**
+ * Force-invalidate every persisted session belonging to a user id (synchronous; the
+ * session dir is small and this runs only on rare privileged actions). Used when a role
+ * or entitlement is changed out-of-band so an established session can't keep stale
+ * privileges until it naturally expires (#2627) — the user is signed out and must
+ * re-authenticate, picking up the new role. Returns the count removed.
+ */
+function destroyUserSessions(dir, userId) {
+  if (!dir || userId == null) return 0;
+  let files;
+  try { files = fs.readdirSync(dir); } catch { return 0; }
+  let removed = 0;
+  for (const f of files) {
+    if (!f.endsWith(".json")) continue;
+    const fp = path.join(dir, f);
+    try {
+      const o = JSON.parse(fs.readFileSync(fp, "utf8"));
+      const uid = o && o.sess && o.sess.user && o.sess.user.id;
+      if (uid != null && String(uid) === String(userId)) { fs.unlinkSync(fp); removed++; }
+    } catch { /* unreadable/rotating file — skip */ }
+  }
+  return removed;
+}
+
+module.exports = { FileSessionStore, destroyUserSessions };

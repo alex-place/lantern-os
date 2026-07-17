@@ -24,7 +24,12 @@ const {
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
-const { createToken, verifyToken } = require("../lib/auth-tokens");
+const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/auth-tokens");
+const { destroyUserSessions } = require("../lib/session-file-store");
+const _pathAuth = require("path");
+// Session store dir (mirrors server.js) — a password reset invalidates the account's live
+// sessions so a hijacked session can't survive the remediation (#2614).
+const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
 const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
 const { isLoopback, clientIp } = require("../lib/request-auth");
 const { canonicalOrigin } = require("../lib/base-url");
@@ -219,6 +224,13 @@ module.exports = async function authRoutes(req, res, url, deps) {
       res.writeHead(302, { Location: `${dest}?verify=invalid` });
       return res.end();
     }
+    // Single-use: once this link has applied its change, a replay (leaked link, a second
+    // click, a link-scanner re-fetch) must not run again — land on the benign
+    // already-verified state rather than re-applying (#2614).
+    if (isConsumed(payload.jti)) {
+      res.writeHead(302, { Location: `${dest}?verify=1` });
+      return res.end();
+    }
     const updates = { emailVerified: true, emailAssumed: false, pendingEmail: null };
     // The token now carries the exact address it was minted for (#2624), so a stale
     // link can't silently verify a DIFFERENT current address.
@@ -250,6 +262,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
     // so this never inflates external adoption. Best-effort; never blocks the redirect.
     const wasVerified = profile.emailVerified === true;
     updateProfile(profile.id, updates);
+    consumeToken(payload.jti, payload.exp); // burn the link so it can't be replayed (#2614)
     if (!wasVerified) {
       recordTractionEvent({
         kind: "signup",
@@ -311,7 +324,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
     const b = await readJsonBody(req);
     if (!b) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_json" })); }
     const payload = verifyToken(b.token, "reset_password");
-    if (!payload) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_or_expired" })); }
+    // Reject a replayed link: a reset token is single-use, so once spent it can't reset
+    // the password again for the rest of its TTL even if leaked (#2614).
+    if (!payload || isConsumed(payload.jti)) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_or_expired" })); }
     const newPassword = String(b.newPassword || "");
     if (newPassword.length < MIN_PASSWORD) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -319,6 +334,8 @@ module.exports = async function authRoutes(req, res, url, deps) {
     }
     if (!getProfile(payload.sub)) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
     setLocalPassword(payload.sub, newPassword);
+    consumeToken(payload.jti, payload.exp);              // burn the token — no replay
+    destroyUserSessions(AUTH_SESSION_DIR, payload.sub);  // sign out any hijacked session
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
