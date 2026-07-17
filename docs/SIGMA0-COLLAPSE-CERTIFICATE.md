@@ -1546,7 +1546,11 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    via the cond-6 provenance ledger, while the fresh arm rejects it on measured merit (cond 1) —
    the load-bearing demonstration of why the freshness tiers exist. *(Steps 1–3 at real-model
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
-   remaining empirical gap, unchanged: this validates the PROTOCOL, not real training.)*
+   remaining empirical gap, unchanged: this validates the PROTOCOL, not real training. The L4
+   run is now fully specified as a self-contained handoff —
+   [SIGMA0-EB-L4-RUNBOOK.md](SIGMA0-EB-L4-RUNBOOK.md): inventory, task partition, the
+   eval→7-metric glue contract, teeth recipes, pre-registered verdicts incl. the Roelofs rule,
+   and a cost-approval gate.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
    signal **add detection power** for bad checkpoints over the external gate alone? No prior art
    surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,

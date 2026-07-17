@@ -294,7 +294,9 @@ condition — what result would delete which column.
   kill condition fired; §1 re-priced**) ·
   E-S → [#2690](https://github.com/alex-place/lantern-os/issues/2690) (Phase 0 done 2026-07-17) ·
   E-B → [#2691](https://github.com/alex-place/lantern-os/issues/2691) (protocol layer done
-  2026-07-17; the L4 training run is the sole remaining gap)
+  2026-07-17; the L4 training run is the sole remaining gap — fully specified as a
+  self-contained handoff in [SIGMA0-EB-L4-RUNBOOK.md](SIGMA0-EB-L4-RUNBOOK.md), with
+  pre-registered verdicts and the Roelofs rule)
 
 1. **E-P (price — RUN 2026-07-17, kill condition FIRED).** The prediction tested: a
    **stochastic** internal signal (re-drawable noise, checkpoint-fixed bias) still cannot
