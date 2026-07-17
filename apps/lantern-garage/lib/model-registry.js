@@ -17,7 +17,7 @@ module.exports = {
     dream: {
       profileId: "lantern-csf-dream",
       ollamaModel: process.env.DREAMCHAT_MODEL || "lantern-csf-dream",
-      surfaces: ["dream-chat", "dream-journal", "three-doors"],
+      surfaces: ["dream-chat", "dream-journal"],
     },
     pcsf: {
       profileId: "lantern-pcsf",
@@ -71,7 +71,7 @@ module.exports = {
       adapterPath:
         process.env.LANTERN_IMAGE_LORA ||
         "models/csf-image/checkpoints/lantern-door-lora-final.safetensors",
-      surfaces: ["dream-journal", "three-doors"],
+      surfaces: ["dream-journal"],
       status: "hold-pending-validation",
     },
   },

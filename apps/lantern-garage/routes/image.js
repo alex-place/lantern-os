@@ -16,8 +16,7 @@
  *
  * DELETE /api/images/:id — remove image from gallery
  *
- * GET /api/image/pool/random — pick a random image from CAAD pool
- *   Priority: THREE_DOORS_IMAGE_POOL_DIR env var → data/images/caadi/
+ * GET /api/image/pool/random — pick a random image from CAAD pool (data/images/caadi/)
  *   Returns: { url: "/api/image/pool/serve?file=...&source=..." }
  *
  * GET /api/image/pool/serve?file=<name>&source=local|caadi — serve a pool image safely
@@ -36,8 +35,8 @@ module.exports = function imageRoutes(req, res, url, deps) {
 
   // POST /api/image/ai-generate — generate an image, selecting the provider through the
   // OSS-first image-model-registry (Act stage). Returns the SAME contract as before —
-  // { ok, url: "/images/<file>", model } — so the chat "draw me X" flow and Three Doors
-  // (public/js/three-doors-images.js) keep working; they keyless-fall-back when ok is false.
+  // { ok, url: "/images/<file>", model } — so the chat "draw me X" flow keeps working;
+  // it keyless-falls-back when ok is false.
   //
   // Phase 1: the local OSS lead (Flux/ComfyUI) has no driver yet and is unreachable, so the
   // chain resolves to OpenAI exactly as before (no behavior change). Once Phase 3 lands the

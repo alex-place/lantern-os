@@ -67,8 +67,6 @@ const EXTENSION = {
   "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
-  // game — playable surface beside the loop (linked from Explore as a game card)
-  "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
   "terms.html":                    ["account", null],
