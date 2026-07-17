@@ -35,10 +35,20 @@ function b32(buf) {
   return buf.toString("base64").replace(/\+/g, "").replace(/\//g, "").replace(/=/g, "").slice(0, 12).toLowerCase();
 }
 
-/** Deterministic signed referral code for a user (stable across sessions). */
+/**
+ * Deterministic signed referral code for a user (stable across sessions).
+ *
+ * This is a keyed MAC over a PUBLIC identifier (the userId), NOT password storage:
+ * the code is meant to be shared in a link, and it must be recomputable to be
+ * verified — so a deliberately-slow password hash (bcrypt/scrypt) would be the
+ * WRONG primitive. HMAC-SHA256 with a server secret is the correct construction
+ * for an unforgeable, verifiable share code. CodeQL's js/insufficient-password-hash
+ * mis-classifies the session-derived userId as a password; suppressed accordingly.
+ */
 function codeFor(userId) {
   const uid = String(userId || "").trim();
   if (!uid) return null;
+  // codeql[js/insufficient-password-hash] — MAC over a public id, not a stored password (see above).
   const mac = crypto.createHmac("sha256", secret()).update("ref:" + uid).digest();
   return b32(mac);
 }
