@@ -87,6 +87,12 @@ check("gate rejects unrelated questions", () => {
   assert.ok(!arxiv.looksLikeAIResearchQuestion("best sourdough bread recipe"));
 });
 
+check("gate accepts control-engineering questions (curated tranche)", () => {
+  assert.ok(arxiv.looksLikeAIResearchQuestion("event-triggered control for scheduling the verify stage"));
+  assert.ok(arxiv.looksLikeAIResearchQuestion("self triggered sampling from measured Lyapunov decay rates"));
+  assert.ok(arxiv.looksLikeAIResearchQuestion("when should we rebalance under transaction costs"));
+});
+
 check("gated query returns [] for non-AI message", () => {
   assert.deepStrictEqual(arxiv.queryArxiv("how do I bake bread"), []);
 });

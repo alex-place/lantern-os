@@ -74,15 +74,6 @@ def test_server_supports_cloud_port_and_mirror_api() -> None:
     assert "LANTERN_CLOUD_MIRROR_URLS" in server
 
 
-def test_dashboard_holds_unverified_aws_url_as_local_front_door() -> None:
-    text = (ROOT / "apps" / "lantern-garage" / "public" / "app.js").read_text(encoding="utf-8")
-    required = [
-        "function canonicalFrontDoorVerified(cloudMirrors)",
-        "function cloudMirrorStateLabel(mirror, mirrors)",
-        'const CLOUD_PROVIDER_LABEL = "AWS ECS/Fargate"',
-        "service URL pending",
-        'setFrontDoorLink(frontDoorUrl, canonicalVerified ? "Cloud front door" : "Local front door")',
-        "return mirrors?.localPrimary || LOCAL_APP_ORIGIN",
-    ]
-    missing = [phrase for phrase in required if phrase not in text]
-    assert missing == []
+# (test_dashboard_holds_unverified_aws_url_as_local_front_door was removed: its
+# subject — public/app.js and its cloud-mirror front-door logic — was deleted as
+# dead code in #2685, which left this test failing on every PR.)

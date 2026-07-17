@@ -49,9 +49,12 @@ function tokenize(text) {
 
 // --- research gate ---------------------------------------------------------------
 // Cheap keyword gate so retrieval only fires on questions where recent papers help,
-// avoiding per-message cost and noise on unrelated chats. Covers the two corpus
-// domains: AI/ML (cs.CL/LG/AI/NE, stat.ML) and quantitative finance (q-fin.*, the
-// Sharpe / portfolio / trading-strategy research that grounds the trading lane).
+// avoiding per-message cost and noise on unrelated chats. Covers the three corpus
+// domains: AI/ML (cs.CL/LG/AI/NE, stat.ML), quantitative finance (q-fin.*, the
+// Sharpe / portfolio / trading-strategy research that grounds the trading lane), and
+// the curated control-engineering tranche (eess.SY / math.OC — event-/self-triggered
+// control, the "schedule interventions from measured decay rates" canon; see
+// docs/ARXIV-CORPUS.md).
 const AI_GATE_TERMS = [
   "llm", "llms", "language model", "language models", "transformer", "transformers",
   "gpt", "claude", "gemini", "llama", "mistral", "qwen", "deepseek", "diffusion",
@@ -72,6 +75,12 @@ const AI_GATE_TERMS = [
   "quantitative trading", "quant trading", "algorithmic trading", "factor investing",
   "momentum strategy", "mean reversion", "volatility", "option pricing", "order book",
   "high-frequency trading", "statistical arbitrage", "kelly criterion",
+  // Control engineering (curated eess.SY / math.OC tranche — trigger scheduling)
+  "event-triggered", "event triggered", "self-triggered", "self triggered",
+  "triggering condition", "lyapunov", "control theory", "control-theoretic",
+  "feedback control", "optimal control", "model predictive", "sampled-data",
+  "sampled data", "impulse control", "decay rate", "dwell time", "rebalanc",
+  "transaction cost", "no-trade",
 ];
 
 function looksLikeAIResearchQuestion(message) {

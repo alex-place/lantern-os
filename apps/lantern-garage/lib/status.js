@@ -234,7 +234,7 @@ function getAccessModel() {
         label: "$20 Auth",
         priceUsdMonthly: 20,
         authRequired: true,
-        summary: "Supporter workspace for queue visibility, report packets, and a weekly operator digest.",
+        summary: "Pro workspace for queue visibility, report packets, and a weekly operator digest.",
         features: ["queue visibility", "report packets", "weekly digest"]
       },
       {

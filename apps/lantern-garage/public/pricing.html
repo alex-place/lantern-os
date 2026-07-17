@@ -156,7 +156,7 @@
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pro" hidden>Upgrade to Pro</button>
-          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Link Patreon</a>
+          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
         </div>
         <p class="tier-note">Billed securely by Stripe or Patreon. Cancel anytime.</p>
       </article>
@@ -174,7 +174,7 @@
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pilot" hidden>Upgrade to Pilot</button>
-          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Link Patreon</a>
+          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
         </div>
         <p class="tier-note">Billed monthly by Stripe or Patreon. Invoice available.</p>
       </article>
@@ -203,8 +203,17 @@
     }
     // Post-checkout return flags (set by /billing/success and the cancel_url).
     var q = new URLSearchParams(location.search);
-    if (q.get('checkout') === 'success') show('success', 'Subscription active — your new tier is unlocked. Thank you for supporting unisona.ai.');
-    else if (q.get('checkout') === 'cancel') show('info', 'Checkout canceled — no charge was made.');
+    if (q.get('checkout') === 'success') {
+      show('success', 'Subscription active — your new tier is unlocked. Thank you for supporting unisona.ai.');
+      // Eager-sync the grant via an authenticated same-origin POST (the /billing/success
+      // GET no longer mutates state — #2648). Fire-and-forget; the webhook is authoritative.
+      var cs = q.get('cs');
+      if (cs) {
+        fetch('/api/billing/sync', { method: 'POST', credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: cs }) })
+          .catch(function () { /* best-effort; webhook still applies it */ });
+      }
+    } else if (q.get('checkout') === 'cancel') { show('info', 'Checkout canceled — no charge was made.'); }
 
     function openPortal() {
       fetch('/api/billing/portal', { method: 'POST', credentials: 'same-origin' })
