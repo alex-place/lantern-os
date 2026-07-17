@@ -37,12 +37,13 @@ const WATCH = ['SPY', 'AAPL', 'TSLA', 'NVDA', 'AMD', 'AMZN', 'INTC', 'SHOP', 'AS
 const WARMUP = 60;             // bars before we start deciding (MACD 26+9, SR zones)
 const COST = 0.0005;           // per side
 const MIN_HOLD_BARS = 2;       // ~30 min on 15m
-const STOP_PCT = 0.02, ARM_PCT = 1.5, EXIT_MIN_PWIN = 0.6;
+const STOP_FLOOR = 0.008, ARM_PCT = 1.5, EXIT_MIN_PWIN = 0.6;  // floor 0.8% so the ATR× mult is the real lever
 
 function closesOf(bars) { return bars.map((b) => b.close); }
 
 // One symbol, one config → array of round-trip trades. No look-ahead.
-function simulateSymbol(sym, bars, useKnife) {
+// stopMult = ATR multiple for the protective stop (the lever under test).
+function simulateSymbol(sym, bars, useKnife, stopMult) {
   const trades = [];
   let pos = null; // {entryPx, stop, peak, entryTs, entryIdx}
   for (let t = WARMUP; t < bars.length - 1; t++) {
@@ -116,7 +117,7 @@ function simulateSymbol(sym, bars, useKnife) {
     // Fill at NEXT bar open (no look-ahead). Stop from the ATR/S-R plan, floored at STOP_PCT.
     const fill = bars[t + 1];
     const a = atr(slice) || price * 0.005;
-    let stop = Math.max(price - a * 2, price * (1 - STOP_PCT));
+    let stop = Math.max(price - a * stopMult, price * (1 - STOP_FLOOR));
     if (sr.support > 0 && sr.support < price && (price - sr.support) / price >= 0.005 && (price - sr.support) / price < 0.06) stop = sr.support;
     pos = { entryPx: fill.open, stop, peak: fill.open, entryTs: fill.timestamp, entryIdx: t + 1 };
   }
@@ -160,20 +161,27 @@ function metrics(trades) {
   process.stderr.write(`Fetching 15m bars for ${WATCH.length} symbols…\n`);
   const bm = await yahoo.getBarsMulti(WATCH, '15m').catch((e) => ({ bars: {}, err: e.message }));
   const bars = (bm && bm.bars) || {};
-  const configs = { baseline_no_filter: false, with_knife_filter: true };
-  const result = { generatedAt: new Date().toISOString(), universe: WATCH, note: 'walk-forward, no look-ahead, next-bar-open fills, longs-only, 15m, news/earnings/sector neutral, 0.10% round-trip cost', configs: {} };
-  for (const [name, useKnife] of Object.entries(configs)) {
+  // Stop-width sweep — the experiment. Knife filter ON (it helped); vary the ATR
+  // multiple for the protective stop. 'as_is_atr2' reproduces the prior run's stop.
+  const configs = [
+    { name: 'atr2_knife', useKnife: true, stopMult: 2 },
+    { name: 'atr3_knife', useKnife: true, stopMult: 3 },
+    { name: 'atr4_knife', useKnife: true, stopMult: 4 },
+    { name: 'atr3_no_knife', useKnife: false, stopMult: 3 },
+  ];
+  const result = { generatedAt: new Date().toISOString(), universe: WATCH, note: 'walk-forward, no look-ahead, next-bar-open fills, longs-only, 15m, news/earnings/sector neutral, 0.10% round-trip cost; stop = max(ATR×mult, 0.8%); sweep over ATR multiple', configs: {} };
+  for (const cfg of configs) {
     let all = [];
     for (const sym of WATCH) {
       const b = (bars[sym] && bars[sym].bars) || [];
       if (b.length < WARMUP + 20) { process.stderr.write(`  ${sym}: only ${b.length} bars — skipped\n`); continue; }
-      all = all.concat(simulateSymbol(sym, b, useKnife));
+      all = all.concat(simulateSymbol(sym, b, cfg.useKnife, cfg.stopMult));
     }
-    result.configs[name] = metrics(all);
-    const m = result.configs[name];
-    process.stderr.write(`\n[${name}] ${m.n} trades over ${m.tradingDays}d | win ${m.winRate}% | riskWin ${m.riskExitWinRate}% | avgR ${m.avgR} | PF ${m.profitFactor} | totRet ${m.totalReturnPct}% | maxDD ${m.maxDDpct}% | Sharpe ${m.sharpe}\n`);
+    result.configs[cfg.name] = metrics(all);
+    const m = result.configs[cfg.name];
+    process.stderr.write(`\n[${cfg.name}] ${m.n} trades over ${m.tradingDays}d | win ${m.winRate}% | riskWin ${m.riskExitWinRate}% | avgR ${m.avgR} | PF ${m.profitFactor} | totRet ${m.totalReturnPct}% | maxDD ${m.maxDDpct}% | Sharpe ${m.sharpe}\n`);
   }
   const outPath = path.join(__dirname, '..', 'data', 'trader-walkforward.json');
   try { fs.writeFileSync(outPath, JSON.stringify(result, null, 0)); process.stderr.write(`\nWrote ${outPath}\n`); } catch (e) { process.stderr.write('write failed: ' + e.message + '\n'); }
-  process.stdout.write(JSON.stringify({ baseline: result.configs.baseline_no_filter, filtered: result.configs.with_knife_filter }, (k, v) => k === 'curve' ? undefined : v, 2));
+  process.stdout.write(JSON.stringify(result.configs, (k, v) => k === 'curve' ? undefined : v, 2));
 })();
