@@ -205,6 +205,16 @@ module.exports = async function statusRoutes(req, res, url, deps) {
   // carries per-user ids + activity evidence, which is not a public surface.
   // Every number is MEASURED (machine-checked artifacts); OPERATOR_REPORTED
   // events are never counted (Converge).
+  // #2550 — the four-plan capability matrix, so the founder can verify pricing.html
+  // matches enforcement 1:1 and see whether live enforcement is armed. Public read
+  // (it's the pricing truth, not sensitive); reports the PLAN_ENFORCEMENT flag state.
+  if (url.pathname === "/api/plan/report" && req.method === "GET") {
+    try {
+      const pm = require("../lib/plan-matrix");
+      sendJson(res, { ok: true, enforcementEnabled: process.env.PLAN_ENFORCEMENT === "1", ...pm.planReport() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   if (url.pathname === "/api/traction/level1") {
     try {
       const { isOperatorRequest } = require("../lib/request-auth");
