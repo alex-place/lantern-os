@@ -103,12 +103,12 @@ function createProfile(userId, data = {}) {
  */
 function getProfile(userId) {
   ensureDirectories();
-  const profile = loadProfileFromIndex(userId);
-  if (profile) {
-    profile.metadata.lastLoginAt = new Date().toISOString();
-    updateProfileCache(profile);
-  }
-  return profile;
+  // Read-only: do NOT stamp lastLoginAt here. getProfile runs on nearly every
+  // request (gates, billing, tools); mutating the shared CACHED object by reference
+  // on each read meant a bogus "last login = now" rode along into the next
+  // updateProfile write, and it's simply wrong — reading a profile is not a login
+  // (#2626). Real login time is recorded by the session/traction path.
+  return loadProfileFromIndex(userId);
 }
 
 /**
@@ -330,11 +330,16 @@ function importFromCSF(csfData) {
     throw new Error("Invalid CSF format");
   }
 
-  csfData.records.forEach((profile) => {
+  // Skip tombstones so a round-trip export→import doesn't RESURRECT deleted accounts
+  // (#2628). Note: exportToCSF strips password credentials by design, so imported
+  // local accounts have no password — they re-authenticate via OAuth or a reset, not
+  // via this restore. (A password-preserving backup is a separate, deliberate flow.)
+  const live = csfData.records.filter((p) => !p.deleted);
+  live.forEach((profile) => {
     createProfile(profile.id, profile);
   });
 
-  return csfData.records.length;
+  return live.length;
 }
 
 // ── Internal helpers ──
@@ -561,9 +566,11 @@ function unlinkIdentity(profileId, provider) {
   if (!has) return { error: "not_linked" };
 
   const remaining = identities.filter((i) => i.provider !== provider);
-  // A local password (passwordHash) is also a login method even if there is no
-  // 'local' identity row, so it counts toward "can still sign in".
-  const canStillLogIn = remaining.length > 0 || !!profile.passwordHash;
+  // A local password is also a login method even if there is no 'local' identity
+  // row, so it counts toward "can still sign in". The field is `credential`, not
+  // `passwordHash` — the old name was always undefined, wrongly blocking a
+  // password-holder from unlinking their only OAuth provider (#2623).
+  const canStillLogIn = remaining.length > 0 || !!profile.credential;
   if (!canStillLogIn) return { error: "last_login_method" };
 
   const updates = { identities: remaining };

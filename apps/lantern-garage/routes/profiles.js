@@ -308,7 +308,19 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const userId = path.split("/")[3];
+    // An admin must not delete their OWN account here — it would tombstone the acting
+    // session (getSessionUser now denies deleted, #2608) and can lock the last admin
+    // out. Account removal of self goes through a deliberate flow, not this endpoint (#2629).
+    if (userId === getSessionUserId(req)) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "cannot_delete_self" }));
+    }
+    if (!getProfile(userId)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "unknown_account" }));
+    }
     deleteProfile(userId);
+    console.log(`[PROFILES] admin ${getSessionUserId(req)} deleted profile ${userId}`); // audit line (#2629)
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }

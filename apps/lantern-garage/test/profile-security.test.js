@@ -69,5 +69,30 @@ check("Patreon re-login does NOT resurrect a deleted account (fresh id, tombston
   assert.equal(p.isProfileDeleted(first.id), true, "the original tombstone is still dead");
 });
 
+// ── #2623 unlinkIdentity counts a local password as a login method ───────────
+check("a password-holder can unlink their only OAuth provider (credential counts, #2623)", () => {
+  const prof = p.createProfile("u-unlink-" + ++n, {
+    email: "pw@x.com",
+    credential: p.hashPassword("hunter2hunter2"),
+    identities: [{ provider: "google", providerId: "g9", email: "pw@x.com", emailVerified: true }],
+  });
+  const res = p.unlinkIdentity(prof.id, "google");
+  assert.ok(res.profile, "unlink allowed because the local password remains a login method");
+  assert.ok(!res.error, "not wrongly blocked as last_login_method");
+});
+
+// ── #2628 CSF import does not resurrect deleted accounts ─────────────────────
+check("importFromCSF skips tombstones (no resurrection, #2628)", () => {
+  const csf = { format: "CSF-1.0", type: "user-profiles", records: [
+    { id: "imp-live-" + ++n, email: "live@x.com", role: "guest", metadata: {} },
+    { id: "imp-dead-" + ++n, email: "dead@x.com", role: "guest", deleted: true, metadata: {} },
+  ] };
+  const liveId = csf.records[0].id, deadId = csf.records[1].id;
+  const count = p.importFromCSF(csf);
+  assert.equal(count, 1, "only the live record is imported");
+  assert.ok(p.getProfile(liveId), "live record imported");
+  assert.equal(p.getProfile(deadId), null, "tombstoned record NOT resurrected");
+});
+
 process.exitCode = failures ? 1 : 0;
 console.error(failures ? `\n${failures} FAILED` : "\nall ok");
