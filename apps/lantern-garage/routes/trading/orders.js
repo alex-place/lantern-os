@@ -122,11 +122,21 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       const uid = getEffectiveUserId(req);
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
       const alpaca = require('../../lib/alpaca-adapter');
+      const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
-      // else the operator's server paper keys). Alpaca PAPER fills for real without
-      // arming — so a paper trade actually happens instead of a dry-run dead end.
-      const result = (await bridge.placeIBKROrder(uid, orderReq).catch(() => null))
-        || (await alpaca.placeOrder(uid, orderReq).catch(() => null))
+      // else the operator's server paper keys), flipped by BROKER_PREFER=alpaca.
+      // Either order keeps the other broker as fallback. Alpaca PAPER fills for
+      // real without arming — so a paper trade actually happens instead of a
+      // dry-run dead end.
+      const attempts = preferredBroker(uid) === 'alpaca'
+        ? [() => alpaca.placeOrder(uid, orderReq), () => bridge.placeIBKROrder(uid, orderReq)]
+        : [() => bridge.placeIBKROrder(uid, orderReq), () => alpaca.placeOrder(uid, orderReq)];
+      let result = null;
+      for (const attempt of attempts) {
+        result = await attempt().catch(() => null);
+        if (result) break;
+      }
+      result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Connect Alpaca (one click) or ask an admin to set Alpaca paper keys to trade.' };
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
@@ -137,6 +147,20 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           status: 'submitted',
           order_type: result.type,
         }]);
+        // #2547: the composite active-user metric needs a per-user paper-trade
+        // artifact. Record it as a MEASURED traction event at the moment a real
+        // broker accepted the order (verified:true — machine-checked, not
+        // self-reported). Best-effort: metrics must never break order placement.
+        if (uid) {
+          require('../../lib/traction').recordTractionEvent({
+            kind: 'paper_trade',
+            actor: String(uid),
+            verified: true,
+            confidence: 'high',
+            source: 'POST /api/trading/orders/place',
+            evidence: { order_id: result.order_id, symbol: result.ticker, side: result.side, qty: result.qty },
+          }).catch(() => {});
+        }
         sendJson(res, result, 201);
       } else if (result && result.status === 'dry_run') {
         // Blocked by the safety gate (TRADER_LIVE off / caps / kill-switch): a

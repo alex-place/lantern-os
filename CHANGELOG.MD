@@ -1,3 +1,299 @@
+## [1.12.0] - 2026-07-17
+
+### Added
+- traction: the composite "active user" instrument + weekly Level-1 rollup (#2547, p1). Product plan v5 defines ACTIVE as *watchlist setup AND ≥10 real chats AND ≥1 paper trade*; Level 1 clears at **50 active · 15 paying · 40% M1 retention** — none of which was measurable.
+-   - **`lib/active-user-metric.js`**: composite evaluator over real per-user artifacts (watchlist files, per-user conversation logs, broker-accepted `paper_trade` traction events), paying count from the profiles store's role field (Pro tier), and month-1 retention over `daily_active` events (cohort ≥28d old, retained = activity in the 28–35d window; empty cohort → `rate: null`, never a fake 0). Operator/test identities are excluded from every count; **only `verified:true` (MEASURED) events count — OPERATOR_REPORTED never does** (the acceptance criterion).
+-   - **Missing instrumentation added**: `POST /api/trading/orders/place` now records a `paper_trade` traction event (actor = user, verified, with order-id evidence) at the moment a broker accepts — per-user practice trades previously had no in-repo artifact at all.
+-   - **Weekly rollup**: one `weekly_rollup` event per ISO week appended to `data/traction/events.jsonl` (MEASURED; boot + daily check; same-week re-runs no-op).
+-   - **`GET /api/traction/level1`** (operator-gated — payload carries per-user evidence) + a **Level-1 tile on metrics.html** showing the three numbers vs targets with the definition inline.
+-   - Verified: 7-case unit suite (composite math, OPERATOR_REPORTED exclusion, operator exclusion, retention cohort math, null-rate honesty, snapshot shape, rollup idempotency) + live on a worktree dev server (boot rollup appended 2026-W29; operator snapshot 200 with honest zeros; proxied guest 403; tile renders).
+- brand/media: README demo screenshots + a real og-image, and the missing brand asset restored (1.11 polish pass).
+-   - **`sigma0-mandala.svg` restored** (#2528): the brand guidelines' documented hero motif was 404 — the asset had been accidentally swept out twice by unrelated commits (restored in `aa63601f`, deleted again by `c61264e9`). Recovered the 18KB original into `apps/lantern-garage/public/`.
+-   - **README demo media** (#2533): real dream-chat screenshots (light + dark, captured from the running stable server at 1280×800@2x via Playwright) now sit under the README tagline in a `<picture>` element that follows the reader's color scheme. Stored in `docs/media/` (small brand assets are in-repo; R2 remains for gallery media).
+-   - **og-image** (#2533): a branded 1200×630 raster (`/og-image.png` — mandala lockup + tagline + loop motto, dark theme tokens, sigma0-mandala ambient motif) rendered from brand tokens. Wired `og:image` + `twitter:card=summary_large_image` into index (replacing the SVG that social crawlers can't unfurl), dream-chat, pricing, proof, faq, and whats-new.
+- ci: markdown link-integrity gate (#2532). `scripts/check-md-links.mjs` (zero-dep) checks every relative link in README.md, root *.md, and docs/** — 1,152 links today. Ratchet design: the ROOT tier blocks (it starts clean — the 3 dead root links found at introduction are fixed in this change: two repointed to surviving docs, one bad `../` prefix); docs/** is warn-only until its 124 pre-existing dead links are burned down (tracked in a follow-up issue), then flips to blocking via `--strict`. Wired into pr-gates as its own job; code fences/inline code are ignored, external URLs are deliberately not fetched (flake), root-absolute `/x` targets are app routes owned by the Site Audit gate. Verified: passes on master, fails on an injected dead link.
+- PAPER micro-futures trend-following book experiment (`experiments/microfutures_trend_book.py`, #2581) — the breadth experiment. 18/18 Yahoo continuous futures usable; classic TSMOM (monthly rebalance, sign-of-trailing-return, vol-parity sizing, 2x gross cap, $20/mo deposits). Honest measurement: full-period deposit-stripped Sharpe 0.28 [Lo 95% CI -0.10, 0.67] → **below** the ADR-0028 Buffett bar (0.79); validation 2013+ Sharpe 0.39; SPY DCA beats it on both Sharpe (0.43) and final value ($37.4k vs $8.9k). The 2x retail gross cap binds at every vol target, so the target is inert. Crisis bootstrap (1,000 x 2y): P(<$10k from $25k) 0.0%, median $27.1k, worst $16.6k — the book is crisis-defensive, not return-competitive. Evidence only: no product surface, no execution code.
+- billing: **Pay for a plan by card, right in Unisona — native Stripe subscriptions alongside Patreon (#2568, #2563).** Pro ($20) and Pilot ($200) can now be purchased with a card through Stripe Checkout without leaving for Patreon, and managed or cancelled in the Stripe Customer Portal.
+-   - **Stripe is a SECOND entitlement source feeding the SAME role model.** A signed webhook is the source of truth: it verifies Stripe's signature over the exact raw bytes, maps the subscription's Price → a whitelisted role, and the effective role is always `MAX(patreonRole, stripeRole)`. A purchase can **never** mint `admin` (mirrors the Patreon "no purchasable admin" invariant). Cancelling one source only drops to the other's floor — a Stripe cancel never strips a Patreon tier, and a lapsed-Patreon login keeps a paid Stripe tier.
+-   - **Server-side tier enforcement.** Member ($5, Patreon) / Pro ($20) / Pilot ($200) map from the pledge/subscription amount to roles + entitlements (`pro`, `trade`, `ai_trader`) and per-tier chat quotas, guarded on the API (`premiumApiGuard` / `tradeApiGuard` / `aiTraderGuard`) — the paywall is real, not just UI. Pilot unlocks the autonomous AI trader.
+-   - **Already subscribed by card elsewhere?** A verified-email "Link my subscription" flow attaches an existing Stripe subscription to your account; a "Manage subscription" button opens the portal for active subscribers instead of offering a second (double-billing) checkout.
+-   - **Boot-safe & opt-in.** The `stripe` SDK is an optional dependency, lazy-required; with no keys the whole surface is inert (`/api/billing/*` → 503) and the app boots normally. Turn it on with `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` + one `STRIPE_PRICE_*` per tier + `PUBLIC_BASE_URL` (see `.env.example`).
+-   - Hardened and verified end-to-end against a live Stripe **test** account: a 26-step lifecycle harness (checkout → grant → dunning-keep → upgrade → cancel → chargeback/refund revoke → idempotency → cross-livemode → bad-signature) passes, and real Stripe CLI events flow through `stripe listen` → the webhook verifies and records them. Strengthens **Act** (turn intent into a provisioned account) and **Verify** (the webhook, not the client, is authoritative).
+- Option-overlay books for the $20/mo walk-forward DCA harness (`experiments/option_overlay_books.py`, #2578): real option-strategy price histories (put-write ^PUT 1996+ substituting the dead-on-Yahoo PUTW ticker, buy-write PBP 2008+, covered-call QYLD 2013+ / JEPI 2020+) folded into the max-Sharpe tangency universe via the existing 36-month universe-entry rule, plus a collar-ish 20% fixed-sleeve book — measured verdict (`experiments/results/option_overlay_books.json`): no overlay moves the ADR-0028 gate off `below` on the full 2000–2026 window (best point Sharpe 0.69 vs bar 0.79, from the pre-fee ^PUT book, which also cuts maxDD −45.9%→−38.1% but costs $4.3k of final value), the collar-ish sleeve actually flips the post-2007 window from `meets_point` to `below`, and standalone only ^PUT beats SPY on Sharpe (0.83 vs 0.72) — consistent with the variance-risk-premium corpus (arXiv 2508.18868, 2508.16598, 2606.17032) but nothing reaches `meets_ci`.
+- trading: public read-only **live demo-account view** at `/demo.html` — watch the paper account trade in real time, no sign-up (#2548, product plan v5 §01).
+-   - **New surface `demo.html`**: account summary tiles (equity, day P&L, unrealized, realized today), open positions table, and a live entries/exits activity feed with the engine's signal tags; polls every 7s with an honest live/stale indicator and a prominent "paper money — not investment advice" badge. Public in `routes/pages.js` + `auth-gate.js`, classified in the surface registry (trading extension, Observe stage).
+-   - **New endpoint `GET /api/trading/demo-feed`** (`routes/trading/demo.js`, listed in `PUBLIC_TRADING_READS`): a sanitized snapshot of the OPERATOR demo account via the trusted in-process loopback (never a visitor's linked broker). Strict field **allowlist** — every object is rebuilt key-by-key, so broker account ids/keys can never leak even if upstream payloads grow; 5s shared cache so N spectators don't multiply broker calls; read-only (no order/config surface exists on the route or the page).
+-   - Verified: page serves 200 to a logged-out guest with zero console errors; feed returns real ledger activity (25 entries/exits with P&L + p(win) tags); a leak test injecting `account_number`/`api_key`/`asset_id` into a fake upstream payload confirmed only allowlisted keys pass; surface-boundary + deployment-profile suites pass.
+- verify: new-.py wiring gate in the sprawl tripwire (#2542). The Python scripts audit found 116 orphan .py files — 97 from a single bulk import nothing ever wired. `scripts/sprawl-tripwire.mjs` (already run by the pre-push hook AND the pr-gates CI job, so zero new wiring) now also blocks a **newly added** `.py` outside `tests/` + `experiments/` unless an anchor references it: server JS (`apps/`), the MCP server, a CI workflow, Makefile, package.json, `scripts/hooks/`, a tracked `.ps1`/`.sh` launcher, the SCRIPTS.md ops registry (#2537) — or an import from an **already-existing** `.py` (two new orphans can't vouch for each other; `__init__.py` package markers are exempt). Existing files are grandfathered; escape hatch unchanged (`SKIP_SPRAWL_CHECK=1`). Verified all five paths live: unwired orphan → exit 1; Makefile-anchored → wired; pre-existing-module import → wired; new-file import → still a violation; tests/+experiments/ additions ignored.
+
+### Fixed
+- ops: stop agent sessions from branch-switching the human's primary checkout (2026-07-16 incident — an agent ran `git stash` + `git checkout` on the main tree, switching active trading WIP out from under the operator and sweeping untracked runtime data).
+-   - **MCP `local_git_create_branch` now refuses a dirty primary checkout** (`git_tree_dirty` error pointing at `local_worktree_create`), mirroring the existing `self-edit-engine.js` guard.
+-   - **`post-checkout` hook tripwire**: git has no blocking pre-checkout hook, so the repo hook now detects an agent session (`CLAUDECODE=1`) completing a branch checkout on the primary tree (never linked worktrees, never file checkouts, never humans), prints a loud switch-back-and-use-a-worktree warning (agents read hook output as feedback), and appends an audit line to `data/ops/main-tree-checkouts.jsonl`.
+-   - **AGENTS.md**: explicit "never branch-switch the primary checkout" rule in the worktree-architecture section.
+-   - Verified: hook fires exactly in the agent+main-tree+branch case (4-scenario matrix), MCP guard refuses dirty / allows clean.
+- mobile(trader): restore the one-panel-at-a-time phone layout the upstream hamburger redesign removed, plus the polish items riding on it (#2501, 6 items).
+-   - **Chart / Tickers / Positions segmented control restored + extended** (items 2–3): the merged single-scroll view stacked header + ticker list + 22 chart cards + account panel into ~11,000px of scroll on an 812px phone. The view tabs are back (recovered from merge-base `833562f7`) with a **third Positions tab** for the account panel; at 375px exactly ONE of {charts, tickers, account} is visible and the page height is the viewport (measured 812px, no overflow).
+-   - **Buy/sell sheet fits without scrolling** (item 4): `.ot-modal` max-height 82vh→92vh; measured with Take-profit + Stop-loss both expanded: content 737px ≤ 747px cap, no scroll (was overflowing by ~68px).
+-   - **Phone chart modes are 1 / 2 only** (item 5): "⊞ All" is retired on phones (it rendered the whole 22-card deck), the viewport cap rises to 2, the default is 1 full-size chart, and a persisted `slotCount=0` migrates to 1 so existing users don't land on a retired option.
+-   - **Chart controls out of ☰, to its left** (item 6): the layout/type/patterns/timeframe cluster stays inline in the horizontally-scrollable header instead of hiding in the hamburger; the ☰ pins sticky-right so it stays reachable. Menu labels updated to match.
+-   - **"Position chart missing" (item 1)**: could not reproduce post-fix — with the tabs restored, the chart view renders one full-size chart with BUY/SELL directly under it (verified at 375×812 via Playwright, authed test session). It was a symptom of the ~11k-px stack; flagged for operator re-check.
+- security: strip the two session-store files + stray telemetry deltas that PR #2575 accidentally committed (swept from a test server's runtime dir), and gitignore `data/sessions/` so a session file can never be committed again. The leaked session IDs were deleted from the live stable server's store immediately (per-request file reads — invalidation was instant) and the cookie-signing secret means raw IDs alone were not replayable.
+- providers/hooks/docs: truth-alignment cluster from the 2026-07-16 audits (#2527 #2529 #2530 #2531 #2536).
+-   - **Grok wired into the fallback chain — and its silent-failure bug fixed** (#2531): the full xai transport (streaming + native tool loop) existed but no chain dispatched it, AND every dispatch (even explicit pins) 400'd because the shared OpenAI decode params include `frequency_penalty`, which grok reasoning models hard-reject (probed live: `"Model grok-3-mini does not support parameter frequencyPenalty"`). Added `applyXAIDecodeParams` (top_p only), swapped both xai call sites, wired xai into the `creative` + `default` chains, and updated PROVIDERS.md §4 from "Declared, Not Yet Implemented" to the verified live state. Provider error rejects (xai plain + xai/openai/cohere/anthropic tool-turns) now carry the provider's response body instead of a bare status — the bare status is what hid this bug.
+-   - **Hook headers tell the truth** (#2527): the pre-push comment described the retired version-bump+CHANGELOG gate; it now describes the changelog.d fragment gate its validator actually enforces. The legacy `pre-commit-version-changelog` hook + `validate-version-changelog.py` are removed; `pre-commit-full-validation` step 1 now runs the current fragment validator (verified: PASS against real fragments). docs/HOOKS.md updated.
+-   - **`tests/perf_dream_journal.py` removed** (#2536): never collected (doesn't match `test_*.py`), targeted the old Dream Journal service API.
+-   - (#2529 and #2530 closed with evidence, no code needed: the lore referrer was deleted wholesale with `lore/` in #2520, and zero surfaces still claim the retired `server-health.js` runtime auto-repair.)
+- Fixed the fleet-review "COMMENT-forever" wedge that starved auto-merge (#2577):
+- the persona prompt advertises real tools, but the watcher's non-streaming
+- `/api/dream/chat` call executes none — so the reviewer narrated inspection plans
+- ("Let's start by looking at the diff…") and never emitted its required first-line
+- `VERDICT:`, which parses fail-closed to COMMENT. Three-part fix: (1) an allowlisted
+- **one-shot mode** in the chat pipeline (`body.mode: "review"`) that swaps in an
+- honest no-tools/no-follow-up system prompt and skips every context injection
+- (web grounding, oracle, mesh, life-fact capture, keystone-ft auto-route);
+- (2) the watcher now **retries once for just the verdict line** when a review
+- lacks the tag, prepending a recovered `VERDICT: X`; (3) cross-host adoption via
+- the `fleet-auto-review:<sha>` marker only adopts reviews that actually
+- **concluded** (explicit tag) and prefers the newest concluded comment, so a
+- stale ramble can't shadow its corrected re-review. New `PrWatcher._verdictTag`
+- helper (tag-only, no bare-token fallback, null instead of fail-closed) with 7
+- new unit tests — 95 pass. Verified live: a watcher-style `mode:"review"` call
+- returns a first-line `VERDICT: APPROVE` with zero tool narration, and the
+- default chat path is unchanged. (Improves Verify — reviews that conclude.)
+- Fixed `start:master` (the stable-server autostart entrypoint): it still chained
+- `python3 …/human-flourishing-frameworks/export_snapshot.py || true` — that script
+- was deleted in the consolidation, and on Windows cmd `|| true` is not a command,
+- so the chain died **before `node --watch server.js` ever ran**. This is what kept
+- the 4177 stable server (and with it the in-process PR auto-merge watcher) from
+- booting on the fleet host. The script is now just pull + serve. (Improves Act —
+- the auto-merge/deploy loop can actually start.)
+
+### Changed
+- # feat(trader): one-click "⚡ Connect Alpaca" in the trader ☰ menu
+- The stock-trader header/hamburger now carries a direct one-click Alpaca connect
+- button (ADR-0027). For entitled traders it starts the OAuth flow immediately
+- (`/api/broker/alpaca/connect?returnTo=/stock-trader.html` → sign in at Alpaca →
+- approve → bounced back to the trader with a confirmation). States:
+- connected → green `⚡ Alpaca · <acct> (paper)`, click manages on orchestration#broker
+- configured, not connected → `⚡ Connect Alpaca` is the OAuth start itself
+- server not configured (missing `ALPACA_OAUTH_CLIENT_ID/_SECRET`) → points at the
+-   broker card, which explains the pending setup and offers IBKR
+- Guests never see it (same `body.guest` gate as the IBKR link). The OAuth return
+- param (`?alpaca=connected|error`) is announced once and scrubbed from the URL.
+- Added deterministic "proper betting" stake sizing to the Kalshi suggestion
+- engine (`lib/kalshi-proper-bet.js`), per arXiv 2607.06166 ("When do prophets
+- profit in prediction markets?"): for a strictly proper scoring rule with convex
+- potential G, the only robustly profitable bet is s_G(p,q) = ∇G(p) − ∇G(q) —
+- Brier variant sizes ∝ |p − q|, log variant ∝ |logit(p) − logit(q)| — with
+- positive expected profit whenever the forecast p outperforms the price q under
+- the rule and the book is liquid enough. Every entry card now carries an
+- ADVISORY `properBet` block (both rules: side, contracts, stake vs. a
+- `KALSHI_PROPER_BET_BANKROLL` advisory bankroll, scoring-rule edge S(p) vs S(q)),
+- computed from the proven resolved-ledger win rate only — honest zero stake when
+- there is no edge, inside the bid-ask deadband, or the ledger is unproven.
+- No conviction floors, order logic, or execution paths changed; live trading
+- stays behind the existing dry-run/kill-switch gates. Offline unit tests:
+- `tests/test_kalshi_proper_bet.js`.
+- Added: `/settings.html` — a tabbed, two-column settings page carrying all of the
+- key config: **API keys** (all four provider key cards — save/test/clear against
+- the real `/api/providers/set-key` + `/api/providers/test/:id` endpoints, plus the
+- preferred-provider picker), **Connectors** (MCP server + web search checks), and
+- **Context** (web/CSF/trading context toggles). Tabs implement the WAI-ARIA tabs
+- pattern (ArrowLeft/Right/Home/End move selection + focus, hash deep-links
+- `#keys/#connectors/#context`); the two-column grid collapses to one column under
+- 720px. The old single-column `/api-keys-settings.html` is retired via a 302 to
+- `/settings.html` (surface registry + explore/welcome links + the a11y test list
+- updated). Verified in a real browser signed in as the test account: tab
+- switching, keyboard nav, mobile collapse, and the server-key overlay all work;
+- `test:boundary` and `scripts/test-a11y.js` pass. (Improves Act — one settings
+- surface, no duplicate key pages.)
+- Polished the stock-trader order ticket: the header's **✕ close button is gone** —
+- the docked panel is now dismissed only via Esc or the phone bottom-sheet backdrop
+- tap (comments/#1694 flow updated) — and in its place the header carries a **live
+- quote readout** (last price + day % change, colored, same `chg_pct` the watchlist
+- shows). The ticket now **re-renders on the 3s price poll**, so its Buy/Sell prices,
+- trade value, and header quote tick live instead of freezing at open time; a guard
+- keeps the armed "Confirm …" two-step label and the "Placing…" state from being
+- clobbered by those re-renders. Also removed the hardcoded fake "Spread 0.00" row
+- (the feed has no bid/ask — showing a permanent 0.00 spread was noise), tidied the
+- exit labels ("Take profit, price" → "Take profit"), sentence-cased the risk-sizing
+- hints, and deduped a double `.ot-field:disabled` rule. Verified in a real browser
+- signed in as the test account: no ✕, live header quote ticking, armed confirm
+- survives polls, Esc closes / BUY reopens, zero console errors. (Improves Act —
+- truthful, live order surface.)
+
+## [1.11.5] - 2026-07-16
+### Fixed
+- **Broker switch works on owner boxes + rows tell the truth (ADR-0027).** (1) `/api/broker/preference` and `preferredBroker()` now resolve an id-less request as `local-owner` — the same owner convention as routes/accounts.js and the broker credential stores — so the ☰ switch no longer dead-clicks (silent 401) on auth-off/single-user setups. (2) The ☰ broker rows now distinguish **· active** (executes your trades, green) from **· fallback** (linked but idle) — previously "IBKR · connected" read as if IBKR were executing while Alpaca actually was. (3) A failed switch now explains itself instead of doing nothing. Tests → 10 (owner fallback honored for id-less requests, other users unaffected; env test pinned to an empty store).
+
+## [1.11.4] - 2026-07-16
+### Fixed
+- Remove a stray empty runtime file (`apps/lantern-garage/data/profiles/index.jsonl`) committed by accident in #2595 and gitignore the per-user `data/profiles/` store — flagged by the Boilerplate/duplication CI check.
+
+## [1.11.3] - 2026-07-16
+### Added
+- **Per-user broker switch — "Broker: Auto / ⚡ Alpaca / 🔗 IBKR" in the trader ☰ (ADR-0027).** Each signed-in trader can now flip which connected broker executes their trades, any time, from the header/hamburger: the choice persists per user (`lib/broker-preference.js`, one tiny JSON per user, gitignored), is served by `GET/POST /api/broker/preference` (`{preference, effective, connected:{alpaca,ibkr}}`), and is honored by every broker-resolution site via `preferredBroker(userId)` — autopilot facade, manual orders, positions. "Auto" follows the server default (`BROKER_PREFER` env, else IBKR-first); the non-preferred broker always remains the automatic fallback, so switching can never strand a working account. Tests: `test/broker-facade.test.js` grows to 8 (per-user beats env both directions, auto/unset follow default, store rejects invalid values). Strengthens **Act**.
+
+## [1.11.2] - 2026-07-16
+### Added
+- **BROKER_PREFER — operator-set broker precedence (ADR-0027).** When a user has BOTH IBKR (ADR-0022) and Alpaca (ADR-0027) connected, `BROKER_PREFER=alpaca` makes all three resolution sites (autopilot broker-facade, manual order placement, positions/account endpoint) try Alpaca first, with IBKR kept as the automatic fallback — and the default remains IBKR-first, byte-compatible with the old behavior. A preference can never strand a working account: the non-preferred broker always stays the fallback. Tests: `test/broker-facade.test.js` (6 — default order, flipped order, both fallback directions, none-connected null, env parsing). Strengthens **Act**.
+
+## [1.11.1] - 2026-07-16
+### Added
+- **One-click ⚡ Connect Alpaca in the trader ☰ menu (ADR-0027).** The stock-trader header/hamburger now starts Alpaca OAuth directly — sign in, approve, bounced back to the trader — instead of routing through the orchestration setup card. Status-aware label (connected / connect / setup pending), guest-gated like the IBKR link, OAuth return param announced once then scrubbed. Strengthens **Act**.
+
+## [1.11.0] - 2026-07-16
+
+### Added
+- trader: volume histogram (bottom band, direction-colored) + dashed amber VWAP overlay on every chart — self-skips when the feed ships no volume (#2436)
+- trader: one-click ✕ Flatten per position row + ✕ Close all in the Positions tab — market-closes via the existing orders/place endpoint with a single confirm (#2437)
+- trader: keyboard-first trading — `/` jump-to-symbol, `B`/`S` buy/sell ticket for the focused symbol, `←→` cycle chart focus, `0-6` layouts; guarded against typing contexts and modifier keys; cheat-sheet pinned in the ☰ menu (#2438)
+- trader: honest feed stamp — "LIVE · 3s" by the pulse dot flips to a red "STALE — reconnecting" after 2 failed polls, so stale prices never masquerade as live (#2439)
+- trader: ET session clock in the toolbar (Pre-mkt/Open/After-hrs/Closed + countdown to the next phase) (#2439)
+- trader: RVOL chip in the symbol panel (relative volume from the regime engine, amber when ≥1.5×) (#2439)
+- trader: risk-based position sizing in the order ticket — enter dollars-at-risk, units auto-compute from the stop distance (#2439)
+- trader: one-shot price alerts per symbol (toast + browser notification, self-removing, persisted) (#2439)
+- trader: watchlist sort — server order · day Δ% · RVOL (#2439)
+- trader: drawing tools — ✏ Draw in the chart cluster places horizontal price levels (one click) and trendlines (two clicks); alt-click deletes, Esc disarms; persisted per symbol and re-rendered through zoom/pan/timeframe (#2444)
+- trader: ⚡ rapid order mode — explicit persisted opt-in that skips order confirms (ticket + flatten) and arms Shift+B/Shift+S instant market orders at the last-used quantity with a toast receipt (#2445)
+- trader: trade journal auto-tag — every order placed from the device snapshots its context (signal, pattern, RVOL, session phase) into a new Journal footer tab (#2446)
+- trader: docked Unisona chat rail (order-ticket-style right dock, reflows the deck, streams from /api/dream/chat/stream; starter chips + hero empty state) (#2431)
+- trader: permanent ☰ sandwich menu — Pre/After + Kalshi at every width; chart controls, Explore, and broker link collapse in on narrow screens
+- broker: one-click Alpaca connect (ADR-0027) — OAuth2 authorize→approve→connected, no keys to generate or paste. Paper account by default; per-user token stored AES-256-GCM encrypted, never returned to the client. New `/api/broker/alpaca/{connect,callback,status,disconnect}`, `alpaca-credentials.js` store, and `alpaca-adapter.js` implementing the same getAccount/getPositions/placeOrder surface as the IBKR path.
+- broker: manual orders + positions now route to a connected Alpaca account when no IBKR account is linked (IBKR → Alpaca → legacy fallback); every order still passes trading-guard (dry unless TRADER_LIVE=1; live Alpaca additionally needs TRADER_ALLOW_LIVE_ACCOUNT=1).
+- ui: "⚡ Connect Alpaca" on orchestration#broker (above the IBKR wizard), a broker-connect panel on work.html, and a "Here to trade?" on-ramp on the sign-in page. All degrade honestly to "setup pending" until the server has ALPACA_OAUTH_CLIENT_ID/_SECRET.
+- research: the local arXiv corpus now covers quantitative finance — harvester keeps `q-fin.PM/TR/ST/RM/CP/MF/PR/GN` (SETS gains `q-fin`, new `--sets` flag backfills one set without re-crawling the others), and the `queryArxiv()` gate passes Sharpe/portfolio/trading-strategy questions, so `!research` grounds trading questions on local post-cutoff papers (~3.4k q-fin papers verified retrievable end-to-end via `scripts/arxiv_query.js`). Improves the Remember stage for the trading lane; same single corpus + BM25 index, no new memory system.
+- docs: `docs/founder-roadmap.html` — the founder's 12-month product roadmap, a standalone companion to `docs/product-plan.html`. A Now/Next/Later focus board over four gated phases (Make it honest → Prove they'll pay & stay → Double down on what sticks → Raise-ready), each with per-workstream rows, a metric clear-condition that unlocks the next phase, and the architecture decisions on record it depends on. Lantern-amber-on-slate identity with a header light/dark toggle; verified WCAG-AA in both themes.
+- docs: `docs/product-plan.html` — the plain-English unisona.ai product plan. A four-plan functionality tier-list (Free / Pro / Business), a gamified four-level 12-month campaign map, illustrative testimonials, a revenue table with a "one year from now" column, the first-50 concierge program (starting with end-to-end verification of 10 demo accounts), and an appendix carrying the plan edit-log + the architecture decisions on record. COMET LEAP report styling with a header light/dark toggle; verified WCAG-AA in both themes.
+- experiments (ADR-0028 Phase-2 evidence): walk-forward $20/mo DCA simulator 2000→2026 (`experiments/dca_walkforward_sim.py` — four objectives incl. 2× margin book with funding/borrow costs and wipeout floor) and the daily leverage-overlay research (`leverage_daily_overlay.py`, `leverage_overlay_opt2.py`, `leverage_risk_2022.py`): train/validation-split tuning, 2022 daily margin-cushion drill-down, and a 1,000-path crisis-only block-bootstrap stress test. Validated Phase-2 spec now recorded in the ADR: daily vol-target 20%/yr + 6-mo trend gate + 15% drawdown brake at 2× cap → +$10,856 vs SPY DCA on the real 26y, −28% max drawdown (vs −51% static/SPY), 0/1,000 crisis margin calls, P(<$10k from $25k) 1.6% vs 70.2% unmanaged.
+- trading (ADR-0028, operator-approved): **Sharpe-mandate gate + tax-aware, objective-selectable proposals**. The Advisor and `propose_rebalance` tool now support `objective=max_return` (max expected return under an annualized vol ceiling — a true long-only efficient-frontier solver, λ-bisected projected gradient with exact LP corner) beside the default max-Sharpe tangency. Every proposal reports where its measured Sharpe stands against the standing mandate (`KEYSTONE_SHARPE_MANDATE`, default 2.0) in three honest states (`meets_ci`/`meets_point`/`below` — only `meets_ci` is eligible for live capital), and SELL rows carry estimated realized gains with a worst-case short-term tax cost so after-tax merit is visible before acting. Leverage/shorting stays out of the recommendation surface (Phase 2, per the ADR).
+- trader: **Advisor tab** — deterministic on-screen portfolio suggestions over your actual broker holdings: measured ex-ante Sharpe with 95% CI, vol, worst drawdown, concentration/diversification flags, a shrunk-tangency rebalance proposal (dry-run order list, CI-honest verdict), and a buy-only **contribution planner** ("adding $20 — which holding should it buy?", fractional-share aware). Pure math from `lib/portfolio-analytics.js` via new `GET /api/trading/portfolio/{analysis,rebalance,contribution}` — no LLM, nothing placed. The same engine is exposed to the chat model as the new `contribution_plan` tool (joining `portfolio_analysis` / `portfolio_whatif` / `propose_rebalance`), so on-screen numbers and tool-call numbers can never diverge. Grounded in the 2026-07-15 Sharpe reading pack (F:\arxiv-corpus\pdfs\REVIEW-2026-07-15.md): tangency direction with shrinkage against estimation error, drawdown reported beside Sharpe, CI-overlap honesty.
+- providers: user BYOK keys now persist server-side (#2505). `POST/DELETE/GET /api/providers/set-key` stores each signed-in user's provider keys AES-256-GCM-encrypted at rest (`lib/user-provider-keys.js`; key scrypt-derived from `LANTERN_KEYSTORE_SECRET` or the session secret), and `POST /api/providers/test/<id>` validates a key with a real provider call. The tenant seam (`lib/tenant.js`) now falls back to the per-user store — below env/vault in the local profile (owner-funded behaviour unchanged), below the session bag in cloud (host env still never used). The API-keys settings page shows keys saved on other devices.
+- Portfolio analytics for the one assistant (Reason stage): three new chat tools apply
+  the UNISONA-SHARPE-CERTIFICATE math to the operator's **actual** broker holdings.
+  `portfolio_analysis` measures current weights, per-holding + whole-portfolio
+  annualized Sharpe with Lo (2002) 95% CIs, volatility, worst drawdown, the pairwise
+  correlation matrix, and concentration (effective N / largest position).
+  `portfolio_whatif` (guest-safe, public data only) scores any user-proposed weight
+  allocation on the same evidence so "what if I went 60/20/20?" gets a measured
+  answer instead of a vibe. `propose_rebalance` computes a shrunk-tangency
+  (w ∝ Σ⁻¹μ, long-only, per-position cap) rebalance PROPOSAL over the existing
+  holdings only, with current-vs-proposed CIs, an explicit statistically-
+  indistinguishable verdict when the bands overlap, and a dry-run whole-share order
+  list — it never suggests new purchases and never places orders (Act stays behind
+  `lib/trading-guard.js` / ADR-0020). Engine: `lib/portfolio-analytics.js`, same
+  Yahoo adjclose total-return source and Sharpe/CI formulas as
+  `scripts/daily-backtest-harness.js` (live outputs cross-checked against the
+  2026-07-10 leaderboard: SPY 0.88, GLD 0.74, SPY–GLD ρ 0.10). Offline unit suite:
+  `npm run test:portfolio --prefix apps/lantern-garage`.
+
+### Fixed
+- docs: removed the case-colliding duplicate `docs/convergence-routing-architecture.md` — the repo tracked BOTH casings of the convergence-routing doc, so on case-insensitive filesystems (Windows/macOS) one always showed as modified, permanently dirtying every checkout and blocking rebase/stash. Canonical UPPERCASE path kept with the newer (brand-swept) content; knowledgecenter + doc-catalog references updated.
+- issue reporter: the 📷 auto-capture no longer photographs full-viewport app pages as a blank sliver. html2canvas sizes its hidden clone iframe with the `width`/`height` attributes — presentational hints that the site.css responsive reset (`iframe{max-width:100%;height:auto}`) overrode, collapsing the clone viewport to the 150px browser default. Inside the clone `100vh` = 150px, so the trading terminal's vh-sized grid captured as headers-over-white — users (and the auto-written report) then reported a "blank page" that was never blank. The capture now pins the clone iframe at the real viewport size for the shot's duration, and passes the true viewport as `windowWidth/windowHeight` so vh units and media queries resolve exactly as the user saw them (long pages still shoot full-document height). Also guarded the trader's inline logo `onload` handlers, which re-fire inside the script-less clone and spammed 13 ReferenceErrors per capture.
+- trader: re-land the P0 execution features (volume+VWAP #2436, Flatten #2437, keyboard-first #2438) — PR #2442 had merged into its stacked base branch instead of master, stranding the work
+- trader charts: bad-tick glitch wicks no longer slam into the plot ceiling — drawn wicks clamped by the same >10× median-span rule the auto-range uses
+- a11y: label the API-key controls and make the chat model picker keyboard-operable (1.11 polish pass).
+-   - **API-key inputs + buttons named for screen readers** (#2474): the four provider key fields on `api-keys-settings.html` were `type=password` with only a placeholder, so a screen reader announced an unlabeled password field; the 👁 show/hide and Save buttons weren't tied to a provider either. Each input now carries an `aria-label` ("Claude API key", …) and every per-row button (show/hide, Save, Test, Clear) exposes a provider-scoped accessible name. `scripts/test-a11y.js` now also runs against `api-keys-settings.html`.
+-   - **Chat model picker operable by keyboard + SR** (#2475): the picker was mouse-only (WCAG 2.1.1 A) — the backing `<select>` is `aria-hidden`/non-focusable and the visible `.mp-item role=option` divs had click-only handlers. The picker now implements the WAI-ARIA listbox pattern: the listbox takes focus on open, ArrowUp/Down move an `aria-activedescendant` active option (skipping disabled/locked ones), Home/End jump to ends, Enter/Space selects and returns focus to the trigger, and Escape closes. Verified end-to-end in a browser keyboard harness (open → arrow → skip-disabled → Enter selects → focus returns; Escape closes).
+- security: close the DOM-XSS in the stock trader's chart overlay (CodeQL #466, `js/xss-through-dom`, high). The timeframe badge interpolated `chartTimeframe` straight into the overlay's `innerHTML`, and both of that value's sources are caller-controlled text — `localStorage['trader.tf']` and the timeframe `<select>` — so a tampered stored pref could inject live markup into the page. The value is now pinned to the eight intervals the chart actually supports (`normalizeTf`, anything else falls back to `5m`) **and** escaped at the sink (`escHtml`), so the taint is broken at both the source and the sink. Legitimate timeframes render exactly as before; a payload like `5m"><img src=x onerror=…>` is reduced to `5M`. Improves Verify (a stored pref can no longer become executable markup).
+- perf: `/api/cubes/alex/personal` no longer freezes the server. The ~9 blocking `execSync` (`gh`/`git`) calls it ran on every dream-chat load (and every 5 min) are now non-blocking async `execFile`, run concurrently, cached for 60s with in-flight de-duplication; the client fetch carries an 8s abort timeout. Concurrent requests stay responsive while it builds — measured: a concurrent `/api/health` returns in ~3ms during a cold 2.8s build, and warm calls return in ~3ms from cache. Also removed the dead `wmic logicaldisk` shell-out (its output was never parsed). (#2492)
+- cloud/chat: the GCP deployment now defaults to Vertex and the chat's Gemini fallbacks are real models again. Two bugs, one symptom (chat failing on the cloud box):
+-   - **The fallback chain called models that don't exist.** `stream-chat.js` fell back to `gemini-3.5-flash` → `gemini-3.1-flash-lite`; both 404 on every wire. Probed live against Vertex `us-central1` (2026-07-15): `gemini-2.5-flash`, `gemini-2.5-flash-lite` and `gemini-2.5-pro` all answer **200**, the two `gemini-3.x` ids **404**. On Vertex a 404 isn't a retryable quota error, so the cloud box had no working fallback at all. The chain now reads from `provider-models.js` (`GEMINI_FALLBACK_MODELS`) — the single-source-of-truth module that exists to stop exactly this drift — and resolves to `gemini-2.5-flash → gemini-2.5-flash-lite → gemini-2.5-pro`. Same fix for `swarm-orchestrator`'s chain.
+-   - **Google Search grounding was silently off everywhere.** The groundable test read `startsWith("gemini-3")`; no gemini-3 has ever reached that chain, so no turn was ever grounded. It now tracks the `googleSearch` tool schema (2.5+), still AI-Studio-wire only — Vertex stays plain.
+- cloud: **Vertex now leads by default wherever it's configured.** Vertex is the only Gemini wire that draws Google Cloud credits (the AI-Studio key is free-tier and bills nothing), so when `GEMINI_USE_VERTEX=1`/`VERTEX_PROJECT` is set and the operator hasn't pinned `KEYSTONE_PREFERRED_PROVIDER`, Gemini leads the dispatch order — spending the credits is the reason Vertex is on. An explicit preference still wins, the backstop chain still follows (a Vertex outage never dead-ends a turn), and non-Vertex deployments are unchanged. GCE runbook updated with the probe table and the new default. Improves Act (the funded provider is the one that answers).
+- trader: the IBKR connect form advertised "saved — leave blank to keep" on credential fields but the server rejected blank fields (`missing_signaturePem`); `POST /api/trading/ibkr/connect` now fills blank fields from the user's stored (encrypted) credentials before validating, so partial updates work. New users with nothing saved still must supply every field.
+- trading: the IBKR Live Session Token expiry (`live_session_token_expiration`) is now handled as the absolute epoch-ms timestamp IBKR's OAuth 1.0a docs specify, instead of being misread as a duration. The old code's 10-minute cap masked the misread but forced a full DH handshake against `/oauth/live_session_token` every 10 minutes; the ~24h token is now cached and reused for its real lifetime, with a 10-minute fallback deadline whenever the value is missing, in the past, or implausibly far out. Protocol-faithful mock in `test/ibkr-cpapi-oauth.test.js` now serves an absolute timestamp and asserts single-handshake reuse plus the malformed-value fallback.
+- nav/info-pages: reconcile and de-fake the shared chrome across the public info pages (1.11 polish pass).
+-   - **Dead "Pitch" link removed** (#2477): `pricing.html` and `proof.html` linked to `/pitch.html`, which 404s (no such file). The links are gone; pricing now cross-links to Live Proof.
+-   - **Pricing + Proof get the shared chrome + dark theme** (#2481): both pages now load `/css/site.css`, run the pre-paint theme bootstrap (no white flash in dark mode), map the legacy `styles.css` token set under `[data-theme="dark"]`, and inject the global nav/footer via `site-chrome.js` instead of a bespoke hardcoded top nav. `proof.html`'s inline `background:#fff` nav is removed.
+-   - **Footer status dot reflects real health** (#2482): `site-chrome.js` shipped a hardcoded green dot + a permanent "connecting…" label that only `index.html`/chat ever updated, so every other shared-chrome page (and the chat footer itself, whose refs are captured before the footer is injected) stayed misleadingly green. site-chrome now polls `/api/health` (+ `/api/serving/status` for the local-model tint) and reflects the real green/gold/red state on any footer it injects (30s cadence, fail-safe to red). A page can opt out with `window.__ownStatusUpdater`.
+-   - **Home footer reconciled** (#2479): `index.html`'s hardcoded footer link set now matches `site-chrome.js` `NAV_LINKS` (Home · Chat · Trader · Settings · Work · Explore) so the home footer, the shared footer, and the top nav all agree.
+-   - **"What's New" refreshed to 1.10** (#2478): `whats-new.html` led with "Unisona 1.8 / latest 1.8.6"; retitled to 1.10, added a "New in 1.9 & 1.10" highlights section grounded in the changelog (SPY-benchmarked trader, honest-degrade badges, direct code answers, ForecastEx grounding, guest-nav trim, radio playlist repair), and dropped the stale "latest 1.8.6" copy.
+- The "Test" web-search check on the API-keys settings page no longer reports "Ready" when web search is broken. It hit `GET /api/web-search` (which returned 404) and never checked `resp.ok`, so any response — including that 404 — flipped the badge to "Ready / Web search OK". Added a real `GET /api/web-search?q=…` endpoint wired to the existing web-search client (MCP → direct/Wikipedia/news fallbacks), and made the self-test verify `resp.ok` and that results came back. Verified: a live search shows "Ready" with the result count and source; a 404 now shows "Error". (#2506)
+- auth: a browser hitting `/accounts.html` without staff access now gets the styled gate page (or a sign-in redirect when signed out) instead of raw `{"error":"Staff access required."}` JSON in the tab (#2472). The `/api/accounts/*` endpoints keep their JSON contract.
+- chat: the Three-Doors `[DOORS:…]` control marker no longer appears in the finished chat bubble (#2497). The strip now lives in `renderMarkdown()` itself, so streaming, finalize, and history replay of persisted messages all render the same clean prose; door chips are unaffected (they parse the raw text separately).
+- images: `POST /api/image/generate` and `POST /api/image/upload` responded never (they used the promise-style `collectRequestBody` as if it took a callback, so every request hung to client timeout), and generate additionally shelled out via a blocking, string-interpolated `execSync` that would have stalled the whole event loop for up to 120s (#2500). Both handlers are now async; generation runs through non-blocking `execFile` with an argv array (no shell). Verified live: generation completes while `/api/health` keeps answering in ~2ms.
+- images: the Three-Doors landing no longer shows four broken-image icons (#2494). The hand-drawn cast references are named in the KOH manifest but were never uploaded anywhere (404 locally AND on the CDN), so the cards now point at the canonical CDN location and hide themselves on error — they light up automatically once the scans are uploaded. The Creator grid's thumbnail fallback now exists as `/placeholder.svg` (SVG because `*.png` is LFS-declared against an unprovisioned endpoint), with a loop-guarded `onerror`.
+- auth: signed-out visitors on a protected page (e.g. `/profile.html`) are now redirected to `/auth.html?returnTo=<page>` instead of hitting a self-contradictory "requires the guest tier" upgrade wall (#2471). The tier-upgrade interstitial is now only reachable signed-in, and gained a "Sign in with another account" CTA for users whose other account holds the tier.
+- Chat tools that read the broker account (`trader_positions`, `portfolio_analysis`,
+-   `propose_rebalance`) now resolve the **requesting user's** per-user IBKR connection
+-   (ADR-0022). The tools fetch `/api/trading/positions` over a session-less in-process
+-   loopback hop, so `getEffectiveUserId` was always null and per-user broker creds
+-   could never surface in chat — only in the trader UI. stream-chat now passes the
+-   chat user's id into `runTool` ctx, the tool forwards it as `x-keystone-user`, and
+-   the trading routes honor it strictly via `request-auth.internalUserId` (operator-
+-   trusted, un-proxied requests only — a proxied/public caller can never impersonate).
+-   Also: `LANTERN_TEST_USER_ID` lets a test-auth boot emulate a specific profile id
+-   (docs/TEST-AUTH.md). Tests: `npm run test:tool-identity --prefix apps/lantern-garage`.
+
+### Changed
+- trader toolbar consolidated to one inline line: single-line stat pills, chart controls as one segmented cluster, no wrap/clip at any width (#2431, #2432)
+- trader charts: direction-aware line color + gradient fill, glowing live-price dot, day-change ▲/▼ chips, hover lift, WATCHING pulse (#2433)
+- trader responsive views: viewport-scaled grid rows, priority-shedding toolbar, narrower sidebar/chat rail on tablets — verified 1280/1024/768-portrait/375 (#2435)
+- trader mobile: merged Robinhood-style view — full chart deck stacked as the hero, one tap zooms with technicals + buy/sell beneath (replaces the Chart/Tickers tab switch)
+- docs: ADR-0027 Accepted (Alex approved) — tiered broker connect: Alpaca one-click now, IBKR self-service as the power tier, IBKR partner OAuth pursued in parallel behind one adapter seam.
+- nav: retire two orphaned pages behind server-side 302 redirects so old links don't 404 and the surface map stays honest (1.11 polish pass).
+-   - **`/trading.html` → `/stock-trader.html`** (#2488): the 1307-line legacy dashboard had zero inbound user-facing links and was superseded by `stock-trader.html`/`kalshi-terminal.html`. Removed from `PROTECTED_PAGES` (routes/pages.js) and the `TRADE_PAGES` registry (auth-gate.js), repointed the feature-graph node to the live trader, deleted the file, and added a redirect.
+-   - **`/upgrade-lab.html` → `/pricing.html`** (#2473): the orphaned, off-brand internal upgrade workbench advertised non-existent tiers and linked to a 404 (`/view?path=CLEANUP.md`). Deleted the file and added a redirect.
+-   - Both surface-registry entries were dropped (the files are gone; the redirects live in `routes/pages.js`, not as public surfaces — matching the `ibkr-connect.html` retirement). Verified: `deployment-profile` + `surface-boundary` suites pass, and pages.js emits `302 → /stock-trader.html` / `302 → /pricing.html`.
+- trading (ADR-0028 recalibration, operator-directed): the Sharpe mandate default drops from 2.0 to **0.79 — the "Buffett bar"** (Berkshire's verified lifetime Sharpe, Frazzini/Kabiller/Pedersen FAJ 2018). Rationale in the ADR: a gate above every long-horizon portfolio in history selects nothing; beating the best investor on record with CI evidence is the meaningful bar. Within the gate, proposals maximize return. Measured against it (`experiments/leverage_buffett_bar_opt.py`): the return-max overlay (35% vol target) makes +$17,249 vs SPY at −36% maxDD and scores `meets_point` on the 2013+ validation window (0.90 vs 0.79); nothing yet achieves `meets_ci` — live capital stays gated.
+- tiers: unified the tier vocabulary to the canonical **Guest / Free / Pro / Business** across the pricing page, the gate/"unlock" walls, and the role-label maps (auth, accounts, profile, chat). The app previously showed a different name on nearly every surface — pricing said Public/Operator/Supporter/Pilot, gates said "Deep Dreamer"/"Wanderer"/"Synthesasia Guild" — so a guest hitting a gate that named a tier absent from the pricing page hit a dead end ("See plans" → no matching card). Now gates name "the Pro tier" and the pricing page has a Pro card. The retired $5 tier displays as Free (grandfathered); the $200 tier is Business. Staff (`admin`) gates now show "Staff access required" with no buy-a-plan CTA instead of naming a purchasable tier. (#2470)
+- docs: full audit of all 658 tracked Python scripts (docs/PYTHON-SCRIPTS-AUDIT-2026-07-16.md) — reference-graph dispositions (375 wired / 133 docs-only / 25 weak / 116 orphaned / 9 package markers), two live wiring breaks found (`/api/csf/search` spawns missing `src/csf_search.py`; Colab training path calls missing `scripts/train_ouro.py`), plus staged migrate/register/remove plan and SCRIPTS.md regeneration payload.
+- docs: rewrote the root README as a short front door, modeled on a 10-repo survey of leading agentic projects (AutoGPT, LangGraph, AutoGen, CrewAI, MetaGPT, OpenHands, SWE-agent, Aider, Letta, Agent Zero) — hero block + tagline, "Why Unisona?" evidence-linked bullets, laddered quickstart (hosted / desktop / local / dual-boot), a loop-stage capability table, and a Verification & trust section. Also fixed every stale claim the audit surfaced: version 1.8.x → 1.10.0, removed the broken report-generation.yml badge (workflow deleted), corrected the provider chain (Grok is declared-only; Mistral is live), replaced the removed trader-dashboard.html with kalshi-terminal/stock-trader, dropped the nonexistent `make check-types`, removed two dead doc links (AUTONOMOUS-REPAIR-GUIDE.md, docs/TROUBLESHOOTING.md), bumped Node 18+ → 20+, resolved the monoworkstream/no-cap contradiction, and stated the proprietary license explicitly.
+- Docs: repo-wide markdown consolidation pass — every tracked `.md` was dispositioned
+- keep / merge / delete against the doc-catalog and a full inbound-reference scan.
+- 138 stale files removed (status snapshots, completed-work reports, superseded
+- plans, relic skill contracts, personal outreach packets), 23 merged into canonical
+- docs (new consolidated READMEs for bettersafe, payment-bridge, discord bots, and
+- brand prompts; salvaged content folded into API-REFERENCE, CONVERGENCE-LOOP,
+- ARXIV-CORPUS, PATREON-OAUTH, SIGMA0-MODEL-DESIGN, SIGMA0-CONTINUAL-TRAINING,
+- creator-intelligence-architecture, the prediction-market survey, and the wallet
+- README). doc-catalog.json pruned 259→185 entries; Knowledge Center + knowledge
+- index regenerated; QA report outputs redirected from docs/ to gitignored
+- reports/; orphaned changelog fragments moved to the root changelog.d/.
+- (Improves Remember — one canonical doc set, less retrieval noise.)
+- Fixed: Knowledge Center index no longer mints junk sections from code-block
+- contents. `split_sections` in `build_knowledge_index.py` was treating `#` comment
+- lines *inside* ```` ``` ```` fenced blocks as markdown headings, which truncated
+- real sections to a bare opening fence (`text: "```bash"`, 1 token) and coined
+- bogus headings from shell comments / URLs. These stubs leaked into chat as junk
+- answers (e.g. asking "is ollama running" returned `` ```bash `` + a QUICKSTART.md
+- citation). The splitter is now fence-aware, and `knowledge-router.js` guards
+- retrieval + deterministic/near answers behind a `hasProse()` check so a
+- prose-less section can never be served verbatim. Index rebuilt.
+- Keystone chat now searches the web proactively like Claude/Gemini: the assistant prompt tells the model to reach for `web_search`/`web_fetch` on its own initiative for current, recent, or uncertain facts instead of answering from memory, open sources with `web_fetch` when snippets aren't enough, cite what it used, and state confidence when it can't verify — rather than relying only on the brittle `needsGrounding` keyword gate. (Improves Verify.)
+- The home page (`/` and `/index.html`) now redirects an unknown first-time visitor to `/auth.html` to make an entry choice — sign in (user) or "Continue without an account" (guest). Signed-in users, chosen guests (`ln_guest=1`), and the local operator/desktop pass straight through; other public pages stay openly reachable.
+- Trader toolbar declutter + self-explaining menu: Explore, Connect broker, and
+  💬 Chat now live inside the ☰ (sandwich) menu at every width, alongside
+  Pre/After and Kalshi — the inline toolbar keeps only the logo, badges, account
+  stats, chart controls, the live-pulse dot, and ☰. Inside the menu every action
+  carries a small caption saying what it does (CSS-rendered from
+  `data-hmenu-desc`, so items round-trip to the toolbar untouched), and choosing
+  an action closes the menu (chart controls keep it open). The `#feedStamp`
+  LIVE·3s feed-honesty label (arriving with the trader-P1-trust PR) is picked up
+  defensively and will join the menu when it exists — its pulse dot deliberately
+  stays inline so a stale feed remains glanceable. Also added clarifying
+  `title`/`aria-label` text across the page: PAPER / READ-ONLY badges, every
+  header stat (Equity, Day P&L, VIX, Positions, Market), chart type/timeframe
+  selects, footer tabs, and the fullscreen BUY/SELL buttons.
+
+### Changed (follow-up)
+- broker: the autopilot is now broker-agnostic (broker-facade.js) — the autonomous scan loop drives a connected Alpaca account too, not just IBKR. Per user the facade resolves to their actual broker (IBKR preferred for execution quality); every order still passes the per-account hard guard (dry unless TRADER_LIVE=1). alpaca-adapter gains standalone stop orders (GTC SELL STP) + open-orders/day-P&L so the re-protect and trailing-exit logic works identically across brokers.
+
+### Fixed (paper testing)
+- trader: paper trading now uses a REAL Alpaca paper account, not a local sim. The Alpaca adapter takes two auth modes: the user's own OAuth token (one-click), or operator-set server keys (ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY, PAPER endpoint by default). Broker precedence is IBKR -> Alpaca (OAuth or server keys). No broker at all -> an honest "connect Alpaca" error, never a silent dry-run.
+- trader: PAPER orders are no longer guard-blocked. Alpaca paper is simulated money, so paper orders send straight to Alpaca (the "paper trade silently fails" bug); only LIVE orders pass trading-guard AND need TRADER_ALLOW_LIVE_ACCOUNT=1.
+- trader: removed the half-baked native browser popups. Order placement, Flatten, and Close-all use an inline two-step confirm (the button arms — "Confirm BUY 5 NVDA ->" — then a second click sends), and every result is a styled toast instead of a native alert(). A dry-run from a connected-but-unarmed live broker reads "not armed", not "Order failed".
+
+### Added (profile)
+- profile: a Brokerage section — one-click ⚡ Connect Alpaca with live status (Connect / connected+Disconnect for OAuth, "shared paper account" for server keys, "setup pending" when unconfigured) plus the Interactive Brokers link. The "Connect broker" feature card now names both brokers.
+
+### Removed
+- chat: three vestigial surfaces whose markup was cut long ago but whose JS lived on (#2476) — the Observer side panel (permanently hidden, opener-less; its 30s `/api/csf/*` poll and per-reply `/api/convergence/status` refresh ran forever into dead DOM), the Performance monitor (invisible; its orphaned init could throw on load, and a global `window.fetch` wrapper taxed every request to feed it), and the `#model-select` sub-picker (early-returned forever; `requestedModel` was always empty). All dead markup, functions, polls, and the fetch wrapper are gone; remaining writers are null-guarded no-ops.
+- api: `GET /api/csf/search` (#2534) — it spawned `src/csf_search.py`, a file that doesn't exist anywhere in the repo, so every call failed with a spawn error; nothing in the UI, src, or tests called it (chat memory retrieval uses the `recall_memory` tool path, not this route).
+- repo: consolidated the top-level folder surface — audited every root folder for references and deleted the dead ones. Gone: `lore/` (fictional-persona-era canon; the live Three Doors game reads `data/three-doors/canon.json`, which stays), `.devin/`, `.windsurf/`, `.vscode/`, `.mcp/` (stale duplicate of root `.mcp.json`), root `csf/` handoff docs (the CSF *code* in `src/csf/` is untouched), `caad/art-direction/`, `reports/` (with its stale COMET-LEAP CI contract job in pr-gates.yml), all Windsurf-era scripts (`Deploy-WindsurfDev*`, `Start-WindsurfDeveloper`, `Build-WindsurfConvergenceReportPdf`, `sync-agent-slots.sh`, `windsurf-dev-api-extensions.js`), and unreferenced root strays (`analyze_shorts.py`, `generate_segments.py`, `e2.json`, `demo_orchestration.js`, `tunnel_mcp.py`, `mcp_tunnel_proxy.py`, `test_oauth_flow.py`, `test_status_cube_phases.py`, `Caddyfile`). Inbound references updated (AGENTS.md, issue templates, anti-sprawl allowlist, Knowledge Center catalog + regenerated index). Kept after verification: `research/` + `editing_priors.json` (live creator-intelligence pipeline), `manifests/`, `surfaces/`, `ops/`, `models/`, `notebooks/`, `config/`, `assets/`, `index.js`, `lessons.db`, `check_gpu.py`.
+
 ## [1.10.0] - 2026-07-14
 
 ### Fixed
@@ -4931,7 +5227,7 @@ incumbent's **0.65**, so the eval gate **rejected** it and left `final/` untouch
 flywheel working as designed. The finding: distilling into a *fresh* adapter from base
 narrows the model; the follow-up is to continue-train from the incumbent and grow/harden the
 corpus. Design + full numbers:
-[docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md](../docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md).
+[docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md](docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md).
 </content>
 
 ---

@@ -203,6 +203,22 @@ def local_git_create_branch(branch: str, from_ref: str = "", dry_run: str = "tru
     if dry_run != "false":
         return {"dry_run": True, "plan": plan, "note": "Pass dry_run='false' to execute."}
     try:
+        # Never branch-switch a DIRTY primary checkout (2026-07-16 incident: an agent
+        # stashed a human's in-progress trading WIP and switched the main tree out from
+        # under them, sweeping untracked runtime data). Mirrors the guard in
+        # lib/self-edit-engine.js gitEnsureClean(). Isolated work belongs in a worktree
+        # — use local_worktree_create instead.
+        dirty = _git(["status", "--porcelain"]).strip()
+        if dirty:
+            n = len(dirty.splitlines())
+            return {
+                "error": "git_tree_dirty",
+                "detail": (
+                    f"Refusing to switch the primary checkout: {n} uncommitted change(s) "
+                    "would be stashed/clobbered. Use local_worktree_create for an "
+                    "isolated worktree instead."
+                ),
+            }
         args = ["checkout", "-b", branch]
         if from_ref:
             args.append(from_ref)

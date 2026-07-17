@@ -89,6 +89,32 @@
         + '<span class="m-chip ' + esc(status) + '">' + esc(status.replace(/_/g, ' ')) + '</span></div>';
     }
 
+    // #2547 Level-1 tile: the three clear-condition numbers, each count/target.
+    // Every number is MEASURED (per-user artifacts; operator excluded); the
+    // definition string comes from the instrument so UI and math can't drift.
+    function level1Tile(l1) {
+      var row = function (label, count, target, extra) {
+        var pct = target ? Math.min(100, Math.round((count / target) * 100)) : 0;
+        var col = count >= target ? '#4ade80' : '#7dd3fc';
+        return '<div style="margin-top:8px"><b>' + esc(label) + '</b> — <b style="color:' + col + '">' + count + '</b> / ' + target
+          + (extra ? ' <span style="color:var(--muted,#9aa0aa)">' + extra + '</span>' : '')
+          + '<div class="m-bar"><i style="width:' + pct + '%;background:' + col + '"></i></div></div>';
+      };
+      var m1 = l1.m1Retention || {};
+      var m1Extra = m1.rate == null
+        ? '(cohort too young to judge — ' + (m1.cohortSize || 0) + ' measurable)'
+        : '(' + m1.retained + '/' + m1.cohortSize + ' retained)';
+      var m1Count = m1.rate == null ? 0 : Math.round(m1.rate * 100);
+      return '<div class="m-tile"><h2>Level 1 — real adoption</h2>'
+        + '<div class="sub">' + esc(l1.definition || 'composite active-user metric') + '</div>'
+        + row('Active users', l1.actives.count, l1.actives.target)
+        + row('Paying', l1.paying.count, l1.paying.target)
+        + row('Month-1 retention %', m1Count, Math.round((m1.target || 0.4) * 100), m1Extra)
+        + '<div class="m-meta" style="margin-top:8px"><b>' + l1.knownUsers + '</b> known external users · provenance <b>MEASURED</b> (operator + test ids excluded)</div>'
+        + '<span class="m-chip ' + (l1.actives.count >= l1.actives.target ? 'ok' : 'insufficient_data') + '">'
+        + (l1.actives.count >= l1.actives.target ? 'level 1 cleared' : 'measuring') + '</span></div>';
+    }
+
     async function load() {
       try {
         var r = await fetch('/api/metrics/outcomes').then(function (x) { return x.json(); });
@@ -135,6 +161,13 @@
           var ex = await fetch('/api/explore/metrics?days=7').then(function (x) { return x.json(); });
           if (ex && ex.ok) tiles.push(exploreTile(ex));
         } catch (_e) { /* explore tile is best-effort */ }
+        // #2547: Level-1 clear-condition vs the composite active-user metric
+        // (watchlist + 10 chats + 1 paper trade — all MEASURED, operator excluded).
+        // Operator-gated endpoint: guests get 403 and simply don't see the tile.
+        try {
+          var l1 = await fetch('/api/traction/level1').then(function (x) { return x.ok ? x.json() : null; });
+          if (l1 && l1.ok) tiles.push(level1Tile(l1));
+        } catch (_e) { /* level-1 tile is operator-only, best-effort */ }
         document.getElementById('tiles').innerHTML = tiles.join('');
         document.getElementById('foot').textContent =
           'Generated ' + (m.generatedAt || '') + ' · baseline captured ' + (base.capturedAt || 'n/a');

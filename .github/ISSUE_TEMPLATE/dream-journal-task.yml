@@ -1,5 +1,5 @@
 name: Dream Journal task
-description: Agent-workable task for the Dream Journal stream (incl. Three Doors / Kingdome of Hearts). Agents pull these top-of-queue by priority.
+description: Agent-workable task for the Dream Journal stream. Agents pull these top-of-queue by priority.
 title: "[dream-journal] "
 labels: ["dream-journal", "agent-task"]
 body:
@@ -20,7 +20,7 @@ body:
       label: Acceptance criteria
       description: Mechanical, checkable statements. The agent implements these and nothing more.
       placeholder: |
-        - [ ] !three-doors scene X reachable from Y
+        - [ ] /api/dream/stream answers a plain journal turn
         - [ ] python -m pytest tests/test_dream_journal.py passes
     validations:
       required: true
@@ -29,8 +29,8 @@ body:
     attributes:
       label: Files expected to change
       placeholder: |
+        apps/lantern-garage/lib/dream-chat.js
         src/discord_lounge_bot/bot_v2.py
-        lore/doors/...
     validations:
       required: true
   - type: input
@@ -40,15 +40,3 @@ body:
       placeholder: "python -m pytest tests/test_dream_journal.py -q --tb=short"
     validations:
       required: true
-  - type: textarea
-    id: csf
-    attributes:
-      label: CSF sources (lore canon this task must honor)
-      placeholder: |
-        csf/ingest/three-doors/2026-06-09-kingdome-of-hearts-lore-expansion.md
-  - type: checkboxes
-    id: gates
-    attributes:
-      label: Gates
-      options:
-        - label: Touches lore canon (lore/ directory) — requires `needs-founder` review per LORE.md promotion gate

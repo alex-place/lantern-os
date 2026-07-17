@@ -929,8 +929,112 @@
           "max_weight": {
             "type": "number",
             "description": "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)"
+          },
+          "objective": {
+            "type": "string",
+            "enum": [
+              "sharpe",
+              "max_return"
+            ],
+            "description": "optimization objective: 'sharpe' (default, shrunk tangency) or 'max_return' (max expected return under the vol ceiling — ADR-0028)"
+          },
+          "max_vol": {
+            "type": "number",
+            "description": "annualized volatility ceiling for objective=max_return, as a fraction (0.05–0.60, default 0.20)"
           }
         }
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "contribution_plan",
+      "description": "Plan where a NEW cash contribution should go across the operator's existing holdings: buy-only, deterministic dollar fill toward the shrunk tangency target (most-underweight first), fractional-share estimates, and ex-ante Sharpe of the resulting weights vs current (both with 95% CIs). Use when the user asks where to put a deposit ('I'm adding $20/month — which holding should it buy?'). It never sells, never suggests new symbols, and NEVER places orders — execution is a separate, human-gated action. The user always decides.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "cash": {
+            "type": "number",
+            "description": "the contribution in dollars (required, > 0)"
+          },
+          "years": {
+            "type": "number",
+            "description": "history window in years (2–10, default 5)"
+          },
+          "max_weight": {
+            "type": "number",
+            "description": "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)"
+          }
+        },
+        "required": [
+          "cash"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "options_strategy",
+      "description": "Propose and price a covered options strategy from the REAL listed-options chain. NO API key required: the data layer tries the user's own connected Alpaca account first (real greeks), then the keyless public Yahoo chain (no greeks — a Black–Scholes delta from Yahoo's own IV is used for selection and labeled model(bs-from-iv)), then Alpha Vantage only if a key already exists; if every provider fails, the tool reports each provider's reason honestly instead of inventing data. Strategies: covered_call (needs shares ≥ 100), cash_secured_put (needs cash — contracts limited to what the cash fully collateralizes), collar (matched-expiry put+call around shares ≥ 100). Strikes are picked by |delta| closest to target inside the DTE window, falling back to ~3-7% OTM moneyness when no delta is available (the output says which path and which delta source was used). Premiums are quote MARKS ((bid+ask)/2), never fills, with the half-spread reported as an explicit cost. ADVISORY ONLY: it never places, simulates placing, or recommends executing orders, and naked short options are permanently out of scope. The user always decides.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "description": "underlying ticker, e.g. IBM"
+          },
+          "strategy": {
+            "type": "string",
+            "enum": [
+              "covered_call",
+              "cash_secured_put",
+              "collar"
+            ],
+            "description": "which covered structure to propose"
+          },
+          "shares": {
+            "type": "number",
+            "description": "shares held of the underlying (covered_call/collar; 100 per contract required)"
+          },
+          "cash": {
+            "type": "number",
+            "description": "cash available as collateral in dollars (cash_secured_put)"
+          },
+          "target_delta": {
+            "type": "number",
+            "description": "target |delta| for the short leg (default 0.30; collar put leg defaults to 0.25)"
+          },
+          "min_dte": {
+            "type": "number",
+            "description": "minimum days to expiration (default 21)"
+          },
+          "max_dte": {
+            "type": "number",
+            "description": "maximum days to expiration (default 60)"
+          },
+          "price": {
+            "type": "number",
+            "description": "underlying price override; omitted = the provider's own underlying quote, else put-call parity at the ATM strike"
+          }
+        },
+        "required": [
+          "symbol",
+          "strategy"
+        ]
       },
       "policy": "read",
       "operator_required": false,

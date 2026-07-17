@@ -33,7 +33,7 @@ implicitly, and the two existing statements pull in different directions:
   ([CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md)).
 - The codemap frames it broadly: "a local-first operating **cockpit**" already spanning chat,
   trading, media creation, RAG/research, and orchestration
-  ([CODEMAP.md §1](../CODEMAP.md); [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md)).
+  (`CODEMAP.md §1`; [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md)).
 
 The practical consequence of the missing definition: when asked "can it help a user look up
 information, fill out a job application, or make a resume?", the honest answer today is *no* —
@@ -139,7 +139,7 @@ every user-capability request a scope argument instead of a build task.
 |---|---|---|---|
 | No existing ADR defines the end-product/user-capability scope | [docs/adr/](.) ADRs 0001–0007 are all infrastructure | High | repo |
 | Briefing frames product as "reasoning and coding" | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) | High | project doc |
-| Codemap/architecture already span chat, trading, media, orchestration | [CODEMAP.md §1](../CODEMAP.md), [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md) | High | project docs |
+| Codemap/architecture already span chat, trading, media, orchestration | `CODEMAP.md §1`, [ARCHITECTURE.md §4/§8](../ARCHITECTURE.md) | High | project docs |
 | Only model-callable tools today are 7 repo-coding tools, repo-sandboxed | [`tool-runner.js:33-136`](../../apps/lantern-garage/lib/tool-runner.js) | High | code |
 | Local model gets a tool-exec loop when `CHAT_TOOL_EXEC=1` | [`stream-chat.js:1579-1634`](../../apps/lantern-garage/lib/stream-chat.js) | High | code |
 | Tool is a core object; capabilities belong in Act | [`objects.py:95`](../../src/convergence/objects.py), [ARCHITECTURE.md §3](../ARCHITECTURE.md) | High | code/doc |

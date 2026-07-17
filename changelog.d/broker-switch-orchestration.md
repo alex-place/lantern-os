@@ -1,0 +1,2 @@
+### Added
+- **🎛 Active-broker switch on the broker page (ADR-0027).** orchestration#broker — the page every "manage broker" link lands on — only offered Connect/Reconnect/Disconnect; the executor switch lived solely in the trader ☰. The broker panel now opens with an Auto / ⚡ Alpaca / 🔗 IBKR segmented control wired to `/api/broker/preference`, with a live hint of what executes right now and which brokers are connected; failed switches surface the reason instead of dead-clicking. Strengthens **Act**.

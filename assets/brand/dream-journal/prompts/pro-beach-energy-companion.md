@@ -1,3 +1,0 @@
-# PRO Beach Energy Companion Card Prompt
-
-Vertical fantasy Patreon card background for Dream Journal by Lantern OS, no text, no words, ornate lavender and gold frame, clean lower empty panel for future text overlay. Mediterranean beach below a Spanish villa near Barcelona at sunset. A group of elegant adult women relaxing on the beach with plush dream friends and a small robot companion, looking up curiously at the glowing villa where the investors are meeting. Warm beach energy, magical lanterns, soft gold light, lavender flowers, ocean, cypress trees, dreamy but tasteful, cozy luxury, ImaginVerse atmosphere.

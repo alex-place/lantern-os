@@ -58,17 +58,22 @@ const VALID_KINDS = new Set([
   "feedback",          // a user/customer/stakeholder feedback receipt
   "daily_active",      // an actor was active on a given UTC day (retention signal, #2041)
   "churn",             // an actor lapsed
+  "paper_trade",       // an actor placed a broker-accepted paper order (#2547)
+  "weekly_rollup",     // machine-computed Level-1 snapshot (actives/paying/M1, #2547)
+  "pmf_prompted",      // the Sean Ellis fit-check was SHOWN to an active user (#2551)
+  "pmf_response",      // their answer: very/somewhat/not disappointed (#2551)
+  "referral_signup",   // a referred signup, keyed (referrer, referee) (#2554)
 ]);
 
 // daily_active is a usage signal, so it feeds distinct-day retention below.
-const USAGE_KINDS = new Set(["signup", "activation", "workflow_used", "feedback", "daily_active"]);
+const USAGE_KINDS = new Set(["signup", "activation", "workflow_used", "feedback", "daily_active", "paper_trade"]);
 
 // Operator identity — so the operator's own dogfooding never inflates "external"
 // adoption. The whole report-card ask is "used by someone OTHER than the
 // operator", so this seam is load-bearing. Env-overridable, comma-separated.
 function operatorSet() {
   const raw = process.env.KEYSTONE_OPERATOR
-    || "alex place,alex,alex-place,founder,founder@lantern-os.net,alex.place.7@gmail.com,operator,keystone";
+    || "alex place,alex,alex-place,founder,founder@lantern-os.net,alex.place.7@gmail.com,operator,keystone,test-user,local-owner";
   return new Set(raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean));
 }
 

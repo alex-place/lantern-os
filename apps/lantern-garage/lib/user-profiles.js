@@ -8,6 +8,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
+const { effectiveRole } = require("./stripe-billing");
 
 // Data directory for user profiles
 const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
@@ -43,6 +44,16 @@ function createProfile(userId, data = {}) {
     // unless explicitly granted. `admin` is allowed implicitly (see auth-middleware).
     entitlements: { trade: false, ...(data.entitlements || {}) },
     patreonId: data.patreonId || null,
+    // ── Dual-source role provenance (ADR: Patreon + Stripe both feed one role) ──
+    // The effective `role` above is MAX(patreonRole, stripeRole). We snapshot each
+    // source separately so revoking one never over-demotes the other: cancelling a
+    // Stripe sub must not strip a Patreon patron's tier, and vice-versa.
+    patreonRole: data.patreonRole || null,   // last role Patreon attested (null = never)
+    stripeRole: data.stripeRole || null,     // role the active Stripe sub grants (null = none)
+    stripeCustomerId: data.stripeCustomerId || null,
+    stripeSubscriptionId: data.stripeSubscriptionId || null,
+    stripeStatus: data.stripeStatus || null, // last webhook subscription status
+    stripeCurrentPeriodEnd: data.stripeCurrentPeriodEnd || null, // unix seconds
     discordId: data.discordId || null, // linked Discord snowflake (#697), if any
     // Provider-agnostic linked identities (ADR-0016). Each entry:
     //   { provider, providerId, email, emailVerified, linkedAt }
@@ -53,6 +64,11 @@ function createProfile(userId, data = {}) {
     // asserts it (Google/Discord). Local sign-ups are unverified until an email
     // verification flow lands. Governs safe auto-linking (ADR-0016).
     emailVerified: data.emailVerified === true,
+    // `emailVerified` was ADMITTED without proof (a no-mailer deploy couldn't send a
+    // confirmation, see local-auth). Ownership-gated actions — claiming a Stripe
+    // subscription by email — must not trust it (#2606). Cleared by a real
+    // verification (link click or provider assertion).
+    emailAssumed: data.emailAssumed === true,
     // Local email+password credential (scrypt), or null. Never sent to the client;
     // stripped by publicProfile(). Shape: { algo:'scrypt', salt, hash, n, r, p }.
     credential: data.credential || null,
@@ -87,12 +103,12 @@ function createProfile(userId, data = {}) {
  */
 function getProfile(userId) {
   ensureDirectories();
-  const profile = loadProfileFromIndex(userId);
-  if (profile) {
-    profile.metadata.lastLoginAt = new Date().toISOString();
-    updateProfileCache(profile);
-  }
-  return profile;
+  // Read-only: do NOT stamp lastLoginAt here. getProfile runs on nearly every
+  // request (gates, billing, tools); mutating the shared CACHED object by reference
+  // on each read meant a bogus "last login = now" rode along into the next
+  // updateProfile write, and it's simply wrong — reading a profile is not a login
+  // (#2626). Real login time is recorded by the session/traction path.
+  return loadProfileFromIndex(userId);
 }
 
 /**
@@ -126,7 +142,7 @@ function updateProfile(userId, updates) {
 function setUserRole(userId, newRole) {
   // deep_dreamer is the $20 web tier (renamed from "founder", #698); "founder"
   // stays accepted as a legacy alias so older callers/profiles don't break.
-  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "tech_support", "admin"];
+  const validRoles = ["guest", "supporter", "deep_dreamer", "founder", "pilot", "tech_support", "admin"];
   if (!validRoles.includes(newRole)) {
     throw new Error(`Invalid role: ${newRole}`);
   }
@@ -146,41 +162,84 @@ function setEntitlement(userId, key, value) {
 }
 
 /**
+ * Apply a Stripe subscription state change to a profile (the webhook's ONLY write seam).
+ *
+ * Persists the Stripe snapshot fields and recomputes the effective role as
+ * MAX(patreonRole floor, stripeRole) — never demoting a Patreon patron or a staff role.
+ * `ai_trader` is set in the SAME write so a Pilot Stripe sub unlocks the autonomous
+ * trader and a downgrade removes it, atomically (no second read-modify-write to race).
+ *
+ * @param {object} patch — any of { stripeRole, status, customerId, subscriptionId,
+ *   currentPeriodEnd }. stripeRole===null revokes (drops to the Patreon/base floor).
+ *   Fields left undefined are preserved.
+ */
+function applyStripeState(userId, patch = {}) {
+  const profile = getProfile(userId);
+  if (!profile) return null;
+
+  // The Patreon/base floor: the role the user has from every NON-Stripe source. Seed it
+  // from the current role on first Stripe touch (at that point `role` is entirely
+  // non-Stripe, so it IS the floor); thereafter trust the stored snapshot. Staff roles
+  // are never lowered below themselves.
+  const patreonFloor = profile.patreonRole != null ? profile.patreonRole : (profile.role || "guest");
+  const nextStripeRole = patch.stripeRole !== undefined ? patch.stripeRole : (profile.stripeRole || null);
+
+  let nextRole = effectiveRole(patreonFloor, nextStripeRole);
+  if (STAFF_ROLES.includes(profile.role)) nextRole = higherRole(profile.role, nextRole);
+
+  // pilot-or-higher (compare via higherRole so we don't depend on an exported level map)
+  const isPilotPlus = higherRole(nextRole, "pilot") === nextRole;
+
+  // NEVER persist a staff role into the floor snapshot. Staff preservation is handled
+  // LIVE by the STAFF_ROLES guard above (reading profile.role); if we also froze the
+  // staff role into patreonRole, a later legitimate setUserRole() demotion would be
+  // silently reverted by the next webhook (re-minting admin). Store only a non-staff
+  // floor (or keep the prior snapshot / null).
+  const patreonFloorSnapshot = STAFF_ROLES.includes(patreonFloor) ? (profile.patreonRole || null) : patreonFloor;
+  const updates = {
+    role: nextRole,
+    patreonRole: patreonFloorSnapshot,
+    stripeRole: nextStripeRole,
+    entitlements: { ...(profile.entitlements || {}), ai_trader: isPilotPlus },
+  };
+  if (patch.customerId !== undefined) updates.stripeCustomerId = patch.customerId;
+  if (patch.subscriptionId !== undefined) updates.stripeSubscriptionId = patch.subscriptionId;
+  if (patch.status !== undefined) updates.stripeStatus = patch.status;
+  if (patch.currentPeriodEnd !== undefined) updates.stripeCurrentPeriodEnd = patch.currentPeriodEnd;
+
+  return updateProfile(userId, updates);
+}
+
+/** Look up a profile by its Stripe customer id (webhooks arrive keyed by customer).
+ *  Uses allProfiles() so a tombstoned account never receives a billing grant (#2608). */
+function getProfileByStripeCustomer(customerId) {
+  if (!customerId) return null;
+  return allProfiles().find((p) => p.stripeCustomerId === customerId) || null;
+}
+
+/**
  * List all profiles (admin view).
  */
 function listProfiles(filter = {}) {
-  ensureDirectories();
-  const profiles = new Map();
-
-  // Read JSONL index and keep latest version of each profile
-  if (fs.existsSync(PROFILES_INDEX)) {
-    const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
-    lines.forEach((line) => {
-      try {
-        const profile = JSON.parse(line);
-        profiles.set(profile.id, profile);
-      } catch (e) {
-        console.error("[PROFILES] Invalid JSON in index:", e.message);
-      }
-    });
-  }
-
-  // Convert to array and filter
-  let results = Array.from(profiles.values());
+  // Serve from the in-memory index instead of re-reading + re-parsing the whole JSONL
+  // on every call (#2611). The index is authoritative once loaded (all writes update it).
+  ensureFullIndex();
+  let results = Array.from(profileCache.values());
 
   if (filter.role) {
     results = results.filter((p) => p.role === filter.role);
   }
   if (filter.source) {
-    results = results.filter((p) => p.metadata.source === filter.source);
+    results = results.filter((p) => p.metadata && p.metadata.source === filter.source);
   }
   if (filter.search) {
     const q = filter.search.toLowerCase();
+    // Null-safe: a record missing name/email must not throw the admin search (#2607).
     results = results.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q) ||
-        p.id.includes(q)
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.email || "").toLowerCase().includes(q) ||
+        String(p.id || "").includes(q)
     );
   }
 
@@ -191,8 +250,9 @@ function listProfiles(filter = {}) {
  * Delete a profile (hard delete).
  */
 function deleteProfile(userId) {
+  // Keep the tombstone in the in-memory index (do NOT clearProfileCache) so the
+  // deleted state stays O(1) for isProfileDeleted / the session gate (#2611, #2608).
   updateProfile(userId, { deleted: true, deletedAt: new Date().toISOString() });
-  clearProfileCache(userId);
 }
 
 /**
@@ -258,16 +318,46 @@ function importFromCSF(csfData) {
     throw new Error("Invalid CSF format");
   }
 
-  csfData.records.forEach((profile) => {
+  // Skip tombstones so a round-trip export→import doesn't RESURRECT deleted accounts
+  // (#2628). Note: exportToCSF strips password credentials by design, so imported
+  // local accounts have no password — they re-authenticate via OAuth or a reset, not
+  // via this restore. (A password-preserving backup is a separate, deliberate flow.)
+  const live = csfData.records.filter((p) => !p.deleted);
+  live.forEach((profile) => {
     createProfile(profile.id, profile);
   });
 
-  return csfData.records.length;
+  return live.length;
 }
 
 // ── Internal helpers ──
 
-let profileCache = new Map(); // In-memory cache for performance
+let profileCache = new Map(); // In-memory index: id -> latest record (incl. tombstones)
+let _fullIndexLoaded = false;
+
+/**
+ * Load the ENTIRE profiles JSONL into the in-memory index ONCE (#2611). Before this,
+ * every login (email lookup), every Stripe webhook (customer lookup), and every
+ * list re-read and re-parsed the whole append-only file — which grows with every
+ * profile update and would eventually hard-fail auth/billing on read time alone.
+ *
+ * All writes go through createProfile/updateProfile, which updateProfileCache() the
+ * new record, so the index stays authoritative after this initial load. Single
+ * writer process per data dir (the dual-boot pair runs from separate worktrees), so
+ * no cross-process invalidation is needed — same assumption the cache already made.
+ */
+function ensureFullIndex() {
+  if (_fullIndexLoaded) return;
+  ensureDirectories();
+  if (fs.existsSync(PROFILES_INDEX)) {
+    const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n");
+    for (const line of lines) {
+      if (!line) continue;
+      try { const p = JSON.parse(line); if (p && p.id) profileCache.set(p.id, p); } catch (e) { /* skip bad line */ }
+    }
+  }
+  _fullIndexLoaded = true;
+}
 
 function updateProfileCache(profile) {
   profileCache.set(profile.id, profile);
@@ -278,37 +368,24 @@ function clearProfileCache(userId) {
 }
 
 function loadProfileFromIndex(userId) {
-  // Check cache first
-  if (profileCache.has(userId)) {
-    return profileCache.get(userId);
-  }
+  // O(1) after the one-time index load — no per-id file rescans (#2611). A tombstoned
+  // (deleted) profile resolves to null everywhere it matters — a deleted account must
+  // not authenticate, receive billing grants, or reset its password (#2608).
+  ensureFullIndex();
+  const cached = profileCache.get(userId);
+  return cached && !cached.deleted ? cached : null;
+}
 
-  ensureDirectories();
-
-  // Read JSONL and find latest version
-  if (!fs.existsSync(PROFILES_INDEX)) {
-    return null;
-  }
-
-  const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
-  let latest = null;
-
-  for (const line of lines) {
-    try {
-      const profile = JSON.parse(line);
-      if (profile.id === userId) {
-        latest = profile;
-      }
-    } catch (e) {
-      // Skip invalid lines
-    }
-  }
-
-  if (latest) {
-    updateProfileCache(latest);
-  }
-
-  return latest;
+/**
+ * True iff the latest record for this id is a delete tombstone. Distinguishes a
+ * DELETED account (deny/lockout) from a simply-missing id, which getProfile can't
+ * (both read as null). Used by the session gate and the anti-resurrection guard.
+ */
+function isProfileDeleted(userId) {
+  if (!userId) return false;
+  ensureFullIndex();
+  const p = profileCache.get(userId);
+  return !!(p && p.deleted);
 }
 
 // ── Patreon <-> Discord account linking (#697) ──
@@ -440,9 +517,11 @@ function linkIdentity(profileId, provider, providerId, email, emailVerified) {
       JSON.stringify({ patreonId: String(profileId), discordId: pid, linkedAt: new Date().toISOString() }) + "\n"
     );
   }
-  // If the linked identity is verified, the profile's email becomes verified too.
+  // If the linked identity is verified, the profile's email becomes verified too
+  // (and no longer merely "assumed" — a provider asserted it, #2606).
   if (emailVerified === true && email) {
     updates.emailVerified = true;
+    updates.emailAssumed = false;
     if (!profile.email) updates.email = email;
   }
   return updateProfile(profileId, updates);
@@ -464,9 +543,11 @@ function unlinkIdentity(profileId, provider) {
   if (!has) return { error: "not_linked" };
 
   const remaining = identities.filter((i) => i.provider !== provider);
-  // A local password (passwordHash) is also a login method even if there is no
-  // 'local' identity row, so it counts toward "can still sign in".
-  const canStillLogIn = remaining.length > 0 || !!profile.passwordHash;
+  // A local password is also a login method even if there is no 'local' identity
+  // row, so it counts toward "can still sign in". The field is `credential`, not
+  // `passwordHash` — the old name was always undefined, wrongly blocking a
+  // password-holder from unlinking their only OAuth provider (#2623).
+  const canStillLogIn = remaining.length > 0 || !!profile.credential;
   if (!canStillLogIn) return { error: "last_login_method" };
 
   const updates = { identities: remaining };
@@ -513,14 +594,25 @@ function getOrCreateFromIdentity(provider, u, role) {
       provider === "patreon" &&
       !STAFF_ROLES.includes(existing.role || "guest") &&
       u.entitlementResolved === true;
-    const nextRole = tierAuthorityReattesting
+    // Patreon-source role after this login: re-baseline to the live read when the tier
+    // authority re-attests, else the monotonic max of prior state + this provider read.
+    const patreonNext = tierAuthorityReattesting
       ? role || "guest"
       : higherRole(existing.role || "guest", role || "guest");
+    // Fold in any independent Stripe grant so a paid Stripe sub survives a Patreon
+    // downgrade (and vice-versa). effectiveRole() whitelists stripeRole, so a bad
+    // snapshot can never mint admin here.
+    const nextRole = effectiveRole(patreonNext, existing.stripeRole);
     const updates = { role: nextRole, tier: u.tier != null ? u.tier : existing.tier };
+    // Snapshot the Patreon-attested role separately (only on an authoritative re-attest)
+    // so a later Stripe revoke recomputes MAX(patreonRole, none) instead of dropping the
+    // patron to guest. Staff roles are excluded by tierAuthorityReattesting above.
+    if (tierAuthorityReattesting) updates.patreonRole = role || "guest";
     if (u.name && !existing.name) updates.name = u.name;
     if (u.avatar && !existing.avatar) updates.avatar = u.avatar;
     if (emailVerified && u.email) {
       updates.emailVerified = true;
+      updates.emailAssumed = false; // a provider ASSERTED this address → upgrade from assumed (#2606)
       if (!existing.email) updates.email = u.email;
     }
     // Ensure the identity is recorded even for legacy profiles that predate identities[].
@@ -541,8 +633,13 @@ function getOrCreateFromIdentity(provider, u, role) {
   }
 
   // 3. Fresh profile. Patreon keeps its providerId as the profile id for on-disk
-  // continuity with existing index.jsonl records; others get a random id.
-  const newId = provider === "patreon" ? providerId : crypto.randomBytes(12).toString("hex");
+  // continuity with existing index.jsonl records; others get a random id. BUT if
+  // that Patreon id was deleted, reusing it would silently void the tombstone
+  // (resurrecting the account on re-login, #2608) — so mint a fresh random id
+  // instead, leaving the delete intact and giving the returning user a new profile.
+  const newId = (provider === "patreon" && !isProfileDeleted(providerId))
+    ? providerId
+    : crypto.randomBytes(12).toString("hex");
   const profile = createProfile(newId, {
     name: u.name || "",
     email: u.email || "",
@@ -577,6 +674,30 @@ function hashPassword(plaintext) {
     .scryptSync(String(plaintext), salt, SCRYPT_KEYLEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P })
     .toString("hex");
   return { algo: "scrypt", salt, hash, n: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P };
+}
+
+/**
+ * Async, non-blocking verify — same contract as verifyPassword but runs scrypt off
+ * the event loop (crypto.scrypt worker) so an unauthenticated login flood can't pin
+ * the main thread (#2609). Use on the login hot path; the sync version stays for
+ * authenticated one-off callers (change-password).
+ */
+function verifyPasswordAsync(plaintext, credential) {
+  return new Promise((resolve) => {
+    if (!credential || credential.algo !== "scrypt" || !credential.salt || !credential.hash) return resolve(false);
+    crypto.scrypt(
+      String(plaintext),
+      credential.salt,
+      SCRYPT_KEYLEN,
+      { N: credential.n || SCRYPT_N, r: credential.r || SCRYPT_R, p: credential.p || SCRYPT_P },
+      (err, derived) => {
+        if (err) return resolve(false);
+        const stored = Buffer.from(credential.hash, "hex");
+        if (stored.length !== derived.length) return resolve(false);
+        try { resolve(crypto.timingSafeEqual(stored, derived)); } catch { resolve(false); }
+      }
+    );
+  });
 }
 
 /** Constant-time verify a plaintext against a stored scrypt credential. */
@@ -657,6 +778,45 @@ function verifyLocalLogin(email, plaintext) {
   return okPassword ? profile : null;
 }
 
+/**
+ * Async twin of verifyLocalLogin — same enumeration-safe behavior (always runs one
+ * scrypt, dummy credential when the email is unknown) but off the event loop (#2609).
+ */
+async function verifyLocalLoginAsync(email, plaintext) {
+  const needle = String(email).toLowerCase();
+  let profile = null;
+  for (const p of allProfiles()) {
+    if (!p.credential) continue;
+    const match =
+      (p.email && p.email.toLowerCase() === needle) ||
+      (p.identities || []).some((i) => i.email && i.email.toLowerCase() === needle);
+    if (match) { profile = p; break; }
+  }
+  const credential = (profile && profile.credential) || _DUMMY_CREDENTIAL;
+  const okPassword = await verifyPasswordAsync(plaintext, credential); // always runs scrypt
+  if (!profile) return null;
+  return okPassword ? profile : null;
+}
+
+/**
+ * The email address this profile has PROVEN ownership of, or null — the root
+ * email when `emailVerified === true`, else the first verified identity email.
+ * This is the same trust gate ADR-0016 uses for cross-provider auto-linking,
+ * reused for Stripe subscription linking: an UNVERIFIED email must never be able
+ * to claim someone else's paid subscription (entitlement theft).
+ */
+function verifiedEmailOf(profile) {
+  if (!profile) return null;
+  // An `emailAssumed` root email was admitted WITHOUT proof (a no-mailer deploy
+  // couldn't send a confirmation — see local-auth). It must not prove ownership of
+  // a Stripe subscription, or an attacker registers a victim's email and claims
+  // their sub via /api/billing/link (#2606). A provider-verified identity email
+  // (OAuth) or a real link-confirmed root email still counts.
+  if (profile.emailVerified === true && profile.emailAssumed !== true && profile.email) return profile.email;
+  const hit = (profile.identities || []).find((i) => i.emailVerified === true && i.email);
+  return hit ? hit.email : null;
+}
+
 /** Strip secrets (credential) before sending a profile to any client. */
 function publicProfile(profile) {
   if (!profile) return profile;
@@ -673,8 +833,11 @@ module.exports = {
   updateProfile,
   setUserRole,
   setEntitlement,
+  applyStripeState,
+  getProfileByStripeCustomer,
   listProfiles,
   deleteProfile,
+  isProfileDeleted,
   getOrCreateFromPatreon,
   linkDiscordAccount,
   getLinkByDiscordId,
@@ -689,8 +852,11 @@ module.exports = {
   getOrCreateFromIdentity,
   hashPassword,
   verifyPassword,
+  verifyPasswordAsync,
   setLocalPassword,
   createLocalAccount,
   verifyLocalLogin,
+  verifyLocalLoginAsync,
+  verifiedEmailOf,
   publicProfile,
 };

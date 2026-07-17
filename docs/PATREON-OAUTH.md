@@ -56,6 +56,28 @@ For production, set:
 - `PATREON_REDIRECT_URI=https://your-domain.com/api/auth/patreon/callback`
 - `NODE_ENV=production` (enables secure cookies over HTTPS)
 
+#### Local dev (`.env.local`, dual-boot ports)
+
+For local development put the credentials in `.env.local` at repo root
+(gitignored — do **not** commit). The `redirect_uri` auto-derives from the
+request host, but Patreon requires an **exact match**, so register both
+dual-boot ports in the Patreon app's Redirect URIs:
+
+```text
+http://localhost:4178/api/auth/patreon/callback   (dev server)
+http://localhost:4177/api/auth/patreon/callback   (stable server)
+```
+
+Smoke test after restart:
+
+```bash
+# should redirect to patreon.com with your real client_id:
+curl -s -i "http://localhost:4178/api/auth/patreon/start?returnTo=%2F" | grep -i location
+```
+
+Then click **Connect with Patreon** on `/auth.html`, complete consent, and
+confirm `/api/auth/session` shows `provider:"patreon"` and the mapped role.
+
 ### 4. Restart the Server
 
 ```bash
@@ -75,23 +97,28 @@ mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmoun
 and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pledges to
 *other* creators can't grant (or block) a role here.
 
-| Entitled pledge (this campaign) | Role | Access |
+| Entitled pledge (this campaign) | Role | Plan / access |
 |-----------|--------------|--------|
 | Free / not a paying member | `guest` | Public pages only |
-| ≥ $5 | `supporter` | Chat + features (the default paid gate) |
-| ≥ $20 (incl. the $200 top tier) | `deep_dreamer` | All paid features + trading unlock |
+| ≥ $20 | `deep_dreamer` | **Pro** — all paid features + real-money trading unlock |
+| ≥ $200 | `pilot` | **Pilot** — everything in Pro plus the autonomous AI trader |
+
+> **Legacy note:** the **$5 Member** tier is **retired and no longer sold**. Its
+> `≥ $5 → supporter` mapping is retained *only* so grandfathered patrons keep their
+> role; that `supporter` role now sits at the **Free** plan floor (see
+> `apps/lantern-garage/lib/plan-matrix.js` `ROLE_TO_PLAN`). The currently sold ladder is
+> **Free / $20 Pro / $200 Pilot** — do not re-advertise $5 as a paid gate.
 
 Notes:
 - **A purchasable tier NEVER grants `admin`.** `admin` is full operator/staff access
   (provider keys, GPU dispatch, feature flags, and the accounts console that can reset any
   password / grant admin), so tying it to a price point would let anyone buy site takeover.
-  The $200 top tier therefore maps to `deep_dreamer`; `admin` comes **only** from
-  `LANTERN_ADMIN_IDS`. If you want the $200 tier to unlock something beyond `deep_dreamer`,
-  add a distinct non-admin paid role — don't map it to `admin`.
+  The top purchasable tier is `pilot` ($200) — it unlocks the autonomous AI trader but
+  **not** `admin`; `admin` comes **only** from `LANTERN_ADMIN_IDS`.
 - **Fail-closed:** a $0 free-tier member, a below-$5 custom pledge, or an entitlement whose
   amount can't be resolved all yield `guest` (never a free paid role).
-- **Re-pricing?** Override the two thresholds (cents): `PATREON_SUPPORTER_CENTS`,
-  `PATREON_DEEP_DREAMER_CENTS`.
+- **Re-pricing?** Override the thresholds (cents): `PATREON_SUPPORTER_CENTS` (legacy),
+  `PATREON_DEEP_DREAMER_CENTS`, `PATREON_PILOT_CENTS`.
 - **Demotion:** logging in via Patreon re-baselines the paid role to the *current*
   entitlement, so a cancelled/downgraded membership loses the tier (staff roles set via
   `setUserRole`/override are never demoted by a login).
@@ -151,8 +178,11 @@ Clears session and logs out user.
 
 | File | Purpose |
 |------|---------|
-| `apps/lantern-garage/lib/patreon-auth.js` | Core OAuth logic: token exchange, user fetch, role mapping |
-| `apps/lantern-garage/routes/auth.js` | Express-like route handlers for OAuth endpoints |
+| `apps/lantern-garage/lib/oauth-core.js` | Provider-agnostic flow engine: `handleOAuthStart` / `handleOAuthCallback` (exchange → fetchUser → role → profile → session) |
+| `apps/lantern-garage/lib/auth-providers.js` | Per-provider config incl. the `patreon` block (authorize/token URLs, scope, `fetchUser`, `roleForAmountCents` mapping) |
+| `apps/lantern-garage/lib/user-profiles.js` | `getOrCreateFromIdentity` — profile creation (records `patreonId` + tier) |
+| `apps/lantern-garage/lib/patreon-auth.js` | Legacy Patreon-specific OAuth logic (superseded by the provider-agnostic pair above) |
+| `apps/lantern-garage/routes/auth.js` | Route handlers for OAuth endpoints |
 | `apps/lantern-garage/public/auth.html` | Patreon login page with tier cards |
 | `apps/lantern-garage/public/profile.html` | User profile page with logout button |
 | `apps/lantern-garage/public/js/auth-gate.js` | Client-side auth enforcement script |

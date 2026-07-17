@@ -496,7 +496,10 @@
   @media (max-width:580px){
     .ot-bg{ top:0; left:0; background:rgba(0,0,0,.5); pointer-events:auto;
             align-items:flex-end; justify-content:stretch; }
-    .ot-modal{ width:100%; max-width:100%; height:auto; max-height:82vh;
+    /* 92vh (was 82vh, #2501 item 4): at 82vh the sheet's full content (734px with
+       Take-profit/Stop-loss expanded) overflowed a 812px phone by ~68px and scrolled;
+       812×0.92 ≈ 747px fits it without scrolling. */
+    .ot-modal{ width:100%; max-width:100%; height:auto; max-height:92vh;
                border-left:none; border-top:1px solid var(--border);
                border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45);
                animation:otSlideUp .2s ease; }
@@ -512,7 +515,6 @@
     .header{gap:8px;padding:0 10px}
   }
   @media (max-width:950px){
-    .header a[href*="explore"]{display:none}
     .hstat:not(.acct){display:none}   /* VIX/Market live in the Σ₀ panel too */
   }
   @media (max-width:900px){
@@ -522,6 +524,14 @@
   /* ── Mobile (#2255): the desktop terminal is a 2-col grid with a full-width toolbar.
      On phones collapse to one column (main gets the room) and let the dense header scroll
      horizontally so no control is clipped off-screen / unreachable. ── */
+  /* Mobile view switch (#2501): Chart / Tickers / Positions — a compact centered
+     segmented control, hidden on desktop (all panels show). Restores the pre-merge
+     one-panel-at-a-time model the upstream hamburger redesign removed. */
+  .mobile-view-tabs{ display:none; }
+  .mvt-btn{ flex:0 1 104px; min-height:28px; background:var(--bg2); color:var(--text1); border:1px solid var(--border);
+    border-radius:7px; font-family:var(--mono); font-size:12px; font-weight:600; letter-spacing:.02em; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; transition:background .15s,border-color .15s; }
+  .mvt-btn.active{ background:var(--bg3); color:var(--text0); border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
   @media (max-width:580px){
     /* Phone: stack the app vertically and show ONE of {charts, ticker list} at a time.
        The ticker list and charts can't both fit at 375px, so a tab bar toggles them. */
@@ -540,22 +550,31 @@
     .header .badge-paper,
     .header .hstat.acct{ display:none; }
     .header .hstat{ min-width:0; }
-    /* Merged single view (Robinhood-style): hero chart on top, symbol details, then
-       the ticker list — ONE scrolling column, no Chart/Tickers tab switch. Tapping a
-       ticker swaps the hero chart (visibleTickers follows activeTicker on phones)
-       and opens the expanded fullscreen view. */
-    .layout{ overflow-y:auto; }
-    /* DOM order is header→sidebar→main→footer (desktop grid placement); reorder the
-       flex column so the hero CHART leads, then details+list, then the footer. */
-    .header{ order:-3; }
-    .main{ order:-2; flex:0 0 auto; height:auto; min-height:280px; overflow:visible; padding-bottom:8px; }
-    .sidebar{ order:-1; display:flex; flex:0 0 auto; min-height:0; border-right:none; border-top:1px solid var(--border); overflow:visible; }
-    #wlList{ flex:none; overflow:visible; }             /* the PAGE scrolls, not the list */
-    .wl-info{ order:-1; height:auto; max-height:none; } /* details sit right under the chart */
+    /* The chart controls now sit inline to the ☰'s left (#2501 item 6); pin the ☰
+       sticky-right so it stays reachable while the control row scrolls under it. */
+    .header .hmenu-btn{ position:sticky; right:0; margin-left:auto; z-index:2;
+      background:var(--bg1); box-shadow:-10px 0 10px -6px var(--bg1); }
+    /* One panel at a time (#2501): the segmented control below the header switches
+       between Chart / Tickers / Positions — the three can't share a 375px screen
+       (stacking them all produced ~11,000px of scroll). Chart is the default. */
+    .mobile-view-tabs{ display:flex; flex:0 0 auto; justify-content:center; gap:6px; padding:6px 10px;
+      background:var(--bg1); border-bottom:1px solid var(--border); }
+    /* default = chart view: charts get the whole screen */
+    .sidebar{ display:none; }
+    .footer{ display:none; }
+    .main{ flex:1 1 auto; min-height:0; overflow-y:auto; padding-bottom:12px; }
     .wl-resize{ display:none!important; }
-    .footer{ flex:0 0 auto; height:auto; min-height:0; max-height:none; box-shadow:0 -6px 12px rgba(0,0,0,.28); }
-    /* Charts are the HERO: auto mode stacks the whole deck full-width, each card a
-       readable ~46vh; the page scrolls through them (Robinhood-style). */
+    /* tickers view: the watchlist gets the screen */
+    .layout.mobile-tickers .sidebar{ display:flex; flex:1 1 auto; min-height:0; border-right:none; overflow-y:auto; }
+    .layout.mobile-tickers .main,
+    .layout.mobile-tickers .footer{ display:none; }
+    /* positions view: the account panel (summary + positions/orders/history tabs)
+       gets the screen instead of being stacked below everything */
+    .layout.mobile-positions .footer{ display:flex; flex:1 1 auto; min-height:0; height:auto; max-height:none; overflow-y:auto; }
+    .layout.mobile-positions .footer .footer-resize{ display:none; } /* nothing to resize against */
+    .layout.mobile-positions .main,
+    .layout.mobile-positions .sidebar{ display:none; }
+    /* Auto-fit fallback: if a chart deck renders unfixed, keep cards readable */
     .cards-grid:not(.grid-fixed){ height:auto; grid-auto-rows:46vh; }
     /* Focus/zoom (1-slot) + fixed layouts: one tall chart so the technicals and
        buy/sell sit right below it in the same screen. */
@@ -570,8 +589,7 @@
   }
   .ot-header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .ot-header .ot-ticker{font-size:14px;font-weight:600;flex:1}
-  .ot-close{cursor:pointer;font-size:12px;color:var(--text1);padding:4px 8px;border-radius:3px;border:1px solid var(--border);background:var(--bg2)}
-  .ot-close:hover{color:var(--text0)}
+  .ot-head-quote{font-family:var(--mono);font-size:12px;color:var(--text1);white-space:nowrap}
   .ot-body{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
   .ot-side-row{display:flex;gap:6px}
   .ot-side-btn{flex:1;text-align:center;padding:8px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:13px;cursor:pointer;line-height:1.6}
@@ -580,14 +598,12 @@
   .ot-side-btn.active.sell .ot-side-label{color:var(--red)}
   .ot-side-btn.active.buy{background:rgba(0,212,170,.15);border-color:var(--green);color:var(--green)}
   .ot-side-btn.active.buy .ot-side-label{color:var(--green)}
-  .ot-spread{font-size:11px;color:var(--text2);text-align:center;margin-top:4px}
   .ot-tabs{display:flex;gap:6px}
   .ot-tab{flex:1;text-align:center;padding:5px 6px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);font-size:11px;cursor:pointer;text-transform:uppercase;letter-spacing:.05em}
   .ot-tab.active{background:var(--bg3);color:var(--text0);border-color:var(--text1)}
   .ot-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .ot-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
   .ot-field{background:var(--bg2);border:1px solid var(--border);color:var(--text0);font-family:var(--mono);font-size:13px;padding:5px 7px;border-radius:3px;width:100px;text-align:right}
-  .ot-field:disabled{opacity:.4}
   .ot-usd{font-size:11px;color:var(--text2);text-align:right;flex:1}
   .ot-section{border-top:1px solid var(--border);padding-top:10px;display:flex;flex-direction:column;gap:8px}
   .ot-section-title{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.15em}
@@ -674,7 +690,7 @@
   body.guest .footer,
   body.guest .footer-resize,
   body.guest .badge-paper,
-  body.guest #brokerLink,          /* broker connect — only for entitled traders */
+  body.guest #brokerBtn,           /* broker status/config — only for entitled traders */
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
@@ -850,18 +866,28 @@
     data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
-  <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
-    data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none"
-    title="Connect your Interactive Brokers account so trades route to your own paper or live account"
-    data-hmenu-desc="Link your own Interactive Brokers account — trades then route to it instead of the shared paper account.">🔗 <span id="brokerLabel">Connect broker</span></a>
+  <!-- Single broker pill (declutter): shows the broker that EXECUTES your trades and
+       links to Settings (orchestration#broker) to add / configure / switch brokers.
+       Replaces the old three-button cluster (switch + ⚡ Alpaca + 🔗 IBKR). -->
+  <a href="/orchestration.html#broker" class="nav-link" id="brokerBtn" style="display:none"
+    title="Which broker executes your trades — click to add, configure, or switch brokers in Settings"
+    data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings."><span id="brokerLabel">🔗 Broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
     data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
   <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
-    aria-label="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat"
-    title="Menu — chart controls, extended hours, Kalshi, Explore, broker connection, and chat">☰</button>
+    aria-label="Menu — extended hours, Kalshi, broker, and chat"
+    title="Menu — extended hours, Kalshi, broker, and chat">☰</button>
+</div>
+
+<!-- Mobile-only view switch (#2501): chart deck, ticker list, and account panel can't
+     share a phone screen, so toggle between them (chart view is the default).
+     Hidden on desktop (all panels show). -->
+<div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
+  <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">Chart</button>
+  <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">Tickers</button>
+  <button class="mvt-btn" data-view="positions" role="tab" aria-selected="false" onclick="setMobileView('positions')">Positions</button>
 </div>
 
 <!-- Sidebar -->
@@ -912,7 +938,7 @@
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
-<div class="hmenu" id="hmenu" hidden role="menu" aria-label="Chart controls and actions"></div>
+<div class="hmenu" id="hmenu" hidden role="menu" aria-label="Trader actions"></div>
 <!-- Keyboard hint appended into the menu at runtime (kept out of the mover's way) -->
 
 <!-- Dream-chat rail — right-side dock, reflows the deck (#trader-chat) -->
@@ -1016,7 +1042,7 @@
   <div class="ot-modal">
     <div class="ot-header">
       <span class="ot-ticker" id="otTickerLabel">—</span>
-      <span class="ot-close" onclick="closeOrderTicket()">✕</span>
+      <span class="ot-head-quote" id="otHeadQuote" title="Last price · day change">—</span>
     </div>
     <div class="ot-body">
       <div>
@@ -1028,7 +1054,6 @@
             <div class="ot-side-label">Buy</div><div id="otBuyPrice">—</div>
           </div>
         </div>
-        <div class="ot-spread" id="otSpread">Spread 0.00</div>
       </div>
 
       <div class="ot-tabs">
@@ -1052,14 +1077,14 @@
         <span class="ot-label" title="Auto-size units from dollars risked to the stop">Risk $ → units</span>
         <input type="number" class="ot-field" id="otRiskUsd" aria-label="Dollars to risk to the stop" placeholder="—" min="0" step="1" oninput="otSizeFromRisk()">
       </div>
-      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">enable a stop loss to auto-size</span></div>
+      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">Enable a stop loss to auto-size</span></div>
 
       <div class="ot-section">
         <div class="ot-section-title">Exits</div>
         <div class="ot-exit-row">
           <div class="ot-exit-head">
             <input type="checkbox" id="otTpEnabled" aria-label="Enable take-profit" onchange="otToggleExit('Tp')">
-            <span class="ot-label">Take profit, price</span>
+            <span class="ot-label">Take profit</span>
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
@@ -1073,7 +1098,7 @@
         <div class="ot-exit-row">
           <div class="ot-exit-head">
             <input type="checkbox" id="otSlEnabled" aria-label="Enable stop-loss" onchange="otToggleExit('Sl')">
-            <span class="ot-label">Stop loss, price</span>
+            <span class="ot-label">Stop loss</span>
           </div>
           <div class="ot-exit-fields">
             <label class="ot-fieldcell"><span>Price</span>
@@ -2173,12 +2198,8 @@ let lastCardOrder = null;
 function visibleTickers(){
   const all = wlPrices.map(t=>t.ticker);
   const cap = maxChartsForViewport();               // #2301: never render more than the viewport can show readably
-  // Phone: the page scrolls, so AUTO mode shows the WHOLE deck — every chart
-  // stacked full-width (charts are the hero). Zoom/fixed modes keep the cap.
-  if(cap===1 && !slotCount){
-    const order={open:0,watching:1,quiet:2};
-    return all.slice().sort((a,b)=> order[tickerState(zonesData[a]||{})] - order[tickerState(zonesData[b]||{})]);
-  }
+  // (The former phone whole-deck AUTO branch is gone with the merged single view:
+  //  phones no longer offer ⊞ All — see buildLayoutOptions, #2501 item 5.)
   if(!slotCount){
     const order={open:0,watching:1,quiet:2};
     return all.slice()
@@ -2246,11 +2267,18 @@ const LAYOUT_OPTS = [[0,'⊞ All'],[1,'1 chart'],[2,'2 charts'],[3,'3 charts'],[
 function buildLayoutOptions(){
   const sel = document.getElementById('chartLayoutSelect');
   if(!sel) return;
-  // Offer ⊞ All + every count that fits the current viewport cap (#2301). A
-  // phone gets [All, 1]; a small monitor [All, 1, 2]; a large desktop everything.
+  // Offer every count that fits the current viewport cap (#2301). Phones get
+  // [1 chart, 2 charts] with NO ⊞ All (#2501 item 5) — "All" stacked the whole
+  // deck (22 cards ≈ 8,400px of scroll); a small monitor gets [All, 1, 2]; a
+  // large desktop everything.
+  const phone = isNarrowTrader();
   const cap = maxChartsForViewport();
-  const opts = LAYOUT_OPTS.filter(([v])=> v===0 || v<=cap);
+  const opts = LAYOUT_OPTS.filter(([v])=> (v===0 ? !phone : v<=cap));
   sel.innerHTML = opts.map(([v,l])=>`<option value="${v}">${l}</option>`).join('');
+  // Migrate phones off a persisted "All" (slotCount 0) — that option is retired
+  // there, and existing users would otherwise land on a value the select no
+  // longer offers. Default to 1 full-size chart.
+  if(phone && !slotCount) setSlotCount(1);
   if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
   else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
   sel.value = String(slotCount);
@@ -2285,7 +2313,7 @@ async function commitSlotSymbol(oldTicker, sym){
   // The symbol is already Alpaca-validated by the search; add it to the watchlist
   // so price/zone data flows, then re-render.
   try{ await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); }catch(e){}
-  lastCardOrder=''; await loadWatchlistPrices(); await loadZones(); renderCards();
+  lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
 
 // ── Symbol-search popup (#1692) — TradingView-style search over all Alpaca assets ──
@@ -2371,7 +2399,7 @@ function otCurrentPrice(){
   return price;
 }
 
-let otUserClosed = false;   // #1694: respect an explicit X — don't auto-reopen
+let otUserClosed = false;   // #1694: respect an explicit dismiss (Esc / backdrop tap) — don't auto-reopen
 // #1695: retarget the order panel to a symbol WITHOUT changing its open/closed state.
 function setOrderSymbol(ticker){
   if(!ticker) return;
@@ -2403,7 +2431,7 @@ function isNarrowTrader(){
 // counts AND ⊞ All; large desktops are uncapped.
 function maxChartsForViewport(){
   const w = window.innerWidth || 1400;
-  if (w <= 580)  return 1;   // phone: one full-size chart
+  if (w <= 580)  return 2;   // phone: 1 by default, 2 at most (#2501 item 5)
   if (w <= 1024) return 2;   // small monitor / tablet
   if (w <= 1440) return 4;   // mid desktop
   return Infinity;           // large desktop: no cap
@@ -2502,7 +2530,12 @@ function renderOrderTicket(){
 
   document.getElementById('otSellPrice').textContent = price ? fmt(price) : '—';
   document.getElementById('otBuyPrice').textContent  = price ? fmt(price) : '—';
-  document.getElementById('otSpread').textContent = 'Spread 0.00';
+  // Header quote: last price + day change, same chg_pct the watchlist shows.
+  const wl  = wlPrices.find(x=>x.ticker===otTicker);
+  const chg = wl && wl.chg_pct!=null ? Number(wl.chg_pct) : null;
+  document.getElementById('otHeadQuote').innerHTML = price
+    ? `$${fmt(price)}${chg==null?'':` <span style="color:${chg>0?'var(--green)':chg<0?'var(--red)':'var(--text2)'}">${chg>=0?'+':''}${chg}%</span>`}`
+    : '—';
 
   document.getElementById('otSellBtn').classList.toggle('active', otSide === 'sell');
   document.getElementById('otBuyBtn').classList.toggle('active', otSide === 'buy');
@@ -2513,9 +2546,12 @@ function renderOrderTicket(){
   document.getElementById('otTickValue').textContent = `$${fmt(TICK_SIZE * qty, 2)}`;
   document.getElementById('otTradeValue').textContent = `$${fmt(qty * tradePrice)}`;
 
+  // Live re-renders must not clobber the armed "Confirm …" label or "Placing…".
   const submit = document.getElementById('otSubmit');
-  submit.textContent = `${otSide === 'buy' ? 'Buy' : 'Sell'} ${qty} ${otTicker} — ${otOrderType.toUpperCase()}`;
-  submit.className = 'ot-submit ' + otSide;
+  if(!_otArmed && submit.style.pointerEvents !== 'none'){
+    submit.textContent = `${otSide === 'buy' ? 'Buy' : 'Sell'} ${qty} ${otTicker} — ${otOrderType.toUpperCase()}`;
+    submit.className = 'ot-submit ' + otSide;
+  }
 }
 
 // ── Drawing tools (#2444) — price levels + trendlines, persisted per symbol ──
@@ -2661,15 +2697,15 @@ async function placeMarketOrder(sym, side, qty, source){
 function otSizeFromRisk(){
   const hint=document.getElementById('otRiskHint');
   const risk=Number(document.getElementById('otRiskUsd').value);
-  if(!risk || risk<=0){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  if(!risk || risk<=0){ if(hint) hint.textContent='Enable a stop loss to auto-size'; return; }
   const slOn=document.getElementById('otSlEnabled').checked;
   const stop=Number(document.getElementById('otSlPrice').value);
   const entry=(otOrderType==='limit' && Number(document.getElementById('otLimitPrice').value)>0)
     ? Number(document.getElementById('otLimitPrice').value)
     : getCurrentPrice(otTicker);
-  if(!slOn || !(stop>0)){ if(hint) hint.textContent='enable a stop loss to auto-size'; return; }
+  if(!slOn || !(stop>0)){ if(hint) hint.textContent='Enable a stop loss to auto-size'; return; }
   const perShare=Math.abs(entry-stop);
-  if(!(perShare>0)){ if(hint) hint.textContent='stop equals entry — no distance to size from'; return; }
+  if(!(perShare>0)){ if(hint) hint.textContent='Stop equals entry — no distance to size from'; return; }
   const qty=Math.max(1, Math.floor(risk/perShare));
   document.getElementById('otQty').value=qty;
   if(hint) hint.textContent=`${qty} units · $${fmt(perShare,2)}/unit to stop · risks $${fmt(qty*perShare,2)}`;
@@ -2880,8 +2916,8 @@ function focusTicker(t){
   // use. They just get the fullscreen chart. #guest-no-order-panel
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
-    // Desktop: keep the docked panel open unless the user X'd it. Phone: don't auto-open —
-    // it's a bottom sheet that would cover the chart we're about to show.
+    // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
+    // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
   }
   openFullscreenChart(t);
@@ -3324,7 +3360,7 @@ async function addWatchlistTicker(){
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t add ticker: ' + (result.error || r.statusText)); return; }
     input.value = '';
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){
     _alertToast('Couldn’t add ticker: ' + e.message);
@@ -3336,7 +3372,7 @@ async function addWatchlistSymbol(sym){
   if(!sym) return;
   try{
     await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){}
 }
@@ -3347,7 +3383,7 @@ async function removeWatchlistTicker(ticker, evt){
     const r = await fetch('/api/trading/watchlist/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t remove ticker: ' + (result.error || r.statusText)); return; }
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){
     _alertToast('Couldn’t remove ticker: ' + e.message);
@@ -3518,7 +3554,15 @@ async function loadCouncil(){
     (rowHtml || '<div class="s0-empty">No signal-bearing trades graded yet.</div>');
 }
 
-let pricesLoading = false;
+// #2491: coalesce the watchlist-prices endpoint. On trader load ~10 independent
+// init paths each call loadWatchlistPrices() within ~0.25s; each completed fast
+// enough that the old in-flight-only guard didn't dedupe them, so the parameterless
+// endpoint got hit ~10×. pricesInFlight shares one request across truly-concurrent
+// callers; lastPricesAt + PRICES_MIN_INTERVAL skip a re-fetch right after a load.
+let pricesInFlight = null;
+let lastPricesAt = 0;
+const PRICES_MIN_INTERVAL = 2000; // ms — coalesces the 0.25s load burst; well under
+                                  // the 3s poll + 30s full-refresh so neither is skipped.
 // ── P1 trust + workflow bundle (#2439) ────────────────────────────────────────
 // Feed honesty: flip the LIVE stamp red after 2 consecutive failed polls (~6s of
 // silence) so stale prices never masquerade as live. Restores on the next success.
@@ -3661,9 +3705,17 @@ function _tickLastBar(tk, px){
   }                                                          // older gap → wait for real server bars
 }
 
-async function loadWatchlistPrices(){
-  if(pricesLoading) return;
-  pricesLoading = true;
+// Thin coalescing wrapper (#2491). Callers that mutate the watchlist first
+// (add/remove ticker) pass {force:true} so the freshness window can't hide the
+// changed ticker set; the poll + full-refresh call it with no args.
+function loadWatchlistPrices(opts){
+  const force = opts === true || !!(opts && opts.force);
+  if(pricesInFlight) return pricesInFlight;                       // concurrent → share one fetch
+  if(!force && Date.now() - lastPricesAt < PRICES_MIN_INTERVAL) return Promise.resolve();
+  pricesInFlight = _loadWatchlistPricesNow();
+  return pricesInFlight;
+}
+async function _loadWatchlistPricesNow(){
   try{
     const r = await fetch('/api/trading/watchlist-prices');
     wlPrices = await r.json();
@@ -3692,8 +3744,12 @@ async function loadWatchlistPrices(){
     });
     updateRegimeBadges();
     renderFullscreenChart();
+    // Keep the docked order ticket's quote ticking with the feed (it has no
+    // poll of its own — without this its prices freeze at open time).
+    if(otTicker && !document.getElementById('otBg').classList.contains('hidden')) renderOrderTicket();
+    lastPricesAt = Date.now();   // #2491: mark fresh only after a successful load
   }catch(e){ _feedStatus(false); }   // #2439: a failed poll must not look live
-  finally{ pricesLoading = false; }
+  finally{ pricesInFlight = null; }
 }
 
 let barsLoading = false;
@@ -4473,7 +4529,7 @@ function startDashboard(){
   initColumnResizers();
   initChartDrag();
   // #1694: order panel is open by default (for the active/first symbol) once data
-  // loads, unless the user closes it with X.
+  // loads, unless the user dismissed it (Esc / backdrop tap).
   setTimeout(()=>{
     // Default the symbol-info sidebar to SPY (or the first watchlist symbol) so it
     // shows real data on load instead of being blank until a chart is clicked.
@@ -4553,7 +4609,7 @@ async function detectGuestMode(){
         // a login gate. Point them at the upgrade, not the sign-in page.
         cta.textContent = 'Upgrade to trade →';
         cta.title = 'Trading unlocks with the Pro ($20/mo) tier';
-        cta.href = 'https://www.patreon.com/cw/UnisonaAI';
+        cta.href = 'https://www.patreon.com/c/UnisonaAI';
         cta.target = '_blank'; cta.rel = 'noopener noreferrer';
       } else {
         cta.textContent = 'Sign in to trade →';
@@ -4561,26 +4617,63 @@ async function detectGuestMode(){
       }
     }
   } else {
-    // Entitled trader → surface the broker connection so they can link IBKR.
-    const link = document.getElementById('brokerLink');
-    if(link){
-      link.style.display='';
-      refreshBrokerStatus();
-    }
+    // Entitled trader → surface the single broker pill (which broker executes +
+    // link to Settings to add/configure/switch).
+    refreshBrokerButton();
   }
 }
-// Live IBKR connection state in the header broker link.
-async function refreshBrokerStatus(){
-  const label = document.getElementById('brokerLabel');
-  const link = document.getElementById('brokerLink');
-  if(!label || !link) return;
+// ── Single broker pill (declutter): one control that shows which broker EXECUTES
+// your trades and links to Settings (orchestration#broker) to add / configure /
+// switch. Replaces the old switch + ⚡Alpaca + 🔗IBKR cluster. The switch itself
+// now lives on the Settings broker page (#2663).
+async function refreshBrokerButton(){
+  const btn = document.getElementById('brokerBtn'), label = document.getElementById('brokerLabel');
+  if(!btn || !label) return;
+  btn.style.display = '';                 // entitled trader → always show the pill
+  btn.href = '/orchestration.html#broker';
   try{
-    const s = await (await fetch('/api/trading/ibkr/connection',{cache:'no-store'})).json();
-    if(s && s.live && s.live.connected){ label.textContent = `IBKR · ${s.accountId||'connected'}`; link.style.color='var(--green)'; link.title='IBKR connected — click to manage'; }
-    else if(s && s.hasCredentials){ label.textContent='IBKR · reconnect'; link.style.color='var(--amber)'; link.title='Credentials saved but not connected — click to fix'; }
-    else { label.textContent='Connect broker'; link.style.color=''; link.title='Connect your Interactive Brokers account to place real trades'; }
-  }catch(e){ /* leave default */ }
+    // One call carries everything: which broker is preferred (`effective`) and which
+    // are actually connected. The executor = preferred-if-connected, else the other
+    // connected one — mirroring the server-side fallback order (broker-facade.js).
+    const s = await (await fetch('/api/broker/preference',{cache:'no-store'})).json();
+    const con = (s && s.connected) || {};
+    const pref = s && s.effective;
+    let active = null;
+    if(pref === 'alpaca' && con.alpaca) active = 'alpaca';
+    else if(pref === 'ibkr' && con.ibkr) active = 'ibkr';
+    else if(con.alpaca) active = 'alpaca';
+    else if(con.ibkr) active = 'ibkr';
+    if(active){
+      const other = active === 'alpaca' ? con.ibkr : con.alpaca;
+      label.textContent = active === 'alpaca' ? '⚡ Alpaca' : '🔗 IBKR';
+      btn.style.color = 'var(--green)';
+      btn.title = (active === 'alpaca' ? 'Alpaca' : 'IBKR') + ' executes your trades' +
+        (other ? ' (the other broker is the automatic fallback)' : '') +
+        '. Click to configure or switch brokers in Settings.';
+    } else {
+      label.textContent = '🔗 Connect broker';
+      btn.style.color = '';
+      btn.title = 'No broker connected — click to add Alpaca or IBKR in Settings.';
+    }
+  }catch(e){
+    label.textContent = '🔗 Broker';      // network hiccup → neutral, still links to Settings
+  }
 }
+// OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
+// or ?alpaca=error&reason=…. Announce it once, then scrub the param from the URL.
+(function(){
+  const q = new URLSearchParams(location.search);
+  const st = q.get('alpaca');
+  if(!st) return;
+  if(st === 'connected'){
+    setTimeout(()=>alert('⚡ Alpaca connected — your trades now route to your own Alpaca account (paper by default).'), 300);
+  } else {
+    const reason = q.get('reason') || 'unknown';
+    setTimeout(()=>alert(`Alpaca connect failed: ${reason}. You can retry from the ☰ menu.`), 300);
+  }
+  q.delete('alpaca'); q.delete('reason');
+  history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : '') + location.hash);
+})();
 // Re-render charts the instant the theme flips. The canvas grid/axis colors are
 // read from CSS at draw time (CHART_*_COLOR) and renderZoneLadder memoizes on
 // data/price, so without this the chart colors keep the old theme until the next
@@ -4614,12 +4707,14 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
   // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
-    {sel:'.header .hgroup',            narrowOnly:true },
+    // The chart-controls cluster (.hgroup) deliberately STAYS inline on every width
+    // (#2501 item 6): layout/type/timeframe are the most-used mobile controls, and
+    // the header scrolls horizontally — so they sit to the LEFT of the ☰ instead of
+    // hiding inside it.
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
-    {sel:'.header a[href*="explore"]', narrowOnly:false},
-    {sel:'#brokerLink',                narrowOnly:false},
+    {sel:'#brokerBtn',                 narrowOnly:false},
     {sel:'#dcToggle',                  narrowOnly:false},
   ];
   const items=[];   // {el, marker, narrowOnly} — marker = comment left in the header slot
@@ -4776,6 +4871,27 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 <script>
   /* Mobile view switch (#2255): toggle between the charts and the ticker list, since both
      can't fit at phone width. Chart is the default; the tab bar only shows on mobile. */
+</script>
+<script>
+  /* Mobile view switch (#2501): toggle between the chart deck, the ticker list, and
+     the account/positions panel — the three can't share a phone screen. Chart is the
+     default; the tab bar only renders on mobile (see .mobile-view-tabs CSS). */
+  function setMobileView(view) {
+    var layout = document.querySelector('.layout');
+    if (!layout) return;
+    layout.classList.toggle('mobile-tickers',   view === 'tickers');
+    layout.classList.toggle('mobile-positions', view === 'positions');
+    document.querySelectorAll('.mvt-btn').forEach(function (b) {
+      var on = b.getAttribute('data-view') === view;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    // Charts just became visible/resized — re-fit them to the pane.
+    if (view === 'chart' && typeof renderCards === 'function') {
+      requestAnimationFrame(function () { try { renderCards(); } catch (e) {} });
+    }
+  }
+  window.setMobileView = setMobileView;
 </script>
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>

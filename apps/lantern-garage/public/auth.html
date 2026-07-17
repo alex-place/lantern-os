@@ -286,15 +286,15 @@
         <button type="submit" class="btn-local" id="local-submit">Sign in</button>
       </form>
       <div class="local-toggle" id="local-toggle-wrap">
-        New here? <a id="local-toggle">Create an account</a>
+        New here? <a id="local-toggle" href="#" role="button">Create an account</a>
       </div>
       <div class="local-toggle" id="forgot-wrap">
-        <a id="forgot-link">Forgot password?</a>
+        <a id="forgot-link" href="#" role="button">Forgot password?</a>
       </div>
     </div>
 
     <div class="auth-divider">support</div>
-    <a class="btn-ghost" href="https://www.patreon.com/cw/UnisonaAI" target="_blank" rel="noopener noreferrer">
+    <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">
       View Patreon Tiers &amp; Support
     </a>
 
@@ -372,6 +372,8 @@
     supporter:    { label: "Free",         canAccess: true },
     deep_dreamer: { label: "Pro",          canAccess: true },
     founder:      { label: "Pro",          canAccess: true }, // legacy alias (#698)
+    pilot:        { label: "Pilot",        canAccess: true }, // #2612: a signed-in Pilot must not be treated as logged out
+    tech_support: { label: "Staff",        canAccess: true },
     admin:        { label: "Admin",        canAccess: true }
   };
 
@@ -383,8 +385,15 @@
     try {
       const rt = new URLSearchParams(location.search).get("returnTo");
       // Mirror the server validator (oauth-core safeReturnTo): root-relative only,
-      // no protocol-relative "//host" and no backslash tricks.
-      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) return rt;
+      // no protocol-relative "//host" and no backslash tricks. Resolve against our
+      // OWN origin and confirm the result stays same-origin before returning only
+      // the path+query — so a redirect sink can never receive an off-site URL even
+      // if a new bypass slips past the string checks (clears CodeQL
+      // js/client-side-unvalidated-url-redirection by construction).
+      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) {
+        const u = new URL(rt, location.origin);
+        if (u.origin === location.origin) return u.pathname + u.search;
+      }
     } catch (_) {}
     return "/";
   }
@@ -419,12 +428,20 @@
   // "Continue without an account": record the choice (ln_guest cookie, 1yr) so the
   // first-visit gate in auth-gate.js won't send them back here, then go where they came
   // from. They stay a signed-OUT guest — this only remembers that they've decided.
+  // A guest can't reach auth-gated pages, so "continue without an account" must not
+  // send them to a protected returnTo (e.g. /profile.html after "Switch account") —
+  // they'd just bounce straight back here. Fall back to home for those (#2639).
+  const GUEST_BLOCKED = ["/profile.html", "/create.html", "/work.html", "/accounts.html", "/accounts", "/admin-flags.html", "/kalshi-terminal.html"];
+  function guestDestination() {
+    const rt = safeReturnTo();
+    return GUEST_BLOCKED.includes(rt.split("?")[0]) ? "/" : rt;
+  }
   (function wireGuest() {
     const btn = document.getElementById("continue-guest");
     if (!btn) return;
     btn.addEventListener("click", () => {
       document.cookie = "ln_guest=1; path=/; max-age=" + 60 * 60 * 24 * 365 + "; samesite=lax";
-      location.href = safeReturnTo();
+      location.href = guestDestination();
     });
   })();
 
@@ -514,7 +531,7 @@
       pw.setAttribute("autocomplete", "new-password");
       pw.setAttribute("placeholder", "Create a password (min 8 characters)");
       submit.textContent = "Create account";
-      toggleWrap.innerHTML = 'Already have an account? <a id="local-toggle">Sign in</a>';
+      toggleWrap.innerHTML = 'Already have an account? <a id="local-toggle" href="#" role="button">Sign in</a>';
       if (tosRow) tosRow.hidden = false;   // show the agreement just above "Create account"
     } else {
       nameInput.hidden = true;
@@ -524,13 +541,14 @@
       pw.setAttribute("autocomplete", "current-password");
       pw.setAttribute("placeholder", "Password (min 8 characters)");
       submit.textContent = "Sign in";
-      toggleWrap.innerHTML = 'New here? <a id="local-toggle">Create an account</a>';
+      toggleWrap.innerHTML = 'New here? <a id="local-toggle" href="#" role="button">Create an account</a>';
       if (tosRow) tosRow.hidden = true;    // hidden for normal sign-in
       if (tosBox) tosBox.checked = false;  // fresh, unchecked each time they enter register
     }
-    document.getElementById("local-toggle").addEventListener("click", () =>
-      setLocalMode(localMode === "login" ? "register" : "login")
-    );
+    document.getElementById("local-toggle").addEventListener("click", (e) => {
+      e.preventDefault();
+      setLocalMode(localMode === "login" ? "register" : "login");
+    });
   }
 
   // ── Confirm-email screen — swaps out the entire sign-in view until the address
@@ -616,7 +634,13 @@
     submit.textContent = "…";
     try {
       const url = localMode === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
-      const body = localMode === "register" ? { email, password, name } : { email, password };
+      // #2554: forward a stored referral code on register (captured from ?ref= on
+      // any landing page). Best-effort — absent/invalid codes are simply ignored.
+      let ref = null;
+      try { ref = localStorage.getItem("unisona_ref") || null; } catch (e) {}
+      const body = localMode === "register"
+        ? (ref ? { email, password, name, ref } : { email, password, name })
+        : { email, password };
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
@@ -635,7 +659,14 @@
         // Signed in — confirm with a success banner, then continue to the app.
         signedIn = true;
         showSignedIn();
-        setTimeout(() => { location.href = safeReturnTo(); }, 1200);
+        // Best-effort: claim a card subscription bought with this (verified) email
+        // before entering the app, so a Stripe subscriber's sign-in lands with the
+        // right tier already applied. The server no-ops fast when billing is off or
+        // there's nothing to link; a slow/failed probe never blocks the redirect.
+        const link = await attemptBillingLink(2500);
+        const freshlyLinked = !!(link && link.linked && !link.already);
+        if (freshlyLinked) showNotice("Signed in ✓ — found your card subscription and linked it to this account. Taking you in…");
+        setTimeout(() => { location.href = safeReturnTo(); }, freshlyLinked ? 1800 : 1200);
         return;
       }
       // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
@@ -660,6 +691,20 @@
       // brief success banner shows and we redirect — don't re-enable it.
       if (!signedIn) { submit.disabled = false; submit.textContent = prev; }
     }
+  }
+
+  // POST /api/billing/link with a hard client timeout. Returns the parsed result
+  // ({ linked, already, role, … }) or null on any failure/timeout — callers treat
+  // null as "nothing linked" and move on.
+  async function attemptBillingLink(timeoutMs) {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
+      const r = await fetch("/api/billing/link", { method: "POST", credentials: "include", signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) return null;
+      return await r.json().catch(() => null);
+    } catch (_) { return null; }
   }
 
   async function checkSession() {
@@ -733,11 +778,19 @@
     }
   }
 
-  async function requestPasswordReset() {
-    const email = (document.getElementById("local-email").value || "").trim()
-      || (prompt("Enter your account email to reset your password:") || "").trim();
-    if (!email) return;
+  async function requestPasswordReset(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const emailEl = document.getElementById("local-email");
     const errEl = document.getElementById("local-error");
+    const email = (emailEl.value || "").trim();
+    // No prompt() — it's inaccessible (blocks the whole page, invisible to screen
+    // readers) and can't be styled. Ask for the address inline instead (#2640).
+    if (!email) {
+      errEl.style.color = "var(--accent)";
+      errEl.textContent = "Enter your account email above, then choose ‘Forgot password?’ again.";
+      emailEl.focus();
+      return;
+    }
     try {
       await fetch("/api/auth/request-password-reset", {
         method: "POST", headers: { "Content-Type": "application/json" },

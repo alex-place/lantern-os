@@ -64,15 +64,19 @@ updated: 2026-06-20
 - **Use Case:** Vision/multimodal, fast responses, live web grounding (googleSearch tool)
 - **Notes:** Vertex has no free-tier 429 on the search tool; the AI-Studio key does, so grounding prefers Vertex.
 
-#### 4. **xAI Grok** ⏳ (Declared, Not Yet Implemented)
+#### 4. **xAI Grok** ✅
 - **API Key:** `XAI_API_KEY`
 - **Model Var:** `XAI_MODEL` (default: `grok-3-mini`)
-- **State:** ✓ Present (configured) — but not yet in fallback chain
+- **State:** ✓ Present (configured) — in the `creative` and `default` fallback chains (#2531)
 - **Get Key:** https://console.x.ai/
 - **Endpoint:** `api.x.ai` (OpenAI-compatible)
 - **Streaming:** Yes
 - **Use Case:** Creative tasks, humor/personality
-- **Notes:** OpenAI API-compatible. Real-time web access. **Reserved for future implementation** — currently declared in PCSF but not yet wired into fallback logic.
+- **Notes:** OpenAI API-compatible, real-time web access. The stream-chat transport
+  (streaming + native tool-use loop) had existed since the pinnable model picker,
+  but no chain dispatched it (#2531). Wired 2026-07-16 after a live key probe
+  (`GET /v1/models` → 200; 1-token chat completion → 200). PCSF merit-ranking
+  reorders it from real outcomes like every other cloud provider.
 
 #### 5. **Ollama Local** ✅
 - **Base URL:** `OLLAMA_BASE_URL` (default: `http://127.0.0.1:11434`)

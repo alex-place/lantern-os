@@ -31,7 +31,7 @@ The hosted **cloud** profile ([`lib/deployment-profile.js`](../apps/lantern-gara
 
 ## Current boundary (measured)
 
-`19 core : 17 extension` — ratio **0.89 : 1** (cap **0.95**). The numbers come from `surface-registry.summary()` via `npm run test:boundary`, not an estimate. (A parallel non-HTML **subsystems** tier — bots + background services, #1948/#1980 — is classified by the same rule; see `SUBSYSTEMS` in the registry.)
+`20 core : 18 extension` — ratio **0.9 : 1** (cap **0.95**). The numbers come from `surface-registry.summary()` via `npm run test:boundary`, not an estimate. (A parallel non-HTML **subsystems** tier — bots + background services, #1948/#1980 — is classified by the same rule; see `SUBSYSTEMS` in the registry.)
 
 ### Core — the convergence loop
 | Stage | Surfaces |
@@ -49,13 +49,12 @@ The hosted **cloud** profile ([`lib/deployment-profile.js`](../apps/lantern-gara
 | account | 7 | — (always-on shell) | `auth`, `entry`, `profile`, `reset-password`, `pricing`, `upgrade-lab`, `api-keys-settings` |
 | trading | 4 | `TRADING_ENABLED` | `trading`, `kalshi-terminal`, `kalshi-screener`, `stock-trader` |
 | meta | 3 | — (always-on shell) | `changelog`, `whats-new`, `faq` |
-| game | 1 | `GAMES_ENABLED` | `three-doors-game` |
 | creator | 1 | `CREATOR_ENABLED` | `create` |
 | media | 1 | `RADIO_ENABLED` | `fallout-radio` |
 
 ## What this buys
 
-- **Honest accounting.** The sprawl is a number (0.89:1) with a **cap that fails CI** (0.95), not a vibe. Setting aside the account/meta shell (10 surfaces), no feature cluster exceeds 4 surfaces (trading).
+- **Honest accounting.** The sprawl is a number (0.9:1) with a **cap that fails CI** (0.95), not a vibe. Setting aside the account/meta shell (11 surfaces), no feature cluster exceeds 5 surfaces (trading).
 - **No silent sprawl.** A new unclassified `public/*.html` fails `npm run test:boundary` — you must name the loop stage it serves, or declare it an extension.
 - **Back-pressure, not just labels.** A new extension that isn't offset by core value trips the budget; every extension is switch-off-able (a `flag`) unless it's the account/meta shell. The sprawl can be *turned off*, not just *counted*.
 - **No list drift.** The cloud hosted subset is cross-checked against disk + this registry, so a hosted entry can't point at a missing or unclassified file.

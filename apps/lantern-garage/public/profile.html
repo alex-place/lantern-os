@@ -93,7 +93,9 @@
     .tier-badge.supporter{ background: rgba(6,182,212,.15);   color: #06b6d4; border-color: rgba(6,182,212,.35); }
     .tier-badge.deep_dreamer,
     .tier-badge.founder  { background: rgba(251,146,60,.15);  color: #fb923c; border-color: rgba(251,146,60,.35); }
-    .tier-badge.admin    { background: rgba(167,139,250,.15); color: #a78bfa; border-color: rgba(167,139,250,.35); }
+    .tier-badge.pilot    { background: rgba(251,191,36,.15);  color: #fbbf24; border-color: rgba(251,191,36,.4); }
+    .tier-badge.admin,
+    .tier-badge.tech_support { background: rgba(167,139,250,.15); color: #a78bfa; border-color: rgba(167,139,250,.35); }
 
     .hero-actions {
       display: flex; gap: 10px; margin-top: 14px;
@@ -172,9 +174,11 @@
       transition: border-color .15s, background .15s;
     }
     .access-card:hover { border-color: var(--accent); background: var(--surface2); }
-    .access-card.locked {
-      opacity: .45; cursor: default; pointer-events: none;
-    }
+    /* #2653: locked cards are now links to /pricing.html — the user is at peak
+       upgrade intent, so don't swallow the click. Keep them dimmed but lift opacity
+       from .45 so the 'Requires …' line clears the contrast floor. */
+    .access-card.locked { opacity: .6; }
+    .access-card.locked .upsell { color: var(--accent-strong); font-weight: 700; white-space: nowrap; }
     .access-icon { font-size: 20px; flex-shrink: 0; }
     .access-label { font-size: 13px; font-weight: 600; color: var(--text); }
     .access-req   { font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -303,8 +307,8 @@
 
 <!-- Change email modal -->
 <div class="modal-backdrop" id="email-modal">
-  <div class="modal">
-    <h2>Change email</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="email-modal-title">
+    <h2 id="email-modal-title">Change email</h2>
     <form id="email-form" onsubmit="saveEmail(event)">
       <div id="email-error" class="form-error" role="alert" hidden></div>
       <div class="form-row">
@@ -322,7 +326,7 @@
 
 <!-- Change password modal -->
 <div class="modal-backdrop" id="password-modal">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="password-modal-title">
     <h2 id="password-modal-title">Change password</h2>
     <form id="password-form" onsubmit="savePassword(event)">
       <div id="password-error" class="form-error" role="alert" hidden></div>
@@ -344,8 +348,8 @@
 
 <!-- Edit modal -->
 <div class="modal-backdrop" id="edit-modal">
-  <div class="modal">
-    <h2>Edit Profile</h2>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+    <h2 id="edit-modal-title">Edit Profile</h2>
     <form id="edit-form" onsubmit="saveProfile(event)">
       <div id="edit-error" class="form-error" role="alert" hidden></div>
       <div class="form-row">
@@ -366,15 +370,22 @@
 
 <script src="/js/theme-toggle.js"></script>
 <script>
-// deep_dreamer is the $20 web tier; `founder` kept as a legacy alias (#698).
-const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, admin: 3 };
+// Patreon tiers by pledge amount: supporter $5 Member, deep_dreamer $20 Pro,
+// pilot $200 Pilot. `founder` kept as a legacy alias for deep_dreamer (#698).
+const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, pilot: 3, tech_support: 4, admin: 5 };
 
+// Tier chip labels. Member ($5) is no longer a sold tier — an existing supporter is
+// grandfathered and shown as Free (matches the nav badge + auth.html), keeping a
+// distinct chip colour. tech_support/pilot now render properly instead of falling
+// back to a 'Free'/locked chip (#2632, #2642).
 const TIER_LABELS = {
   guest:        { label: 'Free',              emoji: '🔓' },
-  supporter:    { label: 'Free (legacy supporter)', emoji: '🌀' },
-  deep_dreamer: { label: 'Pro — $20/mo', emoji: '✦' },
-  founder:      { label: 'Pro — $20/mo', emoji: '✦' }, // legacy alias (#698)
-  admin:        { label: 'Admin (staff)', emoji: '⬡' },
+  supporter:    { label: 'Free',              emoji: '🌀' }, // legacy Member, grandfathered
+  deep_dreamer: { label: 'Pro — $20/mo',      emoji: '✦' },
+  founder:      { label: 'Pro — $20/mo',      emoji: '✦' }, // legacy alias (#698)
+  pilot:        { label: 'Pilot — $200/mo',   emoji: '🛩️' },
+  tech_support: { label: 'Tech Support',      emoji: '🛠️' },
+  admin:        { label: 'Admin (staff)',     emoji: '⬡' },
 };
 
 // Feature access is role-laddered EXCEPT Trader, which is a per-account
@@ -382,11 +393,11 @@ const TIER_LABELS = {
 // user-profiles.js. A `req` of 'trade' means "check entitlements.trade".
 // Feature access is tier-laddered. Trader (manual stocks + Kalshi + AI
 // suggestions) unlocks at the $20 Pro tier; the autonomous AI Trader
-// unlocks at the $200 Business tier.
+// unlocks at the $200 Pilot tier.
 const FEATURES = [
   { emoji: '📖', label: 'Journal',    href: '/dream-chat.html',      req: 'guest',        note: '' },
   { emoji: '📈', label: 'Trader',     href: '/stock-trader.html',    req: 'deep_dreamer', note: 'Trade stocks & Kalshi + AI suggestions' },
-  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'admin',        note: 'Autonomous AI trading' },
+  { emoji: '🤖', label: 'AI Trader',  href: '/stock-trader.html',    req: 'pilot',        note: 'Autonomous AI trading' },
   { emoji: '🔗', label: 'Connect broker', href: '/orchestration.html#broker', req: 'deep_dreamer', note: 'Link Alpaca (one click) or IBKR' },
   { emoji: '✏️', label: 'Create',     href: '/create.html',          req: 'deep_dreamer', note: '' },
   { emoji: '🗺️', label: 'Explore',    href: '/explore.html',         req: 'guest',        note: '' },
@@ -511,10 +522,10 @@ function renderProfile(profile) {
            <span class="access-icon">${f.emoji}</span>
            <div><div class="access-label">${f.label}</div>${f.note ? `<div class="access-req">${escapeHtml(f.note)}</div>` : ''}</div>
          </a>`
-      : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
+      : `<a class="access-card locked" href="/pricing.html" title="${escapeHtml(reqLabel)} — see plans">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)}</div></div>
-         </div>`;
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)} · <span class="upsell">Upgrade →</span></div></div>
+         </a>`;
   }).join('');
 
   wrap.innerHTML = `
@@ -578,6 +589,17 @@ function renderProfile(profile) {
       <p class="link-note">Link a broker to trade your own account in the <a href="/stock-trader.html">Trader</a>. Alpaca is one click, paper by default.</p>
     </div>
 
+    <div id="billing-section" hidden>
+      <div class="section-title">Billing</div>
+      <div class="link-list">
+        <div class="link-row">
+          <span class="link-name">💳 Card subscription <span class="link-sub" id="stripe-sub">Checking…</span></span>
+          <span class="link-state" id="stripe-state"></span>
+        </div>
+      </div>
+      <p class="link-note">Subscribed by card before creating this account? Link it to unlock your tier here — we match the subscription by your verified email. Patreon tiers apply when you connect Patreon above.</p>
+    </div>
+
     <div>
       <div class="section-title">Security</div>
       <div class="link-list">${securityRows}</div>
@@ -589,13 +611,109 @@ function renderProfile(profile) {
       <div class="access-grid">${featureCards}</div>
     </div>
 
+    <div>
+      <div class="section-title">Refer a friend</div>
+      <p class="link-note">Share your link. When a friend signs up and gets active, it shows in your referrals. <span id="ref-note"></span></p>
+      <div class="link-list">
+        <div class="link-row">
+          <input id="ref-link" type="text" readonly value="Loading…" aria-label="Your referral link"
+            style="flex:1;min-width:0;background:var(--surface2,rgba(0,0,0,.2));border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:0.8rem;padding:8px 10px">
+          <button id="ref-copy" type="button" class="btn-pill" style="flex-shrink:0">Copy</button>
+        </div>
+      </div>
+    </div>
+
     </div><!-- /col -->
     </div><!-- /profile-cols -->
   `;
   refreshAlpacaBroker();   // fill the Brokerage → Alpaca row (async, after paint)
+  loadReferralLink();      // #2554 — fill the referral link + copy button (async)
+  refreshStripeBilling();  // fill the Billing → Card subscription row (async, after paint)
+}
+
+// ── Billing: Stripe subscription status / link / manage (#2568 follow-up) ──
+// Hidden entirely unless the server reports billing configured; then shows either
+// "Manage" (live sub, opens the customer portal) or "Link subscription" (claims an
+// existing card sub by the account's VERIFIED email via POST /api/billing/link).
+const STRIPE_STATUS_LABELS = {
+  active: 'active', trialing: 'trial', past_due: 'payment issue — fix in portal',
+  incomplete: 'payment issue — fix in portal',
+};
+async function refreshStripeBilling() {
+  const section = document.getElementById('billing-section');
+  const sub = document.getElementById('stripe-sub');
+  const state = document.getElementById('stripe-state');
+  if (!section || !sub || !state) return;
+  let cfg = null;
+  try { cfg = await (await fetch('/api/billing/config', { credentials: 'include', cache: 'no-store' })).json(); } catch (_e) {}
+  if (!cfg || !cfg.configured) { section.hidden = true; return; }
+  section.hidden = false;
+  const row = state.closest('.link-row');
+  if (cfg.subscribed) {
+    if (row) row.classList.add('linked');
+    sub.textContent = STRIPE_STATUS_LABELS[cfg.stripeStatus] || cfg.stripeStatus || 'active';
+    state.innerHTML = '<span class="link-badge">Linked</span><button class="link-btn connect" onclick="openStripePortal()">Manage</button>';
+  } else {
+    if (row) row.classList.remove('linked');
+    sub.textContent = 'not linked';
+    state.innerHTML = '<button class="link-btn connect" onclick="linkStripeSubscription(this)">Link subscription</button>'
+      + '<a class="link-btn" href="/pricing.html">Plans</a>';
+  }
+}
+async function linkStripeSubscription(btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Looking…'; }
+  try {
+    const res = await fetch('/api/billing/link', { method: 'POST', credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.linked) {
+      showToast(data.already ? 'Your card subscription is already linked. ✓' : 'Card subscription linked — your tier is unlocked. ✓', 'ok');
+      // Role/tier may have changed — re-pull the profile so the badge + features update.
+      try {
+        const pr = await fetch('/api/profiles/me', { credentials: 'include' });
+        if (pr.ok) { currentProfile = await pr.json(); renderProfile(currentProfile); return; }
+      } catch (_) {}
+      refreshStripeBilling();
+      return;
+    }
+    if (res.ok && data.linked === false) { showToast('No card subscription found for your verified email.', 'error'); }
+    else if (data.error === 'email_unverified') { showToast('Confirm your email first — that\'s how we prove the subscription is yours.', 'error'); }
+    else if (data.error === 'customer_already_linked') { showToast('That subscription is already linked to a different account.', 'error'); }
+    else if (data.error === 'too_many_attempts') { showToast('Please wait a few seconds and try again.', 'error'); }
+    else { showToast('Could not link right now — please try again.', 'error'); }
+  } catch (_) {
+    showToast('Network error — please try again.', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Link subscription'; }
+  }
+}
+async function openStripePortal() {
+  try {
+    const res = await fetch('/api/billing/portal', { method: 'POST', credentials: 'include' });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) { location.href = data.url; return; }
+    showToast('Could not open the customer portal.', 'error');
+  } catch (_) { showToast('Network error — please try again.', 'error'); }
 }
 
 // ── Brokerage: Alpaca one-click status/connect/disconnect (ADR-0027) ──
+// #2554 — fetch the signed referral link and wire the copy button.
+async function loadReferralLink() {
+  const input = document.getElementById('ref-link');
+  const copyBtn = document.getElementById('ref-copy');
+  if (!input || !copyBtn) return;
+  try {
+    const r = await fetch('/api/referral/link', { credentials: 'include' }).then((x) => x.json());
+    if (!r || !r.ok || !r.link) { input.value = 'Sign in to get your link'; return; }
+    input.value = r.link;
+    copyBtn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(r.link); }
+      catch (e) { input.select(); document.execCommand('copy'); }
+      const prev = copyBtn.textContent; copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => { copyBtn.textContent = prev; }, 1500);
+    });
+  } catch (e) { input.value = 'Could not load link'; }
+}
+
 async function refreshAlpacaBroker() {
   const sub = document.getElementById('alpaca-sub');
   const state = document.getElementById('alpaca-state');
@@ -862,9 +980,22 @@ async function init() {
 document.addEventListener('DOMContentLoaded', () => {
   // Theme toggle lives in the global header (site-chrome.js) with its own
   // onclick; no per-page binding needed here.
-  // Backdrop click closes any open modal.
+  // Backdrop click closes any open modal; on open, move focus into the dialog and
+  // Escape closes it — basic dialog semantics for keyboard/AT users (#2641).
   document.querySelectorAll('.modal-backdrop').forEach(m => {
     m.addEventListener('click', e => { if (e.target === e.currentTarget) m.classList.remove('open'); });
+    // Focus the first field whenever this modal is opened (class 'open' added).
+    new MutationObserver(() => {
+      if (m.classList.contains('open')) {
+        const first = m.querySelector('input:not([type=hidden]), textarea, button');
+        if (first) first.focus();
+      }
+    }).observe(m, { attributes: true, attributeFilter: ['class'] });
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.modal-backdrop.open');
+    if (open) open.classList.remove('open');
   });
   init();
 });

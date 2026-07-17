@@ -25,8 +25,6 @@ caad/
     symbols.jsonl
     artifacts.jsonl
     backlog.jsonl
-  art-direction/         — Art direction docs and canon
-    doors/
   product/               — Product-specific CAAD entries
     dream-journal/
   architecture/          — System architecture docs

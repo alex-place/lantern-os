@@ -1,0 +1,179 @@
+{
+ "issue": 2581,
+ "bar": 0.79,
+ "universe_requested": [
+  "ES=F",
+  "NQ=F",
+  "RTY=F",
+  "YM=F",
+  "ZN=F",
+  "ZB=F",
+  "ZF=F",
+  "GC=F",
+  "SI=F",
+  "HG=F",
+  "CL=F",
+  "NG=F",
+  "ZC=F",
+  "ZS=F",
+  "ZW=F",
+  "6E=F",
+  "6J=F",
+  "6B=F"
+ ],
+ "universe_usable": [
+  "ES=F",
+  "NQ=F",
+  "RTY=F",
+  "YM=F",
+  "ZN=F",
+  "ZB=F",
+  "ZF=F",
+  "GC=F",
+  "SI=F",
+  "HG=F",
+  "CL=F",
+  "NG=F",
+  "ZC=F",
+  "ZS=F",
+  "ZW=F",
+  "6E=F",
+  "6J=F",
+  "6B=F"
+ ],
+ "excluded": [],
+ "misprints_repaired": {
+  "6J=F": 1
+ },
+ "entry_dates": {
+  "ES=F": "2000-09-18",
+  "NQ=F": "2000-09-18",
+  "RTY=F": "2017-07-10",
+  "YM=F": "2002-04-05",
+  "ZN=F": "2000-09-21",
+  "ZB=F": "2000-09-21",
+  "ZF=F": "2000-09-21",
+  "GC=F": "2000-08-30",
+  "SI=F": "2000-08-30",
+  "HG=F": "2000-08-30",
+  "CL=F": "2000-08-23",
+  "NG=F": "2000-08-30",
+  "ZC=F": "2000-07-17",
+  "ZS=F": "2000-09-15",
+  "ZW=F": "2000-07-17",
+  "6E=F": "2000-09-12",
+  "6J=F": "2000-09-13",
+  "6B=F": "2000-10-05"
+ },
+ "best": {
+  "lookback_days": 252,
+  "lookback": "12m",
+  "vol_target": 0.1
+ },
+ "train_grid": [
+  {
+   "lookback_days": 252,
+   "vol_target": 0.1,
+   "train_sharpe": 0.19623857098675956,
+   "train_final": 3142.0135996639315
+  },
+  {
+   "lookback_days": 252,
+   "vol_target": 0.15,
+   "train_sharpe": 0.16857595833705366,
+   "train_final": 3100.930882676549
+  },
+  {
+   "lookback_days": 252,
+   "vol_target": 0.2,
+   "train_sharpe": 0.16330569878813714,
+   "train_final": 3098.1789911763326
+  },
+  {
+   "lookback_days": 63,
+   "vol_target": 0.2,
+   "train_sharpe": 0.1625405937178365,
+   "train_final": 3318.3124893828453
+  },
+  {
+   "lookback_days": 63,
+   "vol_target": 0.15,
+   "train_sharpe": 0.16214586885017007,
+   "train_final": 3318.3664179257084
+  },
+  {
+   "lookback_days": 63,
+   "vol_target": 0.1,
+   "train_sharpe": 0.16129420617887505,
+   "train_final": 3316.01112662956
+  }
+ ],
+ "validation": {
+  "sharpe": 0.3853289795873154,
+  "lo": -0.14803726670989503,
+  "hi": 0.9186952258845258,
+  "final": 4153.942079311928,
+  "maxdd": -0.18989222419368734,
+  "realized_vol": 0.08898789291109739,
+  "verdict": "below"
+ },
+ "full": {
+  "sharpe": 0.2819150398821499,
+  "lo": -0.10197592987694082,
+  "hi": 0.6658060096412406,
+  "final": 8899.645837417163,
+  "maxdd": -0.208934428873073,
+  "realized_vol": 0.1013323925555571,
+  "avg_long_gross": 1.1210563191747274,
+  "avg_short_gross": 0.7789448937903563,
+  "avg_n_live": 16.46006389776358,
+  "avg_monthly_turnover": 0.5981603091104116,
+  "verdict": "below"
+ },
+ "spy_dca": {
+  "validation": {
+   "sharpe": 0.8661771473174613,
+   "final": 9694.754935853292
+  },
+  "full": {
+   "sharpe": 0.42600554632942267,
+   "lo": 0.03262150392018226,
+   "final": 37390.26305432484,
+   "verdict": "below"
+  }
+ },
+ "stress": {
+  "p_below_10k": 0.0,
+  "median": 27104.5055237797,
+  "p5": 20850.56211458936,
+  "worst": 16636.22013558853,
+  "pool_markets": [
+   "ES=F",
+   "NQ=F",
+   "ZN=F",
+   "ZB=F",
+   "ZF=F",
+   "GC=F",
+   "SI=F",
+   "HG=F",
+   "CL=F",
+   "NG=F",
+   "ZC=F",
+   "ZS=F",
+   "ZW=F",
+   "6E=F",
+   "6J=F",
+   "6B=F"
+  ],
+  "pool_days": 1271
+ },
+ "caveats": [
+  "Yahoo continuous-contract series have roll distortions (not back-adjusted consistently) \u2014 treat levels with suspicion; returns are approximate.",
+  "CME micro futures only exist since 2019; real execution at this shape needs ~$10-25k margin capital.",
+  "Paper book only \u2014 no product surface, no execution code.",
+  "Execution path would be IBKR CPAPI (creds currently stale).",
+  "No funding cost applied (futures margin, not borrowed cash); collateral yield forgone ~ 0 \u2014 T-bill yield on margin is NOT credited, slightly conservative.",
+  "Isolated misprints (huge move fully reverting next day) repaired to previous price and counted in misprints_repaired; genuine crashes and roll gaps left untouched."
+ ],
+ "generated": "2026-07-16T21:34:06.066681+00:00"
+}

@@ -270,6 +270,8 @@ const aiTraderRoutes = require('./trading/ai-trader');
 const newsRoutes = require('./trading/news');
 const miscRoutes = require('./trading/misc');
 const portfolioRoutes = require('./trading/portfolio');
+const optionsRoutes = require('./trading/options');
+const demoRoutes = require('./trading/demo');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -312,6 +314,8 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await aiTraderRoutes(req, res, url, ctx)) return true;
   if (await newsRoutes(req, res, url, ctx)) return true;
   if (await portfolioRoutes(req, res, url, ctx)) return true;
+  if (await optionsRoutes(req, res, url, ctx)) return true;
+  if (await demoRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;

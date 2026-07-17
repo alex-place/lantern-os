@@ -16,7 +16,7 @@
 
 **One harness, two model profiles, selected automatically.** The frontier of consumer dev is the *harness*, not the weights — every frontier tool (Claude Code, Cursor, Windsurf, Devin, Cline) is a harness over a cloud (or BYO) model, and the 2026 literature shows **up to 10× on coding benchmarks from harness/edit-format changes alone, no model change** ([Survey](https://openreview.net/pdf?id=eONq7FdiHa)). That is the Σ₀ "the loop is everything" bet.
 
-Keystone runs the same harness everywhere and lets the **VRAM gate + serving-liveness probe (both already in [`local-model-registry.js`](apps/lantern-garage/lib/local-model-registry.js))** pick the model:
+Keystone runs the same harness everywhere and lets the **VRAM gate + serving-liveness probe (both already in [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js))** pick the model:
 
 | Detected box | Local model leads? | Agentic brain | Claude's role |
 |---|---|---|---|

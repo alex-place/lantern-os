@@ -21,7 +21,7 @@ const MIN_CONTRAST_AA = 4.5;
 
 // Color hex to RGB
 function hexToRgb(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  const result = hex.match(/^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i);
   return result ? {
     r: parseInt(result[1], 16),
     g: parseInt(result[2], 16),
@@ -174,7 +174,8 @@ async function runA11yTests() {
     path.join(PUBLIC_DIR, 'dream-chat.html'),
     path.join(PUBLIC_DIR, 'explore.html'),
     path.join(PUBLIC_DIR, 'stock-trader.html'),
-    path.join(PUBLIC_DIR, 'kalshi-terminal.html')
+    path.join(PUBLIC_DIR, 'kalshi-terminal.html'),
+    path.join(PUBLIC_DIR, 'settings.html')
   ].filter(f => fs.existsSync(f));
 
   let totalPassed = 0;

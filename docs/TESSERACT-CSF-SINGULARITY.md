@@ -299,7 +299,7 @@ the optional real Ouro-1.4B CPU run failed cleanly on a `huggingface-hub` versio
 
 ## 8. What changes in the repo (consolidation, not addition)
 
-Tracked by the comet leap [`COMET-LEAP-P2-TESSERACT-CSF-SINGULARITY.md`](COMET-LEAP-P2-TESSERACT-CSF-SINGULARITY.md):
+Tracked by the comet leap P2 plan (removed 2026-07-16; superseded by [research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md](research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md)):
 
 1. **This doc** becomes the single design reference for the `3**12` lattice.
 2. [`CSF-FORMAT-SPECIFICATION.md`](CSF-FORMAT-SPECIFICATION.md) gains a "lattice view" pointer
@@ -310,5 +310,5 @@ Tracked by the comet leap [`COMET-LEAP-P2-TESSERACT-CSF-SINGULARITY.md`](COMET-L
    "implementation-detail leak" to "storage face of the lattice."
 5. [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
    gains the STARS citation (closes its non-normal gap) and a cross-link here.
-6. [`skills/convergence-mathematical-foundations`](../skills/convergence-mathematical-foundations/SKILL.md)
+6. ``skills/convergence-mathematical-foundations``
    gains a "3¹² Convergence Lattice" section.

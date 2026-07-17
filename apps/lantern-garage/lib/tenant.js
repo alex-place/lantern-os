@@ -78,11 +78,25 @@ function tenantDataRoot(profile, tenantId) {
 
 /**
  * Resolve a BYO provider key for this request. local -> process.env (today's
- * behaviour); cloud -> the per-session key bag only (W6), never the host env.
+ * behaviour); cloud -> per-tenant keys only (W6), never the host env.
+ * Both profiles fall back to the persistent per-user encrypted store
+ * (lib/user-provider-keys.js, #2505) when nothing earlier matched — in local it
+ * ranks BELOW env/vault so owner-funded behaviour is unchanged; in cloud it
+ * ranks below the session bag and above nothing (the host env stays excluded).
  * @returns {string|null}
  */
 function resolveProviderKey(req, provider, profile) {
   const p = String(provider || "").toLowerCase();
+  // Persistent per-user store lookup (both profiles). Session-identity + the
+  // store are lazy-required so a failure there can never break env resolution.
+  const storedUserKey = () => {
+    try {
+      const userId = getSessionUserId(req);
+      return userId ? require("./user-provider-keys").getKey(userId, p) : null;
+    } catch {
+      return null;
+    }
+  };
   if (profile !== "cloud") {
     for (const env of PROVIDER_ENV[p] || []) {
       if (process.env[env]) return process.env[env];
@@ -99,10 +113,10 @@ function resolveProviderKey(req, provider, profile) {
     } catch {
       /* vault optional — never let a vault error break key resolution */
     }
-    return null;
+    return storedUserKey();
   }
   const bag = req && req.session && req.session.tenantKeys;
-  return (bag && typeof bag[p] === "string" && bag[p]) || null;
+  return (bag && typeof bag[p] === "string" && bag[p]) || storedUserKey();
 }
 
 /**

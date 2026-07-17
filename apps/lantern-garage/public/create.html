@@ -1126,7 +1126,7 @@ async function loadRecentEntries() {
 
     list.innerHTML = sorted.map(entry => {
       const title = entry.title || autoName('');
-      const thumbnail = entry.thumbnail ? '/media/' + entry.thumbnail : '/placeholder.png';
+      const thumbnail = entry.thumbnail ? '/media/' + entry.thumbnail : '/placeholder.svg';
       const d = new Date(entry.createdAt);
       const when = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
                    ' • ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1135,7 +1135,7 @@ async function loadRecentEntries() {
       return `
         <div class="project-card">
           <div class="project-thumbnail">
-            <img src="${esc(thumbnail)}" alt="${esc(title)}" onerror="this.src='/placeholder.png';">
+            <img src="${esc(thumbnail)}" alt="${esc(title)}" onerror="this.onerror=null;this.src='/placeholder.svg';">
           </div>
           <div class="project-info">
             <h3 class="project-title">${esc(title)}</h3>
@@ -1183,27 +1183,22 @@ loadRecentEntries();
 // REMOVED: setInterval(loadRecentEntries, 30000);
 // Reason: Polling every 30 seconds caused project title flickering
 // Solution: User can manually refresh or page reloads when project is created/deleted
-console.log("✅ Project list loaded. Manual refresh available via 'Refresh' button.");
 
 // Delete Modal Functions
 let deleteTargetId = null;
 
 function openDeleteModal(entryId, projectName) {
-  console.log("🗑️ openDeleteModal called", { entryId, projectName });
   deleteTargetId = entryId;
   document.getElementById('deleteProjectName').textContent = projectName;
   document.getElementById('deleteModal').classList.add('show');
-  console.log("✅ Modal opened, deleteTargetId set to:", deleteTargetId);
 }
 
 function closeDeleteModal() {
-  console.log("🔐 Closing delete modal");
   deleteTargetId = null;
   document.getElementById('deleteModal').classList.remove('show');
 }
 
 async function confirmDelete() {
-  console.log("🗑️ confirmDelete called, deleteTargetId:", deleteTargetId);
   if (!deleteTargetId) {
     console.error("❌ confirmDelete: deleteTargetId is null or undefined");
     return;
@@ -1218,16 +1213,13 @@ async function confirmDelete() {
   confirmBtn.textContent = 'Deleting...';
 
   try {
-    console.log("🌐 Making DELETE request to /api/creator-entries/" + deleteTargetId);
     const response = await fetch(`/api/creator-entries/${deleteTargetId}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' }
     });
 
-    console.log("📊 Response status:", response.status, response.ok);
 
     if (response.ok) {
-      console.log("✅ Delete successful, reloading entries");
       showStatus('✓ Project deleted successfully', 'success');
       closeDeleteModal();
       await loadRecentEntries();

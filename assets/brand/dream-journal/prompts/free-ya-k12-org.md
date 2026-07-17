@@ -1,3 +1,0 @@
-# FREE / YA K-12 Org Card Prompt
-
-Vertical Patreon tier card background for Dream Journal by Lantern OS, no text, no words, ornate rounded lavender and gold border, upper art scene only with a large clean empty lower panel for future text overlay. Cozy lo-fi space fantasy aesthetic. A safe YA/K-12 Doorwalker scene: one kid boy and one kid girl playing with friendly robot agents and imaginary plush friends around a glowing magical board near open dream doors. Pastel lavender, cream, soft blue, warm gold, gentle stars, floating castles, open doorway to ImaginVerse, books and lanterns nearby, wholesome, magical, inclusive, clean, dreamy, non-dashboard.

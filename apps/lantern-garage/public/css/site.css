@@ -179,6 +179,37 @@ html, body {
 }
 .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
 .nav-btn svg { width: 18px; height: 18px; display: block; }
+
+/* Plan badge — injected by auth-gate.js to the left of the profile button for
+   signed-in users (Free / Pro / Pilot). Links to pricing: a Free user's
+   one-click path to the upgrade options. */
+.nav-tier {
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  padding: 5px 11px; border-radius: 999px; text-decoration: none; white-space: nowrap;
+  color: var(--accent-strong); background: var(--accent-dim);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  transition: border-color 0.15s;
+}
+.nav-tier:hover { border-color: var(--accent); }
+.nav-tier[data-tier="free"] { color: var(--muted); background: var(--surface2); border-color: var(--border); }
+.nav-tier[data-tier="free"]:hover { color: var(--accent-strong); border-color: var(--accent); }
+.nav-tier[data-tier="pilot"] {
+  color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, transparent);
+  border-color: color-mix(in srgb, var(--gold) 40%, var(--border));
+}
+@media (max-width: 580px) { .nav-tier { padding: 4px 8px; font-size: 10px; } }
+/* #2654: on narrow phones the injected plan badge (variable-width text) + the four
+   fixed-width action buttons overflowed the actions row and clipped the wordmark —
+   the same crowding site.css already fixed for app navs, reintroduced by the badge.
+   Collapse the badge to a tier-colored dot (keeps the color cue + the click →
+   /pricing.html + the title tooltip); the label is dropped, not the affordance. */
+@media (max-width: 420px) {
+  .nav-tier {
+    width: 14px; height: 14px; min-width: 14px; padding: 0;
+    border-radius: 50%; font-size: 0; overflow: hidden; flex-shrink: 0;
+  }
+}
 /* Theme toggle icon: show a sun in dark mode (click → light) and a moon in
    light mode (click → dark). Both live in the button; CSS reveals one. */
 #theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }

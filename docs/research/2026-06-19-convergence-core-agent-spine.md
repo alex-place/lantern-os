@@ -83,7 +83,7 @@ There are **two** distinct "convergence loops" on disk; they serve different axe
 | Loop | What it converges over | Status |
 |---|---|---|
 | [`src/convergence/kernel.py`](../../src/convergence/kernel.py) `Kernel` | the **runtime four objects** — Observe→Remember→Reason→Act→Verify→Converge over Memory/Task/Tool/ConvergenceRecord | the real agent loop; **in-memory reference impl, not invoked by the serving path** |
-| [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) `ConvergenceLoop` | **repo / artifact state** — a 20-phase CI self-correction loop (`PHASES` 1–20: `inspect_repo → … → run_validation → fix_failures → promote_or_hold`) | a build/promotion loop, not the runtime agent loop; [`tesseract_convergence.py`](../../src/tesseract_convergence.py) is a re-export shim of it |
+| [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) `ConvergenceLoop` | **repo / artifact state** — a 20-phase CI self-correction loop (`PHASES` 1–20: `inspect_repo → … → run_validation → fix_failures → promote_or_hold`) | a build/promotion loop, not the runtime agent loop; ``tesseract_convergence.py`` is a re-export shim of it |
 
 (The `convergence_io_engine.py` *module docstring* says "12-step," but the implemented `ConvergenceLoop.PHASES` is **20 phases** — cite the code, not the docstring.)
 
@@ -134,11 +134,11 @@ The napkin draft feared "several half-built cars." On disk it's milder: **one ru
 |---|---|---|
 | [`src/convergence/kernel.py`](../../src/convergence/kernel.py) | the runtime six-stage orchestrator over the four objects | **this is the spine** (just not wired to serving) |
 | [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) | 20-phase repo/artifact promotion loop | no — different axis (CI self-correction) |
-| [`src/tesseract_convergence.py`](../../src/tesseract_convergence.py) | re-export shim of the engine above | no (alias) |
+| ``src/tesseract_convergence.py`` | re-export shim of the engine above | no (alias) |
 | [`convergence-agent.js`](../../apps/lantern-garage/lib/convergence-agent.js) | LLM-free keyword router → grounded local answers | no — Q&A router, name only |
 | [`unified-agent.js`](../../apps/lantern-garage/lib/unified-agent.js) | Node→Python process bridge | no — delegates |
 | [`swarm-orchestrator.js`](../../apps/lantern-garage/lib/swarm-orchestrator.js) | provider/model dispatch (single/parallel/consensus/council) | no — orchestrates *models* ("models are interchangeable") |
-| [`three-doors-convergence-loop.js`](../../apps/lantern-garage/lib/three-doors-convergence-loop.js) | bespoke game pipeline (intake→design→build→verify→integrate) | **consolidation candidate** — reframe as a Task through the one loop |
+| ``three-doors-convergence-loop.js`` | bespoke game pipeline (intake→design→build→verify→integrate) | **consolidation candidate** — reframe as a Task through the one loop |
 
 **Verdict:** the debt is *concept/naming* sprawl. The one genuine consolidation target is `three-doors-convergence-loop.js`, whose 5-stage pipeline duplicates the *shape* of the loop for a single domain.
 
@@ -176,9 +176,9 @@ It is **not** "truly agentic" in the AGI sense: no general world-model, no open-
 - Runtime orchestrator — [`src/convergence/kernel.py`](../../src/convergence/kernel.py) (`Kernel`: observe / query_memory / reason / act / verify / extract_patterns)
 - Write-back closure — [`src/convergence/verify.py`](../../src/convergence/verify.py) (wq-007: verify_with_test / _surprise / _monitor)
 - Record emitter + live emit — [`apps/lantern-garage/lib/convergence-records.js`](../../apps/lantern-garage/lib/convergence-records.js) → `data/convergence/records.jsonl`; [`apps/lantern-garage/routes/dream.js`](../../apps/lantern-garage/routes/dream.js) (`emitConvergenceRecord`, lines 299-311)
-- Repo-promotion loop (separate axis) — [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) (`ConvergenceLoop.PHASES`, 20 phases) · shim [`src/tesseract_convergence.py`](../../src/tesseract_convergence.py)
+- Repo-promotion loop (separate axis) — [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) (`ConvergenceLoop.PHASES`, 20 phases) · shim ``src/tesseract_convergence.py``
 - Governors — [`src/cio_sde/collapse.py`](../../src/cio_sde/collapse.py) · [`src/cio_sde/surprise.py`](../../src/cio_sde/surprise.py) · [`apps/lantern-garage/lib/grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js)
 - Architecture spec / roadmap — [`docs/convergence-core-mapping.md`](../convergence-core-mapping.md)
 - North Star — [`CLAUDE.md`](../../CLAUDE.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · Σ₀ limits [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](../SIGMA0-COLLAPSE-CERTIFICATE.md)
 
-**Sprawl census modules:** [`convergence-agent.js`](../../apps/lantern-garage/lib/convergence-agent.js) · [`unified-agent.js`](../../apps/lantern-garage/lib/unified-agent.js) · [`swarm-orchestrator.js`](../../apps/lantern-garage/lib/swarm-orchestrator.js) · [`three-doors-convergence-loop.js`](../../apps/lantern-garage/lib/three-doors-convergence-loop.js)
+**Sprawl census modules:** [`convergence-agent.js`](../../apps/lantern-garage/lib/convergence-agent.js) · [`unified-agent.js`](../../apps/lantern-garage/lib/unified-agent.js) · [`swarm-orchestrator.js`](../../apps/lantern-garage/lib/swarm-orchestrator.js) · ``three-doors-convergence-loop.js``

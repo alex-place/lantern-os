@@ -21,22 +21,26 @@ const {
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
 const { createToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail } = require("../lib/mailer");
+const { canonicalOrigin } = require("../lib/base-url");
 
 const ACCOUNT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ACCOUNT_MIN_PW = 8;
+// Email-confirmation links use the operator-configured canonical origin, not the
+// spoofable Host header (host-header poisoning, #2604).
 function accountOrigin(req) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
-  return `${proto}://${host}`;
+  return canonicalOrigin(req);
 }
 function readBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    // #2649: destroying the request on the size cap kills 'data'/'end', so the
+    // promise never settled and change-password/change-email hung forever. Resolve
+    // (null) on the cap AND on teardown ('close'); resolve() is idempotent so the
+    // races are harmless. The awaiting handler then answers instead of leaking.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
+    req.on("close", () => resolve(null));
   });
 }
 
@@ -55,6 +59,15 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const profile = getProfile(userId);
+    // #2651: a disk-persisted session can outlive its profile record (index reset /
+    // migration). Returning 200 with a null body made clients (profile.html,
+    // auth-gate nav badge) do `(await res.json()).role` → TypeError instead of a
+    // recoverable signed-out state. Answer 401 unknown_account so the client treats
+    // it as signed-out; mirrors the change-password handler's unknown_account branch.
+    if (!profile) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "unknown_account", signedOut: true }));
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(publicProfile(profile)));
   }
@@ -76,14 +89,17 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     req.on("end", () => {
       try {
         const updates = JSON.parse(body);
-        // Users can only update their own profile, not role or tier
-        const safeUpdates = {
-          name: updates.name,
-          bio: updates.bio,
-          avatar: updates.avatar,
-          preferences: updates.preferences,
-          settings: updates.settings,
-        };
+        // Users can only update their own profile, not role or tier. Copy ONLY the
+        // fields the request actually sent — an absent key must not spread `undefined`
+        // over the stored value (updateProfile merges by spread), which previously
+        // wiped avatar/preferences/settings on every save that omitted them (#2607).
+        const ALLOWED = ["name", "bio", "avatar", "preferences", "settings"];
+        const safeUpdates = {};
+        for (const key of ALLOWED) {
+          if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
+            safeUpdates[key] = updates[key];
+          }
+        }
 
         const profile = updateProfile(userId, safeUpdates);
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -306,7 +322,19 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const userId = path.split("/")[3];
+    // An admin must not delete their OWN account here — it would tombstone the acting
+    // session (getSessionUser now denies deleted, #2608) and can lock the last admin
+    // out. Account removal of self goes through a deliberate flow, not this endpoint (#2629).
+    if (userId === getSessionUserId(req)) {
+      res.writeHead(409, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "cannot_delete_self" }));
+    }
+    if (!getProfile(userId)) {
+      res.writeHead(404, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "unknown_account" }));
+    }
     deleteProfile(userId);
+    console.log(`[PROFILES] admin ${getSessionUserId(req)} deleted profile ${userId}`); // audit line (#2629)
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
@@ -331,3 +359,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Test seam (#2649): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readBody = readBody;

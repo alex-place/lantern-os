@@ -1,6 +1,6 @@
 {
   "name": "lantern-garage-app",
-  "version": "1.10.0",
+  "version": "1.12.0",
   "private": true,
   "description": "Local-first Lantern OS garage full-stack app.",
   "scripts": {
@@ -25,7 +25,6 @@
     "test:ui:headed": "npx playwright test ../../tests/test_dream_journal_ui.spec.js --headed",
     "test:dream-chat-ui": "npx playwright test ../../tests/test_dream_chat_ux.spec.js",
     "test:auth": "npm --prefix ../.. run test:auth",
-    "test:three-doors": "node ../../tests/test_three_doors_integration.spec.js",
     "test:showcase": "node test/static-mime.test.js && node test/showcase-manifest.test.js && node test/showcase-gallery-ui.test.js",
     "test:boundary": "node test/surface-boundary.test.js",
     "test:brand": "node test/brand-unisona.test.js",
@@ -35,6 +34,7 @@
     "test:coding-verifier": "node test/coding-verifier.test.js",
     "test:coding-tool": "node test/coding-tool.test.js",
     "test:tenant": "node test/tenant.test.js",
+    "test:byok": "node test/user-provider-keys.test.js",
     "test:profile": "node test/deployment-profile.test.js",
     "test:desktop": "node test/desktop-phase0.test.js",
     "test:appdata": "node test/appdata-migration.test.js",
@@ -50,12 +50,12 @@
     "test:convergence-tool": "node test/convergence-inspect-tool.test.js",
     "test:sigma0": "node test/surface-boundary.test.js && node test/no-keyword-routing.test.js && node test/kalshi-fees-ev.test.js && node test/kalshi-grounded.test.js && node test/tenant.test.js && node test/deployment-profile.test.js && node test/desktop-phase0.test.js && node test/appdata-migration.test.js && node test/desktop-loopback-token.test.js && node test/desktop-loopback-token-http.test.js && node test/verify-llm.test.js && node test/git-hooks-repo-managed.test.js && node test/convergence-inspect-tool.test.js",
     "test:sprint16": "node ../../tests/test_sprint16_dashboards.js",
-    "test:all": "node ../../tests/run-dream-journal-tests.js api chat multiturn keystone cache ui dream-chat-ui && npm run test:three-doors",
+    "test:all": "node ../../tests/run-dream-journal-tests.js api chat multiturn keystone cache ui dream-chat-ui",
     "dev": "node --watch server.js",
     "desktop": "node desktop/launcher.js",
     "screenshot": "node scripts/screenshot.js",
     "shot:dev": "node scripts/screenshot.js http://127.0.0.1:4178/dream-chat.html ../../keystone-dreamchat-4178.png",
-    "start:master": "git -C ../.. pull origin master && python3 ../../integrations/human-flourishing-frameworks/export_snapshot.py || true && node --watch server.js"
+    "start:master": "git -C ../.. pull origin master && node --watch server.js"
   },
   "engines": {
     "node": ">=20"
@@ -79,6 +79,7 @@
     "playwright": "^1.61.0"
   },
   "optionalDependencies": {
-    "win-ca": "^3.5.1"
+    "win-ca": "^3.5.1",
+    "stripe": "^18.0.0"
   }
 }

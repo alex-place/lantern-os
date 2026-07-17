@@ -67,7 +67,7 @@ near-zero overhead on a single machine.
 - **Negative / trade-offs:** main-checkout edits are invisible to the servers (must copy/commit);
   more processes to manage; keys must be hydrated from env before launch or providers come up
   empty.
-- **Follow-ups:** keep [QUICKSTART.md](../QUICKSTART.md) / [DEV-SERVER-WORKTREE.md](DEV-SERVER-WORKTREE.md)
+- **Follow-ups:** keep [QUICKSTART.md](../../QUICKSTART.md) / [DEV-SERVER-WORKTREE.md](../DEV-SERVER-WORKTREE.md)
   authoritative for launch + env hydration.
 
 ## Alternatives considered
@@ -78,8 +78,8 @@ See Options. "Do nothing / single server" couples dev risk to stable uptime.
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| 4177 stable / 4178 dev from separate worktrees | [QUICKSTART.md](../QUICKSTART.md), [DEV-SERVER-WORKTREE.md](DEV-SERVER-WORKTREE.md) | High | project docs |
-| Same server.js picks host by env | [`server.js:69-70`](../apps/lantern-garage/server.js) | High | code |
+| 4177 stable / 4178 dev from separate worktrees | [QUICKSTART.md](../../QUICKSTART.md), [DEV-SERVER-WORKTREE.md](../DEV-SERVER-WORKTREE.md) | High | project docs |
+| Same server.js picks host by env | [`server.js:69-70`](../../apps/lantern-garage/server.js) | High | code |
 | Launch via Start-DualServers.ps1 | `scripts/Start-DualServers.ps1` | High | repo survey |
 | Stable auto-deploys master every ~5 min w/ rollback | scheduled task `KeystoneAutoDeployStable` + `C:\dev\deploy-stable-from-master.ps1` | Medium | operator memory |
-| lantern-os.net → Cloudflare tunnel → local 4177 | [PATREON-OAUTH.md](PATREON-OAUTH.md); tunnel config | Medium | project doc + memory |
+| lantern-os.net → Cloudflare tunnel → local 4177 | [PATREON-OAUTH.md](../PATREON-OAUTH.md); tunnel config | Medium | project doc + memory |

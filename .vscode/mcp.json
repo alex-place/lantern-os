@@ -1,1 +1,0 @@
-{`n  "servers": {`n    "lantern-os": {`n      "type": "sse",`n      "url": "http://127.0.0.1:8771/sse",`n      "mesh": {`n        "mode": "founder-client",`n        "founder_url": "http://127.0.0.1:8771/sse"`n      }`n    }`n  }`n}

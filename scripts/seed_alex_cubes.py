@@ -36,7 +36,7 @@ DATA_DIR = REPO_ROOT / "data" / "csf"
 # ── ImagniVerse: Alex's symbolic world ───────────────────────────────────────
 
 IMAGNIVERSE_SYMBOLS = {
-    # The Kingdome canon (lore/doors/kingdome-of-hearts.md + poem artwork)
+    # The Kingdome canon (data/three-doors/canon.json + poem artwork)
     "king-of-the-kingdome": {
         "definition": "I am the King of the Kingdome of Hearts. Love is the law; "
                       "every living thing beats a verse of it true.",

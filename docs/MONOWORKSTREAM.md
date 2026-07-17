@@ -367,7 +367,7 @@ git push origin claude/feature
 - `auto/issue-XXX` for issues
 - etc.
 
-See [AGENTS.md](AGENTS.md) for the full list.
+See [AGENTS.md](../AGENTS.md) for the full list.
 
 ### Q: I have PR #1 open (old, just waiting). Can I open PR #2 while #1 is waiting for review?
 
@@ -386,10 +386,10 @@ See [AGENTS.md](AGENTS.md) for the full list.
 
 ## Links
 
-- **[AGENTS.md](AGENTS.md)** — Full agent lane assignments
-- **[CLAUDE.md](CLAUDE.md)** — Agent-specific guidance
-- **[.github/workflows/pr-gates.yml](.github/workflows/pr-gates.yml)** — CI enforcement
-- **[scripts/Install-MonoworkstreamHooks.ps1](scripts/Install-MonoworkstreamHooks.ps1)** — Local hook setup
+- **[AGENTS.md](../AGENTS.md)** — Full agent lane assignments
+- **[CLAUDE.md](../CLAUDE.md)** — Agent-specific guidance
+- **[.github/workflows/pr-gates.yml](../.github/workflows/pr-gates.yml)** — CI enforcement
+- **[scripts/Install-MonoworkstreamHooks.ps1](../scripts/Install-MonoworkstreamHooks.ps1)** — Local hook setup
 - **GitHub Issue #636** — Auto-merge crisis (example of violation)
 - **GitHub Issue #638** — Monoworkstream enforcement implementation
 

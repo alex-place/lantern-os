@@ -281,7 +281,7 @@
     .feed-card[data-type="embed"]  { --tile: #06b6d4; }
     .feed-card[data-type="art"]    { --tile: #ec4899; }
 
-    /* Image showcase card — Kingdome of Hearts art + Gage sprites. The
+    /* Image showcase card — Gage sprites and other art cards. The
        lead art bleeds to the card edges and opens the shared lightbox full-size
        (the button carries .showcase-tile[data-full], picked up by the global
        lightbox delegate). */
@@ -1109,7 +1109,6 @@
       <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
       <button type="button" class="feed-chip" data-type="doc" aria-pressed="false"><span aria-hidden="true">📚</span> Docs</button>
       <button type="button" class="feed-chip" data-type="belief" aria-pressed="false"><span aria-hidden="true">🌍</span> Beliefs</button>
-      <button type="button" class="feed-chip" data-topic="kingdome" aria-pressed="false"><span aria-hidden="true">♥</span> Kingdome</button>
       <button type="button" class="feed-chip" data-topic="gage" aria-pressed="false"><span aria-hidden="true">✏️</span> Gage</button>
     </div>
     <div class="feed-toolbar">
@@ -1125,11 +1124,11 @@
     <div class="share-menu" id="shareMenu" role="menu" aria-label="Share this post" hidden></div>
     <div class="share-toast" id="shareToast" role="status" aria-live="polite"></div>
 
-    <!-- The Kingdome of Hearts gallery + Gage's showcase are no longer static walls
-         glued to the bottom of every view: each image/video is now a ranked `art`
-         feed card (lib/explore-feed galleryCards/gageCards), filterable via the
-         ♥ Kingdome / ✏️ Gage chips and fed through the same PCSF algorithm.
-         Only this shared lightbox markup remains — feed `art` cards reuse it. -->
+    <!-- Gage's showcase is no longer a static wall glued to the bottom of every
+         view: each image/video is a ranked `art` feed card (lib/explore-feed
+         gageCards), filterable via the ✏️ Gage chip and fed through the same
+         PCSF algorithm. Only this shared lightbox markup remains — feed `art`
+         cards reuse it. -->
 
     <!-- lightbox preview overlay (shared by every feed art card) -->
     <div class="lightbox" id="kohLightbox" role="dialog" aria-modal="true" aria-label="Image preview">
@@ -1146,9 +1145,9 @@
       <a href="/orchestration.html">Work board</a>
       <a href="/knowledgecenter.html#library">Library</a>
       <a href="/knowledgecenter.html">Knowledge Center</a>
-      <a href="/api-keys-settings.html">Settings</a>
+      <a href="/settings.html">Settings</a>
       <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-      <a href="https://www.patreon.com/cw/UnisonaAI" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
+      <a href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
     </nav>
 
   </main>
@@ -1168,7 +1167,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // — two handlers fire per click and cancel out, so the toggle appears dead.
 
   /* Shared image-preview lightbox — serves every .showcase-tile[data-full]
-     rendered by the feed (Kingdome of Hearts + Gage `art` cards, the explore showcase→feed change). */
+     rendered by the feed (`art` cards, the explore showcase→feed change). */
   const box = document.getElementById('kohLightbox');
   const boxImg = document.getElementById('kohLightboxImg');
   const boxCap = document.getElementById('kohLightboxCap');
@@ -1558,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', () => {
         record(c.key, 'click', 0);                       // playing = engagement
       });
     } else if (media && media.kind === 'image') {
-      // Image showcase card — Kingdome of Hearts art + Gage sprites. The
+      // Image showcase card — Gage sprites and other art cards. The
       // lead art opens the shared lightbox full-size: the button carries
       // .showcase-tile[data-full], picked up by the global lightbox delegate.
       el.className = 'feed-card is-art';

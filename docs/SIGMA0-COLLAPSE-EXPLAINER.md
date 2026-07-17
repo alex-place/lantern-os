@@ -129,5 +129,5 @@ Everything else in the Certificate is finished, machine-checked, and reproducibl
 | The LaTeX source | [sigma0-collapse-certificate.tex](sigma0-collapse-certificate.tex) |
 | The compiled PDF | `/reports/sigma0-collapse-certificate.pdf` |
 | How it connects to the live coder | [SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md) |
-| The broader convergence loop | [TESSERACT-CONVERGENCE-LOOP.md](TESSERACT-CONVERGENCE-LOOP.md) |
+| The broader convergence loop | `TESSERACT-CONVERGENCE-LOOP.md` |
 | The grounding loop (frozen weights + Σ₀) | [research/2026-06-22-frozen-weights-grounding-loop.md](research/2026-06-22-frozen-weights-grounding-loop.md) |
