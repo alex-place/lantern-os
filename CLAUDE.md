@@ -215,7 +215,8 @@ Key runtime components:
 | Module | Responsibility |
 |--------|----------------|
 | `kalshi-api.js` | Kalshi REST client (auth, order placement, market data) |
-| `kalshi-collector.js` | 6s polling loop; 429 backoff with `Retry-After`; exposes `getStatus()` |
+| `kalshi-collector.js` | 6s polling loop (setTimeout chain); 429 backoff with `Retry-After`; exposes `getStatus()`. `KALSHI_ADAPTIVE_POLL=1` swaps the fixed clock for send-on-delta cadence (`kalshi-adaptive-poll.js`) |
+| `kalshi-adaptive-poll.js` | Pure send-on-delta scheduler: next poll delay = β/σ²ₘₐₓ from measured per-market variance (floor 6s, cap 60s, idle/spike handling); arXiv:1707.02531/1609.07534 |
 | `kalshi-suggest.js` | Tight-band entry suggestion engine |
 | `convergence-router.js` | Deterministic routing cache — 120 unisona.ai routes, >70% hit rate |
 | `trading-history-logger.js` | Trade/signal history JSONL persistence |
