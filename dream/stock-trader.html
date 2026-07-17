@@ -927,7 +927,6 @@
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
-    <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
   </div>
   <!-- Tab bodies -->
@@ -935,7 +934,6 @@
     <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
   </div>
 </div>
@@ -2656,21 +2654,6 @@ function journalLog(o){
     localStorage.setItem('trader.journal', JSON.stringify(_journal));
   }catch(e){}
 }
-function renderJournal(){
-  const el=document.getElementById('tp-journal'); if(!el) return;
-  if(!_journal.length){ el.innerHTML='<div class="tp-empty">No trades journaled on this device yet — place an order and its signal context is captured automatically.</div>'; return; }
-  el.innerHTML = `<table class="tp-table"><thead><tr>
-    <th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Px</th><th>Signal</th><th>Pattern</th><th>RVOL</th><th>Session</th><th>Via</th></tr></thead><tbody>`+
-    _journal.map(j=>`<tr>
-      <td style="color:var(--text2)">${_fmtOrderTime(j.ts)}</td>
-      <td><span class="tp-sym" onclick="focusTicker('${j.symbol}')">${j.symbol}</span></td>
-      <td class="tp-side ${j.side==='buy'?'long':'short'}">${(j.side||'').toUpperCase()}</td>
-      <td>${j.qty}</td><td>${j.price?'$'+fmt(j.price,2):'—'}</td>
-      <td>${j.signal||'—'}</td><td>${j.pattern||'—'}</td>
-      <td>${j.rvol!=null?j.rvol+'×':'—'}</td><td>${j.session||'—'}</td>
-      <td style="color:var(--text2)">${j.source}</td></tr>`).join('')+'</tbody></table>';
-}
-
 // ── Rapid order mode (#2445) — explicit, persisted opt-in ─────────────────────
 // ON: ticket submits + flatten skip the confirm dialog, and Shift+B / Shift+S
 // fire an instant market order for the focused symbol at the last-used quantity.
