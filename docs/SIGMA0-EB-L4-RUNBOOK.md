@@ -167,3 +167,46 @@ its first and only use. Pre-registered expectations (from the 16-seed task-level
 - [ ] Both teeth rejected, reasons recorded per arm
 - [ ] Hidden block touched exactly once, at the end
 - [ ] #2691 comment + cert + ledger updated with evidence-class-honest results
+
+## 10. Dual-provider redundant execution (concurrent) — the wired path
+
+A ~12–20 h single-GPU run is exactly what dies at hour 12 to a spot reclaim, an OOM, or
+a CUDA/driver mismatch with Ouro's custom `transformers==4.57` loop — and you don't find
+out until the time is burned. So run the identical job on **two independent clouds at
+once**: if either breaks, the other lands the result; because the job is seeded, two runs
+that agree is a stronger result (a reproducibility cross-check), and two that disagree is
+itself a finding (the gate margin is hardware-sensitive).
+
+**This is wired into the orchestration page, not a bespoke script.** The GPU-training
+orchestration already fans out to every `automatable` provider concurrently, and **Modal
+is now a registered provider alongside Lightning** (`lib/training-dispatcher.js` +
+`scripts/modal_dispatch.py`, mirroring the Lightning dispatch contract). So:
+
+1. **Credentials** (once): on the orchestration page's *Keys* panel, save `MODAL_TOKEN_ID`
+   + `MODAL_TOKEN_SECRET` (modal.com → Settings → API Tokens) and `HF_TOKEN`. Lightning is
+   already connected (existing job history). Both providers default to a **bf16 L4** — the
+   Ouro QLoRA recipe NaNs in fp16 on pre-Ampere silicon, so T4 is refused on both.
+2. **Launch concurrently**: the page's **"Start — dispatch-all"** button
+   (`POST /api/gpu-training/dispatch-all`) fires Lightning **and** Modal in parallel on the
+   same seeded job. Each logs a `training_dispatch` record; poll both from the same panel.
+3. **No artifact clobber**: Lightning uploads `output.csf`, Modal uploads
+   `output.modal.csf` (namespaced on purpose) to the same HF repo — both twins' adapters
+   survive for the cross-check.
+4. **First-green-wins**: whichever finishes first is the result you ship; the second is the
+   cross-check.
+5. **Reconcile** (no GPU): `python scripts/reconcile_dual_provider.py --decision
+   A/decision.json B/decision.json` (E-B verdicts) or `--sha <a> <b>` (adapter
+   footer_sha256). Exit 0 = agree → post the confirmed result to #2691; exit 1 = divergent
+   → post both and flag the hardware-sensitive margin.
+
+**Provider pairing & cost** (rates verified 2026-07-17; ~$8–16/run, ~$20 both, mostly
+covered by Modal's $30/mo credit): **Lightning** (primary — the proven #2231 venue) +
+**Modal** (redundant twin — independent serverless infra, per-second billing). RunPod
+Secure Cloud on-demand is the documented manual fallback if either hits capacity. Use
+on-demand tiers, never spot, for a long single job.
+
+> **For the E-B run specifically**, each provider runs the harness (`sigma_theta_abc/
+> harness.py`) instead of the continuation `train-qlora-ouro.py` body — same Modal/Lightning
+> dispatch primitive, different entry command. The partition (esp. the **hidden block**)
+> must be generated once and shipped to both providers identically (§3), or the two runs
+> aren't the same job.
