@@ -855,6 +855,12 @@ server.listen(port, host, () => {
     newsCollector.start(300000); // 5-min interval
     deps.newsCollector = newsCollector; // Make available to routes
 
+    // ── Weekly Level-1 traction rollup (#2547) ──
+    // Appends ONE weekly_rollup event per ISO week to data/traction/events.jsonl
+    // (actives · paying · M1 retention, all MEASURED). Checks on boot + daily;
+    // same-week re-runs no-op, so restarts can't double-append.
+    require("./lib/active-user-metric").startWeeklyRollupScheduler();
+
     // ── Kalshi Position Monitor (10s polling) ──
     const { startMonitoring } = require("./lib/kalshi-position-monitor");
     startMonitoring();   // Start automated stop-loss monitoring
