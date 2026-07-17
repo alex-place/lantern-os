@@ -205,6 +205,50 @@ module.exports = async function statusRoutes(req, res, url, deps) {
   // carries per-user ids + activity evidence, which is not a public surface.
   // Every number is MEASURED (machine-checked artifacts); OPERATOR_REPORTED
   // events are never counted (Converge).
+  // #2551 — the Sean Ellis PMF fit-check (Level-2 gate: >=40% "very disappointed").
+  // GET /api/pmf/survey — for the SESSION user: if they're composite-active and have
+  // never been asked, records pmf_prompted and returns the survey (prompt-once is
+  // thereby auditable from the ledger). Anyone else gets {show:false, reason}.
+  if (url.pathname === "/api/pmf/survey" && req.method === "GET") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const r = await pmf.recordPrompted(uid, { source: "GET /api/pmf/survey" });
+      if (!r.ok) { sendJson(res, { show: false, reason: r.reason }, 200); return true; }
+      sendJson(res, {
+        show: true,
+        question: "How would you feel if you could no longer use unisona.ai?",
+        options: pmf.FEELINGS,
+      }, 200);
+    } catch (e) { sendJson(res, { show: false, error: e.message }, 500); }
+    return true;
+  }
+  // POST /api/pmf/response — {feeling, benefit?, alternative?}; one per user ever.
+  if (url.pathname === "/api/pmf/response" && req.method === "POST") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const body = JSON.parse((await deps.collectRequestBody(req)) || "{}");
+      const r = await pmf.recordResponse(uid, body, { source: "POST /api/pmf/response" });
+      sendJson(res, r, r.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // GET /api/pmf/tally — operator-gated (free-text + per-user ids), vs the 40% bar.
+  if (url.pathname === "/api/pmf/tally" && req.method === "GET") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      sendJson(res, { ok: true, ...require("../lib/pmf-survey").tally() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   if (url.pathname === "/api/traction/level1") {
     try {
       const { isOperatorRequest } = require("../lib/request-auth");

@@ -60,6 +60,8 @@ const VALID_KINDS = new Set([
   "churn",             // an actor lapsed
   "paper_trade",       // an actor placed a broker-accepted paper order (#2547)
   "weekly_rollup",     // machine-computed Level-1 snapshot (actives/paying/M1, #2547)
+  "pmf_prompted",      // the Sean Ellis fit-check was SHOWN to an active user (#2551)
+  "pmf_response",      // their answer: very/somewhat/not disappointed (#2551)
 ]);
 
 // daily_active is a usage signal, so it feeds distinct-day retention below.
