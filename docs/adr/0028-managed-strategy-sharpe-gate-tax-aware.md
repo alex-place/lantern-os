@@ -69,6 +69,16 @@ operator's primary brokerage account.
    26 years, so live-capital promotion requires either a longer live track record or genuinely higher
    Sharpe machinery. Note the regime caveat: SPY itself scores 0.91 on the 2013+ validation window —
    point-beats of the bar in bull-heavy windows are cheap; full-cycle windows are where the bar bites.
+   **Brake-to-cash evolution (operator-directed 2026-07-16, `experiments/leverage_brake_to_cash.py` +
+   `_stress.py`): the overlay's gross now clamps to [0, 2×]** — vol-targeting uncapped below 1×,
+   6-month trend-down sends the book **fully to cash** (earning the T-bill rate), and the drawdown
+   brake tapers toward cash rather than merely unlevered. Cash floor 0 beat 0.5 in every train config
+   (2000–2012 selection; validated 2013+: Sharpe 0.85 [0.31, 1.38]). Full period: $51,421 (13.3%/yr)
+   vs $54,440 for the milder brake and $38,531 SPY; Sharpe 0.70 [0.32, 1.08]; **maxDD −24%** (vs −36%
+   milder / −51% unbraked); ~25% of days below 1× exposure. Crisis gauntlet: **0/1,000 margin calls,
+   P(<$10k) 0.0%, median $19,879, worst path $13,441** — dominates both prior configs on every risk
+   metric for ~$3k of final value. This supersedes the milder spec below as the Phase-2 default;
+   turnover/tax hostility of daily adjustment still confines it to dry-run/IRA/dedicated accounts.
    **Phase-2 overlay spec (validated 2026-07-15, `experiments/leverage_overlay_opt2.py`):** leverage is
    never static — it is reset **daily** as `gross = min(2.0, 0.20/vol20d) × trendGate(6mo) × brake(dd>15% → 1×)`,
    where vol20d is annualized 20-day realized vol of the tangency direction. Tuned on 2000–2012 ONLY,
