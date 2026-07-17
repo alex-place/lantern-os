@@ -14,6 +14,18 @@ const fs = require('fs');
 
 const at = require('../lib/auto-trader');
 
+test('momentum-death timeframe defaults to 5m and is env-overridable', () => {
+  const saved = process.env.TRADER_MOMENTUM_TF;
+  try {
+    delete process.env.TRADER_MOMENTUM_TF;
+    assert.strictEqual(at.cfg().momentumTf, '5m');       // faster peak capture by default
+    process.env.TRADER_MOMENTUM_TF = '15m';
+    assert.strictEqual(at.cfg().momentumTf, '15m');       // operator can smooth it back
+  } finally {
+    if (saved === undefined) delete process.env.TRADER_MOMENTUM_TF; else process.env.TRADER_MOMENTUM_TF = saved;
+  }
+});
+
 test('trailTriggerPct ratchets tighter as the peak gain grows', () => {
   const base = 2.5;
   assert.strictEqual(at.trailTriggerPct(1, base), 2.5);    // tiny gain → base (room to develop)

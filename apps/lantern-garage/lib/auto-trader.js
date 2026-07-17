@@ -89,6 +89,7 @@ function cfg() {
     trailArmPct: n('TRADER_TRAIL_ARM_PCT', DEFAULTS.trailArmPct),
     takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
     momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
+    momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
     // Lets the user protect open positions without arming full autopilot entries.
     manageExits: process.env.TRADER_MANAGE_EXITS === '1',
@@ -221,10 +222,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
   if (!longs.length) return;
 
-  // Recent 15m bars for momentum — one batched fetch for all held longs (fail-soft).
+  // Recent bars for the momentum-death read — one batched fetch for all held longs
+  // (fail-soft). Default 5m so a fading winner's trend-rollover is caught ~3× sooner
+  // than the old 15m read (nearer the peak); TRADER_MOMENTUM_TF overrides.
   let bars = {};
   if (c.momentumExit) {
-    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), '15m'); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
+    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), c.momentumTf); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
   }
 
   for (const [sym, p] of longs) {
