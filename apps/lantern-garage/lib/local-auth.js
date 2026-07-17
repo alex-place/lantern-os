@@ -20,7 +20,7 @@ const {
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationEmail, smtpConfigured } = require("./mailer");
-const { isLoopback } = require("./request-auth");
+const { isLoopback, clientIp } = require("./request-auth");
 const { canonicalOrigin } = require("./base-url");
 const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
 
@@ -28,7 +28,9 @@ const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-aut
  *  canonical origin, NOT the spoofable Host header, so a forged Host can't point
  *  a genuine confirmation email at an attacker's domain (#2604). */
 function verifyLinkFor(req, profile) {
-  const token = createToken("verify_email", profile.id, null);
+  // Mint the token for the profile's CURRENT email (#2624) so a stale link can't verify
+  // a different address if the email changes before it's clicked.
+  const token = createToken("verify_email", profile.id, profile.email || null);
   return `${canonicalOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
 }
 
@@ -80,8 +82,9 @@ const WINDOW_MS = 15 * 60 * 1000; // 15 min rolling window
 const attempts = new Map(); // key -> { count, first }
 
 function _key(req, email) {
-  const ip = (req.socket && req.socket.remoteAddress) || "?";
-  return `${ip}:${String(email || "").toLowerCase()}`;
+  // Key on the real client IP, not the socket address (which is always loopback
+  // behind the Cloudflare tunnel — collapsing every visitor into one bucket, #2616).
+  return `${clientIp(req)}:${String(email || "").toLowerCase()}`;
 }
 function throttled(req, email) {
   const k = _key(req, email);
@@ -109,7 +112,7 @@ function clearFailures(req, email) {
 // per IP per window and sweep both maps so neither grows without bound.
 const IP_MAX = 40;
 const ipAttempts = new Map(); // ip -> { count, first }
-function _ip(req) { return (req && req.socket && req.socket.remoteAddress) || "?"; }
+function _ip(req) { return clientIp(req); }
 function ipBudgetExceeded(req) {
   const ip = _ip(req);
   const rec = ipAttempts.get(ip);
