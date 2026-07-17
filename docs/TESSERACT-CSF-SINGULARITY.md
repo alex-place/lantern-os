@@ -310,5 +310,5 @@ Tracked by the comet leap P2 plan (removed 2026-07-16; superseded by [research/2
    "implementation-detail leak" to "storage face of the lattice."
 5. [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
    gains the STARS citation (closes its non-normal gap) and a cross-link here.
-6. [`skills/convergence-mathematical-foundations`](../skills/convergence-mathematical-foundations/SKILL.md)
+6. ``skills/convergence-mathematical-foundations``
    gains a "3¹² Convergence Lattice" section.

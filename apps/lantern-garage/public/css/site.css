@@ -199,6 +199,17 @@ html, body {
   border-color: color-mix(in srgb, var(--gold) 40%, var(--border));
 }
 @media (max-width: 580px) { .nav-tier { padding: 4px 8px; font-size: 10px; } }
+/* #2654: on narrow phones the injected plan badge (variable-width text) + the four
+   fixed-width action buttons overflowed the actions row and clipped the wordmark —
+   the same crowding site.css already fixed for app navs, reintroduced by the badge.
+   Collapse the badge to a tier-colored dot (keeps the color cue + the click →
+   /pricing.html + the title tooltip); the label is dropped, not the affordance. */
+@media (max-width: 420px) {
+  .nav-tier {
+    width: 14px; height: 14px; min-width: 14px; padding: 0;
+    border-radius: 50%; font-size: 0; overflow: hidden; flex-shrink: 0;
+  }
+}
 /* Theme toggle icon: show a sun in dark mode (click → light) and a moon in
    light mode (click → dark). Both live in the button; CSS reveals one. */
 #theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }

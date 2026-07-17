@@ -33,9 +33,14 @@ function accountOrigin(req) {
 function readBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    // #2649: destroying the request on the size cap kills 'data'/'end', so the
+    // promise never settled and change-password/change-email hung forever. Resolve
+    // (null) on the cap AND on teardown ('close'); resolve() is idempotent so the
+    // races are harmless. The awaiting handler then answers instead of leaking.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
+    req.on("close", () => resolve(null));
   });
 }
 
@@ -54,6 +59,15 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const profile = getProfile(userId);
+    // #2651: a disk-persisted session can outlive its profile record (index reset /
+    // migration). Returning 200 with a null body made clients (profile.html,
+    // auth-gate nav badge) do `(await res.json()).role` → TypeError instead of a
+    // recoverable signed-out state. Answer 401 unknown_account so the client treats
+    // it as signed-out; mirrors the change-password handler's unknown_account branch.
+    if (!profile) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "unknown_account", signedOut: true }));
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(publicProfile(profile)));
   }
@@ -345,3 +359,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Test seam (#2649): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readBody = readBody;

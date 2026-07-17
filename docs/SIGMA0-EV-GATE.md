@@ -9,7 +9,7 @@ updated: 2026-06-30
 *How unisona.ai decides ENTER vs SKIP on a candidate trade: one transparent
 expected-value model over weighted evidence, not a stack of discretionary gates.*
 
-Source: [`src/trading_agents/convergence_ev.py`](../src/trading_agents/convergence_ev.py)
+Source: [`apps/lantern-garage/lib/signal-engine/convergence-ev.js`](../apps/lantern-garage/lib/signal-engine/convergence-ev.js) (ported from the retired `src/trading_agents/convergence_ev.py`)
 · council read side: [`apps/lantern-garage/lib/sigma0-trader-council.js`](../apps/lantern-garage/lib/sigma0-trader-council.js)
 · API: `GET /api/trading/sigma0/calibration`
 

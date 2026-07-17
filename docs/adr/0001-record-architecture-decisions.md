@@ -21,7 +21,7 @@ establishes applies to this ADR).
 unisona.ai is a solo-developer, local-first reasoning system worked by a fleet of
 concurrent agents (`claude/`, `gemini/`, `codex/`, … lanes). Architectural knowledge today
 is spread across ~120 `docs/*.md` files, dated audits
-([ARCHITECTURE-AUDIT-2026-06-13.md](../ARCHITECTURE-AUDIT-2026-06-13.md)), mapping docs
+(`ARCHITECTURE-AUDIT-2026-06-13.md`), mapping docs
 ([convergence-core-mapping.md](../convergence-core-mapping.md)), and session chat logs.
 There is no single place that records *why* a structural choice was made, so:
 

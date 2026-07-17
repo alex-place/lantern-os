@@ -108,7 +108,7 @@ Two realizations: **lossy gate-trust** (ship via `loop_lm.generate(mode="qexit",
 Three independent lines converge:
 - **This note (E2):** the looped latent state does not contract within its budget; the trained gate, not `‖Δh‖`, is the usable exit signal.
 - **This note (E1):** depth buys nothing for compression.
-- **Parallel deep-research** ([`ouro-looplm-research`](ouro-looplm-research.md), 2026-06-28): Ouro's "small beats big" is *parameter*-not-compute (~4× FLOPs at R=4); test-time scaling **collapses past T≈4**; loses to Qwen3-8B on AIME/GPQA in ByteDance's own table.
+- **Parallel deep-research** (``ouro-looplm-research``, 2026-06-28): Ouro's "small beats big" is *parameter*-not-compute (~4× FLOPs at R=4); test-time scaling **collapses past T≈4**; loses to Qwen3-8B on AIME/GPQA in ByteDance's own table.
 
 **Conclusion:** Ouro's recurrent depth is a baked-in parameter-efficiency mechanism, not a test-time-compute scaling lever and not a storage geometry. You cannot iterate it to a fixed point, cannot scale it past ~4, and cannot turn it into compression. The looped-LM-as-capability-frontier branch is **closed with evidence.**
 

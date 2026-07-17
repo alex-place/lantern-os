@@ -385,8 +385,15 @@
     try {
       const rt = new URLSearchParams(location.search).get("returnTo");
       // Mirror the server validator (oauth-core safeReturnTo): root-relative only,
-      // no protocol-relative "//host" and no backslash tricks.
-      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) return rt;
+      // no protocol-relative "//host" and no backslash tricks. Resolve against our
+      // OWN origin and confirm the result stays same-origin before returning only
+      // the path+query — so a redirect sink can never receive an off-site URL even
+      // if a new bypass slips past the string checks (clears CodeQL
+      // js/client-side-unvalidated-url-redirection by construction).
+      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) {
+        const u = new URL(rt, location.origin);
+        if (u.origin === location.origin) return u.pathname + u.search;
+      }
     } catch (_) {}
     return "/";
   }
@@ -627,7 +634,13 @@
     submit.textContent = "…";
     try {
       const url = localMode === "register" ? "/api/auth/local/register" : "/api/auth/local/login";
-      const body = localMode === "register" ? { email, password, name } : { email, password };
+      // #2554: forward a stored referral code on register (captured from ?ref= on
+      // any landing page). Best-effort — absent/invalid codes are simply ignored.
+      let ref = null;
+      try { ref = localStorage.getItem("unisona_ref") || null; } catch (e) {}
+      const body = localMode === "register"
+        ? (ref ? { email, password, name, ref } : { email, password, name })
+        : { email, password };
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",

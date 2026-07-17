@@ -174,9 +174,11 @@
       transition: border-color .15s, background .15s;
     }
     .access-card:hover { border-color: var(--accent); background: var(--surface2); }
-    .access-card.locked {
-      opacity: .45; cursor: default; pointer-events: none;
-    }
+    /* #2653: locked cards are now links to /pricing.html — the user is at peak
+       upgrade intent, so don't swallow the click. Keep them dimmed but lift opacity
+       from .45 so the 'Requires …' line clears the contrast floor. */
+    .access-card.locked { opacity: .6; }
+    .access-card.locked .upsell { color: var(--accent-strong); font-weight: 700; white-space: nowrap; }
     .access-icon { font-size: 20px; flex-shrink: 0; }
     .access-label { font-size: 13px; font-weight: 600; color: var(--text); }
     .access-req   { font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -520,10 +522,10 @@ function renderProfile(profile) {
            <span class="access-icon">${f.emoji}</span>
            <div><div class="access-label">${f.label}</div>${f.note ? `<div class="access-req">${escapeHtml(f.note)}</div>` : ''}</div>
          </a>`
-      : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
+      : `<a class="access-card locked" href="/pricing.html" title="${escapeHtml(reqLabel)} — see plans">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)}</div></div>
-         </div>`;
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)} · <span class="upsell">Upgrade →</span></div></div>
+         </a>`;
   }).join('');
 
   wrap.innerHTML = `
@@ -609,10 +611,23 @@ function renderProfile(profile) {
       <div class="access-grid">${featureCards}</div>
     </div>
 
+    <div>
+      <div class="section-title">Refer a friend</div>
+      <p class="link-note">Share your link. When a friend signs up and gets active, it shows in your referrals. <span id="ref-note"></span></p>
+      <div class="link-list">
+        <div class="link-row">
+          <input id="ref-link" type="text" readonly value="Loading…" aria-label="Your referral link"
+            style="flex:1;min-width:0;background:var(--surface2,rgba(0,0,0,.2));border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:0.8rem;padding:8px 10px">
+          <button id="ref-copy" type="button" class="btn-pill" style="flex-shrink:0">Copy</button>
+        </div>
+      </div>
+    </div>
+
     </div><!-- /col -->
     </div><!-- /profile-cols -->
   `;
   refreshAlpacaBroker();   // fill the Brokerage → Alpaca row (async, after paint)
+  loadReferralLink();      // #2554 — fill the referral link + copy button (async)
   refreshStripeBilling();  // fill the Billing → Card subscription row (async, after paint)
 }
 
@@ -681,6 +696,24 @@ async function openStripePortal() {
 }
 
 // ── Brokerage: Alpaca one-click status/connect/disconnect (ADR-0027) ──
+// #2554 — fetch the signed referral link and wire the copy button.
+async function loadReferralLink() {
+  const input = document.getElementById('ref-link');
+  const copyBtn = document.getElementById('ref-copy');
+  if (!input || !copyBtn) return;
+  try {
+    const r = await fetch('/api/referral/link', { credentials: 'include' }).then((x) => x.json());
+    if (!r || !r.ok || !r.link) { input.value = 'Sign in to get your link'; return; }
+    input.value = r.link;
+    copyBtn.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(r.link); }
+      catch (e) { input.select(); document.execCommand('copy'); }
+      const prev = copyBtn.textContent; copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => { copyBtn.textContent = prev; }, 1500);
+    });
+  } catch (e) { input.value = 'Could not load link'; }
+}
+
 async function refreshAlpacaBroker() {
   const sub = document.getElementById('alpaca-sub');
   const state = document.getElementById('alpaca-state');
