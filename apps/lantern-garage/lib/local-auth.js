@@ -21,16 +21,15 @@ const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationEmail, smtpConfigured } = require("./mailer");
 const { isLoopback } = require("./request-auth");
+const { canonicalOrigin } = require("./base-url");
 const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
 
-/** Build a fresh email-confirmation link (mints a verify_email token). */
+/** Build a fresh email-confirmation link (mints a verify_email token). Uses the
+ *  canonical origin, NOT the spoofable Host header, so a forged Host can't point
+ *  a genuine confirmation email at an attacker's domain (#2604). */
 function verifyLinkFor(req, profile) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
   const token = createToken("verify_email", profile.id, null);
-  return `${proto}://${host}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  return `${canonicalOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
 }
 
 // Fire-and-forget: email the new account a confirmation link (dev fallback logs
