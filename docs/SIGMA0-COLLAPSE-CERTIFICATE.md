@@ -60,7 +60,7 @@ since carry a verified-on date.
 ## How to audit this document
 
 Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
-were run against this revision on 2026-07-17 (80 tests, all passing; the gate self-test was
+were run against this revision on 2026-07-17 (86 tests, all passing; the gate self-test was
 last run 2026-07-07):
 
 | Claim | Class | Verify with |
@@ -74,6 +74,7 @@ last run 2026-07-07):
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
 | Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
 | Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
+| Three-arm promotion-evidence protocol (F/Fd/R/T) at task-level stuck fidelity + arm-differentiated teeth (§8.6-4, [#2691]) | machine-checked protocol; MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed; full run: `python experiments/sigma_theta_abc/holdout_protocol.py --simulate` |
 | Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
 | §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
 
@@ -1527,9 +1528,25 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    fresh-flow law** — see the MEASURED block in §8.4. **✅ Thresholdout follow-up DONE (2026-07-07,
    third arm + pool ablation, same harness):** the mechanism buys **validity**, the burned pool buys
    **extraction**, and in this harness the mechanism supports safe reuse of the pool — see the
-   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
+   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. **✅ PROTOCOL
+   LAYER DONE (2026-07-17, [#2691]):** the three-arm promotion-evidence protocol itself — Fixed /
+   Fixed+dither (the [#2692] knob, promoted to an arm) / Fresh-flow / Thresholdout+pool, with
+   per-candidate provenance ledgers, Thresholdout budget accounting, and disjoint task-id spaces —
+   is implemented model-agnostically (`experiments/sigma_theta_abc/holdout_protocol.py`, an
+   `eval_fn` callback so the L4 run swaps in the real exec evaluator) and validated at **task-level
+   Bernoulli-stuck fidelity** (per-(candidate,task) outcomes deterministic on re-evaluation — the
+   real stuck-luck mechanism, closer to reality than the Gaussian sims): 7/7 protocol checks,
+   16 seeds (`data/sigma0/holdout_protocol_report.json`;
+   `tests/test_sigma_theta_holdout_protocol.py`, 6 passing). Orderings reproduce at the higher
+   fidelity — fixed gap +0.108 worst / fresh extraction 0.934 best at 61× task consumption /
+   Thresholdout best per-task efficiency among fresh-consuming arms — and one new result:
+   **Fixed+dither reaches 0.856 true extraction at zero extra fresh-task cost** (vs fixed 0.617),
+   the cheapest intervention measured. The planted teeth run through the *real* seven-condition
+   gate with **arm-appropriate reasons**: the fixed arm can catch a contaminated reward-hack only
+   via the cond-6 provenance ledger, while the fresh arm rejects it on measured merit (cond 1) —
+   the load-bearing demonstration of why the freshness tiers exist. *(Steps 1–3 at real-model
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
-   remaining empirical gap.)*
+   remaining empirical gap, unchanged: this validates the PROTOCOL, not real training.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
    signal **add detection power** for bad checkpoints over the external gate alone? No prior art
    surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,
@@ -2076,5 +2093,25 @@ for produced results and Appendix A for the original design sketch.*
 > itself so it cannot be silently forgotten). This is the §8.7 protocol applied to our own
 > law: a pre-registered falsification found the overstatement, and the correction — not the
 > original claim — is the recorded result. Real-model arm folds into the A/B/C run ([#2691]).
+
+> **Maintenance log — 2026-07-17 ([#2691] protocol layer: the three promotion-evidence arms,
+> implemented and validated pre-L4).** The E-B gap splits into two halves — the *protocol* (who
+> reads which task set, when, with what ledgers and budgets) and the *training* (real
+> RLVR/distill steps on L4). The protocol half is now closed:
+> `experiments/sigma_theta_abc/holdout_protocol.py` implements Fixed / Fixed+dither / Fresh-flow
+> / Thresholdout+pool model-agnostically (an `eval_fn` callback; the L4 run swaps in the real
+> exec evaluator) and validates them at **task-level Bernoulli-stuck fidelity** — per-
+> (candidate,task) outcomes are a deterministic hash, so re-evaluation returns the same pass set,
+> which is the *actual* stuck-luck mechanism (an upgrade over every Gaussian sim so far). 16
+> seeds, 7/7 checks (`data/sigma0/holdout_protocol_report.json`;
+> `tests/test_sigma_theta_holdout_protocol.py`, 6 passing; audit run now **86 passed** across the
+> seven suites). Orderings reproduce at the higher fidelity (fixed gap +0.108 worst; fresh 0.934
+> best extraction at 61× task consumption; Thresholdout best fresh-task efficiency), plus one new
+> measured result: **Fixed+dither extracts 0.856 vs fixed 0.617 at identical task consumption** —
+> the [#2692] de-ratcheting knob survives the fidelity upgrade and is the cheapest intervention
+> in the set. Teeth run through the real seven-condition gate with arm-appropriate reasons (fixed
+> catches the contaminated hack only via the cond-6 provenance ledger; fresh rejects it on
+> merit, cond 1). §8.6 item 4 and the audit table updated. **The honest gap is unchanged and
+> now precisely one thing: executing this protocol around real training on L4.**
 
 ---

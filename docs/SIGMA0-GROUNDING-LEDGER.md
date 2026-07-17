@@ -234,6 +234,19 @@ pool after use and let the referee arbitrate pool-versus-holdout feedback. Retir
 dead — the tiers form a cycle, not a conveyor. The rotating-tier structure is cert §8.4.1's
 four-tier discipline, unchanged.
 
+**Protocol layer implemented and validated (2026-07-17,
+[#2691](https://github.com/alex-place/lantern-os/issues/2691)).** The promotion-evidence
+protocol itself — Fixed / Fixed+dither (the E-P knob promoted to an arm) / Fresh-flow /
+Thresholdout+pool, with provenance ledgers and budget accounting — is now implemented
+model-agnostically (`experiments/sigma_theta_abc/holdout_protocol.py`) and validated at
+**task-level Bernoulli-stuck fidelity** (outcomes deterministic on re-evaluation — the real
+stuck-luck mechanism, an upgrade over the Gaussian sims): 7/7 checks, 16 seeds. Orderings hold
+at the higher fidelity, and the dither arm extracts 0.856 vs fixed 0.617 at identical fresh-task
+cost — the cheapest intervention measured. Planted teeth are rejected by the real
+seven-condition gate with arm-appropriate reasons (fixed catches a contaminated hack only via
+the provenance ledger; fresh rejects it on merit). What remains of E-B is exactly one thing:
+running this protocol around real training on L4.
+
 **Positioning against prior art (added with the 2026-07-17 audit).** The problem shape —
 adaptive promotion against a reused evaluation with limited feedback — is the **Ladder**
 (Blum & Hardt, arXiv:1502.04585), built for competition leaderboards; the mechanism imported
@@ -280,7 +293,8 @@ condition — what result would delete which column.
 - E-P → [#2692](https://github.com/alex-place/lantern-os/issues/2692) (**done 2026-07-17 — the
   kill condition fired; §1 re-priced**) ·
   E-S → [#2690](https://github.com/alex-place/lantern-os/issues/2690) (Phase 0 done 2026-07-17) ·
-  E-B → [#2691](https://github.com/alex-place/lantern-os/issues/2691)
+  E-B → [#2691](https://github.com/alex-place/lantern-os/issues/2691) (protocol layer done
+  2026-07-17; the L4 training run is the sole remaining gap)
 
 1. **E-P (price — RUN 2026-07-17, kill condition FIRED).** The prediction tested: a
    **stochastic** internal signal (re-drawable noise, checkpoint-fixed bias) still cannot
