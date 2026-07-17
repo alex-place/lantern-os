@@ -1,0 +1,282 @@
+{
+ "config": {
+  "universe": [
+   "SPY",
+   "QQQ",
+   "IWM",
+   "EFA",
+   "TLT",
+   "GLD",
+   "XMMO",
+   "SPMO"
+  ],
+  "start_equity": 25000.0,
+  "rf": 0.03,
+  "borrow_spread": 0.015,
+  "tc": 0.0002,
+  "tv": 0.35,
+  "max_gross": 2.0,
+  "min_gross": 0.0,
+  "trend_days": 126,
+  "brake": 0.3,
+  "vol_win_daily": 20,
+  "vol_win_hourly": 140,
+  "hourly_vol_annualization": "sqrt(252*6.5)"
+ },
+ "panel": {
+  "bars": 5077,
+  "trading_days": 730,
+  "first_day": "2023-08-18",
+  "last_day": "2026-07-17",
+  "sim_start_day": "2024-03-01",
+  "direction_updates": 32
+ },
+ "wick_repairs": {
+  "SPY": {
+   "count": 16,
+   "examples": [
+    {
+     "ts": 1703269800,
+     "bad": 472.0799865722656,
+     "fixed": 474.6000061035156
+    },
+    {
+     "ts": 1709908200,
+     "bad": 517.9500122070312,
+     "fixed": 514.8599853515625
+    },
+    {
+     "ts": 1713292200,
+     "bad": 505.6199951171875,
+     "fixed": 503.0400085449219
+    }
+   ]
+  },
+  "QQQ": {
+   "count": 14,
+   "examples": [
+    {
+     "ts": 1701376200,
+     "bad": 388.79998779296875,
+     "fixed": 386.4800109863281
+    },
+    {
+     "ts": 1703269800,
+     "bad": 406.93499755859375,
+     "fixed": 409.3086853027344
+    },
+    {
+     "ts": 1717421400,
+     "bad": 454.2200012207031,
+     "fixed": 451.7099914550781
+    }
+   ]
+  },
+  "IWM": {
+   "count": 16,
+   "examples": [
+    {
+     "ts": 1703269800,
+     "bad": 200.5800018310547,
+     "fixed": 202.17999267578125
+    },
+    {
+     "ts": 1706801400,
+     "bad": 192.13999938964844,
+     "fixed": 193.97000122070312
+    },
+    {
+     "ts": 1709908200,
+     "bad": 209.6999969482422,
+     "fixed": 206.8800048828125
+    }
+   ]
+  },
+  "EFA": {
+   "count": 11,
+   "examples": [
+    {
+     "ts": 1696426200,
+     "bad": 66.62999725341797,
+     "fixed": 67.06999969482422
+    },
+    {
+     "ts": 1698240600,
+     "bad": 66.58000183105469,
+     "fixed": 67.0199966430664
+    },
+    {
+     "ts": 1709217000,
+     "bad": 77.37999725341797,
+     "fixed": 77.0250015258789
+    }
+   ]
+  },
+  "TLT": {
+   "count": 20,
+   "examples": [
+    {
+     "ts": 1696012200,
+     "bad": 88.30999755859375,
+     "fixed": 88.76000213623047
+    },
+    {
+     "ts": 1705501800,
+     "bad": 94.23100280761719,
+     "fixed": 94.80999755859375
+    },
+    {
+     "ts": 1708007400,
+     "bad": 93.54640197753906,
+     "fixed": 92.81999969482422
+    }
+   ]
+  },
+  "GLD": {
+   "count": 19,
+   "examples": [
+    {
+     "ts": 1692973800,
+     "bad": 176.8896942138672,
+     "fixed": 177.32000732421875
+    },
+    {
+     "ts": 1694179800,
+     "bad": 178.89999389648438,
+     "fixed": 178.02999877929688
+    },
+    {
+     "ts": 1697812200,
+     "bad": 185.18089294433594,
+     "fixed": 184.42999267578125
+    }
+   ]
+  },
+  "XMMO": {
+   "count": 21,
+   "examples": [
+    {
+     "ts": 1703104200,
+     "bad": 88.47000122070312,
+     "fixed": 89.37129974365234
+    },
+    {
+     "ts": 1706733000,
+     "bad": 93.23999786376953,
+     "fixed": 94.00199890136719
+    },
+    {
+     "ts": 1709667000,
+     "bad": 109.51000213623047,
+     "fixed": 110.3812026977539
+    }
+   ]
+  },
+  "SPMO": {
+   "count": 14,
+   "examples": [
+    {
+     "ts": 1697549400,
+     "bad": 58.35499954223633,
+     "fixed": 58.99660110473633
+    },
+    {
+     "ts": 1721914200,
+     "bad": 83.94000244140625,
+     "fixed": 84.76000213623047
+    },
+    {
+     "ts": 1721935800,
+     "bad": 83.77999877929688,
+     "fixed": 84.76000213623047
+    }
+   ]
+  }
+ },
+ "wick_repairs_total": 131,
+ "variants": {
+  "daily": {
+   "final": 47077.433304685284,
+   "sharpe": 1.177983992098657,
+   "sharpe_lo": -0.09360655612879212,
+   "sharpe_hi": 2.449574540326106,
+   "maxdd_hourly": -0.22157923529524404,
+   "maxdd_dailyclose": -0.2100172290736234,
+   "turnover_sum": 15.911784287660767,
+   "tc_cost_frac": 0.003182356857532155,
+   "carry_frac": -0.0981038084943844,
+   "n_gross_changes": 108,
+   "avg_gross": 1.9197647410041114,
+   "pct_bars_below_1x": 0.005070014485755674,
+   "bars_per_year": 1742.2671787875406,
+   "n_bars": 4141
+  },
+  "hourly": {
+   "final": 51354.620857055124,
+   "sharpe": 1.316095686729816,
+   "sharpe_lo": 0.044442313909999205,
+   "sharpe_hi": 2.5877490595496324,
+   "maxdd_hourly": -0.19846706664169445,
+   "maxdd_dailyclose": -0.19491495905956135,
+   "turnover_sum": 15.895247714554076,
+   "tc_cost_frac": 0.003179049542910811,
+   "carry_frac": -0.09988611750269157,
+   "n_gross_changes": 650,
+   "avg_gross": 1.9364109664340396,
+   "pct_bars_below_1x": 0.005794302269435055,
+   "bars_per_year": 1742.2671787875406,
+   "n_bars": 4141
+  },
+  "static": {
+   "final": 57920.70361298978,
+   "sharpe": 1.424835793239755,
+   "sharpe_lo": 0.15312806325163986,
+   "sharpe_hi": 2.69654352322787,
+   "maxdd_hourly": -0.22841656122643306,
+   "maxdd_dailyclose": -0.2223556910407153,
+   "turnover_sum": 8.002382486056696,
+   "tc_cost_frac": 0.0016004764972113394,
+   "carry_frac": -0.10640306122449099,
+   "n_gross_changes": 1,
+   "avg_gross": 2.0,
+   "pct_bars_below_1x": 0.0,
+   "bars_per_year": 1742.2671787875406,
+   "n_bars": 4141
+  }
+ },
+ "worst_day_episode": {
+  "day": "2025-04-04",
+  "direction_return": -0.045643201307428716,
+  "spy_return": -0.05976118593743862,
+  "gross_in_force_at_open": {
+   "daily": 2.0,
+   "hourly": 2.0
+  },
+  "hourly_delever_effective_ts": 1743777000,
+  "daily_delever_effective_ts": 1744032600,
+  "hours_faster": 71.0,
+  "bars_faster": 6,
+  "note": "hours_faster is wall-clock and can span a weekend (a Friday crash is the worst case FOR the daily brake: it reacts at Monday's open); bars_faster counts hourly trading bars.",
+  "episode_pnl_daily": -0.09094954361289409,
+  "episode_pnl_hourly": -0.07236596479277024,
+  "dollar_diff_on_common_base": 612.4859281872747,
+  "common_base_dollars": 32958.44864521057
+ },
+ "regime": {
+  "window": [
+   "2024-03-01",
+   "2026-07-17"
+  ],
+  "spy_total_return": 0.45549390219664687,
+  "spy_ann_vol": 0.15571038193828968,
+  "spy_maxdd": -0.18952525624507433
+ },
+ "honesty": [
+  "2.4 simulated years after warm-up: Lo-CIs on Sharpe are wide and overlap heavily across variants \u2014 no return claim survives them.",
+  "Conclusions are about MECHANISM: response latency vs whipsaw turnover, measured under identical direction and identical costs.",
+  "Hourly closes are unadjusted (dividends appear as overnight drops) \u2014 identical treatment across variants.",
+  "Exposure is held as a fraction of equity between decisions, i.e. implicit free intra-period rebalancing to constant weights; this slightly understates true turnover for ALL variants equally.",
+  "The drawdown brake (30%) may never fire in this window; the vol-target and trend gate do the braking \u2014 regime-dependent."
+ ],
+ "generated": "2026-07-17T17:27:20.810316+00:00"
+}
