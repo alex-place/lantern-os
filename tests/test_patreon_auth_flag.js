@@ -37,10 +37,11 @@ const TEST_TOKEN = "flag-test-token-abcdef";
 function guestReq() {
   return { headers: {}, socket: { localPort: 4177, remoteAddress: "203.0.113.7" }, session: undefined, url: "/", method: "GET" };
 }
-// A dev/test request via the token-gated test-auth path (direct hit, valid token →
-// emulated admin). Replaces the removed IP/dev-port bypass.
+// A dev/test request via the token-gated test-auth path (direct hit, valid token +
+// EXPLICIT admin role). Replaces the removed IP/dev-port bypass. The role must be
+// named since #2645 made a blank/unknown role fail closed to guest, not admin.
 function testAuthReq() {
-  return { headers: { "x-test-auth": TEST_TOKEN }, socket: { localPort: 4177, remoteAddress: "127.0.0.1" }, session: undefined, url: "/", method: "GET" };
+  return { headers: { "x-test-auth": TEST_TOKEN, "x-test-role": "admin" }, socket: { localPort: 4177, remoteAddress: "127.0.0.1" }, session: undefined, url: "/", method: "GET" };
 }
 // Capture what a guard writes to the response.
 function mockRes() {

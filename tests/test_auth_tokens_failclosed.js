@@ -43,8 +43,14 @@ try {
   // (a) loopback dev (nothing set): mint + verify round-trips (dev default allowed).
   setEnv({});
   const tok = at.createToken("verify_email", "profile-1", "user@example.com");
-  assert.deepStrictEqual(at.verifyToken(tok, "verify_email"), { sub: "profile-1", email: "user@example.com" });
-  ok("loopback dev → verify_email token round-trips");
+  // Tokens now carry exp (expiry) + jti (single-use id) claims — assert identity
+  // fields exactly and the new claims by shape (exp is clock-dependent, jti random).
+  const claims = at.verifyToken(tok, "verify_email");
+  assert.strictEqual(claims.sub, "profile-1");
+  assert.strictEqual(claims.email, "user@example.com");
+  assert.ok(typeof claims.exp === "number" && claims.exp > Date.now(), "exp is a future timestamp");
+  assert.ok(typeof claims.jti === "string" && claims.jti.length > 0, "jti present");
+  ok("loopback dev → verify_email token round-trips (with exp + jti claims)");
 
   // (b) non-loopback (PORT set) without SESSION_SECRET: minting must THROW, so a
   //     forgeable token can never be issued (the server also process.exit(1)s at boot).
@@ -72,7 +78,10 @@ try {
 
   // (e) sanity: a legitimately-minted token under the real secret still verifies.
   const legit = at.createToken("verify_email", "profile-2");
-  assert.deepStrictEqual(at.verifyToken(legit, "verify_email"), { sub: "profile-2", email: null });
+  const legitClaims = at.verifyToken(legit, "verify_email");
+  assert.strictEqual(legitClaims.sub, "profile-2");
+  assert.strictEqual(legitClaims.email, null);
+  assert.ok(typeof legitClaims.exp === "number" && typeof legitClaims.jti === "string", "exp + jti claims present");
   ok("non-loopback + real secret → legitimate token still round-trips");
 
   console.log(`\nAll ${passed} auth-token fail-closed assertions passed.`);
