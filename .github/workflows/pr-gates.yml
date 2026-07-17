@@ -136,8 +136,8 @@ jobs:
 
   # ── Markdown link integrity (#2532) ─────────────────────────────────────────
   # The 2026-07-16 README audit found 7+ dead internal links in the README alone.
-  # Blocking tier: README.md + root *.md (started clean). docs/** is warn-only
-  # until its pre-existing backlog is burned down, then flips via --strict.
+  # STRICT since #2600 (2026-07-17): the 124-link docs/** backlog was burned down,
+  # so every relative link in README.md + root *.md + docs/** now blocks.
   md-link-check:
     name: Markdown link integrity
     runs-on: ubuntu-latest
@@ -147,7 +147,7 @@ jobs:
         with:
           node-version: 24
       - name: Check relative markdown links
-        run: node scripts/check-md-links.mjs
+        run: node scripts/check-md-links.mjs --strict
 
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
