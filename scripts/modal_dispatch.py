@@ -115,11 +115,17 @@ def _train_body(steps: int, hf_repo: str, checkpoint_file: str) -> dict:
         csf.unpack(local_csf, "/root/checkpoint")
         resume_arg = ["--resume_from", "/root/checkpoint"]
 
+    # Ensure real SFT data exists — the old models/lantern-sigma0-coder/training-data.jsonl
+    # path was never in the repo. Prep it from open datasets (the worker has egress) if absent.
+    data_path = _os.environ.get("OURO_TRAIN_DATA", "data/eval/distill.jsonl")
+    if not _os.path.exists(data_path):
+        subprocess.run([_sys.executable, "scripts/eb_prep_corpus.py", "--allow-download",
+                        "--distill-n", "2000", "--rlvr-n", "1000"], check=True)
     train_env = {**_os.environ, "HF_HOME": "/root/hf-cache"}
     subprocess.run(
         [_sys.executable, "scripts/train-qlora-ouro.py",
          "--base", "ByteDance/Ouro-1.4B",
-         "--data", "models/lantern-sigma0-coder/training-data.jsonl",
+         "--data", data_path,
          "--out", "/root/output",
          "--max-steps", str(steps),
          "--seq", "1536",

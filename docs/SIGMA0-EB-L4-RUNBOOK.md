@@ -61,6 +61,17 @@ real scale, or was the simulation a worst-case story? **A refutation is a valid 
 
 ## 3. Step 0 (CPU, before touching the GPU) — corpus + partition + training data
 
+> **✅ AUTOMATED — `scripts/eb_prep_corpus.py`.** One command on any egress machine builds
+> everything below: `python scripts/eb_prep_corpus.py --allow-download`. It pulls
+> best-practice, license-verified open datasets (2026-07-17) — **OpenCodeInstruct** (CC BY 4.0,
+> Qwen-generated so no GPT-distillation-ToS entanglement) → `distill.jsonl`/`distill-replay.jsonl`;
+> **Eurus-2-RL-Data** coding split (MIT, executable tests) → `rlvr-train.jsonl`; **LiveCodeBench**
+> (contamination-free, date-annotated) + MBPP + HumanEval → the partition — decontaminates every
+> train prompt sharing a 13-gram with any eval prompt, and fills the **hidden block from
+> post-cutoff LiveCodeBench** (the freshness-law selector, #2692). `--dry-run` validates all logic
+> offline. The three dispatch scripts run it automatically if `data/eval/distill.jsonl` is missing.
+> The manual recipe below documents what it produces.
+
 Assemble ≥ 900 exec-verified Python tasks: **MBPP full** (~974, via HF `datasets`:
 `mbpp`, sanitized split) + **HumanEval** (164, `scripts/build_humaneval_corpus.py`) +
 the repo suites above. Every task gets a stable integer id and a `{prompt, tests}` record.

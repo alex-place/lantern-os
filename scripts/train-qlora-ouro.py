@@ -41,7 +41,11 @@ def load_training_records(path):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="ByteDance/Ouro-1.4B")
-    ap.add_argument("--data", default="models/lantern-sigma0-coder/training-data.jsonl")
+    # Default data comes from the E-B prep pipeline (scripts/eb_prep_corpus.py), NOT the
+    # old models/lantern-sigma0-coder/training-data.jsonl path — that file was never in the
+    # repo, so the default silently pointed at nothing (every dispatch failed at data-load).
+    # Override with $OURO_TRAIN_DATA or --data.
+    ap.add_argument("--data", default=os.environ.get("OURO_TRAIN_DATA", "data/eval/distill.jsonl"))
     ap.add_argument("--out", default="D:/lantern-train/ouro-sigma0-adapters")
     ap.add_argument("--epochs", type=int, default=3)
     ap.add_argument("--max-steps", type=int, default=-1, help="override epochs (smoke test); -1 = use epochs")
