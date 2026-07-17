@@ -81,13 +81,15 @@ def build_panel():
 
 
 def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
-              deposits=True, equity0=0.0, irx_flat=0.03, band=0.0, band_mode="sym"):
+              deposits=True, equity0=0.0, irx_flat=0.03, band=0.08, band_mode="sym"):
     """band > 0 installs a no-trade region: hold yesterday's exposure unless the
     L1 drift to today's target exceeds `band` (units = fraction of equity, so
     band=0.04 ~ the tranche's +-4pp). band_mode="brake_aware" always honors a
     de-risking move (target gross < current) so the drawdown brake / trend gate
-    are never delayed by the band; "sym" bands both directions. band=0.0 is the
-    legacy every-day-retrade behavior (main() results unchanged)."""
+    are never delayed by the band; "sym" bands both directions. DEFAULT band=0.08
+    is the measured turnover-optimal (experiments/overlay_notrade_band.py:
+    +2.4% full / +2.5% out-of-sample, ~20% less turnover, flat drawdown); pass
+    band=0.0 for the legacy every-day-retrade behavior."""
     n = len(UNIVERSE)
     i0 = next(i for i, d in enumerate(days) if d >= start)
     i1 = len(days) if end is None else next(i for i, d in enumerate(days) if d >= end)
