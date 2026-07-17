@@ -93,16 +93,6 @@ const KNOWLEDGE = [
     ],
   },
   {
-    category: "game",
-    persona: "lantern",
-    keywords: ["play", "game", "door", "kingdome", "explore", "three-doors", "adventure"],
-    answer:
-      "Three-Doors Kingdome is an infinitely replayable, CSF-native game personalized by archetype and symbols across a 7-stage convergence loop.",
-    actions: [
-      { label: "Play Kingdome", command: "!explore" },
-    ],
-  },
-  {
     category: "story",
     persona: "lantern",
     keywords: ["story", "dream", "journal", "tale", "narrate", "freeform"],
@@ -110,7 +100,6 @@ const KNOWLEDGE = [
       "The Dream Journal is a freeform narrative space. Personas (lantern, waterfall, xenon…) co-write with you and persist entries to your dream notebook.",
     actions: [
       { label: "Start a dream", command: "Tell me a story" },
-      { label: "Play Kingdome", command: "!explore" },
     ],
   },
   {
@@ -153,12 +142,11 @@ const DEFAULT_RESPONSE = {
   category: "help",
   persona: "keystone",
   answer:
-    "I route locally and deterministically. Ask about work, trading, creating, the convergence router, or play the Kingdome game.",
+    "I route locally and deterministically. Ask about work, trading, creating, or the convergence router.",
   actions: [
     { label: "What work is there?", command: "!ask what work needs to be done" },
     { label: "Open Trader", href: "/stock-trader.html" },
     { label: "Open Create", href: "/create.html" },
-    { label: "Play Kingdome", command: "!explore" },
   ],
 };
 

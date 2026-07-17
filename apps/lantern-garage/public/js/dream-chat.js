@@ -70,10 +70,9 @@
     return "lantern";
   }
 
-  // Telemetry shim. `log` is a no-op so normal use keeps a quiet console (#2495);
-  // warn/error still surface real problems. Replace with real telemetry if needed.
+  // Telemetry shim (logs to console; replace with real telemetry if needed)
   const TELEMETRY = {
-    log() {},
+    log(scope, msg) { console.log(`[${scope}]`, msg); },
     warn(scope, msg) { console.warn(`[${scope}]`, msg); },
     error(scope, msg, extra) { console.error(`[${scope}]`, msg, extra || ""); }
   };
@@ -688,17 +687,6 @@
       scrollToBottom();
       return;
     }
-    // Special handling for Kingdome of Hearts game
-    const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
-    if (kingdomeMatch) {
-      if (emptyState) emptyState.style.display = "none";
-      inputEl.value = "";
-      analytics.messagesSent++;
-      analytics.record("send", "Kingdome of Hearts game started");
-      startThreeDoors();
-      return;
-    }
-
     // !convergance log an issue <title> — POST to non-stream handler
     if (/^!converg(?:ence|ance)\s+log\s+an?\s+issue\s+/i.test(text)) {
       if (emptyState) emptyState.style.display = "none";
@@ -1199,8 +1187,7 @@
       row.appendChild(webChips);
     }
 
-    // ── Three Doors banner (disabled — appendDoorsBanner not yet implemented) ──
-    // Show image prompt when AI suggests SD generation for doors
+    // Show image prompt when AI suggests SD generation
     if (imagePrompt) {
       const imgNote = document.createElement("div");
       imgNote.className = "source-badge";
@@ -2225,100 +2212,4 @@
   initVoice();
   loadVoiceSettings();
 
-  // ── Kingdome of Hearts Game Integration ────────────────────────────────
-  let doorsGameState = null;
-  let doorsUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
-  async function startThreeDoors() {
-    const row = document.createElement("div");
-    row.className = "msg-row agent";
-    row.innerHTML = `<div class="msg-label">🚪 Kingdome of Hearts</div><div class="bubble"><b>Opening the first door...</b></div>`;
-    messagesEl.appendChild(row);
-    scrollToBottom();
-
-    try {
-      const r = await fetch(`${serverBase}/api/dream/doors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: doorsUserId, action: "start" }),
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-
-      if (data.error) {
-        row.querySelector(".bubble").textContent = `⚠️ Error: ${data.error}`;
-        return;
-      }
-
-      doorsGameState = data;
-      renderDoorsScene(row, data);
-    } catch (error) {
-      console.error("[Kingdome] Error:", error);
-      row.querySelector(".bubble").textContent = `❌ Failed to start game: ${error.message}`;
-    }
-  }
-
-  function renderDoorsScene(row, scene) {
-    const bubble = row.querySelector(".bubble");
-    const html = `
-      <div style="margin: 8px 0;">
-        <div style="margin-bottom: 12px; line-height: 1.6; color: #e2e8f0;">${scene.text}</div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-          ${(scene.doors || [])
-            .map((door) => `
-            <button onclick="window.chooseDoorsPath('${door.label}')"
-              style="padding: 8px 12px; background: #4c1d95; border: 1px solid #7c3aed; color: #c4b5fd; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; font-weight: 500;"
-              onmouseover="this.style.background='#6d28d9'; this.style.borderColor='#a78bfa';"
-              onmouseout="this.style.background='#4c1d95'; this.style.borderColor='#7c3aed';">
-              ${door.label}. ${door.name}
-            </button>
-          `)
-            .join("")}
-        </div>
-        ${scene.image_prompt ? `
-          <div style="background: #1e1b4b; border-left: 3px solid #7c3aed; padding: 8px; border-radius: 4px; margin-top: 12px; font-size: 11px; color: #a78bfa; max-height: 80px; overflow-y: auto;">
-            <div style="font-weight: 600; margin-bottom: 4px;">📸 Stable Diffusion Prompt:</div>
-            <div style="font-family: monospace; line-height: 1.4; color: #c4b5fd;">${scene.image_prompt}</div>
-          </div>
-        ` : ""}
-        ${scene.fox_present ? `<div style="color: #fbbf24; font-size: 12px; margin-top: 8px; font-style: italic;">🦊 The fox is here.</div>` : ""}
-      </div>
-    `;
-    bubble.innerHTML = html;
-  }
-
-  window.chooseDoorsPath = async (doorLabel) => {
-    if (!doorsGameState) return;
-
-    const row = document.createElement("div");
-    row.className = "msg-row agent";
-    row.innerHTML = `<div class="msg-label">🚪 Choosing door ${doorLabel}...</div><div class="bubble"><em>traversing...</em></div>`;
-    messagesEl.appendChild(row);
-    scrollToBottom();
-
-    try {
-      const r = await fetch(`${serverBase}/api/dream/doors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: doorsUserId, action: "choose", choice: doorLabel }),
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-
-      if (data.error) {
-        row.querySelector(".bubble").textContent = `⚠️ ${data.error}`;
-        return;
-      }
-
-      doorsGameState = data;
-      renderDoorsScene(row, data);
-    } catch (error) {
-      console.error("[Kingdome] Choice error:", error);
-      row.querySelector(".bubble").textContent = `❌ Failed: ${error.message}`;
-    }
-  };
-
-  window.startThreeDoors = startThreeDoors;
 
