@@ -871,7 +871,7 @@
        Replaces the old three-button cluster (switch + ⚡ Alpaca + 🔗 IBKR). -->
   <a href="/orchestration.html#broker" class="nav-link" id="brokerBtn" style="display:none"
     title="Which broker executes your trades — click to add, configure, or switch brokers in Settings"
-    data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings.">🔗 <span id="brokerLabel">Broker</span></a>
+    data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings."><span id="brokerLabel">🔗 Broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
@@ -4634,12 +4634,12 @@ async function refreshBrokerButton(){
         (other ? ' (the other broker is the automatic fallback)' : '') +
         '. Click to configure or switch brokers in Settings.';
     } else {
-      label.textContent = 'Connect broker';
+      label.textContent = '🔗 Connect broker';
       btn.style.color = '';
       btn.title = 'No broker connected — click to add Alpaca or IBKR in Settings.';
     }
   }catch(e){
-    label.textContent = 'Broker';         // network hiccup → neutral, still links to Settings
+    label.textContent = '🔗 Broker';      // network hiccup → neutral, still links to Settings
   }
 }
 // OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
