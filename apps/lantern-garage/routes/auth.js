@@ -61,9 +61,14 @@ function originOf(req) {
 function readJsonBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    // #2650: destroying the request on the size cap kills the 'data'/'end' events,
+    // so the promise never settled and the async handler hung forever. Resolve(null)
+    // on the cap AND on teardown ('close', which destroy() DOES fire). resolve() is
+    // idempotent, so the end/error/close races are harmless; the caller answers 413.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
+    req.on("close", () => resolve(null));
   });
 }
 
@@ -321,3 +326,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Test seam (#2650): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readJsonBody = readJsonBody;
