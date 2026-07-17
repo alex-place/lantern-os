@@ -60,12 +60,17 @@ contribution until the §5 experiments run.
 
 ## Plain-language summary
 
-**Price.** Fresh verified truth is the only currency that can *select* — pick which model,
-which answer, which update is genuinely better. The tempting substitutes (the model's own
-perplexity, confidence, any self-check) are measured to buy nothing in that role, however
-accurate, because they are deterministic properties of the thing being judged: their errors
-stick to the champion exactly like a lucky test score does. Self-checks are smoke detectors,
-never judges. **Internal signals detect; only fresh truth selects.**
+**Price.** Fresh verified truth is the only currency that can *inform* selection — genuinely
+rank which model, answer, or update is better. Deterministic self-checks (perplexity,
+confidence — measured twice, same number) buy nothing in that role: their errors stick to the
+champion exactly like a lucky test score does. But the E-P falsification (2026-07-17) found a
+twist the original law missed: *stochastic* self-checks — and even plain added noise carrying
+zero information — recover a real fraction of the budget by **shaking the champion's lucky
+seat** (de-ratcheting), the same trick the Thresholdout referee performs deliberately. So the
+price column has three tiers now: deterministic self-checks are worthless for selection,
+fresh randomness is half a substitute (it unsticks, it doesn't rank), and only fresh truth
+does both. **Internal signals detect; fresh randomness de-ratchets; only fresh truth
+informs.**
 
 **Schedule.** A loop that feeds on its own output *commits* to its trajectory at a measurable
 rate, and the outside evidence needed to un-commit it grows at that same rate, then saturates.
@@ -90,7 +95,8 @@ new experiment; §5 names the experiments that would.
 
 | Claim | Class | Imported from (cert §) | Verify with |
 |---|---|---|---|
-| Freshness law — intrinsic signals add ~nothing in the selection role | MEASURED (simulation, 32 seeds) | §8.4.1 | `python experiments/sigma_update_internal_signal_value.py` |
+| Freshness law — *deterministic* intrinsic signals add ~nothing in the selection role | MEASURED (simulation, 32 seeds) | §8.4.1 | `python experiments/sigma_update_internal_signal_value.py` |
+| Freshness law RE-STATED — kill test fired: re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates | MEASURED (simulation, 32 seeds; E-P, [#2692](https://github.com/alex-place/lantern-os/issues/2692)) | §8.4.1 re-stated block | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
 | n-graded staleness — fresh flow beats fixed holdout 22× at n=50 | MEASURED (simulation, 32 seeds) | §8.4 | `python experiments/sigma_update_holdout_staleness.py` |
 | Detection value — internal bundle ΔAUC +0.121→+0.019 as external n grows 2→5 | MEASURED (one model) | §8.6 item 5 | `experiments/sigma_incremental_validity_ouro.py` (GPU; log in PR #2240) |
 | Commitment inequality — escape budget B*(n) rises geometrically, saturates | PROVEN on synthetic maps (machine-checked) | §3.1 | `python experiments/sigma0_grounding_deadline.py` → `data/sigma0/grounding_deadline_report.json` |
@@ -121,14 +127,22 @@ signal. Distinguish two roles:
 |---|---|---|
 | Fresh verified tasks (re-drawn per gate) | **full value** — extracts 12.68 units of true quality at n=50 in the reference simulation | full value |
 | Fixed verified holdout (reused) | **n-graded decay** — 22× less than fresh at n=50; within 10% of fresh only at n ≥ 2000 | full value while unburned |
-| Internal signal (perplexity, entropy, any deterministic self-check) | **~zero** — 1.0–1.2× the holdout alone; strictly *worse* as its weight rises (0.64 → 0.10); a near-oracle internal signal reaches 4.10 vs fresh 12.68 | **real but scarcity-gated** — ΔAUC +0.121 over an n=2 external gate, decaying to +0.019 by n=5; catches gross breakage only |
+| **Deterministic** internal signal (perplexity, entropy — measured twice, same number) | **~zero** — 1.0–1.2× the holdout alone; strictly *worse* as its weight rises (0.64 → 0.10); a near-oracle internal signal reaches 4.10 vs fresh 12.68 | **real but scarcity-gated** — ΔAUC +0.121 over an n=2 external gate, decaying to +0.019 by n=5; catches gross breakage only |
+| **Stochastic** internal signal (self-consistency over re-drawn seeds, MC-dropout) — *re-priced 2026-07-17, [#2692](https://github.com/alex-place/lantern-os/issues/2692)* | **partial** — recovers ≈50% of fresh-flow value at n=50 purely by **de-ratcheting** (zero-information dither reproduces the entire effect, 6.42 vs 6.43); adds no information | same as deterministic |
+| Deliberate dither on a fixed holdout (add noise to every score comparison) | **partial, free** — same de-ratcheting effect without any model signal; has an interior optimum (too much hurts) | n/a |
 
-**The mechanism (the freshness law).** An intrinsic signal is a deterministic function of the
-checkpoint — measuring the same checkpoint twice returns the same number — so its error sticks
-to the champion exactly the way a fixed holdout's lucky draw does. It cannot re-anchor the
-selection ratchet; only a *re-drawn* measurement can. **Freshness (re-drawability), not
-externality, is the active ingredient of grounding.** In one line: *internal signals detect;
-only fresh truth selects.*
+**The mechanism (the freshness law — as re-stated after its own kill test fired,
+2026-07-17).** A *deterministic* intrinsic signal's error sticks to the champion exactly the
+way a fixed holdout's lucky draw does, so it cannot re-anchor the selection ratchet. But the
+E-P falsification ([#2692](https://github.com/alex-place/lantern-os/issues/2692), pre-registered)
+found the original one-line law **too strong**: re-drawn *measurement noise* — though it
+carries zero information — rescues a large fraction of the budget by **de-ratcheting** the
+champion's seat (a zero-information dither reproduces the entire rescue; it is the same
+mechanism Thresholdout buys deliberately with Laplace noise). Selection error decomposes into
+a **stuck** part (sets the ratchet) and a **fresh** part (breaks it); only re-drawn external
+truth both breaks the ratchet *and* ranks candidates, which is why fresh truth still strictly
+dominates every internal arm. In three lines now: *internal signals detect; fresh randomness
+de-ratchets; only fresh truth informs.*
 
 **Honest scope.** The selection half is simulation-shaped (32 seeds, synthetic hill-climb;
 shape, not constants). The detection half is one model (Ouro-1.4B), 8 truth tasks, and a
@@ -263,17 +277,21 @@ can grow at a ceiling rate, and no amount of introspection substitutes for food.
 Three experiments, ordered by cost, each tracked as a repo issue. Each names its kill
 condition — what result would delete which column.
 
-- E-P → [#2692](https://github.com/alex-place/lantern-os/issues/2692) ·
+- E-P → [#2692](https://github.com/alex-place/lantern-os/issues/2692) (**done 2026-07-17 — the
+  kill condition fired; §1 re-priced**) ·
   E-S → [#2690](https://github.com/alex-place/lantern-os/issues/2690) (Phase 0 done 2026-07-17) ·
   E-B → [#2691](https://github.com/alex-place/lantern-os/issues/2691)
 
-1. **E-P (price, cheap — CPU simulation + optional real model).** The freshness law's sharpest
-   untested prediction: a **stochastic** internal signal (e.g. self-consistency over re-drawn
-   sampling seeds) has re-drawable *noise* but checkpoint-fixed *bias* — the law predicts it
-   still cannot extend the selection budget. Run the §8.4.1 harness with a resampled-noise
-   internal arm. **Kill condition:** if re-drawable measurement noise recovers selection budget,
-   the law's active ingredient is misidentified and §1 must be re-stated (re-drawable *truth*,
-   not re-drawable *measurement*).
+1. **E-P (price — RUN 2026-07-17, kill condition FIRED).** The prediction tested: a
+   **stochastic** internal signal (re-drawable noise, checkpoint-fixed bias) still cannot
+   extend the selection budget. **Measured outcome
+   (`experiments/sigma_update_stochastic_signal.py`, pre-registered):** H-P1 confirmed
+   (bias→noise error shift raises extraction 0.81 → 9.36 at n=50), but **H-P2 refuted** —
+   re-drawn noise at fixed bias rescued extraction 7.9×, and a post-hoc zero-information
+   dither control reproduces the entire rescue (6.42 vs 6.43). The law was too strong; §1's
+   price table and mechanism paragraph are re-priced accordingly (de-ratcheting is real and
+   nearly free; information still requires fresh truth, which still strictly dominates). The
+   optional real-model arm folds into E-B.
 2. **E-S (schedule — needs a well-conditioned loop).** Prospective deadline test on a
    JSRR/STARS-stabilized loop (ρ < 1, measured `cond(P)` moderate): predict `B*(n)` and the
    half-life from the measured γ and P *before* the run; then measure actual correction cost vs

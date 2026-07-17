@@ -60,7 +60,7 @@ since carry a verified-on date.
 ## How to audit this document
 
 Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
-were run against this revision on 2026-07-17 (74 tests, all passing; the gate self-test was
+were run against this revision on 2026-07-17 (80 tests, all passing; the gate self-test was
 last run 2026-07-07):
 
 | Claim | Class | Verify with |
@@ -73,6 +73,7 @@ last run 2026-07-07):
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
 | Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
+| Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
 | Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
 | §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
 
@@ -1432,6 +1433,37 @@ reuse. What intrinsic signals *are* measurably good for is **detection**, not se
 §8.6 item 5 result. One sentence: **internal signals detect; only fresh truth selects.**
 [MEASURED-by-simulation; shape, not a closed-form constant.]
 
+**RE-STATED (2026-07-17, [#2692] E-P — the law's own pre-registered kill test fired).** The
+paragraph above is correct for **deterministic** intrinsic signals but overstated as a general
+law. `experiments/sigma_update_stochastic_signal.py` (pre-registered H-P1/H-P2, 32 seeds,
+oracle-weight sweep per cell so no combiner alibi; `data/sigma0/stochastic_signal_report.json`;
+regression `tests/test_sigma_update_stochastic_signal.py`, 6 passing) decomposed the internal
+signal into a checkpoint-fixed **bias** `b` (sticks) and re-drawn **measurement noise** `m`
+(re-rolls — self-consistency over seeds, MC-dropout, resampled prompts):
+
+- **H-P1 CONFIRMED (mechanism):** at fixed total error, extraction rises steeply as error mass
+  moves from stuck bias to re-drawn noise (n=50: 0.81 → 9.36; fixed-alone 0.61).
+- **H-P2 REFUTED — the kill condition fired:** at *fixed* bias `s_b=0.5`, adding pure re-drawn
+  noise rescued extraction **7.9×** (0.81 → 6.43). Re-drawn measurement noise is *not* inert.
+- **Post-hoc attribution (labeled as such):** a **zero-information dither** — fresh noise added
+  to every score comparison, carrying no signal whatsoever — reproduces the entire rescue
+  (6.42 vs 6.43) with an interior optimum (too much dither hurts). So the rescue is pure
+  **de-ratcheting**, not information: the same mechanism Thresholdout exploits deliberately
+  with Laplace noise (§8.4 third road), arising for free from any stochastic measurement.
+- **Fresh truth still strictly dominates** every internal arm (n=50 ordering: fresh-alone
+  12.90 > zero-bias internal 9.36 > noise-rescued stuck bias 6.43 > deterministic 0.81 >
+  fixed-alone 0.61).
+
+**The law, re-stated:** selection error decomposes into a **stuck** part (sets the ratchet) and
+a **fresh** part (breaks it). Deterministic internal signals neither de-ratchet nor inform;
+stochastic internal signals **de-ratchet but do not inform**; only re-drawn external truth does
+both. Three sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh
+truth informs.* Design consequence (cheap, actionable): a scarce fixed holdout should be read
+**with deliberate dither** (or through a stochastic self-check) — in this harness that recovers
+≈50% of the fresh-flow value at `n=50` — but dither is a de-ratcheting knob with an optimum,
+never a substitute for sourcing fresh verified tasks. [MEASURED-by-simulation; shape, not
+constants; the real-model arm folds into the A/B/C run, [#2691].]
+
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
 is never one it has already leaked into:
@@ -1456,8 +1488,11 @@ the compounding effect is MEASURED-by-simulation.]**
 
 **Claimed:** a computable three-leg gate anchored to an external holdout; a proven
 monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao);
-evidence that naïve fixed-holdout reuse degrades under adaptive selection; that intrinsic signals
-cannot substitute for fresh verified data in the *selection* role (§8.4.1, MEASURED-by-simulation);
+evidence that naïve fixed-holdout reuse degrades under adaptive selection; that **deterministic**
+intrinsic signals cannot substitute for fresh verified data in the *selection* role, while
+**stochastic** intrinsic signals recover part of the budget purely by de-ratcheting — an effect
+fully reproduced by zero-information dither, with fresh truth still strictly dominant (§8.4.1
+as re-stated 2026-07-17, MEASURED-by-simulation, [#2692]);
 and that an internal-signal bundle adds *detection* power for gross degradation exactly when the
 external gate is smallest (§8.6 item 5, MEASURED on one model). **NOT claimed:** an in-repo theorem
 for the full gate; real-model validation of its training behavior; that "two fates" is exhaustive
@@ -1519,7 +1554,8 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    matching the measured quantization cliff. So the **still-open half is subtle, training-induced
    badness** (reward hacks, forgetting): only the real A/B/C artifacts (teeth 2–3) can produce it.
    Caveats: one model, 8-task truth, coarse AUC granularity. Joint law with §8.4.1: **internal
-   signals detect; only fresh truth selects.**
+   signals detect; only fresh truth selects** — *as re-stated 2026-07-17 ([#2692]): internal
+   signals detect; fresh randomness de-ratchets; only fresh truth informs.*
 
 ### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
 
@@ -2021,5 +2057,24 @@ for produced results and Appendix A for the original design sketch.*
 > `pytest tests/test_cio_sde.py tests/test_sigma0_roa_certified.py tests/test_sigma_theta_gate.py
 > tests/test_sigma_theta_thresholdout.py tests/test_sigma0_scheduled_grounding.py` → **74 passed**.
 > Frontmatter `updated:` → 2026-07-17.
+
+> **Maintenance log — 2026-07-17 (E-P run: the freshness law's own kill test fired; §8.4.1
+> re-stated).** [#2692]'s pre-registered experiment ran the same day it was filed
+> (`experiments/sigma_update_stochastic_signal.py`, 32 seeds, oracle-weight sweep per cell —
+> no combiner alibi). **H-P1 CONFIRMED:** at fixed total error, moving error mass from
+> checkpoint-fixed bias to re-drawn noise raises extraction steeply (n=50: 0.81 → 9.36 vs
+> fixed-alone 0.61). **H-P2 REFUTED — the kill condition fired:** at fixed bias, pure re-drawn
+> measurement noise rescued extraction 7.9× (0.81 → 6.43). A post-hoc, labeled-as-such control
+> attributes the entire rescue to **zero-information dither** (6.42 vs 6.43, interior optimum)
+> — de-ratcheting, not information; the same mechanism Thresholdout buys with Laplace noise,
+> obtained free from any stochastic measurement. Fresh truth still strictly dominates every
+> internal arm (12.90 > 9.36 > 6.43 > 0.81 > 0.61). §8.4.1 gains the RE-STATED block (three
+> sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh truth
+> informs*), §8.5's claimed list is corrected to deterministic-only, §8.6-5's joint-law line
+> carries the re-statement, audit table +1 row
+> (`tests/test_sigma_update_stochastic_signal.py`, 6 passing — one test pins the refutation
+> itself so it cannot be silently forgotten). This is the §8.7 protocol applied to our own
+> law: a pre-registered falsification found the overstatement, and the correction — not the
+> original claim — is the recorded result. Real-model arm folds into the A/B/C run ([#2691]).
 
 ---
