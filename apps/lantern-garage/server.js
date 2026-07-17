@@ -695,6 +695,9 @@ function shutdown(signal) {
   if (deps.newsCollector) {
     deps.newsCollector.stop();
   }
+  if (deps.brakeMonitor) {
+    deps.brakeMonitor.stop();
+  }
   prWatcher.stop();
   server.close(() => {
     process.exit(0);
@@ -711,6 +714,7 @@ function reapChildren() {
   try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
   try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }
   try { if (deps.newsCollector) deps.newsCollector.stop(); } catch { /* best-effort */ }
+  try { if (deps.brakeMonitor) deps.brakeMonitor.stop(); } catch { /* best-effort */ }
 }
 
 // #2066: without these, a throw in any background loop/child-spawn (collectors,
@@ -841,6 +845,14 @@ server.listen(port, host, () => {
     const kalshiCollector = require("./lib/kalshi-collector");
     kalshiCollector.start();
     deps.kalshiCollector = kalshiCollector; // Make available to routes
+
+    // ── ADR-0028 streaming brake monitor (60s, PAPER ONLY — places nothing) ──
+    // Intraday risk monitoring for the Phase-2 leverage overlay: vol targeting ×
+    // 6-mo trend gate × drawdown taper, gross clamped [0, 2×]. Kill switch:
+    // BRAKE_MONITOR=0. Status streams at GET /api/trading/brake/status.
+    const brakeMonitor = require("./lib/brake-monitor");
+    brakeMonitor.start();
+    deps.brakeMonitor = brakeMonitor;
 
     // ── Crypto Price & News Collector (30s polling) ──
     const CryptoCollector = require("./lib/crypto-collector");

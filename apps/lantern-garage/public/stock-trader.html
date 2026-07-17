@@ -180,6 +180,12 @@
   .adv-btn{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 12px;font-family:var(--mono);font-size:12px;cursor:pointer}
   .adv-btn:hover{border-color:var(--tv-text-secondary)}
   .adv-note{color:var(--text2);font-size:11px;line-height:1.5}
+  .brake-strip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px}
+  .brake-gross{font-size:24px;font-weight:700;color:var(--text);line-height:1}
+  .brake-chip{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text2)}
+  .brake-chip.ok{color:var(--green);border-color:var(--green)}
+  .brake-chip.braking{color:var(--amber);border-color:var(--amber)}
+  .brake-meta{color:var(--text2);font-size:11px}
   .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
     border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
@@ -4134,8 +4140,38 @@ function _advSuggestions(a,r){
   return items;
 }
 
+// ── Live brake strip (ADR-0028 overlay monitor — paper mode, market math only).
+// Polls /api/trading/brake/status every 60s while the Advisor tab is visible;
+// the poller self-clears when the pane is hidden. Renders the gross target,
+// the three signal chips (vol/trend/drawdown), and the paper-book equity.
+let _brakeTimer=null;
+function startBrakePoll(){
+  loadBrakeStrip();
+  if(!_brakeTimer) _brakeTimer=setInterval(loadBrakeStrip,60000);
+}
+async function loadBrakeStrip(){
+  const el=document.getElementById('advBrake'), pane=document.getElementById('tp-advisor');
+  if(!el||!pane||pane.hidden){ if(_brakeTimer){clearInterval(_brakeTimer);_brakeTimer=null;} return; }
+  try{
+    const d=await fetch('/api/trading/brake/status').then(x=>x.json());
+    renderBrakeStrip(el,d);
+  }catch(e){ el.innerHTML=`<div class="adv-note">brake monitor unavailable (${_advEsc(e.message)})</div>`; }
+}
+function renderBrakeStrip(el,d){
+  if(!d||d.ok!==true){ el.innerHTML='<div class="adv-note">brake monitor not running on this server</div>'; return; }
+  const chip=(label,s)=>`<span class="brake-chip ${s==='braking'?'braking':(s==='ok'?'ok':'')}">${label}: ${_advEsc(s||'—')}</span>`;
+  const sig=d.signals||{}, b=d.book||{};
+  const pnl=(b.equity!=null&&b.startEquity)?b.equity-b.startEquity:null;
+  el.innerHTML=`<div class="brake-strip" title="${_advEsc(d.formula||'')}">
+    <span class="brake-gross">${d.grossTarget!=null?d.grossTarget.toFixed(2)+'×':'—'}</span>
+    ${chip('vol',sig.vol&&sig.vol.state)}${chip('trend',sig.trend&&sig.trend.state)}${chip('drawdown',sig.drawdown&&sig.drawdown.state)}
+    <span class="brake-meta">${_advEsc(d.action||'')}</span>
+    <span class="brake-meta">paper book $${fmt(b.equity,0)}${pnl!=null?` (${pnl>=0?'+':'−'}$${fmt(Math.abs(pnl),0)})`:''}</span>
+    <span class="brake-chip" title="${_advEsc(d.disclaimer||'')}">practice mode — places nothing</span>
+  </div>`;
+}
 function renderAdvisor(el,a,r){
-  if(!a||!a.ok){ el.innerHTML=`<div class="tp-empty">${_advEsc((a&&a.reason)||'analysis unavailable')}</div>`; return; }
+  if(!a||!a.ok){ el.innerHTML=`<div id="advBrake"></div><div class="tp-empty">${_advEsc((a&&a.reason)||'analysis unavailable')}</div>`; startBrakePoll(); return; }
   const p=a.portfolio;
   const stats=`<div class="adv-stats">
     <span>Sharpe (${a.window.years}y): <b>${_advSharpe(p.sharpe)}</b></span>
@@ -4164,6 +4200,7 @@ function renderAdvisor(el,a,r){
     </div>`;
   const excluded=(a.excluded&&a.excluded.length)?`<div class="adv-note">Excluded: ${a.excluded.map(e=>`${_advEsc(e.symbol)} (${_advEsc(e.reason)})`).join('; ')}</div>`:'';
   el.innerHTML=`<div class="adv-wrap">
+    <div id="advBrake"></div>
     ${stats}
     <div class="adv-h">Suggestions (computed, not AI)</div>
     <ul class="adv-list">${_advSuggestions(a,r).join('')}</ul>
@@ -4183,6 +4220,7 @@ function renderAdvisor(el,a,r){
     ${excluded}
     <div class="adv-note">Method: long-only shrunk tangency (w ∝ Σ⁻¹μ), max weight 35%, existing holdings only. Evidence: historical daily total returns; CI is an i.i.d. floor (Lo 2002); taxes/slippage not modeled. Backtest ≠ future performance — decision support, not personalized investment advice. The same numbers are available to the chat assistant via the portfolio_analysis / propose_rebalance / contribution_plan tools.</div>
   </div>`;
+  startBrakePoll();
 }
 
 async function planAdvisorContribution(btn){
