@@ -16,10 +16,11 @@ const {
   verifyLocalLoginAsync,
   publicProfile,
   updateProfile,
+  getProfileByEmail,
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
-const { sendVerificationEmail, smtpConfigured } = require("./mailer");
+const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("./mailer");
 const { isLoopback, clientIp } = require("./request-auth");
 const { canonicalOrigin } = require("./base-url");
 const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
@@ -189,7 +190,22 @@ async function handleLocalRegister(req, res) {
   if (password.length < MIN_PASSWORD) return _json(res, 400, { error: "weak_password", detail: `min ${MIN_PASSWORD} chars` });
 
   const result = createLocalAccount(email, password, name);
-  if (result.error === "email_taken") return _json(res, 409, { error: "email_taken" });
+  if (result.error === "email_taken") {
+    // Anti-enumeration (#2617): a 409 email_taken vs the 202 a fresh signup gets lets an
+    // attacker probe which emails have accounts. Never reveal it — behave EXACTLY like a
+    // fresh signup: email the EXISTING owner a recovery (reset-password) link so a legit
+    // re-register can get back in, and return the identical generic 202. Best-effort mail;
+    // register is already IP-throttled (#2609) so this can't be turned into a bomb.
+    const existing = getProfileByEmail(email);
+    if (existing) {
+      try {
+        const token = createToken("reset_password", existing.id, existing.email);
+        const link = `${canonicalOrigin(req)}/reset-password.html?token=${encodeURIComponent(token)}`;
+        sendPasswordResetEmail(existing.email, existing.name, link).catch(() => {});
+      } catch { /* best-effort */ }
+    }
+    return _json(res, 202, { ok: true, pendingVerification: true, email, emailDelivery: "sent" });
+  }
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
 
   // No-mailer lockout guard (#2065): with SMTP unconfigured the confirmation link
