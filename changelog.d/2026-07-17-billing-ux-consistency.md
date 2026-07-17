@@ -1,0 +1,7 @@
+### Fixed
+
+- ux/mobile: billing/tier UX-consistency fixes from the 2026-07-16 audit.
+  - **Card-subscription auto-link now works for OAuth sign-ins** (#2652): the "claim your card subscription on sign-in" auto-link only fired for email/password logins (client-side in auth.html); a Google/Discord sign-in on the same verified email landed as Free. `auth-gate.js` now fires `/api/billing/link` once per session for any authenticated user (guarded server-side by verified-email + cooldown, no-op when billing is off), reloading only on a fresh link so the unlocked tier shows immediately.
+  - **Locked feature cards are no longer dead-ends** (#2653): `profile.html`'s locked cards had `pointer-events:none` (swallowing the click at peak upgrade intent) and dropped to 45% opacity (illegible "Requires …"). They now link to `/pricing.html`, stay clickable, and are legible (0.68→0.85 on hover).
+  - **Mobile nav no longer risks clipping the wordmark** (#2654): the injected plan badge (`#nav-tier`) plus up to four action buttons crowded the brand at phone widths; hidden at ≤430px (the profile button beside it still links to plans/profile, so no path is lost).
+  - **"Link Patreon" → "Subscribe on Patreon"** (#2637): on pricing.html the button *starts a Patreon subscription*, not the profile.html "link an existing subscription" flow — reusing the word "Link" for two different actions invited "I paid and got nothing" confusion.

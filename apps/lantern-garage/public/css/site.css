@@ -199,6 +199,11 @@ html, body {
   border-color: color-mix(in srgb, var(--gold) 40%, var(--border));
 }
 @media (max-width: 580px) { .nav-tier { padding: 4px 8px; font-size: 10px; } }
+/* At phone widths the injected plan badge + up to four action buttons crowd (and can clip)
+   the brand wordmark for signed-in users — the same regression .nav-appbar already fixes
+   for app navs. Hide the text badge here; nothing is lost — the profile button beside it
+   still links to plans/profile (#2654). */
+@media (max-width: 430px) { .nav-tier { display: none; } }
 /* Theme toggle icon: show a sun in dark mode (click → light) and a moon in
    light mode (click → dark). Both live in the button; CSS reveals one. */
 #theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }
