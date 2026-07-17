@@ -28,10 +28,13 @@ const alpaca = require('./alpaca-adapter');
  *  no userId falls through to the operator's BROKER_PREFER env; default keeps
  *  IBKR-first. */
 function preferredBroker(userId) {
-  if (userId != null) {
-    const own = require('./broker-preference').get(userId);
-    if (own === 'alpaca' || own === 'ibkr') return own;
-  }
+  // Owner-machine convention (routes/accounts.js): no session id = the owner,
+  // the same 'local-owner' identity the broker credential stores already use.
+  // Keeps the ☰ switch effective on auth-off/single-user boxes, where every
+  // trading route resolves uid as null.
+  const uid = userId != null ? userId : 'local-owner';
+  const own = require('./broker-preference').get(uid);
+  if (own === 'alpaca' || own === 'ibkr') return own;
   return process.env.BROKER_PREFER === 'alpaca' ? 'alpaca' : 'ibkr';
 }
 

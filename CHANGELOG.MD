@@ -1,3 +1,7 @@
+## [1.11.5] - 2026-07-16
+### Fixed
+- **Broker switch works on owner boxes + rows tell the truth (ADR-0027).** (1) `/api/broker/preference` and `preferredBroker()` now resolve an id-less request as `local-owner` — the same owner convention as routes/accounts.js and the broker credential stores — so the ☰ switch no longer dead-clicks (silent 401) on auth-off/single-user setups. (2) The ☰ broker rows now distinguish **· active** (executes your trades, green) from **· fallback** (linked but idle) — previously "IBKR · connected" read as if IBKR were executing while Alpaca actually was. (3) A failed switch now explains itself instead of doing nothing. Tests → 10 (owner fallback honored for id-less requests, other users unaffected; env test pinned to an empty store).
+
 ## [1.11.4] - 2026-07-16
 ### Fixed
 - Remove a stray empty runtime file (`apps/lantern-garage/data/profiles/index.jsonl`) committed by accident in #2595 and gitignore the per-user `data/profiles/` store — flagged by the Boilerplate/duplication CI check.
