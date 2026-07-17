@@ -10,17 +10,18 @@ const { getSessionUser } = require("./session-identity");
 const { roleLevel, isStaffRole } = require("./role-hierarchy");
 
 /**
- * Is the Patreon login gate active? Controlled by the admin-toggleable
- * `patreon_auth` feature flag. Defaults ON when the flag has never been created,
- * so the gate never silently drops open on a fresh install — an admin must
- * explicitly create+disable `patreon_auth` to open the site.
+ * Is the login gate active? Controlled by the admin-toggleable feature flag.
+ * Defaults ON when the flag has never been created, so the gate never silently
+ * drops open on a fresh install — an admin must explicitly create+disable it to
+ * open the site.
  *
- * When OFF, unauthenticated visitors are treated as guests instead of being
- * bounced to /auth.html. Role- and entitlement-gated surfaces (admin pages, the
- * trade API) stay protected: with no Patreon login available, only the
- * local-admin bypass (the owner's own machine) reaches them.
+ * The stored flag key is still `patreon_auth` for back-compat with existing
+ * admin toggles (the gate predates the Patreon retirement and was never
+ * Patreon-specific in function — it just decides whether guests are bounced to
+ * /auth.html). When OFF, unauthenticated visitors are treated as guests. Role-
+ * and entitlement-gated surfaces (admin pages, the trade API) stay protected.
  */
-function patreonAuthEnabled() {
+function loginGateEnabled() {
   return isFlagEnabledOr("patreon_auth", true);
 }
 
@@ -44,7 +45,7 @@ const SIGNOUT_COOKIE = "ln_signout";
  */
 function requireAuth(req, res) {
   // Auth gate disabled by an admin → treat everyone as an allowed guest.
-  if (!patreonAuthEnabled()) return true;
+  if (!loginGateEnabled()) return true;
 
   const session = getSessionUser(req);
 
@@ -73,12 +74,12 @@ function requireRole(req, res, requiredRole = "supporter") {
     // pages, but still refuse anything that needs a higher tier (admin pages,
     // paid tiers) with a 403 — there is no login to redirect them to, and the
     // gate being off must never expose privileged surfaces.
-    if (!patreonAuthEnabled()) {
+    if (!loginGateEnabled()) {
       if (requiredLevel <= roleLevel("guest")) return true;
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Higher tier required; Patreon login is disabled.",
+          error: "Higher tier required; login is disabled.",
           required: requiredRole,
           current: "guest",
         })
@@ -172,11 +173,11 @@ function requireEntitlement(req, res, key) {
     // Gate disabled → no login to redirect to; the entitlement still isn't
     // granted to an anonymous visitor, so deny with a 403 (keeps the trade /
     // money API closed to the public even with the gate off).
-    if (!patreonAuthEnabled()) {
+    if (!loginGateEnabled()) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Account required; Patreon login is disabled.",
+          error: "Account required; login is disabled.",
           entitlement: key,
         })
       );
@@ -219,7 +220,7 @@ function isStaff(req) {
 function requireStaff(req, res) {
   const session = getSessionUser(req);
   if (!session?.id) {
-    if (!patreonAuthEnabled()) {
+    if (!loginGateEnabled()) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ error: "Staff access required." }));
       return false;
@@ -278,5 +279,5 @@ module.exports = {
   SIGNOUT_COOKIE,
   protectStaticPage,
   attachProfile,
-  patreonAuthEnabled,
+  loginGateEnabled,
 };

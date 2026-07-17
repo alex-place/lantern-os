@@ -1,6 +1,6 @@
 /**
- * Auth routes (ADR-0016): provider-agnostic OAuth (Google / Discord / Patreon),
- * local email+password, session, logout.
+ * Auth routes (ADR-0016): provider-agnostic OAuth (Google), local
+ * email+password, session, logout.
  *
  *   GET  /api/auth/session               → { authenticated, role, provider, entitlements, user, authRequired, providers }
  *   GET  /api/auth/providers             → { providers: [{ id, displayName }] }
@@ -11,7 +11,7 @@
  *   POST /api/auth/logout                → { ok }
  */
 
-const { getSessionInfo, handleLogout } = require("../lib/patreon-auth");
+const { getSessionInfo, handleLogout } = require("../lib/session-auth");
 const { handleOAuthStart, handleOAuthCallback } = require("../lib/oauth-core");
 const { getSessionUser, establishSession } = require("../lib/session-identity");
 const {
@@ -22,7 +22,7 @@ const {
   TEST_ROLES,
 } = require("../lib/test-auth");
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
-const { patreonAuthEnabled } = require("../lib/auth-middleware");
+const { loginGateEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
@@ -76,7 +76,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
     const info = getSessionInfo(req);
     // Tell the client whether the login gate is active. When false, auth-gate.js
     // must not bounce guests to /auth.html.
-    info.authRequired = patreonAuthEnabled();
+    info.authRequired = loginGateEnabled();
     // Advertise which login methods are actually usable (configured OAuth + local).
     info.providers = listEnabledProviders();
     // Test-auth: expose the role picker to the auth page ONLY on a direct, un-proxied
@@ -93,7 +93,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // seeded test account with a chosen role (the browser role picker uses this). Gated
   // to a direct, un-proxied hit while LANTERN_TEST_AUTH_TOKEN is set; 404 otherwise so
   // the endpoint is invisible in production. Emulates an SSO login when `provider` is
-  // set (google/discord/patreon), without the OAuth round-trip.
+  // set (google), without the OAuth round-trip.
   if (method === "POST" && path === "/api/auth/test-login") {
     if (!testAuthEnabled() || !isDirectTestReq(req)) {
       res.writeHead(404, { "Content-Type": "application/json" });

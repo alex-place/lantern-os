@@ -111,6 +111,27 @@ def test_get_user_tier_supporter():
     assert bot_v2.get_user_tier(_member_with_roles("Supporter")) == "supporter"
 
 
+def test_get_user_tier_deep_dreamer_maps_to_pro_not_supporter():
+    # #2659: the Discord "Deep Dreamer" server role is the $20 Pro tier and must
+    # resolve to the web's `deep_dreamer`, NOT the lower `supporter` canonical tier.
+    assert bot_v2.get_user_tier(_member_with_roles("Deep Dreamer")) == "deep_dreamer"
+
+
+def test_deep_dreamer_outranks_supporter():
+    # Pro sits above supporter in the ladder, so a member holding both resolves to Pro.
+    member = _member_with_roles("Supporter", "Deep Dreamer")
+    assert bot_v2.get_user_tier(member) == "deep_dreamer"
+    assert bot_v2.TIER_ORDER["deep_dreamer"] > bot_v2.TIER_ORDER["supporter"]
+    assert bot_v2.TIER_ORDER["pilot"] > bot_v2.TIER_ORDER["deep_dreamer"]
+
+
+def test_tier_labels_no_deep_dreamer_supporter_collision():
+    # #2659: "Deep Dreamer" is reserved for the Pro tier on both surfaces; the
+    # supporter tier must not borrow that label.
+    assert bot_v2._TIER_LABELS[bot_v2.ROLE_DEEP_DREAMER] == "Deep Dreamer"
+    assert bot_v2._TIER_LABELS[bot_v2.ROLE_SUPPORTER] != "Deep Dreamer"
+
+
 def test_get_user_tier_public_with_no_special_roles():
     assert bot_v2.get_user_tier(_member_with_roles("Member")) == "@everyone"
 

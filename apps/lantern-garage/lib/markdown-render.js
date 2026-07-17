@@ -435,8 +435,6 @@ function renderMarkdownDocument(markdown, sourcePath) {
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html" class="active">Help</a>
-    <span class="sep" style="margin: 0 4px;">·</span>
-    <a href="https://www.patreon.com/lanternos" class="nav-support" target="_blank" rel="noopener noreferrer">♥ Support unisona.ai on Patreon</a>
   </div>
   <div class="nav-actions">
     <a href="/profile.html" class="nav-btn" id="profile-btn" title="Your profile" aria-label="View your profile">👤</a>

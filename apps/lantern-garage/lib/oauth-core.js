@@ -47,7 +47,7 @@ function generatePkce() {
 // signed, short-TTL HttpOnly cookie (SameSite=Lax) and recover from it on callback.
 const OAUTH_COOKIE = "lantern_oauth";
 function _oauthSecret() {
-  return process.env.SESSION_SECRET || process.env.PATREON_CLIENT_SECRET || "lantern-oauth-secret";
+  return process.env.SESSION_SECRET || "lantern-oauth-secret";
 }
 function signOauth(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -104,8 +104,6 @@ function resolveRedirectUri(req, providerId) {
       (req.socket && req.socket.encrypted ? "https" : "http");
     return `${proto}://${host}/api/auth/${providerId}/callback`;
   }
-  // Legacy single-provider override kept for Patreon; generic override otherwise.
-  if (providerId === "patreon" && process.env.PATREON_REDIRECT_URI) return process.env.PATREON_REDIRECT_URI;
   return process.env.OAUTH_REDIRECT_BASE
     ? `${process.env.OAUTH_REDIRECT_BASE}/api/auth/${providerId}/callback`
     : null;

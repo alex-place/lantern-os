@@ -3,9 +3,8 @@
  * routes/profiles.js over HTTP and drives them with a cookie-carrying client.
  *
  * Verifies end-to-end:
- *   - #1876: /api/profiles/me works for a non-Patreon (local) session (was 401).
- *   - #1877: /api/auth/:provider/start on an UNCONFIGURED provider redirects to
- *            /auth.html?error=provider_unconfigured instead of a raw 500.
+ *   - #1876: /api/profiles/me works for a local (non-federated) session (was 401).
+ *   - retired Discord/Patreon /start routes are unknown providers → 404.
  *   - local register → login → session → profile round-trip.
  *   - /api/auth/providers reflects configured providers only.
  *   - credential is never exposed by /api/profiles/me.
@@ -26,11 +25,12 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "authtest-"));
 process.chdir(tmp);
 process.env.SESSION_SECRET = "integration-test-secret";
 process.env.LANTERN_LOCAL_AUTH = "1";
-// Configure exactly one OAuth provider (patreon) so we can assert the providers
-// list, and leave google/discord UNCONFIGURED so /start must redirect gracefully.
-process.env.PATREON_CLIENT_ID = "test-pat-id";
-process.env.PATREON_CLIENT_SECRET = "test-pat-secret";
-delete process.env.GOOGLE_CLIENT_ID;
+// Configure the one OAuth provider (google) so we can assert the providers list
+// and the configured-provider redirect. Discord and Patreon were fully retired as
+// sign-in methods, so their /start routes are unknown providers (→ 404).
+process.env.GOOGLE_CLIENT_ID = "test-goog-id";
+process.env.GOOGLE_CLIENT_SECRET = "test-goog-secret";
+delete process.env.PATREON_CLIENT_ID;
 delete process.env.DISCORD_CLIENT_ID;
 
 const LIB = path.join(__dirname, "..");
@@ -93,22 +93,23 @@ server.listen(0, "127.0.0.1", async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   const c = makeClient(base);
   try {
-    // Anonymous: providers list = patreon (configured) + local; NOT google/discord.
+    // Anonymous: providers list = google (configured) + local; NOT discord/patreon.
     let r = await c("GET", "/api/auth/providers");
     const ids = (r.json.providers || []).map((p) => p.id);
-    ok("providers lists configured patreon", ids.includes("patreon"));
+    ok("providers lists configured google", ids.includes("google"));
     ok("providers lists local", ids.includes("local"));
-    ok("providers omits unconfigured google", !ids.includes("google"));
-    ok("providers omits unconfigured discord", !ids.includes("discord"));
-
-    // #1877: unconfigured provider start → graceful redirect, not 500.
-    r = await c("GET", "/api/auth/google/start?returnTo=/profile.html");
-    ok("google/start redirects (302)", r.status === 302);
-    ok("google/start redirects to /auth.html with error", /\/auth\.html\?/.test(r.location || "") && /provider_unconfigured/.test(r.location || ""));
+    ok("providers omits retired discord", !ids.includes("discord"));
+    ok("providers omits retired patreon", !ids.includes("patreon"));
 
     // Configured provider start → redirect to the provider (302), sets oauth cookie.
+    r = await c("GET", "/api/auth/google/start?returnTo=/profile.html");
+    ok("google/start redirects to accounts.google.com", r.status === 302 && /accounts\.google\.com/.test(r.location || ""));
+
+    // Retired providers are no longer registered → unknown provider → 404.
     r = await c("GET", "/api/auth/patreon/start?returnTo=/profile.html");
-    ok("patreon/start redirects to patreon.com", r.status === 302 && /patreon\.com/.test(r.location || ""));
+    ok("patreon/start is 404 (retired)", r.status === 404);
+    r = await c("GET", "/api/auth/discord/start?returnTo=/profile.html");
+    ok("discord/start is 404 (retired)", r.status === 404);
 
     // Anonymous profile is 401 (still gated).
     r = await c("GET", "/api/profiles/me");
