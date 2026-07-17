@@ -237,6 +237,24 @@
       // guests browse freely — don't bounce them to /auth.html.
       const gateOff = session && session.authRequired === false;
       const authed = !!(session && session.authenticated);
+      // #2652: card-subscription auto-link is provider-agnostic. auth.html fires it after an
+      // email/password login, but OAuth (Google/Discord) sign-ins redirect server-side and
+      // skip it — so a customer who bought by card and then signs in with OAuth on the same
+      // verified email would land as Free. Fire it here once per browser session for ANY
+      // authenticated user; the server is guarded (verified-email + cooldown) and no-ops
+      // fast when billing is off or there's nothing to link. Reload only on a fresh link so
+      // the newly-unlocked tier shows immediately (the session flag prevents a loop).
+      if (authed) {
+        try {
+          if (!sessionStorage.getItem('billing-link-tried')) {
+            sessionStorage.setItem('billing-link-tried', '1');
+            fetch('/api/billing/link', { method: 'POST', credentials: 'same-origin' })
+              .then(function (r) { return r && r.ok ? r.json() : null; })
+              .then(function (d) { if (d && d.linked && !d.already) location.reload(); })
+              .catch(function () { /* best-effort */ });
+          }
+        } catch (e) { /* no sessionStorage — skip */ }
+      }
       // First-visit gate: a not-signed-in visitor who hasn't made an entry choice yet is
       // sent to /auth.html ONCE to decide. Signing in creates a session; "Continue without
       // an account" sets ln_guest=1. Either way they're not prompted again — so the default

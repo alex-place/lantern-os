@@ -11,10 +11,13 @@ source = arXiv url]`.
 
 ## What it stores
 
-- **Metadata + abstracts only** — no PDFs, no full text. ~1 GB for all 2025-07→ AI papers.
-- Categories: `cs.CL`, `cs.LG`, `cs.AI`, `cs.NE`, `stat.ML` (edit `TARGET_CATEGORIES` in
+- **Harvested papers: metadata + abstracts only** — no full text. ~1 GB for all 2025-07→ AI papers.
+- Categories: `cs.CL`, `cs.LG`, `cs.AI`, `cs.NE`, `stat.ML` + q-fin.* (edit `TARGET_CATEGORIES` in
   `scripts/arxiv_harvest.py`).
 - Window: submission month **2025-07 onward** (bridges the pre-cutoff gap + all of 2026).
+- **Curated tranches are the exception** — hand-picked papers outside the harvest window/categories,
+  added by id via `scripts/arxiv_add_papers.py`, often **with their PDFs** in `pdfs\<id>.pdf`
+  (see "Curated tranches" below).
 
 ## Where it lives
 
@@ -53,6 +56,35 @@ python scripts/arxiv_build_index.py
 ```
 
 > The sandboxed Bash tool has no network egress — run harvests from a real shell / PowerShell.
+
+## Curated tranches (beyond the harvest window)
+
+The harvester deliberately stays narrow (AI + q-fin, 2025-07→). For research fields we cite
+deliberately — starting with **control engineering** (eess.SY / math.OC: event-triggered and
+self-triggered control, the 15-year "schedule the next intervention from measured decay rates"
+canon that grounds Verify-stage scheduling, rebalance bands, Q-exit early stopping, and
+watcher/poller cadences) — papers are added **by id, curated and judged, not harvested**:
+
+```bash
+# Fetch authoritative metadata from the arXiv API, append to raw shards (deduped),
+# download PDFs, rebuild the index — ids are the ONLY input (titles/abstracts always
+# come from arXiv itself, never from the requester):
+python scripts/arxiv_add_papers.py --ids 0806.0709,1301.2182 --pdfs --reindex
+python scripts/arxiv_add_papers.py --file tranche.json --pdfs --reindex
+```
+
+Rules of the road:
+
+- Modern **YYMM.NNNNN ids only** (pre-2007 ids can't be dated by id and are rejected).
+- Records land in the same `raw\<YYYY-MM>.jsonl` shards under the same schema — one corpus,
+  one index, no second memory system. Dedup is corpus-wide; re-running an add is a no-op.
+- PDFs live at `pdfs\<id>.pdf`; each tranche leaves a `pdfs\REVIEW-<date>-<topic>.md` note
+  recording what was added and the per-paper `[claim → evidence]` line it grounds.
+- The daily harvest does **not** track curated categories — a tranche grows only when someone
+  curates it again. That's intentional (anti-sprawl): eess.SY/math.OC as a firehose would
+  double the corpus for a field we cite selectively.
+- The chat gate (`AI_GATE_TERMS` in `lib/arxiv-index.js`) carries a small control-engineering
+  term group so trigger-scheduling questions actually retrieve the tranche.
 
 ## Wiring it into chat
 

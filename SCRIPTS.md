@@ -147,6 +147,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/build_knowledge_index.py` | `apps/lantern-garage/lib/knowledge-router.js` | `python scripts/build_knowledge_index.py` |
 | `scripts/arxiv_build_index.py` | `lib/arxiv-index.js`, `lib/csf-memory.js` | server-driven |
 | `scripts/arxiv_harvest.py` | `lib/arxiv-fulltext.js`, `lib/csf-memory.js` | server-driven |
+| `scripts/arxiv_add_papers.py` | `scripts/arxiv_harvest.py` (ShardWriter/dedup) | `python scripts/arxiv_add_papers.py --ids … --pdfs --reindex` (curated tranches; docs/ARXIV-CORPUS.md) |
 | `scripts/resume_docx.py` | `routes/docmode.js`, `routes/documents.js` | server-driven |
 | `scripts/orchestration/rag_local_knowledge_base.py` | `scripts/Ingest-CaadZip.ps1` | via launcher |
 

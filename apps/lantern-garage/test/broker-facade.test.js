@@ -88,6 +88,24 @@ test('preferredBroker(): env parsing — only "alpaca" flips it', () => {
   });
 });
 
+test('preferredBroker(): the broker_pref cookie wins over store + env', () => {
+  withPrefStore((prefs) => {
+    const { preferredBroker } = loadFacadeWith(aliveAlpaca);
+    process.env.BROKER_PREFER = 'alpaca';           // env says alpaca
+    prefs.set('local-owner', 'alpaca');             // store says alpaca
+    const reqIbkr = { headers: { cookie: 'foo=1; broker_pref=ibkr; bar=2' } };
+    assert.strictEqual(preferredBroker(null, reqIbkr), 'ibkr');   // cookie overrides both
+    const reqAlp = { headers: { cookie: 'broker_pref=alpaca' } };
+    delete process.env.BROKER_PREFER;
+    prefs.set('local-owner', 'ibkr');               // store says ibkr
+    assert.strictEqual(preferredBroker(null, reqAlp), 'alpaca');  // cookie overrides store
+    const reqNone = { headers: {} };                // no cookie → fall through to store
+    assert.strictEqual(preferredBroker(null, reqNone), 'ibkr');
+    const reqJunk = { headers: { cookie: 'broker_pref=robinhood' } }; // invalid cookie ignored
+    assert.strictEqual(preferredBroker(null, reqJunk), 'ibkr');
+  });
+});
+
 test('preferredBroker(): no session id resolves as the owner (local-owner store)', () => {
   withPrefStore((prefs) => {
     const { preferredBroker } = loadFacadeWith(aliveAlpaca);

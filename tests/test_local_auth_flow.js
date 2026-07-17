@@ -91,9 +91,13 @@ async function call(handler, req, ...rest) {
 async function main() {
   // ── 1. Action-token expiry / tamper / purpose-mismatch ─────────────────────────
   const good = authTokens.createToken("verify_email", "prof-1", "u@ex.com");
-  assert.deepStrictEqual(authTokens.verifyToken(good, "verify_email"),
-    { sub: "prof-1", email: "u@ex.com" });
-  ok("valid verify_email token round-trips");
+  // Tokens carry exp + jti claims now — assert identity exactly, claims by shape.
+  const goodClaims = authTokens.verifyToken(good, "verify_email");
+  assert.strictEqual(goodClaims.sub, "prof-1");
+  assert.strictEqual(goodClaims.email, "u@ex.com");
+  assert.ok(typeof goodClaims.exp === "number" && goodClaims.exp > Date.now(), "exp is future");
+  assert.ok(typeof goodClaims.jti === "string" && goodClaims.jti.length > 0, "jti present");
+  ok("valid verify_email token round-trips (with exp + jti claims)");
 
   // purpose mismatch
   assert.strictEqual(authTokens.verifyToken(good, "reset_password"), null);
