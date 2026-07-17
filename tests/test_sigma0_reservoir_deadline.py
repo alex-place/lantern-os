@@ -17,6 +17,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments"))
+pytest.importorskip("scipy")  # scipy-free CI must skip, not fail collection (#862 convention)
 import sigma0_reservoir_deadline as m  # noqa: E402
 
 

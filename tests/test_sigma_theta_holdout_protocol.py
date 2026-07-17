@@ -13,7 +13,10 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "experiments" / "sigma_theta_abc"))
+pytest.importorskip("scipy")  # scipy-free CI must skip, not fail collection (#862 convention)
 import holdout_protocol as m  # noqa: E402
 
 SEEDS, GATES = 6, 25
