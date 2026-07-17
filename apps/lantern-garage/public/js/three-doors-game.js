@@ -86,9 +86,9 @@ function saveProgress() {
   try {
     playerProgress.lastPlayed = new Date().toISOString();
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(playerProgress));
-    
-    // Optional: sync to backend if available
-    syncProgressToBackend();
+    // Progress is stored locally (localStorage). Server-side cross-device sync was a dead
+    // call — the /api/three-doors/progress endpoint never existed (404) — and a per-user
+    // progress store would be new architectural sprawl, so it was removed (#2507).
   } catch (e) {
     console.error("[Three Doors] Failed to save progress:", e);
   }
@@ -132,36 +132,6 @@ function migrateProgress(oldData) {
   // Migration logic for future version changes
   const migrated = { ...DEFAULT_PROGRESS, ...oldData, version: PROGRESS_VERSION };
   return migrated;
-}
-
-async function syncProgressToBackend() {
-  try {
-    await fetch("/api/three-doors/progress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(playerProgress),
-    });
-  } catch (e) {
-    // Backend sync is optional, fail silently
-  }
-}
-
-async function loadProgressFromBackend() {
-  try {
-    const resp = await fetch("/api/three-doors/progress");
-    if (resp.ok) {
-      const data = await resp.json();
-      if (data && data.lastPlayed) {
-        // Merge backend progress with local progress
-        playerProgress = validateProgress({ ...playerProgress, ...data });
-        saveProgress();
-        return true;
-      }
-    }
-  } catch (e) {
-    // Backend sync is optional, fail silently
-  }
-  return false;
 }
 
 function resetProgress() {
