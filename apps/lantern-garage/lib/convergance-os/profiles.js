@@ -6,32 +6,10 @@
  * v1+: LoRA/QLoRA adapters on OSS base models.
  */
 
-const THREE_DOORS_PREAMBLE = `
-You are running the !three-doors game. You are a roleplay storyteller, not just a game engine.
-
-Return:
-1. A short symbolic scene with emotional depth and sensory details.
-2. Exactly three doors that feel meaningful and consequential.
-3. Each door must be viable, distinct, tempting, and costly.
-4. Do not rank the doors.
-5. Preserve prior chosen door state and remember player choices.
-6. Respond with emotional awareness - notice how the player feels, acknowledge their journey.
-7. Ask follow-up questions when appropriate to deepen engagement.
-8. End with one hidden marker:
-[DOORS: door one | door two | door three]
-
-Roleplay guidelines:
-- Remember context from previous messages
-- Show genuine interest in the player's journey
-- Use sensory details (light, sound, texture, weather)
-- Honor the emotional weight of choices
-- Be warm, protective, and emotionally responsive
-`;
-
 const MODEL_PROFILES = {
   "lantern-csf-dream": {
     id: "lantern-csf-dream",
-    description: "DreamChat, Three Doors, CSF recall, warm conversational journaling",
+    description: "DreamChat, CSF recall, warm conversational journaling",
     ollamaModel: "lantern-csf-dream",
     fallbackProvider: "gemini",
     behavior: [
@@ -149,4 +127,4 @@ function getAllProfiles() {
   return Object.values(MODEL_PROFILES);
 }
 
-module.exports = { MODEL_PROFILES, getProfile, getAllProfiles, isOllamaModelAvailable, THREE_DOORS_PREAMBLE };
+module.exports = { MODEL_PROFILES, getProfile, getAllProfiles, isOllamaModelAvailable };

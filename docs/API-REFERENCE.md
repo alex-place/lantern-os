@@ -196,61 +196,8 @@ Create a new content entry.
 
 ### Three-Doors Kingdome API
 
-**Infinitely replayable game with archetype personalization**
-
-#### POST `/api/three-doors/start`
-Initialize a new game session.
-
-**Response:**
-```json
-{
-  "gameId": "game-2026-06-15-001",
-  "userId": "user-123",
-  "stage": 1,
-  "scene": "Welcome to the Kingdome of Hearts",
-  "doors": [
-    {
-      "id": "A",
-      "name": "The Path",
-      "description": "A well-worn trail through mist"
-    },
-    {
-      "id": "B",
-      "name": "The Threshold",
-      "description": "A shimmering gateway"
-    },
-    {
-      "id": "C",
-      "name": "The Unknown",
-      "description": "Darkness beckoning"
-    }
-  ]
-}
-```
-
-#### POST `/api/three-doors/choose`
-Make a choice in the game.
-
-**Request:**
-```json
-{
-  "gameId": "game-2026-06-15-001",
-  "choice": "A"
-}
-```
-
-**Response:**
-```json
-{
-  "stage": 2,
-  "text": "You follow the path...",
-  "doors": [...],
-  "convergenceScore": 65
-}
-```
-
-#### GET `/api/three-doors/convergence`
-Game convergence metrics and improvement suggestions.
+**Migrated** — the game (and its `/api/doors/*` route) moved to its own repo:
+<https://github.com/alex-place/three-doors>.
 
 ---
 
@@ -321,8 +268,6 @@ curl http://localhost:4177/api/token-audit/stats
 # 3. View dream history
 curl http://localhost:4177/api/dreams?limit=5
 
-# 4. Play Three-Doors game
-curl -X POST http://localhost:4177/api/three-doors/start
 ```
 
 ---

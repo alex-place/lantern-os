@@ -32,10 +32,8 @@ const { verifyExec } = require("./exec-verify");
 const { assembleSessionContext } = require("./session-summary-store");
 const { formatCSFContextForPrompt, formatCSFContextForPromptAsync, saveDoorChoice } = require("./csf-memory");
 const { formatGrounding: oracleFormatGrounding } = require("./convergence-oracle");
-const { resolveGrounding, formatGroundingForPrompt, generateXpDoorImagePrompt } = require("./mesh-grounding");
+const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
-const { THREE_DOORS_PREAMBLE } = require("./convergance-os/profiles");
-const { generateDoorSceneImage } = require("./image-generation");
 const { analyzeImage } = require("./vision");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
 const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
@@ -82,9 +80,8 @@ const CODING_PATCH_DIRECTIVE =
 
 // Whether a turn should carry the patch directive. Triggers on the classified coding
 // intent OR the caller's explicit routeIntent, because a raw single-shot patch prompt
-// (SWE-bench, an API caller) won't always self-classify as coding. Never in RP mode.
-function codingPatchDirective(isCodingIntent, routeIntent, isRpMode) {
-  if (isRpMode) return "";
+// (SWE-bench, an API caller) won't always self-classify as coding.
+function codingPatchDirective(isCodingIntent, routeIntent) {
   return (isCodingIntent || CODING_INTENTS.has(routeIntent)) ? CODING_PATCH_DIRECTIVE : "";
 }
 const { emitClaimDraft } = require("./claim-drafter");
@@ -191,30 +188,6 @@ function withTimeout(promise, ms, fallback) {
 
 
 
-// Non-blocking image generation sidecar for Three Doors mode
-function triggerImageGeneration({ cleanText, doors, suggestions, surfaceMode, symbolMesh, sceneType }) {
-  if (surfaceMode !== "three-doors") return null;
-  if (sceneType && sceneType !== "three-doors" && sceneType !== "future-doors") return null;
-
-  const entryId = Date.now().toString();
-  const doorList = doors || suggestions || [];
-
-  // XP Door glitch aesthetic: adjust prompt when present (guarded — helper may not exist)
-  let imagePrompt = cleanText;
-  if (typeof generateXpDoorImagePrompt === "function" && doorList.some(d => d && d.type === "xp-door")) {
-    imagePrompt = generateXpDoorImagePrompt(cleanText, doorList);
-  }
-
-  generateDoorSceneImage({ cleanText: imagePrompt, doors: doorList, symbolMesh, entryId, sceneType })
-    .then(result => {
-      // Image generation completes asynchronously; failure is non-blocking
-    })
-    .catch(err => {
-      // Image generation errors are non-blocking
-    }); 
-  
-  return entryId;
-}
 
 /**
  * Analyze a convergence loop result and determine:
@@ -329,13 +302,7 @@ async function handleStreamChat(req, url, res) {
   // below — no dedicated store, no dedicated recall UI. formatCSFContextForPromptAsync (below)
   // already retrieves + IDF-ranks it into later turns automatically. Best-effort, non-blocking.
   //
-  // Skip the Three Doors game surface (parsed.surface === "three-doors", the Ask-Lantern
-  // freeform chat): a player's in-character narration is game progress, not a personal fact
-  // about the user — the game keeps its own door-state store, and surfacing it under "facts
-  // about you" is misleading (#1978). This is also the only live path by which a "three-doors"
-  // message could still reach recordLifeFact — the dedicated game-fact writer that produced the
-  // historical life-memory/three-doors records was removed, so no other capture path remains.
-  if (message && parsed.surface !== "three-doors") {
+  if (message) {
     try {
       const fact = extractFact(message);
       if (fact) {
@@ -386,9 +353,8 @@ async function handleStreamChat(req, url, res) {
   // branch even when the heuristic wouldn't have fired for this message.
   const forceGround = !!parsed.forceGround;
 
-  // Surface mode: dream-chat (default) or three-doors.
-  // The game page declares itself via body.surface; bang commands can also flip it below.
-  let surfaceMode = parsed.surface === "three-doors" ? "three-doors" : "dream-chat";
+  // Surface label stamped on SSE route events and conversation-log entries.
+  const surfaceMode = "dream-chat";
 
   // Session scoping: stamp every recorded turn with the caller's session so history
   // reads back per-conversation instead of one global flat log (issue: session mgmt).
@@ -435,12 +401,6 @@ async function handleStreamChat(req, url, res) {
   }
 
   if (cmd) {
-    // Three Doors mode
-    if (cmd.name === "three-doors" || cmd.name === "threedoors" || cmd.name === "three_doors") {
-      surfaceMode = "three-doors";
-      message = message.replace(/!(?:three-doors|threedoors|three_doors)\b/gi, "").trim() || "begin";
-    }
-
     if (cmd.name === "swarm") {
       // Parse: !swarm <mode> <job> <message...>
       // or:   !swarm <job> <message...>  (default mode = single)
@@ -486,93 +446,6 @@ async function handleStreamChat(req, url, res) {
           sendToken(`Swarm failed: ${err.message}\n`);
           sendDone("failed", { error: err.message });
         });
-      return;
-    }
-
-    if (cmd.name === "choose-future-door") {
-      // This command is triggered by the frontend when a Tomorrow Door path is chosen.
-      // It does not directly correspond to a user message, but rather an action.
-      const { doorName, currentScene, history, playerProgress } = JSON.parse(cmd.args);
-
-      sse.writeStreamHeaders(res);
-      const sendToken = (token) => sse.sendToken(res, token);
-      const sendImageId = (id) => sse.sendEvent(res, "image_id", { id });
-      const sendFutureAnalysis = (analysis) => sse.sendEvent(res, "future_analysis", { analysis });
-      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
-
-      try {
-        // 1. Generate an image for the chosen future path
-        const imagePrompt = `A vivid, imaginative scene depicting the consequences or unfolding of choosing the "${doorName}" path, starting from the current situation: "${currentScene.description}". Focus on the immediate future, showing what might happen next.`;
-        const imageEntryId = Date.now().toString();
-        generateDoorSceneImage({
-          cleanText: imagePrompt,
-          doors: [{ name: doorName }],
-          symbolMesh: currentScene.symbolMesh,
-          entryId: imageEntryId,
-          sceneType: "future-doors",
-        }).then(result => {
-          if (result && result.id) {
-            sendImageId(result.id);
-          }
-        }).catch(err => {
-          console.error("Future Door image generation failed:", err);
-        });
-
-        // 2. Analyze the chosen future path and its implications
-        const analysisPrompt = `Given the user chose the "${doorName}" path from the Tomorrow Door, and the current scene is "${currentScene.description}", describe the likely immediate future in a "creed voice" and "true cast" manner. Focus on potential outcomes, challenges, and opportunities this choice opens up. Be evocative and slightly mysterious, hinting at branching possibilities. Incorporate elements from the generated image (if available) into the analysis.`;
-
-        // One assistant everywhere — the "future analysis" flavor is carried by
-        // the prompt suffix below, not a separate persona. (The old
-        // `AGENT_PERSONAS.creed` was a property access on an ARRAY: always
-        // undefined, so this path threw before it could stream.)
-        const futureAgent = selectAgent(analysisPrompt);
-        const futureSystemPrompt = `${futureAgent.systemPrompt}\n\nYour role is to analyze a chosen future path from the Tomorrow Door. Speak in a "creed voice" and "true cast" manner, offering evocative insights into the potential outcomes, challenges, and opportunities of this choice. Be slightly mysterious, hinting at branching possibilities.`;
-
-        const messages = [
-          { role: "system", content: futureSystemPrompt },
-          ...history,
-          { role: "user", content: analysisPrompt },
-        ];
-
-        const stream = unifiedAgentStreamSSE({
-          messages,
-          user,
-          modelFor,
-          logConversation,
-          agent: futureAgent,
-          provider: requestedProvider,
-          sessionId,
-          surfaceMode,
-        });
-
-        let fullAnalysisText = "";
-        stream.on("data", (data) => {
-          if (data.type === "token") {
-            fullAnalysisText += data.text;
-            sendToken(data.text);
-          } else if (data.type === "done") {
-            sendFutureAnalysis(fullAnalysisText); // Send the full analysis text as a separate event
-            sendDone("creed-future-analysis", {
-              agent: futureAgent.name,
-              provider: data.provider,
-              model: data.model,
-              online: true,
-              analysis: fullAnalysisText,
-            });
-          }
-        });
-
-        stream.on("error", (err) => {
-          console.error("Future Door analysis stream error:", err);
-          sendToken(`An error occurred during future analysis: ${err.message}`);
-          sendDone("error", { error: err.message });
-        });
-
-      } catch (e) {
-        console.error("Error processing choose-future-door:", e);
-        sendToken(`An unexpected error occurred: ${e.message}`);
-        sendDone("error", { error: e.message });
-      }
       return;
     }
 
@@ -751,62 +624,6 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
-    if (cmd.name === "doors" || cmd.name === "door") {
-      const { spawn } = require("child_process");
-      const doorTypes = cmd.args || "elephant garden cosmic";
-      
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream; charset=utf-8",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-        "X-Accel-Buffering": "no",
-      });
-      const sendToken = (token) => res.write(`event: token\ndata: ${JSON.stringify({ token })}\n\n`);
-      const sendDone = (source, meta) => res.write(`event: done\ndata: ${JSON.stringify({ done: true, source, ...meta })}\n\n`);
-
-      sendToken(`◈ Generating mystical doors…\n\n`);
-      sendToken(`Door types: ${doorTypes}\n`);
-      sendToken(`Style: Abstract, dreamlike, not cartoonish\n\n`);
-      
-      // PYTHONIOENCODING=utf-8 so non-ASCII stdout streamed to the chat UI isn't mangled
-      // into "�" on Windows (cp1252 default) — same fix as convergence-adapter.js (#1605).
-      const py = spawn("python", ["scripts/generate-door-images.py", "generate"],
-        { cwd: repoRoot, env: { ...process.env, PYTHONIOENCODING: "utf-8" } });
-      let stdout = "";
-      let stderr = "";
-      
-      py.stdout.on("data", (d) => {
-        stdout += d.toString();
-        sendToken(d.toString());
-      });
-      
-      py.stderr.on("data", (d) => {
-        stderr += d.toString();
-        sendToken(`⚠️ ${d.toString()}`);
-      });
-      
-      py.on("close", (code) => {
-        if (code === 0) {
-          sendToken(`\n✅ Door images generated successfully!\n`);
-          sendToken(`Check: data/images/three-doors/\n`);
-          sendDone("doors", { agent: "DoorGenerator", online: true, count: 3 });
-        } else {
-          sendToken(`\n❌ Generation failed (exit ${code})\n`);
-          sendToken(`Make sure Stable Diffusion is running: python -m launch --api\n`);
-          sendDone("doors", { agent: "DoorGenerator", online: false, error: stderr });
-        }
-        res.end();
-      });
-      
-      py.on("error", (err) => {
-        sendToken(`\n❌ Failed to spawn generator: ${err.message}\n`);
-        sendDone("doors", { agent: "DoorGenerator", online: false, error: err.message });
-        res.end();
-      });
-      
-      return;
-    }
 
     // Grounded self-assessment: !report-card produces an honest letter-grade
     // scorecard of unisona.ai. Evidence is gathered deterministically (git, real
@@ -1185,16 +1002,8 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
-    // Three Doors variants: start fresh game if no history, else strip command and continue
-    if (cmd.name === "three-doors" || cmd.name === "threedoors" || cmd.name === "three_doors"
-        || cmd.name === "converge" || cmd.name === "convergance"
+    if (cmd.name === "converge" || cmd.name === "convergance"   // already handled above
         || cmd.name === "ask") {   // !ask falls through to the convergence-agent short-circuit below
-      if (cmd.name === "converge" || cmd.name === "convergance") { /* already handled above */ }
-      if (history && history.length > 0) {
-        // Game already in progress — strip the bang command, keep any surrounding text
-        const stripped = message.replace(/!(?:three-doors|threedoors|three_doors)\b/gi, "").trim();
-        message = stripped || "continue";
-      }
       // fall through to normal SSE chat routing below
     } else {
       res.writeHead(400, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
@@ -1224,8 +1033,7 @@ async function handleStreamChat(req, url, res) {
     return { ...d, text: `[${d.kind || 'dream'} — ${d.tags?.[0] || 'untitled'}]`, _fidelity: 'placeholder' }; // Placeholder
   });
 
-  // ONE assistant on every surface — the Three Doors game layers its RP
-  // preamble onto the same assistant below. Keyword persona scoring and
+  // ONE assistant on every surface. Keyword persona scoring and
   // per-message task-lens prompts are gone: the model decides how to handle a
   // message, and its capabilities are native tool calls (lib/tool-runner.js).
   // taskType for PCSF provider ranking comes from detectTaskType below.
@@ -1236,7 +1044,7 @@ async function handleStreamChat(req, url, res) {
   // about app dev, repo state, and convergence. Direct API access from the UX.
   const isKeystoneDebug = agent.id === "keystone" && (mcpFlag || message.startsWith("[Convergence task]"));
 
-  // Name reported in done events — unisona.ai at the desk, the persona (unisona.ai) in the game
+  // Name reported in done events
   const doneAgentName = agent.name || "unisona.ai";
 
   let dreamContext = recentDreams.length > 0
@@ -1294,12 +1102,6 @@ async function handleStreamChat(req, url, res) {
   const topPairs = Object.entries(coOccur).sort((a,b)=>b[1]-a[1]).slice(0,3)
     .map(([k,v]) => `${k}(\xd7${v})`).join(', ');
 
-  const meshHint = symbolMesh.length > 0
-    ? `\nRecurring symbols in dreamer's mesh: ${symbolMesh.join(", ")}.${topPairs ? ` Connected pairs: ${topPairs}.` : ''}`
-    : "";
-
-  // Three Doors instruction — equally weighted future-tense canaries
-  const DOORS_INSTRUCTION = `\n\nAt the end of every response, imagine exactly 3 forward-facing doors — canaries the dreamer is sending ahead into their waking and dreaming life. Each door should be a brief, future-tense, equally weighted sensory or experiential path grounded in the last door mentioned and the dreamer's personal symbol mesh. All 3 should carry equal weight — no door is more important. They represent what the dreamer wants to see, hear, feel, taste, touch, or live. Write them as a single hidden line:\n[DOORS: door one | door two | door three]\nRules: future tense, first person, short (under 8 words), no questions, no commands, equally weighted, rooted in the conversation and symbol mesh.${meshHint}`;
 
   // unisona.ai debug prompt — raw dev access, no persona, no doors
   const KEYSTONE_DEBUG_PROMPT = `You are unisona.ai, a direct debug interface for unisona.ai development. You have access to the full repo context below. Respond as a senior engineer — concise, honest, actionable. No dream persona, no doors, no metaphors.\n\n${_realtimeCtx}\n\nRepo state:\n- Server: apps/lantern-garage/server.js (modular routes under routes/)\n- Streaming: lib/stream-chat.js (Gemini→Claude→OpenAI→Grok→Ollama chain)\n- Dream journal: ${allRecent.length} entries in data/dream_journal/\n- Providers configured: ${['GEMINI_API_KEY','ANTHROPIC_API_KEY','OPENAI_API_KEY','XAI_API_KEY'].filter(k => process.env[k]).join(', ') || 'none'}\n- Symbol mesh: ${symbolMesh.slice(0, 5).join(', ') || 'empty'}\n- Co-occurrence: ${topPairs || 'none'}\n${historyContext}\n\nYou can EXECUTE commands. When you output a single-line bash code block, the UI renders a ▶ Run button.\nONLY use these exact commands (anything else is blocked):\n\nTESTS: \`npm test\` or \`node tests/test_dream_journal_api.js\` or \`node tests/test_dream_journal_chat.js\` or \`node tests/test_dream_chat_multiturns.js\` or \`node tests/test_dream_journal_keystone.js\`\nGIT: \`git status\` \`git diff --stat\` \`git log --oneline -N\` \`git add FILE\` \`git commit -m "MSG"\` \`git push origin master\` \`git branch\`\nPR: \`gh pr create --repo alex-place/lantern-os --head cdblasioli-gif:master --base master --title "TITLE" --body "BODY"\`\nORCH: \`python src/convergence_io_engine.py health\` or \`loop\` or \`inspect\`\nREAD: \`cat FILE\` \`head -N FILE\`\n\nWhen asked to do something, output the EXACT command in a bash code block. The user clicks ▶ to run it. Do NOT suggest commands outside this list.\n\nAnswer directly. Reference file paths. Check data/pcsf/ for state. Check manifests/dream-journal-v1-agent-slots.json for work queue.`;
@@ -1395,7 +1197,7 @@ async function handleStreamChat(req, url, res) {
   // Wire the Knowledge Center in: the nearest doc section grounds the LLM, and a
   // confident hit can answer before any model (Tier 0, below). Off via KB_ROUTER=0.
   let kbAnswer = null;
-  if (!isKeystoneDebug && surfaceMode !== "three-doors" && message && process.env.KB_ROUTER !== "0") {
+  if (!isKeystoneDebug && message && process.env.KB_ROUTER !== "0") {
     try {
       const kr = require("./knowledge-router");
       kbAnswer = kr.answer(message);
@@ -1425,7 +1227,7 @@ async function handleStreamChat(req, url, res) {
   // Links unisona.ai chat to the project's real tools/details so ANY provider
   // (incl. Grok) answers grounded in the live repo, not generic guesses. Cached
   // 60s, best-effort. Disable with KEYSTONE_MCP=0.
-  if (!isKeystoneDebug && surfaceMode !== "three-doors" && message && process.env.KEYSTONE_MCP !== "0") {
+  if (!isKeystoneDebug && message && process.env.KEYSTONE_MCP !== "0") {
     try {
       const { gatherProjectContext } = require("./keystone-context");
       const proj = await withTimeout(gatherProjectContext({ maxItems: 8 }), GROUNDING_TIMEOUT_MS, null);
@@ -1476,10 +1278,6 @@ async function handleStreamChat(req, url, res) {
   // Capabilities come from the model's native tool calls; task-type / provider routing
   // comes from the model-based Ouro router (below) + measured PCSF ordering.
 
-  // ── RP lives in the Three Doors game only. Dream Chat is always plain unisona.ai;
-  // roleplay requests in chat get pointed at /three-doors-game.html instead.
-  const isRpMode = surfaceMode === "three-doors";
-
   // #1167: the local Ollama coder (ouro:latest) is a 1.4B model fine-tuned on
   // 243 code-only instruction/response pairs. Auto-mode local-first routing
   // (below) sent it general/creative/meta chat too — hallucinated answers and,
@@ -1517,7 +1315,6 @@ async function handleStreamChat(req, url, res) {
     trading: "unisona.ai · market route",
     memory_export: "unisona.ai · CSF memory export",
     dream_analysis: "unisona.ai · dream analysis",
-    rp_game: "Three Doors · RP game",
     coding_change: "unisona.ai · code / GitHub route",
     document_request: "unisona.ai · documents",
     technical_debug: "unisona.ai · debug route",
@@ -1525,15 +1322,12 @@ async function handleStreamChat(req, url, res) {
     convergance_action: "Convergence · loop route",
     capacity_query: "unisona.ai · capacity query",
     dream_chat: "unisona.ai · chat",
-    three_doors: "Three Doors · RP game",
   };
   const routeLabel = isKeystoneDebug
     ? "unisona.ai · direct debug"
     : requestedProvider === "keystone-ft"
       ? "unisona.ai FT · memory route"
-      : surfaceMode === "three-doors"
-        ? `${agent.name || "unisona.ai"} · Three Doors`
-        : (ROUTE_LABEL_MAP[converganceIntent] || "unisona.ai · router");
+      : (ROUTE_LABEL_MAP[converganceIntent] || "unisona.ai · router");
 
   // Plain unisona.ai desk prompt — no persona voice, no doors. Dream Chat is unisona.ai-only.
   // The product-fact line gives even a weak fallback model (e.g. local Ollama, when the
@@ -1546,7 +1340,7 @@ async function handleStreamChat(req, url, res) {
   // OpenAI/xAI/Ouro) must never leak its vendor identity through the unisona.ai
   // persona — a Gemini-served turn was answering "I'm a large language model built
   // by Google". Inject a deterministic identity block on the assistant surfaces
-  // (debug + router); leave the creative RP/journal personas untouched.
+  // (debug + router).
   const KEYSTONE_IDENTITY =
     "You are unisona.ai — the assistant of a local-first, model-agnostic " +
     "reasoning system. You are part of unisona.ai; you were NOT built by Google, OpenAI, " +
@@ -1555,15 +1349,11 @@ async function handleStreamChat(req, url, res) {
     "any given turn varies. If asked which model or company powers you, answer consistently: " +
     "you are unisona.ai, which selects from several interchangeable " +
     "providers per turn — do not name a specific vendor as your maker or invent a model name.";
-  const baseSystemPrompt = isKeystoneDebug
-    ? KEYSTONE_DEBUG_PROMPT
-    : isRpMode
-      ? `${agent.systemPrompt}\n\n${dreamContext}${csfBlock}${groundingContext ? "\n\n" + groundingContext : ""}${oracleBlock}${meshGroundBlock}${attachmentBlock}\n\nTone: thoughtful, unhurried, human. Never clinical. Never sycophantic. Use the dreamer's own words back to them. When the dreamer asks about previous dreams or doors, use the CSF memory and door state above — never fabricate memories.${DOORS_INSTRUCTION}${surfaceMode === "three-doors" ? THREE_DOORS_PREAMBLE : ""}`
-      : ROUTER_PROMPT;
-  let systemPrompt = isRpMode ? baseSystemPrompt : `${KEYSTONE_IDENTITY}\n\n${baseSystemPrompt}`;
+  const baseSystemPrompt = isKeystoneDebug ? KEYSTONE_DEBUG_PROMPT : ROUTER_PROMPT;
+  let systemPrompt = `${KEYSTONE_IDENTITY}\n\n${baseSystemPrompt}`;
 
   // Coding-change patch directive (#2218 SWE-bench leak) — see codingPatchDirective().
-  systemPrompt += codingPatchDirective(isCodingIntent, routeIntent, isRpMode);
+  systemPrompt += codingPatchDirective(isCodingIntent, routeIntent);
 
 
   const sendToken = (token) => sse.sendToken(res, token);
@@ -1642,12 +1432,12 @@ async function handleStreamChat(req, url, res) {
     // coding-intent local-first hit (#1167): that's the designed fast path,
     // not a cloud outage, so labeling it "cloud unreachable" would be false.
     const isLocalSource = source === "ollama" || source === "offline";
-    const degradedLocal = isLocalSource && !requestedProvider && !isRpMode && !isCodingIntent;
+    const degradedLocal = isLocalSource && !requestedProvider && !isCodingIntent;
     let finalRouteLabel = routeLabel;
     if (degradedLocal) {
       signature.degraded = true;
       finalRouteLabel = `${routeLabel} · ⚠ degraded — local model (cloud unreachable)`;
-    } else if (isLocalSource && isCodingIntent && !requestedProvider && !isRpMode) {
+    } else if (isLocalSource && isCodingIntent && !requestedProvider) {
       // #1556 [CAP-4]: coding-on-local is the designed fast path (#1167), NOT a
       // cloud outage — so we don't claim "cloud unreachable". But a local model is
       // weakest exactly at complex coding, the prime confident-wrong case. Set the
@@ -1939,7 +1729,7 @@ async function handleStreamChat(req, url, res) {
   {
     const _askM = message.match(/^!ask\s+(.+)/i);
     const _WORK_INTENT = /\b(what (work|issues?|tasks?|bugs?|tickets?|pr[s']?|pull requests?)|what (needs?|needs to be) (done|fixed|closed|worked on)|what'?s? (open|pending|left|next|the status|blocking)|show (me )?(open |the )?issues?|status (of|update)|list (issues?|tasks?|open)|open issues?|any issues?|what should i (work on|fix|do)|top issues?|priority (issues?|tasks?))\b/i;
-    if (!isKeystoneDebug && surfaceMode !== "three-doors" && (_askM || (_WORK_INTENT.test(message) && !message.startsWith("!")))) {
+    if (!isKeystoneDebug && (_askM || (_WORK_INTENT.test(message) && !message.startsWith("!")))) {
       try {
         const _q = _askM ? _askM[1].trim() : message;
         const r = await require("./convergence-agent").respond(_q);
@@ -1994,8 +1784,7 @@ async function handleStreamChat(req, url, res) {
   let primaryProviderHint = null;
   try {
     // #1167: this used to force isCreative whenever surfaceMode === "dream-chat" —
-    // but "dream-chat" is the surface name for ALL general unisona.ai chat (isRpMode
-    // is what flags the actual roleplay/journal surface, "three-doors"), so EVERY
+    // but "dream-chat" is the surface name for ALL general unisona.ai chat, so EVERY
     // message here was tagged "creative" regardless of content. PROVIDER_CHAINS.creative
     // leads with ollama, which is always "healthy" — so cloud was never reached for
     // any message on the main chat surface. Use the real per-message intent instead:
@@ -2132,11 +1921,11 @@ async function handleStreamChat(req, url, res) {
   const intent = (ouroRoute && ouroRoute.taskType) || "default";
   const { orderChainByLeaderboard, recordModelOutcome } = require("./model-leaderboard");
   let staticChain = OLLAMA_MODEL_CHAIN[intent] || OLLAMA_MODEL_CHAIN.default;
-  // unisona.ai chat (non-RP) is a technical/tool assistant — never fall back to the
-  // dream-tuned `lantern-csf-dream`, which ignores tools and emits dream-journal
-  // narrative ("the Return Door remembers…"). That model is for the Three Doors RP
-  // surface only. Without this, an offline/degraded unisona.ai chat answers in persona.
-  if (!isRpMode) {
+  // unisona.ai chat is a technical/tool assistant — never fall back to the dream-tuned
+  // `lantern-csf-dream`, which ignores tools and emits dream-journal narrative ("the
+  // Return Door remembers…"). The Three Doors RP surface that model served migrated to
+  // the three-doors repo. Without this, an offline/degraded chat answers in persona.
+  {
     const cleaned = staticChain.filter((m) => m !== "lantern-csf-dream");
     if (cleaned.length) staticChain = cleaned;
   }
@@ -2202,7 +1991,7 @@ async function handleStreamChat(req, url, res) {
   // (grounding by default). See lib/local-model-registry.js.
   let _leadSelfConverges = false;
   try { _leadSelfConverges = require("./local-model-registry").selfConverges(modelChain[0]); } catch (_e) {}
-  if (process.env.LOOP_REASONER === "1" && !isKeystoneDebug && !isRpMode && !requestedProvider
+  if (process.env.LOOP_REASONER === "1" && !isKeystoneDebug && !requestedProvider
       && (intent === "coding" || intent === "reasoning")
       && !_leadSelfConverges) {
     try {
@@ -2405,8 +2194,7 @@ async function handleStreamChat(req, url, res) {
               fullReply = toolAnswer.trim() || _firstTurn;
             }
           } catch (e) { /* tool handling is non-fatal — fall through to normal render */ }
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
-          const imageEntryId = triggerImageGeneration({ cleanText, suggestions, surfaceMode, symbolMesh });
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({
             recordedAt: new Date().toISOString(),
             surface: "dream-chat-stream",
@@ -2419,7 +2207,6 @@ async function handleStreamChat(req, url, res) {
           const ollamaReceipt = buildPcsfReceipt("ollama", ollamaModel, true);
           sendReceipt(ollamaReceipt);
           const meta = { agent: doneAgentName, online: true, cleanText, suggestions, model: ollamaModel, webSuggestions, receipt: ollamaReceipt };
-          if (imageEntryId) meta.image = { entryId: imageEntryId, status: "generating" };
           sendDone("ollama", meta);
           return;
         }
@@ -2452,7 +2239,7 @@ async function handleStreamChat(req, url, res) {
       });
       if (sseErr) throw sseErr;
       if (fullReply) {
-        const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+        const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
         await logConversation({
           recordedAt: new Date().toISOString(),
           surface: "dream-chat-stream",
@@ -2512,7 +2299,7 @@ async function handleStreamChat(req, url, res) {
         const tools = toolRunner.geminiTools({ operator });
         if (tools[0] && tools[0].functionDeclarations.length) {
           const geminiModelName = modelFor("gemini");
-          const generationConfig = { maxOutputTokens: isRpMode ? 2048 : 4096, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } }; // #1210 room for tools + answer; thinkingBudget:0 stops 2.5-flash buffering a long silent thinking phase that starves the SSE reader (vertex_empty_response)
+          const generationConfig = { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }; // #1210 room for tools + answer; thinkingBudget:0 stops 2.5-flash buffering a long silent thinking phase that starves the SSE reader (vertex_empty_response)
           const contents = [
             ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
             { role: "user", parts: [{ text: message }] },
@@ -2543,7 +2330,7 @@ async function handleStreamChat(req, url, res) {
             }
             contents.push({ role: "user", parts: responseParts });
           }
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");
           const geminiReceipt = buildPcsfReceipt("gemini", geminiModelName, true);
@@ -2554,7 +2341,7 @@ async function handleStreamChat(req, url, res) {
       } catch (err) {
         recordProviderFailure("gemini", `tool_loop: ${err.message}`);
         if (fullReply) {
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           recordProviderSuccess("gemini");
           sendDone("gemini", { agent: doneAgentName, provider: "gemini", model: modelFor("gemini"), online: true, cleanText, suggestions, webSuggestions });
           return;
@@ -2586,7 +2373,7 @@ async function handleStreamChat(req, url, res) {
         contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
         // Non-RP gets the same 4096 as the tool path (was 1024) — a 1024 cap truncated long
         // code answers on this single-shot fallback too. thinkingBudget:0 keeps the budget visible.
-        generationConfig: { maxOutputTokens: isRpMode ? 1536 : 4096, temperature: isRpMode ? 0.88 : 0.7, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
       };
       if (groundingEnabled) {
         geminiPayloadBase.tools = [{ googleSearch: {} }];
@@ -2644,7 +2431,7 @@ async function handleStreamChat(req, url, res) {
       });
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("gemini_empty_response");
-      let { cleanText: geminiClean, suggestions: geminiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      let { cleanText: geminiClean, suggestions: geminiDoors } = doorsOrFallback(fullReply, true);
       // Σ₀ verify pass
       let geminiSigma0 = null;
       if (isVerifyEnabled()) {
@@ -2750,7 +2537,7 @@ async function handleStreamChat(req, url, res) {
             for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
               const { assistantContent, toolUses, stopReason } = await anthropicToolTurn({
                 anthropicKey, model: claudeModel, system, messages: convo, tools,
-                maxTokens: isRpMode ? 2048 : 4096, // #1210: room for multi-call tool reasoning + answer
+                maxTokens: 4096, // #1210: room for multi-call tool reasoning + answer
                 onToken: (t) => { fullReply += t; sendToken(t); },
                 mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
                 onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
@@ -2770,7 +2557,7 @@ async function handleStreamChat(req, url, res) {
               }
               convo.push({ role: "user", content: results });
             }
-            const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+            const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
             await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName } }).catch(() => {});
             recordProviderSuccess("anthropic");
             recordProviderSuccessRouter("anthropic");
@@ -2784,7 +2571,7 @@ async function handleStreamChat(req, url, res) {
           if (fullReply) {
             // Already streamed partial output — finalize rather than re-streaming a
             // fresh single-shot answer (which would duplicate/contradict on screen).
-            const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+            const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
             recordProviderSuccess("anthropic");
             sendDone("anthropic", { agent: doneAgentName, provider: "anthropic", model: claudeModel, online: true, cleanText, suggestions, webSuggestions });
             return;
@@ -2801,8 +2588,8 @@ async function handleStreamChat(req, url, res) {
       // is below the model's min cacheable length — verify via usage fields.
       const payload = JSON.stringify({
         model: claudeModel,
-        max_tokens: isRpMode ? 1536 : 1024,
-        temperature: isRpMode ? 0.88 : undefined,
+        max_tokens: 1024,
+        temperature: undefined,
         stream: true,
         system: [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }],
         messages: [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }],
@@ -2887,7 +2674,7 @@ async function handleStreamChat(req, url, res) {
       });
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("anthropic_empty_response");
-      let { cleanText: anthropicClean, suggestions: anthropicDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      let { cleanText: anthropicClean, suggestions: anthropicDoors } = doorsOrFallback(fullReply, true);
       // Σ₀ verify pass — ground claims against codebase, web, Gemini
       let anthropicSigma0 = null;
       if (isVerifyEnabled()) {
@@ -2967,7 +2754,7 @@ async function handleStreamChat(req, url, res) {
               messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
             }
           }
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "openai", model: openaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("openai");
           recordProviderSuccessRouter("openai");
@@ -2979,7 +2766,7 @@ async function handleStreamChat(req, url, res) {
       } catch (err) {
         recordProviderFailure("openai", `tool_loop: ${err.message}`);
         if (fullReply) {
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           recordProviderSuccess("openai");
           sendDone("openai", { agent: doneAgentName, provider: "openai", model: modelFor("openai"), online: true, cleanText, suggestions, webSuggestions });
           return;
@@ -3053,7 +2840,7 @@ async function handleStreamChat(req, url, res) {
           if (iv.revisedReply) fullReply = iv.revisedReply;
         } catch { /* intervention must never break a reply */ }
       }
-      const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      const { cleanText: openaiClean, suggestions: openaiDoors } = doorsOrFallback(fullReply, true);
       await logConversation({
         recordedAt: new Date().toISOString(),
         surface: "dream-chat-stream",
@@ -3118,7 +2905,7 @@ async function handleStreamChat(req, url, res) {
               messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
             }
           }
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("xai");
           const grokReceipt = buildPcsfReceipt("grok", xaiModelName, true);
@@ -3129,7 +2916,7 @@ async function handleStreamChat(req, url, res) {
       } catch (err) {
         recordProviderFailure("xai", `tool_loop: ${err.message}`);
         if (fullReply) {
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           recordProviderSuccess("xai");
           sendDone("grok", { agent: doneAgentName, provider: "grok", model: modelFor("xai"), online: true, cleanText, suggestions, webSuggestions });
           return;
@@ -3190,7 +2977,7 @@ async function handleStreamChat(req, url, res) {
           if (iv.revisedReply) fullReply = iv.revisedReply;
         } catch { /* intervention must never break a reply */ }
       }
-      const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      const { cleanText: xaiClean, suggestions: xaiDoors } = doorsOrFallback(fullReply, true);
       await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: xaiClean.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModel, agent: doneAgentName } }).catch(() => {});
       recordProviderSuccess("xai");
       const grokModelName = xaiModel; // receipt MUST reflect the model actually sent
@@ -3251,7 +3038,7 @@ async function handleStreamChat(req, url, res) {
               messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
             }
           }
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("cohere");
           recordProviderSuccessRouter("cohere");
@@ -3263,7 +3050,7 @@ async function handleStreamChat(req, url, res) {
       } catch (err) {
         recordProviderFailure("cohere", `tool_loop: ${err.message}`);
         if (fullReply) {
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           recordProviderSuccess("cohere");
           sendDone("cohere", { agent: doneAgentName, provider: "cohere", model: modelFor("cohere"), online: true, cleanText, suggestions, webSuggestions });
           return;
@@ -3306,7 +3093,7 @@ async function handleStreamChat(req, url, res) {
       });
       // 200 OK with no tokens is not an answer — cascade instead of finalizing empty.
       if (isEmptyReply(fullReply)) throw new Error("cohere_empty_response");
-      const { cleanText: cohereClean, suggestions: cohereDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+      const { cleanText: cohereClean, suggestions: cohereDoors } = doorsOrFallback(fullReply, true);
       await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cohereClean.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModel, agent: doneAgentName } }).catch(() => {});
       recordProviderSuccess("cohere");
       recordProviderSuccessRouter("cohere");
@@ -3356,7 +3143,7 @@ async function handleStreamChat(req, url, res) {
         });
         if (sseErr) throw sseErr;
         if (fullReply) {
-          const { cleanText, suggestions } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+          const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({
             recordedAt: new Date().toISOString(),
             surface: "dream-chat-stream",
@@ -3440,7 +3227,7 @@ async function handleStreamChat(req, url, res) {
         req2.end();
       });
       if (ollamaOk && fullReply) {
-        const { cleanText: ollamaClean, suggestions: ollamaDoors } = doorsOrFallback(fullReply, isKeystoneDebug || !isRpMode);
+        const { cleanText: ollamaClean, suggestions: ollamaDoors } = doorsOrFallback(fullReply, true);
         await logConversation({
           recordedAt: new Date().toISOString(),
           surface: "dream-chat-stream",

@@ -98,7 +98,7 @@ Capabilities, organized by the loop stage they strengthen:
 | **Verify** | Σ₀ verification + convergence records · fact-check button + grounding-diff viewer · drift canaries · council exec-verify · WCAG 2.1 AA on all surfaces · autonomous Playwright test fleet |
 | **Converge** | Decision journal + calibration scoring · [external benchmarks registry](docs/BENCHMARKS.md) · PCSF provider leaderboard · CI convergence gates |
 
-**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `dream-chat.html` (the chat — primary UI) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `three-doors-game.html` (Σ₀ game mode) · `orchestration.html` (operator settings).
+**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `dream-chat.html` (the chat — primary UI) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
 
 **Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](apps/lantern-garage/public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)). Historical milestone writeup: [Unisona 1.8 — "one front door"](docs/UNISONA-1.8.md).
 

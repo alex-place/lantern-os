@@ -1,5 +1,5 @@
 {
-  "built_at": 1784213381.639967,
+  "built_at": 1784260459.335139,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -145,7 +145,6 @@
     "docs/FACECAM_DETECTION.md",
     "docs/creator-v10/research-dataset-schema.md",
     "docs/creator-v10/safe-zone-v2.md",
-    "docs/THREE-DOORS-SD-PROMPT-USER-GUIDE.md",
     "docs/creator-v10/variant-engine-v2.md",
     "docs/CHATGPT-CONNECTOR-SETUP.md",
     "docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md",
@@ -642,7 +641,7 @@
       ]
     }
   },
-  "sections": 2583,
+  "sections": 2515,
   "external": 34,
-  "sha256": "b4fcfe75725d07c21bfe852a6de3a697e384a379cc1b71a30a8989f917c3a1d4"
+  "sha256": "36ae9846906d8d00587b2d6741aedbb56cc82af7784311cccbae5dfe96b63d55"
 }

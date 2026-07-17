@@ -1,5 +1,5 @@
 // Reply post-processing for stream-chat: strip local-model artifacts, extract the
-// hidden [DOORS: …] marker (Three Doors RP surface), and produce the final
+// hidden [DOORS: …] marker (a model may still emit one), and produce the final
 // cleanText + suggestions. Also the web-search suggestion link generator.
 const { saveDoorChoice } = require("../csf-memory");
 
