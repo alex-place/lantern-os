@@ -1,0 +1,114 @@
+{
+  "issue": "#2690 Phase 0.5",
+  "system": "router_reservoir_G (trained, seed 42)",
+  "predictions_preregistered": {
+    "rho_J": 0.9835535647455068,
+    "gamma": 0.9999794931590206,
+    "lmax_P": 48764.21487860691,
+    "cond_P": 47886.138266376525,
+    "half_life": 33800.43148064367,
+    "regime_call": "sliver_timing_indifferent"
+  },
+  "fixed_point_residual": 1.4239491151417717e-15,
+  "jacobian_max_err": 0.00012989666607499117,
+  "basin_c": 3.3245979322709383e-06,
+  "deadline_rows": [
+    {
+      "rel_budget": 0.2,
+      "budget": 1.6513873091126984e-06,
+      "predicted_deadline": 16624.8,
+      "measured_last_escape": 9,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.3,
+      "budget": 2.4770809636690472e-06,
+      "predicted_deadline": 29647.8,
+      "measured_last_escape": 11,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.4,
+      "budget": 3.3027746182253967e-06,
+      "predicted_deadline": 44681.7,
+      "measured_last_escape": 15,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.5,
+      "budget": 4.128468272781746e-06,
+      "predicted_deadline": 62463.1,
+      "measured_last_escape": 19,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.6,
+      "budget": 4.9541619273380945e-06,
+      "predicted_deadline": 84225.7,
+      "measured_last_escape": 31,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.7,
+      "budget": 5.779855581894444e-06,
+      "predicted_deadline": 112282.6,
+      "measured_last_escape": 40,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.8,
+      "budget": 6.6055492364507935e-06,
+      "predicted_deadline": 151826.6,
+      "measured_last_escape": 40,
+      "consistent": true
+    },
+    {
+      "rel_budget": 0.9,
+      "budget": 7.431242891007143e-06,
+      "predicted_deadline": 219427.4,
+      "measured_last_escape": 59,
+      "consistent": true
+    },
+    {
+      "rel_budget": 1.0,
+      "budget": 8.256936545563492e-06,
+      "predicted_deadline": null,
+      "measured_last_escape": 59,
+      "consistent": true
+    }
+  ],
+  "deadline_consistent": true,
+  "deadline_note": "necessary-condition bound; in the sliver regime it is loose (consistent but without bite) \u2014 the measured last-escape rising with B shows a real commitment window exists at micro-basin scale only",
+  "regime_check": {
+    "instrument": "sliver_realistic_anchor_sweep",
+    "result": {
+      "b_real": 0.11334635887029926,
+      "B_star_inf": 8.256936545563492e-06,
+      "anchor_to_ceiling_ratio": 13727.410674023047,
+      "fire_time_grid": {
+        "B_real": {
+          "1": 1.0,
+          "10": 1.0,
+          "30": 1.0,
+          "59": 1.0
+        },
+        "B_real/10": {
+          "1": 1.0,
+          "10": 1.0,
+          "30": 1.0,
+          "59": 1.0
+        },
+        "B_real/100": {
+          "1": 1.0,
+          "10": 1.0,
+          "30": 1.0,
+          "59": 1.0
+        }
+      },
+      "timing_indifferent_at_realistic_scales": true
+    }
+  },
+  "regime_call_held": true,
+  "all_ok": true,
+  "evidence_class": "MEASURED (real learned dynamical system, CPU; not an LLM \u2014 Phase 1 gap unchanged)"
+}

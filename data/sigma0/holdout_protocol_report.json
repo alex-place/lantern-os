@@ -1,0 +1,110 @@
+{
+  "issue": "#2691",
+  "claim": "three-arm promotion-evidence protocol validated at task-level Bernoulli fidelity; teeth rejected via the real 7-condition gate with arm-appropriate reasons",
+  "evidence_class": "protocol machine-checked; orderings MEASURED-by-simulation \u2014 validates the PROTOCOL, not real training (L4 gap unchanged)",
+  "params": {
+    "n": 60,
+    "pool_mult": 4,
+    "gates": 25,
+    "k": 8,
+    "seeds": 6,
+    "dither": 0.05,
+    "thr_sigma": 0.04,
+    "thr_T": 0.08,
+    "gamma": 0.02
+  },
+  "arms": {
+    "fixed": {
+      "true": 0.6074548929519251,
+      "reported": 0.6972222222222223,
+      "gap": 0.08976732927029703,
+      "fresh_consumed": 60.0,
+      "extraction_per_100_fresh": 1.012424821586542,
+      "budget_exhausted_frac": 0.0
+    },
+    "fixed+dither": {
+      "true": 0.7280652143588614,
+      "reported": 0.8174456768022704,
+      "gap": 0.0893804624434091,
+      "fresh_consumed": 60.0,
+      "extraction_per_100_fresh": 1.2134420239314356,
+      "budget_exhausted_frac": 0.0
+    },
+    "fresh": {
+      "true": 0.7709356998905615,
+      "reported": 0.8055555555555555,
+      "gap": 0.03461985566499404,
+      "fresh_consumed": 1560.0,
+      "extraction_per_100_fresh": 0.049418955121189836,
+      "budget_exhausted_frac": 0.0
+    },
+    "thresholdout": {
+      "true": 0.7458981861769303,
+      "reported": 0.7847222222222222,
+      "gap": 0.038824036045291964,
+      "fresh_consumed": 300.0,
+      "extraction_per_100_fresh": 0.24863272872564343,
+      "budget_exhausted_frac": 1.0
+    }
+  },
+  "teeth": {
+    "fixed": {
+      "hack_rejected": true,
+      "hack_failed": [
+        "2_retention",
+        "3_reward_integrity",
+        "6_data_integrity"
+      ],
+      "forget_rejected": true,
+      "forget_failed": [
+        "1_fresh_gain",
+        "2_retention"
+      ]
+    },
+    "fixed+dither": {
+      "hack_rejected": true,
+      "hack_failed": [
+        "2_retention",
+        "3_reward_integrity",
+        "6_data_integrity"
+      ],
+      "forget_rejected": true,
+      "forget_failed": [
+        "2_retention"
+      ]
+    },
+    "fresh": {
+      "hack_rejected": true,
+      "hack_failed": [
+        "1_fresh_gain",
+        "2_retention"
+      ],
+      "forget_rejected": true,
+      "forget_failed": [
+        "2_retention"
+      ]
+    },
+    "thresholdout": {
+      "hack_rejected": true,
+      "hack_failed": [
+        "2_retention",
+        "3_reward_integrity",
+        "6_data_integrity"
+      ],
+      "forget_rejected": true,
+      "forget_failed": [
+        "2_retention"
+      ]
+    }
+  },
+  "checks": {
+    "validity_fixed_worst_gap": true,
+    "extraction_fresh_best": true,
+    "dither_rescues_fixed": true,
+    "efficiency_thresholdout_best": true,
+    "teeth_all_rejected": true,
+    "hack_caught_by_ledger_on_fixed": true,
+    "hack_caught_on_merit_on_fresh": true
+  },
+  "all_ok": true
+}
