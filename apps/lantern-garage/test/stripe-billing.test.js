@@ -20,11 +20,11 @@ delete require.cache[require.resolve("../lib/stripe-billing")];
 const B = require("../lib/stripe-billing");
 
 // ── tierToRole: the UI keyword → role ────────────────────────────────────────
-check("tierToRole maps the three buyable tiers (case-insensitive)", () => {
-  assert.equal(B.tierToRole("member"), "supporter");
+check("tierToRole maps the two sold tiers (case-insensitive); Member is rejected", () => {
   assert.equal(B.tierToRole("Pro"), "deep_dreamer");
   assert.equal(B.tierToRole("PILOT"), "pilot");
-  assert.equal(B.tierToRole("supporter"), "supporter");   // role names accepted too
+  assert.equal(B.tierToRole("member"), null);             // #2613: Member no longer sold
+  assert.equal(B.tierToRole("supporter"), null);          // #2613: nor by role name
   assert.equal(B.tierToRole("admin"), null);              // never a buyable keyword
   assert.equal(B.tierToRole("nonsense"), null);
   assert.equal(B.tierToRole(""), null);
@@ -41,12 +41,22 @@ check("roleForPrice: metadata.role honored ONLY when whitelisted (admin typo can
   assert.equal(B.roleForPrice({ id: "p2", metadata: { role: "admin" } }), null);        // NOT admin
   assert.equal(B.roleForPrice({ id: "p3", metadata: { role: "founder" } }), null);      // NOT a paid tier
 });
-check("roleForPrice: USD unit_amount fallback thresholds", () => {
-  assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 500 }), "supporter");
-  assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 1999 }), "supporter");
+check("roleForPrice: USD unit_amount fallback (dev only — no Price ids configured; no $5 Member)", () => {
+  // Runs with no STRIPE_PRICE_* set → the dev fallback is active.
+  assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 500 }), null);       // #2613: $5 no longer → supporter
+  assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 1999 }), null);       // below Pro floor
   assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 2000 }), "deep_dreamer");
   assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 20000 }), "pilot");
   assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 100000 }), "pilot"); // $1000 → still pilot, not admin
+});
+check("roleForPrice: #2620 — with a Price configured, an UNMATCHED USD price grants NOTHING", () => {
+  process.env.STRIPE_PRICE_DEEP_DREAMER = "price_pro_live";
+  // A matching id still resolves…
+  assert.equal(B.roleForPrice({ id: "price_pro_live", currency: "usd", unit_amount: 2000 }), "deep_dreamer");
+  // …but an unrelated $20 product on the same account no longer mints Pro by amount.
+  assert.equal(B.roleForPrice({ id: "price_unrelated", currency: "usd", unit_amount: 2000 }), null);
+  assert.equal(B.roleForPrice({ id: "price_unrelated", currency: "usd", unit_amount: 500000 }), null);
+  delete process.env.STRIPE_PRICE_DEEP_DREAMER;
 });
 check("roleForPrice: FAIL CLOSED on sub-floor, non-USD, or missing price", () => {
   assert.equal(B.roleForPrice({ id: "x", currency: "usd", unit_amount: 499 }), null); // below $5
