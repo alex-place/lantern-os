@@ -209,6 +209,32 @@ async function getOpenOrders(userId) {
   }));
 }
 
+/** Full order list (open + closed) for the Orders / Order-history tabs, newest first,
+ *  normalized to the UI shape. `status=all` so filled/cancelled orders populate history. */
+async function getAllOrders(userId, limit = 200) {
+  const auth = _authFor(userId);
+  if (!auth) return [];
+  const n = Math.min(500, Math.max(1, Number(limit) || 200));
+  const r = await _req(auth, 'GET', `/v2/orders?status=all&limit=${n}&direction=desc&nested=false`);
+  if (!r.ok || !Array.isArray(r.json)) return [];
+  const norm = (s) => {
+    const x = String(s || '').toLowerCase();
+    if (/fill/.test(x)) return 'filled';
+    if (/cancel|expired|rejected|replaced|done_for_day/.test(x)) return 'canceled';
+    if (/new|accepted|pending|held|partially/.test(x)) return 'open';
+    return x || 'unknown';
+  };
+  return r.json.map((o) => ({
+    id: o.id, symbol: o.symbol, side: String(o.side || '').toLowerCase(),
+    qty: Number(o.qty) || Number(o.filled_qty) || 0,
+    type: String(o.type || 'market').toLowerCase(),
+    limit_price: o.limit_price != null ? Number(o.limit_price) : (o.stop_price != null ? Number(o.stop_price) : null),
+    status: norm(o.status),
+    filled_avg_price: Number(o.filled_avg_price) || 0,
+    filled_at: o.filled_at || '', created_at: o.submitted_at || o.created_at || '',
+  }));
+}
+
 async function getDayPnl(userId) {
   const acct = await getAccount(userId).catch(() => null);
   if (!acct) return null;
@@ -237,4 +263,4 @@ async function cancelOpenOrders(userId, symbol) {
   return n;
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };
