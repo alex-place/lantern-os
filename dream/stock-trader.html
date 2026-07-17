@@ -4609,13 +4609,43 @@ async function detectGuestMode(){
     }
   } else {
     // Entitled trader → surface the broker connections (one-click Alpaca + IBKR).
+    // Await the two connection rows THEN paint the active/fallback overlay, so the
+    // overlay is never clobbered by a slower fetch finishing after it.
     const link = document.getElementById('brokerLink');
-    if(link){
-      link.style.display='';
-      refreshBrokerStatus();
+    if(link) link.style.display='';
+    Promise.all([refreshBrokerStatus(), refreshAlpacaStatus()]).then(refreshBrokerPref);
+  }
+}
+// Truthful broker rows: "connected" (credentials exist) is not "active" (executes
+// your trades). After the switch state is known, restamp both rows so exactly one
+// says · active and a connected-but-idle broker says · fallback.
+function applyBrokerActiveLabels(s){
+  if(!s || !s.effective) return;
+  const aLbl=document.getElementById('alpacaLabel'), aLink=document.getElementById('alpacaLink');
+  const iLbl=document.getElementById('brokerLabel'), iLink=document.getElementById('brokerLink');
+  if(aLbl && aLink && s.connected && s.connected.alpaca){
+    if(s.effective==='alpaca'){
+      aLbl.textContent = aLbl.textContent.replace(/ · (active|fallback).*$/,'');
+      aLbl.textContent = (aLbl.textContent==='Connect Alpaca' ? 'Alpaca' : aLbl.textContent) + ' · active';
+      aLink.style.color='var(--green)';
+      aLink.title='Alpaca executes your trades right now' + (aLbl.textContent.startsWith('Alpaca ·') ? ' (shared paper account). One-click connect of your OWN account still available.' : '.');
+    } else {
+      aLbl.textContent = (aLbl.textContent==='Connect Alpaca' ? 'Alpaca' : aLbl.textContent.replace(/ · (active|fallback).*$/,'')) + ' · fallback';
+      aLink.style.color='';
+      aLink.title='Alpaca is connected but idle — it only executes if the active broker fails.';
     }
-    refreshAlpacaStatus();
-    refreshBrokerPref();
+  }
+  if(iLbl && iLink && s.connected && s.connected.ibkr){
+    const base = iLbl.textContent.replace(/ · (active|fallback).*$/,'').replace(/^Connect broker$/,'IBKR');
+    if(s.effective==='ibkr'){
+      iLbl.textContent = base + ' · active';
+      iLink.style.color='var(--green)';
+      iLink.title='IBKR executes your trades right now — click to manage the connection';
+    } else {
+      iLbl.textContent = base + ' · fallback';
+      iLink.style.color='';
+      iLink.title='IBKR is linked but idle — it only executes if the active broker fails. Click to manage.';
+    }
   }
 }
 // ── Broker switch (per-user, ADR-0027): Auto → Alpaca → IBKR → Auto. The choice
@@ -4633,19 +4663,24 @@ function _paintBrokerPref(pref, effective){
 async function refreshBrokerPref(){
   try{
     const s = await (await fetch('/api/broker/preference',{cache:'no-store'})).json();
-    if(s && s.preference) _paintBrokerPref(s.preference, s.effective);
+    if(s && s.preference){ _paintBrokerPref(s.preference, s.effective); applyBrokerActiveLabels(s); }
   }catch(e){ /* leave hidden */ }
 }
 async function cycleBrokerPref(){
   const next = _brokerPref==='auto' ? 'alpaca' : _brokerPref==='alpaca' ? 'ibkr' : 'auto';
   try{
-    const s = await (await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:next})})).json();
+    const r = await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:next})});
+    const s = await r.json();
     if(s && s.ok){
       _paintBrokerPref(s.preference, s.effective);
+      refreshBrokerPref();   // GET carries `connected` → restamps the · active / · fallback rows
       // Positions/equity now come from the newly preferred broker — refetch soon.
       if(typeof loadPositions==='function') setTimeout(loadPositions, 300);
+    } else {
+      // Don't fail silently — the old dead-button behavior read as "switch is broken".
+      alert('Could not switch broker: ' + ((s && (s.message || s.error)) || ('HTTP ' + r.status)));
     }
-  }catch(e){ /* keep old label */ }
+  }catch(e){ alert('Could not switch broker: ' + e.message); }
 }
 // One-click Alpaca connect state (ADR-0027). Three states:
 //  connected        → green "Alpaca · <acct>", click manages it on orchestration#broker
