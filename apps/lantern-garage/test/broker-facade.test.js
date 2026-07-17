@@ -77,13 +77,27 @@ test('neither broker connected → null (caller skips the user)', async () => {
 });
 
 test('preferredBroker(): env parsing — only "alpaca" flips it', () => {
-  const { preferredBroker } = loadFacadeWith(aliveAlpaca);
-  delete process.env.BROKER_PREFER;
-  assert.strictEqual(preferredBroker(), 'ibkr');
-  process.env.BROKER_PREFER = 'alpaca';
-  assert.strictEqual(preferredBroker(), 'alpaca');
-  process.env.BROKER_PREFER = 'nonsense';
-  assert.strictEqual(preferredBroker(), 'ibkr');
+  withPrefStore(() => {   // pin an empty store so a stray local-owner.json can't interfere
+    const { preferredBroker } = loadFacadeWith(aliveAlpaca);
+    delete process.env.BROKER_PREFER;
+    assert.strictEqual(preferredBroker(), 'ibkr');
+    process.env.BROKER_PREFER = 'alpaca';
+    assert.strictEqual(preferredBroker(), 'alpaca');
+    process.env.BROKER_PREFER = 'nonsense';
+    assert.strictEqual(preferredBroker(), 'ibkr');
+  });
+});
+
+test('preferredBroker(): no session id resolves as the owner (local-owner store)', () => {
+  withPrefStore((prefs) => {
+    const { preferredBroker } = loadFacadeWith(aliveAlpaca);
+    delete process.env.BROKER_PREFER;
+    assert.strictEqual(preferredBroker(null), 'ibkr');           // no stored choice → default
+    assert.ok(prefs.set('local-owner', 'alpaca'));               // ☰ switch on an auth-off box
+    assert.strictEqual(preferredBroker(null), 'alpaca');         // honored for id-less requests
+    assert.strictEqual(preferredBroker(undefined), 'alpaca');
+    assert.strictEqual(preferredBroker('someone-else'), 'ibkr'); // other users unaffected
+  });
 });
 
 // ── Per-user preference (broker-preference.js) — uses the REAL store in a temp dir ──

@@ -102,26 +102,30 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
   if (p === '/api/broker/preference') {
     const prefs = require('../lib/broker-preference');
     const { preferredBroker } = require('../lib/broker-facade');
+    // Owner-machine convention (same as routes/accounts.js): a request with no
+    // session id on a box whose auth funnel is off IS the owner — the identity the
+    // broker stores already use ('local-owner', e.g. ibkr-credentials). Without
+    // this, the ☰ broker switch 401s exactly for the single-user local setup the
+    // trader ships in. Patreon-gated deployments always have a session id, so
+    // anonymous internet visitors there never reach this fallback.
+    const prefUserId = userId != null ? userId : 'local-owner';
     if (method === 'GET') {
       let ibkrConnected = false;
-      try { ibkrConnected = require('../lib/ibkr-credentials').has(userId); } catch (_e) { /* absent module = not connected */ }
+      try { ibkrConnected = require('../lib/ibkr-credentials').has(prefUserId); } catch (_e) { /* absent module = not connected */ }
       const adapter = require('../lib/alpaca-adapter');
       return _json(res, 200, {
-        preference: prefs.get(userId),            // the stored choice (may be 'auto')
-        effective: preferredBroker(userId),       // what actually resolves after env/default
-        connected: { alpaca: adapter.available(userId), ibkr: ibkrConnected },
+        preference: prefs.get(prefUserId),        // the stored choice (may be 'auto')
+        effective: preferredBroker(prefUserId),   // what actually resolves after env/default
+        connected: { alpaca: adapter.available(prefUserId), ibkr: ibkrConnected },
       }), true;
     }
     if (method === 'POST') {
-      if (userId == null) {
-        return _json(res, 401, { error: 'not_signed_in', message: 'Sign in to choose a broker.' }), true;
-      }
       const body = await _readBody(req);
       const broker = String((body && body.broker) || '').toLowerCase();
-      if (!prefs.set(userId, broker)) {
+      if (!prefs.set(prefUserId, broker)) {
         return _json(res, 400, { error: 'invalid_broker', message: "broker must be 'alpaca', 'ibkr', or 'auto'" }), true;
       }
-      return _json(res, 200, { ok: true, preference: broker, effective: preferredBroker(userId) }), true;
+      return _json(res, 200, { ok: true, preference: broker, effective: preferredBroker(prefUserId) }), true;
     }
     return _json(res, 405, { error: 'method_not_allowed' }), true;
   }
