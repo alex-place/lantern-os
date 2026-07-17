@@ -297,6 +297,25 @@
   <section class="panel" id="broker">
     <h2>🔗 Broker Connection <span class="section-meta">connect your account</span></h2>
 
+    <!-- Which connected broker EXECUTES trades (per-user switch, ADR-0027). The cards
+         below manage CREDENTIALS; this picks the executor. The non-selected broker
+         always remains the automatic fallback, so switching can't strand an account. -->
+    <style>
+      #broker .bswitch{display:flex;gap:9px;margin:6px 0 4px;flex-wrap:wrap}
+      #broker .bsw{padding:9px 16px;border:1px solid var(--border);border-radius:9px;background:var(--bg0);color:var(--text1);cursor:pointer;font-size:.84rem;transition:border-color .15s,background .15s}
+      #broker .bsw:hover{border-color:var(--accent)}
+      #broker .bsw.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--text0);font-weight:700}
+    </style>
+    <div class="bgen" id="brokerSwitchCard">
+      <div class="bgen-head"><strong>🎛 Active broker</strong> <span class="bgen-sub">which account executes your trades — switch any time</span></div>
+      <div class="bswitch" role="radiogroup" aria-label="Active broker">
+        <button type="button" class="bsw" data-broker="auto" title="Follow the server default">Auto</button>
+        <button type="button" class="bsw" data-broker="alpaca" title="Execute on Alpaca">⚡ Alpaca</button>
+        <button type="button" class="bsw" data-broker="ibkr" title="Execute on Interactive Brokers">🔗 IBKR</button>
+      </div>
+      <p class="bhint" id="bswHint">Checking…</p>
+    </div>
+
     <!-- One-click tier (ADR-0027): Alpaca OAuth2 — no keys, paper by default -->
     <div class="bgen" id="alpacaCard" style="border-color:var(--accent)">
       <div class="bgen-head"><strong>⚡ Connect Alpaca</strong> <span class="bgen-sub">one click · recommended · paper by default</span></div>
@@ -1592,6 +1611,36 @@ openssl dhparam -out dhparam.pem 2048</pre>
     refresh();
   });
   refresh();
+})();
+
+// ── Active-broker switch (per-user, ADR-0027) — which connected account EXECUTES ──
+(function(){
+  const $=(id)=>document.getElementById(id);
+  const card=$('brokerSwitchCard'); if(!card) return;
+  const btns=[...card.querySelectorAll('.bsw')];
+  const NAME={alpaca:'Alpaca', ibkr:'IBKR'};
+  function paint(s){
+    btns.forEach(b=>b.classList.toggle('active', b.dataset.broker===s.preference));
+    const eff=NAME[s.effective]||s.effective;
+    const con=s.connected||{};
+    const conTxt=[con.alpaca?'Alpaca ✓':'Alpaca —', con.ibkr?'IBKR ✓':'IBKR —'].join(' · ');
+    $('bswHint').textContent =
+      (s.preference==='auto' ? `Auto → ${eff} executes your trades right now.` : `${eff} executes your trades.`) +
+      ` The other broker stays the automatic fallback. Connected: ${conTxt}`;
+  }
+  async function load(){
+    try{ const s=await (await fetch('/api/broker/preference',{cache:'no-store'})).json(); if(s&&s.preference) paint(s); }
+    catch(_e){ $('bswHint').textContent='Switch unavailable — server unreachable.'; }
+  }
+  btns.forEach(b=>b.addEventListener('click', async ()=>{
+    try{
+      const r=await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:b.dataset.broker})});
+      const s=await r.json();
+      if(s&&s.ok) load();
+      else $('bswHint').textContent='Could not switch: '+((s&&(s.message||s.error))||('HTTP '+r.status));
+    }catch(e){ $('bswHint').textContent='Could not switch: '+e.message; }
+  }));
+  load();
 })();
 
 // ── Broker connection (IBKR) — per-user (ADR-0022) ──
