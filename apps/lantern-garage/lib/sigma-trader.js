@@ -1,11 +1,11 @@
 'use strict';
 
 /**
- * champion-book.js — the long-horizon "Champion" allocation engine, live on the
+ * sigma-trader.js — the long-horizon "Sigma Trader" allocation engine, live on the
  * PAPER Alpaca account (ADR-0027 broker, ADR-0028 governance). Loop stage: Act,
  * but slow-and-diversified, NOT a day-trader.
  *
- * This is the deployment of the backtested Champion (experiments/dca_champion_2k.py):
+ * This is the deployment of the backtested Champion (now the Sigma Trader) (experiments/dca_champion_2k.py):
  * a momentum-tilted, shrunk-tangency allocation across a fixed ETF universe, scaled
  * by the streaming vol-target brake's live gross (brake-monitor.js), rebalanced with
  * a no-churn band. It composes three existing pieces:
@@ -16,7 +16,7 @@
  * GOVERNANCE (non-negotiable, matches ADR-0028):
  *   - PAPER ONLY. Refuses to trade a live (non-paper) Alpaca account outright.
  *   - DRY BY DEFAULT: rebalanceNow computes the plan and places NOTHING unless the
- *     caller explicitly arms it AND the operator set CHAMPION_ARM=1. "A person always
+ *     caller explicitly arms it AND the operator set SIGMA_ARM=1. "A person always
  *     decides."  Real capital stays gated on the Sharpe-CI mandate, which nothing has
  *     met — this only ever builds the paper track record the gate will one day measure.
  *   - Every rebalance is appended to a JSONL ledger so the gate can score it later.
@@ -29,7 +29,7 @@ const path = require('path');
 
 // Fixed universe — the 8-asset momentum book (matches experiments/dca_champion_2k.py).
 const UNIVERSE = ['SPY', 'QQQ', 'IWM', 'EFA', 'TLT', 'GLD', 'XMMO', 'SPMO'];
-const LEDGER = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'champion-book.jsonl');
+const LEDGER = path.join(__dirname, '..', 'data', 'lantern-garage', 'trading', 'sigma-trader.jsonl');
 const MAX_GROSS = 2.0;              // hard leverage ceiling (ADR-0028 §4)
 const DEFAULT_BAND_PCT = 0.6;       // don't trade a leg whose drift < this % of equity (no-churn)
 
@@ -158,16 +158,22 @@ function _liveGross() {
   } catch (_e) { return 1.0; }
 }
 
+// The Sigma Trader ALWAYS trades its own dedicated account — never the caller's
+// identity and never the shared day-trader book. Its broker resolves ONLY to a
+// dedicated Alpaca account (its own connected OAuth or SIGMA_ALPACA_* keys). When no
+// dedicated account is configured, the account fetch returns null → the engine plans
+// but refuses to place a single order, so it can NEVER collide with the day-trader.
+const acctId = () => require('./alpaca-adapter').SIGMA_USER;
+
 /**
- * Compute the current plan (weights, targets, drift orders) WITHOUT trading.
- * Reads the paper Alpaca account, daily bars for the universe, and the live brake.
+ * Compute the current plan (weights, targets, drift orders) WITHOUT trading. Reads
+ * the Sigma Trader's OWN Alpaca account, daily bars for the universe, and the brake.
  */
-async function plan(userId, { bandPct = DEFAULT_BAND_PCT } = {}) {
+async function plan({ bandPct = DEFAULT_BAND_PCT } = {}) {
   const alpaca = require('./alpaca-adapter');
   const yahoo = require('./market-data-yahoo');
-  const acct = await alpaca.getAccount(userId).catch(() => null);
-  if (!acct) return { ok: false, reason: 'no_alpaca_account' };
-  const equity = Number(acct.equity) || Number(acct.portfolio_value) || 0;
+  const uid = acctId();
+  const acct = await alpaca.getAccount(uid).catch(() => null);
   const bm = await yahoo.getBarsMulti(UNIVERSE, '1d').catch(() => ({ bars: {} }));
   const bars = (bm && bm.bars) || {};
   const closesBySym = {}; const prices = {};
@@ -177,39 +183,44 @@ async function plan(userId, { bandPct = DEFAULT_BAND_PCT } = {}) {
     if (b.length) prices[s] = b[b.length - 1].close;
   }
   const { weights, used, dropped } = targetWeights(closesBySym);
-  const pos = (await alpaca.getPositions(userId).catch(() => null)) || { positions: [] };
-  // prefer the broker's live price for held names
-  for (const p of pos.positions) if (p.current_price > 0) prices[String(p.symbol).toUpperCase()] = p.current_price;
   const gross = _liveGross();
+  // No dedicated Sigma account yet → return the target allocation but no orders, and
+  // flag it, so the UI can prompt "connect the Sigma Trader's own account".
+  if (!acct) {
+    return { ok: true, account: 'not_configured', equity: 0, gross, weights, used, dropped,
+      orders: [], targets: {}, note: 'The Sigma Trader has no dedicated account. Set SIGMA_ALPACA_API_KEY_ID/_SECRET (a SEPARATE Alpaca paper account) or connect one — it will not borrow the day-trader’s book.' };
+  }
+  const equity = Number(acct.equity) || Number(acct.portfolio_value) || 0;
+  const pos = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
+  for (const p of pos.positions) if (p.current_price > 0) prices[String(p.symbol).toUpperCase()] = p.current_price;
   const reb = computeRebalance({ equity, gross, weights, prices, positions: pos.positions, bandPct });
-  return { ok: true, env: acct.env || 'paper', equity, gross, weights, used, dropped, prices, positions: pos.positions, ...reb };
+  return { ok: true, account: acct.account_id, env: acct.env || 'paper', equity, gross, weights, used, dropped, prices, positions: pos.positions, ...reb };
 }
 
 /**
- * Rebalance the paper book toward the target. DRY unless BOTH arm:true AND
- * CHAMPION_ARM=1. Refuses a non-paper account. Places fractional PAPER market orders.
+ * Rebalance the Sigma Trader's OWN paper book toward the target. DRY unless BOTH
+ * arm:true AND SIGMA_ARM=1. Refuses a non-paper account. Refuses entirely if no
+ * dedicated Sigma account is configured (so it never touches the day-trader).
  */
-async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders = Infinity } = {}) {
-  const p = await plan(userId, { bandPct });
+async function rebalanceNow({ arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders = Infinity } = {}) {
+  const p = await plan({ bandPct });
   if (!p.ok) return p;
-  const armed = arm && process.env.CHAMPION_ARM === '1';
-  // Hard refuse: never trade a live account from this engine.
+  if (p.account === 'not_configured') return { ...p, executed: false, refused: 'no_dedicated_account' };
+  const armed = arm && process.env.SIGMA_ARM === '1';
   if (armed && p.env === 'live') { logLedger({ event: 'refused_live', equity: p.equity }); return { ...p, executed: false, refused: 'live_account_forbidden' }; }
   if (!armed) { logLedger({ event: 'plan_dry', equity: p.equity, gross: p.gross, weights: p.weights, orders: p.orders }); return { ...p, executed: false, dryRun: true }; }
   const alpaca = require('./alpaca-adapter');
+  const uid = acctId();
   const results = [];
-  // maxOrders bounds a controlled test (place N of the plan's legs); default = all.
   for (const o of p.orders.slice(0, maxOrders)) {
-    // A rebalance SELL fails with "insufficient qty available" when the shares are
-    // reserved by another engine's resting orders (e.g. the day-trader's protective
-    // stops on a shared paper account). Free them first so the champion's allocation
-    // can actually execute. (Cancelling working orders on a name we're exiting anyway.)
+    // Free shares reserved by resting orders before a sell (defensive — on its own
+    // account there should be none, but a prior partial rebalance could leave some).
     let cancelled = 0;
-    if (o.side === 'sell') cancelled = await alpaca.cancelOpenOrders(userId, o.symbol).catch(() => 0);
-    const r = await alpaca.placeOrder(userId, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
+    if (o.side === 'sell') cancelled = await alpaca.cancelOpenOrders(uid, o.symbol).catch(() => 0);
+    const r = await alpaca.placeOrder(uid, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
     results.push({ ...o, cancelledResting: cancelled, status: r && r.status, order_id: r && r.order_id, reason: r && r.reason });
   }
-  logLedger({ event: 'rebalance', equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
+  logLedger({ event: 'rebalance', account: p.account, equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
   return { ...p, executed: true, results };
 }
 
