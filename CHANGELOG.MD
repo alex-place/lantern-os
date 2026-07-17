@@ -5102,7 +5102,7 @@ incumbent's **0.65**, so the eval gate **rejected** it and left `final/` untouch
 flywheel working as designed. The finding: distilling into a *fresh* adapter from base
 narrows the model; the follow-up is to continue-train from the incumbent and grow/harden the
 corpus. Design + full numbers:
-[docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md](../docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md).
+[docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md](docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md).
 </content>
 
 ---

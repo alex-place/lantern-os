@@ -134,6 +134,21 @@ jobs:
       - name: Run sprawl tripwire
         run: node scripts/sprawl-tripwire.mjs --base origin/master
 
+  # ── Markdown link integrity (#2532) ─────────────────────────────────────────
+  # The 2026-07-16 README audit found 7+ dead internal links in the README alone.
+  # Blocking tier: README.md + root *.md (started clean). docs/** is warn-only
+  # until its pre-existing backlog is burned down, then flips via --strict.
+  md-link-check:
+    name: Markdown link integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Check relative markdown links
+        run: node scripts/check-md-links.mjs
+
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
   # keyword/regex intercepts (which once turned "world news" into "Now playing —
