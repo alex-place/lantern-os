@@ -7,6 +7,9 @@
 *.pfx
 *.secret
 secrets/
+API Keys.txt
+*api*keys*.txt
+*API*Keys*.txt
 
 # ─── Private / PII data (never commit) ────────────────────────────────────────
 data/private/**
