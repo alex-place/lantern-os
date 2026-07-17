@@ -273,6 +273,7 @@ const portfolioRoutes = require('./trading/portfolio');
 const optionsRoutes = require('./trading/options');
 const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
+const scorecardRoutes = require('./trading/scorecard');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -318,6 +319,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await optionsRoutes(req, res, url, ctx)) return true;
   if (await brakeRoutes(req, res, url, ctx)) return true;
   if (await demoRoutes(req, res, url, ctx)) return true;
+  if (await scorecardRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;
