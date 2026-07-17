@@ -174,9 +174,11 @@
       transition: border-color .15s, background .15s;
     }
     .access-card:hover { border-color: var(--accent); background: var(--surface2); }
-    .access-card.locked {
-      opacity: .45; cursor: default; pointer-events: none;
-    }
+    /* #2653: locked cards are now links to /pricing.html — the user is at peak
+       upgrade intent, so don't swallow the click. Keep them dimmed but lift opacity
+       from .45 so the 'Requires …' line clears the contrast floor. */
+    .access-card.locked { opacity: .6; }
+    .access-card.locked .upsell { color: var(--accent-strong); font-weight: 700; white-space: nowrap; }
     .access-icon { font-size: 20px; flex-shrink: 0; }
     .access-label { font-size: 13px; font-weight: 600; color: var(--text); }
     .access-req   { font-size: 11px; color: var(--muted); margin-top: 2px; }
@@ -520,10 +522,10 @@ function renderProfile(profile) {
            <span class="access-icon">${f.emoji}</span>
            <div><div class="access-label">${f.label}</div>${f.note ? `<div class="access-req">${escapeHtml(f.note)}</div>` : ''}</div>
          </a>`
-      : `<div class="access-card locked" title="${escapeHtml(reqLabel)}">
+      : `<a class="access-card locked" href="/pricing.html" title="${escapeHtml(reqLabel)} — see plans">
            <span class="access-icon">${f.emoji}</span>
-           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)}</div></div>
-         </div>`;
+           <div><div class="access-label">${f.label}</div><div class="access-req">${escapeHtml(f.note ? f.note + ' · ' + reqLabel : reqLabel)} · <span class="upsell">Upgrade →</span></div></div>
+         </a>`;
   }).join('');
 
   wrap.innerHTML = `
