@@ -259,6 +259,35 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
     return true;
   }
+  // #2554 — refer-a-friend. GET /api/referral/link → the SESSION user's signed
+  // share link (+ raw code). Requires a session; the code is a keyed HMAC so it
+  // can't be forged or enumerated.
+  if (url.pathname === "/api/referral/link" && req.method === "GET") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const uid = getEffectiveUserId(req);
+      if (!uid) { sendJson(res, { ok: false, error: "login_required" }, 401); return true; }
+      const ref = require("../lib/referrals");
+      const origin = (req.headers["x-forwarded-proto"] ? req.headers["x-forwarded-proto"].split(",")[0] : "http")
+        + "://" + (req.headers.host || "www.unisona.ai");
+      sendJson(res, { ok: true, code: ref.codeFor(uid), link: ref.linkFor(uid, origin) }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // GET /api/referral/report — operator-gated: per-referrer signups + conversions
+  // (a conversion = a referee who reached composite-active; the reward-eligible set).
+  if (url.pathname === "/api/referral/report" && req.method === "GET") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      sendJson(res, { ok: true, ...require("../lib/referrals").conversions() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   // #2556 — UnisonaTrader research partner (Business/Pilot tier). Returns an
   // evidence-cited research brief for a symbol; every quantitative claim traces to
   // a tool-call receipt in the run log. NOT advice — the brief carries a disclaimer
