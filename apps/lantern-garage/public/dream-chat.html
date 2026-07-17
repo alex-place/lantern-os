@@ -438,6 +438,59 @@
 
 <script src="js/voice-dictation.js?v=20260630-voice"></script>
 <script src="js/dream-chat.js?v=20260716-dead-surfaces"></script>
+<script>
+/* ── PMF fit-check (#2551) — shown ONCE, only to composite-active users. ─────
+   GET /api/pmf/survey is the single gate: the server records pmf_prompted and
+   answers show:true exactly once per eligible user, so this client stays dumb —
+   no localStorage heuristics that could double-prompt across devices. */
+(function pmfSurvey() {
+  setTimeout(async () => {
+    let sv;
+    try { sv = await fetch('/api/pmf/survey').then((r) => r.json()); } catch { return; }
+    if (!sv || !sv.show) return;
+    const card = document.createElement('div');
+    card.id = 'pmf-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'One quick question');
+    card.style.cssText = 'position:fixed;right:18px;bottom:84px;z-index:1200;max-width:340px;'
+      + 'background:var(--surface,#111827);border:1px solid var(--border,#1f2937);border-radius:14px;'
+      + 'padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.4);font-size:14px;color:var(--text,#f3f4f6)';
+    const FEELS = [
+      ['very_disappointed', 'Very disappointed'],
+      ['somewhat_disappointed', 'Somewhat disappointed'],
+      ['not_disappointed', 'Not disappointed'],
+    ];
+    card.innerHTML = '<div style="font-weight:700;margin-bottom:4px">One quick question</div>'
+      + '<div style="margin-bottom:10px">' + sv.question + '</div>'
+      + FEELS.map(([v, l]) => '<button type="button" data-feel="' + v + '" style="display:block;width:100%;margin:6px 0;'
+        + 'padding:9px 12px;border-radius:10px;border:1px solid var(--border,#1f2937);background:none;'
+        + 'color:inherit;cursor:pointer;text-align:left">' + l + '</button>').join('')
+      + '<textarea id="pmf-benefit" placeholder="Optional: the main benefit you get / what you would use instead" rows="2" '
+      + 'style="display:none;width:100%;margin-top:8px;border-radius:8px;border:1px solid var(--border,#1f2937);'
+      + 'background:none;color:inherit;padding:8px;font:inherit"></textarea>'
+      + '<button type="button" id="pmf-close" aria-label="Dismiss" '
+      + 'style="position:absolute;top:8px;right:10px;border:none;background:none;color:var(--muted,#9ca3af);cursor:pointer;font-size:15px">✕</button>';
+    document.body.appendChild(card);
+    let chosen = null;
+    card.querySelector('#pmf-close').addEventListener('click', () => card.remove());
+    card.querySelectorAll('[data-feel]').forEach((b) => b.addEventListener('click', async () => {
+      if (!chosen) {
+        chosen = b.dataset.feel;
+        card.querySelectorAll('[data-feel]').forEach((x) => { x.style.opacity = x === b ? '1' : '.4'; x.style.borderColor = x === b ? 'var(--accent,#06b6d4)' : ''; });
+        const ta = card.querySelector('#pmf-benefit');
+        ta.style.display = 'block';
+        b.textContent = '✓ ' + b.textContent + ' — click again to send';
+        return;
+      }
+      if (b.dataset.feel !== chosen) return;
+      const benefit = card.querySelector('#pmf-benefit').value;
+      try { await fetch('/api/pmf/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeling: chosen, benefit }) }); } catch {}
+      card.innerHTML = '<div style="font-weight:700">Thank you 🙏</div><div style="color:var(--muted,#9ca3af);margin-top:4px">Your answer shapes what gets built next.</div>';
+      setTimeout(() => card.remove(), 3500);
+    }));
+  }, 4000); // let the chat settle first — the survey must never beat the product to the screen
+})();
+</script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/terminal-skin.js?v=20260630-terminal"></script>
 <script src="/js/dream-chat-ui.js?v=20260716-dead-surfaces"></script>

@@ -215,6 +215,67 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
     return true;
   }
+  // #2551 — the Sean Ellis PMF fit-check (Level-2 gate: >=40% "very disappointed").
+  // GET /api/pmf/survey — for the SESSION user: if they're composite-active and have
+  // never been asked, records pmf_prompted and returns the survey (prompt-once is
+  // thereby auditable from the ledger). Anyone else gets {show:false, reason}.
+  if (url.pathname === "/api/pmf/survey" && req.method === "GET") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const r = await pmf.recordPrompted(uid, { source: "GET /api/pmf/survey" });
+      if (!r.ok) { sendJson(res, { show: false, reason: r.reason }, 200); return true; }
+      sendJson(res, {
+        show: true,
+        question: "How would you feel if you could no longer use unisona.ai?",
+        options: pmf.FEELINGS,
+      }, 200);
+    } catch (e) { sendJson(res, { show: false, error: e.message }, 500); }
+    return true;
+  }
+  // POST /api/pmf/response — {feeling, benefit?, alternative?}; one per user ever.
+  if (url.pathname === "/api/pmf/response" && req.method === "POST") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const body = JSON.parse((await deps.collectRequestBody(req)) || "{}");
+      const r = await pmf.recordResponse(uid, body, { source: "POST /api/pmf/response" });
+      sendJson(res, r, r.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // GET /api/pmf/tally — operator-gated (free-text + per-user ids), vs the 40% bar.
+  if (url.pathname === "/api/pmf/tally" && req.method === "GET") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      sendJson(res, { ok: true, ...require("../lib/pmf-survey").tally() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // #2556 — UnisonaTrader research partner (Business/Pilot tier). Returns an
+  // evidence-cited research brief for a symbol; every quantitative claim traces to
+  // a tool-call receipt in the run log. NOT advice — the brief carries a disclaimer
+  // and contains no buy/sell imperatives. Free/Pro hit a clean upgrade gate (403).
+  if (url.pathname === "/api/unisona-trader/research" && req.method === "GET") {
+    try {
+      const { requireEntitlement } = require("../lib/auth-middleware");
+      // "ai_trader" is the $200 Pilot/Business-tier entitlement — reuse it so
+      // Free/Pro get the standard 403 upgrade page, admins pass, and this stays
+      // consistent with the (dormant) plan-matrix's unisona_trader→pilot mapping.
+      if (!requireEntitlement(req, res, "ai_trader")) return true; // 403/302 already sent
+      const symbol = url.searchParams.get("symbol") || url.searchParams.get("ticker") || "";
+      const brief = await require("../lib/unisona-trader").researchBrief(symbol);
+      sendJson(res, brief, brief.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   if (url.pathname === "/api/traction/level1") {
     try {
       const { isOperatorRequest } = require("../lib/request-auth");
