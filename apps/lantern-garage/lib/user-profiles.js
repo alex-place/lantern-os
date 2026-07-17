@@ -221,38 +221,25 @@ function getProfileByStripeCustomer(customerId) {
  * List all profiles (admin view).
  */
 function listProfiles(filter = {}) {
-  ensureDirectories();
-  const profiles = new Map();
-
-  // Read JSONL index and keep latest version of each profile
-  if (fs.existsSync(PROFILES_INDEX)) {
-    const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
-    lines.forEach((line) => {
-      try {
-        const profile = JSON.parse(line);
-        profiles.set(profile.id, profile);
-      } catch (e) {
-        console.error("[PROFILES] Invalid JSON in index:", e.message);
-      }
-    });
-  }
-
-  // Convert to array and filter
-  let results = Array.from(profiles.values());
+  // Serve from the in-memory index instead of re-reading + re-parsing the whole JSONL
+  // on every call (#2611). The index is authoritative once loaded (all writes update it).
+  ensureFullIndex();
+  let results = Array.from(profileCache.values());
 
   if (filter.role) {
     results = results.filter((p) => p.role === filter.role);
   }
   if (filter.source) {
-    results = results.filter((p) => p.metadata.source === filter.source);
+    results = results.filter((p) => p.metadata && p.metadata.source === filter.source);
   }
   if (filter.search) {
     const q = filter.search.toLowerCase();
+    // Null-safe: a record missing name/email must not throw the admin search (#2607).
     results = results.filter(
       (p) =>
-        p.name.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q) ||
-        p.id.includes(q)
+        (p.name || "").toLowerCase().includes(q) ||
+        (p.email || "").toLowerCase().includes(q) ||
+        String(p.id || "").includes(q)
     );
   }
 
@@ -263,8 +250,9 @@ function listProfiles(filter = {}) {
  * Delete a profile (hard delete).
  */
 function deleteProfile(userId) {
+  // Keep the tombstone in the in-memory index (do NOT clearProfileCache) so the
+  // deleted state stays O(1) for isProfileDeleted / the session gate (#2611, #2608).
   updateProfile(userId, { deleted: true, deletedAt: new Date().toISOString() });
-  clearProfileCache(userId);
 }
 
 /**
@@ -344,7 +332,32 @@ function importFromCSF(csfData) {
 
 // ── Internal helpers ──
 
-let profileCache = new Map(); // In-memory cache for performance
+let profileCache = new Map(); // In-memory index: id -> latest record (incl. tombstones)
+let _fullIndexLoaded = false;
+
+/**
+ * Load the ENTIRE profiles JSONL into the in-memory index ONCE (#2611). Before this,
+ * every login (email lookup), every Stripe webhook (customer lookup), and every
+ * list re-read and re-parsed the whole append-only file — which grows with every
+ * profile update and would eventually hard-fail auth/billing on read time alone.
+ *
+ * All writes go through createProfile/updateProfile, which updateProfileCache() the
+ * new record, so the index stays authoritative after this initial load. Single
+ * writer process per data dir (the dual-boot pair runs from separate worktrees), so
+ * no cross-process invalidation is needed — same assumption the cache already made.
+ */
+function ensureFullIndex() {
+  if (_fullIndexLoaded) return;
+  ensureDirectories();
+  if (fs.existsSync(PROFILES_INDEX)) {
+    const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n");
+    for (const line of lines) {
+      if (!line) continue;
+      try { const p = JSON.parse(line); if (p && p.id) profileCache.set(p.id, p); } catch (e) { /* skip bad line */ }
+    }
+  }
+  _fullIndexLoaded = true;
+}
 
 function updateProfileCache(profile) {
   profileCache.set(profile.id, profile);
@@ -355,41 +368,12 @@ function clearProfileCache(userId) {
 }
 
 function loadProfileFromIndex(userId) {
-  // A tombstoned (deleted) profile resolves to null everywhere it matters — a
-  // deleted account must not authenticate, receive billing grants, or reset its
-  // password (#2608). deleteProfile appends { deleted:true } as the latest record.
-  // Check cache first.
-  if (profileCache.has(userId)) {
-    const cached = profileCache.get(userId);
-    return cached && cached.deleted ? null : cached;
-  }
-
-  ensureDirectories();
-
-  // Read JSONL and find latest version
-  if (!fs.existsSync(PROFILES_INDEX)) {
-    return null;
-  }
-
-  const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
-  let latest = null;
-
-  for (const line of lines) {
-    try {
-      const profile = JSON.parse(line);
-      if (profile.id === userId) {
-        latest = profile;
-      }
-    } catch (e) {
-      // Skip invalid lines
-    }
-  }
-
-  if (latest) {
-    updateProfileCache(latest);
-  }
-
-  return latest && latest.deleted ? null : latest;
+  // O(1) after the one-time index load — no per-id file rescans (#2611). A tombstoned
+  // (deleted) profile resolves to null everywhere it matters — a deleted account must
+  // not authenticate, receive billing grants, or reset its password (#2608).
+  ensureFullIndex();
+  const cached = profileCache.get(userId);
+  return cached && !cached.deleted ? cached : null;
 }
 
 /**
@@ -399,16 +383,9 @@ function loadProfileFromIndex(userId) {
  */
 function isProfileDeleted(userId) {
   if (!userId) return false;
-  const cached = profileCache.get(userId);
-  if (cached) return cached.deleted === true;
-  ensureDirectories();
-  if (!fs.existsSync(PROFILES_INDEX)) return false;
-  const lines = fs.readFileSync(PROFILES_INDEX, "utf-8").split("\n").filter(Boolean);
-  let latest = null;
-  for (const line of lines) {
-    try { const p = JSON.parse(line); if (p.id === userId) latest = p; } catch (e) { /* skip */ }
-  }
-  return !!(latest && latest.deleted);
+  ensureFullIndex();
+  const p = profileCache.get(userId);
+  return !!(p && p.deleted);
 }
 
 // ── Patreon <-> Discord account linking (#697) ──
