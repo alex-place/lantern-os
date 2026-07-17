@@ -90,6 +90,7 @@ function cfg() {
     takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
     momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
     momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
+    entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
     // Lets the user protect open positions without arming full autopilot entries.
     manageExits: process.env.TRADER_MANAGE_EXITS === '1',
@@ -177,6 +178,23 @@ function _loadState() {
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
+
+/**
+ * Falling-knife filter for ENTRIES. The autopilot buys mean-reversion dips (support
+ * / oversold RSI), which is right in theory but catches knives when down-momentum is
+ * still accelerating. Returns true when the recent trend is CRATERING — MACD histogram
+ * negative AND still falling (this bar more negative than the last) — i.e. don't buy
+ * yet; wait for the histogram to turn up (decelerating), even if still negative. A
+ * histogram that is rising (turning) passes: that's the stabilization we want to buy.
+ * Pure + testable; fail-open (insufficient data → NOT a knife, don't block entries).
+ */
+function isFallingKnife(closes) {
+  if (!Array.isArray(closes) || closes.length < 36) return false;   // need 2 MACD reads
+  const now = macd(closes);
+  const prev = macd(closes.slice(0, -1));
+  if (!now || !prev) return false;
+  return now.histogram < 0 && now.histogram < prev.histogram;        // negative AND deepening
+}
 
 /**
  * Ratcheting trailing-stop distance: the more a winner has run, the TIGHTER we
@@ -367,6 +385,18 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 
   let opened = 0;
 
+  // Falling-knife filter: one batched fetch of the momentum-timeframe bars for the
+  // ENTER candidates, so the BULLISH branch can veto buying into cratering momentum
+  // without a per-symbol fetch. Fail-soft — no bars → filter simply doesn't block.
+  let entryBars = {};
+  if (c.entryKnifeFilter && enters.length) {
+    try {
+      const syms = [...new Set(enters.map((s) => String(s.symbol).toUpperCase()))];
+      const bm = await yahoo.getBarsMulti(syms, c.momentumTf);
+      entryBars = (bm && bm.bars) || {};
+    } catch (_e) { entryBars = {}; }
+  }
+
   for (const s of enters) {
     const sym = String(s.symbol).toUpperCase();
     const price = Number(s.entry_price) || 0;
@@ -433,6 +463,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
     if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bullish scans (persistence)` }); continue; }
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
+    // Falling-knife veto: don't buy the dip while down-momentum is still accelerating.
+    // Wait for the momentum to turn (histogram rising, even if negative). (#c)
+    if (c.entryKnifeFilter) {
+      const closes = ((entryBars[sym] && entryBars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
+      if (isFallingKnife(closes)) { out.skipped.push({ ...record, why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' }); continue; }
+    }
     // Defensive: on a stray short, clear any stale resting orders before re-entering.
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
 
@@ -469,4 +505,4 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _saveState(); }
 
-module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, _resetCooldowns, _saveState, _loadState, STATE_FILE };
+module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };

@@ -66,3 +66,32 @@ test('_saveState writes a valid snapshot to the real STATE_FILE; _loadState read
   assert.strictEqual(typeof snap.savedAt, 'number');
   assert.doesNotThrow(() => at._loadState());               // reload must be safe
 });
+
+test('isFallingKnife: true when momentum still cratering, false once it turns', () => {
+  // Flat, then a sharp accelerating late drop → MACD histogram negative AND deepening → knife.
+  const crater = [...Array.from({ length: 45 }, () => 100), ...Array.from({ length: 15 }, (_, i) => 100 - Math.pow(i + 1, 1.8) * 0.4)];
+  assert.strictEqual(at.isFallingKnife(crater), true);
+  // A downtrend that bottoms and turns up in the last bars → histogram rising → NOT a knife.
+  const turn = [...Array.from({ length: 45 }, (_, i) => 100 - i * 1.2), ...Array.from({ length: 15 }, (_, i) => 46 + i * 1.4)];
+  assert.strictEqual(at.isFallingKnife(turn), false);
+  // A steady uptrend is never a knife.
+  const up = Array.from({ length: 60 }, (_, i) => 50 + i * 0.8);
+  assert.strictEqual(at.isFallingKnife(up), false);
+});
+
+test('isFallingKnife: fail-open on insufficient data (does not block entries)', () => {
+  assert.strictEqual(at.isFallingKnife([]), false);
+  assert.strictEqual(at.isFallingKnife(Array.from({ length: 20 }, () => 10)), false);
+});
+
+test('entryKnifeFilter config defaults on, disables via env', () => {
+  const saved = process.env.TRADER_ENTRY_KNIFE_FILTER;
+  try {
+    delete process.env.TRADER_ENTRY_KNIFE_FILTER;
+    assert.strictEqual(at.cfg().entryKnifeFilter, true);
+    process.env.TRADER_ENTRY_KNIFE_FILTER = '0';
+    assert.strictEqual(at.cfg().entryKnifeFilter, false);
+  } finally {
+    if (saved === undefined) delete process.env.TRADER_ENTRY_KNIFE_FILTER; else process.env.TRADER_ENTRY_KNIFE_FILTER = saved;
+  }
+});
