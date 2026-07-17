@@ -1,0 +1,3 @@
+### Removed
+
+- dead `public/` orphans (145 lines): **`test-file.js`** — a one-line throwaway (`test code change`) committed to verify auto-merge could process real code; and **`courtney.js`** — an orphaned 144-line dreamer-notebook form script that no page loads and which binds to a `dreamerForm` element present on no served page (a leftover the personal-name privacy sweep missed). Verified: neither is referenced by any HTML `<script>`, route, manifest, or CI config; the only `courtney`-named file that survives is the unrelated `courtney.json` creator fixture in `traction.test.js`. (`sw.js` was intentionally kept — it's a defensive service-worker self-cleanup whose removal has client-cache-lifecycle implications.)
