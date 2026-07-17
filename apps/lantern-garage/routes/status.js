@@ -278,6 +278,23 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
     return true;
   }
+  // #2556 — UnisonaTrader research partner (Business/Pilot tier). Returns an
+  // evidence-cited research brief for a symbol; every quantitative claim traces to
+  // a tool-call receipt in the run log. NOT advice — the brief carries a disclaimer
+  // and contains no buy/sell imperatives. Free/Pro hit a clean upgrade gate (403).
+  if (url.pathname === "/api/unisona-trader/research" && req.method === "GET") {
+    try {
+      const { requireEntitlement } = require("../lib/auth-middleware");
+      // "ai_trader" is the $200 Pilot/Business-tier entitlement — reuse it so
+      // Free/Pro get the standard 403 upgrade page, admins pass, and this stays
+      // consistent with the (dormant) plan-matrix's unisona_trader→pilot mapping.
+      if (!requireEntitlement(req, res, "ai_trader")) return true; // 403/302 already sent
+      const symbol = url.searchParams.get("symbol") || url.searchParams.get("ticker") || "";
+      const brief = await require("../lib/unisona-trader").researchBrief(symbol);
+      sendJson(res, brief, brief.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   if (url.pathname === "/api/traction/level1") {
     try {
       const { isOperatorRequest } = require("../lib/request-auth");
