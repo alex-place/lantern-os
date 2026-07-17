@@ -400,7 +400,11 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
+    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
+    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
+    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
+    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
