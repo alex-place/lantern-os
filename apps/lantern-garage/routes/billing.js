@@ -265,6 +265,29 @@ async function handleEvent(event) {
   }
 }
 
+// Eager-sync a just-completed checkout into the caller's OWN profile. Returns true if it
+// applied anything. The `cs.client_reference_id === userId` gate means a caller can only
+// ever sync THEIR own checkout — but this now runs behind an authenticated same-origin
+// POST (not a state-changing GET reachable by cross-site navigation), so the ownership
+// check is defense-in-depth rather than the sole CSRF barrier (#2648). Idempotent — the
+// webhook re-applies the same absolute state.
+async function eagerSyncCheckout(userId, sessionId) {
+  if (!userId || !sessionId) return false;
+  try {
+    const cs = await stripe().checkout.sessions.retrieve(sessionId);
+    if (!cs || cs.client_reference_id !== userId) return false; // only the caller's own checkout
+    const customerId = typeof cs.customer === "string" ? cs.customer : (cs.customer && cs.customer.id);
+    if (customerId) applyStripeState(userId, { customerId });
+    if (cs.subscription) {
+      const sub = await stripe().subscriptions.retrieve(
+        typeof cs.subscription === "string" ? cs.subscription : cs.subscription.id
+      );
+      syncSubscription(sub, userId);
+    }
+    return true;
+  } catch (e) { console.error("[BILLING] eager-sync failed", e.message); return false; }
+}
+
 module.exports = async function billingRoutes(req, res, url, deps) {
   const { sendJson } = deps;
   if (!url.pathname.startsWith("/api/billing/") && url.pathname !== "/billing/success") return false;
@@ -451,6 +474,26 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     return true;
   }
 
+  // ── Post-checkout eager-sync (authenticated same-origin POST) ────────────────
+  // Moved off the GET /billing/success redirect so no state change rides a cross-site
+  // navigation (#2648). Applies the caller's own just-completed checkout immediately
+  // (the webhook is still the source of truth and re-applies it), then refreshes the
+  // session role so the UI reflects the new tier without a re-login.
+  if (url.pathname === "/api/billing/sync" && req.method === "POST") {
+    const userId = getEffectiveUserId(req);
+    if (!userId) { sendJson(res, { error: "auth_required" }, 401); return true; }
+    let body = {};
+    try { body = JSON.parse(await deps.collectRequestBody(req) || "{}"); } catch { /* empty ok */ }
+    const synced = await eagerSyncCheckout(userId, String(body.session_id || ""));
+    const fresh = getProfile(userId);
+    const sess = getSessionUser(req);
+    if (fresh && sess) setSessionUser(req, { ...sess, role: fresh.role, entitlements: fresh.entitlements || {} });
+    const done = () => sendJson(res, { ok: true, synced, role: (fresh && fresh.role) || null });
+    if (req.session && typeof req.session.save === "function") { try { req.session.save(done); } catch { done(); } }
+    else done();
+    return true;
+  }
+
   // ── Post-checkout return: eager-sync the grant, then refresh the session role ──
   // Stripe redirects the browser here BEFORE it delivers checkout.session.completed, so
   // the profile role is still pre-purchase at this moment. We use the session_id to
@@ -459,35 +502,14 @@ module.exports = async function billingRoutes(req, res, url, deps) {
   // instead of only after the webhook lands / a re-login. The webhook remains the source
   // of truth; this is a best-effort eager mirror gated to THIS user's own session.
   if (url.pathname === "/billing/success" && req.method === "GET") {
-    const userId = getEffectiveUserId(req);
-    if (userId) {
-      const sessionId = url.searchParams.get("session_id");
-      if (sessionId) {
-        try {
-          const cs = await stripe().checkout.sessions.retrieve(sessionId);
-          if (cs && cs.client_reference_id === userId) { // only sync the caller's own checkout
-            const customerId = typeof cs.customer === "string" ? cs.customer : (cs.customer && cs.customer.id);
-            if (customerId) applyStripeState(userId, { customerId });
-            if (cs.subscription) {
-              const sub = await stripe().subscriptions.retrieve(
-                typeof cs.subscription === "string" ? cs.subscription : cs.subscription.id
-              );
-              syncSubscription(sub, userId);
-            }
-          }
-        } catch (e) { console.error("[BILLING] success eager-sync failed", e.message); }
-      }
-      const fresh = getProfile(userId);
-      const sess = getSessionUser(req);
-      if (fresh && sess) {
-        setSessionUser(req, { ...sess, role: fresh.role, entitlements: fresh.entitlements || {} });
-      }
-    }
-    // Persist the session BEFORE redirecting so the next page load reads the fresh role
-    // (avoids a redirect-vs-save race). Fall back to an immediate redirect if no store.
-    const go = () => { res.writeHead(302, { Location: "/pricing.html?checkout=success" }); res.end(); };
-    if (req.session && typeof req.session.save === "function") { try { req.session.save(go); } catch { go(); } }
-    else go();
+    // Stripe redirects the browser here (a cross-site top-level GET), so this MUST NOT
+    // mutate state (#2648) — it only forwards the session id to the pricing page, which
+    // then triggers the eager-sync via an authenticated same-origin POST below. No Stripe
+    // calls, no role writes on the GET.
+    const sessionId = url.searchParams.get("session_id") || "";
+    const q = sessionId ? `?checkout=success&cs=${encodeURIComponent(sessionId)}` : "?checkout=success";
+    res.writeHead(302, { Location: `/pricing.html${q}` });
+    res.end();
     return true;
   }
 
