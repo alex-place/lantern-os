@@ -269,6 +269,15 @@
   <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
 </head>
 <body>
+<script>
+  /* #2554: capture a referral code from ?ref= and persist it so it survives the
+     auth redirect and reaches the register POST. Stored once; never overwritten by
+     a later bare visit, so the first referrer wins. */
+  (function(){try{
+    var m=new URLSearchParams(location.search).get('ref');
+    if(m && /^[a-z0-9]{6,16}$/.test(m) && !localStorage.getItem('unisona_ref')) localStorage.setItem('unisona_ref', m);
+  }catch(e){}})();
+</script>
 
 <!-- ── Whole-screen file drop overlay ── -->
 <div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">files → attached to chat &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
@@ -441,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = prefix + 'v' + v;
       el.style.cursor = 'pointer';
       el.title = 'View changelog';
-      el.onclick = () => window.open('/repo/CHANGELOG.MD', '_blank');
+      el.onclick = () => window.open('/changelog.html', '_blank');
     });
   }
 

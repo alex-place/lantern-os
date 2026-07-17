@@ -234,7 +234,7 @@ Authorization URL: https://mcp.lantern-os.net/oauth/authorize?provider=discord
 Callback: https://mcp.lantern-os.net/oauth/callback/discord
 ```
 
-See [`docs/OAUTH2-MCP-SETUP.md`](OAUTH2-MCP-SETUP.md) for full configuration.
+See ``docs/OAUTH2-MCP-SETUP.md`` for full configuration.
 
 ---
 
@@ -291,8 +291,8 @@ Go to [Cloudflare Dashboard → Tunnels](https://dash.cloudflare.com/tunnels) an
 
 ## Next Steps
 
-1. **[Email Setup](./CLOUDFLARE-EMAIL-SETUP.md)** — Configure lantern-os.net email
-2. **[OAuth2 MCP](./OAUTH2-MCP-SETUP.md)** — Set up OAuth2 authentication
+1. **`Email Setup`** — Configure lantern-os.net email
+2. **`OAuth2 MCP`** — Set up OAuth2 authentication
 3. **[Zero Trust](https://developers.cloudflare.com/cloudflare-one/)** — Require login before access
 4. **[Analytics](https://dash.cloudflare.com/analytics)** — Monitor traffic and performance
 

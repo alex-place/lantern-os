@@ -33,16 +33,14 @@ function accountOrigin(req) {
 function readBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    // Over the 1MB cap: settle (null) BEFORE destroying. req.destroy() emits neither
-    // 'end' nor 'error', so without this the awaiting handler hangs forever and leaks
-    // its frames (#2649). 'close' is a belt-and-suspenders settle; resolve() is idempotent.
+    // #2649: destroying the request on the size cap kills 'data'/'end', so the
+    // promise never settled and change-password/change-email hung forever. Resolve
+    // (null) on the cap AND on teardown ('close'); resolve() is idempotent so the
+    // races are harmless. The awaiting handler then answers instead of leaking.
     req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
-    const done = () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } };
-    req.on("end", done);
+    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
-    // 'close' can fire before/instead of 'end' (over-cap destroy, or undici ordering);
-    // settle from whatever body arrived rather than clobbering a good parse (#2649 follow-up).
-    req.on("close", done);
+    req.on("close", () => resolve(null));
   });
 }
 
@@ -61,11 +59,15 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const profile = getProfile(userId);
-    // An authenticated session whose profile record is gone (index reset/migrated while a
-    // disk-persisted session survived) must NOT return 200 with body `null` — clients do
-    // `await res.json()` and then read fields off it, turning a recoverable "signed out"
-    // state into a TypeError. Answer 404 like the change-password/-email handlers (#2651).
-    if (!profile) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
+    // #2651: a disk-persisted session can outlive its profile record (index reset /
+    // migration). Returning 200 with a null body made clients (profile.html,
+    // auth-gate nav badge) do `(await res.json()).role` → TypeError instead of a
+    // recoverable signed-out state. Answer 401 unknown_account so the client treats
+    // it as signed-out; mirrors the change-password handler's unknown_account branch.
+    if (!profile) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "unknown_account", signedOut: true }));
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(publicProfile(profile)));
   }
@@ -357,3 +359,7 @@ module.exports = async function profileRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Test seam (#2649): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readBody = readBody;

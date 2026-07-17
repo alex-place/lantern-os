@@ -12,10 +12,10 @@
  * External URLs are deliberately NOT fetched (flake); anchors are not resolved
  * (heading slugs move too often to gate on).
  *
- * Ratchet: the ROOT tier (README.md + root *.md) BLOCKS — it started clean.
- * docs/** starts as WARN-only (124 pre-existing dead links at introduction —
- * tracked for burn-down; see the follow-up issue) and flips to blocking with
- * --strict once the backlog is cleared. New rot in the root tier can't land.
+ * Ratchet: the ROOT tier (README.md + root *.md) always BLOCKS. docs/** started
+ * WARN-only (124 pre-existing dead links at introduction, #2600) and was flipped
+ * to blocking on 2026-07-17 after the burn-down — CI runs with --strict, so new
+ * rot can't land anywhere. Without --strict, docs/** falls back to warn-only.
  *
  * Usage: node scripts/check-md-links.mjs [--quiet] [--strict]
  * Exit:  0 = blocking tier clean · 1 = dead links in the blocking tier

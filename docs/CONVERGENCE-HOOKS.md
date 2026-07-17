@@ -433,6 +433,6 @@ The hook will parse `#123`, `#456` as grounding signals (related context).
 - **[CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md)** — Architecture, Convergence 12 components
 - **[SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md)** — Mathematical foundation, safety mechanism
 - **[src/convergence/hooks.py](../src/convergence/hooks.py)** — Implementation
-- **[.git/hooks/convergence-loop-hook](.git/hooks/convergence-loop-hook)** — Git hook
+- **`.git/hooks/convergence-loop-hook`** — Git hook
 
 **Status:** Foundation solid. Framework ready. Next: broad instrumentation.

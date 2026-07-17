@@ -20,7 +20,7 @@
  */
 const ROLE_HIERARCHY = Object.freeze({
   guest: 0, // authenticated free tier (see note above) — NOT anonymous
-  supporter: 1, // legacy $5 Member Patreon tier (retired #2613; grandfathered patrons only, not sold)
+  supporter: 1, // legacy $5 patrons (RETIRED Member tier); maps to the Free plan — not a sold tier
   deep_dreamer: 2, // $20 Pro tier
   founder: 2, // legacy alias for deep_dreamer (#698)
   // Staff support role: can operate the account-support surface (accounts.html) to

@@ -115,7 +115,7 @@ rebuild it**; the live retrain pipeline is [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0
 | **Serving** | [`scripts/ouro_serve.py`](../scripts/ouro_serve.py) — drop-in **Ollama HTTP API** (`ouro:latest` on `:11434`); fast cached default + opt-in native deep mode |
 | **8GB / long-context** | `OURO_4BIT=1` (NF4 base, ~7.7→1.85 GB) + `OURO_KV_INT8=1` (int8 KV cache) + `OURO_UT_STEPS=2` (halves the recurrent KV) — reaches CC-scale (15–20k) prompts on an 8 GB card |
 | **Integration** | transparent: the coder/agent path POSTs to `OLLAMA_BASE_URL` (default `:11434`) — point it at ouro_serve and the whole path uses Ouro |
-| **Claude Code** | protocol bridge solved ([`scripts/ouro_anthropic_bridge.py`](../scripts/ouro_anthropic_bridge.py)); the 1.4B adapter is not yet reliable enough to *drive* CC — see [integration status](SIGMA0-CODER-CLAUDE-CODE-STATUS.md) |
+| **Claude Code** | protocol bridge solved ([`scripts/ouro_anthropic_bridge.py`](../scripts/ouro_anthropic_bridge.py)); the 1.4B adapter is not yet reliable enough to *drive* CC — see `integration status` |
 
 ## Why Ouro for the coder
 Ouro builds reasoning into **computation depth** — reusing weight-tied layers R times in
@@ -130,7 +130,7 @@ and local.
 
 **Source:** *Scaling Latent Reasoning via Looped Language Models* (Ouro,
 [arXiv:2510.25741](https://arxiv.org/abs/2510.25741)). PDF in repo:
-[`docs/research-papers/ouro-looped-llm-2510.25741.pdf`](research-papers/ouro-looped-llm-2510.25741.pdf).
+``docs/research-papers/ouro-looped-llm-2510.25741.pdf``.
 
 ### The idea (paper)
 LoopLM builds reasoning into computation by **reusing weight-tied layers R times** in latent

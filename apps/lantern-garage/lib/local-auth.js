@@ -208,6 +208,16 @@ async function handleLocalRegister(req, res) {
   }
   if (!result.profile) return _json(res, 500, { error: "create_failed" });
 
+  // #2554 — refer-a-friend attribution. If the signup carried a valid ref code
+  // (from ?ref= on the landing page, forwarded by the client), record the
+  // referrer→referee link as a MEASURED traction event. Best-effort: a referral
+  // must never break account creation. No reward is issued here (founder call).
+  if (b.ref) {
+    require("./referrals")
+      .attributeSignup({ code: b.ref, refereeId: result.profile.id, source: "local_register" })
+      .catch(() => {});
+  }
+
   // No-mailer lockout guard (#2065): with SMTP unconfigured the confirmation link
   // can never reach a real (proxied/public) user, so the hard email gate would
   // permanently lock every signup out of a self-hosted deploy. We cannot verify

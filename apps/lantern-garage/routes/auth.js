@@ -68,14 +68,14 @@ function readJsonBody(req) {
     let body = "";
     // Over the 1MB cap: settle (null) BEFORE destroying — req.destroy() fires neither
     // 'end' nor 'error', so otherwise the awaiting auth handler never responds and its
-    // frames leak (#2650). Mirrors the billing raw-body reader. resolve() is idempotent.
+    // frames leak (#2650). 'close' can fire before/instead of 'end' (over-cap destroy, or
+    // undici's ordering), so it settles from whatever body arrived rather than clobbering a
+    // good parse with null — the over-cap path already resolved(null) first. resolve() is
+    // idempotent, so the races are harmless; the caller answers 413/400.
     req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     const done = () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } };
     req.on("end", done);
     req.on("error", () => resolve(null));
-    // 'close' can fire before/instead of 'end' (destroy on over-cap, or undici's ordering),
-    // so settle from whatever body we have rather than clobbering a good parse with null.
-    // Over-cap already resolved(null) above, so this stays null there. (#2650 follow-up)
     req.on("close", done);
   });
 }
@@ -374,3 +374,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
 
   return false;
 };
+
+// Test seam (#2650): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readJsonBody = readJsonBody;

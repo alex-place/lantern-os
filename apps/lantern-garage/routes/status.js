@@ -205,6 +205,106 @@ module.exports = async function statusRoutes(req, res, url, deps) {
   // carries per-user ids + activity evidence, which is not a public surface.
   // Every number is MEASURED (machine-checked artifacts); OPERATOR_REPORTED
   // events are never counted (Converge).
+  // #2550 — the four-plan capability matrix, so the founder can verify pricing.html
+  // matches enforcement 1:1 and see whether live enforcement is armed. Public read
+  // (it's the pricing truth, not sensitive); reports the PLAN_ENFORCEMENT flag state.
+  if (url.pathname === "/api/plan/report" && req.method === "GET") {
+    try {
+      const pm = require("../lib/plan-matrix");
+      sendJson(res, { ok: true, enforcementEnabled: process.env.PLAN_ENFORCEMENT === "1", ...pm.planReport() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // #2551 — the Sean Ellis PMF fit-check (Level-2 gate: >=40% "very disappointed").
+  // GET /api/pmf/survey — for the SESSION user: if they're composite-active and have
+  // never been asked, records pmf_prompted and returns the survey (prompt-once is
+  // thereby auditable from the ledger). Anyone else gets {show:false, reason}.
+  if (url.pathname === "/api/pmf/survey" && req.method === "GET") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const r = await pmf.recordPrompted(uid, { source: "GET /api/pmf/survey" });
+      if (!r.ok) { sendJson(res, { show: false, reason: r.reason }, 200); return true; }
+      sendJson(res, {
+        show: true,
+        question: "How would you feel if you could no longer use unisona.ai?",
+        options: pmf.FEELINGS,
+      }, 200);
+    } catch (e) { sendJson(res, { show: false, error: e.message }, 500); }
+    return true;
+  }
+  // POST /api/pmf/response — {feeling, benefit?, alternative?}; one per user ever.
+  if (url.pathname === "/api/pmf/response" && req.method === "POST") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const pmf = require("../lib/pmf-survey");
+      const uid = getEffectiveUserId(req);
+      const body = JSON.parse((await deps.collectRequestBody(req)) || "{}");
+      const r = await pmf.recordResponse(uid, body, { source: "POST /api/pmf/response" });
+      sendJson(res, r, r.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // GET /api/pmf/tally — operator-gated (free-text + per-user ids), vs the 40% bar.
+  if (url.pathname === "/api/pmf/tally" && req.method === "GET") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      sendJson(res, { ok: true, ...require("../lib/pmf-survey").tally() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // #2554 — refer-a-friend. GET /api/referral/link → the SESSION user's signed
+  // share link (+ raw code). Requires a session; the code is a keyed HMAC so it
+  // can't be forged or enumerated.
+  if (url.pathname === "/api/referral/link" && req.method === "GET") {
+    try {
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const uid = getEffectiveUserId(req);
+      if (!uid) { sendJson(res, { ok: false, error: "login_required" }, 401); return true; }
+      const ref = require("../lib/referrals");
+      const origin = (req.headers["x-forwarded-proto"] ? req.headers["x-forwarded-proto"].split(",")[0] : "http")
+        + "://" + (req.headers.host || "www.unisona.ai");
+      sendJson(res, { ok: true, code: ref.codeFor(uid), link: ref.linkFor(uid, origin) }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // GET /api/referral/report — operator-gated: per-referrer signups + conversions
+  // (a conversion = a referee who reached composite-active; the reward-eligible set).
+  if (url.pathname === "/api/referral/report" && req.method === "GET") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      sendJson(res, { ok: true, ...require("../lib/referrals").conversions() }, 200);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
+  // #2556 — UnisonaTrader research partner (Business/Pilot tier). Returns an
+  // evidence-cited research brief for a symbol; every quantitative claim traces to
+  // a tool-call receipt in the run log. NOT advice — the brief carries a disclaimer
+  // and contains no buy/sell imperatives. Free/Pro hit a clean upgrade gate (403).
+  if (url.pathname === "/api/unisona-trader/research" && req.method === "GET") {
+    try {
+      const { requireEntitlement } = require("../lib/auth-middleware");
+      // "ai_trader" is the $200 Pilot/Business-tier entitlement — reuse it so
+      // Free/Pro get the standard 403 upgrade page, admins pass, and this stays
+      // consistent with the (dormant) plan-matrix's unisona_trader→pilot mapping.
+      if (!requireEntitlement(req, res, "ai_trader")) return true; // 403/302 already sent
+      const symbol = url.searchParams.get("symbol") || url.searchParams.get("ticker") || "";
+      const brief = await require("../lib/unisona-trader").researchBrief(symbol);
+      sendJson(res, brief, brief.ok ? 200 : 400);
+    } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
+    return true;
+  }
   if (url.pathname === "/api/traction/level1") {
     try {
       const { isOperatorRequest } = require("../lib/request-auth");

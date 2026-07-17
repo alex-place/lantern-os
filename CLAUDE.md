@@ -257,7 +257,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 - `PATREON_CLIENT_ID`, `PATREON_CLIENT_SECRET`, `PATREON_CAMPAIGN_ID`, `PATREON_REDIRECT_URI`, `SESSION_SECRET`
 - See **[PATREON-OAUTH.md](docs/PATREON-OAUTH.md)** for full setup guide
 - When configured, unauthenticated users redirect to `/auth.html` login page
-- Patreon pledge amount maps to roles. SOLD tiers: Free / $20 Pro (deep_dreamer) / $200 Pilot (pilot). The $5 Member→supporter tier is **retired** (#2613) — grandfathered patrons only, not offered on pricing.html. `admin` is a staff role, never purchasable.
+- Patreon tiers map to roles by pledge amount. Sold ladder: **Free** (`guest`/`supporter`) → **$20 Pro** (`deep_dreamer`) → **$200 Pilot** (`pilot`); `admin` is staff-only (`LANTERN_ADMIN_IDS`), never purchasable. The retired **$5 Member** tier still maps `$5 → supporter` for legacy patrons, but `supporter` now sits at the Free floor — see [PATREON-OAUTH.md](docs/PATREON-OAUTH.md) and `lib/plan-matrix.js`.
 
 `pytest.ini` sets `pythonpath = apps src` so tests can import from both trees without install.
 

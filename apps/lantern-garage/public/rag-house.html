@@ -135,7 +135,7 @@
         <li>Phase 14: <strong>update_bayesian_beliefs</strong></li>
         <li>Phases 15–20: Validation &amp; closure</li>
       </ul>
-      <a href="/repo/docs/TESSERACT-CSF-SINGULARITY.md" target="_blank">Read full docs →</a>
+      <a href="/repo/docs/CONVERGENCE-LOOP.md" target="_blank">Read full docs →</a>
     </div>
 
     <div class="arch-card">
@@ -219,16 +219,16 @@
     </div>
 
     <div class="arch-card">
-      <div class="icon">🎭</div>
+      <div class="icon">🧭</div>
       <h3>One Assistant</h3>
       <span class="tag memory">Live</span>
-      <p>The chat is a single assistant (Keystone) — there is no keyword persona routing (the RP narrators were retired in #1664). Capabilities are real tool calls the model invokes natively, the way Claude/ChatGPT/Gemini work.</p>
+      <p>A single assistant backed by the Convergence Core. Capabilities are real tool calls the model invokes natively — not keyword-routed personas (the RP narrators were retired in the one-assistant refactor).</p>
       <ul>
-        <li>Documents — read, summarize, generate</li>
-        <li>Web — search &amp; fetch</li>
-        <li>Market data — live quotes &amp; charts</li>
+        <li>Documents — read &amp; cite your files</li>
+        <li>Web — search &amp; ground claims</li>
+        <li>Market data — live quotes &amp; macro</li>
         <li>Repo / GitHub — code &amp; issues</li>
-        <li>Memory — persistent, append-only</li>
+        <li>Memory — append-only JSONL + CSF archive</li>
       </ul>
     </div>
   </div>
@@ -331,7 +331,7 @@
       <span class="tag memory">Docs</span>
       <p>Architecture docs, convergence methods, hooks reference, and code maps.</p>
       <ul>
-        <li><a href="/repo/docs/TESSERACT-CSF-SINGULARITY.md" target="_blank">Tesseract Loop</a></li>
+        <li><a href="/repo/docs/CONVERGENCE-LOOP.md" target="_blank">Tesseract Loop</a></li>
         <li><a href="/repo/docs/CONVERGENCE-LOOP.md" target="_blank">Original 12-Step Loop</a></li>
         <li><a href="/repo/docs/HOOKS.md" target="_blank">Git Hooks Reference</a></li>
         <li><a href="/repo/docs/CODEMAP.md" target="_blank">CODEMAP</a></li>

@@ -194,6 +194,11 @@ function level1Snapshot(opts = {}) {
   const { users, actives } = evaluateActiveUsers(o);
   const paying = payingUsers();
   const retention = m1Retention(o);
+  // Level-2 gate rides along (#2551): the Sean Ellis fit-check vs the 40% bar.
+  let pmf = null;
+  try { pmf = require("./pmf-survey").tally({ tractionFile: o.tractionFile }); } catch { pmf = null; }
+  let referrals = null;
+  try { const c = require("./referrals").conversions(o); referrals = { signups: c.totalSignups, converted: c.totalConverted }; } catch { referrals = null; }
   return {
     generatedAt: new Date().toISOString(),
     provenance: "MEASURED", // every number below is machine-checked; see per-user evidence
@@ -201,6 +206,8 @@ function level1Snapshot(opts = {}) {
     actives: { count: actives.length, target: o.targets.active, users: actives },
     paying: { count: paying.length, target: o.targets.paying, users: paying },
     m1Retention: { ...retention, target: o.targets.m1Retention, cohort: retention.cohort.slice(0, 50) },
+    pmf,
+    referrals,
     knownUsers: users.length,
     definition: `active = watchlist setup AND >=${o.chatThreshold} chats AND >=${o.tradeThreshold} paper trade (composite, product plan v5 §05.6)`,
   };
@@ -232,6 +239,8 @@ async function runWeeklyRollup(opts = {}) {
       paying: snap.paying.count,
       m1Retention: snap.m1Retention.rate,
       m1Cohort: snap.m1Retention.cohortSize,
+      pmf: snap.pmf ? { n: snap.pmf.n, pctVeryDisappointed: snap.pmf.pctVeryDisappointed, pass: snap.pmf.pass } : null, // #2551 weekly review vs the 40% bar
+      referrals: snap.referrals, // #2554 signups + conversions for the weekly review
       knownUsers: snap.knownUsers,
       targets: snap.targets,
     },

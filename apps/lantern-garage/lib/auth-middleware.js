@@ -102,7 +102,7 @@ function requireRole(req, res, requiredRole = "supporter") {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Higher tier required; Patreon login is disabled.",
+          error: `Higher tier required. Sign in, then upgrade your plan to reach the ${requiredRole} tier.`,
           required: requiredRole,
           current: "guest",
         })
@@ -177,6 +177,23 @@ function hasEntitlement(req, key) {
   const role = effectiveRole(req);
   if (role === "admin") return true;
 
+  // #2550 — four-plan enforcement, OFF by default. When PLAN_ENFORCEMENT=1 (the
+  // founder's Level-2 activation), a capability is granted iff the caller's plan
+  // (resolved from their role via lib/plan-matrix) includes it. The matrix maps
+  // supporter→Free / deep_dreamer→Pro / pilot→Pilot, so this is consistent with the
+  // legacy role checks below — it just makes the WHOLE §01 matrix (not only
+  // trade/ai_trader) enforceable from one source of truth, verifiable via
+  // /api/plan/report before the flip. Flag unset → this block is skipped and
+  // behavior is byte-identical. It only ever GRANTS (never hard-denies), so the
+  // per-account override + legacy checks below still apply.
+  if (process.env.PLAN_ENFORCEMENT === "1") {
+    try {
+      const pm = require("./plan-matrix");
+      const capName = Object.keys(pm.CAPABILITIES).find((c) => pm.CAPABILITIES[c].entitlement === key) || key;
+      if (pm.minPlanForCapability(capName) && pm.roleHasCapability(role, capName)) return true;
+    } catch { /* the matrix must never break the legacy gate */ }
+  }
+
   // Tier unlocks (product model — keyed off role level, itself derived from the
   // Patreon pledge amount in auth-providers.js):
   //   • "pro"       — Pro content features (Creator Suite, image/vision/document
@@ -208,7 +225,7 @@ function requireEntitlement(req, res, key) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Account required; Patreon login is disabled.",
+          error: "Account required — sign in, then upgrade your plan if this feature needs a higher tier.",
           entitlement: key,
         })
       );

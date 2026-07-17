@@ -157,7 +157,12 @@ async function distilRecord(record, apiKey) {
 function triggerLocalTraining(state) {
   const scriptPath = path.join(REPO_ROOT, "scripts", "train-convergence-lora.py");
   if (!fs.existsSync(scriptPath)) {
-    // Script not yet created; record intent only
+    // DELIBERATE STUB (#2543 audit decision): the flywheel's job is to COLLECT
+    // verified convergence→distillation pairs (see collectAndMaybeTrainAsync); the
+    // local-training launcher is a future step. train-convergence-lora.py has never
+    // existed, so this returns a no-op sentinel instead of spawning a missing script.
+    // When a trainer is added, drop it at scripts/train-convergence-lora.py and this
+    // path activates unchanged — the collected pairs at PAIRS_PATH are its input.
     return `no-op:script-missing:${scriptPath}`;
   }
   const jobId = `lora-${Date.now()}`;
