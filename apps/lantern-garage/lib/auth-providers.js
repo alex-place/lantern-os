@@ -32,12 +32,16 @@ const { roleLevel } = require("./role-hierarchy");
 // is `pilot` ($200) — it unlocks the autonomous AI trader but NOT admin; real admin comes
 // ONLY from LANTERN_ADMIN_IDS (isAdminOverride) or an explicit setUserRole.
 //
-// The three live Patreon tiers map by pledge amount: $5 Member → supporter, $20 Pro →
-// deep_dreamer, $200 Pilot → pilot. Thresholds are env-overridable (cents) so a re-price
-// is config, not code.
+// The SOLD ladder is Free / $20 Pro / $200 Pilot. The $5 "Member" tier was RETIRED:
+// its $5 → supporter mapping is RETAINED ONLY so legacy patrons who still pledge $5
+// keep their role (which now sits at the Free plan floor — see plan-matrix
+// ROLE_TO_PLAN). Do NOT re-advertise $5 as a sold tier, and do NOT delete the mapping
+// (that would strip legacy patrons of their grandfathered role). The two currently
+// sold Patreon tiers are $20 Pro → deep_dreamer and $200 Pilot → pilot. Thresholds are
+// env-overridable (cents) so a re-price is config, not code.
 const num = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const TIER_CENTS = {
-  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5  Member
+  supporter: num(process.env.PATREON_SUPPORTER_CENTS, 500), // $5 — RETIRED Member tier, retained for legacy patrons only (maps to Free plan)
   deep_dreamer: num(process.env.PATREON_DEEP_DREAMER_CENTS, 2000), // $20  Pro (trading + all Pro features)
   pilot: num(process.env.PATREON_PILOT_CENTS, 20000), // $200  Pilot (adds the autonomous AI trader)
 };

@@ -97,23 +97,28 @@ mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmoun
 and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pledges to
 *other* creators can't grant (or block) a role here.
 
-| Entitled pledge (this campaign) | Role | Access |
+| Entitled pledge (this campaign) | Role | Plan / access |
 |-----------|--------------|--------|
 | Free / not a paying member | `guest` | Public pages only |
-| ≥ $5 | `supporter` | Chat + features (the default paid gate) |
-| ≥ $20 (incl. the $200 top tier) | `deep_dreamer` | All paid features + trading unlock |
+| ≥ $20 | `deep_dreamer` | **Pro** — all paid features + real-money trading unlock |
+| ≥ $200 | `pilot` | **Pilot** — everything in Pro plus the autonomous AI trader |
+
+> **Legacy note:** the **$5 Member** tier is **retired and no longer sold**. Its
+> `≥ $5 → supporter` mapping is retained *only* so grandfathered patrons keep their
+> role; that `supporter` role now sits at the **Free** plan floor (see
+> `apps/lantern-garage/lib/plan-matrix.js` `ROLE_TO_PLAN`). The currently sold ladder is
+> **Free / $20 Pro / $200 Pilot** — do not re-advertise $5 as a paid gate.
 
 Notes:
 - **A purchasable tier NEVER grants `admin`.** `admin` is full operator/staff access
   (provider keys, GPU dispatch, feature flags, and the accounts console that can reset any
   password / grant admin), so tying it to a price point would let anyone buy site takeover.
-  The $200 top tier therefore maps to `deep_dreamer`; `admin` comes **only** from
-  `LANTERN_ADMIN_IDS`. If you want the $200 tier to unlock something beyond `deep_dreamer`,
-  add a distinct non-admin paid role — don't map it to `admin`.
+  The top purchasable tier is `pilot` ($200) — it unlocks the autonomous AI trader but
+  **not** `admin`; `admin` comes **only** from `LANTERN_ADMIN_IDS`.
 - **Fail-closed:** a $0 free-tier member, a below-$5 custom pledge, or an entitlement whose
   amount can't be resolved all yield `guest` (never a free paid role).
-- **Re-pricing?** Override the two thresholds (cents): `PATREON_SUPPORTER_CENTS`,
-  `PATREON_DEEP_DREAMER_CENTS`.
+- **Re-pricing?** Override the thresholds (cents): `PATREON_SUPPORTER_CENTS` (legacy),
+  `PATREON_DEEP_DREAMER_CENTS`, `PATREON_PILOT_CENTS`.
 - **Demotion:** logging in via Patreon re-baselines the paid role to the *current*
   entitlement, so a cancelled/downgraded membership loses the tier (staff roles set via
   `setUserRole`/override are never demoted by a login).
