@@ -96,6 +96,22 @@ for file in $(git diff --cached --name-only); do
   fi
 done
 
+# 4b. Inline-<script> debug pollution in HTML (#2495). The loop above only scans
+#     .js/.ts/etc, so console.log/debugger left in a page's inline <script> slipped
+#     through (create.html had 8 emoji debug logs). console.log in an .html file only
+#     ever lives in inline JS, so a whole-file scan matches "inline <script>" intent.
+#     Same test/scripts exemption. Mirror in .github/workflows/slop-check.yml.
+for file in $(git diff --cached --name-only -- '*.html'); do
+  case "$file" in
+    */test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) continue ;;
+  esac
+  content=$(git show ":$file" 2>/dev/null) || continue
+  if echo "$content" | grep -qE "(^|[^a-zA-Z])(console\.log\(|debugger;)"; then
+    echo "SLOP [debug]: debug statement in an inline <script> of $file — remove before committing (#2495)."
+    slop_fail=1
+  fi
+done
+
 # 5. Oversized commit — count SOURCE lines only (docs / data / configs exempt).
 #    Convergence work is documentation- and experiment-output-heavy; gating on the
 #    total line count false-blocks legitimate research commits. Mirror the CI gate

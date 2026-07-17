@@ -591,7 +591,6 @@ function handleXpDoorInteraction(doorName) {
     playerProgress.glitchesFound = (playerProgress.glitchesFound || 0) + 1;
     saveProgress();
     // Additional logic for XP Door, e.g., triggering visual glitches, special narration
-    console.log("XP Door interacted! Glitches found:", playerProgress.glitchesFound);
     // Trigger a visual glitch effect
     triggerXpGlitchEffect();
 
