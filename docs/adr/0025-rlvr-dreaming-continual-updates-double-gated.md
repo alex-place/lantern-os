@@ -14,7 +14,7 @@ superseded-by: none
 - Status: **Accepted** — approved by Alex Place, 2026-07-07 (explicit operator directive in-session: "approve ADR-0025"). Drafted Proposed per the ADR approval gate; flipped only on that directive.
 - Loop stage: **Verify** (the update gate) + **Reason** (the updated policy) + **Remember** (verified-memory replay buffer)
 - Relates to: [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) (continual-learning rules — this ADR is the *mechanism* for 0010's verify-gated last-resort path), [ADR-0015](0015-qwen-teacher-verified-distillation.md) (verified distillation — extended, not replaced), [ADR-0024](0024-sigma0-frontier-training-program.md) (frontier program — this is the *continual-update* half 0024 explicitly excludes), [ADR-0017](0017-surprise-gated-decoding.md) (surprise canary), [ADR-0021](0021-serving-substrate-retain-ouro-custom-loop.md)
-- Research backing: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md)
+- Research backing: `data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md`
 - Theory backing: [SIGMA0-COLLAPSE-CERTIFICATE.md](../SIGMA0-COLLAPSE-CERTIFICATE.md) §8 (Part II — the Model-Update Acceptance Gate Σ_θ) — merged into the unified Convergence Certificate; adversarially bounded twice. **Key consequence for Gate A (as corrected by the second review):** repeatedly selecting checkpoints against an ordinary feedback-rich fixed holdout overfits it (PROVEN), and no tight safe-reuse budget is known for model-level gating (`B_max` OPEN — measured in the Phase-1 harness); so Gate A uses **fresh evaluation data, once-per-release promotion sets, or a formal reusable-holdout mechanism (Thresholdout-class)** rather than assuming a fixed suite stays valid.
 
 ## Reconciliation with Accepted ADRs (read first)
@@ -33,7 +33,7 @@ superseded-by: none
 
 ## Context
 
-Research this cycle ([report](../../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md)) established three load-bearing facts:
+Research this cycle (`report`) established three load-bearing facts:
 
 1. **RLVR is the right update rule** because on-policy sampling keeps updates in a low reverse-KL
    region near the base, making RL structurally forgetting-robust vs SFT — and the KL penalty is
