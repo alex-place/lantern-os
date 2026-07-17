@@ -109,13 +109,19 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
     // trader ships in. Patreon-gated deployments always have a session id, so
     // anonymous internet visitors there never reach this fallback.
     const prefUserId = userId != null ? userId : 'local-owner';
+    // The per-browser cookie (set on POST below) is the authoritative choice for
+    // request-bound routes, so a rotating guest id can't lose it.
+    const { readCookie } = require('../lib/oauth-core');
+    const cookiePref = (() => { const c = readCookie(req, 'broker_pref'); return (c === 'alpaca' || c === 'ibkr') ? c : null; })();
     if (method === 'GET') {
       let ibkrConnected = false;
       try { ibkrConnected = require('../lib/ibkr-credentials').has(prefUserId); } catch (_e) { /* absent module = not connected */ }
       const adapter = require('../lib/alpaca-adapter');
+      // The cookie (if present) is what the user last picked in THIS browser; show it
+      // as the selected preference so the UI reflects reality, not a drifted store.
       return _json(res, 200, {
-        preference: prefs.get(prefUserId),        // the stored choice (may be 'auto')
-        effective: preferredBroker(prefUserId),   // what actually resolves after env/default
+        preference: cookiePref || prefs.get(prefUserId),
+        effective: preferredBroker(prefUserId, req),   // cookie > store > env > default
         connected: { alpaca: adapter.available(prefUserId), ibkr: ibkrConnected },
       }), true;
     }
@@ -125,7 +131,26 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       if (!prefs.set(prefUserId, broker)) {
         return _json(res, 400, { error: 'invalid_broker', message: "broker must be 'alpaca', 'ibkr', or 'auto'" }), true;
       }
-      return _json(res, 200, { ok: true, preference: broker, effective: preferredBroker(prefUserId) }), true;
+      // Single-user/owner box (auth off): the background auto-trader trades the
+      // 'local-owner' account and reads that key's preference — mirror the choice
+      // there so the autopilot follows the UI instead of falling back to the env
+      // default. On multi-user prod (auth on) each user's own id is authoritative,
+      // so we do NOT hijack local-owner.
+      try {
+        const { patreonAuthEnabled } = require('../lib/auth-middleware');
+        if (!patreonAuthEnabled() && prefUserId !== 'local-owner') prefs.set('local-owner', broker);
+      } catch (_e) { /* auth module absent → nothing to mirror */ }
+      // Persist the choice to the browser: a 1-year cookie so it survives reloads
+      // and session-id drift. 'auto' clears the cookie (falls back to store/env).
+      const secure = (((req.headers && req.headers['x-forwarded-proto']) || '').includes('https') || (req.socket && req.socket.encrypted)) ? '; Secure' : '';
+      const cookie = broker === 'auto'
+        ? `broker_pref=; Path=/; Max-Age=0; SameSite=Lax${secure}`
+        : `broker_pref=${broker}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+      res.setHeader('Set-Cookie', cookie);
+      // effective from the NEW choice (the Set-Cookie above isn't on `req` yet):
+      // an explicit alpaca/ibkr IS the effective broker; 'auto' resolves via store/env.
+      const effective = (broker === 'alpaca' || broker === 'ibkr') ? broker : preferredBroker(prefUserId);
+      return _json(res, 200, { ok: true, preference: broker, effective }), true;
     }
     return _json(res, 405, { error: 'method_not_allowed' }), true;
   }

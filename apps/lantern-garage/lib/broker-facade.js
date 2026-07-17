@@ -27,7 +27,17 @@ const alpaca = require('./alpaca-adapter');
  *  stored choice wins (broker-preference.js, set from the trader ☰); 'auto' or
  *  no userId falls through to the operator's BROKER_PREFER env; default keeps
  *  IBKR-first. */
-function preferredBroker(userId) {
+function preferredBroker(userId, req) {
+  // Highest precedence: the per-browser `broker_pref` cookie. Identity can drift
+  // (guest ids rotate; the UI saves under a session id the autopilot/env then pull
+  // back toward the default) — a cookie pins the choice to the browser so what the
+  // user clicked is what every request-bound route uses, stably across reloads.
+  if (req) {
+    try {
+      const c = require('./oauth-core').readCookie(req, 'broker_pref');
+      if (c === 'alpaca' || c === 'ibkr') return c;
+    } catch (_e) { /* no cookie / helper — fall through */ }
+  }
   // Owner-machine convention (routes/accounts.js): no session id = the owner,
   // the same 'local-owner' identity the broker credential stores already use.
   // Keeps the ☰ switch effective on auth-off/single-user boxes, where every

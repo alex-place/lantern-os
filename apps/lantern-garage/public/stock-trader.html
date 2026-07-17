@@ -4041,8 +4041,14 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
 }
 async function flattenAll(btn){
   if(!_lastPositions.length) return;
-  if(!_twoStep(btn, `Confirm — close all ${_lastPositions.length}?`, ()=>flattenAll(btn))) return;
   const snapshot=_lastPositions.slice();
+  // Close-all is the single most destructive control, so it ALWAYS asks — the
+  // inline two-step is bypassed by Rapid mode, so use a hard blocking confirm that
+  // Rapid can't skip. Lists count + total market value so an accidental click on a
+  // large book is obvious before it fires.
+  const totalMV = snapshot.reduce((s,p)=>s+Math.abs(Number(p.market_value)||0),0);
+  const mv = totalMV ? ` (~$${totalMV.toLocaleString(undefined,{maximumFractionDigits:0})})` : '';
+  if(!window.confirm(`Close ALL ${snapshot.length} open position${snapshot.length===1?'':'s'}${mv}?\n\nThis market-sells everything at once and can't be undone.`)) return;
   for(const p of snapshot) await flattenPosition(p.symbol, p.side, p.qty, true);
   _alertToast(`✓ Closed ${snapshot.length} position${snapshot.length===1?'':'s'} (paper)`);
 }
