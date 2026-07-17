@@ -70,14 +70,46 @@ function readJsonBody(req) {
     // 'end' nor 'error', so otherwise the awaiting auth handler never responds and its
     // frames leak (#2650). Mirrors the billing raw-body reader. resolve() is idempotent.
     req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
-    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
+    const done = () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } };
+    req.on("end", done);
     req.on("error", () => resolve(null));
-    req.on("close", () => resolve(null));
+    // 'close' can fire before/instead of 'end' (destroy on over-cap, or undici's ordering),
+    // so settle from whatever body we have rather than clobbering a good parse with null.
+    // Over-cap already resolved(null) above, so this stays null there. (#2650 follow-up)
+    req.on("close", done);
   });
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
+
+// Confirmation interstitial for a pending EMAIL CHANGE (#2646). Rendered inline by the
+// verify-email route (NOT a new public .html surface), so an email prefetcher/scanner that
+// auto-GETs the link gets a page but applies nothing — the change needs the explicit POST
+// the button fires. `token` is a url-safe base64url.hmac string; the address is escaped.
+function emailChangeInterstitial(token, newEmail) {
+  const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Confirm email change</title><style>
+body{font-family:system-ui,sans-serif;background:#0f151a;color:#e6edf3;display:grid;place-items:center;min-height:100vh;margin:0}
+.card{max-width:420px;padding:28px 26px;border:1px solid #2a343d;border-radius:14px;background:#161d24;text-align:center}
+h1{font-size:1.15rem;margin:0 0 10px}p{color:#9aa7b2;line-height:1.5;margin:0 0 18px}strong{color:#e6edf3}
+button{font:inherit;padding:11px 18px;border-radius:9px;border:0;background:#3b82f6;color:#fff;cursor:pointer;width:100%}
+button[disabled]{opacity:.6;cursor:progress}#s{margin:12px 0 0;font-size:14px;min-height:18px}
+</style></head><body><div class="card">
+<h1>Confirm your email change</h1>
+<p>Confirm to change your account email to <strong>${esc(newEmail)}</strong>. This link only works once.</p>
+<button id="c" type="button">Confirm email change</button>
+<p id="s"></p>
+<script>
+document.getElementById('c').addEventListener('click',function(){this.disabled=true;
+fetch('/api/auth/verify-email',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:${JSON.stringify(token || "")}})})
+.then(function(r){return r.json().then(function(d){return{s:r.status,d:d};});})
+.then(function(res){if(res.s===200){location.href=(res.d.dest||'/profile.html')+'?verify=1';}else{document.getElementById('c').disabled=false;document.getElementById('s').textContent='Could not confirm: '+((res.d&&res.d.error)||'please try the link again');}})
+.catch(function(){document.getElementById('c').disabled=false;document.getElementById('s').textContent='Network error — try again.';});});
+</script></div></body></html>`;
+}
 
 const START_RE = /^\/api\/auth\/([a-z]+)\/start$/;
 const CALLBACK_RE = /^\/api\/auth\/([a-z]+)\/callback$/;
@@ -210,56 +242,55 @@ module.exports = async function authRoutes(req, res, url, deps) {
 
   // GET /api/auth/verify-email?token=… — confirm an email address (new account or
   // a pending email change). Applies the pending email if the token carries one.
-  if (method === "GET" && path === "/api/auth/verify-email") {
-    // Hard email gate: a fresh signup has no session, so land them on the login
-    // page (where they now sign in). A signed-in email change lands on profile.
+  if (path === "/api/auth/verify-email" && (method === "GET" || method === "POST")) {
+    const isPost = method === "POST";
+    const token = isPost ? String(((await readJsonBody(req)) || {}).token || "") : url.searchParams.get("token");
+    // Hard email gate: a fresh signup has no session, so land them on the login page; a
+    // signed-in email change lands on profile.
     const dest = getSessionUser(req)?.id ? "/profile.html" : "/auth.html";
-    const payload = verifyToken(url.searchParams.get("token"), "verify_email");
-    if (!payload) {
-      res.writeHead(302, { Location: `${dest}?verify=invalid` });
-      return res.end();
-    }
+    // Uniform failure: POST callers (the confirm interstitial) get JSON; GET callers a banner.
+    const fail = (reason, code) => {
+      if (isPost) { res.writeHead(code || 400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: reason })); }
+      res.writeHead(302, { Location: `${dest}?verify=${reason}` }); return res.end();
+    };
+    const payload = verifyToken(token, "verify_email");
+    if (!payload) return fail("invalid");
     const profile = getProfile(payload.sub);
-    if (!profile) {
-      res.writeHead(302, { Location: `${dest}?verify=invalid` });
-      return res.end();
-    }
-    // Single-use: once this link has applied its change, a replay (leaked link, a second
-    // click, a link-scanner re-fetch) must not run again — land on the benign
-    // already-verified state rather than re-applying (#2614).
+    if (!profile) return fail("invalid");
+    // Single-use: a spent link (leaked, double-clicked, scanner re-fetch) lands on the
+    // benign already-verified state rather than re-applying (#2614).
     if (isConsumed(payload.jti)) {
-      res.writeHead(302, { Location: `${dest}?verify=1` });
-      return res.end();
+      if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, already: true, dest })); }
+      res.writeHead(302, { Location: `${dest}?verify=1` }); return res.end();
+    }
+    // The token carries the exact address it was minted for (#2624); an address that
+    // differs from the profile's current one is a pending email CHANGE.
+    const isEmailChange = !!(payload.email && payload.email !== profile.email);
+    // #2646: an email CHANGE is a sensitive mutation and must NOT be applied by a GET that
+    // a link-prefetcher/scanner auto-fetches. Serve a confirmation interstitial whose
+    // button POSTs the token; only the POST applies. Plain signup verification stays a GET.
+    if (isEmailChange && !isPost) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(emailChangeInterstitial(token, payload.email));
     }
     const updates = { emailVerified: true, emailAssumed: false, pendingEmail: null };
-    // The token now carries the exact address it was minted for (#2624), so a stale
-    // link can't silently verify a DIFFERENT current address.
-    if (payload.email && payload.email !== profile.email) {
-      // Token address differs from the profile's current one. Apply it ONLY when it
-      // matches a pending email CHANGE (change-email minted it for that new address);
-      // otherwise it's a stale signup/resend token from before the address changed and
-      // must not revert the email (#2624).
+    if (isEmailChange) {
+      // Apply ONLY when it matches the recorded pending change; otherwise it's a stale
+      // signup/resend token from before the address changed and must not revert it (#2624).
       if (profile.pendingEmail && payload.email === profile.pendingEmail) {
         const clash = getProfileByEmail(payload.email);
-        if (clash && clash.id !== profile.id) {
-          res.writeHead(302, { Location: `${dest}?verify=email_taken` });
-          return res.end();
-        }
+        if (clash && clash.id !== profile.id) return fail("email_taken", 409);
         updates.email = payload.email;
-        // Move the local login identity to the new address so the OLD email stops being
-        // a working login key / email_taken squatter (#2625).
+        // Move the local login identity to the new address so the OLD email stops being a
+        // working login key / email_taken squatter (#2625).
         updates.identities = (profile.identities || []).map((i) =>
           i.provider === "local" ? { ...i, email: payload.email } : i);
       } else {
-        res.writeHead(302, { Location: `${dest}?verify=invalid` });
-        return res.end();
+        return fail("invalid");
       }
     }
-    // Emit a verified `signup` traction event exactly once — email confirmation is
-    // the moment a local signup clears the hard email gate (OBSERVE stage). Guard on
-    // the pre-update flag so repeat clicks on the same link don't re-count. The
-    // ledger's classifyActor() files the operator's own confirmations as "operator",
-    // so this never inflates external adoption. Best-effort; never blocks the redirect.
+    // Emit a verified `signup` traction event exactly once (OBSERVE stage). Guard on the
+    // pre-update flag so repeat confirmations don't re-count. Best-effort.
     const wasVerified = profile.emailVerified === true;
     updateProfile(profile.id, updates);
     consumeToken(payload.jti, payload.exp); // burn the link so it can't be replayed (#2614)
@@ -273,6 +304,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
         note: "email address confirmed via verify-email link",
       }).catch(() => {});
     }
+    if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, dest })); }
     res.writeHead(302, { Location: `${dest}?verify=1` });
     return res.end();
   }

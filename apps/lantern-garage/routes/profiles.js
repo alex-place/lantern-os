@@ -37,9 +37,12 @@ function readBody(req) {
     // 'end' nor 'error', so without this the awaiting handler hangs forever and leaks
     // its frames (#2649). 'close' is a belt-and-suspenders settle; resolve() is idempotent.
     req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
-    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
+    const done = () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } };
+    req.on("end", done);
     req.on("error", () => resolve(null));
-    req.on("close", () => resolve(null));
+    // 'close' can fire before/instead of 'end' (over-cap destroy, or undici ordering);
+    // settle from whatever body arrived rather than clobbering a good parse (#2649 follow-up).
+    req.on("close", done);
   });
 }
 
