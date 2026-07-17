@@ -103,6 +103,7 @@ new experiment; §5 names the experiments that would.
 | Deadline → token-level grounding mapping | CONJECTURED | §3.1 | open — §5 E-S |
 | Thresholdout decomposition — mechanism buys validity, pool buys extraction | MEASURED (simulation, 32 seeds) | §8.4 third road | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed |
 | Scheduled-vs-reactive race — alarm premium 2.25× (well-conditioned); sliver timing-indifferent | MEASURED (simulation, 200 seeds) | §3.1 (added 2026-07-17, [#2690](https://github.com/alex-place/lantern-os/issues/2690) Phase 0) | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
+| Phase 0.5 prospective shot-call on the trained reservoir — sliver call held; anchor/ceiling 1.4·10⁴ | MEASURED (real learned system) | §3.1 ([#2690](https://github.com/alex-place/lantern-os/issues/2690) Phase 0.5) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
 | Composed ledger (§4) | TARGET | — (new composition) | open — all of §5 |
 
 If a command above fails on a fresh clone, this ledger has drifted from the code and should not
@@ -196,14 +197,25 @@ step 3, and the **alarm premium is 2.25×** — scheduled grounding reaches ≥9
 timing-indifferent — the Ouro-regime null, produced rather than retrodicted. Synthetic maps;
 single-shot policies; one detector family.
 
-**The honest null.** The one real loop measured so far (Ouro-1.4B) is the bad regime for this
-theory twice over: its true Jacobian is locally expansive and strongly non-normal
-(ρ(J) ≈ 8–11, cert §6 [#2029] correction), and its basin conditioning is sliver-class, so the
-theory predicts its own null — grounding stays cheap at all depths, which is what
-`experiments/ouro_canary_vs_logprob.py` measured. A retrodiction, not a validation. The
-schedule has therefore **never been tested where it should bite**: a well-conditioned,
-genuinely contracting loop (e.g. JSRR/STARS-stabilized, ρ < 1 — the gate the project already
-adopted, cert §1.2.3). That is experiment E-S (§5), Phases 1–2.
+**Phase 0.5 — the prospective shot-call held (2026-07-17,
+[#2690](https://github.com/alex-place/lantern-os/issues/2690)).** The first prospective test
+ran on a real *learned* system: the trained §6 reservoir. Every quantity was computed from
+the linearization before any sweep — ρ(J)=0.9836, cond(P)≈4.8·10⁴, pre-registered regime
+call **sliver / timing-indifferent** — and the true nonlinear dynamics then confirmed it:
+the measured per-turn grounding kick of the real conversation stream is **14,000× the escape
+ceiling**, and escape succeeds at every depth even at a hundredth of that kick
+(`experiments/sigma0_reservoir_deadline.py`, 5 tests). The theory called its shot on a system
+it wasn't tuned for, with the instrument chosen by the call, and the call held.
+
+**The accumulating pattern (and the honest null).** Both real learned loops measured so far
+land *outside* the well-conditioned regime: Ouro-1.4B is expansive and strongly non-normal
+(ρ(J) ≈ 8–11, cert §6 [#2029] correction; its anchoring null measured by
+`experiments/ouro_canary_vs_logprob.py` is retrodicted by the theory), and the reservoir is
+near-critical sliver — despite a design spectral radius of 0.9. The schedule has therefore
+**still never been tested where it should bite**, and the pattern now suggests that regime
+may only exist in deliberately stabilized loops (JSRR/STARS, ρ < 1 — the gate the project
+already adopted, cert §1.2.3). That is experiment E-S (§5), Phases 1–2 — motivated by
+measurement now, not assumption.
 
 ---
 
@@ -292,7 +304,9 @@ condition — what result would delete which column.
 
 - E-P → [#2692](https://github.com/alex-place/lantern-os/issues/2692) (**done 2026-07-17 — the
   kill condition fired; §1 re-priced**) ·
-  E-S → [#2690](https://github.com/alex-place/lantern-os/issues/2690) (Phase 0 done 2026-07-17) ·
+  E-S → [#2690](https://github.com/alex-place/lantern-os/issues/2690) (Phase 0 + Phase 0.5 done
+  2026-07-17 — the prospective shot-call held on the trained reservoir; Phases 1–2 need a
+  JSRR-stabilized loop, now motivated by measurement) ·
   E-B → [#2691](https://github.com/alex-place/lantern-os/issues/2691) (protocol layer done
   2026-07-17; the L4 training run is the sole remaining gap — fully specified as a
   self-contained handoff in [SIGMA0-EB-L4-RUNBOOK.md](SIGMA0-EB-L4-RUNBOOK.md), with

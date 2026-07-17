@@ -60,7 +60,7 @@ since carry a verified-on date.
 ## How to audit this document
 
 Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
-were run against this revision on 2026-07-17 (86 tests, all passing; the gate self-test was
+were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
 last run 2026-07-07):
 
 | Claim | Class | Verify with |
@@ -70,6 +70,7 @@ last run 2026-07-07):
 | 900-run collapse-prevention sweep (§3) | MEASURED | `data/sigma0_regime_sweep_report.json`; regenerate: `python experiments/sigma0_regime_sweep.py` |
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
 | Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
+| Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
 | Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
@@ -709,6 +710,27 @@ fully timing-indifferent (every budget × depth cell ≥ 0.95) — item 3's meas
 null, now *produced*, not only retrodicted. Honest scope: synthetic maps; single-shot
 policies; one detector family; the canary is calibrated on the true healthy distribution
 (charitable — strengthens a lateness verdict, weakens an earliness one).
+
+**Phase 0.5 — the prospective shot-call on a real LEARNED system ([#2690], 2026-07-17).**
+The race above is on hand-built maps; the first *prospective* test ran on the §6 trained
+reservoir (`router_reservoir_G.py`, seed 42 — a real learned nonlinear loop nobody's Jacobian
+was picked for). `experiments/sigma0_reservoir_deadline.py` computes every §3.1 quantity from
+the linearization **first** — fixed point (residual 1.4e-15), analytic Jacobian (max err vs
+numeric 1.3e-4), **ρ(J)=0.9836**, **cond(P)≈4.8·10⁴ → pre-registered regime call: SLIVER,
+timing-indifferent** — then grades the call on the true nonlinear dynamics with the regime's
+own instrument: the measured realistic per-turn grounding kick of the actual conversation
+stream (B_real=0.113) is **1.4·10⁴× the escape ceiling** B*_∞=8.3·10⁻⁶, and a forced
+fire-time sweep is fully timing-indifferent even at B_real/100 — **the shot-call held**
+(`data/sigma0/reservoir_deadline_report.json`; `tests/test_sigma0_reservoir_deadline.py`, 5
+passing). The deadline rows are consistent but deliberately noted as *without bite* here
+(necessary-condition bound, loose in the sliver regime; the measured last-escape rising with
+B shows a commitment window exists at micro-basin scale only). **Accumulating pattern worth
+stating plainly: both real learned loops measured so far (Ouro, this reservoir — one
+expansive, one near-critical) land OUTSIDE the well-conditioned regime, even though the
+reservoir's design spectral radius was 0.9.** The schedule's practical bite may exist only on
+deliberately stabilized loops — which is exactly the Phase-1 JSRR/STARS motivation, now
+evidence-backed rather than assumed. A first-run harness vacuity (the basin-entry race is the
+wrong instrument in the sliver regime) is kept on the record in the script docstring.
 
 **Prior-art positioning (2026-07-17 corner audit).** "Compute the next intervention time from
 a certified decay rate" is **self-triggered control** — a mature field (Heemels, Johansson &
@@ -2117,5 +2139,21 @@ for produced results and Appendix A for the original design sketch.*
 > catches the contaminated hack only via the cond-6 provenance ledger; fresh rejects it on
 > merit, cond 1). §8.6 item 4 and the audit table updated. **The honest gap is unchanged and
 > now precisely one thing: executing this protocol around real training on L4.**
+
+> **Maintenance log — 2026-07-17 ([#2690] Phase 0.5: the prospective shot-call on a real
+> learned system).** `experiments/sigma0_reservoir_deadline.py` ran the §3.1 machinery
+> prospectively on the trained §6 reservoir: every quantity computed from the linearization
+> FIRST (ρ(J)=0.9836, cond(P)≈4.8·10⁴ → pre-registered SLIVER call), then graded on the true
+> nonlinear dynamics — the measured realistic grounding kick is 1.4·10⁴× the escape ceiling
+> and forced fire-times are fully timing-indifferent even at B_real/100: **the call held**
+> (5 new tests; audit suites now 8 files / 91 passed). Two honest records kept: (1) the
+> first-run harness applied the basin-entry race unconditionally and it is VACUOUS in the
+> sliver regime (1/100 usable traces, cadence ≫ horizon) — the instrument now branches on the
+> pre-registered regime call, and the vacuity note stays in the script docstring; (2) the
+> deadline rows are consistent-but-without-bite here, said so in the report. New
+> evidence-backed pattern recorded in §3.1: both real learned loops measured so far (Ouro
+> expansive, reservoir near-critical) land outside the well-conditioned regime — the
+> schedule's bite may require deliberately JSRR-stabilized loops, which upgrades Phase 1's
+> motivation from assumption to measurement.
 
 ---
