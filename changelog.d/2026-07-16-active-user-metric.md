@@ -1,0 +1,8 @@
+### Added
+
+- traction: the composite "active user" instrument + weekly Level-1 rollup (#2547, p1). Product plan v5 defines ACTIVE as *watchlist setup AND ≥10 real chats AND ≥1 paper trade*; Level 1 clears at **50 active · 15 paying · 40% M1 retention** — none of which was measurable.
+  - **`lib/active-user-metric.js`**: composite evaluator over real per-user artifacts (watchlist files, per-user conversation logs, broker-accepted `paper_trade` traction events), paying count from the profiles store's role field (Pro tier), and month-1 retention over `daily_active` events (cohort ≥28d old, retained = activity in the 28–35d window; empty cohort → `rate: null`, never a fake 0). Operator/test identities are excluded from every count; **only `verified:true` (MEASURED) events count — OPERATOR_REPORTED never does** (the acceptance criterion).
+  - **Missing instrumentation added**: `POST /api/trading/orders/place` now records a `paper_trade` traction event (actor = user, verified, with order-id evidence) at the moment a broker accepts — per-user practice trades previously had no in-repo artifact at all.
+  - **Weekly rollup**: one `weekly_rollup` event per ISO week appended to `data/traction/events.jsonl` (MEASURED; boot + daily check; same-week re-runs no-op).
+  - **`GET /api/traction/level1`** (operator-gated — payload carries per-user evidence) + a **Level-1 tile on metrics.html** showing the three numbers vs targets with the definition inline.
+  - Verified: 7-case unit suite (composite math, OPERATOR_REPORTED exclusion, operator exclusion, retention cohort math, null-rate honesty, snapshot shape, rollup idempotency) + live on a worktree dev server (boot rollup appended 2026-W29; operator snapshot 200 with honest zeros; proxied guest 403; tile renders).

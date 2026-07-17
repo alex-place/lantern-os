@@ -147,6 +147,20 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           status: 'submitted',
           order_type: result.type,
         }]);
+        // #2547: the composite active-user metric needs a per-user paper-trade
+        // artifact. Record it as a MEASURED traction event at the moment a real
+        // broker accepted the order (verified:true — machine-checked, not
+        // self-reported). Best-effort: metrics must never break order placement.
+        if (uid) {
+          require('../../lib/traction').recordTractionEvent({
+            kind: 'paper_trade',
+            actor: String(uid),
+            verified: true,
+            confidence: 'high',
+            source: 'POST /api/trading/orders/place',
+            evidence: { order_id: result.order_id, symbol: result.ticker, side: result.side, qty: result.qty },
+          }).catch(() => {});
+        }
         sendJson(res, result, 201);
       } else if (result && result.status === 'dry_run') {
         // Blocked by the safety gate (TRADER_LIVE off / caps / kill-switch): a

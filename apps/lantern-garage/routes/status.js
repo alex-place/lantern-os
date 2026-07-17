@@ -200,6 +200,26 @@ module.exports = async function statusRoutes(req, res, url, deps) {
     }
     return true;
   }
+  // #2547 — the composite active-user instrument vs the Level-1 clear-condition
+  // (50 active · 15 paying · 40% M1 retention). Operator-gated: the payload
+  // carries per-user ids + activity evidence, which is not a public surface.
+  // Every number is MEASURED (machine-checked artifacts); OPERATOR_REPORTED
+  // events are never counted (Converge).
+  if (url.pathname === "/api/traction/level1") {
+    try {
+      const { isOperatorRequest } = require("../lib/request-auth");
+      const { isAdmin } = require("../lib/auth-middleware");
+      if (!isOperatorRequest(req) && !isAdmin(req)) {
+        sendJson(res, { ok: false, error: "operator_required" }, 403);
+        return true;
+      }
+      const { level1Snapshot } = require("../lib/active-user-metric");
+      sendJson(res, { ok: true, ...level1Snapshot() });
+    } catch (e) {
+      sendJson(res, { ok: false, error: e.message }, 500);
+    }
+    return true;
+  }
   if (url.pathname === "/api/readiness") {
     sendJson(res, getReadiness());
     return true;
