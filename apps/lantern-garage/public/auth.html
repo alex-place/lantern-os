@@ -385,8 +385,15 @@
     try {
       const rt = new URLSearchParams(location.search).get("returnTo");
       // Mirror the server validator (oauth-core safeReturnTo): root-relative only,
-      // no protocol-relative "//host" and no backslash tricks.
-      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) return rt;
+      // no protocol-relative "//host" and no backslash tricks. Resolve against our
+      // OWN origin and confirm the result stays same-origin before returning only
+      // the path+query — so a redirect sink can never receive an off-site URL even
+      // if a new bypass slips past the string checks (clears CodeQL
+      // js/client-side-unvalidated-url-redirection by construction).
+      if (rt && rt.startsWith("/") && !rt.startsWith("//") && !rt.includes("\\")) {
+        const u = new URL(rt, location.origin);
+        if (u.origin === location.origin) return u.pathname + u.search;
+      }
     } catch (_) {}
     return "/";
   }
