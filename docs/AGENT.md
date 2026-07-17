@@ -209,9 +209,11 @@ sits behind login (`/auth.html`); Patreon tiers map to roles:
 | Role | Source | Typical entitlement |
 |---|---|---|
 | **guest** | unauthenticated / free | read-only public surfaces |
-| **supporter** | Patreon supporter tier | dream-chat, dream journal |
-| **founder** | founder tier | trade chat, deeper surfaces |
-| **admin** | owner | full control, feature flags, DEEP mode |
+| **supporter** | legacy $5 patrons (retired tier) → Free plan | dream-chat, dream journal |
+| **deep_dreamer** | Patreon $20 (**Pro**) | trade chat, deeper surfaces |
+| **founder** | legacy alias for `deep_dreamer` (#698) | same as Pro |
+| **pilot** | Patreon $200 (**Pilot**) | autonomous AI trader |
+| **admin** | owner / `LANTERN_ADMIN_IDS` | full control, feature flags, DEEP mode |
 
 Requirements the agent must honor per user:
 - **Identity continuity** — a known issue is that **Web (Patreon) and Discord identities are not yet
