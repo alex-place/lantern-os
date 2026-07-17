@@ -1,8 +1,0 @@
-### Fixed
-
-- mobile(trader): restore the one-panel-at-a-time phone layout the upstream hamburger redesign removed, plus the polish items riding on it (#2501, 6 items).
-  - **Chart / Tickers / Positions segmented control restored + extended** (items 2–3): the merged single-scroll view stacked header + ticker list + 22 chart cards + account panel into ~11,000px of scroll on an 812px phone. The view tabs are back (recovered from merge-base `833562f7`) with a **third Positions tab** for the account panel; at 375px exactly ONE of {charts, tickers, account} is visible and the page height is the viewport (measured 812px, no overflow).
-  - **Buy/sell sheet fits without scrolling** (item 4): `.ot-modal` max-height 82vh→92vh; measured with Take-profit + Stop-loss both expanded: content 737px ≤ 747px cap, no scroll (was overflowing by ~68px).
-  - **Phone chart modes are 1 / 2 only** (item 5): "⊞ All" is retired on phones (it rendered the whole 22-card deck), the viewport cap rises to 2, the default is 1 full-size chart, and a persisted `slotCount=0` migrates to 1 so existing users don't land on a retired option.
-  - **Chart controls out of ☰, to its left** (item 6): the layout/type/patterns/timeframe cluster stays inline in the horizontally-scrollable header instead of hiding in the hamburger; the ☰ pins sticky-right so it stays reachable. Menu labels updated to match.
-  - **"Position chart missing" (item 1)**: could not reproduce post-fix — with the tabs restored, the chart view renders one full-size chart with BUY/SELL directly under it (verified at 375×812 via Playwright, authed test session). It was a symptom of the ~11k-px stack; flagged for operator re-check.
