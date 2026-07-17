@@ -53,7 +53,7 @@ const MIN_PASSWORD = 8;
 
 // Roles an operator may assign from the console. `founder` is a legacy alias and is
 // intentionally omitted from the picker (deep_dreamer is its canonical name).
-const ASSIGNABLE_ROLES = ["guest", "supporter", "deep_dreamer", "tech_support", "admin"];
+const ASSIGNABLE_ROLES = ["guest", "supporter", "deep_dreamer", "pilot", "tech_support", "admin"];
 
 function actorOf(req) {
   return getSessionUserId(req) || "local-owner";
