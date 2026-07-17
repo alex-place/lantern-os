@@ -102,7 +102,7 @@ function requireRole(req, res, requiredRole = "supporter") {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Higher tier required; Patreon login is disabled.",
+          error: `Higher tier required. Sign in, then upgrade your plan to reach the ${requiredRole} tier.`,
           required: requiredRole,
           current: "guest",
         })
@@ -225,7 +225,7 @@ function requireEntitlement(req, res, key) {
       res.writeHead(403, { "Content-Type": "application/json" });
       res.end(
         JSON.stringify({
-          error: "Account required; Patreon login is disabled.",
+          error: "Account required — sign in, then upgrade your plan if this feature needs a higher tier.",
           entitlement: key,
         })
       );
