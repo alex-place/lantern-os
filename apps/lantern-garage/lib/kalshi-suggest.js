@@ -21,6 +21,7 @@ const kalshi = require("./kalshi-api");
 const { getWinRate, getCategory, getCategoryStats } = require("./kalshi-winrate-tracker");
 const { evaluateExit, getMarketState, scoreHold } = require("./kalshi-adaptive-exits");
 const { breakevenWinProb, netEvCents } = require("./kalshi-fees");
+const { properBetSize } = require("./kalshi-proper-bet");
 
 // ── exit thresholds (DEPRECATED - replaced by adaptive exits) ──────────────────
 // Kept for reference only; adaptive exits now use convergence-based logic
@@ -119,6 +120,59 @@ function entryProvenance(m, f) {
     source: "paper-ledger:data/kalshi/paper-positions.jsonl",
     confidence,
   };
+}
+
+// ── ADVISORY proper-bet sizing (arXiv 2607.06166, Def. 2 + Thm. 1) ───────────
+// Theorem-backed replacement for Kelly sizing on order-book markets: stake
+// ∝ ∇G(p) − ∇G(q) for a strictly proper scoring rule's potential G, positive
+// expected profit whenever the forecast p outperforms the price q under the
+// rule (and the book is liquid enough that slippage stays under the Bregman
+// term). ADVISORY ONLY — carried on the card, never routed to the order
+// endpoint; conviction floors, gates and execution paths are untouched.
+const PROPER_BET_DEFAULT_BANKROLL = 100; // dollars; override: KALSHI_PROPER_BET_BANKROLL
+function properBetBankroll() {
+  const v = parseFloat(process.env.KALSHI_PROPER_BET_BANKROLL || "");
+  return Number.isFinite(v) && v > 0 ? v : PROPER_BET_DEFAULT_BANKROLL;
+}
+
+// Build the advisory properBet block for an entry card. Needs a REAL
+// probability forecast — the heuristic now-slice conviction % is not one — so
+// it only activates when the resolved ledger is proven (n ≥ MIN_RESOLVED_SAMPLE)
+// and uses the measured win rate as P(favored side pays).
+function buildProperBet(m, f, prov) {
+  if (!prov || !prov.proven || prov.winRate == null) {
+    return {
+      available: false,
+      reason: `no probability forecast — conviction is a heuristic, and the resolved ledger is unproven (n=${prov ? prov.sampleN : 0} < ${MIN_RESOLVED_SAMPLE})`,
+    };
+  }
+  const yesAsk = num(m.yes_ask), noAsk = num(m.no_ask);
+  if (yesAsk == null || noAsk == null || yesAsk <= 0 || yesAsk >= 100 || noAsk <= 0 || noAsk >= 100) {
+    return { available: false, reason: "book prices unavailable or degenerate" };
+  }
+  const winP = Math.min(0.99, Math.max(0.01, prov.winRate / 100)); // P(favored side pays)
+  const pYes = f.side === "yes" ? winP : 1 - winP;                 // YES-space forecast
+  const bankroll = properBetBankroll();
+  const out = {
+    available: true,
+    forecastYes: Math.round(pYes * 1e4) / 1e4,
+    forecastSource: `resolved-ledger win rate (${prov.category}, n=${prov.sampleN})`,
+    bankroll,
+  };
+  for (const rule of ["brier", "log"]) {
+    const r = properBetSize({ forecast: pYes, price: yesAsk / 100, noPrice: noAsk / 100, bankroll, rule });
+    out[rule] = r.ok
+      ? {
+          side: r.side,
+          contracts: r.contracts,
+          stakeDollars: r.stakeDollars,
+          scoreGap: r.edge ? Math.round(r.edge.scoreGap * 1e6) / 1e6 : 0,
+          zeroReason: r.zeroReason,
+        }
+      : { error: r.reason };
+  }
+  out.agreesWithCard = !!(out.brier && out.brier.side === f.side);
+  return out;
 }
 
 // Check if entry passes profitability filters. `f` is the favorability() result.
@@ -348,6 +402,7 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
       confidence: prov.confidence,                       // grounded [0..1] from resolved ledger
       provenance: prov,                                  // {proven, sampleN, winRate, expectancy, breakevenPct, source}
       netEvCents: evCents,                               // fee-aware EV per contract at the measured win%
+      properBet: buildProperBet(m, f, prov),             // ADVISORY proper-betting stake (arXiv 2607.06166); never routed to orders
       reason,
       minsToClose: Number.isFinite(f.minsToClose) ? Math.round(f.minsToClose) : null,
       close: m.close_time || "",
@@ -398,4 +453,4 @@ async function getSuggestions({ limit = 60, series_ticker = "KXMLBGAME", collect
   };
 }
 
-module.exports = { getSuggestions, isSupportedEntryMarket, isEntryTradeable, entryProvenance };
+module.exports = { getSuggestions, isSupportedEntryMarket, isEntryTradeable, entryProvenance, buildProperBet };

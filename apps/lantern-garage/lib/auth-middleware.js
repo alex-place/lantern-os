@@ -38,6 +38,30 @@ function patreonAuthEnabled() {
 const SIGNOUT_COOKIE = "ln_signout";
 
 /**
+ * The role to make access decisions on for a request.
+ *
+ * For a REAL session this is the PERSISTED profile role (fresh from getProfile),
+ * NOT the role snapshotted into the cookie at login. A Stripe cancel / refund /
+ * chargeback (and an admin demotion) updates the profile but cannot reach a live
+ * cookie session — so gating on the session role let a charged-back user keep
+ * Pro / trade / the autonomous trader for the cookie's whole lifetime (#2605,
+ * and role demotions for #2627). Re-deriving from the profile makes a revoke take
+ * effect on the very next request. getProfile is cache-backed, so this is a cache
+ * hit on the hot path.
+ *
+ * A test-auth EMULATED session (isTest) has no separate persisted role to trust —
+ * its profile is always the seeded admin — so honor the caller-chosen session role
+ * (the dev role picker). Returns null when unauthenticated.
+ */
+function effectiveRole(req) {
+  const session = getSessionUser(req);
+  if (!session?.id) return null;
+  if (session.isTest) return session.role;
+  const profile = getProfile(session.id);
+  return (profile && profile.role) || session.role;
+}
+
+/**
  * Require authentication for a route.
  * Returns true if user is authenticated, false otherwise.
  * Sends appropriate redirect (to /auth.html if not logged in).
@@ -90,7 +114,8 @@ function requireRole(req, res, requiredRole = "supporter") {
     return false;
   }
 
-  const userLevel = roleLevel(session.role);
+  const currentRole = effectiveRole(req);
+  const userLevel = roleLevel(currentRole);
 
   if (userLevel < requiredLevel) {
     // Insufficient role
@@ -99,7 +124,7 @@ function requireRole(req, res, requiredRole = "supporter") {
       JSON.stringify({
         error: "Insufficient permissions",
         required: requiredRole,
-        current: session.role,
+        current: currentRole,
       })
     );
     return false;
@@ -147,16 +172,23 @@ function protectStaticPage(requiredRole = "supporter") {
 function hasEntitlement(req, key) {
   const session = getSessionUser(req);
   if (!session?.id) return false;
-  if (session.role === "admin") return true;
+  // Decide on the PERSISTED role so a revoked subscription (or demotion) drops the
+  // entitlement immediately, instead of persisting for the cookie lifetime (#2605).
+  const role = effectiveRole(req);
+  if (role === "admin") return true;
 
-  // Tier unlocks (product model):
-  //   • "trade"     — stocks + Kalshi + AI suggestions — unlocked by the $20
-  //                   Deep Dreamer tier and up.
-  //   • "ai_trader" — the autonomous AI trader — unlocked by the $200 tier
-  //                   (admin, handled by the role check above).
-  // The per-account entitlement below remains an override (admins can grant it
-  // to a specific free/lower-tier account).
-  if (key === "trade" && roleLevel(session.role) >= roleLevel("deep_dreamer")) return true;
+  // Tier unlocks (product model — keyed off role level, itself derived from the
+  // Patreon pledge amount in auth-providers.js):
+  //   • "pro"       — Pro content features (Creator Suite, image/vision/document
+  //                   generation, wide research) — the $20 Pro tier (deep_dreamer) and up.
+  //   • "trade"     — stocks + Kalshi + broker connect + AI suggestions — the $20 Pro
+  //                   tier (deep_dreamer) and up.
+  //   • "ai_trader" — the AUTONOMOUS AI trader (bot executes on your account) — the
+  //                   $200 Pilot tier (pilot) and up. Strictly above Pro.
+  // The per-account entitlement below remains an override (admins can grant any key
+  // to a specific lower-tier account).
+  if ((key === "trade" || key === "pro") && roleLevel(role) >= roleLevel("deep_dreamer")) return true;
+  if (key === "ai_trader" && roleLevel(role) >= roleLevel("pilot")) return true;
 
   const profile = getProfile(session.id);
   return !!(profile && profile.entitlements && profile.entitlements[key] === true);
@@ -208,7 +240,7 @@ function requireEntitlement(req, res, key) {
  * writes to the response.
  */
 function isStaff(req) {
-  return isStaffRole(getSessionUser(req)?.role);
+  return isStaffRole(effectiveRole(req));
 }
 
 /**
@@ -240,7 +272,7 @@ function requireStaff(req, res) {
  * touches the response — use this to branch on admin status without sending a 403.
  */
 function isAdmin(req) {
-  return getSessionUser(req)?.role === "admin";
+  return effectiveRole(req) === "admin";
 }
 
 /**
@@ -252,7 +284,7 @@ function isAdmin(req) {
 function meetsRole(req, requiredRole) {
   const session = getSessionUser(req);
   if (!session?.id) return false;
-  return roleLevel(session.role) >= roleLevel(requiredRole);
+  return roleLevel(effectiveRole(req)) >= roleLevel(requiredRole);
 }
 
 /**

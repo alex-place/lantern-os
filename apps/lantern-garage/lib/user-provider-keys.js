@@ -26,7 +26,7 @@ const { resolveSessionSecret } = require("./session-secret");
 
 // The BYOK providers a user may store a key for. Kept deliberately narrower than
 // the host-env allowlist in routes/providers.js: these are the four the settings
-// page (api-keys-settings.html) offers.
+// page (settings.html) offers.
 const BYOK_PROVIDERS = ["anthropic", "openai", "gemini", "xai"];
 
 const SCRYPT_SALT = "unisona-byok-keystore-v1"; // versioned; bump on format change

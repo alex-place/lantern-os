@@ -96,7 +96,12 @@ module.exports = async function dreamerRoutes(req, res, url, deps) {
     try {
       const fs = require("fs");
       const busboy = require("busboy");
-      const user = normalizeDreamerUser(url.searchParams.get("user") || "dreamer");
+      // Identity comes from the authenticated SESSION, not a caller-supplied ?user=
+      // (which previously let one account stage a video into any other user's notebook).
+      // The premium guard already requires a Pro session to reach this endpoint, so a
+      // session id is present; the query param is ignored when one exists.
+      const { getEffectiveUserId } = require("../lib/session-identity");
+      const user = normalizeDreamerUser(getEffectiveUserId(req) || url.searchParams.get("user") || "dreamer");
       console.log("[UPLOAD] Setup complete, creating busboy");
 
       const videosDir = path.join(repoRoot, "data", "dreamer", "videos");

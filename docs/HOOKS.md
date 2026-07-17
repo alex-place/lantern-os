@@ -93,7 +93,6 @@ Beyond the hooks above, these validators can be run by hand (some are wired into
 alternate `scripts/hooks/pre-commit-full-validation`):
 
 ```bash
-python3 scripts/validate-version-changelog.py         # staged version/changelog
 python3 scripts/validate-prepush-version-changelog.py # vs origin/master
 python3 scripts/validate-deployment-readiness.py
 python3 scripts/validate-autoupdate-safety.py

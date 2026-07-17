@@ -10,7 +10,7 @@
 
 ### Dream Chat API
 
-**Dream Journal conversation endpoint with multi-agent routing**
+**Dream Journal conversation endpoint (one assistant, SSE streaming)**
 
 #### POST `/api/dream/stream`
 Stream dream chat responses with server-sent events.
@@ -120,62 +120,28 @@ Provider-specific statistics (e.g., `anthropic`, `openai`).
 
 ### Trading API
 
-**Kalshi market data, orders, and signals**
+The trading surface (Kalshi + IBKR, 60+ endpoints under `/api/trading/*`) has
+its own canonical reference: **[trading-api-reference.md](./trading-api-reference.md)**.
 
-#### GET `/api/trading/positions`
-Current portfolio and open positions.
+---
 
-**Response:**
-```json
-{
-  "account": {
-    "cash": 5000.00,
-    "totalValue": 12500.00,
-    "buyingPower": 8500.00
-  },
-  "positions": [
-    {
-      "ticker": "TSLA",
-      "shares": 10,
-      "avgPrice": 250.00,
-      "currentPrice": 265.00,
-      "gain": 150.00
-    }
-  ]
-}
-```
+### Auto-Merge API
 
-#### POST `/api/trading/order`
-Place a market or limit order.
+**PR merge-conflict analysis and learned merge patterns**
+(`routes/auto-merge.js` → `lib/auto-merge-resolver.js`)
 
-**Request:**
-```json
-{
-  "ticker": "AAPL",
-  "side": "buy",
-  "action": "limit",
-  "count": 5,
-  "limitCents": 17500
-}
-```
+- `GET /api/merge/status` — resolver status
+- `GET /api/merge/convergance-query` — query convergence records for merges
+- `POST /api/merge/analyze` — analyze a merge/conflict
+- `POST /api/merge/record` — record a merge decision
+- `POST /api/merge/apply-improvements` — apply learned improvements
+- `POST /api/merge/keystone-response` — feed an assistant response into the trainer
+- `GET /api/merge/analysis` — aggregated analysis
+- `GET /api/merge/export` — export decisions
 
-**Response (201 Created):**
-```json
-{
-  "orderId": "order-123456",
-  "ticker": "AAPL",
-  "side": "buy",
-  "status": "filled",
-  "filledPrice": 175.00,
-  "cost": 875.00
-}
-```
-
-#### GET `/api/trading/signals`
-AI trading signals and recommendations.
-
-**Query Parameters:**
-- `limit` (default: 5) - Number of recent signals
+Data files: `data/auto-merge-decisions.jsonl` (append-only decision log),
+`data/merge-patterns.json` (learned-pattern cache; pattern key format
+`{agent}:{fileCount}`).
 
 ---
 
@@ -309,6 +275,7 @@ curl http://localhost:4177/api/dreams?limit=5
 ## Related Documentation
 
 - [Architecture Overview](./ARCHITECTURE.md)
-- [Convergence Workflow](./COMET-LEAP-1.5-CONVERGENCE-WORKFLOW.md)
+- [Convergence Loop](./CONVERGENCE-LOOP.md)
+- [Trading API Reference](./trading-api-reference.md)
 - [Security Considerations](../SECURITY.md)
 - [Development Guide](../QUICKSTART.md)

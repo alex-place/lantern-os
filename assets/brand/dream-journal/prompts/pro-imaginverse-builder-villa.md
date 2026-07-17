@@ -1,3 +1,0 @@
-# PRO ImaginVerse Builder Villa Card Prompt
-
-Vertical Patreon tier card background for Dream Journal by Lantern OS, no text, no words, ornate rounded lavender and gold border, upper art scene only with a large clean empty lower panel for future text overlay. Elegant ImaginVerse Builder scene with predominantly masculine investor board meeting energy in a Spanish villa near Barcelona at golden hour. Refined adult men and advisors around an ornate round table that becomes a glowing portal-door to riches, good fortune, and a Mediterranean dream world. Coastal villa, cypress trees, warm lanterns, gold filigree, crystal accents, tasteful abundance, magical realism, lavender and gold, not corporate, not dashboard.

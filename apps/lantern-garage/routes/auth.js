@@ -26,7 +26,22 @@ const { patreonAuthEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken } = require("../lib/auth-tokens");
 const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
-const { isLoopback } = require("../lib/request-auth");
+const { isLoopback, clientIp } = require("../lib/request-auth");
+const { canonicalOrigin } = require("../lib/base-url");
+
+// Lightweight per-IP limiter for the UNAUTHENTICATED email endpoints (password
+// reset, resend verification) so they can't be used to email-bomb a victim or scan
+// (#2615). Best-effort in-memory; keyed on the real client IP (#2616).
+const _emailHits = new Map();
+function emailEndpointThrottled(req, max = 12, windowMs = 15 * 60 * 1000) {
+  const ip = clientIp(req);
+  const now = Date.now();
+  const rec = _emailHits.get(ip);
+  if (!rec || now - rec.first > windowMs) { _emailHits.set(ip, { count: 1, first: now }); return false; }
+  rec.count++;
+  if (_emailHits.size > 5000) { for (const [k, v] of _emailHits) if (now - v.first > windowMs) _emailHits.delete(k); }
+  return rec.count > max;
+}
 const { recordTractionEvent } = require("../lib/traction");
 const {
   getProfile,
@@ -35,13 +50,12 @@ const {
   setLocalPassword,
 } = require("../lib/user-profiles");
 
-// Absolute origin of the current request (honors the tunnel's forwarded proto).
+// Absolute origin for links emailed to the user (verify-email, password reset).
+// Built from the operator-configured canonical origin, NOT the raw Host header, so
+// a forged Host can't point a genuine security email at an attacker's domain
+// (reset poisoning, #2604). Falls back to Host only for loopback dev.
 function originOf(req) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
-  return `${proto}://${host}`;
+  return canonicalOrigin(req);
 }
 
 function readJsonBody(req) {
@@ -201,16 +215,29 @@ module.exports = async function authRoutes(req, res, url, deps) {
       res.writeHead(302, { Location: `${dest}?verify=invalid` });
       return res.end();
     }
-    const updates = { emailVerified: true, pendingEmail: null };
-    // If the token was minted for a pending email change, apply it now (unless
-    // someone else claimed that email in the meantime).
+    const updates = { emailVerified: true, emailAssumed: false, pendingEmail: null };
+    // The token now carries the exact address it was minted for (#2624), so a stale
+    // link can't silently verify a DIFFERENT current address.
     if (payload.email && payload.email !== profile.email) {
-      const clash = getProfileByEmail(payload.email);
-      if (clash && clash.id !== profile.id) {
-        res.writeHead(302, { Location: `${dest}?verify=email_taken` });
+      // Token address differs from the profile's current one. Apply it ONLY when it
+      // matches a pending email CHANGE (change-email minted it for that new address);
+      // otherwise it's a stale signup/resend token from before the address changed and
+      // must not revert the email (#2624).
+      if (profile.pendingEmail && payload.email === profile.pendingEmail) {
+        const clash = getProfileByEmail(payload.email);
+        if (clash && clash.id !== profile.id) {
+          res.writeHead(302, { Location: `${dest}?verify=email_taken` });
+          return res.end();
+        }
+        updates.email = payload.email;
+        // Move the local login identity to the new address so the OLD email stops being
+        // a working login key / email_taken squatter (#2625).
+        updates.identities = (profile.identities || []).map((i) =>
+          i.provider === "local" ? { ...i, email: payload.email } : i);
+      } else {
+        res.writeHead(302, { Location: `${dest}?verify=invalid` });
         return res.end();
       }
-      updates.email = payload.email;
     }
     // Emit a verified `signup` traction event exactly once — email confirmation is
     // the moment a local signup clears the hard email gate (OBSERVE stage). Guard on
@@ -237,13 +264,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // link. Always 200 (no account enumeration); sends only for an existing account
   // whose email is still unconfirmed.
   if (method === "POST" && path === "/api/auth/resend-verification") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     const respBody = { ok: true };
     if (EMAIL_RE.test(email)) {
       const profile = getProfileByEmail(email);
       if (profile && profile.emailVerified !== true) {
-        const token = createToken("verify_email", profile.id, null);
+        const token = createToken("verify_email", profile.id, profile.email);
         const link = `${originOf(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
         sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
         // Dev-only self-service: no mail server + direct loopback hit → return the
@@ -259,6 +287,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // POST /api/auth/request-password-reset { email } — always 200 (no account
   // enumeration); sends a reset link only if a local-capable account exists.
   if (method === "POST" && path === "/api/auth/request-password-reset") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     if (EMAIL_RE.test(email)) {

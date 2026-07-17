@@ -210,31 +210,9 @@
   }
   loadAgents();
 
-  // ── Convergence loop status (CONVERGE stage) — live sidebar panel ──────────
-  // Reads /api/convergence/status (records.jsonl + patterns) and lights up the
-  // "Convergence" observability slot so the loop the chat feeds is visible.
-  function refreshConvergence() {
-    fetch(`${serverBase}/api/convergence/status`, { signal: AbortSignal.timeout(3000) })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (!s) return;
-        // Dedicated "Loop Records" row — do NOT reuse #obs-convergence (that slot
-        // is the dream-delta convergence score, owned by dream-chat-ui.js).
-        const el = document.getElementById("obs-loop-records");
-        const fill = document.getElementById("obs-loop-records-fill");
-        if (el) {
-          el.textContent = s.total
-            ? `${s.total} rec · ${Math.round((s.avgConfidence || 0) * 100)}% conf · ${s.topReasoner || "—"}`
-            : "no records yet";
-          el.title = s.total
-            ? `${s.total} convergence records · ${Math.round((s.groundedPct || 0) * 100)}% grounded · ${s.verified || 0} verified · ${s.patternsCount || 0} patterns`
-            : "Reason→Act emits a ConvergenceRecord per reply";
-        }
-        if (fill) fill.style.width = Math.round((s.avgConfidence || 0) * 100) + "%";
-      })
-      .catch(() => {});
-  }
-  refreshConvergence();
+  // refreshConvergence() was removed with the Observer panel (#2476): its only
+  // sinks (#obs-loop-records) lived in that unreachable panel, so it fetched
+  // /api/convergence/status on load and after every reply for nothing.
 
   // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
   async function loadConversationHistory() {
@@ -959,18 +937,8 @@
                 if (evt.cleanText && evt.cleanText !== fullText) {
                   bubble.textContent = evt.cleanText;
                 }
-                // Update Loop Depth observer panel (Ouro Σ₀ CDF exit)
-                try {
-                  const loopN = evt.loop_n ?? 1;
-                  const conf = evt.confidence ?? (evt.sigma0?.claims ? Math.min(1, 0.5 + evt.sigma0.claims * 0.08) : 0.5);
-                  const exitReason = evt.exit_reason ?? 'single_pass';
-                  const loopEl = document.getElementById('obs-loop-depth');
-                  const fillEl = document.getElementById('obs-loop-fill');
-                  if (loopEl) loopEl.textContent = `⟳ ${loopN} loop${loopN !== 1 ? 's' : ''} · ${Math.round(conf * 100)}% conf · ${exitReason}`;
-                  if (fillEl) fillEl.style.width = (conf * 100) + '%';
-                } catch (_) {}
-                // CONVERGE: this reply just emitted a record — refresh the loop panel.
-                try { refreshConvergence(); } catch (_) {}
+                // (Observer-panel loop-depth writer + per-reply refreshConvergence()
+                // removed with the unreachable panel, #2476.)
 
                 // Parse [DOORS: A name | B name | C name] from full text if backend didn't extract
                 let suggestions = evt.suggestions;

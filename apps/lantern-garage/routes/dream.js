@@ -118,42 +118,10 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
     return true;
   }
 
-  // ── CSF search endpoint ───────────────────────────────────────────────
-  if (url.pathname === "/api/csf/search" && req.method === "GET") {
-    const query = (url.searchParams.get("q") || "").trim();
-    if (!query) {
-      sendJson(res, { error: "q parameter required" }, 400);
-      return true;
-    }
-    const topN = Math.min(10, Math.max(1, parseInt(url.searchParams.get("top_n") || "3", 10) || 3));
-    try {
-      const { spawn } = require("child_process");
-      const py = process.platform === "win32" ? "python" : "python3";
-      const result = await new Promise((resolve, reject) => {
-        const proc = spawn(py, ["src/csf_search.py"], {
-          cwd: repoRoot,
-          env: { ...process.env, PYTHONPATH: path.join(repoRoot, "src") },
-        });
-        let out = "", err = "";
-        proc.stdout.on("data", (c) => (out += c));
-        proc.stderr.on("data", (c) => (err += c));
-        const timeout = setTimeout(() => { proc.kill(); reject(new Error("csf_search timeout")); }, 8000);
-        proc.on("close", (code) => {
-          clearTimeout(timeout);
-          if (code !== 0) reject(new Error(err || `csf_search exit ${code}`));
-          else resolve(out.trim());
-        });
-        proc.on("error", (e) => { clearTimeout(timeout); reject(e); });
-        proc.stdin.write(JSON.stringify({ query, top_n: topN }));
-        proc.stdin.end();
-      });
-      const data = JSON.parse(result);
-      sendJson(res, { ...data, query, generatedAt: new Date().toISOString() });
-    } catch (err) {
-      sendJson(res, { segments: [], query, error: err.message, generatedAt: new Date().toISOString() });
-    }
-    return true;
-  }
+  // (The GET /api/csf/search endpoint was removed (#2534): it spawned
+  // src/csf_search.py, which does not exist anywhere in the repo, so every call
+  // failed — and nothing in public/, src/, or tests/ called the endpoint. Chat
+  // memory retrieval runs through the recall_memory tool path, not this route.)
 
   // ── Code modification endpoint (unisona.ai can apply real changes) ─────────
   if (url.pathname === "/api/code/apply" && req.method === "POST") {
@@ -346,6 +314,21 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
   }
 
   if (url.pathname === "/api/dream/chat" && req.method === "POST") {
+    // Same server-side daily cap as the stream path (#tier-caps). Internal/operator
+    // callers (bang commands, pr-watcher, the proxy to /stream) are exempt; a real
+    // end-user direct POST is metered once here (its internal proxy to /stream is
+    // loopback → exempt there, so no double count).
+    if (!require("../lib/request-auth").isOperatorRequest(req)) {
+      const q = require("../lib/chat-quota").consume(req);
+      if (!q.allowed) {
+        sendJson(res, {
+          error: "daily_limit_reached", tier: q.tier, cap: q.cap,
+          detail: `Daily limit reached: ${q.cap} messages/day on the ${q.tier} tier. Upgrade for more capacity.`,
+          upgrade: true,
+        }, 429);
+        return true;
+      }
+    }
     try {
       const raw = await collectRequestBody(req);
       const body = JSON.parse(raw || "{}");
@@ -362,7 +345,9 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
           : selectAgent(message);
         result = await handleConvergenceCommand(recentDreams, agent, message);
       } else {
-        result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "");
+        // body.mode: allowlisted one-shot mode (#2577, e.g. "review" from pr-watcher) —
+        // no tools narrative, no context injection; unknown values are ignored.
+        result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "", body.mode || "");
         // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists)
         if (result.reply && isVerifyEnabled()) {
           try {
@@ -459,6 +444,22 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
 
   if ((url.pathname === "/api/dream/stream" && req.method === "GET") ||
       (url.pathname === "/api/dream/chat/stream" && req.method === "POST")) {
+    // Server-side daily message cap by tier (Guest 10 / Free 50 / Member 100 / Pro 250 /
+    // Pilot ∞) — the UI declared these but never enforced them, so any tier could send
+    // unlimited paid LLM calls. Only real end-user POSTs are metered; internal/operator
+    // calls (loopback automation, the non-stream handler's own proxy, bang commands) are
+    // exempt so they never consume a user's quota. #tier-caps
+    if (req.method === "POST" && !require("../lib/request-auth").isOperatorRequest(req)) {
+      const q = require("../lib/chat-quota").consume(req);
+      if (!q.allowed) {
+        sendJson(res, {
+          error: "daily_limit_reached", tier: q.tier, cap: q.cap,
+          detail: `Daily limit reached: ${q.cap} messages/day on the ${q.tier} tier. Upgrade for more capacity.`,
+          upgrade: true,
+        }, 429);
+        return true;
+      }
+    }
     const { appendConvergenceRecord } = require("../lib/dream-chat");
 
     // Intercept SSE writes so we can log every model interaction as a convergence

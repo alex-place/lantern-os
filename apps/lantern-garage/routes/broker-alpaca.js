@@ -90,11 +90,45 @@ function _fetchAccount(token, env) {
 
 module.exports = async function brokerAlpacaRoutes(req, res, url) {
   const p = url.pathname;
-  if (!p.startsWith('/api/broker/alpaca/')) return false;
+  if (!p.startsWith('/api/broker/alpaca/') && p !== '/api/broker/preference') return false;
   const method = req.method;
   const userId = getEffectiveUserId(req);
   const origin = _origin(req);
   const redirectUri = `${origin}/api/broker/alpaca/callback`;
+
+  // GET/POST /api/broker/preference — which connected broker executes THIS user's
+  // trades ('alpaca' | 'ibkr' | 'auto' = server default). No secrets; the stored
+  // value only matters for users who actually have a broker connected.
+  if (p === '/api/broker/preference') {
+    const prefs = require('../lib/broker-preference');
+    const { preferredBroker } = require('../lib/broker-facade');
+    // Owner-machine convention (same as routes/accounts.js): a request with no
+    // session id on a box whose auth funnel is off IS the owner — the identity the
+    // broker stores already use ('local-owner', e.g. ibkr-credentials). Without
+    // this, the ☰ broker switch 401s exactly for the single-user local setup the
+    // trader ships in. Patreon-gated deployments always have a session id, so
+    // anonymous internet visitors there never reach this fallback.
+    const prefUserId = userId != null ? userId : 'local-owner';
+    if (method === 'GET') {
+      let ibkrConnected = false;
+      try { ibkrConnected = require('../lib/ibkr-credentials').has(prefUserId); } catch (_e) { /* absent module = not connected */ }
+      const adapter = require('../lib/alpaca-adapter');
+      return _json(res, 200, {
+        preference: prefs.get(prefUserId),        // the stored choice (may be 'auto')
+        effective: preferredBroker(prefUserId),   // what actually resolves after env/default
+        connected: { alpaca: adapter.available(prefUserId), ibkr: ibkrConnected },
+      }), true;
+    }
+    if (method === 'POST') {
+      const body = await _readBody(req);
+      const broker = String((body && body.broker) || '').toLowerCase();
+      if (!prefs.set(prefUserId, broker)) {
+        return _json(res, 400, { error: 'invalid_broker', message: "broker must be 'alpaca', 'ibkr', or 'auto'" }), true;
+      }
+      return _json(res, 200, { ok: true, preference: broker, effective: preferredBroker(prefUserId) }), true;
+    }
+    return _json(res, 405, { error: 'method_not_allowed' }), true;
+  }
 
   // GET /status — redacted connection state (safe for guests to poll)
   if (method === 'GET' && p === '/api/broker/alpaca/status') {

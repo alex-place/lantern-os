@@ -1,5 +1,5 @@
 {
-  "built_at": 1784216107.066113,
+  "built_at": 1784260459.335139,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -122,18 +122,13 @@
     "docs/adr/0021-serving-substrate-retain-ouro-custom-loop.md",
     "docs/adr/0024-sigma0-frontier-training-program.md",
     "docs/research/2026-07-04-serving-and-rho-convergence.md",
-    "docs/SIGMA0-READING-PACK.md",
     "docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md",
     "docs/research/2026-07-13-ouro-mbpp-distillation.md",
     "docs/research/2026-07-04-serving-design-sota.md",
-    "docs/SIGMA0-PLT-HANDOFF.md",
-    "docs/SIGMA0-UPDATE-CERTIFICATE.md",
     "docs/SIGMA0-FRONTIER-TRAIN-BRIEF.md",
     "docs/SIGMA0-HONESTY-BENCHMARK.md",
     "docs/SIGMA0-MODEL-DESIGN.md",
-    "docs/SIGMA0-MODEL-DESIGN-BRIEF.md",
     "docs/research/SIGMA0-ARXIV-READING-PACK-2026-07.md",
-    "docs/SIGMA0-PHYSICS-EINSTEIN-COMPARISON.md",
     "docs/KALSHI-API-SPEC.md",
     "docs/PORTFOLIO-SETUP.md",
     "docs/trading-api-reference.md",
@@ -163,6 +158,7 @@
     "docs/MCP-CONNECTOR.md",
     "docs/USER-PROFILES.md",
     "docs/YOUTUBE-API-SETUP.md",
+    "docs/API-REFERENCE.md",
     "docs/adr/0019-ibkr-connectivity-client-portal-gateway.md",
     "docs/adr/0020-ibkr-live-order-placement.md",
     "docs/adr/0022-ibkr-per-user-self-service-oauth.md",
@@ -208,7 +204,6 @@
     "docs/HOOKS.md",
     "docs/research/2026-07-10-grounding-v2-verdict.md",
     "docs/research/2026-07-10-hneurons-probe.md",
-    "docs/patreon-login-wiring.md",
     "docs/research/2026-07-10-honesty-under-quantization.md",
     "docs/research/2026-07-04-qexit-adaptivity.md",
     "docs/research/2026-07-01-surprise-leak-layer2-result.md",
@@ -231,7 +226,6 @@
     "docs/research/2026-07-09-truth-probe-transfer.md",
     "docs/research/2026-07-09-honesty-calibration-adapter-trackB.md",
     "docs/UNISONA-SHARPE-CERTIFICATE.md",
-    "docs/v1.9-issue-list.md",
     "docs/research/2026-07-03-verso-competitive-analysis.md",
     "docs/SIGMA-THETA-ABC-HARNESS-SPEC.md",
     "docs/research/2026-07-02-weather-oracle-constant-fit.md",
@@ -647,7 +641,7 @@
       ]
     }
   },
-  "sections": 2541,
+  "sections": 2515,
   "external": 34,
-  "sha256": "825ea7e0cddecc02a37bb3a79c4b9f9ebd18ab94be804dd97029a4b53d76ed85"
+  "sha256": "36ae9846906d8d00587b2d6741aedbb56cc82af7784311cccbae5dfe96b63d55"
 }

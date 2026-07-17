@@ -37,6 +37,28 @@ function isLoopback(req) {
   return addr === "127.0.0.1" || addr === "::1" || addr === "::ffff:127.0.0.1";
 }
 
+/**
+ * The real client IP for rate-limiting / abuse keys. Behind the Cloudflare named
+ * tunnel EVERY external visitor reaches Node from the loopback socket, so the raw
+ * socket address is useless as a per-client key (#2616) — the whole internet shares
+ * one bucket. Prefer the tunnel/proxy-set client headers (Cloudflare sets
+ * cf-connecting-ip and strips any client-supplied copy), falling back to the socket
+ * for genuine direct hits. Note: x-forwarded-for is only trustworthy behind a proxy
+ * that overwrites it (which this deploy has); it's the last header resort.
+ */
+function clientIp(req) {
+  const h = (req && req.headers) || {};
+  const first = (v) => String(v || "").split(",")[0].trim();
+  return (
+    first(h["cf-connecting-ip"]) ||
+    first(h["true-client-ip"]) ||
+    first(h["x-real-ip"]) ||
+    first(h["x-forwarded-for"]) ||
+    (req && req.socket && req.socket.remoteAddress) ||
+    "unknown"
+  );
+}
+
 /** Constant-time string compare (avoids leaking token length/prefix via timing). */
 function tokensEqual(a, b) {
   const ab = Buffer.from(String(a || ""));
@@ -119,6 +141,7 @@ module.exports = {
   internalUserId,
   isLoopback,
   isProxied,
+  clientIp,
   tokensEqual,
   requestToken,
   parseCookies,

@@ -41,6 +41,10 @@ const PUBLIC_PAGES = {
   // Terms of Service + EULA — MUST be public so a signed-out user can read it
   // before agreeing during account creation (linked from auth.html).
   "/terms.html":          "terms.html",
+  // Pricing is a conversion page — it MUST be visible to signed-out prospects, who
+  // are exactly its audience. Auth-gating it bounced them to sign-in and dropped the
+  // destination (#2610). The Stripe checkout buttons still require auth server-side.
+  "/pricing.html":        "pricing.html",
   "/reset-password.html": "reset-password.html",
   "/":                    "index.html",
   "/index.html":          "index.html",
@@ -57,6 +61,10 @@ const PUBLIC_PAGES = {
   // client-side; the trade-gated data endpoints stay blocked server-side by
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
+  // Public read-only spectator view of the demo (paper) account (#2548): a
+  // logged-out visitor can watch it trade live. No order controls exist on the
+  // page and its feed endpoint is a sanitized public read (PUBLIC_TRADING_READS).
+  "/demo.html":           "demo.html",
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
@@ -92,6 +100,7 @@ const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
+  "/api-keys-settings.html": "/settings.html", // single-column key page retired → tabbed two-column settings
 };
 
 function renderDisabledPage(pathname) {
@@ -110,15 +119,18 @@ font-family:system-ui,sans-serif;color:var(--text,#e5e7eb);background:var(--bg,#
 // A signed-in user who lacks the tier/entitlement for a page gets a friendly HTML
 // "unlock" page instead of a raw JSON 403 filling the browser (a first-time-user
 // papercut). Unauthenticated users are still redirected to login upstream.
-// Canonical tier display names (Guest / Free / Pro / Business, #2470). The $5
-// "supporter" tier is retired → shown as Free (grandfathered); the $20 tier is
-// Pro. `admin` is a STAFF role, not a purchasable tier, so it's handled below as
-// a staff gate (no "See plans") rather than being named as a buyable tier.
-const TIER_LABEL = { supporter: "Free", deep_dreamer: "Pro" };
+// Canonical tier display names, mapped from the Patreon pledge amount:
+//   supporter ($5) → Member · deep_dreamer ($20) → Pro · pilot ($200) → Pilot.
+// `admin` is a STAFF role, not a purchasable tier, so it's handled below as a staff
+// gate (no "See plans") rather than being named as a buyable tier.
+const TIER_LABEL = { supporter: "Member", deep_dreamer: "Pro", pilot: "Pilot" };
+// Friendly name for the tier a per-feature ENTITLEMENT requires (used when a page
+// gates on an entitlement rather than a role).
+const ENTITLEMENT_TIER = { trade: "Pro", pro: "Pro", ai_trader: "Pilot" };
 const STAFF_ROLES = new Set(["admin", "tech_support"]);
 function renderUpgradePage(page) {
   const isStaff = page.staff === true || STAFF_ROLES.has(page.role);
-  const need = page.entitlement === "trade" ? "the Pro tier"
+  const need = page.entitlement ? `the ${ENTITLEMENT_TIER[page.entitlement] || "a higher"} tier`
     : page.role ? `the ${TIER_LABEL[page.role] || page.role} tier` : "a higher tier";
   const heading = isStaff ? "Staff access required" : "This feature needs an upgrade";
   // Staff pages aren't for sale — never show a buy-a-plan CTA on them (#2470).

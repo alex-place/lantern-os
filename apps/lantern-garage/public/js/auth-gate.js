@@ -19,7 +19,7 @@
   // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
   // body.is-guest and their endpoints are admin-gated server-side. So it must not
   // bounce here either.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html'];
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html', '/pricing.html', '/demo.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest
@@ -115,7 +115,42 @@
     }).catch(() => {});
   }
 
+  // Role → plan badge shown beside the profile button. Roles collapse to the
+  // three sold plans (the supporter role survives from retired $5 patrons and
+  // reads as Free); staff roles show their staff label instead of a plan.
+  const TIER_BADGE = {
+    guest: ['Free', 'free'], supporter: ['Free', 'free'],
+    deep_dreamer: ['Pro', 'pro'], founder: ['Pro', 'pro'],
+    pilot: ['Pilot', 'pilot'],
+    tech_support: ['Staff', 'admin'], admin: ['Admin', 'admin'],
+  };
+
+  // Show the signed-in user's plan to the LEFT of the profile button. The badge
+  // links to /pricing.html — for a Free user that's the upgrade path, for a paid
+  // user it's where Manage subscription lives. Removed entirely for guests (their
+  // profile slot is a sign-in link; a plan label there would be noise).
+  function updateTierBadge(session) {
+    const profileBtn = document.getElementById('profile-btn');
+    let badge = document.getElementById('nav-tier');
+    if (!(session && session.authenticated) || !profileBtn) {
+      if (badge) badge.remove();
+      return;
+    }
+    const [label, kind] = TIER_BADGE[session.role] || ['Free', 'free'];
+    if (!badge) {
+      badge = document.createElement('a');
+      badge.id = 'nav-tier';
+      badge.className = 'nav-tier';
+      badge.href = '/pricing.html';
+      profileBtn.parentElement.insertBefore(badge, profileBtn);
+    }
+    badge.textContent = label;
+    badge.dataset.tier = kind;
+    badge.title = kind === 'free' ? 'Your plan: Free — see upgrade options' : 'Your plan: ' + label;
+  }
+
   function updateNav(session) {
+    updateTierBadge(session);
     // Profile button
     const profileBtn = document.getElementById('profile-btn');
     // Logout button

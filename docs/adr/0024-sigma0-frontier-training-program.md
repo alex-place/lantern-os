@@ -14,7 +14,7 @@ superseded-by: none
 - Status: **Proposed** (requires Alex's explicit acceptance; agents may not flip this)
 - Loop stage: Reason (the trained model is the reasoner) + Verify (honesty-native abstention; certificate quantities as training-time abort criteria)
 - Relates to: [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) (continual-learning rules — see reconciliation below), [ADR-0011](0011-proprietary-sigma0-base-model.md) (own Σ₀ base), [ADR-0015](0015-qwen-teacher-verified-distillation.md) (verified distillation), [ADR-0021](0021-serving-substrate-retain-ouro-custom-loop.md) (serving substrate)
-- Briefs: [SIGMA0-FRONTIER-TRAIN-BRIEF.md](../SIGMA0-FRONTIER-TRAIN-BRIEF.md) (this program) · [SIGMA0-MODEL-DESIGN-BRIEF.md](../SIGMA0-MODEL-DESIGN-BRIEF.md) (serving layer / distillation target)
+- Briefs: [SIGMA0-FRONTIER-TRAIN-BRIEF.md](../SIGMA0-FRONTIER-TRAIN-BRIEF.md) (this program) · [SIGMA0-MODEL-DESIGN.md](../SIGMA0-MODEL-DESIGN.md) (appendix) (serving layer / distillation target)
 
 > **Note (2026-07-06):** originally merged as "ADR-0023" (PR #2158), one minute after
 > [0023-default-profile-foregrounds-the-loop.md](0023-default-profile-foregrounds-the-loop.md)

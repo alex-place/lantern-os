@@ -100,3 +100,19 @@ When `creatorIntelligence` flag is off, `index.js` still loads but population-de
 - No bulk scraping of platforms in violation of ToS. Collection adapters are credentialed and rate-limited; absent credentials the dataset stays empty.
 - No pretrained "viral model" weights shipped in-repo. Population intelligence is computed locally from rows the operator legitimately collected.
 - No synthetic/placeholder metrics to make the UI "look finished."
+
+## Feature flags
+
+(Absorbed from `creator-dashboard-v10-plan.md`, 2026-07-16.) All V10 behavior
+ships behind flags in `src/creator-intelligence/dataset/feature-flags.js`
+(env-overridable); default **off** for anything unproven so the stable dashboard
+is never destabilized:
+
+| Flag | Env var | Default | Gates |
+|---|---|---|---|
+| `creatorIntelligence` | `LANTERN_CI_ENABLED` | off | whole subsystem |
+| `safeZoneV2` | `LANTERN_CI_SAFEZONE_V2` | off | new detector |
+| `captionEngineV3` | `LANTERN_CI_CAPTION_V3` | off | new caption engine |
+| `variantEngineV2` | `LANTERN_CI_VARIANT_V2` | off | A–E variants |
+| `exportValidator` | `LANTERN_CI_EXPORT_VALIDATOR` | **on** | ffprobe gates (safe to enable) |
+| `researchReport` | `LANTERN_CI_RESEARCH_REPORT` | off | reverse-engineer report |

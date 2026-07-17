@@ -200,6 +200,24 @@ function selectAgent(_message) {
 // with the keyword personas: the one assistant + real tool calls covers those
 // intents, and PCSF provider ranking gets its taskType from detectTaskType.
 
+// One-shot modes for internal callers (#2577). The persona prompt advertises real
+// tools, but this non-streaming path executes none — a reviewer told it can access
+// the repo narrates inspection plans instead of concluding, and the required
+// "VERDICT:" line never appears (pr-watcher parsed every review as COMMENT and
+// auto-merge starved). A one-shot call is told the truth: no tools, no follow-up
+// turn — conclude now. Allowlisted server-side; never a free-text prompt override.
+const ONESHOT_MODES = {
+  review: {
+    systemPrompt:
+      "You are a precise senior code reviewer producing a single, complete, self-contained reply.\n" +
+      "This is a one-shot call with NO tools: you cannot open files, run commands, browse, or fetch\n" +
+      "anything, and there is no follow-up turn. Base the review ONLY on the material included in\n" +
+      "the message. Never say you will inspect, verify, or look at anything — conclude from what is\n" +
+      "given, and state uncertainty explicitly instead of deferring. Follow the message's\n" +
+      "output-format instructions exactly.",
+  },
+};
+
 function parseBangCommand(input) {
   const m = String(input || "").trim().match(/^!(\S+)(?:\s+(.*))?$/);
   if (!m) return null;
@@ -511,14 +529,17 @@ function parseUpstreamProviderError(provider, statusCode, rawBody) {
   return { provider, status: statusCode, code, type: String(type), message: String(message).slice(0, 300) };
 }
 
-async function dreamChatReply(message, recentDreams, requestedAgent = "", requestedProvider = "") {
+async function dreamChatReply(message, recentDreams, requestedAgent = "", requestedProvider = "", oneshotMode = "") {
   console.log("[dreamChatReply] Called with agent:", requestedAgent, "provider:", requestedProvider);
   const text = String(message || "").trim();
+  // #2577: allowlisted one-shot mode (unknown values ignored). Swaps the persona
+  // prompt for an honest no-tools one and skips every context injection below.
+  const oneshot = ONESHOT_MODES[String(oneshotMode || "").toLowerCase()] || null;
   const webSuggestions = generateWebSuggestions(message);
 
   // Remember-stage hook (#1429): same capture as stream-chat.js — persist a detected
   // personal-fact statement through the ONE canonical CSF memory. Best-effort, non-blocking.
-  if (text) {
+  if (text && !oneshot) {
     try {
       const fact = extractFact(text);
       if (fact) {
@@ -551,6 +572,10 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
     agent = selectAgent(message);
   }
 
+  // One-shot callers get the truthful no-tools prompt — the persona prompt's
+  // tool claims are what made single-shot reviews narrate instead of conclude.
+  if (oneshot) agent = { ...agent, systemPrompt: oneshot.systemPrompt };
+
   // For unisona.ai (technical agent), skip dream door suggestions
   const suggestions = agent.id === "keystone" ? [] : Object.values(DREAM_DOORS)
     .slice(0, 4)
@@ -569,7 +594,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   // ── Web Search Grounding ───────────────────────────────────────────
   let groundingContext = "";
-  if (needsGrounding(text)) {
+  if (!oneshot && needsGrounding(text)) {
     const searchQuery = extractSearchQuery(text);
     if (searchQuery) {
       try {
@@ -591,7 +616,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
 
   // Convergence Oracle — ground every question in its cosmic-time observer slice (fail-safe).
   let oracleContext = "";
-  try { oracleContext = await oracleGround(text); } catch (_) { oracleContext = ""; }
+  if (!oneshot) { try { oracleContext = await oracleGround(text); } catch (_) { oracleContext = ""; } }
 
   // Mesh grounding (MESH_GROUNDING=1, off by default) — local memory + Knowledge Center rings.
   // ADDITIVE ONLY: inject the cited evidence block when the resolver actually GROUNDS; never
@@ -600,7 +625,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   // Web ring is omitted (the chat does its own web grounding above); the mesh peer ring is
   // omitted (ADR-gated). Fail-safe: any error → "".
   let meshGroundContext = "";
-  if (process.env.MESH_GROUNDING === "1") {
+  if (!oneshot && process.env.MESH_GROUNDING === "1") {
     try {
       const _gr = await resolveGrounding(text, { rings: defaultRings({ mesh: false, web: false }) });
       if (_gr.grounded) {
@@ -615,7 +640,8 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   let rp = String(requestedProvider || "").toLowerCase().trim();
 
   // ── unisona.ai FT: Auto-route unisona.ai agent to trained keystone-ft provider ──
-  if (agent.id === "keystone" && !rp) {
+  // (not for one-shot callers — they need the plain provider chain, deterministic)
+  if (!oneshot && agent.id === "keystone" && !rp) {
     // Check if ft-result.json exists to enable keystone-ft
     try {
       const ftPath = require("path").resolve(__dirname, "../../data/training/ft-result.json");
@@ -1396,6 +1422,7 @@ const tokenAudit = new TokenAudit();
 module.exports = {
   AGENT_PERSONAS,
   DREAM_DOORS,
+  ONESHOT_MODES,
   selectAgent,
   parseBangCommand,
   handleConvergenceCommand,

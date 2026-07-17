@@ -2883,7 +2883,7 @@ async function handleStreamChat(req, url, res) {
         const tools = toolRunner.openaiTools({ operator });
         if (tools.length) {
           const xaiModelName = modelFor("xai");
-          const decode = serving.applyOpenAIDecodeParams({});
+          const decode = serving.applyXAIDecodeParams({}); // grok rejects penalty params (#2531)
           const messages = buildProviderMessages(systemPrompt, compacted, message);
           const MAX_TOOL_ITERS = 6;
           let toolCalls = 0;
@@ -2927,8 +2927,9 @@ async function handleStreamChat(req, url, res) {
     }
     try {
       const xaiModel = modelFor("xai");
-      // xAI/Grok is OpenAI-compatible → FAST-mode decode params (issue #729).
-      const payload = JSON.stringify(streamSurprise.withOpenAILogprobs(serving.applyOpenAIDecodeParams({
+      // xAI/Grok is OpenAI-compatible, but its reasoning models 400 on penalty
+      // params — use the xAI decode variant (top_p only, #2531).
+      const payload = JSON.stringify(streamSurprise.withOpenAILogprobs(serving.applyXAIDecodeParams({
         model: xaiModel, stream: true,
         messages: buildProviderMessages(systemPrompt, compacted, message),
       }))); // #1678: + per-token logprobs when SURPRISE_CANARY on (else unchanged)
@@ -2938,7 +2939,14 @@ async function handleStreamChat(req, url, res) {
           hostname: "api.x.ai", path: "/v1/chat/completions", method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${xaiKey}`, "Content-Length": Buffer.byteLength(payload) },
         }, (upstream) => {
-          if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`xai_status_${upstream.statusCode}`)); return; }
+          if (upstream.statusCode !== 200) {
+            // Keep the provider's own reason — a bare status made the frequency-penalty
+            // rejection (#2531) undiagnosable from logs.
+            let ebody = "";
+            upstream.on("data", (c) => { if (ebody.length < 300) ebody += c.toString(); });
+            upstream.on("end", () => reject(new Error(`xai_status_${upstream.statusCode}: ${ebody.slice(0, 200)}`)));
+            return;
+          }
           let buf = "";
           upstream.on("data", (chunk) => {
             buf += chunk.toString();

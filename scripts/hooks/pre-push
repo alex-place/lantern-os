@@ -20,11 +20,12 @@ while read local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
-# ── 2. Change-record + version-bump gate ─────────────────────────────────────
-# A code-bearing branch must bump package.json to a new X.X.X version AND carry a
-# matching CHANGELOG.MD entry, relative to origin/master. Runs BEFORE the gh /
-# workstream checks below so it is enforced even without gh and even on branches
-# that already have an open PR.
+# ── 2. Change-record gate (changelog fragment) ───────────────────────────────
+# A code-bearing branch must add a timestamped changelog.d/*.md fragment relative
+# to origin/master (the per-PR version bump + CHANGELOG.MD edit model was retired —
+# release assembly folds fragments; see scripts/validate-prepush-version-changelog.py,
+# #2527). Runs BEFORE the gh / workstream checks below so it is enforced even
+# without gh and even on branches that already have an open PR.
 # Bypass: SKIP_VERSION_CHECK=1 (or SKIP_MONOWORKSTREAM=1) git push ...
 if [ "$SKIP_MONOWORKSTREAM" != "1" ] && [ "$SKIP_VERSION_CHECK" != "1" ]; then
   _root=$(git rev-parse --show-toplevel 2>/dev/null)

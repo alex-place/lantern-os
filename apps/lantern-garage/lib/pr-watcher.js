@@ -302,10 +302,19 @@ class PrWatcher {
    * never counts as an approval. Defaults to COMMENT (does NOT merge) when no clear
    * verdict is present — fail closed.
    */
+  /** The explicit `VERDICT: X` tag from a review body, normalized — or null when
+   *  the review never concluded (#2577's rambling reviews). Unlike _parseVerdict
+   *  this has NO bare-token fallback and never fails closed, so callers can tell
+   *  "concluded COMMENT" apart from "no verdict at all". */
+  static _verdictTag(text) {
+    const m = String(text || "").toUpperCase().match(/\bVERDICT\s*:\s*(APPROVE|REQUEST[_ ]CHANGES|COMMENT)\b/);
+    return m ? m[1].replace(" ", "_") : null;
+  }
+
   static _parseVerdict(text) {
     const t = String(text || "").toUpperCase();
-    const tagged = t.match(/\bVERDICT\s*:\s*(APPROVE|REQUEST[_ ]CHANGES|COMMENT)\b/);
-    if (tagged) return tagged[1].replace(" ", "_");
+    const tagged = PrWatcher._verdictTag(t);
+    if (tagged) return tagged;
     const lastOf = (re) => { const g = new RegExp(re, "gi"); let m, last = -1; while ((m = g.exec(t)) !== null) last = m.index; return last; };
     const req = Math.max(lastOf("REQUEST[_ ]CHANGES"), lastOf("REQUESTING CHANGES"));
     const app = lastOf("\\bAPPROVED?\\b");
@@ -554,8 +563,11 @@ class PrWatcher {
 
     // Cross-instance idempotency: if another fleet host already posted a review for
     // THIS exact commit, don't duplicate it (and skip the diff fetch + chat).
+    // #2577: only adopt a review that actually CONCLUDED (explicit VERDICT: tag).
+    // A verdict-less ramble adopted here would wedge the PR on COMMENT-forever;
+    // falling through re-reviews it with the fixed one-shot pipeline instead.
     const remoteReview = await this._reviewExistsRemotely(number, reviewSha);
-    if (remoteReview) {
+    if (remoteReview && PrWatcher._verdictTag(remoteReview)) {
       entry.reviewedSha = reviewSha;
       entry.reviewVerdict = PrWatcher._parseVerdict(remoteReview);  // adopt the other host's verdict
       entry.reviewedAt = Date.now();
@@ -622,6 +634,24 @@ class PrWatcher {
       return { ok: false, error: review.error };
     }
 
+    // #2577 safety net: a review with no explicit VERDICT: tag can't gate the merge
+    // (it parses fail-closed to COMMENT and the PR wedges at this SHA). One follow-up
+    // asks for just the verdict line; a recovered tag is prepended so both the posted
+    // comment and _parseVerdict see it. Still no tag → post as-is, fail closed.
+    if (!PrWatcher._verdictTag(review.text)) {
+      console.warn(`[PR Watcher] PR #${number} review lacks a VERDICT: tag — asking for the verdict line`);
+      const follow = await this._keystoneChat([
+        "Below is a code review that is missing its required verdict line.",
+        "Based ONLY on that review, reply with EXACTLY one line and nothing else:",
+        "VERDICT: APPROVE or VERDICT: REQUEST_CHANGES or VERDICT: COMMENT",
+        "",
+        "## Review",
+        String(review.text).slice(0, 6000),
+      ].join("\n"));
+      const recovered = follow.ok ? PrWatcher._verdictTag(follow.text) : null;
+      if (recovered) review.text = `VERDICT: ${recovered}\n\n${review.text}`;
+    }
+
     try {
       await this._gh(
         "pr", "comment", String(number),
@@ -653,7 +683,12 @@ class PrWatcher {
     try {
       const data = await this._ghJson("pr", "view", String(number), "--json", "comments");
       const marker = `fleet-auto-review:${sha}`;
-      const hit = (data.comments || []).find((c) => (c.body || "").includes(marker));
+      const hits = (data.comments || []).filter((c) => (c.body || "").includes(marker));
+      // Prefer the newest marker comment that carries an explicit verdict — after a
+      // #2577 re-review, the old verdict-less ramble still matches the marker and
+      // must not shadow the corrected review that follows it.
+      const concluded = hits.filter((c) => PrWatcher._verdictTag(c.body));
+      const hit = (concluded.length ? concluded : hits).pop();
       return hit ? (hit.body || "") : null;
     } catch {
       return null; // best-effort; fall through to normal (SHA-gated) review
@@ -666,6 +701,10 @@ class PrWatcher {
         message,
         user: "pr-watcher",
         conversationId: "pr-review-fleet",
+        // One-shot review mode (#2577): honest no-tools system prompt, no context
+        // injection — the persona prompt's tool claims made single-shot reviews
+        // narrate inspection plans instead of concluding with a VERDICT: line.
+        mode: "review",
         // The route reads `agent` (not `forceAgent`) → keep the unisona.ai reviewer persona.
         agent: "keystone",
         // Pin a working provider. The default (no provider) path classifies a diff-bearing

@@ -145,3 +145,29 @@ self-observation to a real, calibrated, externally-determined price.
   NeurIPS, JASA, J. Prediction Markets) located via literature search 2023–2026.
 - No claim here asserts that Lantern OS currently trains on market rewards — it
   does not. This is a viability survey plus a proposed integration.
+
+---
+
+## 6. Live wiring in Lantern OS (absorbed from `docs/prediction-markets-as-grounding.md`, 2026-07-16)
+
+The Kalshi tight-band terminal (`apps/lantern-garage/public/kalshi-terminal.html`)
+already uses prediction markets as an operational grounding signal:
+
+- **Collapse detection** — a market discontinuity (large price jump) registers as
+  a surprise spike in the Σ₀ anti-collapse loop (PR #511).
+- **Recovery validation** — post-discontinuity price stabilization validates the
+  recovery excitation; measured < 5 min in the #507 grounding demo.
+- **Baseline accuracy** — agent performance vs human traders; 40% tight-band
+  accuracy at the 2026-06 baseline, tracked daily in
+  `data/kalshi/cio-accuracy-log.jsonl` (#425). A/B target: anti-collapse ON vs
+  OFF > 2% accuracy gain.
+
+Integration points: `apps/lantern-garage/routes/trading.js` (Kalshi REST),
+`apps/lantern-garage/lib/kalshi-collector.js` (6s polling + 429 backoff with
+`Retry-After`).
+
+Additional verified references carried over: Wolfers & Zitzewitz (2004),
+*Prediction Markets*, J. Economic Perspectives 18(2):107–126 — verified 2026-06-17
+(#660); Dohmatob et al. (2024), *A Tale of Tails: Model Collapse as a Change of
+Scaling Laws*, arXiv:2402.07043 (ICML 2024); Bar-Shalom, Li & Kirubarajan (2001),
+*Estimation with Applications to Tracking and Navigation*.
