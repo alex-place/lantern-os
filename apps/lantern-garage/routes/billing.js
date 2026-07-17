@@ -85,7 +85,12 @@ function baseUrl(req) {
 // not be offered a SECOND checkout (double billing). A bare customer link with no
 // status (link established, sub never synced) does not count.
 function hasLiveSubscription(profile) {
-  return !!(profile && profile.stripeCustomerId && profile.stripeStatus &&
+  // Require a GRANTED role, not just a non-revoked status. An `incomplete` sub (initial
+  // payment never succeeded) is "keep" but conferred no access + set no stripeRole; without
+  // this it would block re-checkout while the user holds nothing, wedged until Stripe
+  // expires it (~23h). Gating on stripeRole means only a sub that actually granted a tier
+  // (active, or past_due mid-dunning) routes the user to the portal instead of a 2nd checkout (#2647).
+  return !!(profile && profile.stripeCustomerId && profile.stripeRole && profile.stripeStatus &&
     accessForStatus(profile.stripeStatus) !== "revoke");
 }
 

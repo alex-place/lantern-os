@@ -1,0 +1,8 @@
+### Fixed
+
+- robustness/security: a batch of billing/auth/profile correctness fixes from the 2026-07-16 audit.
+  - **Oversized request bodies no longer hang the handler** (#2649, #2650): `readBody` in `routes/profiles.js` and `readJsonBody` in `routes/auth.js` called `req.destroy()` past the 1MB cap without settling their promise — `destroy()` emits neither `end` nor `error`, so the awaiting async handler was suspended forever and leaked its frames. Both now `resolve(null)` before destroy (+ a `close` safety net), so the caller answers cleanly instead of leaking a pending handler per oversized POST.
+  - **`GET /api/profiles/me` no longer returns `200 null`** (#2651): when an authenticated session outlives its profile record (index reset/migrated), it now answers `404 unknown_account` like the change-password/-email handlers, instead of a success body of `null` that turned into client-side TypeErrors.
+  - **An `incomplete` Stripe subscription no longer wedges checkout** (#2647): a first-payment-never-succeeded sub conferred no access but counted as "live", blocking a fresh checkout for ~23h. `hasLiveSubscription` now requires an actually-granted `stripeRole`, so only a sub that granted a tier routes the user to the portal.
+  - **test-auth no longer fails open to admin** (#2645): `normalizeRole` defaulted an unknown/blank role to `admin`, so a token presented without a role silently became a full admin session. It now defaults to `guest` (least privilege); admin/tech_support require naming them explicitly. Also added the `pilot` tier to the emulatable roles.
+  - Verified: billing lifecycle E2E stays 26/26; `node --check` clean.

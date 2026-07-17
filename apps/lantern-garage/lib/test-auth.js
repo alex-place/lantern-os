@@ -68,7 +68,7 @@ const TEST_NAME = "Test User";
 const TEST_DEFAULT_PASSWORD = "test-account-1234";
 
 /** Roles the picker/header may emulate. "guest" is excluded (guest = not logged in). */
-const TEST_ROLES = ["supporter", "deep_dreamer", "founder", "admin", "tech_support"];
+const TEST_ROLES = ["supporter", "deep_dreamer", "pilot", "founder", "admin", "tech_support"];
 
 /** Is the test-auth mechanism switched on for this process? */
 function testAuthEnabled() {
@@ -112,12 +112,16 @@ function presentedToken(req) {
   return q ? String(q) : "";
 }
 
-/** Validate + normalize a requested role. Unknown/blank → "admin" (most permissive). */
+/**
+ * Validate + normalize a requested role. Unknown/blank → "guest" (LEAST privilege).
+ * Defaulting to admin was fail-open: a token presented with a missing or mistyped role
+ * silently became a full admin session (#2645). Admin/tech_support are still reachable —
+ * but only by naming them explicitly, so emulating an operator is a deliberate act.
+ */
 function normalizeRole(role) {
   const r = String(role || "").trim();
   if (r && TEST_ROLES.includes(r)) return r;
-  // roleLevel tolerates custom roles; only accept ones we know are meaningful.
-  return "admin";
+  return "guest";
 }
 
 /**

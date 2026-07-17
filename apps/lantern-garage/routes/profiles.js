@@ -33,9 +33,13 @@ function accountOrigin(req) {
 function readBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    // Over the 1MB cap: settle (null) BEFORE destroying. req.destroy() emits neither
+    // 'end' nor 'error', so without this the awaiting handler hangs forever and leaks
+    // its frames (#2649). 'close' is a belt-and-suspenders settle; resolve() is idempotent.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
+    req.on("close", () => resolve(null));
   });
 }
 
@@ -54,6 +58,11 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     }
 
     const profile = getProfile(userId);
+    // An authenticated session whose profile record is gone (index reset/migrated while a
+    // disk-persisted session survived) must NOT return 200 with body `null` — clients do
+    // `await res.json()` and then read fields off it, turning a recoverable "signed out"
+    // state into a TypeError. Answer 404 like the change-password/-email handlers (#2651).
+    if (!profile) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(publicProfile(profile)));
   }

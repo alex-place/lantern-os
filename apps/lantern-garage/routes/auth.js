@@ -61,9 +61,13 @@ function originOf(req) {
 function readJsonBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
+    // Over the 1MB cap: settle (null) BEFORE destroying — req.destroy() fires neither
+    // 'end' nor 'error', so otherwise the awaiting auth handler never responds and its
+    // frames leak (#2650). Mirrors the billing raw-body reader. resolve() is idempotent.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
     req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
     req.on("error", () => resolve(null));
+    req.on("close", () => resolve(null));
   });
 }
 
