@@ -605,16 +605,40 @@ function setLocalPassword(profileId, plaintext) {
 /**
  * Create a local email+password account. Returns { profile } or { error }.
  *
- * SECURITY (ADR-0016 review): if ANY profile already exists for this email we
- * refuse — we do NOT silently attach a password to it. Attaching would let an
- * attacker claim a victim's existing (e.g. Patreon/Google) profile by registering
- * a local password against the same email — an account-takeover / pre-hijacking
- * path. Adding a password to an existing account must instead be an
- * authenticated action from account settings (a follow-up). Local accounts start
- * UNVERIFIED.
+ * SECURITY (ADR-0016 review): if a VERIFIED or OAuth-linked profile already exists
+ * for this email we refuse — we do NOT silently attach a password to it. Attaching
+ * would let an attacker claim a victim's existing (e.g. Patreon/Google) profile by
+ * registering a local password against the same email — an account-takeover /
+ * pre-hijacking path. Adding a password to such an account must instead be an
+ * authenticated action from account settings.
+ *
+ * A DORMANT, UNVERIFIED, LOCAL-ONLY signup is different: nobody has proven
+ * ownership of that email yet, so it is not a real account — it is a stalled first
+ * attempt (common on self-hosted installs with no SMTP, where the verification link
+ * only reaches the server log). Re-registering the same email must NOT hard-fail
+ * with "an account already exists" (#2703); instead we treat it idempotently —
+ * refresh the password/name and let the caller re-issue the verification link.
+ * Overwriting an unverified account the registrant does not own gains nothing:
+ * access is still gated on the email-confirmation link, which only the inbox owner
+ * can click. Local accounts start UNVERIFIED.
  */
 function createLocalAccount(email, plaintext, name) {
-  if (getProfileByEmail(email)) return { error: "email_taken" };
+  const existing = getProfileByEmail(email);
+  if (existing) {
+    const hasOAuth =
+      (existing.identities || []).some((i) => i.provider !== "local") ||
+      !!existing.patreonId ||
+      !!existing.discordId;
+    const dormantLocalOnly =
+      existing.emailVerified !== true && !!existing.credential && !hasOAuth;
+    if (dormantLocalOnly) {
+      const updates = { credential: hashPassword(plaintext) };
+      if (name) updates.name = name;
+      const profile = updateProfile(existing.id, updates);
+      return { profile, reused: true };
+    }
+    return { error: "email_taken" };
+  }
   const profile = createProfile(crypto.randomBytes(12).toString("hex"), {
     name: name || "",
     email,
