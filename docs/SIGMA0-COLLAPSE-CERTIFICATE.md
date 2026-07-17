@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-07
+updated: 2026-07-17
 ---
 
 # Σ — The Convergence Certificate
@@ -59,8 +59,9 @@ since carry a verified-on date.
 
 ## How to audit this document
 
-Every load-bearing claim maps to a runnable artifact in this repo. All commands below were run
-against this revision on 2026-07-07 (68 tests, all passing, plus the gate self-test):
+Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
+were run against this revision on 2026-07-17 (74 tests, all passing; the gate self-test was
+last run 2026-07-07):
 
 | Claim | Class | Verify with |
 |---|---|---|
@@ -68,6 +69,7 @@ against this revision on 2026-07-07 (68 tests, all passing, plus the gate self-t
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | 900-run collapse-prevention sweep (§3) | MEASURED | `data/sigma0_regime_sweep_report.json`; regenerate: `python experiments/sigma0_regime_sweep.py` |
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
+| Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
 | Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
@@ -611,6 +613,17 @@ and no parameter being identified — only a state kept off a manifold. So Σ₀
 established**. (Canonical attribution is **Anderson 1977**, consistent across the
 `.md` and `.tex` variants — issue [#660].)
 
+**Nearer classical kin (added 2026-07-17 corner audit).** Condition-triggered,
+direction-targeted covariance re-excitation is classical in recursive least squares:
+**covariance resetting** and **directional forgetting** (Kulhavý & Kárný 1984;
+variable-direction forgetting, arXiv:2003.03523; SIFt-RLS, arXiv:2404.10844) keep an
+estimator's information matrix from degenerating in unexcited directions, with boundedness
+theorems of their own. Σ₀⁻¹'s covariance floor is the state-space mirror of that family
+(they prevent covariance *windup* under poor excitation; Σ₀⁻¹ prevents covariance
+*flatness* on the near-null band). Mechanism novelty is therefore **not** claimed for the
+operator; the C3 anti-freeze theorem is the one piece with no located counterpart, and it
+lives on this synthetic SDE, not a real model.
+
 **Latent code defect — RESOLVED (2026-06-15).** `AntiCollapseOperator.__init__`
 annotated `detector: Optional[...]` while `collapse.py` imported only `from typing
 import Dict`, so `typing.get_type_hints()` raised `NameError: name 'Optional' is
@@ -678,6 +691,34 @@ retrodiction of our own null, not a prospective test.
    deadline is a hard constraint (well-conditioned) or soft (sliver). Measuring it is
    cheap and should accompany any certified rate.
 
+**Now MEASURED — the schedule-vs-alarm race ([#2690], 2026-07-17).** Design-shift items 1–2
+are no longer only a corollary reading. `experiments/sigma0_scheduled_grounding.py` races two
+*single-shot* grounding policies over the same certified basins — timing the only variable;
+escape checked by exact trust-region maximization (not by the inequality); the
+critical-slowing-down canary swept over **all** healthy-quantile thresholds rather than one
+calibration. Result (`data/sigma0/scheduled_grounding_report.json`, 200 seeds;
+`tests/test_sigma0_scheduled_grounding.py` → 6 passing): in a **well-conditioned** basin
+(cond(P)≈2) the charitably-calibrated canary (FPR 1.5%) has median alarm at step 14 vs the
+cadence tick at step 3, and the **alarm premium is 2.25×** — grounding on the
+certificate-derived cadence reaches ≥90% escape at 0.40·B*_∞ while waiting for the alarm
+needs 0.90·B*_∞, the expensive end of the window, exactly as item 2 states (reactive is not
+hopeless; it is *late*). In the **sliver** basin (cond(P)≈6·10⁵) a forced fire-time sweep is
+fully timing-indifferent (every budget × depth cell ≥ 0.95) — item 3's measured-Ouro-regime
+null, now *produced*, not only retrodicted. Honest scope: synthetic maps; single-shot
+policies; one detector family; the canary is calibrated on the true healthy distribution
+(charitable — strengthens a lateness verdict, weakens an earliness one).
+
+**Prior-art positioning (2026-07-17 corner audit).** "Compute the next intervention time from
+a certified decay rate" is **self-triggered control** — a mature field (Heemels, Johansson &
+Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012;
+Lyapunov event-triggered stabilization with a known convergence rate, arXiv:1803.08980). §3.1
+is that field's recipe applied to this certificate's objects, and cites it rather than
+re-deriving it. The LLM literature has the *event-triggered* side only — FLARE
+(arXiv:2305.06983) and DRAGIN (arXiv:2403.10081) trigger retrieval reactively on uncertainty —
+plus naive fixed-interval retrieval; a cadence *derived from measured loop dynamics* appears
+to be an open lane, tracked with the Phase-1/2 real-model plan in [#2690] and composed in
+[SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) §2.
+
 **Honest limits.** The additive-anchor model is a simplification — real grounding enters
 as tokens through attention, not as a clean latent displacement. The qualitative
 phenomenon ("early intervention beats late; models commit") is independently published
@@ -686,6 +727,8 @@ phenomenon ("early intervention beats late; models commit") is independently pub
 quantities. A prospective test needs a **well-conditioned** loop (e.g. STARS-trained,
 arXiv:2605.26733) where the deadline should bite; on Ouro the theory predicts its own
 null.
+
+[#2690]: https://github.com/alex-place/lantern-os/issues/2690
 
 ---
 
@@ -1455,7 +1498,14 @@ is holdout theater, the same collapse it exists to prevent, one level up.
 5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
    signal **add detection power** for bad checkpoints over the external gate alone? No prior art
    surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,
-   2026-07-07). **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
+   2026-07-07). **Correction (2026-07-17 corner audit): that "no prior art" line is now stale** —
+   the detection lane is occupied: internal-state readouts predicting model quality without
+   validation data (*Model-Centric Diagnostics*, arXiv:2601.16874), statistical detection of
+   degraded/quantized checkpoints (arXiv:2602.10144), and a two-failure-mode account of LLM
+   quantization matching the binary cliff measured below (arXiv:2604.19884). The *incremental*
+   ΔAUC-over-a-tiny-external-gate design may remain unique; the lane is not. The follow-on
+   falsification (stochastic-internal-signal test: re-drawable noise vs re-drawn truth) is
+   tracked as [#2692]. **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
    `experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B, PR #2240):** a 9-checkpoint
    corruption-ladder generator (int8 / Gaussian noise 3–15% / partial+full naive ternary / int4)
    with exec pass rate as truth. Adding an internal bundle {perplexity, predictive entropy,
@@ -1494,6 +1544,10 @@ overclaimed certificate into an honest gate plus one falsifiable design constrai
 - EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
 - **Primary SOTA for the RLVR-forgetting premise (added 2026-07-08 research pass; all ids title-verified against the local arXiv corpus):** *RL's Razor: Why Online RL Forgets Less* (arXiv:2509.04259 — on-policy updates are KL-minimal w.r.t. the base; forgetting is predicted by KL-from-base); *Reinforcement Fine-Tuning Naturally Mitigates Forgetting in Continual Post-Training* (arXiv:2507.05386); *Mechanistic origins of catastrophic forgetting: why RL preserves circuits better than SFT* (arXiv:2605.28860). **Counterpoint, same pass:** *RL Forgets! Towards Continual Policy Optimization* (arXiv:2607.04364 — RL still forgets in continual settings; drift control needed) and *The Choice of Divergence* (arXiv:2509.07430 — divergence choice governs diversity collapse). The gate assumes only the relative advantage, not immunity.
 - Close prior art surfaced by the harder novelty search (2026-07-07, all corpus/web-verified): ADOWIP budgeted when-to-update gating (arXiv:2606.25068); Uncertainty-Guided Checkpoint Selection for RL finetuning (arXiv:2511.09864); *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant* (arXiv:2606.11417) — nearest neighbor to the §8.4 sealed-promotion-set discipline; *Learning, Fast and Slow* (arXiv:2605.12484) — prior art for the fast/slow timescale framing itself.
+- Added by the 2026-07-17 corner audit (both verified that date): **the Ladder** (Blum & Hardt, *The Ladder: A Reliable Leaderboard for Machine Learning Competitions*, arXiv:1502.04585) — adaptive leaderboard maintenance *is* champion-promotion gating with limited feedback, the §8.4 problem shape, and was missing here; and the standing **counterpoint** Roelofs et al., *A Meta-Analysis of Overfitting in Machine Learning* (NeurIPS 2019) — ~100 Kaggle competitions showed *little* adaptive overfitting in practice, so whether §8.4's severe small-`n` staleness materializes at realistic scale is exactly what the real A/B/C run must answer ([#2691]).
+
+[#2691]: https://github.com/alex-place/lantern-os/issues/2691
+[#2692]: https://github.com/alex-place/lantern-os/issues/2692
 - Backing research: `data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md`; decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
 
@@ -1545,6 +1599,9 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into [`RESEARCH-CANON.md`](RESEARCH-CANON.md) [11].
 - **arXiv:2310.01798** — Huang, Chen, Mishra, Zheng, Yu, Song & Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet* (ICLR 2024) — the **inference-time twin** of §7's collapse claim: intrinsic self-correction *without external feedback* degrades reasoning (GPT-4 95.5→91.5 on GSM8K). The model-collapse citations above are the *training-time* version of the same "no contact with outside reality → degradation" mechanism; this is the same law one timescale down, and the escape (external feedback) matches §7's grounding. Title/authors/venue verified against arXiv 2026-07-07.
 - **arXiv:2406.15927** — Kossen et al., *Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs* (2024) — a **linear probe on a single generation's hidden state** predicting semantic entropy; nearest prior for §7.3's confabulation-detection honesty layer. The §7.2 rule "bind every honesty signal to an external check" is the product-form guard around exactly this internal signal. Verified against arXiv 2026-07-07.
+- W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012; **arXiv:1803.08980** — Lyapunov event-triggered stabilization with a known convergence rate. The mature prior-art field for §3.1's schedule consequence (intervention timing from a certified decay rate). Verified 2026-07-17.
+- R. Kulhavý & M. Kárný (1984), directional forgetting in recursive identification; **arXiv:2003.03523** — *RLS with Variable-Direction Forgetting*; **arXiv:2404.10844** — *SIFt-RLS: Subspace of Information Forgetting RLS*. Classical kin of Σ₀⁻¹'s covariance leg (§3). Verified 2026-07-17.
+- **arXiv:2604.09979** — *A Minimal Model of Representation Collapse* (2026) — dynamical-systems analysis of representation collapse in SSL (stop-gradient / frustration); adjacent, uncited-until-now prior for Part I's framing. Verified 2026-07-17.
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -1935,5 +1992,34 @@ for produced results and Appendix A for the original design sketch.*
 > truth selects.** Also fixed in the same pass: `tests/test_sigma0_jsrr_gate.py` imported torch
 > unguarded, breaking collection on torch-free CI — the audit table's "tests pass on a fresh clone"
 > contract; now `pytest.importorskip`-guarded per repo convention.
+
+> **Maintenance log — 2026-07-17 (external-novelty corner audit; Σ_G ledger split out; schedule
+> race measured).** A reviewer-style pass over the corners the 2026-07-07 audits did *not* sweep
+> (those closed the headline claims: loop spectral radius, Σ_θ components, the grounding thesis).
+> Findings, all folded in this pass. **(1) Prior-art additions.** §3.1's schedule consequence is
+> **self-triggered control** applied to this certificate's objects (Heemels-Johansson-Tabuada,
+> CDC 2012; arXiv:1803.08980 — now cited in §3.1 + References); Σ₀⁻¹'s covariance leg has
+> classical kin in RLS **covariance resetting / directional forgetting** (Kulhavý-Kárný 1984;
+> arXiv:2003.03523, arXiv:2404.10844 — now cited in §3, mechanism novelty explicitly disclaimed);
+> §8.4's problem shape is **the Ladder** (Blum & Hardt, arXiv:1502.04585 — now in §8.8) with
+> Roelofs et al. (NeurIPS 2019) as the standing counterpoint; adjacent Part-I prior
+> arXiv:2604.09979 added to References. **(2) Stale claim corrected.** §8.6 item 5's
+> "no prior art surfaced" no longer holds — the detection lane is occupied (arXiv:2601.16874,
+> 2602.10144, 2604.19884); corrected in place, per this document's own discipline. **(3) The
+> three thin still-open corners** are now tracked as issues and composed in a new companion doc,
+> [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) (*grounding has a price, a schedule,
+> and a budget*): [#2690] schedule (self-triggered grounding), [#2691] budget
+> (Thresholdout-gated promotion — the real A/B/C run), [#2692] price (freshness-law
+> falsification: re-drawable noise vs re-drawn truth). The companion is deliberately a *ledger*,
+> not a certificate — it upgrades nothing here, and if the two disagree this document wins.
+> **(4) New measurement ([#2690] Phase 0).** `experiments/sigma0_scheduled_grounding.py` — the
+> scheduled-vs-reactive grounding race: in the well-conditioned basin the **alarm premium is
+> 2.25×** (charitable canary FPR 1.5%, median alarm step 14 vs cadence tick 3; reactive needs
+> 0.90·B*_∞ where scheduled needs 0.40·B*_∞); the sliver basin is fully timing-indifferent (the
+> Ouro-null, now produced rather than retrodicted). §3.1 gains the MEASURED block; audit table
+> +1 row; `tests/test_sigma0_scheduled_grounding.py` (6 passing). Fresh audit run this pass:
+> `pytest tests/test_cio_sde.py tests/test_sigma0_roa_certified.py tests/test_sigma_theta_gate.py
+> tests/test_sigma_theta_thresholdout.py tests/test_sigma0_scheduled_grounding.py` → **74 passed**.
+> Frontmatter `updated:` → 2026-07-17.
 
 ---
