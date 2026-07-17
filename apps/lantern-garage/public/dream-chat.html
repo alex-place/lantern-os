@@ -339,9 +339,11 @@
    */
   const LANTERN_ROLES = {
     guest:        { label: "Guest",        canChat: true,  dailyMessages: 10,  modelAccess: ["public"] }, // #739: limited guest chat (no account)
-    supporter:    { label: "Free",         canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
+    supporter:    { label: "Free",         canChat: true,  dailyMessages: 100, modelAccess: ["keystone", "openai"] }, // legacy Member, grandfathered 100/day (matches chat-quota)
     deep_dreamer: { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
     founder:      { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    pilot:        { label: "Pilot",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }, // #2633: $200 Pilot is unlimited, not "Guest · 10/day"
+    tech_support: { label: "Staff",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] },
     admin:        { label: "Admin",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
   };
 
