@@ -1,5 +1,5 @@
 {
-  "built_at": 1784260459.335139,
+  "built_at": 1784311510.5848336,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -192,6 +192,7 @@
     "docs/adr/0017-surprise-gated-decoding.md",
     "docs/adr/0025-rlvr-dreaming-continual-updates-double-gated.md",
     "docs/adr/0028-managed-strategy-sharpe-gate-tax-aware.md",
+    "docs/research/2026-07-17-control-engineering-tranche-analysis.md",
     "docs/research/2026-07-01-hff-500y-merge-convergence.md",
     "docs/research/2026-07-01-image-adapter-oss-cdn-phase1.md",
     "docs/research/2026-07-10-tsar-cpu-ternary.md",
@@ -641,7 +642,7 @@
       ]
     }
   },
-  "sections": 2515,
+  "sections": 2538,
   "external": 34,
-  "sha256": "36ae9846906d8d00587b2d6741aedbb56cc82af7784311cccbae5dfe96b63d55"
+  "sha256": "986e26aeeb47e308fc3acabb07cc62016c7bffc96ed06bee9951a25bfaf14102"
 }
