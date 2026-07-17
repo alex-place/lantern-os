@@ -95,12 +95,15 @@ function hasLiveSubscription(profile) {
 // { customerId, sub } on a match, { conflict: true } when the only candidates
 // belong to someone else, or null when there is nothing to link.
 async function findLinkableCustomer(email, userId) {
-  const customers = await stripe().customers.list({ email, limit: 100 });
+  // An email realistically maps to one (rarely a few) Stripe customers, so cap the
+  // scan tightly — the old limit:100 × a serial subscriptions.list each was a needless
+  // fan-out of API calls per checkout/link (#2630).
+  const customers = await stripe().customers.list({ email, limit: 10 });
   let sawForeign = false;
   for (const c of customers.data || []) {
     const owner = getProfileByStripeCustomer(c.id);
     if (owner && owner.id !== userId) { sawForeign = true; continue; }
-    const subs = await stripe().subscriptions.list({ customer: c.id, status: "all", limit: 100 });
+    const subs = await stripe().subscriptions.list({ customer: c.id, status: "all", limit: 10 });
     const sub = pickLinkableSubscription(subs.data || []);
     if (sub) return { customerId: c.id, sub };
   }
@@ -115,7 +118,11 @@ function linkCooldownOk(userId, windowMs = 5000) {
   const now = Date.now();
   const last = _linkAttempts.get(userId) || 0;
   if (now - last < windowMs) return false;
-  if (_linkAttempts.size > 1000) _linkAttempts.clear(); // bound the map
+  // Sweep expired entries rather than clearing EVERYONE's cooldown when the map fills
+  // (which reset the throttle for all users at once, #2630).
+  if (_linkAttempts.size > 1000) {
+    for (const [k, t] of _linkAttempts) if (now - t > windowMs) _linkAttempts.delete(k);
+  }
   _linkAttempts.set(userId, now);
   return true;
 }

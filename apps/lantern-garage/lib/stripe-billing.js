@@ -132,16 +132,44 @@ const HANDLED_EVENTS = new Set([
 function ledgerPath() {
   return path.resolve(process.cwd(), "data", "billing", "processed-events.jsonl");
 }
+// In-memory dedup cache, loaded once from the ledger then kept in sync on write, so a
+// webhook doesn't re-read + re-scan the whole file per event (#2622). Keyed by ledger
+// path so a test with a custom ledger stays isolated.
+const _ledgerCache = new Map(); // ledgerPath -> Set(eventId)
+const LEDGER_KEEP = 5000; // rotate: retain the most-recent N ids so the file can't grow forever
+
+function _loadLedger(ledger) {
+  let set = _ledgerCache.get(ledger);
+  if (set) return set;
+  set = new Set();
+  try {
+    for (const line of fs.readFileSync(ledger, "utf8").split("\n")) {
+      const m = line.match(/"id":"([^"]+)"/);
+      if (m) set.add(m[1]);
+    }
+  } catch { /* no ledger yet */ }
+  _ledgerCache.set(ledger, set);
+  return set;
+}
 function alreadyProcessed(eventId, ledger = ledgerPath()) {
   if (!eventId) return false;
-  try {
-    return fs.readFileSync(ledger, "utf8").split("\n").some((l) => l.includes(`"id":"${eventId}"`));
-  } catch { return false; }
+  return _loadLedger(ledger).has(eventId);
 }
 function markProcessed(eventId, type, ledger = ledgerPath()) {
+  if (!eventId) return;
+  const set = _loadLedger(ledger);
+  if (set.has(eventId)) return; // already recorded (also guards the append race)
+  set.add(eventId);
   try {
     fs.mkdirSync(path.dirname(ledger), { recursive: true });
     fs.appendFileSync(ledger, JSON.stringify({ id: eventId, type: type || "", at: new Date().toISOString() }) + "\n");
+    // Rotate when it grows well past the keep target: rewrite with the most-recent ids
+    // (Set preserves insertion order) so the ledger can't grow without bound.
+    if (set.size > LEDGER_KEEP * 2) {
+      const keep = Array.from(set).slice(-LEDGER_KEEP);
+      _ledgerCache.set(ledger, new Set(keep));
+      fs.writeFileSync(ledger, keep.map((id) => JSON.stringify({ id })).join("\n") + "\n");
+    }
   } catch { /* best-effort telemetry — never fail a webhook on the ledger */ }
 }
 
