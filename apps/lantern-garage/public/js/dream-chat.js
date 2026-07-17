@@ -70,9 +70,10 @@
     return "lantern";
   }
 
-  // Telemetry shim (logs to console; replace with real telemetry if needed)
+  // Telemetry shim. `log` is a no-op so normal use keeps a quiet console (#2495);
+  // warn/error still surface real problems. Replace with real telemetry if needed.
   const TELEMETRY = {
-    log(scope, msg) { console.log(`[${scope}]`, msg); },
+    log() {},
     warn(scope, msg) { console.warn(`[${scope}]`, msg); },
     error(scope, msg, extra) { console.error(`[${scope}]`, msg, extra || ""); }
   };
@@ -2229,7 +2230,6 @@
   let doorsUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
   async function startThreeDoors() {
-    console.log("[Kingdome] Starting game...");
     const row = document.createElement("div");
     row.className = "msg-row agent";
     row.innerHTML = `<div class="msg-label">🚪 Kingdome of Hearts</div><div class="bubble"><b>Opening the first door...</b></div>`;

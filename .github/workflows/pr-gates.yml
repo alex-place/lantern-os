@@ -251,7 +251,9 @@ jobs:
           # The old list only matched top-level tests/ + test_*, so colocated
           # apps/**/test/*.test.js and scripts/*.mjs CLIs tripped the gate falsely (#1561).
           # Real leaks in shipped lib/ routes/ public/ code are still caught.
-          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.mjs' \
+          # '*.html' catches console.log/debugger in a page's inline <script> — the
+          # loop only saw .js before, so create.html's 8 debug logs slipped in (#2495).
+          diff=$(git diff origin/master...HEAD -- '*.js' '*.ts' '*.py' '*.mjs' '*.html' \
             ':(exclude,glob)**/tests/**' ':(exclude,glob)**/test/**' \
             ':(exclude,glob)**/*.test.*' ':(exclude,glob)**/*.spec.*' \
             ':(exclude,glob)**/test_*.py' ':(exclude,glob)**/test_*.js' ':(exclude,glob)**/test_*.ts' \

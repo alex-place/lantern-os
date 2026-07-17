@@ -195,7 +195,6 @@ const FeatureRuntime = (() => {
       if (oldF.implementation === newF.implementation) continue;
 
       // Implementation changed — execute hot-swap
-      console.log(`[FeatureRuntime] hot-swap ${newF.id}: ${oldF.implementation} → ${newF.implementation}`);
       const el = document.querySelector(`[data-feature-id="${newF.id}"]`);
 
       if (_hotSwapHandlers[newF.implementation]) {
