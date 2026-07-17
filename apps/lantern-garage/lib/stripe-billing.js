@@ -43,10 +43,12 @@ function isConfigured() { return !!(process.env.STRIPE_SECRET_KEY || "").trim();
  */
 function isLiveKey(key) { return /^(sk|rk)_live_/.test(String(key || "").trim()); }
 
-/** The UI sends a tier keyword ("member"/"pro"/"pilot"); resolve it to a role. */
+/** The UI sends a tier keyword ("pro"/"pilot"); resolve it to a role. Member ($5 /
+ *  supporter) is no longer a sold tier — reject it so the checkout API can't create a
+ *  new $5 subscription (#2613). Existing Patreon supporters are grandfathered via the
+ *  role model, not via new checkouts. */
 function tierToRole(tier) {
   const t = String(tier || "").toLowerCase().trim();
-  if (t === "member" || t === "supporter") return "supporter";
   if (t === "pro" || t === "deep_dreamer") return "deep_dreamer";
   if (t === "pilot") return "pilot";
   return null;
@@ -72,11 +74,16 @@ function roleForPrice(price) {
   }
   const meta = price.metadata && price.metadata.role;
   if (meta && PURCHASABLE.has(meta)) return meta;
-  if (price.currency === "usd" && Number.isFinite(Number(price.unit_amount))) {
+  // USD-amount fallback is a DEV-ONLY safety net for an account with NO Price ids
+  // configured. With any Price configured (prod), an unmatched price belongs to an
+  // UNRELATED product and must NOT grant a paid role by its dollar amount (#2620) —
+  // that would let any $20+ subscription on the shared account mint Pro. Also no longer
+  // maps $5 → supporter, since Member isn't Stripe-sold (#2613).
+  const anyConfigured = Object.values(ids).some(Boolean);
+  if (!anyConfigured && price.currency === "usd" && Number.isFinite(Number(price.unit_amount))) {
     const c = Number(price.unit_amount);
     if (c >= AMOUNT_CENTS.pilot) return "pilot";
     if (c >= AMOUNT_CENTS.deep_dreamer) return "deep_dreamer";
-    if (c >= AMOUNT_CENTS.supporter) return "supporter";
   }
   return null;
 }

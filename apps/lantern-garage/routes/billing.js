@@ -23,7 +23,7 @@ const {
   pickLinkableSubscription, alreadyProcessed, markProcessed, HANDLED_EVENTS,
 } = require("../lib/stripe-billing");
 const {
-  getProfile, applyStripeState, getProfileByStripeCustomer, verifiedEmailOf,
+  getProfile, applyStripeState, getProfileByStripeCustomer, getProfileByEmail, verifiedEmailOf,
 } = require("../lib/user-profiles");
 const { getEffectiveUserId, getSessionUser, setSessionUser } = require("../lib/session-identity");
 
@@ -174,10 +174,22 @@ function invoiceSubscriptionId(inv) {
 
 // Revoke by customer for money-reversal events (refund / chargeback) that don't carry a
 // subscription object. Keeping access after a dispute would let a chargeback keep the tier.
-function revokeByCustomer(customerId, statusLabel) {
-  const p = getProfileByStripeCustomer(customerId);
-  if (!p) return;
+async function revokeByCustomer(customerId, statusLabel, opts = {}) {
+  let p = customerId ? getProfileByStripeCustomer(customerId) : null;
+  // A refund/dispute can arrive before the customer→profile link exists, or with no
+  // customer at all — fall back to the charge's receipt email so the revoke still lands
+  // instead of silently no-opping (#2643).
+  if (!p && opts.email) p = getProfileByEmail(opts.email);
+  if (!p) { console.error("[BILLING] revoke: no profile for", statusLabel, "customer=", customerId, "email=", opts.email || ""); return; }
   applyStripeState(p.id, { stripeRole: null, status: statusLabel });
+  // Durability (#2621): nulling the role isn't enough — the SUBSCRIPTION is still active,
+  // so the next subscription.updated / invoice.paid re-grants the paid role. Cancel it in
+  // Stripe so the revoke sticks. Ignore already-gone / already-canceled subs.
+  const subId = p.stripeSubscriptionId;
+  if (subId) {
+    try { await stripe().subscriptions.cancel(subId); }
+    catch (e) { if (!/resource_missing|No such subscription|already canceled|canceled/i.test(e.message || "")) console.error("[BILLING] revoke: sub cancel failed", e.message); }
+  }
 }
 
 async function handleEvent(event) {
@@ -218,21 +230,22 @@ async function handleEvent(event) {
       // must not strip a paying subscriber's tier. `refunded` is true only when fully
       // refunded; otherwise compare amounts.
       const fully = obj.refunded === true || (Number(obj.amount_refunded) >= Number(obj.amount) && Number(obj.amount) > 0);
-      if (fully) revokeByCustomer(typeof obj.customer === "string" ? obj.customer : (obj.customer && obj.customer.id), "refunded");
+      if (fully) await revokeByCustomer(typeof obj.customer === "string" ? obj.customer : (obj.customer && obj.customer.id), "refunded", { email: obj.receipt_email });
       break;
     }
     case "charge.dispute.created": {
       // event.data.object is a DISPUTE, which has NO .customer — resolve it from the
       // disputed charge, else a chargeback silently keeps access.
       const chargeId = typeof obj.charge === "string" ? obj.charge : (obj.charge && obj.charge.id);
-      let customerId = null;
+      let customerId = null, receiptEmail = null;
       if (chargeId) {
         try {
           const ch = await stripe().charges.retrieve(chargeId);
           customerId = typeof ch.customer === "string" ? ch.customer : (ch.customer && ch.customer.id);
+          receiptEmail = ch.receipt_email || (ch.billing_details && ch.billing_details.email) || null;
         } catch (e) { console.error("[BILLING] dispute charge lookup failed", e.message); }
       }
-      revokeByCustomer(customerId, "disputed");
+      await revokeByCustomer(customerId, "disputed", { email: receiptEmail });
       break;
     }
     default:
