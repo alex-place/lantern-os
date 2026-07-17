@@ -515,7 +515,6 @@
     .header{gap:8px;padding:0 10px}
   }
   @media (max-width:950px){
-    .header a[href*="explore"]{display:none}
     .hstat:not(.acct){display:none}   /* VIX/Market live in the Σ₀ panel too */
   }
   @media (max-width:900px){
@@ -691,9 +690,7 @@
   body.guest .footer,
   body.guest .footer-resize,
   body.guest .badge-paper,
-  body.guest #brokerLink,          /* broker connect — only for entitled traders */
-  body.guest #alpacaLink,          /* one-click Alpaca connect — same gate */
-  body.guest #brokerPrefBtn,       /* broker switch — trading-only control */
+  body.guest #brokerBtn,           /* broker status/config — only for entitled traders */
   body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
@@ -869,24 +866,19 @@
     data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
-  <a href="/explore.html?topic=finance" class="nav-link" title="Explore — community tools and experiences beyond the core journaling and trading pages (opens on the finance topic)"
-    data-hmenu-desc="Community tools and experiences beyond this terminal, opened on the finance topic.">Explore →</a>
-  <button type="button" class="nav-link" id="brokerPrefBtn" style="display:none" onclick="cycleBrokerPref()"
-    title="Which connected broker executes your trades. Auto = server default. Click to switch — the other broker stays the automatic fallback."
-    data-hmenu-desc="Switch which broker executes your trades — Auto, Alpaca, or IBKR. The other stays the fallback.">Broker: <span id="brokerPrefLabel">Auto</span></button>
-  <a href="/api/broker/alpaca/connect?returnTo=%2Fstock-trader.html" class="nav-link" id="alpacaLink" style="display:none"
-    title="One-click: sign in to Alpaca and approve — trades route to your own paper account. No keys to paste."
-    data-hmenu-desc="One-click broker connect — sign in to Alpaca, approve, done. Starts on a paper account.">⚡ <span id="alpacaLabel">Connect Alpaca</span></a>
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerLink" style="display:none"
-    title="Connect your Interactive Brokers account so trades route to your own paper or live account"
-    data-hmenu-desc="Link your own Interactive Brokers account — trades then route to it instead of the shared paper account.">🔗 <span id="brokerLabel">Connect broker</span></a>
+  <!-- Single broker pill (declutter): shows the broker that EXECUTES your trades and
+       links to Settings (orchestration#broker) to add / configure / switch brokers.
+       Replaces the old three-button cluster (switch + ⚡ Alpaca + 🔗 IBKR). -->
+  <a href="/orchestration.html#broker" class="nav-link" id="brokerBtn" style="display:none"
+    title="Which broker executes your trades — click to add, configure, or switch brokers in Settings"
+    data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings.">🔗 <span id="brokerLabel">Broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
     data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
   <button type="button" class="nav-link hmenu-btn" id="hmenuBtn" aria-haspopup="true" aria-expanded="false" aria-controls="hmenu"
-    aria-label="Menu — extended hours, Kalshi, Explore, broker connection, and chat"
-    title="Menu — extended hours, Kalshi, Explore, broker connection, and chat">☰</button>
+    aria-label="Menu — extended hours, Kalshi, broker, and chat"
+    title="Menu — extended hours, Kalshi, broker, and chat">☰</button>
 </div>
 
 <!-- Mobile-only view switch (#2501): chart deck, ticker list, and account panel can't
@@ -4608,120 +4600,47 @@ async function detectGuestMode(){
       }
     }
   } else {
-    // Entitled trader → surface the broker connections (one-click Alpaca + IBKR).
-    // Await the two connection rows THEN paint the active/fallback overlay, so the
-    // overlay is never clobbered by a slower fetch finishing after it.
-    const link = document.getElementById('brokerLink');
-    if(link) link.style.display='';
-    Promise.all([refreshBrokerStatus(), refreshAlpacaStatus()]).then(refreshBrokerPref);
+    // Entitled trader → surface the single broker pill (which broker executes +
+    // link to Settings to add/configure/switch).
+    refreshBrokerButton();
   }
 }
-// Truthful broker rows: "connected" (credentials exist) is not "active" (executes
-// your trades). After the switch state is known, restamp both rows so exactly one
-// says · active and a connected-but-idle broker says · fallback.
-function applyBrokerActiveLabels(s){
-  if(!s || !s.effective) return;
-  const aLbl=document.getElementById('alpacaLabel'), aLink=document.getElementById('alpacaLink');
-  const iLbl=document.getElementById('brokerLabel'), iLink=document.getElementById('brokerLink');
-  if(aLbl && aLink && s.connected && s.connected.alpaca){
-    if(s.effective==='alpaca'){
-      aLbl.textContent = aLbl.textContent.replace(/ · (active|fallback).*$/,'');
-      aLbl.textContent = (aLbl.textContent==='Connect Alpaca' ? 'Alpaca' : aLbl.textContent) + ' · active';
-      aLink.style.color='var(--green)';
-      aLink.title='Alpaca executes your trades right now' + (aLbl.textContent.startsWith('Alpaca ·') ? ' (shared paper account). One-click connect of your OWN account still available.' : '.');
-    } else {
-      aLbl.textContent = (aLbl.textContent==='Connect Alpaca' ? 'Alpaca' : aLbl.textContent.replace(/ · (active|fallback).*$/,'')) + ' · fallback';
-      aLink.style.color='';
-      aLink.title='Alpaca is connected but idle — it only executes if the active broker fails.';
-    }
-  }
-  if(iLbl && iLink && s.connected && s.connected.ibkr){
-    const base = iLbl.textContent.replace(/ · (active|fallback).*$/,'').replace(/^Connect broker$/,'IBKR');
-    if(s.effective==='ibkr'){
-      iLbl.textContent = base + ' · active';
-      iLink.style.color='var(--green)';
-      iLink.title='IBKR executes your trades right now — click to manage the connection';
-    } else {
-      iLbl.textContent = base + ' · fallback';
-      iLink.style.color='';
-      iLink.title='IBKR is linked but idle — it only executes if the active broker fails. Click to manage.';
-    }
-  }
-}
-// ── Broker switch (per-user, ADR-0027): Auto → Alpaca → IBKR → Auto. The choice
-// re-routes ALL trading surfaces (autopilot, manual orders, positions) at once;
-// the non-preferred broker always stays the automatic fallback server-side.
-let _brokerPref = 'auto';
-function _paintBrokerPref(pref, effective){
-  const btn=document.getElementById('brokerPrefBtn'), lbl=document.getElementById('brokerPrefLabel');
-  if(!btn || !lbl) return;
-  _brokerPref = pref;
-  const name = pref==='alpaca' ? '⚡ Alpaca' : pref==='ibkr' ? '🔗 IBKR' : `Auto (${effective==='alpaca'?'Alpaca':'IBKR'})`;
-  lbl.textContent = name;
-  btn.style.display='';
-}
-async function refreshBrokerPref(){
+// ── Single broker pill (declutter): one control that shows which broker EXECUTES
+// your trades and links to Settings (orchestration#broker) to add / configure /
+// switch. Replaces the old switch + ⚡Alpaca + 🔗IBKR cluster. The switch itself
+// now lives on the Settings broker page (#2663).
+async function refreshBrokerButton(){
+  const btn = document.getElementById('brokerBtn'), label = document.getElementById('brokerLabel');
+  if(!btn || !label) return;
+  btn.style.display = '';                 // entitled trader → always show the pill
+  btn.href = '/orchestration.html#broker';
   try{
+    // One call carries everything: which broker is preferred (`effective`) and which
+    // are actually connected. The executor = preferred-if-connected, else the other
+    // connected one — mirroring the server-side fallback order (broker-facade.js).
     const s = await (await fetch('/api/broker/preference',{cache:'no-store'})).json();
-    if(s && s.preference){ _paintBrokerPref(s.preference, s.effective); applyBrokerActiveLabels(s); }
-  }catch(e){ /* leave hidden */ }
-}
-async function cycleBrokerPref(){
-  const next = _brokerPref==='auto' ? 'alpaca' : _brokerPref==='alpaca' ? 'ibkr' : 'auto';
-  try{
-    const r = await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:next})});
-    const s = await r.json();
-    if(s && s.ok){
-      _paintBrokerPref(s.preference, s.effective);
-      refreshBrokerPref();   // GET carries `connected` → restamps the · active / · fallback rows
-      // Positions/equity now come from the newly preferred broker — refetch soon.
-      if(typeof loadPositions==='function') setTimeout(loadPositions, 300);
+    const con = (s && s.connected) || {};
+    const pref = s && s.effective;
+    let active = null;
+    if(pref === 'alpaca' && con.alpaca) active = 'alpaca';
+    else if(pref === 'ibkr' && con.ibkr) active = 'ibkr';
+    else if(con.alpaca) active = 'alpaca';
+    else if(con.ibkr) active = 'ibkr';
+    if(active){
+      const other = active === 'alpaca' ? con.ibkr : con.alpaca;
+      label.textContent = active === 'alpaca' ? '⚡ Alpaca' : '🔗 IBKR';
+      btn.style.color = 'var(--green)';
+      btn.title = (active === 'alpaca' ? 'Alpaca' : 'IBKR') + ' executes your trades' +
+        (other ? ' (the other broker is the automatic fallback)' : '') +
+        '. Click to configure or switch brokers in Settings.';
     } else {
-      // Don't fail silently — the old dead-button behavior read as "switch is broken".
-      alert('Could not switch broker: ' + ((s && (s.message || s.error)) || ('HTTP ' + r.status)));
+      label.textContent = 'Connect broker';
+      btn.style.color = '';
+      btn.title = 'No broker connected — click to add Alpaca or IBKR in Settings.';
     }
-  }catch(e){ alert('Could not switch broker: ' + e.message); }
-}
-// One-click Alpaca connect state (ADR-0027). Three states:
-//  connected        → green "Alpaca · <acct>", click manages it on orchestration#broker
-//  ready to connect → the link IS the OAuth start (302 → Alpaca sign-in → approve → back here)
-//  not configured   → server missing ALPACA_OAUTH_CLIENT_ID/_SECRET; point at the setup card
-async function refreshAlpacaStatus(){
-  const link = document.getElementById('alpacaLink'), label = document.getElementById('alpacaLabel');
-  if(!link || !label) return;
-  try{
-    const s = await (await fetch('/api/broker/alpaca/status',{cache:'no-store'})).json();
-    if(s && s.connected && s.via !== 'server-keys'){
-      label.textContent = `Alpaca · ${s.accountNumber || 'connected'}${s.env === 'live' ? '' : ' (paper)'}`;
-      link.style.color = 'var(--green)';
-      link.href = '/orchestration.html#broker';
-      link.title = 'Alpaca connected — click to manage or disconnect';
-    } else if(s && s.configured){
-      label.textContent = 'Connect Alpaca';
-      link.style.color = '';
-      link.href = '/api/broker/alpaca/connect?returnTo=%2Fstock-trader.html';
-      link.title = 'One-click: sign in to Alpaca and approve — trades route to your own paper account. No keys to paste.';
-    } else {
-      // Server not configured for one-click yet → send to the broker card, which
-      // explains the pending setup and offers IBKR.
-      label.textContent = 'Connect Alpaca';
-      link.href = '/orchestration.html#broker';
-      link.title = 'One-click Alpaca is not set up on this server yet — opens the broker page (IBKR available).';
-    }
-    link.style.display = '';
-  }catch(e){ /* leave default */ }
-}
-// Live IBKR connection state in the header broker link.
-async function refreshBrokerStatus(){
-  const label = document.getElementById('brokerLabel');
-  const link = document.getElementById('brokerLink');
-  if(!label || !link) return;
-  try{
-    const s = await (await fetch('/api/trading/ibkr/connection',{cache:'no-store'})).json();
-    if(s && s.live && s.live.connected){ label.textContent = `IBKR · ${s.accountId||'connected'}`; link.style.color='var(--green)'; link.title='IBKR connected — click to manage'; }
-    else if(s && s.hasCredentials){ label.textContent='IBKR · reconnect'; link.style.color='var(--amber)'; link.title='Credentials saved but not connected — click to fix'; }
-    else { label.textContent='Connect broker'; link.style.color=''; link.title='Connect your Interactive Brokers account to place real trades'; }
-  }catch(e){ /* leave default */ }
+  }catch(e){
+    label.textContent = 'Broker';         // network hiccup → neutral, still links to Settings
+  }
 }
 // OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected
 // or ?alpaca=error&reason=…. Announce it once, then scrub the param from the URL.
@@ -4778,10 +4697,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
-    {sel:'.header a[href*="explore"]', narrowOnly:false},
-    {sel:'#brokerPrefBtn',             narrowOnly:false},
-    {sel:'#alpacaLink',                narrowOnly:false},
-    {sel:'#brokerLink',                narrowOnly:false},
+    {sel:'#brokerBtn',                 narrowOnly:false},
     {sel:'#dcToggle',                  narrowOnly:false},
   ];
   const items=[];   // {el, marker, narrowOnly} — marker = comment left in the header slot
