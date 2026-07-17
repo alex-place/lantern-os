@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="observe">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    /* Theme bootstrap — set before first paint (matches index.html). */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.setAttribute('data-theme', (stored ? stored === 'dark' : prefersDark) ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    })();
+  </script>
+  <title>Live Demo Account — unisona.ai</title>
+  <!-- Social share (#2533) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="unisona.ai">
+  <meta property="og:title" content="unisona.ai — watch the demo account trade live">
+  <meta property="og:description" content="A read-only window onto the paper trading account: positions, fills, and P&L updating in real time. No sign-up.">
+  <meta property="og:image" content="https://www.unisona.ai/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    .demo-page { max-width: 980px; margin: 0 auto; padding: 20px 20px 90px; }
+    .demo-hero { text-align: center; padding: 26px 0 10px; }
+    .demo-hero h1 { font-size: 1.7rem; font-weight: 800; margin: 0 0 8px; }
+    .demo-hero p { color: var(--muted); max-width: 62ch; margin: 0 auto; line-height: 1.55; }
+    .paper-badge {
+      display: inline-block; margin: 12px auto 0; padding: 4px 12px; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #f59e0b; border: 1px solid #f59e0b55; background: #f59e0b14;
+    }
+    .demo-updated { font-size: 0.75rem; color: var(--muted); text-align: center; margin: 8px 0 20px; }
+    .demo-updated .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#22c55e; margin-right:6px; vertical-align:1px; }
+    .demo-updated.stale .dot { background: #ef4444; }
+    .stat-row { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 22px; }
+    .stat {
+      flex: 1 1 130px; max-width: 190px; text-align: center; padding: 14px 10px;
+      border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+    }
+    .stat .l { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+    .stat .v { font-size: 1.15rem; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .pos { color: #22c55e; } .neg { color: #ef4444; }
+    .demo-section { margin-bottom: 26px; }
+    .demo-section h2 { font-size: 1.05rem; font-weight: 700; margin: 0 0 10px; }
+    .demo-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+    table.demo { width: 100%; border-collapse: collapse; font-size: 0.85rem; min-width: 560px; }
+    table.demo th, table.demo td { padding: 8px 12px; text-align: right; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+    table.demo th { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+    table.demo th:first-child, table.demo td:first-child { text-align: left; }
+    table.demo tr:last-child td { border-bottom: none; }
+    .empty { padding: 18px 14px; color: var(--muted); font-size: 0.85rem; }
+    .act-entry { color: #22c55e; font-weight: 700; } .act-exit { color: #ef4444; font-weight: 700; }
+    .demo-cta { text-align: center; margin-top: 28px; }
+    .demo-cta a {
+      display: inline-block; padding: 11px 20px; border-radius: 10px; font-weight: 600;
+      text-decoration: none; background: var(--accent); color: #fff;
+    }
+    .demo-cta .ghost { background: none; color: var(--text); border: 1px solid var(--border); margin-left: 10px; }
+  </style>
+</head>
+<body>
+<!-- Site nav + footer injected by /js/site-chrome.js -->
+<a class="skip-link" href="#main">Skip to the live demo</a>
+<main id="main" class="demo-page" tabindex="-1">
+  <header class="demo-hero">
+    <h1>Watch the demo account trade — live</h1>
+    <p>This is a read-only window onto the system's own paper-trading account: its open positions,
+       its entries and exits as they happen, and its running P&amp;L. Nothing here is hidden or
+       simulated after the fact — it's the same ledger the trader writes as it acts.</p>
+    <span class="paper-badge">Paper money — a demo account, not investment advice</span>
+  </header>
+  <p class="demo-updated" id="updated"><span class="dot"></span>connecting…</p>
+
+  <div class="stat-row" id="stats" aria-live="polite">
+    <div class="stat"><div class="l">Equity</div><div class="v" id="sEquity">—</div></div>
+    <div class="stat"><div class="l">Day P&amp;L</div><div class="v" id="sDay">—</div></div>
+    <div class="stat"><div class="l">Unrealized</div><div class="v" id="sUnreal">—</div></div>
+    <div class="stat"><div class="l">Realized today</div><div class="v" id="sReal">—</div></div>
+    <div class="stat"><div class="l">Open positions</div><div class="v" id="sCount">—</div></div>
+  </div>
+
+  <section class="demo-section">
+    <h2>Open positions</h2>
+    <div class="demo-table-wrap">
+      <table class="demo" aria-label="Open positions">
+        <thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Avg entry</th><th>Now</th><th>Unrealized</th></tr></thead>
+        <tbody id="posBody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="demo-section">
+    <h2>Recent activity</h2>
+    <div class="demo-table-wrap">
+      <table class="demo" aria-label="Recent entries and exits">
+        <thead><tr><th>Time</th><th>Event</th><th>Symbol</th><th>Qty</th><th>Price</th><th>P&amp;L</th><th>Why</th></tr></thead>
+        <tbody id="actBody"><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="demo-cta">
+    <a href="/stock-trader.html">Open the full terminal →</a>
+    <a class="ghost" href="/pricing.html">See plans</a>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var usd = function (n) { return n == null ? '—' : (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); };
+  var signed = function (n, suffix) {
+    if (n == null) return '—';
+    var s = (n > 0 ? '+' : '') + n.toLocaleString('en-US', { maximumFractionDigits: 2 });
+    return s + (suffix || '');
+  };
+  var cls = function (n) { return n == null ? '' : n >= 0 ? 'pos' : 'neg'; };
+  var fmtTime = function (ts) {
+    var d = new Date(ts); if (isNaN(d)) return esc(ts);
+    return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  };
+  var set = function (id, text, klass) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.className = 'v' + (klass ? ' ' + klass : '');
+  };
+
+  function render(d) {
+    var a = d.account || {};
+    set('sEquity', usd(a.equity));
+    set('sDay', a.pnl_today == null ? '—' : signed(a.pnl_today) + (a.pnl_pct != null ? ' (' + signed(Math.round(a.pnl_pct * 100) / 100, '%') + ')' : ''), cls(a.pnl_today));
+    set('sUnreal', a.unrealized == null ? '—' : signed(a.unrealized), cls(a.unrealized));
+    set('sReal', a.realized_today == null ? '—' : signed(a.realized_today), cls(a.realized_today));
+    set('sCount', String((d.positions || []).length));
+
+    var pb = document.getElementById('posBody');
+    if (!d.positions || !d.positions.length) {
+      pb.innerHTML = '<tr><td colspan="6" class="empty">No open positions right now — check the activity feed below.</td></tr>';
+    } else {
+      pb.innerHTML = d.positions.map(function (p) {
+        return '<tr><td><b>' + esc(p.symbol) + '</b></td><td>' + esc(p.side) + '</td><td>' + (p.qty == null ? '—' : p.qty.toLocaleString()) +
+          '</td><td>' + usd(p.avg_entry) + '</td><td>' + usd(p.current) +
+          '</td><td class="' + cls(p.unrealized_pl) + '">' + signed(p.unrealized_pl) +
+          (p.unrealized_plpc != null ? ' (' + signed(Math.round(p.unrealized_plpc * 10000) / 100, '%') + ')' : '') + '</td></tr>';
+      }).join('');
+    }
+
+    var ab = document.getElementById('actBody');
+    if (!d.activity || !d.activity.length) {
+      ab.innerHTML = '<tr><td colspan="7" class="empty">No trades logged yet.</td></tr>';
+    } else {
+      ab.innerHTML = d.activity.map(function (t) {
+        return '<tr><td>' + fmtTime(t.ts) + '</td><td class="act-' + esc(t.event) + '">' + esc(t.event.toUpperCase()) +
+          '</td><td><b>' + esc(t.symbol) + '</b></td><td>' + (t.qty == null ? '—' : t.qty.toLocaleString()) +
+          '</td><td>' + usd(t.price) + '</td><td class="' + cls(t.pnl) + '">' + (t.pnl == null ? '—' : signed(t.pnl)) +
+          '</td><td>' + esc(t.reason || (t.p_win != null ? 'p(win) ' + Math.round(t.p_win * 100) + '%' : '')) + '</td></tr>';
+      }).join('');
+    }
+
+    var up = document.getElementById('updated');
+    up.classList.remove('stale');
+    up.innerHTML = '<span class="dot"></span>live · updated ' + new Date().toLocaleTimeString();
+  }
+
+  function tick() {
+    fetch('/api/trading/demo-feed', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(render)
+      .catch(function () {
+        var up = document.getElementById('updated');
+        up.classList.add('stale');
+        up.innerHTML = '<span class="dot"></span>feed unavailable — retrying…';
+      });
+  }
+  tick();
+  setInterval(tick, 7000);
+})();
+</script>
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+</body>
+</html>

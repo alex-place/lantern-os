@@ -71,6 +71,27 @@ The system is fully operational for local development and testing.
    - (+ 6 more MCP tools)
    ```
 
+#### Quick self-service registration (Custom GPT)
+
+Alternative to the OpenAI-platform client above (absorbed from
+`.claude/GPT-OAUTH-SETUP.md`): the OAuth MCP server can mint a `client_id`
+itself — useful for a Custom GPT Action.
+
+1. Register a public client (no `client_secret` needed):
+   ```bash
+   curl "http://127.0.0.1:8772/oauth/register?client_name=MyGPT&redirect_uri=https://oauth.pstmn.io/v1/callback"
+   ```
+2. In the GPT → Configure → Actions, import the schema from
+   `http://YOUR_HOST:8772/.well-known/mcp` or paste
+   `.claude/gpt-oauth-mcp-schema.yaml`.
+3. Authentication → OAuth: Client ID from step 1, Client Secret blank,
+   Authorization URL `http://YOUR_HOST:8772/oauth/authorize`, Token URL
+   `http://YOUR_HOST:8772/oauth/token`, Scope `mcp`, Token Exchange Method
+   `Default (POST request)`.
+4. If registration was done on a different host than the GPT reaches
+   (e.g. ngrok), re-register against the public URL — otherwise you get
+   `Invalid client_id`.
+
 ### Phase 2: Production Deployment (Tunnel Fix Required)
 
 Once the Cloudflare tunnel routing issue is resolved, move to HTTPS endpoints.
@@ -382,6 +403,8 @@ GEMINI_API_KEY=...
 - Monitor token usage and revoke compromised tokens
 - Implement rate limiting on OAuth endpoints
 - Add audit logging for all tool calls
+- Disable dynamic auto-registration (`/oauth/register`) for production — remove
+  the auto-register block in `src/mcp_server/server_oauth.py` (~line 470)
 
 ## Production Deployment Checklist
 

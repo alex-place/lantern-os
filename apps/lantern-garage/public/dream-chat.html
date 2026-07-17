@@ -16,6 +16,16 @@
   <!-- Restore the opt-in Terminal (CRT) skin before paint, to avoid a flash of the default theme. -->
   <script>(function(){try{if(localStorage.getItem('keystone-skin')==='terminal')document.documentElement.setAttribute('data-skin','terminal');}catch(e){}})();</script>
   <title>Dream Chat — unisona.ai</title>
+  <!-- Social share (#2533) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="unisona.ai">
+  <meta property="og:title" content="unisona.ai Chat — one assistant, real tools">
+  <meta property="og:description" content="A persistent, local-first AI operator console — one assistant that remembers, reasons, acts, and verifies.">
+  <meta property="og:image" content="https://www.unisona.ai/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
 
 <style>
   /* Patreon auth gate */
@@ -222,61 +232,10 @@
 
   </div><!-- /.app-main -->
 
-  <!-- Observer side panel (hidden by default for simplicity) -->
-  <aside class="observer-panel collapsed hidden" id="observer-panel" style="display:none">
-    <div class="observer-panel-header">
-      <span class="observer-panel-title">◈ Observer</span>
-      <button class="observer-panel-close" onclick="toggleObserver()" aria-label="Close observer panel" title="Close">×</button>
-    </div>
-    <div class="observer-panel-body">
-      <div>
-        <div class="obs-section-title">Mood Arc</div>
-        <div class="obs-value" id="obs-mood-arc">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-mood-fill" style="width:50%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Recurring Symbols</div>
-        <div class="obs-symbol-list" id="obs-symbols">—</div>
-      </div>
-      <div>
-        <div class="obs-section-title">Last Delta</div>
-        <div class="obs-value" id="obs-last-delta">—</div>
-      </div>
-      <div>
-        <div class="obs-section-title">Convergence</div>
-        <div class="obs-value" id="obs-convergence">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-conv-fill" style="width:0%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Loop Depth (Σ₀)</div>
-        <div class="obs-value" id="obs-loop-depth" style="font-family:'IBM Plex Mono',monospace;font-size:11px">⟳ — loops · — conf</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-fill" style="width:0%;background:var(--accent)"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Loop Records (Σ₀)</div>
-        <div class="obs-value" id="obs-loop-records" title="ConvergenceRecords emitted by chat replies (Reason→Act)">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-records-fill" style="width:0%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Dilation Ratio</div>
-        <div class="obs-value" id="obs-dilation">1.0×</div>
-      </div>
-      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-      <div>
-        <div class="obs-section-title">Current Priorities</div>
-        <div id="priorities-panel">
-          <div style="font-size:11px;color:var(--muted)">Loading…</div>
-        </div>
-      </div>
-    </div>
-  </aside>
-</div>
-
-<!-- Performance Monitor -->
-<div class="perf-monitor" id="perf-monitor" style="display:none">
-  <div class="perf-row"><span class="perf-label">Tokens:</span><span class="perf-value" id="perf-tokens">0</span></div>
-  <div class="perf-row"><span class="perf-label">Cost:</span><span class="perf-value" id="perf-cost">$0</span></div>
-  <div class="perf-row"><span class="perf-label">Latency:</span><span class="perf-value" id="perf-latency">0ms</span></div>
+  <!-- The Observer side panel and the Performance Monitor were removed (#2476):
+       both were permanently hidden with no working opener (markup for their
+       toggles was cut earlier), so the JS that fed them polled/computed into
+       dead DOM. Their writers in dream-chat.js are null-guarded no-ops. -->
 </div>
 
 <!-- Settings (provider pick + API keys) moved to Profile → Orchestrator (#1904);
@@ -478,10 +437,10 @@
 </script>
 
 <script src="js/voice-dictation.js?v=20260630-voice"></script>
-<script src="js/dream-chat.js?v=20260630-cap4"></script>
+<script src="js/dream-chat.js?v=20260716-dead-surfaces"></script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/terminal-skin.js?v=20260630-terminal"></script>
-<script src="/js/dream-chat-ui.js?v=20260716-doors-strip"></script>
+<script src="/js/dream-chat-ui.js?v=20260716-dead-surfaces"></script>
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>

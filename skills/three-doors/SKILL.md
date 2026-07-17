@@ -188,6 +188,20 @@ the one shared world-state log: chat play (via `scripts/journey_append.js`) and
 the web game write to it, and resume reads its tail
 (`node scripts/journey_append.js --state`).
 
+**Scene graph.** Doors follow the canonical scene graph in
+`data/three-doors/scenes.json` (scenes → exactly three doors → `next_map`
+routing); the door tree below is its shape.
+
+**Web game.** In the web game the image path is `POST /api/image/ai-generate` →
+`lib/openai-image.js`; the client's dynamic prompt is `buildDynamicImagePrompt`
+in `apps/lantern-garage/public/js/three-doors-data.js`, which injects this cast.
+
+**Reference lore.** Read `skills/three-doors-game/references/lore.md` when a
+scene calls for it — it holds the full King's creed and its rules, the seven
+major gates with contents and routing, the Garden poem gate (riddle + accepted
+answers), and the **export / import / `!ingest`** contract for preserving game
+state.
+
 ## Setting & creed: the Kingdome of Hearts
 
 The Doorwalker is the **King of the Kingdome of Hearts**. The seat of the game is a

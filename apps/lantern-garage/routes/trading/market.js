@@ -180,6 +180,20 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
     try {
       const uid = getEffectiveUserId(req);
+      const alpaca = require('../../lib/alpaca-adapter');
+      const { preferredBroker } = require('../../lib/broker-facade');
+      // Serve the Alpaca account view (the user's own OAuth account, else the
+      // operator's server paper keys). This is the real paper account, not a sim.
+      const serveAlpaca = async () => {
+        const alpacaAccount = await alpaca.getAccount(uid).catch(() => null);
+        if (!alpacaAccount) return false;
+        const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
+        alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
+        sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
+        return true;
+      };
+      // BROKER_PREFER=alpaca → Alpaca first; the IBKR path below stays the fallback.
+      if (preferredBroker(uid) === 'alpaca' && await serveAlpaca()) return true;
       const ibkrAccount = await bridge.getIBKRAccount(uid).catch(() => null);
       if (ibkrAccount) {
         // IBKR keeps just-closed names in the portfolio snapshot as qty:0 rows; they're
@@ -246,16 +260,8 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;
       }
-      // No IBKR account → Alpaca (the user's own OAuth account, else the operator's
-      // server paper keys). This is the real paper account, not a local sim.
-      const alpaca = require('../../lib/alpaca-adapter');
-      const alpacaAccount = await alpaca.getAccount(uid).catch(() => null);
-      if (alpacaAccount) {
-        const ap = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
-        alpacaAccount.unrealized = (ap.positions || []).reduce((s, p) => s + (Number(p.unrealized_pl) || 0), 0);
-        sendJson(res, { positions: ap.positions || [], account: alpacaAccount }, 200);
-        return true;
-      }
+      // No IBKR account (or IBKR preferred but unavailable) → Alpaca fallback.
+      if (await serveAlpaca()) return true;
     } catch (_e) { /* fall through to the legacy agent */ }
     if (!traderAgent) {
       sendJson(res, { positions: [], account: {} }, 503);

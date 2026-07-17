@@ -29,6 +29,11 @@ private/**
 *.jpeg
 *.gif
 *.webp
+
+# Essential brand rasters — tracked in-repo (README hero + social unfurl, #2533).
+!apps/lantern-garage/public/og-image.png
+!docs/media/dream-chat-light.png
+!docs/media/dream-chat-dark.png
 *.pdf
 *.zip
 *.mp4
@@ -521,3 +526,17 @@ data/internal-rag-house/LANTERN-OS-INTERNAL-HOUSE-RAG.flat.md
 
 # Live trader watchlist — runtime user state; seeded from watchlist.seed.json
 data/lantern-garage/trading/watchlist.json
+
+# Generated QA report outputs (scripts/sigma0.js, qa-audit.js, qa-creator-dashboard.js)
+reports/sigma0-issue-audit.md
+reports/button-audit.md
+reports/creator-dashboard-audit.md
+
+# server session store — runtime state, never commit
+data/sessions/
+
+# Per-user runtime stores (never commit): broker creds + broker choice
+apps/lantern-garage/data/ibkr-credentials/
+apps/lantern-garage/data/alpaca-credentials/
+apps/lantern-garage/data/broker-preference/
+apps/lantern-garage/data/profiles/

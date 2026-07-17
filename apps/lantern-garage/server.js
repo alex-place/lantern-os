@@ -180,6 +180,7 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/symbol-info",       // name/exchange/asset_class
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
+  "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
 ]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue

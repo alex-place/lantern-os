@@ -59,6 +59,7 @@ const EXTENSION = {
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
+  "demo.html":                     ["trading", "TRADING_ENABLED"], // public read-only demo-account spectator (#2548)
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
@@ -77,7 +78,8 @@ const EXTENSION = {
   "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],
   // upgrade-lab.html retired (#2473) — 302s to /pricing.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
-  "api-keys-settings.html":        ["account", null],
+  // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
+  "settings.html":                 ["account", null], // tabbed settings: API keys + connectors + context modes
   // project meta
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],

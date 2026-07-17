@@ -21,7 +21,6 @@ chat logs. If a decision shapes the system's structure, it gets an ADR. If you w
 | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) | **Immutable North Star** — the constraints ADRs must obey, not themselves an ADR |
 | [ARCHITECTURE.md](../ARCHITECTURE.md) | **Current-state snapshot** — what the system *is* today (the "now"), with `file:line` evidence |
 | `docs/adr/*.md` | **Decision log** — *why* it became that way, one decision at a time (the "history") |
-| [CODEMAP.md](../CODEMAP.md) | Feature/surface roadmap + status table |
 
 ARCHITECTURE.md answers "what is true now"; ADRs answer "what did we decide and why".
 When an ADR changes the current state, ARCHITECTURE.md is updated to match.

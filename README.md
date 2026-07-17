@@ -13,6 +13,13 @@ updated: 2026-07-16
 <p align="center"><b>A persistent, local-first AI operator console — one assistant that remembers, reasons, acts, and verifies.</b></p>
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/dream-chat-dark.png">
+    <img src="docs/media/dream-chat-light.png" alt="unisona.ai Chat — the primary surface: one assistant with real tools, running locally" width="820">
+  </picture>
+</p>
+
+<p align="center">
   <a href="https://unisona.ai">unisona.ai</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
