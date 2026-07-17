@@ -83,7 +83,7 @@ This repo is designed for agentic-first workflows. Every agent (Claude, Gemini, 
 |------|------------------|-------|
 | [`data/pcsf/model.pcsf.json`](data/pcsf/model.pcsf.json) | Default model per provider, available overrides | Don't search for model strings |
 | [`data/pcsf/agent.pcsf.json`](data/pcsf/agent.pcsf.json) | All agents, their capabilities, route bindings | Don't explore routes/ to understand what exists |
-| [`data/pcsf/provider.pcsf.json`](data/pcsf/provider.pcsf.json) | Provider fallback chain + per-provider config (env-var presence lives in [`.env.example`](.env.example)) | Don't grep for process.env / provider order |
+| `data/pcsf/provider.pcsf.json` (generated at boot — git-ignored) | Provider fallback chain + per-provider config (env-var presence lives in [`.env.example`](.env.example)) | Don't grep for process.env / provider order |
 | [`data/pcsf/narrator.pcsf.json`](data/pcsf/narrator.pcsf.json) | Keyword routing rules. **Note:** it still lists 6 legacy narrators, but only `keystone` is selectable at runtime — [`data/contexts/personas.json`](data/contexts/personas.json) is the source of truth (RP personas removed in #1664) | Don't read dream-chat.js to understand agents |
 | [`manifests/dream-journal-v1-agent-slots.json`](manifests/dream-journal-v1-agent-slots.json) | Queued work items with priority + description | Don't ask "what's left to do" |
 | [`manifests/CONVERGENCE-LOOP-AGENT-FLEET.md`](manifests/CONVERGENCE-LOOP-AGENT-FLEET.md) | 36-slot agent fleet design and receipt contract | Don't re-derive fleet structure |

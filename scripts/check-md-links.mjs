@@ -22,10 +22,36 @@
  */
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const QUIET = process.argv.includes("--quiet");
+
+// Validate against TRACKED files (git ls-files), not the local filesystem: a local
+// checkout accumulates gitignored runtime artifacts (e.g. data/pcsf/provider.pcsf.json,
+// generated at boot) that don't exist in CI's clean checkout — fs.existsSync passed
+// locally and failed in CI on exactly that. Tracked-set semantics make local runs and
+// CI agree by construction. Falls back to the filesystem if git is unavailable.
+let TRACKED = null; // Set of repo-relative paths (posix separators)
+let TRACKED_DIRS = null; // Set of every ancestor directory of a tracked file
+try {
+  const out = execFileSync("git", ["-C", ROOT, "ls-files"], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  TRACKED = new Set(out.split("\n").map((s) => s.trim()).filter(Boolean));
+  TRACKED_DIRS = new Set();
+  for (const f of TRACKED) {
+    let d = f;
+    while (d.includes("/")) { d = d.slice(0, d.lastIndexOf("/")); TRACKED_DIRS.add(d); }
+  }
+} catch { TRACKED = null; }
+
+function targetExists(absResolved) {
+  if (!TRACKED) return fs.existsSync(absResolved);
+  const rel = path.relative(ROOT, absResolved).replace(/\\/g, "/");
+  if (rel.startsWith("..")) return fs.existsSync(absResolved); // outside the repo → fs truth
+  const clean = rel.replace(/\/+$/, "");
+  return TRACKED.has(clean) || TRACKED_DIRS.has(clean);
+}
 
 function listFiles() {
   const files = [];
@@ -72,7 +98,7 @@ for (const file of listFiles()) {
     if (target.startsWith("/")) continue;
     const resolved = path.resolve(path.dirname(file), target);
     checked++;
-    if (!fs.existsSync(resolved)) {
+    if (!targetExists(resolved)) {
       dead.push({ file: rel, target, blocking });
     }
   }
