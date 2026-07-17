@@ -189,7 +189,7 @@ async function plan(userId, { bandPct = DEFAULT_BAND_PCT } = {}) {
  * Rebalance the paper book toward the target. DRY unless BOTH arm:true AND
  * CHAMPION_ARM=1. Refuses a non-paper account. Places fractional PAPER market orders.
  */
-async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT } = {}) {
+async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders = Infinity } = {}) {
   const p = await plan(userId, { bandPct });
   if (!p.ok) return p;
   const armed = arm && process.env.CHAMPION_ARM === '1';
@@ -198,9 +198,16 @@ async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT } 
   if (!armed) { logLedger({ event: 'plan_dry', equity: p.equity, gross: p.gross, weights: p.weights, orders: p.orders }); return { ...p, executed: false, dryRun: true }; }
   const alpaca = require('./alpaca-adapter');
   const results = [];
-  for (const o of p.orders) {
+  // maxOrders bounds a controlled test (place N of the plan's legs); default = all.
+  for (const o of p.orders.slice(0, maxOrders)) {
+    // A rebalance SELL fails with "insufficient qty available" when the shares are
+    // reserved by another engine's resting orders (e.g. the day-trader's protective
+    // stops on a shared paper account). Free them first so the champion's allocation
+    // can actually execute. (Cancelling working orders on a name we're exiting anyway.)
+    let cancelled = 0;
+    if (o.side === 'sell') cancelled = await alpaca.cancelOpenOrders(userId, o.symbol).catch(() => 0);
     const r = await alpaca.placeOrder(userId, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
-    results.push({ ...o, status: r && r.status, order_id: r && r.order_id });
+    results.push({ ...o, cancelledResting: cancelled, status: r && r.status, order_id: r && r.order_id, reason: r && r.reason });
   }
   logLedger({ event: 'rebalance', equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
   return { ...p, executed: true, results };

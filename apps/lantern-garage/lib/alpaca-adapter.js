@@ -188,4 +188,26 @@ async function getDayPnl(userId) {
   return { dailyPnl: acct.pnl_today, unrealizedPnl: acct.unrealized, realizedPnl: acct.realized_today };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, _authFor };
+/** Cancel a single working order by id. Returns true on 2xx/207. */
+async function cancelOrder(userId, orderId) {
+  const auth = _authFor(userId);
+  if (!auth || !orderId) return false;
+  const r = await _req(auth, 'DELETE', `/v2/orders/${encodeURIComponent(orderId)}`);
+  return r.ok || r.status === 207 || r.status === 404;   // 404 = already gone → treat as cancelled
+}
+
+/** Cancel every working order for a symbol (frees reserved shares before a rebalance
+ *  sell). Returns the count cancelled. */
+async function cancelOpenOrders(userId, symbol) {
+  const sym = String(symbol || '').toUpperCase();
+  const open = await getOpenOrders(userId).catch(() => []);
+  let n = 0;
+  for (const o of open) {
+    if (String(o.symbol || '').toUpperCase() === sym && o.order_id) {
+      if (await cancelOrder(userId, o.order_id)) n += 1;
+    }
+  }
+  return n;
+}
+
+module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor };
