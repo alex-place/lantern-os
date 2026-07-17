@@ -2313,7 +2313,7 @@ async function commitSlotSymbol(oldTicker, sym){
   // The symbol is already Alpaca-validated by the search; add it to the watchlist
   // so price/zone data flows, then re-render.
   try{ await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); }catch(e){}
-  lastCardOrder=''; await loadWatchlistPrices(); await loadZones(); renderCards();
+  lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
 
 // ── Symbol-search popup (#1692) — TradingView-style search over all Alpaca assets ──
@@ -3360,7 +3360,7 @@ async function addWatchlistTicker(){
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t add ticker: ' + (result.error || r.statusText)); return; }
     input.value = '';
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){
     _alertToast('Couldn’t add ticker: ' + e.message);
@@ -3372,7 +3372,7 @@ async function addWatchlistSymbol(sym){
   if(!sym) return;
   try{
     await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){}
 }
@@ -3383,7 +3383,7 @@ async function removeWatchlistTicker(ticker, evt){
     const r = await fetch('/api/trading/watchlist/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t remove ticker: ' + (result.error || r.statusText)); return; }
-    await Promise.all([loadWatchlistPrices(), loadZones()]);
+    await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
   }catch(e){
     _alertToast('Couldn’t remove ticker: ' + e.message);
@@ -3554,7 +3554,15 @@ async function loadCouncil(){
     (rowHtml || '<div class="s0-empty">No signal-bearing trades graded yet.</div>');
 }
 
-let pricesLoading = false;
+// #2491: coalesce the watchlist-prices endpoint. On trader load ~10 independent
+// init paths each call loadWatchlistPrices() within ~0.25s; each completed fast
+// enough that the old in-flight-only guard didn't dedupe them, so the parameterless
+// endpoint got hit ~10×. pricesInFlight shares one request across truly-concurrent
+// callers; lastPricesAt + PRICES_MIN_INTERVAL skip a re-fetch right after a load.
+let pricesInFlight = null;
+let lastPricesAt = 0;
+const PRICES_MIN_INTERVAL = 2000; // ms — coalesces the 0.25s load burst; well under
+                                  // the 3s poll + 30s full-refresh so neither is skipped.
 // ── P1 trust + workflow bundle (#2439) ────────────────────────────────────────
 // Feed honesty: flip the LIVE stamp red after 2 consecutive failed polls (~6s of
 // silence) so stale prices never masquerade as live. Restores on the next success.
@@ -3697,9 +3705,17 @@ function _tickLastBar(tk, px){
   }                                                          // older gap → wait for real server bars
 }
 
-async function loadWatchlistPrices(){
-  if(pricesLoading) return;
-  pricesLoading = true;
+// Thin coalescing wrapper (#2491). Callers that mutate the watchlist first
+// (add/remove ticker) pass {force:true} so the freshness window can't hide the
+// changed ticker set; the poll + full-refresh call it with no args.
+function loadWatchlistPrices(opts){
+  const force = opts === true || !!(opts && opts.force);
+  if(pricesInFlight) return pricesInFlight;                       // concurrent → share one fetch
+  if(!force && Date.now() - lastPricesAt < PRICES_MIN_INTERVAL) return Promise.resolve();
+  pricesInFlight = _loadWatchlistPricesNow();
+  return pricesInFlight;
+}
+async function _loadWatchlistPricesNow(){
   try{
     const r = await fetch('/api/trading/watchlist-prices');
     wlPrices = await r.json();
@@ -3731,8 +3747,9 @@ async function loadWatchlistPrices(){
     // Keep the docked order ticket's quote ticking with the feed (it has no
     // poll of its own — without this its prices freeze at open time).
     if(otTicker && !document.getElementById('otBg').classList.contains('hidden')) renderOrderTicket();
+    lastPricesAt = Date.now();   // #2491: mark fresh only after a successful load
   }catch(e){ _feedStatus(false); }   // #2439: a failed poll must not look live
-  finally{ pricesLoading = false; }
+  finally{ pricesInFlight = null; }
 }
 
 let barsLoading = false;
