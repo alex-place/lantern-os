@@ -9,7 +9,7 @@
  * (?arm=1) AND the operator set SIGMA_ARM=1. Real capital stays gated on ADR-0028.
  *
  *   GET  /api/trading/sigma-trader            → plan: target weights × brake gross,
- *                                                current vs target, drift orders
+ *                                                current vs target, drift orders + schedule state
  *   POST /api/trading/sigma-trader/rebalance  → rebalance the OWN paper book (dry unless armed)
  *
  * /api/trading/champion(/rebalance) kept as a back-compat alias for one release.
@@ -27,7 +27,10 @@ module.exports = async function sigmaRoutes(req, res, url, ctx) {
   try {
     if (PLAN.has(p) && req.method === 'GET') {
       const plan = await sigma.plan();
-      return sendJson(res, plan, plan.ok ? 200 : 503), true;
+      // Attach the scheduler state so the UI shows whether Sigma is running itself.
+      let schedule = null;
+      try { schedule = require('../../lib/sigma-scheduler').getStatus(); } catch (_e) { /* absent */ }
+      return sendJson(res, { ...plan, schedule }, plan.ok ? 200 : 503), true;
     }
     if (REBAL.has(p) && req.method === 'POST') {
       const arm = url.searchParams.get('arm') === '1';

@@ -854,6 +854,15 @@ server.listen(port, host, () => {
     brakeMonitor.start();
     deps.brakeMonitor = brakeMonitor;
 
+    // ── Sigma Trader schedule (ADR-0028) — the long-horizon allocation book on its
+    // OWN account. Rebalances on drift + reacts to the brake's gross, market-hours
+    // only. Off by default; opt in with SIGMA_SCHEDULE=1. Places nothing unless also
+    // armed (SIGMA_ARM=1) with a dedicated Sigma account (SIGMA_ALPACA_*). Fully
+    // independent of the day-trader — separate engine, separate account.
+    const sigmaScheduler = require("./lib/sigma-scheduler");
+    sigmaScheduler.start();
+    deps.sigmaScheduler = sigmaScheduler;
+
     // ── Crypto Price & News Collector (30s polling) ──
     const CryptoCollector = require("./lib/crypto-collector");
     const cryptoCollector = new CryptoCollector();
