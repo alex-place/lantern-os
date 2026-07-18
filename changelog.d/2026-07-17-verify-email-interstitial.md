@@ -1,5 +1,0 @@
-### Fixed
-
-- security/csrf: **a pending email CHANGE is no longer applied by a GET** (#2646). Email scanners / link-prefetchers auto-fetch links, so the verify-email GET could silently apply an account email change before the user ever clicked. The GET now serves a confirmation interstitial (rendered inline by the route — not a new public surface) whose button fires an explicit **`POST /api/auth/verify-email`**; only the POST applies the change. A plain signup verification still applies on the GET (single-use + benign). Combined with the single-use tokens (#2614), a prefetcher can neither apply nor replay the change.
-- robustness: follow-up to #2649/#2650 — the body readers' `close` handler now settles from the accumulated body (matching `end`) instead of resolving `null`, since `close` can fire before/instead of `end`; the over-cap path still resolves `null` (it settles first, before `destroy()`).
-- Tests: `test/verify-email-interstitial.test.js` (in-process) asserts GET→interstitial-with-no-mutation, POST→applies, single-use replay, and that plain signup-verify still works on the GET. Billing lifecycle E2E stays 27/27.

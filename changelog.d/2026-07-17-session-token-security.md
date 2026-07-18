@@ -1,6 +1,0 @@
-### Fixed
-
-- security/access-control: live sessions and action tokens no longer outlive a privileged change (2026-07-16 audit).
-  - **Role changes now take effect on live sessions** (#2627): revoking admin/tech_support (or downgrading a tier) via `POST /api/accounts/role` had no effect on the target's established, disk-persisted session — they kept `isAdmin`/`isStaff` until it naturally expired. A new `destroyUserSessions(dir, userId)` invalidates the target's sessions on the role write, so they re-authenticate into the new role immediately (response now reports `sessionsInvalidated`).
-  - **Reset/verify links are single-use** (#2614): the signed action tokens were replayable for their whole TTL, so a leaked reset link kept working even after the legitimate user set a new password. Tokens now carry a random `jti` tracked in a consumed-token ledger; a spent token is rejected. Additionally, completing a password reset **invalidates the account's existing sessions**, so a hijacked session can't survive the remediation.
-  - Tests: `test/session-invalidation.test.js` (removes exactly the target's sessions, leaves others/anon/non-json), `test/auth-token-single-use.test.js` (first use consumes, replay rejected, distinct tokens don't collide). Strengthens **Verify**.

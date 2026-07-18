@@ -1,2 +1,0 @@
-### Changed
-- **Momentum-death exit now reads 5-minute candles (was 15m).** The fading-winner exit (MACD histogram flips negative + price below its short EMA while in profit) evaluates on 5m bars by default, so a rolling-over trend is caught ~3× sooner — nearer the peak — instead of waiting for a 15m bar to confirm. Tunable via `TRADER_MOMENTUM_TF` (e.g. `15m` to smooth it back). The 5m series still supplies well over the 30-bar MACD/RSI window. Complements the ratcheting trailing stop.

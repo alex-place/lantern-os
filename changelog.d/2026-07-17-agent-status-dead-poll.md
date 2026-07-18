@@ -1,3 +1,0 @@
-### Fixed
-
-- agent-status.html (#2480): stopped polling two removed endpoints. `loadAll()` fetched `/api/nodes/mesh` and `/api/agents/workers` inside a `setInterval(…, 30_000)`, but both routes were removed server-side and return **404** — so the "Node Mesh" / "Agent Workers" panels rendered permanently empty and generated a 404 network error every 30s. `index.html` already dropped these for the same reason (#878). Removed the two fetches, the dead render block, and the empty markup section. Verified: 0 live references to either endpoint remain (comments only); the `loadAll()` destructuring stays symmetric (9 vars = 9 fetches); the inline script parses clean; both endpoints still 404 on the live server, confirming the page no longer calls them.
