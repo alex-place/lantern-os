@@ -68,7 +68,8 @@ Playwright:
 const ctx = await browser.newContext({ extraHTTPHeaders: { 'X-Test-Auth': 'my-dev-token' } });
 ```
 
-Unspecified role defaults to `admin`.
+An unspecified/unknown role is **fail-closed to `guest`** (#2645) — emulating an
+operator requires naming `X-Test-Role: admin` (or `tech_support`) explicitly.
 
 ### 3. Real email + password
 
