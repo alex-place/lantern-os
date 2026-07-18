@@ -632,7 +632,7 @@ local_csf = hf_hub_download(repo_id="${hfRepo}", filename="${path.basename(check
 import sys as _sys; _sys.path.insert(0, "/kaggle/working/lantern-os/src")
 import csf
 csf.unpack(local_csf, "/kaggle/working/checkpoint")
-resume_args = ["--resume_from", "/kaggle/working/checkpoint"]
+resume_args = ["--resume", "/kaggle/working/checkpoint"]
 ` : `resume_args = []  # cold start`;
 
   return `import subprocess, sys, os, json
@@ -756,13 +756,13 @@ from huggingface_hub import hf_hub_download
 hf_hub_download(repo_id='${hfRepo}', filename='${checkpointFile}',
     repo_type='model', local_dir='/tmp/checkpoint')
 "
-  RESUME_ARGS="--resume_from /tmp/checkpoint"
+  RESUME_ARGS="--resume /tmp/checkpoint"
 fi
 
 # Run training
 HF_HOME=/tmp/hf-cache python3 scripts/train-qlora-ouro.py \\
   --base ByteDance/Ouro-1.4B \\
-  --data models/lantern-sigma0-coder/training-data.jsonl \\
+  --data data/eval/distill.jsonl \\
   --out /tmp/output \\
   --max-steps ${steps} \\
   --seq 1536 \\

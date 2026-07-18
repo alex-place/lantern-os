@@ -16,7 +16,6 @@
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const STATE_PATH = path.join(REPO_ROOT, "data", "convergence-lora-state.json");
@@ -152,44 +151,28 @@ async function distilRecord(record, apiKey) {
   return pair;
 }
 
-// ── Trigger local LoRA training ───────────────────────────────────────────────
-
-function triggerLocalTraining(state) {
-  const scriptPath = path.join(REPO_ROOT, "scripts", "train-convergence-lora.py");
-  if (!fs.existsSync(scriptPath)) {
-    // DELIBERATE STUB (#2543 audit decision): the flywheel's job is to COLLECT
-    // verified convergence→distillation pairs (see collectAndMaybeTrainAsync); the
-    // local-training launcher is a future step. train-convergence-lora.py has never
-    // existed, so this returns a no-op sentinel instead of spawning a missing script.
-    // When a trainer is added, drop it at scripts/train-convergence-lora.py and this
-    // path activates unchanged — the collected pairs at PAIRS_PATH are its input.
-    return `no-op:script-missing:${scriptPath}`;
-  }
-  const jobId = `lora-${Date.now()}`;
-  const outputDir = path.join(REPO_ROOT, "data", "models", "lora", `convergence-${jobId}`);
-  fs.mkdirSync(outputDir, { recursive: true });
-  const logPath = path.join(outputDir, "training.log");
-  const py = process.platform === "win32" ? "python" : "python3";
-  const proc = spawn(
-    py,
-    [scriptPath, "--pairs", PAIRS_PATH, "--output_dir", outputDir],
-    { cwd: REPO_ROOT, detached: true, stdio: ["ignore", fs.openSync(logPath, "w"), fs.openSync(logPath, "a")] }
-  );
-  fs.writeFileSync(path.join(outputDir, "training.pid"), String(proc.pid), "utf8");
-  proc.unref();
-  return jobId;
-}
+// ── Collected pairs are a batch ready for EXTERNAL training ───────────────────
+//
+// The former triggerLocalTraining() spawned scripts/train-convergence-lora.py — a file
+// that never existed, so it only ever returned a "no-op:script-missing" sentinel while
+// the caller still advertised a phantom "training" run (#2535). Local weight training is
+// also off-architecture: CLAUDE.md — "PERSISTENT LEARNING, NOT WEIGHT MODIFICATION …
+// improve via retrieval and reasoning, not retraining." So the dead launcher is removed.
+// The flywheel's real job is to COLLECT verified convergence→distillation pairs at
+// PAIRS_PATH; at the threshold those pairs are a completed batch for external/cloud
+// training. If a real trainer is ever wanted, wire it behind an explicit opt-in flag.
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
  * Process up to `batchSize` convergence records, generate training pairs via
- * Claude API, persist pairs, and trigger local training at the TRAIN_EVERY threshold.
+ * Claude API, and persist them. At the TRAIN_EVERY threshold the accumulated pairs are
+ * marked as a batch ready for external/cloud training (no local weight training is run).
  *
  * @param {object} opts
  * @param {string} opts.apiKey   - Anthropic API key
  * @param {number} [opts.batchSize=5] - records to process per call
- * @returns {Promise<{added: number, total: number, trainTriggered: boolean, jobId?: string}>}
+ * @returns {Promise<{added: number, total: number, pairsReady: boolean, batchCount: number, pairsPath: string}>}
  */
 async function collectAndMaybeTrainAsync({ apiKey, batchSize = 5 } = {}) {
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY required for convergence-lora");
@@ -219,23 +202,25 @@ async function collectAndMaybeTrainAsync({ apiKey, batchSize = 5 } = {}) {
     }
   }
 
-  let trainTriggered = false;
-  let jobId;
+  // At the TRAIN_EVERY threshold the distilled pairs form a completed batch that is
+  // ready for external/cloud training. We never spawn a local trainer and never set a
+  // "training" status that nothing clears (the old dead branch wedged the machine there
+  // permanently, blocking all future collection) — snapshot the batch, reset the counter,
+  // and keep collecting.
+  let pairsReady = false;
+  let batchCount = 0;
   if (state.examplesCollected >= TRAIN_EVERY) {
-    state.status = "training";
-    jobId = triggerLocalTraining(state);
-    state.activeJobId = jobId;
-    state.lastTrainedAt = new Date().toISOString();
+    batchCount = state.examplesCollected;
+    const readyAt = new Date().toISOString();
+    state.batches = [...(state.batches || []), { pairsPath: PAIRS_PATH, count: batchCount, readyAt }];
+    state.lastBatchReadyAt = readyAt;
     state.examplesCollected = 0;
-    state.jobs = [...(state.jobs || []), { jobId, startedAt: state.lastTrainedAt }];
-    trainTriggered = true;
-    saveState(state);
-  } else {
-    state.status = "idle";
-    saveState(state);
+    pairsReady = true;
   }
+  state.status = "idle";
+  saveState(state);
 
-  return { added, total: state.examplesCollected, trainTriggered, jobId };
+  return { added, total: state.examplesCollected, pairsReady, batchCount, pairsPath: PAIRS_PATH };
 }
 
 /**
