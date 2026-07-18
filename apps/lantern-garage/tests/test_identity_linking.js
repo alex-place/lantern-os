@@ -62,9 +62,6 @@ ok("getProfileByIdentity finds discord", up.getProfileByIdentity("discord", "d-9
 ok("getProfileByIdentity finds patreon by legacy id", up.getProfileByIdentity("patreon", "49294581").id === "49294581");
 ok("getProfileByEmail verifiedOnly returns verified profile", up.getProfileByEmail("alice@example.com", { verifiedOnly: true }).id === g.profile.id);
 
-// Backward-compat wrappers still work.
-ok("getOrCreateFromPatreon returns a profile", up.getOrCreateFromPatreon({ id: "p-2", name: "P2", email: "p2@x.com", primaryTier: "t" }, "supporter").id === "p-2");
-
 // ── SECURITY REGRESSIONS (ADR-0016 review) ──
 
 // Register-takeover: an OAuth profile with no local password must NOT be claimable

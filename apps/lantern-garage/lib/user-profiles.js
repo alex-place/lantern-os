@@ -256,27 +256,6 @@ function deleteProfile(userId) {
 }
 
 /**
- * Get or create profile from Patreon OAuth session.
- */
-function getOrCreateFromPatreon(patreonUser, patreonRole) {
-  // Delegate to the one provider-agnostic path (ADR-0016) so Patreon logins take
-  // the same linking route as Google/Discord. Patreon email is treated as
-  // UNVERIFIED (Patreon does not assert email_verified), so it never auto-links.
-  const { profile } = getOrCreateFromIdentity(
-    "patreon",
-    {
-      providerId: patreonUser.id,
-      email: patreonUser.email,
-      emailVerified: false,
-      name: patreonUser.name,
-      tier: patreonUser.primaryTier,
-    },
-    patreonRole
-  );
-  return profile;
-}
-
-/**
  * Export profiles to CSF archive (future: binary format).
  */
 function exportToCSF() {
@@ -838,7 +817,6 @@ module.exports = {
   listProfiles,
   deleteProfile,
   isProfileDeleted,
-  getOrCreateFromPatreon,
   linkDiscordAccount,
   getLinkByDiscordId,
   getProfileByDiscordId,

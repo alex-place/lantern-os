@@ -109,8 +109,6 @@ function resolveRedirectUri(req, providerId) {
       (req.socket && req.socket.encrypted ? "https" : "http");
     return `${proto}://${host}/api/auth/${providerId}/callback`;
   }
-  // Legacy single-provider override kept for Patreon; generic override otherwise.
-  if (providerId === "patreon" && process.env.PATREON_REDIRECT_URI) return process.env.PATREON_REDIRECT_URI;
   return process.env.OAUTH_REDIRECT_BASE
     ? `${process.env.OAUTH_REDIRECT_BASE}/api/auth/${providerId}/callback`
     : null;
