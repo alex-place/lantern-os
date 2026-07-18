@@ -202,6 +202,52 @@ continual learning, and the Certificate's slow-weights gate (Σ_θ) live.*
 
 ---
 
+## Reverse-engineering the frontier — the inverse-problem method (the black-hole telescope)
+
+*Status: FRAMING (the method is ESTABLISHED science; its application here is ours). Added
+2026-07-18 with the operator's synthesis.*
+
+The frontier recipe — the unpublished data mixture, RL and systems tricks — is an
+**ill-posed inverse problem**: we cannot observe it directly, and infinitely many recipes
+are consistent with what we can observe. That is *exactly* the problem the Event Horizon
+Telescope solves to image a black hole: interferometry data admits infinitely many images,
+and **Regularized Maximum Likelihood** selects "a conservative image from an infinite number
+of possible images" — fitting the data while regularizing hard enough to never hallucinate
+structure the data doesn't support
+([EHT sparse modeling](https://iopscience.iop.org/article/10.3847/1538-4357/aa6305/epub);
+[M87 imaging](https://iopscience.iop.org/article/10.3847/2041-8213/ab0e85/pdf)).
+
+The mapping, term by term:
+
+| EHT imaging | Frontier reconstruction (this project) |
+|---|---|
+| sparse visibility data | the frontier model's observable input→output behavior |
+| RML forward-modeling | **distillation** — recover the map from the black box's shadow |
+| imaging the interior from indirect measurement | **probing** — e.g. the linear honesty probe reading truth off hidden states |
+| the regularizer (entropy/sparsity priors) | **grounding (the Certificate)** — fit the observable capability, regularize to the established corpus, refuse to hallucinate the secret sauce |
+| the conservative-image discipline | the evidence-class discipline — the same one that refused a fake "novel mechanism" every time this session tested one |
+
+Reconstruction has a hard ceiling stated plainly: **an inverse problem cannot add structure
+the data doesn't contain.** Distilling the frontier reaches it asymptotically; it does not
+surpass it. To *exceed* the reconstruction you need an instrument the original doesn't have —
+**fresh verified ground truth on domains the frontier has no cheap labels for**: resolved
+market P&L, execution-verified code outcomes, real user corrections. That is the telescope
+they do not own, and the freshness law (only fresh truth selects) is why it is the only thing
+that can pull the student past the teacher — locally, on the surfaces that matter.
+
+### How we make AGI — the disciplined synthesis (operator-approved, 2026-07-18)
+
+We do not make AGI by training a frontier-scale model from scratch; that path is closed by
+capital, data, and unpublished tacit knowledge. The open path is the one this document maps:
+**rent** the six load-bearing capabilities the frontier ships; **own** the one it is missing
+and names as its top failure (long-horizon grounding / anti-collapse); **distill** to a
+small, local, verifiable serving artifact; **close the loop** with fresh domain verification
+surfaces the frontier cannot cheaply replicate; and use the inverse-problem method above to
+reconstruct what they hide — then exceed it locally where our telescope sees truth theirs
+cannot. The Certificate's rule is unchanged and non-negotiable: no claimed edge, capability,
+or novelty counts until it survives fresh, out-of-sample verification on the actual surface.
+That is the plus-ultra that is actually beyond what they ship, *because it is grounded*.
+
 ## The honest AGI-scope assessment
 
 **Could this become the best model possible?** Not from what we own. Six of the seven load-bearing
