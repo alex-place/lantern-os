@@ -472,7 +472,7 @@ the worst cell **DOWN·calm −30.2%/yr** (217 days).
    the damage, but this is the clear lever → **iter-12 tests a better/confirmed signal to cut
    false flips**, iter-13 tests event-triggered rebalancing.
 
-> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on branch `claude/trading-research-loop2` (PR #2731). Iters 8-12 done; iter-12 found the 200d-SMA gate beats the shipped momentum gate (needs OOS validation in iter-13).
+> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on `claude/trading-research-loop2` (PR #2731). Iters 8-13 done; iter-13 REJECTED the SMA signal (in-sample overfit, fails OOS) — shipped momentum gate stands, no live change.
 > at 14:14Z. Loop-2 continues on branch `claude/trading-research-loop2`; a new PR will
 > collect iters 11+.
 
@@ -510,3 +510,32 @@ when BOTH say down.
    OOS treatment before any live change. **Iter-13 validates sma-vs-mom train(pre-2000)/
    validate(2000+) — only then does it become a live champion-book/brake-monitor refinement
    (money-path → PR #2731, tests, human review).**
+
+---
+
+## Iteration 13 (Σ₀-critical) — the SMA "improvement" was in-sample overfitting; REJECTED
+
+`deep_history_signal_oos.py` re-tested iter-12's SMA gate on a clean split (TRAIN pre-2000,
+VALIDATE 2000-2026).
+
+| signal | S&P train Sh | S&P **validate** Sh | Nasdaq train Sh | Nasdaq **validate** Sh |
+|---|---|---|---|---|
+| mom (shipped) | 0.69 | **0.69** | 1.13 | **0.71** |
+| sma | 0.85 | **0.68** | 1.25 | **0.68** |
+| dual | 0.77 | 0.74 | 1.19 | 0.73 |
+
+Bootstrap validate ΔSharpe (sma − mom): S&P **[−0.22, +0.20]** (P=44%), Nasdaq **[−0.23, +0.17]**
+(P=37%) — both CIs straddle 0. **VERDICT on both indices: sma does NOT beat mom OOS.**
+
+**Findings (iteration 13) — a Σ₀ win: a false positive caught before shipping.**
+1. **The iter-12 SMA dominance did not generalize.** Its big in-sample edge (Sharpe 0.85/1.25
+   train) collapsed to *slightly worse than momentum* out-of-sample (0.68 vs 0.69 / 0.71). The
+   full-history win was pre-2000 regime-specific luck — exactly the overfitting trap OOS
+   validation exists to catch. **No signal change is warranted; the shipped 12mo-momentum gate
+   stands. No live edit made.**
+2. **`dual` is a weak, non-significant maybe** (validate P(dual>mom) 79%/59%, CIs include 0,
+   no drawdown gain) — not enough evidence to justify a money-path change either.
+3. **Net for the model:** loop-2 has now *confirmed the shipped config's robustness*
+   (significant edge, holds under production weighting, TC-robust, understood by regime) and
+   *rejected one tempting-but-false improvement*. The honest, evidence-first outcome. The
+   `signal` param stays a research knob, not a live default.
