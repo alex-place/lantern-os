@@ -73,10 +73,42 @@ fixed with `calendar.timegm` + epoch-plus-timedelta in `deep_history_cache.py`.)
 3. **Honest limitation.** 1987 (a single −22% day) is the one regime the daily brake
    barely helps — no daily-bar overlay can pre-empt a one-session crash.
 
+---
+
+## Iteration 2 — tune the non-risky overlay: how few trades can it make?
+
+`deep_history_sweep.py` sweeps band × brake × trend_m for the **no-margin** book, with
+an honest split — TRAIN on each series' pre-2000 history, VALIDATE on 2000-2026 (unseen
+dot-com/GFC/COVID/2022). Selection: among configs beating buy&hold's TRAIN Sharpe, take
+the **fewest-trades** one.
+
+**Both indices independently selected the SAME config: `band=0.30, brake=0.20,
+trend=12mo`** — and it holds out-of-sample:
+
+| VALIDATE 2000-2026 | Sharpe | vs buy&hold | maxDD | vs buy&hold | final | vs buy&hold | trades/yr |
+|---|---|---|---|---|---|---|---|
+| S&P no-margin | 0.69 | 0.42 | −19% | −57% | $161k | $133k | **9** |
+| Nasdaq no-margin | 0.71 | 0.41 | −23% | −78% | $228k | $164k | **16** |
+
+**Findings (iteration 2).**
+1. **Trading *less* is strictly better here.** Across the whole grid, widening the band
+   (→0.30) and lengthening the trend window (→12mo) cut trades to **~1/month** while
+   validate Sharpe/final *held or improved*. The live model's daily retrade
+   (hundreds–thousands of trade-days) is over-trading — turnover cost with no edge.
+2. **It beats buy&hold out-of-sample on BOTH return and risk** — not just risk-adjusted:
+   higher final value, ~⅓ the drawdown, on data never used to tune it.
+3. **Robustness:** two independent 55-99y series converging on the same low-trade config
+   is strong evidence it isn't overfit.
+4. **Constraint check:** 9-16 rebalances/yr is far under any PDT/day-trade threshold;
+   never borrows → no margin risk. Exactly the profile requested.
+
+**Recommendation forming:** default the overlay to **Conservative (no-margin), band 0.30
+/ brake 0.20 / trend 12mo**; keep 2× leverage as an explicit opt-in.
+
 ### Next (later iterations)
-- Tune `band`/`brake`/`trend_m` *on the deep history* with a clean train(pre-1990)/
-  validate(1990+) split — confirm ~16 trades/yr is near-optimal, not just the live spec.
-- Re-run with the real DCA deposit schedule (not lump sum) to match the live plan.
-- Test a blended S&P+Nasdaq+gold panel over deep history.
+- Re-run with the real DCA $20/mo deposit schedule (not lump sum) to match the live plan.
+- Test a blended S&P+Nasdaq+gold panel + a bond-proxy from ^TNX over deep history.
+- Web-research low-turnover tactical-allocation literature to sanity-check the band/trend
+  choice against published dual-momentum / trend-following-with-cash results.
 - If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the
   live model rather than adding a parallel system (extend, don't sprawl).
