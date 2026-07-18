@@ -56,6 +56,14 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 
 ---
 
+## Trader reports (monthly)
+
+| Script | Purpose | How to run |
+|--------|---------|-----------|
+| `scripts/reports/sigma_trader_report_2026_07.py` | Builds the July 2026 Sigma Trader Report PDF (`apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf`) — the champion's monthly balance, current events, suggestions, receipts. All numbers pinned in-file; reproducible offline. Next month: copy to a new dated file, update the DATA + prose. | `python scripts/reports/sigma_trader_report_2026_07.py` |
+
+---
+
 ## Hooks & validators (repo-managed via `core.hooksPath`)
 
 Anchored by `scripts/hooks/pre-push` and `scripts/hooks/pre-commit-full-validation`.
