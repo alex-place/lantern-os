@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **5** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification vs brake). Next:
+> fabrication). Iterations done: **6** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification vs brake; literature match). Next: wire Conservative mode into live model + tests -> final synthesis + PR.
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -216,9 +216,45 @@ the Conservative (no-margin) brake, band 0.30 / brake 0.20 / trend 12mo** — ~2
 never borrows, Sharpe ~0.9, drawdown roughly a third of all-equity. Present the return
 give-up honestly; it's a risk-tolerance dial, not a free lunch.
 
-### Next (later iterations)
-- Low-turnover tactical-allocation literature sanity-check (web) — does published
-  dual-momentum / trend+cash work corroborate the band/trend/brake choice?
+---
+
+## Iteration 6 — literature sanity-check: our findings match published work
+
+Cross-checked our measured results against the three canonical low-turnover tactical
+strands (external reality > internal consistency). All three corroborate, and the
+places we diverge are explained.
+
+| Source | Rule | Their result | Matches our finding |
+|---|---|---|---|
+| **Faber, GTAA** (SSRN 962461), 10-mo SMA, monthly, 5-asset EW | in/out by 10-mo SMA | 1901-2012: Sharpe **0.55 vs 0.32** buy&hold, maxDD **−50% vs −84%**; "equity returns, bond-like drawdowns" | our S&P no-margin: Sharpe **0.71 vs 0.42**, maxDD **−30% vs −86%** — same direction, similar magnitude |
+| **Moskowitz-Ooi-Pedersen, Time Series Momentum** (AQR 2012) | **12-mo** lookback, **1-mo** hold | 12-mo is the canonical trend signal; strong in 2008 | our sweep independently picked **trend=12mo, ~monthly** rebalance |
+| **Antonacci, Dual Momentum** | 12-mo **absolute momentum** → cash/bonds when negative | maxDD **60%→22.7%**; "absolute momentum does far more to lessen drawdown" | our **trend gate to cash** is the same mechanism; drawdowns cut by a similar factor |
+
+**Findings (iteration 6).**
+1. **Our independently-derived config is the academic consensus.** A 10-12-month trend/
+   absolute-momentum signal, **monthly** rebalance, cash-defensive, applied to a
+   diversified book — we reached band 0.30 / brake 0.20 / **trend 12mo** from a train/
+   validate sweep with *no* reference to this literature, and it lands exactly on
+   Faber/AQR/Antonacci. Strong external validation.
+2. **"Monthly, not daily" is confirmed from the outside.** All three rebalance monthly.
+   Reinforces iter-2: the live model's daily retrade is over-trading.
+3. **The DCA "reversal" (iter 3) is a known feature, not our bug.** Faber explicitly notes
+   the timing model "underperformed stocks six of the next eight years" post-2009; the
+   literature frames these as *risk-management* overlays that trail in strong bulls —
+   exactly what we measured.
+4. **Honest divergence.** TSMOM's headline Sharpe ~1.28 is a *leveraged 58-asset long/short
+   futures composite* — not comparable to our long/cash single-index book. The right
+   comparables are Faber's single-portfolio 0.55 and Antonacci's drawdown numbers, and we
+   sit in line with both. We do NOT claim TSMOM-level Sharpes.
+
+Sources: [Faber GTAA](https://mebfaber.com/wp-content/uploads/2016/05/SSRN-id962461.pdf) ·
+[AQR Time Series Momentum](https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum) ·
+[Antonacci Dual Momentum](https://awealthofcommonsense.com/2015/07/my-thoughts-on-gary-antonaccis-dual-momentum/)
+
+### Next (final iterations)
+- Wire a selectable **"Conservative (no-margin)"** overlay mode into the LIVE model (extend
+  the existing overlay in apps/lantern-garage — don't add a parallel system) + tests.
+- Final synthesis + open PR to master.
 - Web-research low-turnover tactical-allocation literature (dual-momentum, trend+cash) to
   sanity-check the band/trend choice against published results.
 - If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the live
