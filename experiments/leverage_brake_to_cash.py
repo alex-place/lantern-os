@@ -26,16 +26,24 @@ import leverage_daily_overlay as D
 RF = 0.03  # flat cash/funding base, matches run_daily's irx_flat
 
 
-def run_daily_cash(days, px, tv, trend_m, brake, min_gross, start="2000-01-03", end=None):
+def run_daily_cash(days, px, tv, trend_m, brake, min_gross, start="2000-01-03", end=None,
+                   init_cash=0.0, band=0.0, band_mode="sym"):
+    """init_cash seeds the account (the $2k champion start); 0 = deposits-only.
+    band>0 installs the no-trade region (see leverage_daily_overlay.run_daily):
+    hold yesterday's exposure until L1 drift to target exceeds `band`; band=0 is
+    the legacy every-day-retrade behavior. band_mode="brake_aware" always honors
+    a de-risking move so the brake-to-cash is never delayed."""
     n = len(D.UNIVERSE)
     i0 = next(i for i, d in enumerate(days) if d >= start)
     i1 = len(days) if end is None else next(i for i, d in enumerate(days) if d >= end)
-    eq, peak = 0.0, 1e-9
+    eq, peak = init_cash, max(init_cash, 1e-9)
     w_dir = np.zeros(n)
     cur_month = ""
     rets_out, eq_path = [], []
     prev_expo = np.zeros(n)
     gross_hist = []
+    gross_prev = 0.0
+    turnover_sum, trade_days = 0.0, 0
     for i in range(i0, i1):
         d = days[i]
         if d[:7] != cur_month:
@@ -83,7 +91,15 @@ def run_daily_cash(days, px, tv, trend_m, brake, min_gross, start="2000-01-03", 
             g = min(g, min_gross + (1.0 - over) * max(0.0, 1.0 - min_gross))
         if eq < D.MARGIN_MIN:
             g = min(g, 1.0)
-        expo = w_dir * g
+        # no-trade band: hold yesterday's exposure unless drift to target exceeds
+        # `band`. brake_aware never blocks a de-risking (gross-reducing) move.
+        target = w_dir * g
+        drift = float(np.abs(target - prev_expo).sum())
+        derisk = g < gross_prev - 1e-12
+        if band > 0 and drift <= band and not (band_mode == "brake_aware" and derisk):
+            expo = prev_expo
+        else:
+            expo = target
         r_today = np.zeros(n)
         for k in range(n):
             if prev_expo[k] != 0 and not (np.isnan(px[D.UNIVERSE[k]][i]) or np.isnan(px[D.UNIVERSE[k]][i - 1])):
@@ -91,13 +107,18 @@ def run_daily_cash(days, px, tv, trend_m, brake, min_gross, start="2000-01-03", 
         port_r = float(prev_expo @ r_today)
         prev_g = float(np.abs(prev_expo).sum())
         carry = (-(prev_g - 1.0) * (RF + 0.015) / 252) if prev_g > 1 else ((1.0 - prev_g) * RF / 252)
-        tc = D.TC * float(np.abs(expo - prev_expo).sum())
+        moved = float(np.abs(expo - prev_expo).sum())
+        tc = D.TC * moved
+        turnover_sum += moved
+        if moved > 1e-12:
+            trade_days += 1
         eq_r = port_r + carry - tc
         rets_out.append(eq_r)
         eq = max(eq * (1.0 + eq_r), 0.0)
         peak = max(peak, eq)
+        gross_prev = float(np.abs(expo).sum())
         prev_expo = expo
-        gross_hist.append(prev_g)
+        gross_hist.append(float(np.abs(expo).sum()))
         eq_path.append((d, eq))
     r = np.array(rets_out)
     sh = r.mean() / r.std(ddof=1) * math.sqrt(252) if r.size > 2 and r.std(ddof=1) > 0 else 0.0
@@ -106,6 +127,7 @@ def run_daily_cash(days, px, tv, trend_m, brake, min_gross, start="2000-01-03", 
     return {"final": eq, "sharpe": sh, "maxdd": float(np.min(e / peaks - 1.0)),
             "avg_gross": float(np.mean(gross_hist)) if gross_hist else 0.0,
             "pct_in_cashish": float(np.mean(np.array(gross_hist) < 0.99)) if gross_hist else 0.0,
+            "turnover": turnover_sum, "trade_days": trade_days,
             "path": eq_path, "rets": r}
 
 
