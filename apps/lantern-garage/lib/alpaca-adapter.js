@@ -27,8 +27,23 @@ const { orderGate } = require('./trading-guard');
 const HOSTS = { paper: 'paper-api.alpaca.markets', live: 'api.alpaca.markets' };
 
 function _serverKeys() {
-  const id = process.env.ALPACA_API_KEY_ID || '';
-  const secret = process.env.ALPACA_API_SECRET_KEY || process.env.ALPACA_API_SECRET || '';
+  // Accept every common spelling of the Alpaca server keys. The trader docs and the
+  // shipped .env use ALPACA_API_KEY / ALPACA_SECRET_KEY; the official Alpaca SDK uses
+  // APCA_API_KEY_ID / APCA_API_SECRET_KEY; older code here used ALPACA_API_KEY_ID /
+  // ALPACA_API_SECRET_KEY. Reading only the last set meant correctly-configured keys
+  // (ALPACA_API_KEY / ALPACA_SECRET_KEY) silently didn't load, so the Alpaca paper
+  // account showed "disconnected" / $0.00 even though credentials were present.
+  const id =
+    process.env.ALPACA_API_KEY_ID ||
+    process.env.ALPACA_API_KEY ||
+    process.env.APCA_API_KEY_ID ||
+    '';
+  const secret =
+    process.env.ALPACA_API_SECRET_KEY ||
+    process.env.ALPACA_API_SECRET ||
+    process.env.ALPACA_SECRET_KEY ||
+    process.env.APCA_API_SECRET_KEY ||
+    '';
   if (!id || !secret) return null;
   // Server keys default to PAPER unless explicitly ALPACA_ENV=live.
   const env = process.env.ALPACA_ENV === 'live' ? 'live' : 'paper';
