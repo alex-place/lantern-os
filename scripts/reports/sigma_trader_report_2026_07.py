@@ -60,16 +60,18 @@ def _idx(j):
     return 2 * j if j < 153 else 305 + (j - 153)
 
 
-# The $20 split - lifetime-average champion mix, normalized to $20.00
+# The $20 split - lifetime-average champion mix, normalized to $20.00.
+# Last closes = Friday 2026-07-17 marks from the live brake monitor's state file.
+# (ticker, plain name, what it is, Fri close, weight, $-of-20 label, $, color)
 SPLIT = [
-    ("The S&amp;P 500", "the 500 biggest US companies, one bundle", "$6.75", 6.75, GOLD),
-    ("Steady bonds", "loans to the US government - the ballast", "$4.15", 4.15, STORM),
-    ("The tech 100", "the Nasdaq's engine room", "$3.00", 3.00, CYAN),
-    ("Gold", "the ancient anchor", "$2.80", 2.80, colors.HexColor("#D9A441")),
-    ("Small companies", "tomorrow's mid-caps", "$1.10", 1.10, ARC),
-    ("Rest of the world", "big companies beyond the US", "$0.90", 0.90, colors.HexColor("#8FB8D8")),
-    ("Momentum, mid-size", "more of what's already winning", "$0.75", 0.75, colors.HexColor("#C88A5B")),
-    ("Momentum, large", "the big winners' lane", "$0.55", 0.55, colors.HexColor("#B4622D")),
+    ("SPY", "The S&amp;P 500", "the 500 biggest US companies, one bundle", "$743.29", "34%", "$6.75", 6.75, GOLD),
+    ("TLT", "Long US bonds", "20+ year loans to the US government - ballast", "$84.52", "21%", "$4.15", 4.15, STORM),
+    ("QQQ", "The tech 100", "the Nasdaq's engine room", "$695.33", "15%", "$3.00", 3.00, CYAN),
+    ("GLD", "Gold", "the ancient anchor, in fund form", "$368.41", "14%", "$2.80", 2.80, colors.HexColor("#D9A441")),
+    ("IWM", "Small companies", "the Russell 2000 - tomorrow's mid-caps", "$294.04", "5.5%", "$1.10", 1.10, ARC),
+    ("EFA", "Rest of the world", "big developed markets beyond the US", "$103.33", "4.6%", "$0.90", 0.90, colors.HexColor("#8FB8D8")),
+    ("XMMO", "Momentum, mid-size", "mid-caps already winning", "$157.08", "3.7%", "$0.75", 0.75, colors.HexColor("#C88A5B")),
+    ("SPMO", "Momentum, large", "large-caps in the winners' lane", "$143.89", "2.9%", "$0.55", 0.55, colors.HexColor("#B4622D")),
 ]
 
 _BAD = re.compile(r"[^\x20-\x7E -ÿ–—‘’“”×·½°]")
@@ -185,26 +187,29 @@ def comet_chart(w=7.0 * inch, h=3.2 * inch):
 def split_bar(w=7.0 * inch, h=0.6 * inch):
     d = Drawing(w, h)
     x = 0.0
-    for name, _sub, dollars, amt, col in SPLIT:
+    for tkr, _name, _sub, _px, _wt, dollars, amt, col in SPLIT:
         seg = w * (amt / 20.0)
         d.add(Rect(x, 0.2 * inch, seg, 0.3 * inch, fillColor=col, strokeColor=NIGHT, strokeWidth=1.2))
         if amt >= 2.5:
-            d.add(String(x + seg / 2, 0.295 * inch, dollars, fontName="Helvetica-Bold",
-                         fontSize=8.5, fillColor=NIGHT, textAnchor="middle"))
+            d.add(String(x + seg / 2, 0.36 * inch, dollars, fontName="Helvetica-Bold",
+                         fontSize=8, fillColor=NIGHT, textAnchor="middle"))
+            d.add(String(x + seg / 2, 0.255 * inch, tkr, fontName="Helvetica",
+                         fontSize=6.4, fillColor=NIGHT, textAnchor="middle"))
         x += seg
-    d.add(String(0, 0.0, "one twenty, eight ingredients - poured automatically, every month",
+    d.add(String(0, 0.0, "one twenty, eight tickers - poured automatically, every month",
                  fontName="Helvetica", fontSize=6.8, fillColor=MARBLE))
     return d
 
 
 def gem_row():
+    """The board - Friday's marks a trader glances at first, cockpit-styled."""
     gems = [
-        ("DRIP", "on schedule", ARC),
-        ("MIX", "eight assets", ARC),
-        ("BRAKE", "cruising 2.0×", ARC),
-        ("SKIES", "VIX 18.8 calm", ARC),
-        ("GATES", "3 of 3 green", ARC),
-        ("REAL $", "practice mode", GOLD),
+        ("SPY $743.29", "Fri -1.0% · wk -1.5%", ARC),
+        ("VIX 18.77", "calm is under 20", ARC),
+        ("10-YR 4.55%", "off 4.62% high", ARC),
+        ("WTI $82+", "+10% on the week", GOLD),
+        ("GOLD $4,017", "+20% in a year", ARC),
+        ("FED JUL 28-29", "hold expected", ARC),
     ]
     cells = []
     for label, sub, col in gems:
@@ -270,34 +275,40 @@ def build():
     story.append(P("The July Leap", "title"))
     story.append(Spacer(1, 4))
     story.append(P(
-        "One page of world news translated into plain money-sense, one page on where a spare $20 can go, "
-        "and the monthly postcard from our robot trader. Data through Friday, July 17. Published July 18, 2026.",
-        "subtitle"))
+        "World news in plain money-sense · where a spare $20 goes · the monthly postcard from our robot "
+        "trader. Data through Friday, July 17 close. Published July 18, 2026.", "subtitle"))
     story.append(Spacer(1, 8))
-    story.append(card([P(
-        "<b>New here? Sixty seconds of backstory.</b> unisona.ai keeps a house strategy nicknamed <b>the "
-        "champion</b> - a robot-managed recipe of stocks, bonds and gold. We test it the honest way: a "
-        "simulator started it with $2,000 + $20 a month back in January 2000 and replayed every real "
-        "market day since - crashes included, no peeking ahead. That story grew to <b>$91,537</b>. Today "
-        "the same robot also flies a live <b>$25,000 practice account</b> (started Friday; real money "
-        "stays parked behind an evidence gate). This report is its monthly postcard - and you can borrow "
-        "its habits with any $20, on any app, without joining anything.", "body")], accent=GOLD))
-    story.append(Spacer(1, 9))
+    story.append(card([
+        P("<b>Hi - welcome to the first Leap.</b> If we haven't met: we keep a house strategy here "
+          "nicknamed <b>the champion</b> - a robot-managed recipe of eight funds (you'll get every "
+          "ticker on page 4). We test it the honest way: a simulator started it with $2,000 + $20 a "
+          "month in January 2000 and replayed every real market day since, crashes included, no peeking. "
+          "That story stands at <b>$91,537</b> tonight. July asked it a real question - war headlines, "
+          "oil up, the hot stocks suddenly cold - and it answered the way we hoped it would: calmly. "
+          "You don't need our plan, or any plan, to use these pages; borrow the habits with any $20 on "
+          "any app. We'll be here every month either way.", "body"),
+        Spacer(1, 4),
+        P("- the unisona.ai trading desk &nbsp;·&nbsp; <i>P.S. Our robot's live practice book: "
+          "$24,997.62 at 2.0× - all three of its tripwires green. Real money stays parked behind the "
+          "evidence gate, as always.</i>", "small"),
+    ], accent=GOLD))
+    story.append(Spacer(1, 8))
     story.append(comet_chart())
     story.append(Spacer(1, 3))
     story.append(P(
         "The whole flight in one picture: the gold comet is the champion ($8,380 total paid in, dashed "
-        "line). The cyan line is the exact same drip into a plain S&amp;P 500 index fund - $54,278, no "
-        "robot needed, and still a lovely flight. Four storms, sailed through, are dotted in blue.", "small"))
-    story.append(Spacer(1, 9))
+        "line). The cyan line is the same drip into a plain S&amp;P 500 fund (ticker SPY) - $54,278, no "
+        "robot needed, and still a lovely flight. Four storms, sailed through, dotted in blue.", "small"))
+    story.append(Spacer(1, 8))
+    story.append(P("THE BOARD · FRIDAY'S CLOSING MARKS", "label"))
+    story.append(Spacer(1, 3))
     story.append(gem_row())
-    story.append(Spacer(1, 9))
+    story.append(Spacer(1, 8))
     story.append(P(
-        "<b>The word for July is <font color='#F0C24C'>poise</font>.</b> Headlines got loud this month - "
-        "a conflict flared, oil jumped, the market's favorite stocks cooled. The champion's balance eased "
-        "-6.4%, and its robot's answer was the calmest sentence it knows: <i>all gates green, keep "
-        "cruising, keep dripping.</i> A dip this size has visited 24 times in 26 years; all 24 were "
-        "followed, in time, by a brand-new high. Poise, practiced.", "big"))
+        "<b>The word for July is <font color='#F0C24C'>poise</font>.</b> The champion's balance eased "
+        "-6.4% as the market rotated - and a dip this size has visited 24 times in 26 years, every one "
+        "followed, in time, by a new high. So the robot's answer was the calmest sentence it knows: "
+        "<i>all gates green, keep cruising, keep dripping.</i> Poise, practiced.", "big"))
 
     story.append(PageBreak())
 
@@ -455,13 +466,14 @@ def build():
     story.append(split_bar())
     story.append(Spacer(1, 5))
     story.append(data_table(
-        [["Ingredient", "What it is", "Of your $20"]] +
-        [[name, sub, dollars] for name, sub, dollars, _a, _c in SPLIT],
-        [1.8 * inch, 3.7 * inch, 1.5 * inch], right_from=2))
+        [["Ticker", "Fund", "What it is", "Fri close", "Weight", "Of your $20"]] +
+        [[tkr, name, sub, px, wt, dollars] for tkr, name, sub, px, wt, dollars, _a, _c in SPLIT],
+        [0.62 * inch, 1.42 * inch, 2.33 * inch, 0.95 * inch, 0.68 * inch, 1.0 * inch], right_from=3))
     story.append(Spacer(1, 3))
     story.append(P(
-        "The champion's lifetime-average recipe (its momentum slices grow as their track record does). "
-        "Any lane can graduate to the next whenever you're ready - the drip is the engine in all three.", "small"))
+        "Lifetime-average recipe, weights rounded (the momentum slices grow as their track record does); "
+        "closes are Friday 7/17 marks from our live monitor. Fractional shares make every slice buyable "
+        "with pocket change - and any lane can graduate to the next whenever you're ready.", "small"))
 
     story.append(PageBreak())
 
@@ -506,7 +518,7 @@ def build():
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
     story.append(lg)
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 7))
 
     story.append(card([P(
         "<b>THE 24-FOR-24 BADGE.</b> A month like July (-6.4%) has visited the champion's arc 24 times "
@@ -514,7 +526,7 @@ def build():
         "balance went on to a brand-new high. Number 25 is now on the clock, chasing the May peak of "
         "$103,189. History measured, future unwritten - but that is one well-rehearsed bounce.", "big")],
         accent=GOLD, bg=colors.HexColor("#1A2320")))
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 7))
 
     story.append(P("The leap - if the next years rhyme with the last 26", "h3"))
     story.append(Spacer(1, 4))
@@ -530,19 +542,33 @@ def build():
         "drip, the mix, and patience do the promising here - not the projection.", "small"))
     story.append(Spacer(1, 10))
 
+    story.append(P("The dials - for readers who trade", "h3"))
+    story.append(Spacer(1, 4))
+    story.append(card([P(
+        "Universe: SPY · QQQ · IWM · EFA · TLT · GLD · XMMO · SPMO, weighted by a shrunk tangency "
+        "optimizer (per-fund cap 35%), rebalanced with a 0.6%-of-equity no-churn band - about monthly "
+        "in practice. Exposure dial: gross 0 to 2.0×, set by a streaming brake = 35% volatility target "
+        "× 6-month trend gate (to cash) × drawdown taper that begins at -30%; idle cash earns T-bill "
+        "interest. Current stance: gross 2.0×, all three tripwires green, book drawdown -11% vs the "
+        "-30% taper. A Conservative mode (max 1.0×, never borrows, 12-month trend, wider band, ~1 "
+        "trade/month) shipped this month for funded balances. Paper only; live capital stays gated on "
+        "out-of-sample evidence.", "small", textColor=INK)], accent=STORM, pad=8))
+    story.append(Spacer(1, 6))
+
     story.append(P("Where every number comes from", "h3"))
     story.append(Spacer(1, 4))
     story.append(P(
         "Champion balances &amp; the chart: unisona.ai walk-forward simulation, 2000-2026, re-run July "
         "17 (real market history, borrowing costs charged, no peeking; monthly path on file). Practice "
-        "book &amp; robot status: live monitor state, July 18, 17:38 UTC. Market weather: VIX 18.77, "
-        "July 18 feed. World news: CNBC (July 16-17), Seeking Alpha (July 17), Federal Reserve minutes "
-        "(July 8), Trading Economics (July 17). Practice mode throughout: simulation + paper account - "
-        "real dollars wait behind the plan's evidence gate, every real-money decision belongs to a "
-        "human, and big personal choices deserve a licensed advisor.", "small"))
-    story.append(Spacer(1, 8))
+        "book, ETF closes &amp; robot status: live monitor state, July 18, 17:38 UTC. Market weather: "
+        "VIX 18.77, July 18 feed. World news: CNBC (July 16-17), Seeking Alpha (July 17), Federal "
+        "Reserve minutes (July 8), Trading Economics (July 17). Practice mode throughout: simulation + "
+        "paper account - real dollars wait behind the plan's evidence gate, every real-money decision "
+        "belongs to a human, and big personal choices deserve a licensed advisor.", "small"))
+    story.append(Spacer(1, 5))
     story.append(P(
-        "See you at the August Leap - same arc, fresh node.", "small", alignment=TA_CENTER))
+        "Until August - keep the drip alive. &nbsp;- the unisona.ai trading desk", "small",
+        alignment=TA_CENTER))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     doc = BaseDocTemplate(str(OUT), pagesize=letter,
