@@ -1,12 +1,13 @@
-"""Sigma Trader Report - July 2026 -- THE JULY LEAP (comet-leap edition, Vol. 1).
+"""Sigma Trader Report - July 2026 -- THE JULY LEAP (comet-leap, for-everyone edition).
 
 Builds apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf: the
-monthly investor-facing report on the Champion trader in the house COMET LEAP
-style (Lantern Preferred Visual System v0.1: arc-of-past -> node-of-now ->
-projected leap; lantern gold / spectral cyan / storm blue / arc green on dark
-marble; tables + at least one labeled graph; reads in grayscale). Written for
-normies: your next $20, what to lean on, what to glide past - engaging, plain,
-no jargon. Loop stage: Verify (publishes the measured state of the Act loop).
+monthly report on unisona.ai's Champion trader, written for EVERY user - free or
+paid, plan or no plan, market-fluent or brand new. House COMET LEAP style
+(Lantern Preferred Visual System v0.1: arc-of-past -> node-of-now -> projected
+leap; lantern gold / spectral cyan / storm blue / arc green on dark marble;
+tables + a labeled graph; reads in grayscale). Assumes zero prior knowledge:
+events come with backstory, jargon gets a little dictionary, and the next-$20
+answer has three lanes so it lands wherever the reader is starting from.
 
 Every number is pinned as data below - reproducible offline from this file.
 Sources: experiments/dca_champion_2k.py walk-forward (run 2026-07-17 15:19 ET,
@@ -26,7 +27,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, Polygon, Rect, String
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, HRFlowable, PageBreak, PageTemplate, Paragraph,
+    BaseDocTemplate, Frame, PageBreak, PageTemplate, Paragraph,
     Spacer, Table, TableStyle,
 )
 
@@ -34,15 +35,15 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "apps" / "lantern-garage" / "public" / "reports" / "sigma-trader-report-2026-07.pdf"
 
 # COMET LEAP palette (style profile colors_named, on dark marble)
-NIGHT = colors.HexColor("#0F1518")     # page
-MARBLE = colors.HexColor("#93A29B")    # muted
+NIGHT = colors.HexColor("#0F1518")
+MARBLE = colors.HexColor("#93A29B")
 CARD = colors.HexColor("#151D22")
 HAIR = colors.HexColor("#26313A")
 INK = colors.HexColor("#EBEAE2")
-GOLD = colors.HexColor("#F0C24C")      # lantern gold - the champion arc
-CYAN = colors.HexColor("#5BC8E8")      # spectral cyan - the plain index
-STORM = colors.HexColor("#6E93C8")     # storm blue
-ARC = colors.HexColor("#54BE9F")       # arc green - status / the leap
+GOLD = colors.HexColor("#F0C24C")
+CYAN = colors.HexColor("#5BC8E8")
+STORM = colors.HexColor("#6E93C8")
+ARC = colors.HexColor("#54BE9F")
 GOLD_DIM = colors.Color(0.941, 0.761, 0.298, 0.16)
 GOLD_GLOW = colors.Color(0.941, 0.761, 0.298, 0.10)
 
@@ -61,13 +62,13 @@ def _idx(j):
 
 # The $20 split - lifetime-average champion mix, normalized to $20.00
 SPLIT = [
-    ("The S&amp;P 500", "the big American 500", "$6.75", 6.75, GOLD),
-    ("Steady bonds", "the long-term ballast", "$4.15", 4.15, STORM),
+    ("The S&amp;P 500", "the 500 biggest US companies, one bundle", "$6.75", 6.75, GOLD),
+    ("Steady bonds", "loans to the US government - the ballast", "$4.15", 4.15, STORM),
     ("The tech 100", "the Nasdaq's engine room", "$3.00", 3.00, CYAN),
     ("Gold", "the ancient anchor", "$2.80", 2.80, colors.HexColor("#D9A441")),
     ("Small companies", "tomorrow's mid-caps", "$1.10", 1.10, ARC),
-    ("Rest of the world", "beyond the US", "$0.90", 0.90, colors.HexColor("#8FB8D8")),
-    ("Momentum, mid-size", "what's already winning", "$0.75", 0.75, colors.HexColor("#C88A5B")),
+    ("Rest of the world", "big companies beyond the US", "$0.90", 0.90, colors.HexColor("#8FB8D8")),
+    ("Momentum, mid-size", "more of what's already winning", "$0.75", 0.75, colors.HexColor("#C88A5B")),
     ("Momentum, large", "the big winners' lane", "$0.55", 0.55, colors.HexColor("#B4622D")),
 ]
 
@@ -90,8 +91,7 @@ ST = {
     "body": s("body"),
     "big": s("big", fontSize=10.6, leading=15.5),
     "small": s("small", fontSize=8.2, leading=11.5, textColor=MARBLE),
-    "stat_n": s("stat_n", fontName="Times-Bold", fontSize=21, leading=23, textColor=GOLD),
-    "stat_k": s("stat_k", fontName="Helvetica-Bold", fontSize=7.4, leading=9.5, textColor=MARBLE),
+    "label": s("label", fontName="Helvetica-Bold", fontSize=7.2, leading=10, textColor=MARBLE),
     "cell": s("cell", fontSize=9, leading=12.5),
     "cellb": s("cellb", fontName="Helvetica-Bold", fontSize=9, leading=12.5),
     "gem": s("gem", fontName="Helvetica-Bold", fontSize=7.6, leading=10, textColor=INK, alignment=TA_CENTER),
@@ -123,7 +123,7 @@ def card(flowables, pad=10, bg=CARD, border=HAIR, width=7.0 * inch, accent=None)
 
 
 # ------------------------------------------------------------------ the arc
-def comet_chart(w=7.0 * inch, h=3.35 * inch):
+def comet_chart(w=7.0 * inch, h=3.2 * inch):
     d = Drawing(w, h)
     d.add(Rect(0, 0, w, h, fillColor=CARD, strokeColor=HAIR, strokeWidth=0.8))
     L, R, B, T = 0.52 * inch, w - 1.28 * inch, 0.34 * inch, h - 0.22 * inch
@@ -135,7 +135,6 @@ def comet_chart(w=7.0 * inch, h=3.35 * inch):
     def Y(v):
         return B + (T - B) * v / ymax
 
-    # faint grid + axis labels (grayscale-readable)
     for gv in (25000, 50000, 75000, 100000):
         d.add(Line(L, Y(gv), R, Y(gv), strokeColor=HAIR, strokeWidth=0.5))
         d.add(String(L - 4, Y(gv) - 2.6, "$%dk" % (gv // 1000), fontName="Helvetica",
@@ -145,42 +144,35 @@ def comet_chart(w=7.0 * inch, h=3.35 * inch):
         d.add(String(X(idx), B - 9, str(yr), fontName="Helvetica", fontSize=6.4,
                      fillColor=MARBLE, textAnchor="middle"))
 
-    # money paid in - dashed marble baseline
     paid = [(X(_idx(j)), Y(2020 + 20 * _idx(j))) for j in range(len(CH))]
     pl = PolyLine([c for pt in paid for c in pt], strokeColor=MARBLE, strokeWidth=0.8)
     pl.strokeDashArray = [2.5, 2.5]
     d.add(pl)
 
-    # plain S&P drip - spectral cyan
     d.add(PolyLine([c for j in range(len(SP)) for c in (X(_idx(j)), Y(SP[j]))],
                    strokeColor=CYAN, strokeWidth=1.15))
 
-    # the champion - lantern-gold comet: soft fill, glow pass, bright core
     pts = [(X(_idx(j)), Y(CH[j])) for j in range(len(CH))]
     d.add(Polygon([c for pt in (pts + [(R, B), (X(0), B)]) for c in pt],
                   fillColor=GOLD_DIM, strokeColor=None))
     d.add(PolyLine([c for pt in pts for c in pt], strokeColor=GOLD_GLOW, strokeWidth=5.5))
     d.add(PolyLine([c for pt in pts for c in pt], strokeColor=GOLD, strokeWidth=1.7))
 
-    # storms it sailed through (small storm-blue nodes, labels tucked below)
     for lbl, idx, dx in (("storm '02", 32, 0), ("'08", 106, 0), ("'20", 242, -5), ("'22", 272, 4)):
         j = idx // 2
         d.add(Circle(X(idx), Y(CH[j]), 2.1, fillColor=STORM, strokeColor=None))
         d.add(String(X(idx) + dx, Y(CH[j]) - 13, lbl, fontName="Helvetica",
                      fontSize=6.0, fillColor=STORM, textAnchor="middle"))
 
-    # the node of now - glowing head of the comet
     nx, ny = pts[-1]
     d.add(Circle(nx, ny, 7.5, fillColor=colors.Color(0.941, 0.761, 0.298, 0.14), strokeColor=None))
     d.add(Circle(nx, ny, 4.6, fillColor=colors.Color(0.941, 0.761, 0.298, 0.30), strokeColor=None))
     d.add(Circle(nx, ny, 2.5, fillColor=GOLD, strokeColor=None))
 
-    # the leap - dashed arc-green hint beyond the node
     leap = PolyLine([nx, ny, nx + 16, ny + 13, nx + 30, ny + 30], strokeColor=ARC, strokeWidth=1.4)
     leap.strokeDashArray = [3, 3]
     d.add(leap)
 
-    # direct labels (no legend hunting)
     d.add(String(nx + 6, ny - 3, "$91,537", fontName="Times-Bold", fontSize=10.5, fillColor=GOLD))
     d.add(String(nx + 6, ny - 12.5, "the champion, today", fontName="Helvetica", fontSize=6.4, fillColor=MARBLE))
     d.add(String(nx + 6, Y(SP[-1]) - 3, "$54,278", fontName="Helvetica-Bold", fontSize=8, fillColor=CYAN))
@@ -190,17 +182,17 @@ def comet_chart(w=7.0 * inch, h=3.35 * inch):
     return d
 
 
-def split_bar(w=7.0 * inch, h=0.62 * inch):
+def split_bar(w=7.0 * inch, h=0.6 * inch):
     d = Drawing(w, h)
     x = 0.0
     for name, _sub, dollars, amt, col in SPLIT:
         seg = w * (amt / 20.0)
-        d.add(Rect(x, 0.22 * inch, seg, 0.30 * inch, fillColor=col, strokeColor=NIGHT, strokeWidth=1.2))
+        d.add(Rect(x, 0.2 * inch, seg, 0.3 * inch, fillColor=col, strokeColor=NIGHT, strokeWidth=1.2))
         if amt >= 2.5:
-            d.add(String(x + seg / 2, 0.315 * inch, dollars, fontName="Helvetica-Bold",
+            d.add(String(x + seg / 2, 0.295 * inch, dollars, fontName="Helvetica-Bold",
                          fontSize=8.5, fillColor=NIGHT, textAnchor="middle"))
         x += seg
-    d.add(String(0, 0.02 * inch, "one twenty, eight ingredients - poured automatically, every month",
+    d.add(String(0, 0.0, "one twenty, eight ingredients - poured automatically, every month",
                  fontName="Helvetica", fontSize=6.8, fillColor=MARBLE))
     return d
 
@@ -233,14 +225,14 @@ def gem_row():
     return t
 
 
-def data_table(rows, widths, right_from=1):
+def data_table(rows, widths, right_from=1, header_color=GOLD):
     body = []
     for i, row in enumerate(rows):
         body.append([P(c, "cellb" if i == 0 or j == 0 else "cell")
                      for j, c in enumerate(row)])
     t = Table(body, colWidths=widths)
     cmds = [
-        ("LINEBELOW", (0, 0), (-1, 0), 0.8, GOLD),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.8, header_color),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [CARD, NIGHT]),
         ("LEFTPADDING", (0, 0), (-1, -1), 6), ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
@@ -273,82 +265,232 @@ def build():
     story = []
 
     # ---------------------------------------------------------------- page 1
-    story.append(P("UNISONA.AI MONTHLY · VOL. 1 · THE COMET-LEAP EDITION", "kicker"))
+    story.append(P("UNISONA.AI MONTHLY · VOL. 1 · FOR EVERY USER - NO HOMEWORK REQUIRED", "kicker"))
     story.append(Spacer(1, 4))
     story.append(P("The July Leap", "title"))
     story.append(Spacer(1, 4))
     story.append(P(
-        "The Sigma Trader's monthly postcard: where the arc has been, where it glows tonight, "
-        "and where your next $20 goes. Data through Friday, July 17. Published July 18, 2026.",
+        "One page of world news translated into plain money-sense, one page on where a spare $20 can go, "
+        "and the monthly postcard from our robot trader. Data through Friday, July 17. Published July 18, 2026.",
         "subtitle"))
+    story.append(Spacer(1, 8))
+    story.append(card([P(
+        "<b>New here? Sixty seconds of backstory.</b> unisona.ai keeps a house strategy nicknamed <b>the "
+        "champion</b> - a robot-managed recipe of stocks, bonds and gold. We test it the honest way: a "
+        "simulator started it with $2,000 + $20 a month back in January 2000 and replayed every real "
+        "market day since - crashes included, no peeking ahead. That story grew to <b>$91,537</b>. Today "
+        "the same robot also flies a live <b>$25,000 practice account</b> (started Friday; real money "
+        "stays parked behind an evidence gate). This report is its monthly postcard - and you can borrow "
+        "its habits with any $20, on any app, without joining anything.", "body")], accent=GOLD))
     story.append(Spacer(1, 9))
     story.append(comet_chart())
     story.append(Spacer(1, 3))
     story.append(P(
-        "The whole flight, one picture: $2,000 launched in January 2000 + $20 a month ($8,380 paid in, "
-        "the dashed line). The gold comet is the champion at $91,537 today - eleven times the fuel spent - "
-        "sailing through four storms on the way. The cyan line is the same drip into plain S&amp;P, $54,278. "
-        "Measured in the walk-forward simulation, borrowing costs charged, no peeking.", "small"))
-    story.append(Spacer(1, 10))
+        "The whole flight in one picture: the gold comet is the champion ($8,380 total paid in, dashed "
+        "line). The cyan line is the exact same drip into a plain S&amp;P 500 index fund - $54,278, no "
+        "robot needed, and still a lovely flight. Four storms, sailed through, are dotted in blue.", "small"))
+    story.append(Spacer(1, 9))
     story.append(gem_row())
-    story.append(Spacer(1, 10))
+    story.append(Spacer(1, 9))
     story.append(P(
-        "<b>The word for July is <font color='#F0C24C'>poise</font>.</b> Markets took a breather - the "
-        "spring's hottest stocks cooled off, headlines got loud, oil jumped - and the system's answer was "
-        "the calmest sentence it knows: <i>all gates green, keep cruising, keep dripping.</i> The arc bent "
-        "-6.4% this month. It has bent this way 24 times in 26 years, and after every single one it went "
-        "on to a brand-new high. That is what the dashed green line off the comet's nose is drawn from: "
-        "not hope - <b>habit</b>.", "big"))
+        "<b>The word for July is <font color='#F0C24C'>poise</font>.</b> Headlines got loud this month - "
+        "a conflict flared, oil jumped, the market's favorite stocks cooled. The champion's balance eased "
+        "-6.4%, and its robot's answer was the calmest sentence it knows: <i>all gates green, keep "
+        "cruising, keep dripping.</i> A dip this size has visited 24 times in 26 years; all 24 were "
+        "followed, in time, by a brand-new high. Poise, practiced.", "big"))
 
     story.append(PageBreak())
 
     # ---------------------------------------------------------------- page 2
-    story.append(P("PART 1 · YOUR NEXT $20", "kicker"))
+    story.append(P("PART 1 · THE WORLD THIS MONTH, FROM THE TOP", "kicker"))
     story.append(Spacer(1, 3))
-    story.append(P("Where the next twenty goes", "h2"))
+    story.append(P("Two big stories - explained like you were away all month", "h2"))
+    story.append(Spacer(1, 7))
+
+    def event(col, head, backstory, happened, wallet, calm):
+        story.append(card([
+            P("<b>%s</b>" % head, "big", textColor=col),
+            Spacer(1, 4),
+            P("THE BACKSTORY", "label"), Spacer(1, 1.5),
+            P(backstory), Spacer(1, 4),
+            P("WHAT JUST HAPPENED", "label"), Spacer(1, 1.5),
+            P(happened), Spacer(1, 4),
+            P("WHY IT TOUCHES YOUR WALLET", "label"), Spacer(1, 1.5),
+            P(wallet), Spacer(1, 4),
+            P("THE CALM MOVE", "label"), Spacer(1, 1.5),
+            P("<i>%s</i>" % calm),
+        ], accent=col, pad=9))
+        story.append(Spacer(1, 7))
+
+    event(GOLD, "Oil jumped 10% as the Middle East flared up again",
+          "A large share of the world's oil ships through one narrow sea lane - the Strait of Hormuz, "
+          "between Iran and the Arabian peninsula. Whenever that lane looks risky, oil gets pricier "
+          "everywhere, because tankers wait, insure, or take the long way round.",
+          "A June truce between the US and Iran gave way in mid-July: strikes resumed on both sides and "
+          "far fewer tankers made the passage - about half the usual traffic in a day. Crude climbed "
+          "above $82 a barrel, its highest in a month, up 10% for the week (CNBC, July 16).",
+          "Pricier oil seeps into daily life with a lag: the pump first, then flights, shipping, and "
+          "some grocery prices. It can also make the inflation-watchers at the central bank more "
+          "cautious about cutting interest rates. Markets themselves stayed remarkably calm - the "
+          "'fear index' traders watch (the VIX) reads a mellow 18.8, which is normal-weather territory.",
+          "Storm headlines are not an instruction to do anything. Keeping a cash cushion and letting a "
+          "monthly auto-investment run is the whole move. Our robot's version of the same idea: it "
+          "re-checks the weather every minute, ready to glide toward interest-earning cash - and this "
+          "month it never needed to.")
+
+    event(CYAN, "The market's favorite stocks changed seats",
+          "For two years the star performers were computer-chip and AI companies - they powered a huge "
+          "run. Markets rotate, though: sooner or later money takes profits from the leaders and looks "
+          "for the next value, and the leaderboard reshuffles. It's regular weather, not an alarm.",
+          "That rotation arrived in July. Chipmakers cooled sharply - a top supplier's spending plans "
+          "spooked the group - and the broad S&amp;P 500 index eased about 1.6% for the week. The quiet "
+          "part: company profits are actually coming in strong - 87% of the early summer earnings "
+          "reports beat expectations (CNBC and Seeking Alpha, July 16-17).",
+          "If your savings live in a broad index fund, a week like this barely dents a decades-long "
+          "plan - and if you were tempted to buy 'the hot stock everyone mentions,' July is why "
+          "spreading out wins: last month's rocket can be this month's cooldown.",
+          "Own a little of everything and you never have to guess the next favorite. That is the whole "
+          "trick behind index funds - and behind our robot's eight-ingredient mix, which holds the "
+          "winners' lane and the calm lanes at once.")
+
+    story.append(PageBreak())
+
+    # ---------------------------------------------------------------- page 3
+    story.append(P("PART 1, CONTINUED", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("Two quieter stories that pay you to know them", "h2"))
+    story.append(Spacer(1, 7))
+
+    event(STORM, "The Fed holds interest rates steady - and cash still pays",
+          "The Federal Reserve - 'the Fed' - is America's central bank. Its main dial is the interest "
+          "rate: turning it up makes borrowing pricier and saving more rewarding (to cool inflation); "
+          "turning it down does the reverse. Eight times a year, its committee meets and the world "
+          "watches.",
+          "The next meeting is July 28-29 and everything points to no change. Inflation readings came "
+          "in gentler than expected in June, though officials remain watchful with oil rising "
+          "(Federal Reserve minutes; CNBC, July 8). Bottom line: rates stay where they've been - which "
+          "is historically decent for savers.",
+          "This is the friendliest fact in finance right now: boring cash earns real interest again. "
+          "High-yield savings accounts and money-market funds pay meaningful yields while rates hold - "
+          "an emergency fund is no longer dead money, it's a small engine.",
+          "Before any investing move, park one: a cushion in a high-yield account is the purchase that "
+          "buys sleep. Our robot agrees so strongly it's built in - when it de-risks, it parks in "
+          "interest-earning cash, never under a mattress.")
+
+    event(ARC, "Gold is having a golden year",
+          "Gold is humanity's oldest savings account - no company behind it, no interest paid, just "
+          "scarcity and trust. People reach for it when they're unsure about everything else, which is "
+          "why it often (not always) rises when stocks or currencies wobble.",
+          "It sits near $4,017 an ounce - up about 20% from a year ago even after a breather this "
+          "month (Trading Economics, July 17). The year's conflicts and inflation worries kept the "
+          "old anchor in demand.",
+          "You don't need coins in a drawer to benefit; a small slice of a gold fund inside a mixed "
+          "portfolio does the same job - it tends to zig when stocks zag, smoothing the ride. The key "
+          "word is slice: gold pays no interest, so all-in is a bet, not a plan.",
+          "A pinch of gold as seasoning, never the whole meal. In our robot's $20 pour it's $2.80 - "
+          "enough anchor to steady the boat, never enough to slow the voyage.")
+
+    story.append(P("The little dictionary - six words this report just used", "h3"))
+    story.append(Spacer(1, 4))
+    dico = [
+        ("Index fund", "one purchase that buys a tiny slice of hundreds of companies at once. The classic is the S&amp;P 500."),
+        ("Drip (auto-invest)", "the same small amount invested every month, automatically - rain, shine, or headlines."),
+        ("The Fed", "America's central bank. Sets the price of borrowing; meets next July 28-29."),
+        ("VIX", "the market's mood ring - a fear gauge. Under 20 reads calm; July 17 read 18.8."),
+        ("Momentum", "owning a little extra of whatever has already been winning lately."),
+        ("Dip", "how far a balance sits below its best-ever mark. The champion's July dip: 11%."),
+    ]
+    drows = []
+    for i in range(0, len(dico), 2):
+        drows.append([P("<b>%s</b> - %s" % dico[i], "small", textColor=INK),
+                      P("<b>%s</b> - %s" % dico[i + 1], "small", textColor=INK)])
+    dt = Table(drows, colWidths=[3.5 * inch, 3.5 * inch])
+    dt.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), CARD),
+        ("LINEBEFORE", (0, 0), (0, -1), 2.4, ARC),
+        ("LINEBEFORE", (1, 0), (1, -1), 2.4, ARC),
+        ("LINEBELOW", (0, 0), (-1, -2), 3, NIGHT),
+        ("LINEAFTER", (0, 0), (0, -1), 6, NIGHT),
+        ("LEFTPADDING", (0, 0), (-1, -1), 9),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    story.append(dt)
+
+    story.append(PageBreak())
+
+    # ---------------------------------------------------------------- page 4
+    story.append(P("PART 2 · YOUR NEXT $20", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("Three lanes - start where you're standing", "h2"))
     story.append(Spacer(1, 5))
     story.append(P(
-        "The plan's answer never needs a hot take: the next $20 buys <b>the whole mix, automatically</b> - "
-        "a little more of whatever has drifted below its target weight, so you quietly buy what's on sale. "
-        "Here is this month's pour:", "big"))
+        "Twenty dollars a month sounds small; the chart on page 1 is what it looks like grown up. "
+        "Pick the lane that matches your life today - each one is a complete, respectable answer.", "big"))
     story.append(Spacer(1, 8))
+
+    lanes = [
+        (GOLD, "LANE 1 · THE GUARANTEED WIN - claim this first",
+         "If any card or loan is charging you double-digit interest, your next $20 earns its best "
+         "return by shrinking that balance - an instant, sure gain no market can promise. Sorted? Then "
+         "build the cushion: a few hundred in a high-yield savings account, which finally pays real "
+         "interest while rates hold. Cushion first, adventure second - every good plan starts here."),
+        (CYAN, "LANE 2 · THE ONE-FUND DRIP - the everyone answer",
+         "A $20 automatic monthly buy of one broad, low-cost index fund at any major app or broker. "
+         "Fractional shares mean twenty is plenty; automation means willpower is never invited. This "
+         "is the cyan line on page 1: $8,380 dripped in since 2000 became $54,278 - through four "
+         "storms - with zero decisions along the way. Set it on payday and forget it's happening."),
+        (ARC, "LANE 3 · THE CHAMPION'S POUR - for the curious",
+         "The robot's own recipe, if you enjoy a richer mix: eight ingredients, poured by target "
+         "weights, a little extra to whatever's drifted cheap. Here is exactly how it would split a "
+         "twenty this month:"),
+    ]
+    for col, head, body in lanes:
+        story.append(card([P("<b>%s</b>" % head, "body", textColor=col),
+                           Spacer(1, 3), P(body)], accent=col))
+        story.append(Spacer(1, 7))
+
     story.append(split_bar())
-    story.append(Spacer(1, 6))
+    story.append(Spacer(1, 5))
     story.append(data_table(
         [["Ingredient", "What it is", "Of your $20"]] +
         [[name, sub, dollars] for name, sub, dollars, _a, _c in SPLIT],
-        [1.95 * inch, 3.55 * inch, 1.5 * inch], right_from=2))
-    story.append(Spacer(1, 4))
+        [1.8 * inch, 3.7 * inch, 1.5 * inch], right_from=2))
+    story.append(Spacer(1, 3))
     story.append(P(
-        "Lifetime-average champion recipe; the momentum slices grow as their track record does. "
-        "Fractional shares mean all eight fit inside one twenty.", "small"))
-    story.append(Spacer(1, 12))
+        "The champion's lifetime-average recipe (its momentum slices grow as their track record does). "
+        "Any lane can graduate to the next whenever you're ready - the drip is the engine in all three.", "small"))
+
+    story.append(PageBreak())
+
+    # ---------------------------------------------------------------- page 5
+    story.append(P("PART 3 · HABITS &amp; THE LEAP AHEAD", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("Lean on, glide past, and where this could fly", "h2"))
+    story.append(Spacer(1, 7))
 
     lean = [
-        ("THE DRIP ITSELF", "Twenty in, every month, rain or shine. Across everything the lab has ever "
-         "tested, the contribution is the strongest lever in the whole machine - stronger than any "
-         "clever tweak. Level it up when life allows and you out-lever every strategy change."),
-        ("BORING BALLAST", "Bonds and gold are a third of the pour, and July is why: they let the arc "
-         "climb without white knuckles. Gold is up about 20% on the year - the anchor is pulling."),
-        ("THE ROBOT'S WATCH", "A brake checks the skies every minute the market is open, ready to glide "
-         "the book toward interest-earning cash if a storm builds. Tonight it reads calm. You were "
-         "never on watch duty - that's the point."),
+        ("THE DRIP ITSELF", "Twenty in, every month, rain or shine. Across everything our lab has "
+         "tested, the steady contribution beats every clever tweak. Level it up when life allows."),
+        ("BORING BALLAST", "Cushion cash that earns interest, bonds, a pinch of gold - the unglamorous "
+         "pieces are what let you stay invested when headlines shout."),
+        ("TIME &amp; AUTOMATION", "The chart's secret isn't genius - it's 319 straight months of "
+         "showing up. Automate the showing up and you've automated the hard part."),
     ]
     glide = [
-        ("CHASING JULY'S FIREWORKS", "The spring's hottest chip stocks just took the summer's sharpest "
-         "turn. The mix already owns the winners' lane through its momentum slices - you get the ride "
-         "without picking the horse."),
-        ("DIY BORROWING", "Leverage is the robot's craft, practiced on a paper book behind a gate. On a "
-         "personal account, plain and unborrowed is the strong move. Let the machine do the tightrope."),
-        ("WATCHING DAILY", "A drip plan pays you for patience: every dip your $20 lands in is a "
-         "discount. The scoreboard that matters prints monthly - this page - not at 3am."),
+        ("CHASING THE HOT STOCK", "July's coolest lesson: the spring's rockets took the summer's "
+         "sharpest turn. A broad mix already owns tomorrow's winner - no guessing required."),
+        ("BORROWING TO INVEST", "Leverage looks magic in good months and bites in bad ones. Our robot "
+         "practices it in a gated paper account; personal money flies best unborrowed."),
+        ("WATCHING DAILY", "A drip plan pays you for patience - every dip your $20 lands in is a "
+         "discount. The scoreboard worth reading prints monthly. This is it."),
     ]
     rows = [[P("Lean on these", "h3"), P("Glide past these", "h3c")]]
     for (lh, lb), (gh, gb) in zip(lean, glide):
-        rows.append([
-            P("<b>%s</b> - %s" % (lh, lb), "cell"),
-            P("<b>%s</b> - %s" % (gh, gb), "cell"),
-        ])
+        rows.append([P("<b>%s</b> - %s" % (lh, lb), "cell"),
+                     P("<b>%s</b> - %s" % (gh, gb), "cell")])
     lg = Table(rows, colWidths=[3.5 * inch, 3.5 * inch])
     lg.setStyle(TableStyle([
         ("BACKGROUND", (0, 1), (-1, -1), CARD),
@@ -364,111 +506,43 @@ def build():
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
     story.append(lg)
+    story.append(Spacer(1, 10))
 
-    story.append(PageBreak())
-
-    # ---------------------------------------------------------------- page 3
-    story.append(P("PART 2 · THE WORLD THIS MONTH", "kicker"))
-    story.append(Spacer(1, 3))
-    story.append(P("Four headlines, four calm answers", "h2"))
-    story.append(Spacer(1, 6))
-
-    events = [
-        (GOLD, "Oil leapt 10% as the Middle East flared",
-         "Tensions between the US and Iran boiled over and crude jumped above $82 - a one-month high "
-         "(CNBC, July 16). Gas may pinch; markets, remarkably, kept their cool: the fear gauge sits at a "
-         "mellow 18.8.",
-         "The plan's answer: nothing to do - and that's a feature. If storms build, the brake glides "
-         "toward cash that currently pays real interest, all by itself, minutes-fast. Shelter with a yield."),
-        (CYAN, "The market rotated out of spring's favorites",
-         "Chipmakers cooled and the spotlight moved on - the S&amp;P eased 1.6% for the week while, quietly, "
-         "87% of early earnings reports beat expectations (CNBC; Seeking Alpha, July 17). Strong engine, "
-         "new seating chart.",
-         "The plan's answer: this is exactly why you own eight ingredients instead of one hero. Rotations "
-         "shuffle the leaderboard; the mix keeps a seat at every table, and July's drip buys the "
-         "newly-discounted seats."),
-        (STORM, "The Fed holds steady - and cash still pays",
-         "The July 28-29 meeting is expected to keep rates right where they are, with inflation watched "
-         "closely (Federal Reserve minutes; CNBC, July 8). The 10-year sits near 4.55%.",
-         "The plan's answer: higher-for-now rates are the quiet gift of this era - the brake's cash "
-         "refuge earns Treasury-bill interest, so playing defense is never dead money. Patience, paid."),
-        (ARC, "Gold's golden year rolls on",
-         "Even after catching its breath this month, gold shines near $4,017 an ounce - up about 20% "
-         "from a year ago (Trading Economics, July 17).",
-         "The plan's answer: the $2.80 gold slice in every twenty is the ancient anchor doing modern "
-         "work - it zigs when stocks zag, most of the time, and asks nothing of you in return."),
-    ]
-    for col, head, what, take in events:
-        story.append(card([
-            P("<b>%s</b>" % head, "big", textColor=col),
-            Spacer(1, 3),
-            P(what),
-            Spacer(1, 3),
-            P("<i>%s</i>" % take, "body", textColor=INK),
-        ], accent=col))
-        story.append(Spacer(1, 7))
-
-    story.append(Spacer(1, 2))
-    story.append(card([
-        P("<b>THE 24-FOR-24 BADGE.</b> A month like July (-6.4%) has happened 24 times before on this "
-          "arc since 2000 - the dot-com winter, 2008, the 2020 flash-storm, the 2022 bear. The record "
-          "after those 24: <b>24 new all-time highs.</b> The 25th is now on the clock, and the May peak "
-          "($103,189) is the line it's chasing. History measured, future unwritten - but that is one "
-          "well-rehearsed bounce.", "big")], accent=GOLD, bg=colors.HexColor("#1A2320")))
-
-    story.append(PageBreak())
-
-    # ---------------------------------------------------------------- page 4
-    story.append(P("PART 3 · THE LEAP AHEAD", "kicker"))
-    story.append(Spacer(1, 3))
-    story.append(P("The arc, the node, the leap", "h2"))
-    story.append(Spacer(1, 6))
-
-    story.append(P("The arc - the last three statement lines", "h3"))
-    story.append(Spacer(1, 4))
-    story.append(data_table([
-        ["", "May", "June", "July 17", "Since 2000"],
-        ["The champion", "$103,189", "$97,743", "$91,537", "11.0× the money in"],
-        ["Plain S&amp;P drip", "$55,108", "$54,561", "$54,278", "6.5× the money in"],
-        ["Money paid in", "$8,340", "$8,360", "$8,380", "the only guaranteed row"],
-    ], [1.9 * inch, 1.15 * inch, 1.15 * inch, 1.15 * inch, 1.65 * inch]))
+    story.append(card([P(
+        "<b>THE 24-FOR-24 BADGE.</b> A month like July (-6.4%) has visited the champion's arc 24 times "
+        "since 2000 - the dot-com winter, 2008, the 2020 flash-storm, the 2022 bear. After all 24, the "
+        "balance went on to a brand-new high. Number 25 is now on the clock, chasing the May peak of "
+        "$103,189. History measured, future unwritten - but that is one well-rehearsed bounce.", "big")],
+        accent=GOLD, bg=colors.HexColor("#1A2320")))
     story.append(Spacer(1, 10))
 
     story.append(P("The leap - if the next years rhyme with the last 26", "h3"))
     story.append(Spacer(1, 4))
     story.append(data_table([
-        ["From today's $91,537 + $20/month", "by 2031", "by 2036"],
-        ["At the champion's measured pace (12.6%/yr)", "about $167,000", "about $304,000"],
-        ["At the plain-index pace (10.0%/yr)", "about $148,000", "about $241,000"],
-        ["New money you'd add", "$1,200", "$2,400"],
+        ["From the champion's $91,537 + $20/month", "by 2031", "by 2036"],
+        ["At its measured pace (12.6%/yr)", "about $167,000", "about $304,000"],
+        ["At the plain index-fund pace (10.0%/yr)", "about $148,000", "about $241,000"],
+        ["New money added along the way", "$1,200", "$2,400"],
     ], [3.7 * inch, 1.65 * inch, 1.65 * inch]))
-    story.append(Spacer(1, 4))
+    story.append(Spacer(1, 3))
     story.append(P(
-        "Paces are what each line actually measured, 2000-2026. The future keeps its own counsel - "
-        "which is why the drip, the mix, and the brake do the promising here, not the projection.", "small"))
-    story.append(Spacer(1, 12))
-
-    story.append(P("The plot, on one card", "h3"))
-    story.append(Spacer(1, 4))
-    story.append(data_table([
-        ["", ""],
-        ["Directive", "A monthly report for unisona.ai users: how the next $20 leaps, with current events in mind."],
-        ["Promoted system", "The champion mix + streaming brake, now also running a live $25,000 practice book "
-         "(reading $24,998, cruising 2.0×, started July 17)."],
-        ["Evidence", "Walk-forward simulation 2000-2026 (run July 17; monthly path on file) · live brake state "
-         "saved July 18, 17:38 UTC · market feed July 18 · news of July 16-18 (CNBC, Seeking Alpha, Trading "
-         "Economics, federalreserve.gov)."],
-        ["Boundaries", "Practice mode: simulation + paper only. Real dollars wait behind the plan's own "
-         "evidence gate, and every real-money click belongs to a human - with a licensed advisor for the "
-         "personal stuff."],
-        ["Next action", "Keep the drip. Skim next month's Leap. If you do one extra thing in July: nudge the "
-         "twenty toward twenty-five."],
-    ], [1.35 * inch, 5.65 * inch], right_from=99))
+        "Paces are what each line actually measured, 2000-2026; the future keeps its own counsel. The "
+        "drip, the mix, and patience do the promising here - not the projection.", "small"))
     story.append(Spacer(1, 10))
+
+    story.append(P("Where every number comes from", "h3"))
+    story.append(Spacer(1, 4))
     story.append(P(
-        "See you at the August Leap - same arc, fresh node. · Full method &amp; every receipt: "
-        "docs/investing-2k-plan.html and experiments/ in the unisona.ai repo.", "small",
-        alignment=TA_CENTER))
+        "Champion balances &amp; the chart: unisona.ai walk-forward simulation, 2000-2026, re-run July "
+        "17 (real market history, borrowing costs charged, no peeking; monthly path on file). Practice "
+        "book &amp; robot status: live monitor state, July 18, 17:38 UTC. Market weather: VIX 18.77, "
+        "July 18 feed. World news: CNBC (July 16-17), Seeking Alpha (July 17), Federal Reserve minutes "
+        "(July 8), Trading Economics (July 17). Practice mode throughout: simulation + paper account - "
+        "real dollars wait behind the plan's evidence gate, every real-money decision belongs to a "
+        "human, and big personal choices deserve a licensed advisor.", "small"))
+    story.append(Spacer(1, 8))
+    story.append(P(
+        "See you at the August Leap - same arc, fresh node.", "small", alignment=TA_CENTER))
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     doc = BaseDocTemplate(str(OUT), pagesize=letter,
