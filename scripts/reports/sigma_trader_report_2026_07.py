@@ -313,10 +313,28 @@ def build():
     story.append(PageBreak())
 
     # ---------------------------------------------------------------- page 2
-    story.append(P("PART 1 · THE WORLD THIS MONTH, FROM THE TOP", "kicker"))
+    story.append(P("PART 1 · THE SCOREBOARD", "kicker"))
     story.append(Spacer(1, 3))
-    story.append(P("Two big stories - explained like you were away all month", "h2"))
-    story.append(Spacer(1, 7))
+    story.append(P("The month so far, on one card", "h2"))
+    story.append(Spacer(1, 5))
+    story.append(data_table([
+        ["Market", "Friday's mark", "Last week", "2026 so far"],
+        ["S&amp;P 500 · SPY", "7,458 (-1.0%)", "-1.6%", "+9.6% first half"],
+        ["Nasdaq · QQQ", "-1.5% Friday", "-2.9%", "strongest Q2 since 2020"],
+        ["Small caps · IWM", "$294.04", "cooled with peers", "+21.2% H1 - biggest lead on the S&amp;P since 1991"],
+        ["World stocks · EFA", "$103.33", "steadier", "beat the S&amp;P in June"],
+        ["Long bonds · TLT", "$84.52", "10-yr at 4.55%", "off its 4.62% high"],
+        ["Gold · GLD", "$4,017/oz", "about -3%", "-4.6% in July · +19.9% in a year"],
+        ["Oil · WTI crude", "$82+", "+10%", "highest in a month"],
+        ["The champion (sim)", "$91,537", "eased", "-6.4% in July · +7.2% YTD"],
+    ], [1.5 * inch, 1.55 * inch, 1.35 * inch, 2.6 * inch]))
+    story.append(Spacer(1, 4))
+    story.append(P(
+        "Friday, July 17 close. Under the hood, the market is broadening, not breaking: seven of "
+        "eleven S&amp;P sectors rose in June (industrials led), profits are beating estimates, and the "
+        "selling is concentrated in the year's hottest corner - chips. Sources: Trading Economics, "
+        "CNBC, Morgan Stanley/E*TRADE monthly commentary; the champion is our walk-forward simulation.", "small"))
+    story.append(Spacer(1, 11))
 
     def event(col, head, backstory, happened, wallet, calm):
         story.append(card([
@@ -328,10 +346,15 @@ def build():
             P(happened), Spacer(1, 4),
             P("WHY IT TOUCHES YOUR WALLET", "label"), Spacer(1, 1.5),
             P(wallet), Spacer(1, 4),
-            P("THE CALM MOVE", "label"), Spacer(1, 1.5),
+            P("THE TAKEAWAY", "label"), Spacer(1, 1.5),
             P("<i>%s</i>" % calm),
         ], accent=col, pad=9))
         story.append(Spacer(1, 7))
+
+    story.append(P("PART 2 · FOUR STORIES, FROM THE TOP", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("The news, explained like you were away all month", "h2"))
+    story.append(Spacer(1, 6))
 
     event(GOLD, "Oil jumped 10% as the Middle East flared up again",
           "A large share of the world's oil ships through one narrow sea lane - the Strait of Hormuz, "
@@ -347,46 +370,60 @@ def build():
           "Storm headlines are not an instruction to do anything. Keeping a cash cushion and letting a "
           "monthly auto-investment run is the whole move. Our robot's version of the same idea: it "
           "re-checks the weather every minute, ready to glide toward interest-earning cash - and this "
-          "month it never needed to.")
-
-    event(CYAN, "The market's favorite stocks changed seats",
-          "For two years the star performers were computer-chip and AI companies - they powered a huge "
-          "run. Markets rotate, though: sooner or later money takes profits from the leaders and looks "
-          "for the next value, and the leaderboard reshuffles. It's regular weather, not an alarm.",
-          "That rotation arrived in July. Chipmakers cooled sharply - a top supplier's spending plans "
-          "spooked the group - and the broad S&amp;P 500 index eased about 1.6% for the week. The quiet "
-          "part: company profits are actually coming in strong - 87% of the early summer earnings "
-          "reports beat expectations (CNBC and Seeking Alpha, July 16-17).",
-          "If your savings live in a broad index fund, a week like this barely dents a decades-long "
-          "plan - and if you were tempted to buy 'the hot stock everyone mentions,' July is why "
-          "spreading out wins: last month's rocket can be this month's cooldown.",
-          "Own a little of everything and you never have to guess the next favorite. That is the whole "
-          "trick behind index funds - and behind our robot's eight-ingredient mix, which holds the "
-          "winners' lane and the calm lanes at once.")
+          "month it never needed to. Worth knowing: the pros' June notes celebrated this strait "
+          "reopening; July closed it again. Headlines age fast - habits don't.")
 
     story.append(PageBreak())
 
     # ---------------------------------------------------------------- page 3
-    story.append(P("PART 1, CONTINUED", "kicker"))
+    story.append(P("PART 2, CONTINUED", "kicker"))
     story.append(Spacer(1, 3))
-    story.append(P("Two quieter stories that pay you to know them", "h2"))
-    story.append(Spacer(1, 7))
+    story.append(P("The rotation, and the people who set the price of money", "h2"))
+    story.append(Spacer(1, 6))
+
+    event(CYAN, "The market's favorite stocks changed seats",
+          "For two years the star performers were computer-chip and AI companies - they powered a huge "
+          "run. Markets rotate, though: sooner or later money takes profits from the leaders and goes "
+          "looking for the next value, and the leaderboard reshuffles. It's regular weather, not an "
+          "alarm.",
+          "That rotation arrived in July. Chip stocks slid on worries that the big AI buyers may slow "
+          "their spending: on Friday alone the S&amp;P 500 fell 1.0% to 7,458, the Nasdaq 1.5%, and "
+          "the Dow 407 points, capping a -1.6% week. The quiet part: seven of eleven S&amp;P sectors "
+          "actually ROSE in June (industrials led), small companies are having their best lead over "
+          "the S&amp;P since 1991 (+21.2% first half), and 87% of early earnings beat expectations "
+          "(Trading Economics, CNBC, Seeking Alpha, E*TRADE commentary, July 16-18).",
+          "If your savings live in a broad index fund, a week like this barely dents a decades-long "
+          "plan. If you were tempted by 'the hot stock everyone mentions,' July is the case for "
+          "spreading out: last month's rocket can be this month's cooldown - while quieter corners "
+          "(small caps, world stocks) quietly carry the year.",
+          "Own a little of everything and you never have to guess the next favorite. That's the whole "
+          "trick behind index funds - and behind our robot's eight-ticker mix, which holds the "
+          "winners' lane (SPMO, XMMO), the quiet leaders (IWM, EFA), and the ballast, all at once.")
 
     event(STORM, "The Fed holds interest rates steady - and cash still pays",
           "The Federal Reserve - 'the Fed' - is America's central bank. Its main dial is the interest "
           "rate: turning it up makes borrowing pricier and saving more rewarding (to cool inflation); "
-          "turning it down does the reverse. Eight times a year, its committee meets and the world "
-          "watches.",
-          "The next meeting is July 28-29 and everything points to no change. Inflation readings came "
-          "in gentler than expected in June, though officials remain watchful with oil rising "
-          "(Federal Reserve minutes; CNBC, July 8). Bottom line: rates stay where they've been - which "
-          "is historically decent for savers.",
+          "turning it down does the reverse. Eight times a year its committee meets, and the world "
+          "watches - these days under a new chair, Kevin Warsh, whose talk runs hawkish.",
+          "The next meeting is July 28-29 and everything points to no change. June's inflation "
+          "readings came in gentler than expected, though officials stay watchful with oil rising. "
+          "The honest wrinkle: most economists expect a hold through 2026, while rate-futures traders "
+          "still price real odds of a hike by December - the pros disagree, and we'd rather tell you "
+          "that than pick a side (Fed minutes July 8; CNBC; E*TRADE commentary).",
           "This is the friendliest fact in finance right now: boring cash earns real interest again. "
           "High-yield savings accounts and money-market funds pay meaningful yields while rates hold - "
           "an emergency fund is no longer dead money, it's a small engine.",
           "Before any investing move, park one: a cushion in a high-yield account is the purchase that "
           "buys sleep. Our robot agrees so strongly it's built in - when it de-risks, it parks in "
           "interest-earning cash, never under a mattress.")
+
+    story.append(PageBreak())
+
+    # ---------------------------------------------------------------- page 4
+    story.append(P("PART 2, CONCLUDED", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("The old anchor, the little dictionary, and the road ahead", "h2"))
+    story.append(Spacer(1, 6))
 
     event(ARC, "Gold is having a golden year",
           "Gold is humanity's oldest savings account - no company behind it, no interest paid, just "
@@ -429,11 +466,28 @@ def build():
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
     story.append(dt)
+    story.append(Spacer(1, 10))
+
+    story.append(P("The road ahead - what the pros have circled", "h3"))
+    story.append(Spacer(1, 4))
+    story.append(data_table([
+        ["When", "What", "Why it's circled"],
+        ["Wed, Jul 22", "Alphabet &amp; Tesla report earnings (plus ServiceNow, Texas Instruments)",
+         "Alphabet's AI-spending plans are THE tell for the whole chip story above"],
+        ["Thu-Fri, Jul 23-24", "Intel, Honeywell, Lockheed, Blackstone; then American Express",
+         "earnings season is running +23% vs last year so far (FactSet)"],
+        ["Tue-Wed, Jul 28-29", "The Fed meets", "hold expected; the tone under new chair Warsh is the story"],
+        ["Every market minute", "Our robot re-checks its three tripwires", "boring by design - that's the product"],
+    ], [1.15 * inch, 3.05 * inch, 2.8 * inch], right_from=99, header_color=CYAN))
+    story.append(Spacer(1, 4))
+    story.append(P(
+        "A light week for economic data (jobless claims, PMI, new-home sales) and a heavy one for "
+        "earnings - calendar via CNBC's week-ahead and Yahoo Finance (July 17).", "small"))
 
     story.append(PageBreak())
 
-    # ---------------------------------------------------------------- page 4
-    story.append(P("PART 2 · YOUR NEXT $20", "kicker"))
+    # ---------------------------------------------------------------- page 5
+    story.append(P("PART 3 · YOUR NEXT $20", "kicker"))
     story.append(Spacer(1, 3))
     story.append(P("Three lanes - start where you're standing", "h2"))
     story.append(Spacer(1, 5))
@@ -478,7 +532,7 @@ def build():
     story.append(PageBreak())
 
     # ---------------------------------------------------------------- page 5
-    story.append(P("PART 3 · HABITS &amp; THE LEAP AHEAD", "kicker"))
+    story.append(P("PART 4 · HABITS &amp; THE LEAP AHEAD", "kicker"))
     story.append(Spacer(1, 3))
     story.append(P("Lean on, glide past, and where this could fly", "h2"))
     story.append(Spacer(1, 7))
@@ -560,12 +614,38 @@ def build():
     story.append(P(
         "Champion balances &amp; the chart: unisona.ai walk-forward simulation, 2000-2026, re-run July "
         "17 (real market history, borrowing costs charged, no peeking; monthly path on file). Practice "
-        "book, ETF closes &amp; robot status: live monitor state, July 18, 17:38 UTC. Market weather: "
-        "VIX 18.77, July 18 feed. World news: CNBC (July 16-17), Seeking Alpha (July 17), Federal "
-        "Reserve minutes (July 8), Trading Economics (July 17). Practice mode throughout: simulation + "
-        "paper account - real dollars wait behind the plan's evidence gate, every real-money decision "
-        "belongs to a human, and big personal choices deserve a licensed advisor.", "small"))
+        "book, ETF closes &amp; robot status: live monitor state, July 18, 17:38 UTC. Market weather &amp; "
+        "indexes: Trading Economics and the July 18 feed (VIX 18.77). World news &amp; calendar: CNBC "
+        "(July 8-17), Seeking Alpha (July 17), Federal Reserve minutes (July 8), Morgan Stanley/E*TRADE "
+        "monthly commentary (July), FactSet earnings via CNBC.", "small"))
+
+    story.append(PageBreak())
+
+    # ---------------------------------------------------------------- back page
+    story.append(P("THE BACK PAGE", "kicker"))
+    story.append(Spacer(1, 3))
+    story.append(P("About The Leap", "h2"))
     story.append(Spacer(1, 5))
+    story.append(card([P(
+        "<b>What this is.</b> The Sigma Trader Report is unisona.ai's monthly letter for every user - "
+        "free and paid, beginner and trader. Each issue, in order: the scoreboard, the month's stories "
+        "explained from the top, the road ahead, where a spare $20 goes, and the champion's numbers "
+        "with their habits. It ships as a PDF on the site under /reports/ in the third week of the "
+        "month. How to read it: <b>measured</b> numbers come from real history or our live practice "
+        "book; <b>projected</b> numbers are clearly labeled rhymes, never promises; the guaranteed "
+        "row is always the money you put in.", "body")], accent=GOLD))
+    story.append(Spacer(1, 8))
+    story.append(card([P(
+        "<b>THE FINE PRINT, IN PLAIN ENGLISH.</b> This report is education, not personalized "
+        "investment, tax, or legal advice, and not an offer or recommendation to buy or sell anything. "
+        "The champion's track record is a simulation on real historical prices (borrowing costs "
+        "charged; taxes not modeled); its live book is practice money; simulated and past performance "
+        "never guarantee future results. Prices, yields, and dates are as shown and have moved since. "
+        "Tickers describe our practice mix, not endorsements. Investing involves risk, including loss "
+        "of what you put in; markets can fall by half and stay down for years. unisona.ai is software, "
+        "not a registered investment adviser or broker-dealer - before acting on anything here, "
+        "consider your own situation, ideally with a licensed advisor.", "small")], pad=9))
+    story.append(Spacer(1, 6))
     story.append(P(
         "Until August - keep the drip alive. &nbsp;- the unisona.ai trading desk", "small",
         alignment=TA_CENTER))
