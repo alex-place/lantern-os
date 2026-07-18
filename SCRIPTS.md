@@ -53,6 +53,7 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | `src/convergence_io_engine.py` | **Main orchestrator** — 12-phase convergence loop, health, inspect. | `python src/convergence_io_engine.py health` · `… loop` · `… converge --message "…"` |
 | `src/mcp_server/server.py` | MCP server (port 8771) — tools with real implementations only. | `python src/mcp_server/server.py` |
 | `scripts/convergence_close_loop.py` | Closes convergence records. Anchors: `lib/convergence-status.js`, `lib/kalshi-convergence-outcomes.js`. | server-driven; manual: `python scripts/convergence_close_loop.py` |
+| `scripts/session_to_convergence.py` | Mines Claude Code session history into both-class ConvergenceRecords (claim + verified/refuted/corrected, confidence capped by grounding) → `data/convergence/records.jsonl`. `--records` appends a pre-extracted set (current session); `--transcript` extracts a past session via a Claude model. Idempotent (deterministic ids). Writer schema mirrors `lib/convergence-records.js`. | `python scripts/session_to_convergence.py --records <set.json>` · `… --transcript <session.jsonl>` |
 
 ---
 
