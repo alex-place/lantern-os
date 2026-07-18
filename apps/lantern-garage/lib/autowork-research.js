@@ -278,6 +278,36 @@ async function researchIssue(o) {
 
   const scopeFiles = await _findScopeFiles(workRoot, keywords, emit, maxFiles);
 
+  // arXiv research-corpus grounding (Σ₀ Remember): BM25 over the post-cutoff research
+  // corpus. Gated on KEYSTONE_ARXIV_RETRIEVAL + isAvailable() so it is a fail-safe NO-OP
+  // wherever the corpus is absent (e.g. the GCE web tier). The corpus path is
+  // env-configurable (ARXIV_CORPUS_DIR), so it moves to a cloud-hosted corpus by config,
+  // not a rewrite. Papers feed grounding_signals + cap allowed_max_confidence, so a
+  // convergence record emitted from this research can't launder confidence past its
+  // evidence — retrieval is grounding, not verification (#2542 / grounding-ledger).
+  let arxivEvidence = [];
+  const groundingSignals = [];
+  let allowedMaxConfidence = null;
+  if (process.env.KEYSTONE_ARXIV_RETRIEVAL === "1") {
+    try {
+      const arxiv = require("./arxiv-index");
+      if (arxiv.isAvailable()) {
+        const papers = arxiv.queryArxiv(issueFullText, 3) || [];
+        arxivEvidence = papers.map((p) => ({
+          title: p.title, id: p.id, published: p.published || null, snippet: (p.snippet || "").trim(),
+        }));
+        for (const p of papers) groundingSignals.push(`arxiv:${p.id}`);
+        if (arxivEvidence.length) allowedMaxConfidence = 0.85;                                    // grounded, still capped
+        else if (arxiv.looksLikeAIResearchQuestion(issueFullText)) allowedMaxConfidence = 0.6;    // research Q, corpus found nothing → humble
+        emit("research", "arxiv", { available: true, papers: arxivEvidence.length, ids: groundingSignals });
+      } else {
+        emit("research", "arxiv", { available: false, reason: "corpus absent (set ARXIV_CORPUS_DIR)" });
+      }
+    } catch (e) {
+      emit("research", "arxiv", { skipped: true, reason: e.message });
+    }
+  }
+
   const researchContext = {
     keywords,
     scopeFiles: scopeFiles.slice(0, maxFiles),
@@ -285,16 +315,20 @@ async function researchIssue(o) {
     // returned evidence so the model sees the full grounded set.
     webEvidence: webEvidence.slice(0, 5),
     ...(webSummary ? { webSummary, webConfidence } : {}),
+    ...(arxivEvidence.length ? { arxivEvidence } : {}),
+    ...(groundingSignals.length ? { grounding_signals: groundingSignals } : {}),
+    ...(allowedMaxConfidence != null ? { allowed_max_confidence: allowedMaxConfidence } : {}),
     timestamp: new Date().toISOString(),
   };
   emit("research", "done", {
     filesFound: scopeFiles.length,
     webSourcesFound: webEvidence.length,
+    arxivPapers: arxivEvidence.length,
     webMode: wide ? "wide" : "narrow",
     context: researchContext,
   });
 
-  return { keywords, scopeFiles, webEvidence, webSummary, webConfidence, researchContext, runId };
+  return { keywords, scopeFiles, webEvidence, webSummary, webConfidence, arxivEvidence, groundingSignals, allowedMaxConfidence, researchContext, runId };
 }
 
 module.exports = {
