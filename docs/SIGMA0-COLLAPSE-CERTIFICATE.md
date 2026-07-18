@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Σ — The Convergence Certificate
@@ -664,6 +664,18 @@ any budget `B < B*_∞` stops working after a **computable deadline**
 trust-region maximization of `V(x_n+a)` over the budget ball) on a normal basin —
 predicted deadlines 1.6/2.9/6.0 vs measured last-escapes 1/2/5, conservative in the right
 direction (`data/sigma0/grounding_deadline_report.json`).
+
+**Conventional grounding (not novel).** This is the standard **bounded-input reachable-set**
+argument for a discrete contracting (Schur-stable) linear system: the reachable set of
+`x_{k+1}=Ax_k+a`, `‖a‖≤B` from a decaying free response is a classical object in linear-systems /
+reachability theory (Kailath, *Linear Systems*, 1980; Sontag, *Mathematical Control Theory*, 1998;
+Blanchini & Miani, *Set-Theoretic Methods in Control*, 2015 for invariant/reachable sets in a
+Lyapunov metric). The inequality is corollary-grade (a geometric-decay bound composed with a
+P-norm triangle inequality), and the *scheduling* consequence it feeds (§3.1's design shift) is the
+**self-triggered control** recipe — compute the next intervention from a certified decay rate
+(Heemels, Johansson & Tabuada, CDC 2012; arXiv:1803.08980). No new dynamical-systems theorem is
+claimed; the contribution is composing these standard bounds from the certificate's own measured
+`(γ, c, P)` and reading off a grounding cadence.
 
 **Where it bites (MEASURED caveat).** The deadline binds in the Euclidean norm only for
 **well-conditioned** basins. In a strongly non-normal "sliver" basin (`cond(P) ≈ 6·10⁵`)
@@ -1477,6 +1489,22 @@ signal into a checkpoint-fixed **bias** `b` (sticks) and re-drawn **measurement 
   12.90 > zero-bias internal 9.36 > noise-rescued stuck bias 6.43 > deterministic 0.81 >
   fixed-alone 0.61).
 
+**Conventional grounding (the mechanism is NOT novel — prior-art check 2026-07-17).** De-ratcheting
+is textbook **stochastic acceptance / simulated annealing**: injecting randomness into a repeated
+greedy selection lets a stuck incumbent be displaced so the search escapes premature convergence
+(Metropolis et al. 1953; Kirkpatrick, Gelatt & Vecchi, *Optimization by Simulated Annealing*,
+*Science* 220 (1983); Černý 1985). The **interior optimum** ("too much dither hurts") is that
+literature's temperature optimum — too little noise never unsticks the champion, too much destroys
+the ranking signal — and the same effect is why perturbed-SGD escapes sharp local minima (Ge et al.,
+*Escaping From Saddle Points*, COLT 2015). The specific *noise-on-a-reused-holdout* form is exactly
+**Thresholdout**'s differential-privacy mechanism (Dwork et al., §8.8), which adds Laplace noise for
+*validity* (bounding overfitting). **What is measured here — not claimed as new mechanism — is (a)
+the stuck-vs-fresh error decomposition and (b) that in the *checkpoint-promotion-under-holdout-reuse*
+setting the same noise buys *extraction* (finding better checkpoints), not only validity.** That is a
+connection between two established literatures (stochastic optimization + adaptive data analysis), not
+a new law. Reasoning for the gap: our earlier one-line "only fresh truth selects" over-generalized by
+omitting the annealing channel; the re-statement restores it and cites the standard mechanism.
+
 **The law, re-stated:** selection error decomposes into a **stuck** part (sets the ratchet) and
 a **fresh** part (breaks it). Deterministic internal signals neither de-ratchet nor inform;
 stochastic internal signals **de-ratchet but do not inform**; only re-drawn external truth does
@@ -1681,6 +1709,8 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012; **arXiv:1803.08980** — Lyapunov event-triggered stabilization with a known convergence rate. The mature prior-art field for §3.1's schedule consequence (intervention timing from a certified decay rate). Verified 2026-07-17.
 - R. Kulhavý & M. Kárný (1984), directional forgetting in recursive identification; **arXiv:2003.03523** — *RLS with Variable-Direction Forgetting*; **arXiv:2404.10844** — *SIFt-RLS: Subspace of Information Forgetting RLS*. Classical kin of Σ₀⁻¹'s covariance leg (§3). Verified 2026-07-17.
 - **arXiv:2604.09979** — *A Minimal Model of Representation Collapse* (2026) — dynamical-systems analysis of representation collapse in SSL (stop-gradient / frustration); adjacent, uncited-until-now prior for Part I's framing. Verified 2026-07-17.
+- **Conventional grounding added 2026-07-18 (classic, venue-verifiable — no arXiv):** N. Metropolis, A. Rosenbluth, M. Rosenbluth, A. Teller & E. Teller (1953), *Equation of State Calculations by Fast Computing Machines*, J. Chem. Phys. 21; **S. Kirkpatrick, C. D. Gelatt & M. P. Vecchi (1983), *Optimization by Simulated Annealing*, Science 220:671–680**; V. Černý (1985), J. Optim. Theory Appl. 45 — the stochastic-acceptance / simulated-annealing mechanism that §8.4.1's *de-ratcheting* rediscovers (noise unsticks a stuck incumbent; the "interior optimum" is the temperature optimum). R. Ge, F. Huang, C. Jin & Y. Yuan (2015), *Escaping From Saddle Points*, COLT — the same noise-escapes-stuck-states effect in optimization.
+- **T. Kailath (1980), *Linear Systems*, Prentice Hall; E. D. Sontag (1998), *Mathematical Control Theory* (2nd ed.), Springer; F. Blanchini & S. Miani (2015), *Set-Theoretic Methods in Control*, Birkhäuser** — the bounded-input reachable-set / invariant-set theory that §3.1's commitment inequality is a corollary of (reachable set of a Schur-stable system under bounded input, measured in a Lyapunov metric). Standard textbook material; no novel dynamical-systems result is claimed.
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -2155,5 +2185,44 @@ for produced results and Appendix A for the original design sketch.*
 > expansive, reservoir near-critical) land outside the well-conditioned regime — the
 > schedule's bite may require deliberately JSRR-stabilized loops, which upgrades Phase 1's
 > motivation from assumption to measurement.
+
+> **Maintenance log — 2026-07-18 (conventional-grounding pass — every gap tied to an established
+> method + source + reasoning; no new mechanism claimed anywhere).** A deliberate sweep to ensure
+> each load-bearing construct is presented as the *conventional* result it is, with a
+> venue-verifiable citation and a one-line reason for the gap. Two under-grounded spots were fixed
+> in place: **§8.4.1 de-ratcheting** now cites **simulated annealing / stochastic acceptance**
+> (Metropolis 1953; Kirkpatrick–Gelatt–Vecchi, *Science* 1983; Černý 1985; Ge et al., COLT 2015) —
+> the mechanism our E-P result rediscovered, with the "interior optimum" identified as the
+> temperature optimum — and states plainly that only the *measurement + stuck-vs-fresh framing in
+> the holdout-reuse setting* is ours; and **§3.1's commitment inequality** now cites the standard
+> **bounded-input reachable-set / invariant-set** theory (Kailath 1980; Sontag 1998; Blanchini &
+> Miani 2015) it is a corollary of. References gain both clusters. **Gap → conventional grounding
+> map** (the whole document at a glance; each row is *established method, not a Σ₀ contribution*):
+>
+> | Construct (gap) | Conventional method it *is* | Source |
+> |---|---|---|
+> | §1 collapse/contraction (Thm 1, C3) | Lyapunov stability; contraction analysis / matrix measure μ₂ | Lyapunov 1892; Lohmiller–Slotine 1998; Khalil 2002 |
+> | §1.2.1 non-normal stability gates | numerical range, pseudospectra, Kreiss/Crouzeix constants | Trefethen–Embree 2005; Crouzeix–Palencia 2017 |
+> | §1.2.2 routed loops are switched systems | switched-system / dwell-time stability | (arXiv refs in §1.2.2) |
+> | §1.2.3 discrete acceptance gate | Jacobian spectral radius `ρ<1` (Schur) — adopted from STARS/JSRR | arXiv:2605.26733 |
+> | §2 four-signal trigger [HEURISTIC] | conjunctive multi-indicator degeneracy detector (soft-AND / Gödel t-norm) — an operational definition, not a theorem | (labeled as such in §2) |
+> | §3 Σ₀⁻¹ re-excitation | persistent excitation; RLS covariance-resetting / directional forgetting | Anderson 1977; Kulhavý–Kárný 1984 |
+> | §3.1 commitment inequality + cadence | bounded-input reachable set + self-triggered control | Kailath 1980; Sontag 1998; Heemels–Johansson–Tabuada 2012 |
+> | §4 canary | critical slowing down; Kalman innovation-consistency (NIS χ²) | Wissel 1984; Scheffer 2009; Bar-Shalom et al. 2001 |
+> | §5 attractor graph / ROA | Markov state models; Lyapunov/LaSalle ROA via interval arithmetic | Khalil 2002 (Ex. 8.4) |
+> | §7 collapse-without-grounding | model collapse; intrinsic self-correction degrades | Shumailov 2024; Feng 2024; Huang 2024 |
+> | §7.1 σ=0 limit | ICL-as-estimator; continual-learning weight-perturbation σ | Akyürek 2022; Elsayed–Mahmood 2024 |
+> | §7.2 honesty-theater | Goodhart / specification gaming; eval-awareness | Amodei 2016; Skalse 2022 |
+> | §8.4.1 de-ratcheting (new) | stochastic acceptance / simulated annealing; Thresholdout noise | Kirkpatrick 1983; Dwork 2015 |
+> | §8 Σ_θ gate | TRPO monotonic-improvement; reward-model overoptimization curve; reusable holdout | Schulman 2015; Gao 2023; Dwork 2015 |
+> | §9 two-timescale composition [TARGET] | two-timescale stochastic approximation; singular perturbation | Borkar 1997; Khalil 2002 |
+>
+> **The one honest empirical gap is unchanged** and carries no novelty claim: §8/§9 have not
+> controlled a *real* training run (sim-validated, real pending — the standard "validated in
+> simulation, real-model validation outstanding" status). Net: the document's contribution is
+> **disciplined in-repo formalization + honest measurement of standard results**, which is exactly
+> what its own §7.2 (honesty-not-theater) and the 2026-07-07 nearest-prior audit already conceded;
+> this pass makes that explicit at every gap. No theorem changed; citations added are classic and
+> venue-verifiable (no arXiv IDs invented — see the fabricated-ID caution above).
 
 ---
