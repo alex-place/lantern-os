@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **4** (extend-1927; low-trade tune; DCA reversal; hybrid retired). Next:
+> fabrication). Iterations done: **5** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification vs brake). Next:
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -177,8 +177,48 @@ overlay for an **existing/funded balance** (advisor + champion-book), where it w
 return and risk (iters 1-2). For pure small-DCA, present it honestly as "half the drawdown,
 higher Sharpe, somewhat less final value" — a risk-tolerance choice, not a free lunch.
 
+---
+
+## Iteration 5 — diversification vs the brake (and both together)
+
+`deep_history_blend.py` builds a constant-duration 10Y bond total-return proxy from
+`^TNX` (carry − D·Δyield, D=8; a first-order CMT approximation — a proxy, not a real
+bond index) and separates the two risk effects.
+
+| 1962-2026 (S&P + bond) | final | CAGR | Sharpe | maxDD | trades/yr |
+|---|---|---|---|---|---|
+| S&P buy&hold | $2.62M | 7.5% | 0.52 | −57% | 0 |
+| 60/40 buy&hold (diversif. only) | $2.13M | 7.1% | 0.71 | −33% | 0 |
+| S&P + no-margin brake (brake only) | $1.97M | 7.0% | 0.70 | −27% | 7 |
+| **60/40 + no-margin brake (both)** | $1.35M | 6.4% | **0.86** | **−26%** | **4.3** |
+
+| 2000-2026, 50/30/20 S&P/bond/gold | final | CAGR | Sharpe | maxDD | trades/yr |
+|---|---|---|---|---|---|
+| S&P buy&hold | $123k | 6.4% | 0.42 | −57% | 0 |
+| 3-asset buy&hold (diversif. only) | $151k | 7.2% | 0.75 | −27% | 0 |
+| **3-asset + no-margin brake (both)** | $135k | 6.7% | **0.96** | **−13%** | **2.4** |
+
+**Findings (iteration 5).**
+1. **Diversification is the biggest *free* non-risky win.** A 60/40 (or 3-asset) blend
+   cuts drawdown about as much as the brake (Sharpe 0.52→0.71-0.75, maxDD −57%→−27/−33%)
+   with **zero trades and no timing risk**. In the 2000+ era the diversified blend *beat*
+   S&P on **both** return and risk. (The live model already diversifies via its 6-ETF
+   tangency — so it's on the right track; the lever is turning DOWN its trading.)
+2. **Brake + diversification = best risk profile, fewest trades.** Sharpe 0.86-0.96,
+   drawdown −13 to −26%, at **2.4-4.3 rebalances/yr** — the strongest non-risky, low-
+   turnover result in the whole study — at the cost of the most absolute return.
+3. **Caveat (honest):** the 1962-2026 bond leg spans the 1981-2020 falling-rate bull that
+   flatters 60/40; the ^TNX proxy is constant-duration (no convexity/roll). Directionally
+   solid, not a promise of future 60/40 magic.
+
+**Recommendation, final form:** the non-risky, low-trade optimum is **a diversified book +
+the Conservative (no-margin) brake, band 0.30 / brake 0.20 / trend 12mo** — ~2-5 trades/yr,
+never borrows, Sharpe ~0.9, drawdown roughly a third of all-equity. Present the return
+give-up honestly; it's a risk-tolerance dial, not a free lunch.
+
 ### Next (later iterations)
-- Blended S&P+Nasdaq+gold panel + a bond-proxy from ^TNX over deep history.
+- Low-turnover tactical-allocation literature sanity-check (web) — does published
+  dual-momentum / trend+cash work corroborate the band/trend/brake choice?
 - Web-research low-turnover tactical-allocation literature (dual-momentum, trend+cash) to
   sanity-check the band/trend choice against published results.
 - If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the live
