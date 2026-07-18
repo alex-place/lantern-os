@@ -123,7 +123,7 @@ def run_overlay(days, px, tv, trend_m, brake, min_gross, max_gross, band,
         "pct_derisked": float(np.mean(np.array(gross_hist) < 0.99)) if gross_hist else 0.0,
         "turnover_per_yr": turnover_sum / yrs, "trade_days": trade_days,
         "trade_days_per_yr": trade_days / yrs, "years": yrs,
-        "path": eq_path,
+        "path": eq_path, "rets": r,
     }
 
 

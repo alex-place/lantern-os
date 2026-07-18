@@ -1,0 +1,40 @@
+{
+ "seed": 12345,
+ "n_boot": 2000,
+ "block": 21,
+ "n_trials": 45,
+ "results": {
+  "^GSPC": {
+   "symbol": "^GSPC",
+   "n_days": 24751,
+   "sharpe_no_margin": 0.6871060316327975,
+   "sharpe_buyhold": 0.4199107046291528,
+   "delta_sharpe_point": 0.2671953270036447,
+   "delta_sharpe_ci95": [
+    0.09923940559576722,
+    0.4287696433328873
+   ],
+   "p_no_margin_better": 0.999,
+   "significant": true,
+   "deflated_sharpe_prob": 0.9999951989068456,
+   "sharpe_ann": 0.6871060316327975,
+   "sharpe_star_ann": 0.22558270570268135
+  },
+  "^IXIC": {
+   "symbol": "^IXIC",
+   "n_days": 13977,
+   "sharpe_no_margin": 0.9017278646364613,
+   "sharpe_buyhold": 0.5963559565271732,
+   "delta_sharpe_point": 0.30537190810928805,
+   "delta_sharpe_ci95": [
+    0.08789917661888087,
+    0.5226575358118755
+   ],
+   "p_no_margin_better": 0.995,
+   "significant": true,
+   "deflated_sharpe_prob": 0.9999932570119947,
+   "sharpe_ann": 0.9017278646364613,
+   "sharpe_star_ann": 0.30018929017623674
+  }
+ }
+}

@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **7 + closing validation**. LOOP COMPLETE — PR #2728 open (48/48 CI green), awaiting human review.
+> fabrication). LOOP 2 running (Σ₀). Iteration 8 done: edge is statistically significant (bootstrap ΔSharpe CI excludes 0 both indices).
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -327,3 +327,54 @@ mode in the live champion book (PR #2728, **48/48 CI green**, awaiting human rev
 Bottom line for Alex: the biggest non-risky win is **cap leverage at 1×, trade ~monthly not
 daily, stay diversified** — best Sharpe, ~half the drawdown, far under PDT limits, zero margin
 risk. Leverage and daily retrade were both net-negative. Full evidence trail above.
+
+---
+
+# LOOP 2 (2026-07-18, Σ₀ protocol) — run until ~21:27Z
+
+Goal: keep improving the model with Σ₀ rigor — external reality beats internal
+consistency; every claim = [claim, evidence, confidence, source]; nothing accepted
+without evidence; no fabrication. Loop 1 found the Conservative (≤1×, ~monthly,
+diversified) overlay. Loop 2 goes deeper. Agenda (one focused iteration each):
+
+8.  Significance: is the edge real? Block-bootstrap CI on the Sharpe/maxDD *difference*
+    (no_margin − buy&hold) + Deflated Sharpe accounting for the configs we tried.
+9.  Tangency-weighted validation — port the live tangency_dir weighting to deep history
+    (match production exactly, not equal-weight).
+10. Transaction-cost sensitivity — re-run at TC 5/10/20 bp; is low-turnover robust to
+    worse fills?
+11. Regime attribution — decompose where the brake adds vs subtracts (bull/bear/recovery),
+    deep-diving the actual rebalance decisions.
+12. Alternative/combined signals — 200-day SMA vs 12-mo TSMOM vs dual (require BOTH);
+    does combining cut whipsaw?
+13. Event-triggered rebalance — trade only on signal flips (even fewer trades;
+    control-engineering send-on-delta).
+14. Sequence-of-returns / decumulation — a withdrawal scenario where the brake should
+    shine; + crisis-only block-bootstrap P(ruin) for the no-margin book.
+15. Synthesis 2 + update PR #2728 / the recommendation.
+
+---
+
+## Iteration 8 (Σ₀) — the edge is statistically real (not config-mining)
+
+`deep_history_significance.py`: stationary block bootstrap (21-day blocks, 2000 resamples,
+seed 12345) of the paired daily returns, + Deflated Sharpe (Bailey/López de Prado 2014)
+against the 45 configs tried in iter-2.
+
+| | point ΔSharpe | bootstrap 95% CI | P(no_margin > buy&hold) | CI excludes 0? | Deflated SR |
+|---|---|---|---|---|---|
+| **S&P 1927+** | +0.27 | **[+0.10, +0.43]** | 99.9% | **YES** | ≈1.000 (haircut 0.69→>0.23) |
+| **Nasdaq 1971+** | +0.31 | **[+0.09, +0.52]** | 99.5% | **YES** | ≈1.000 (haircut 0.90→>0.30) |
+
+**Findings (iteration 8).**
+1. **Significant on both indices.** The Sharpe-difference CI excludes 0 — the Conservative
+   overlay's risk-adjusted edge is not noise, and no_margin beats buy&hold's Sharpe in
+   99.5-99.9% of block-bootstrap resamples.
+2. **Survives selection deflation.** Even after deflating for the 45-config sweep, the
+   no_margin Sharpe clears the selection-adjusted bar (0.69>0.23, 0.90>0.30). Honest note:
+   DSR ≈1.000 is *driven by the very large T* (24,751 / 13,977 daily obs give enormous
+   statistical power) — the bootstrap CI is the more informative statistic; both agree the
+   edge is real.
+3. **What this does NOT prove:** that the edge is as large *out-of-sample* as in-sample
+   (iter-2's 2000+ validation already addressed magnitude), nor that future regimes match
+   the past. It proves the historical risk-adjusted improvement is not statistical luck.
