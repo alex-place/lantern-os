@@ -1,0 +1,67 @@
+{
+  "source": "arXiv:2604.15259 (Stability and Generalization in Looped Transformers)",
+  "claim_checked": "recall + outer normalization -> reachable, input-dependent fixed points; no-recall -> ill-posed (this proxy: non-reachable) in the contracting regime",
+  "cert_connection": "recall == per-step grounding; the no-recall ill-posedness is the well-posedness analogue of \u00a72's underdetermined collapse",
+  "honest_record": "the pre-registered H1 (input-INDEPENDENCE collapse) was REFUTED by the run; the observed no-recall failure is non-reachability. Corrected to H1'.",
+  "params": {
+    "D": 16,
+    "N_INPUTS": 64,
+    "T": 200,
+    "rhos": [
+      0.5,
+      0.9,
+      1.0,
+      1.5,
+      3.0
+    ],
+    "seed": 20260718
+  },
+  "rows": [
+    {
+      "rho": 0.5,
+      "dep_no_recall": NaN,
+      "conv_no_recall": 0.0,
+      "dep_recall": 1.0,
+      "conv_recall": 1.0
+    },
+    {
+      "rho": 0.9,
+      "dep_no_recall": NaN,
+      "conv_no_recall": 0.0,
+      "dep_recall": 0.9993,
+      "conv_recall": 1.0
+    },
+    {
+      "rho": 1.0,
+      "dep_no_recall": NaN,
+      "conv_no_recall": 0.0,
+      "dep_recall": 0.9994,
+      "conv_recall": 1.0
+    },
+    {
+      "rho": 1.5,
+      "dep_no_recall": NaN,
+      "conv_no_recall": 0.0,
+      "dep_recall": 0.9978,
+      "conv_recall": 1.0
+    },
+    {
+      "rho": 3.0,
+      "dep_no_recall": 0.7217,
+      "conv_no_recall": 1.0,
+      "dep_recall": 0.9931,
+      "conv_recall": 1.0
+    }
+  ],
+  "verdict": {
+    "H1_original_input_independence_REFUTED": true,
+    "H1_original_note": "no-recall failure is NON-REACHABILITY (conv~0 for rho<=1.5), not input-independence; the proxy tested the wrong axis \u2014 kept on record.",
+    "H1prime_recall_gives_reachable_input_dependent_fp": true,
+    "H1prime_detail": "recall conv=[1.0, 1.0, 1.0, 1.0, 1.0] dep=[1.0, 0.999, 0.999, 0.998, 0.993]",
+    "H2prime_no_recall_fails_reachability_when_contracting": true,
+    "H2prime_detail": "no-recall conv (rho<=1) = [0.0, 0.0, 0.0]",
+    "kill_condition_triggered": false
+  },
+  "reproduced_corrected_claim": true,
+  "evidence_class": "MEASURED (synthetic maps, CPU; mechanism check, not a benchmark)"
+}

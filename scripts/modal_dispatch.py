@@ -80,18 +80,31 @@ def _check_gpu():
 # (clone repo, QLoRA fine-tune train-qlora-ouro.py, CSF-pack, upload to HF), so the
 # two providers run the identical job. Deps are baked into the image (below), not
 # pip-installed at runtime, so cold starts are fast and the environment is pinned.
-def _train_body(steps: int, hf_repo: str, checkpoint_file: str) -> dict:
+def _train_body(steps: int, hf_repo: str, checkpoint_file: str, repo_ref: str = "master") -> dict:
     import json as _json
     import os as _os
     import subprocess
     import sys as _sys
 
+    def _run_logged(cmd, tag, env=None):
+        """Run a subprocess capturing output; ALWAYS print the tail (so `modal app logs`
+        shows it) and raise with the tail on failure. The first E-B dispatches died with an
+        opaque 'signal 6' because output wasn't captured — never again."""
+        print(f"[{tag}] $ {' '.join(cmd)}", flush=True)
+        p = subprocess.run(cmd, env=env, capture_output=True, text=True)
+        tail = ((p.stdout or "")[-2000:] + "\n--- stderr ---\n" + (p.stderr or "")[-4000:])
+        print(f"[{tag}] exit={p.returncode}\n{tail}", flush=True)
+        if p.returncode != 0:
+            raise RuntimeError(f"{tag} failed (exit {p.returncode}); tail:\n{tail[-1500:]}")
+        return p
+
     repo = "/root/lantern-os"
     if not _os.path.exists(repo):
         clone_env = {**_os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
-        subprocess.run(["git", "clone", "--depth", "1",
-                        "https://github.com/alex-place/lantern-os", repo],
-                       env=clone_env, check=True)
+        # -b <ref>: train from a branch when its data/scripts haven't merged yet.
+        _run_logged(["git", "clone", "--depth", "1", "-b", repo_ref,
+                     "https://github.com/alex-place/lantern-os", repo],
+                    "clone", env=clone_env)
     _os.chdir(repo)
     _sys.path.insert(0, _os.path.join(repo, "src"))
 
@@ -119,10 +132,10 @@ def _train_body(steps: int, hf_repo: str, checkpoint_file: str) -> dict:
     # path was never in the repo. Prep it from open datasets (the worker has egress) if absent.
     data_path = _os.environ.get("OURO_TRAIN_DATA", "data/eval/distill.jsonl")
     if not _os.path.exists(data_path):
-        subprocess.run([_sys.executable, "scripts/eb_prep_corpus.py", "--allow-download",
-                        "--distill-n", "2000", "--rlvr-n", "1000"], check=True)
+        _run_logged([_sys.executable, "scripts/eb_prep_corpus.py", "--allow-download",
+                     "--distill-n", "2000", "--rlvr-n", "1000"], "prep")
     train_env = {**_os.environ, "HF_HOME": "/root/hf-cache"}
-    subprocess.run(
+    _run_logged(
         [_sys.executable, "scripts/train-qlora-ouro.py",
          "--base", "ByteDance/Ouro-1.4B",
          "--data", data_path,
@@ -130,7 +143,7 @@ def _train_body(steps: int, hf_repo: str, checkpoint_file: str) -> dict:
          "--max-steps", str(steps),
          "--seq", "1536",
          *resume_arg],
-        check=True, env=train_env,
+        "train", env=train_env,
     )
 
     manifest = csf.pack(["/root/output"], "/root/output.csf")
@@ -167,9 +180,10 @@ if modal is not None:
         "HUGGINGFACE_TOKEN": os.environ.get("HF_TOKEN", ""),
     })
 
-    @app.function(gpu=GPU, image=_image, secrets=[_secret], timeout=24 * 60 * 60)
-    def train(steps: int, hf_repo: str, checkpoint_file: str) -> dict:
-        return _train_body(steps, hf_repo, checkpoint_file)
+    @app.function(gpu=GPU, image=_image, secrets=[_secret], timeout=24 * 60 * 60,
+                  memory=32768)  # 32 GiB host RAM — datasets+torch import headroom
+    def train(steps: int, hf_repo: str, checkpoint_file: str, repo_ref: str = "master") -> dict:
+        return _train_body(steps, hf_repo, checkpoint_file, repo_ref)
 else:
     app = None
     train = None
@@ -185,7 +199,7 @@ def cmd_dispatch(args):
         # Detached run: the spawned call keeps running on Modal after this client exits,
         # so the JS dispatcher can return immediately and poll by call id later.
         with app.run(detach=True):
-            call = train.spawn(args.steps, hf_repo, checkpoint_file)
+            call = train.spawn(args.steps, hf_repo, checkpoint_file, args.repo_ref)
             job_id = call.object_id
         result = {"status": "running", "provider": "modal", "jobId": job_id,
                   "gpu": GPU, "steps": args.steps, "app": APP_NAME,
@@ -237,6 +251,8 @@ def main():
     p_dispatch.add_argument("--steps", type=int, default=600)
     p_dispatch.add_argument("--checkpoint-uri", default="")
     p_dispatch.add_argument("--hf-repo", default="")
+    p_dispatch.add_argument("--repo-ref", default=os.environ.get("MODAL_REPO_REF", "master"),
+                            help="git branch/ref the worker clones (data+scripts source)")
 
     p_poll = sub.add_parser("poll")
     p_poll.add_argument("--job-id", required=True)

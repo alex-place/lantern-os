@@ -1,0 +1,40 @@
+{
+  "sources": [
+    "arXiv:2607.00164",
+    "OpenReview:profit-on-prediction-markets",
+    "arXiv:2604.03888 (PolySwarm)"
+  ],
+  "claim": "trader edge is SIZING on a real (bias/info) edge, not calibration; on shared information nothing profits; the residual market edge is live info",
+  "H1_shared_info_no_profit": {
+    "pass": true,
+    "vals": {
+      "kelly": 0.0007,
+      "flat": 0.0007,
+      "conservative": 0.0006
+    }
+  },
+  "H2_sizing_helps_but_edge_thin": {
+    "sizing_helps": true,
+    "edge_is_thin": true,
+    "vals": {
+      "kelly": 0.0009,
+      "flat": 0.0001,
+      "conservative": 0.0008
+    },
+    "no_edge_floor": 0.0007
+  },
+  "H3_profit_goes_negative_without_edge": {
+    "pass": true,
+    "vals": {
+      "0.02": 0.0009,
+      "0.06": 0.0004,
+      "0.12": -0.0013,
+      "0.2": -0.0048
+    }
+  },
+  "kill_flat_matches_kelly": false,
+  "reproduced": true,
+  "headline": "the bias+sizing edge (~0.0009/event) barely clears the no-edge noise floor (~0.0007) and turns NEGATIVE with modest forecast error \u2014 reproducing 'calibration does not guarantee profit'. The DOMINANT lever is HAVING A LARGE REAL EDGE, not calibration or sizing.",
+  "actionable": "budget goes to MANUFACTURING a real, large-enough edge \u2014 proprietary/live information [Observe] or a strong structural mispricing \u2014 big enough to clear the noise floor AND fees. Calibration + Kelly sizing are thin second-order levers.",
+  "evidence_class": "MEASURED-by-simulation (CPU; mechanism, not a backtest; no fees/slippage)"
+}
