@@ -1,0 +1,541 @@
+<title>Benchmarks — unisona.ai</title>
+<script>
+  /* Theme bootstrap — set before first paint to avoid a flash of wrong theme.
+     Mirrors index.html; falls back to the OS preference. */
+  (function () {
+    try {
+      var stored = localStorage.getItem('lantern-theme');
+      var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = stored ? stored === 'dark' : prefersDark;
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    } catch (e) {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  })();
+</script>
+<style>
+  /* ── Global tokens (mirrors css/site.css :root) ───────────────────────── */
+  :root {
+    --bg: #ffffff; --surface: #f8f9fa; --surface2: #f1f3f5; --border: #e5e7eb;
+    --text: #111827; --muted: #6b7280;
+    --accent: #0ea5e9; --accent-dim: #cffafe; --accent-hover: #06b6d4; --accent-strong: #0369a1;
+    --green: #10b981; --gold: #f59e0b; --danger: #ef4444;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 2px 8px rgba(0,0,0,0.04);
+    --shadow-hover: 0 4px 16px rgba(0,0,0,0.1);
+    --radius: 14px;
+  }
+  [data-theme="dark"] {
+    --bg: #0a0e17; --surface: #111827; --surface2: #1a2332; --border: #1f2937;
+    --text: #f3f4f6; --muted: #9ca3af;
+    --accent: #06b6d4; --accent-dim: #164e63; --accent-hover: #0891b2; --accent-strong: #06b6d4;
+    --green: #34d399; --gold: #fbbf24; --danger: #ef4444;
+    --shadow: 0 2px 8px rgba(0,0,0,0.3); --shadow-hover: 0 4px 20px rgba(0,0,0,0.45);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 16px; line-height: 1.6; margin: 0;
+  }
+  body { display: flex; flex-direction: column; min-height: 100vh; }
+  a { color: inherit; }
+
+  /* ── Top nav (mirrors .site-nav) ──────────────────────────────────────── */
+  .site-nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 20px; height: 52px;
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 var(--border); flex-shrink: 0;
+  }
+  .nav-brand {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 18px; font-weight: 600; color: var(--text);
+    text-decoration: none; letter-spacing: -0.3px; margin-right: 8px;
+  }
+  .nav-brand svg { width: 24px; height: 24px; }
+  .nav-links { display: flex; align-items: center; gap: 2px; flex: 1; overflow-x: auto; scrollbar-width: none; }
+  .nav-links::-webkit-scrollbar { display: none; }
+  .nav-links a {
+    font-size: 13px; color: var(--muted); text-decoration: none;
+    padding: 6px 10px; border-radius: 7px;
+    transition: color .15s, background .15s; white-space: nowrap;
+  }
+  .nav-links a:hover { color: var(--text); background: var(--surface2); }
+  .nav-links a.active { color: var(--accent-strong); font-weight: 600; }
+  .nav-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .nav-btn {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface2);
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .nav-btn svg { width: 18px; height: 18px; display: block; }
+  #theme-toggle .icon-sun, #theme-toggle .icon-moon { display: none; }
+  html[data-theme="dark"] #theme-toggle .icon-sun { display: block; }
+  html[data-theme="light"] #theme-toggle .icon-moon { display: block; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ── Page container (mirrors .page) ───────────────────────────────────── */
+  .page { max-width: 1100px; margin: 0 auto; padding: 0 20px 80px; width: 100%; }
+  @media (min-width: 1700px) { .page { max-width: 1400px; } }
+
+  /* ── Header ───────────────────────────────────────────────────────────── */
+  .bm-head { padding: 34px 0 10px; }
+  .bm-head .eyebrow {
+    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.11em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .bm-head h1 {
+    margin: 6px 0 6px;
+    font-family: "Century Gothic", "Franklin Gothic Heavy", "Segoe UI", system-ui, sans-serif;
+    font-size: clamp(1.9rem, 5vw, 2.6rem); font-weight: 700;
+    letter-spacing: -0.01em; text-wrap: balance;
+  }
+  .bm-head .sub { color: var(--muted); max-width: 68ch; font-size: 0.95rem; }
+  .bm-head .provenance {
+    margin-top: 12px; font-size: 0.78rem; color: var(--muted);
+    display: flex; flex-wrap: wrap; gap: 6px 14px;
+  }
+  .bm-head .provenance b { color: var(--text); font-weight: 600; }
+
+  /* ── Warning banner (snapshot mismatch) ───────────────────────────────── */
+  .note {
+    display: flex; gap: 12px; align-items: flex-start;
+    background: rgba(245,158,11,0.09); border: 1px solid rgba(245,158,11,0.32);
+    border-radius: var(--radius); padding: 14px 16px; margin: 20px 0 8px;
+    font-size: 0.86rem; line-height: 1.55;
+  }
+  .note svg { width: 18px; height: 18px; color: var(--gold); flex-shrink: 0; margin-top: 2px; }
+  .note b { color: var(--text); }
+
+  /* ── Sections ─────────────────────────────────────────────────────────── */
+  .section { margin-top: 38px; }
+  .section > h2 {
+    font-size: 1.12rem; font-weight: 700; margin: 0 0 4px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section > .desc { color: var(--muted); font-size: 0.85rem; margin: 0 0 14px; max-width: 74ch; }
+
+  /* ── Capability summary cards ─────────────────────────────────────────── */
+  .caps { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 12px; }
+  .cap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 16px 14px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .cap .stage { font-size: 0.62rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .cap .mark { font-size: 0.9rem; font-weight: 600; }
+  .cap .bar { height: 6px; border-radius: 4px; background: var(--surface2); overflow: hidden; margin: 8px 0 6px; }
+  .cap .bar > span { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+  .cap.warn .bar > span { background: var(--gold); }
+  .cap.miss .bar > span { background: var(--danger); }
+  .cap .figures { display: flex; align-items: baseline; justify-content: space-between; font-variant-numeric: tabular-nums; }
+  .cap .local { font-size: 1.32rem; font-weight: 700; letter-spacing: -0.02em; }
+  .cap .share { font-size: 0.74rem; color: var(--muted); }
+
+  /* ── Tables ───────────────────────────────────────────────────────────── */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
+  }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.87rem; min-width: 640px; }
+  thead th {
+    text-align: left; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--muted);
+    padding: 12px 16px; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.rank { color: var(--muted); font-weight: 700; text-align: center; width: 46px; font-variant-numeric: tabular-nums; }
+  td.score { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.provider, td.asof, td.src { color: var(--muted); font-size: 0.8rem; }
+  .src a { color: var(--accent-strong); text-decoration: none; }
+  .src a:hover { text-decoration: underline; }
+  .src-inline { color: var(--accent-strong); text-decoration: none; white-space: nowrap; }
+  .src-inline:hover { text-decoration: underline; }
+  .cap .share b { color: var(--text); font-weight: 600; }
+  .model { font-weight: 600; }
+  tr.field td { color: var(--muted); font-style: italic; }
+  tr.local {
+    background: linear-gradient(90deg, var(--accent-dim), transparent 62%);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  tr.local .model, tr.local td.score { color: var(--accent-strong); }
+  tr.local td.rank { color: var(--accent-strong); }
+
+  .caveat {
+    display: flex; gap: 9px; align-items: flex-start;
+    padding: 11px 16px; font-size: 0.79rem; color: var(--muted);
+    background: var(--surface2); border-top: 1px solid var(--border); line-height: 1.5;
+  }
+  .caveat svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
+  .caveat.saturated svg { color: var(--gold); }
+  .caveat.missing svg { color: var(--danger); }
+  .caveat.mismatch svg { color: var(--accent); }
+  .caveat b { color: var(--text); }
+
+  /* ── Pills (mirrors .pill) ────────────────────────────────────────────── */
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; white-space: nowrap; }
+  .pill.run { background: rgba(16,185,129,0.14); color: var(--green); }
+  .pill.partial { background: rgba(245,158,11,0.14); color: var(--gold); }
+  .pill.missing { background: rgba(239,68,68,0.14); color: var(--danger); }
+
+  /* ── Run-next plan ────────────────────────────────────────────────────── */
+  .plan { display: flex; flex-direction: column; gap: 12px; }
+  .step {
+    display: grid; grid-template-columns: 34px 1fr; gap: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .step .n {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--accent-dim); color: var(--accent-strong);
+    font-weight: 700; font-size: 0.95rem; font-variant-numeric: tabular-nums;
+  }
+  .step h3 { margin: 2px 0 5px; font-size: 0.95rem; font-weight: 700; }
+  .step p { margin: 0 0 8px; font-size: 0.84rem; color: var(--muted); line-height: 1.5; }
+  .step .why { color: var(--text); }
+  .step code {
+    display: block; overflow-x: auto; white-space: pre;
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 11px; font-size: 0.76rem; color: var(--text);
+    font-family: "Cascadia Code", "Consolas", ui-monospace, monospace;
+  }
+  .step .meta { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 0.68rem; font-weight: 600; color: var(--muted);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 8px;
+  }
+
+  /* ── Verdict ──────────────────────────────────────────────────────────── */
+  .verdict {
+    margin-top: 34px; border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    background: var(--surface); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow);
+  }
+  .verdict h2 { margin: 0 0 8px; font-size: 1rem; }
+  .verdict p { margin: 0; color: var(--text); font-size: 0.9rem; line-height: 1.62; }
+  .verdict p + p { margin-top: 10px; color: var(--muted); font-size: 0.84rem; }
+
+  /* ── Footer (mirrors .site-footer) ────────────────────────────────────── */
+  .site-footer { border-top: 1px solid var(--border); padding: 16px 20px; margin-top: auto; background: var(--surface); }
+  .footer-inner {
+    max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: center;
+    gap: 8px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted);
+  }
+  .footer-inner a { color: var(--muted); text-decoration: none; }
+  .footer-inner a:hover { color: var(--text); text-decoration: underline; }
+  .footer-inner .sep { color: var(--border); }
+  .footer-brand { display: inline-flex; align-items: center; gap: 5px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<!-- Inline mandala mark so the brand matches without an external asset -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="mandala" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.4">
+      <circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/>
+      <path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9 4.9 19.1"/>
+    </g>
+  </symbol>
+</svg>
+
+<nav class="site-nav">
+  <a class="nav-brand" href="/">
+    <svg style="color:var(--accent)"><use href="#mandala"/></svg>
+    <span>unisona.ai</span>
+  </a>
+  <div class="nav-links">
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/stock-trader.html">Trader</a>
+    <a href="/orchestration.html">Settings</a>
+    <a href="/work.html">Work</a>
+    <a href="/explore.html">Explore</a>
+    <a href="/benchmarks.html" class="active" aria-current="page">Benchmarks</a>
+  </div>
+  <div class="nav-actions">
+    <button class="nav-btn" id="theme-toggle" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</nav>
+
+<main class="page" id="main-content">
+
+  <header class="bm-head">
+    <div class="eyebrow">Observe · Verify — external marks</div>
+    <h1>Benchmarks</h1>
+    <p class="sub">Where the local stack actually stands on hard, externally-owned marks — read from the append-only eval ledgers, placed against the live public state of the art. A Σ₀ artifact: nothing here is stated from memory.</p>
+    <div class="provenance">
+      <span>Ledger source: <b>data/eval/leaderboard.jsonl</b></span>
+      <span>Newest measured row: <b>2026-07-08</b> (SWE-bench graded — no eval run since)</span>
+      <span>Competitor rows: <b>web-validated live, Jul 17 2026</b> — 5-way parallel fan-out</span>
+      <span>Branch: <b>master</b> · refresh #2268</span>
+    </div>
+  </header>
+
+  <div class="note">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    <div><b>Snapshot mismatch — "the local model" is not one thing.</b> The coding marks come from <b>Qwen2.5-Coder</b> (the shipped engine, #2171); the raw HumanEval 0.427 is <b>frozen Ouro-1.4B</b> (research base, a different model); LongMemEval is the retrieval <b>MemoryEngine</b>; HaluEval runs on a <b>gpt-4o-mini</b> oracle harness. They're kept in separate tables below — any single claim spanning them is unsound.</div>
+  </div>
+
+  <!-- ── Capability across the loop ── -->
+  <section class="section">
+    <h2>Capability across the loop</h2>
+    <p class="desc">The suite is per-stage instrumentation of one loop — Observe → Remember → Reason → Act → Verify → Converge — not a scoreboard of independent games. Each figure is the local mark's share of the live public SOTA.</p>
+    <div class="caps">
+      <div class="cap">
+        <span class="stage">Act</span><span class="mark">HumanEval · chat (Qwen)</span>
+        <div class="figures"><span class="local">0.829</span><span class="share">/ 0.951 live top</span></div>
+        <div class="bar"><span style="width:87%"></span></div>
+        <span class="share">87% of live top · saturated mark</span>
+      </div>
+      <div class="cap">
+        <span class="stage">Act</span><span class="mark">Coding golden-25 (Qwen)</span>
+        <div class="figures"><span class="local">0.96</span><span class="share">n=25</span></div>
+        <div class="bar"><span style="width:96%"></span></div>
+        <span class="share">absolute read · self-owned set</span>
+      </div>
+      <div class="cap miss">
+        <span class="stage">Act + Verify</span><span class="mark">SWE-bench Lite</span>
+        <div class="figures"><span class="local">0/5</span><span class="share">/ 0.955 SOTA</span></div>
+        <div class="bar"><span style="width:2%"></span></div>
+        <span class="share">first graded row · single-shot 0%</span>
+      </div>
+      <div class="cap">
+        <span class="stage">Remember</span><span class="mark">LongMemEval · recall@5</span>
+        <div class="figures"><span class="local">0.709</span><span class="share">~0.95 QA</span></div>
+        <div class="bar"><span style="width:74%"></span></div>
+        <span class="share">~74%* · not apples-to-apples</span>
+      </div>
+      <div class="cap warn">
+        <span class="stage">Verify</span><span class="mark">HaluEval-QA · grounded</span>
+        <div class="figures"><span class="local">0.20</span><span class="share">64% rel ↓</span></div>
+        <div class="bar"><span style="width:64%"></span></div>
+        <span class="share">accept-gate ✓ · harness metric</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Apples-to-apples methodology ── -->
+  <section class="section">
+    <h2>Reading these fairly <span class="pill partial">web-validated · Jul 17 2026</span></h2>
+    <p class="desc">A number is only a comparison if the split, the grader, and the scaffold match. A live 5-way web fan-out cross-checked against the local arXiv corpus surfaced four rules that decide whether each row below is rankable or merely indicative.</p>
+    <div class="caps" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">
+      <div class="cap">
+        <span class="stage">Code · HumanEval / MBPP</span>
+        <span class="mark">Use EvalPlus (+), greedy pass@1</span>
+        <div class="bar"><span style="width:100%;background:var(--gold)"></span></div>
+        <span class="share">Vanilla HumanEval carries <b>8–19% contamination</b>; the credible board is <b>HumanEval+/MBPP+</b> ranked by <b>greedy</b> pass@1. Our 0.829 is <b>vanilla, chat-sampled</b> — re-run as HumanEval+ greedy to be rankable. <a class="src-inline" href="https://evalplus.github.io/leaderboard.html" target="_blank" rel="noopener">EvalPlus</a></span>
+      </div>
+      <div class="cap">
+        <span class="stage">SWE-bench</span>
+        <span class="mark">Verified + fixed scaffold, or it's not a rank</span>
+        <div class="bar"><span style="width:100%;background:var(--danger)"></span></div>
+        <span class="share">Scaffold alone swings scores <b>10–20 pts</b>; a <b>Lite-only single-shot</b> number "reads as uninformed or evasive". Compare only within one split + harness class. Our 0/5 is a <b>floor read, not a rank</b>. <a class="src-inline" href="https://www.digitalapplied.com/blog/swe-bench-verified-june-2026-benchmark-vs-scaffolding-analysis" target="_blank" rel="noopener">digitalapplied</a></span>
+      </div>
+      <div class="cap">
+        <span class="stage">Memory · LongMemEval</span>
+        <span class="mark">QA-accuracy, not recall@k</span>
+        <div class="bar"><span style="width:100%;background:var(--gold)"></span></div>
+        <span class="share">Reporting <b>recall@k as if it were QA-accuracy inflates 20–30 pts</b>. Leaders report retrieve→generate→GPT-4o-judge. Our 0.709 is <b>retrieval-only</b> — add the reader stage before ranking. <a class="src-inline" href="https://www.emergentmind.com/topics/longmemeval" target="_blank" rel="noopener">emergentmind</a></span>
+      </div>
+      <div class="cap">
+        <span class="stage">Honesty · HaluEval</span>
+        <span class="mark">Cross-check; reward abstention</span>
+        <div class="bar"><span style="width:100%;background:var(--gold)"></span></div>
+        <span class="share">A length-only classifier scores <b>93.3%</b> on HaluEval-QA, and the 98%+ hidden-state <b>detection</b> SOTA is largely a teacher-forced artifact — <b>PARALLAX</b> (Jul 17 web-check) finds a text-similarity baseline alone hits 0.98, and on <i>live-generated</i> text a top probe collapses <b>0.96 → 0.62</b> — right where our own unsupervised canary (≤0.66) sits. Cross-check <b>TruthfulQA / SimpleQA-Verified</b>; reward calibrated abstention. <a class="src-inline" href="https://arxiv.org/abs/2605.17028" target="_blank" rel="noopener">PARALLAX 2605.17028</a></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HumanEval ── -->
+  <section class="section">
+    <h2>HumanEval <span class="pill run">Run</span></h2>
+    <p class="desc">pass@1 on 164 code-synthesis problems. Two layers measured: the raw model and the whole chat product.</p>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>Model</th><th>Provider</th><th>pass@1</th><th>As of</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">1</td><td class="model">MiniCPM-SALA</td><td class="provider">OpenBMB (OSS)</td><td class="score">95.1%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://llm-stats.com/benchmarks/humaneval" target="_blank" rel="noopener">llm-stats</a></td></tr>
+          <tr><td class="rank">2</td><td class="model">Kimi K2 0905</td><td class="provider">Moonshot AI (OSS)</td><td class="score">94.5%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://llm-stats.com/benchmarks/humaneval" target="_blank" rel="noopener">llm-stats</a></td></tr>
+          <tr><td class="rank">3</td><td class="model">Claude 3.5 Sonnet</td><td class="provider">Anthropic</td><td class="score">93.7%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://llm-stats.com/benchmarks/humaneval" target="_blank" rel="noopener">llm-stats</a></td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Qwen2.5-Coder (chat product)</td><td class="provider">local · Σ₀</td><td class="score">82.9% <span style="font-weight:400;color:var(--muted)">(full 164)</span></td><td class="asof">Jul 7 2026</td><td class="src">leaderboard.jsonl</td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Ouro-1.4B + adapter (raw)</td><td class="provider">local · Σ₀</td><td class="score">42.7% <span style="font-weight:400;color:var(--muted)">(ck600)</span></td><td class="asof">Jun 26 2026</td><td class="src">leaderboard.jsonl</td></tr>
+          <tr class="field"><td class="rank">—</td><td class="model">field average (66 models)</td><td class="provider">—</td><td class="score">81.2%</td><td class="asof">Jul 17 2026</td><td class="src">llm-stats</td></tr>
+        </tbody>
+      </table></div>
+      <div class="caveat saturated">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><b>Saturated — and the live board is going stale.</b> As of Jul 17, the frontier flagships (Claude Sonnet 4.5, DeepSeek R1 — our old 97.6/97.4 leaders) have largely <b>stopped self-reporting HumanEval</b>, so llm-stats now tops at an OSS model (MiniCPM-SALA 95.1) with the 2024-era Claude 3.5 Sonnet at #3; the highest cached figure (97.6, pricepertoken) was unreachable and unverifiable this run. Vanilla HumanEval also carries 8–19% contamination — the rankable standard is <b>HumanEval+ (EvalPlus), greedy pass@1</b> (top: Llama 3.1 405B <b>89</b>). Our 0.829 is vanilla and chat-sampled — an absolute-capability read, not an EvalPlus rank (0.72 → 0.829 was the #2194 harness fix, not a model change). The board itself now points to LiveCodeBench / SWE-bench to differentiate.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── MBPP / coding ── -->
+  <section class="section">
+    <h2>MBPP / coding-golden <span class="pill run">Run</span></h2>
+    <p class="desc">Exec-and-assert function synthesis. The local number is our own 25-problem golden set — a proxy, not public MBPP.</p>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>Model</th><th>Provider</th><th>Score</th><th>As of</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">1</td><td class="model">o4-mini</td><td class="provider">OpenAI</td><td class="score">94.9% <span style="font-weight:400;color:var(--muted)">MBPP</span></td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://www.codesota.com/benchmark/mbpp" target="_blank" rel="noopener">codesota</a></td></tr>
+          <tr><td class="rank">2</td><td class="model">Sarvam-30B</td><td class="provider">Sarvam AI (OSS)</td><td class="score">92.7% <span style="font-weight:400;color:var(--muted)">top open-weight</span></td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://llm-stats.com/benchmarks/mbpp" target="_blank" rel="noopener">llm-stats</a></td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Qwen2.5-Coder <span style="font-weight:400;color:var(--muted)">— mbpp-basic subset</span></td><td class="provider">local · Σ₀</td><td class="score">100% <span style="font-weight:400;color:var(--muted)">(18/18) · ceiling artifact</span></td><td class="asof">Jul 8 2026</td><td class="src">leaderboard.jsonl</td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Qwen2.5-Coder <span style="font-weight:400;color:var(--muted)">— coding-golden proxy</span></td><td class="provider">local · Σ₀</td><td class="score">96% <span style="font-weight:400;color:var(--muted)">golden-25 (24/25)</span></td><td class="asof">Jul 6 2026</td><td class="src">leaderboard.jsonl</td></tr>
+        </tbody>
+      </table></div>
+      <div class="caveat mismatch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span><b>Not the public set.</b> 96% is against our own golden-25 proxy — a different task set, so it can't be ranked against o4-mini's MBPP or the EvalPlus <b>MBPP+ greedy</b> board. To sit <i>in</i> the field, run MBPP-basic (plan #2 — harness now takes <code style="display:inline;padding:1px 5px">--dataset</code>), ideally the EvalPlus MBPP+ variant with greedy decoding.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── SWE-bench ── -->
+  <section class="section">
+    <h2>SWE-bench Lite <span class="pill run">Run · first graded</span></h2>
+    <p class="desc">Real-repo issue → patch, execution-graded resolved%. The differentiating agentic coding mark. First on-box graded number landed 2026-07-08 (#2268).</p>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>Model</th><th>Provider</th><th>Resolved</th><th>As of</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">1</td><td class="model">Claude Mythos 5</td><td class="provider">Anthropic</td><td class="score">95.5%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://www.swebench.com/" target="_blank" rel="noopener">swebench.com</a></td></tr>
+          <tr><td class="rank">2</td><td class="model">Claude Fable 5</td><td class="provider">Anthropic</td><td class="score">95.0%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://benchlm.ai/benchmarks/sweVerified" target="_blank" rel="noopener">benchlm</a></td></tr>
+          <tr><td class="rank">3</td><td class="model">Claude Opus 4.8</td><td class="provider">Anthropic</td><td class="score">88.6%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://www.swebench.com/" target="_blank" rel="noopener">swebench.com</a></td></tr>
+          <tr><td class="rank">—</td><td class="model">Gemini 3.1 Pro <span style="font-weight:400;color:var(--muted)">best non-Anthropic</span></td><td class="provider">Google</td><td class="score">80.6%</td><td class="asof">Jul 17 2026</td><td class="src"><a href="https://llm-stats.com/benchmarks/swe-bench-verified" target="_blank" rel="noopener">llm-stats</a></td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Qwen2.5-Coder (single-shot --direct)</td><td class="provider">local · Σ₀</td><td class="score">0/5 resolved <span style="font-weight:400;color:var(--muted)">(0%)</span></td><td class="asof">Jul 8 2026</td><td class="src">swebench/…keystone-1783465949.json</td></tr>
+          <tr class="field"><td class="rank">—</td><td class="model">field average (104 models)</td><td class="provider">—</td><td class="score">~70%</td><td class="asof">Jul 17 2026</td><td class="src">llm-stats</td></tr>
+        </tbody>
+      </table></div>
+      <div class="caveat mismatch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><b>First graded row — now on master (#2268).</b> Official swebench harness, WSL2 Docker: 4 patches applied cleanly but failed FAIL_TO_PASS tests, 1 hunk-apply failure. <b>Not rankable against the SOTA column:</b> research is blunt that scaffold alone swings SWE-bench 10–20 pts and a Lite-only single-shot number "reads as uninformed or evasive" — ours is Lite single-shot vs the frontier's Verified agentic runs. It's an honest floor for our own stack, not a position on this board. Next lever: the agentic loop on the Verified split under a fixed minimal harness — the only comparable configuration.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── LongMemEval + HaluEval ── -->
+  <section class="section">
+    <h2>Memory &amp; honesty</h2>
+    <p class="desc">Remember and Verify stages. Both are measured on different substrates than the public leaders — read the caveats.</p>
+    <div class="card" style="margin-bottom:16px">
+      <div class="table-scroll"><table>
+        <thead><tr><th>#</th><th>System</th><th>Provider</th><th>LongMemEval</th><th>As of</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">1</td><td class="model">MemPalace <span style="font-weight:400;color:var(--muted)">raw</span></td><td class="provider">open-source</td><td class="score">96.6% QA-acc</td><td class="asof">Apr 2026</td><td class="src"><a href="https://www.mempalace.tech/benchmarks" target="_blank" rel="noopener">mempalace.tech</a></td></tr>
+          <tr><td class="rank">2</td><td class="model">OMEGA</td><td class="provider">omegamax</td><td class="score">95.4% QA-acc <span style="font-weight:400;color:var(--muted)">task-avg</span></td><td class="asof">Feb 2026</td><td class="src"><a href="https://omegamax.co/benchmarks" target="_blank" rel="noopener">omegamax.co</a></td></tr>
+          <tr><td class="rank">3</td><td class="model">ByteRover</td><td class="provider">ByteRover</td><td class="score">92.8% QA-acc</td><td class="asof">Mar 2026</td><td class="src"><a href="https://www.byterover.dev/blog/benchmark_ai_agent_memory_real_production_byterover_top_market_accuracy_longmemeval" target="_blank" rel="noopener">byterover.dev</a></td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">Keystone (multi-signal + qwen reader)</td><td class="provider">local · Σ₀</td><td class="score">QA-acc 0.294 <span style="font-weight:400;color:var(--muted)">(141/479) · det-judge floor</span></td><td class="asof">Jul 8 2026</td><td class="src">longmemeval/runs.jsonl</td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">MemoryEngine — retrieval only</td><td class="provider">local · Σ₀</td><td class="score">recall@5 0.774 <span style="font-weight:400;color:var(--muted)">(479) · not QA-acc</span></td><td class="asof">Jul 8 2026</td><td class="src">longmemeval/runs.jsonl</td></tr>
+        </tbody>
+      </table></div>
+      <div class="caveat mismatch">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        <span><b>Not apples-to-apples — and the gap is quantified.</b> Leaders report end-to-end QA-accuracy (retrieve → generate → GPT-4o judge); ours is retrieval recall@k only. Research: reporting recall@k <i>as if</i> it were QA-accuracy <b>inflates 20–30 pts</b> — so 0.709 recall must not be read next to OMEGA's 95.4% QA-acc. Within its own lane it's real: multi-signal crushes keyword (0.774 vs 0.196 recall). <b>First measured QA-accuracy (Jul 8, full 479):</b> 0.294 under our deterministic normalized-contains judge — a <b>floor</b>, since the frontier's GPT-4o judge credits paraphrases ours rejects, and this figure also folds in the 7B reader's own skill. Wiring <code style="display:inline;padding:1px 5px">--judge llm</code> is what makes it truly comparable to OMEGA's 95.4%. <b>Web-check (Jul 17):</b> the podium is stable but every figure is <b>vendor-self-reported under a different protocol</b> — Mem0's 93% self-report collapses to <b>31.8% under a standardized protocol</b>, and MemPalace's headline 100%-hybrid was publicly called a reranking artifact (96.6 raw is the honest number). And <b>LongMemEval-V2</b> (arXiv:2605.12493, 100M-token contexts) is far harder — the best method scores ~58–72% vs ~95% on V1, so this whole board resets soon.</span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-scroll"><table>
+        <thead><tr><th></th><th>Config</th><th>Model</th><th>Hallucination</th><th>Gate</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td class="rank">—</td><td class="model">Baseline (closed-book)</td><td class="provider">gpt-4o-mini</td><td class="score">55%</td><td class="asof">—</td><td class="src">halueval_ab_results.json</td></tr>
+          <tr class="local"><td class="rank">▸</td><td class="model">+ Σ₀ grounding</td><td class="provider">gpt-4o-mini</td><td class="score">20% <span style="font-weight:400;color:var(--muted)">(64% rel ↓)</span></td><td class="asof">ADR-0017 ✓</td><td class="src">halueval_ab_results.json</td></tr>
+        </tbody>
+      </table></div>
+      <div class="caveat saturated">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span><b>No public leaderboard, weak native metric</b> (a length-only classifier scores ~93% on HaluEval). This measures the grounding harness on gpt-4o-mini, not a local model. The local honesty-adapter numbers in PR #2263's docs are unverified — that data dir is empty on master.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Run next ── -->
+  <section class="section">
+    <h2>Run next</h2>
+    <p class="desc">Ranked by information gained per hour of wall-clock. A cheap run that fills a MISSING cell beats re-running a fresh one.</p>
+    <div class="plan">
+      <div class="step" style="opacity:.62">
+        <div class="n" style="background:rgba(16,185,129,0.14);color:var(--green)">✓</div>
+        <div>
+          <h3>Merge PR #2268 → the graded SWE-bench row lands <span class="pill run">Done</span></h3>
+          <p class="why">Landed on local master 2026-07-08 — the 0/5 graded row + BENCHMARKS reposition are now in the tree. (Remote push pending owner action, below.)</p>
+          <div class="meta"><span class="tag">no compute</span><span class="tag">merged locally</span></div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">1</div>
+        <div>
+          <h3>SWE-bench agentic loop, graded</h3>
+          <p>Single-shot 0% is now the measured floor and is floor-pinned by the paper; only the propose → test → retry loop has real dynamic range.</p>
+          <code>wsl -d Ubuntu --cd /mnt/c/dev/lantern-os -- python3 \
+  -m swebench.harness.run_evaluation \
+  --dataset_name princeton-nlp/SWE-bench_Lite \
+  --predictions_path &lt;agentic-preds.jsonl&gt; \
+  --run_id &lt;id&gt; --max_workers 1</code>
+          <div class="meta"><span class="tag">~17 min / 5 first-build</span><span class="tag">needs Docker/WSL2</span><span class="tag">good: any nonzero resolved</span></div>
+        </div>
+      </div>
+      <div class="step" style="opacity:.62">
+        <div class="n" style="background:rgba(16,185,129,0.14);color:var(--green)">✓</div>
+        <div>
+          <h3>Real MBPP-basic subset <span class="pill run">Done · 18/18</span></h3>
+          <p>Ran on a served qwen2.5-coder (Jul 8): <b>100% pass@1 (18/18)</b>, 1.3 s/problem, row stamped <code style="display:inline;padding:1px 5px">dataset: mbpp-basic.jsonl</code>. Honest read: a perfect score on 18 problems is a <b>subset ceiling artifact</b>, not a public rank — the EvalPlus MBPP+ greedy run is still the one that sits in the field.</p>
+          <div class="meta"><span class="tag">done ✓</span><span class="tag">subset ceiling, not a rank</span><span class="tag">next: EvalPlus MBPP+ greedy</span></div>
+        </div>
+      </div>
+      <div class="step" style="opacity:.62">
+        <div class="n" style="background:rgba(16,185,129,0.14);color:var(--green)">✓</div>
+        <div>
+          <h3>LongMemEval end-to-end QA-accuracy <span class="pill run">Done · 0.294 floor</span></h3>
+          <p>Re-downloaded the full <code style="display:inline;padding:1px 5px">longmemeval_s</code> (500 / 479 gold) and ran <code style="display:inline;padding:1px 5px">--qa --reader qwen2.5-coder</code> (Jul 8, ~70 min): <b>QA-accuracy 0.294 (141/479)</b>, recall@5 0.774. This is a <b>deterministic-judge floor</b> — the GPT-4o-judged frontier (OMEGA 95.4%) credits paraphrases ours rejects, and this also folds in the 7B reader's own skill. Not yet a like-for-like rank.</p>
+          <div class="meta"><span class="tag">done ✓</span><span class="tag">deterministic-judge floor</span><span class="tag">next: --judge llm (GPT-4o) for the rankable figure</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Verdict ── -->
+  <div class="verdict">
+    <h2>Whole-loop verdict</h2>
+    <p>The <b>Act</b> stage is genuinely strong and honestly measured this snapshot — Qwen2.5-Coder at 0.829 full-HumanEval, with the 0.72 → 0.829 correction being the harness catching up to reality, not inflation. And the loop's differentiating stage, <b>Act + Verify (SWE-bench)</b>, now has its first real number on master: <b>0/5 resolved</b> — humbling, but honest, and no longer a blank.</p>
+    <p>0% is the measured single-shot floor, exactly where the published curve puts an affordable-n run for a stack this size — so it isn't a regression, it's a baseline. The loop is stronger as a system this snapshot because the empty cell that mattered most is now filled; the next lever is the agentic propose → test → retry loop, the only SWE-bench configuration with real dynamic range at our rung.</p>
+    <p>Competitor rows were re-validated live on Jul 17 (our own numbers unchanged — no eval run since Jul 8). The podiums barely moved, but the cross-check found the rivals' numbers are softer than they look: HumanEval's live board has gone <b>stale</b> — the flagships stopped self-reporting, so an OSS model tops it and a 2024 Claude sits at #3; the 98%+ honesty-<i>detection</i> SOTA is largely a <b>teacher-forced artifact</b> (PARALLAX: top probes fall to 0.62 on live text, at our own canary's level); and the memory podium is vendor self-reports under clashing protocols (one 93% claim collapses to 32% standardized). External reality cuts both ways — it right-sizes the frontier as much as us.</p>
+  </div>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-brand"><span class="dot"></span> unisona.ai</span>
+    <span class="sep">·</span>
+    <a href="/">Home</a>
+    <a href="/dream-chat.html">Chat</a>
+    <a href="/explore.html">Explore</a>
+    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
+    <span class="sep">·</span>
+    <span style="opacity:.75">Σ₀ benchmarks · external-reality read · master</span>
+  </div>
+</footer>
+
+<script>
+  /* Theme toggle — persists to the same key the real site uses. */
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+      var root = document.documentElement;
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('lantern-theme', next); } catch (e) {}
+    });
+  })();
+</script>
