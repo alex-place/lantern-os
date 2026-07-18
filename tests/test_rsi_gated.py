@@ -48,5 +48,7 @@ def test_committed_report_reproduced():
     r = json.loads(p.read_text(encoding="utf-8"))
     assert r["reproduced"] is True
     v = r["verdicts"]
-    assert v["H1_delusion_and_precision_decay"] and v["H2_gated_bounded_and_no_worse"]
-    assert v["H3_throughput_limited"] and not v["kill_grounding_adds_nothing"]
+    # the full RSI-stabilizer spectrum (survey arXiv:2607.07663 verification hierarchy)
+    assert v["H1_ungrounded_delusion_decay"] and v["H2_fresh_gate_bounded"]
+    assert v["H3_throughput_limited"] and v["H4_deanchoring_prevents_basin_no_external_truth"]
+    assert v["H5_reused_filter_slows_not_stops"] and not v["kill_grounding_adds_nothing"]

@@ -67,7 +67,8 @@ CYCLES = 60
 SEEDS = 200
 MU_PROP, SIGMA_PROP = -0.01, 0.06     # most proposals are not improvements
 SIGMA_SELF, SIGMA_EXT = 0.04, 0.01    # self-assessment noisier than external verification
-ETA = 0.35                            # assessor-bias learning rate on flattering accepts
+ETA = 0.35                            # assessor-bias learning rate on flattering accepts (self, easy to game)
+ETA_FILTER = 0.10                     # Goodhart-drift rate against a REUSED exogenous verifier (harder to game)
 K_DEFAULT = 4                         # external verification every k-th cycle
 K_SWEEP = (1, 2, 4, 8)
 
@@ -76,19 +77,25 @@ def run_arm(arm, seed, k=K_DEFAULT, cycles=CYCLES):
     rng = np.random.default_rng((seed, hash(arm) & 0xFFFF, k))
     true_log = 0.0
     believed_log = 0.0
-    bias = 0.0
+    bias = 0.0            # anchored-self flattery bias (ungrounded)
+    filter_game = 0.0     # Goodhart drift against a REUSED exogenous verifier (fixed_filter)
+    fixed_eps = rng.normal(0.0, SIGMA_EXT)  # a static verifier's systematic blind spot (drawn once)
     accepts = goods = 0
-    precision_late = precision_early = [0, 0]  # [good, total] — filled below
     early, late = [0, 0], [0, 0]
     for t in range(cycles):
         d_true = rng.normal(MU_PROP, SIGMA_PROP)
-        d_self = d_true + bias + rng.normal(0.0, SIGMA_SELF)
+        d_self = d_true + bias + rng.normal(0.0, SIGMA_SELF)          # anchored self-score
+        d_self_blind = d_true + rng.normal(0.0, SIGMA_SELF)           # de-anchored: commit before seeing candidate
         verify_cycle = (t % k) == 0
-        if arm == "ungrounded":
+        if arm == "ungrounded":                                       # self, anchored — 2607.05904 basin
             accept = d_self > 0
-        elif arm == "gated":
+        elif arm == "deanchored":                                     # commit-first self — 2607.05904 FIX (no external truth)
+            accept = d_self_blind > 0
+        elif arm == "fixed_filter":                                   # REUSED exogenous verifier — 2606.28438 (slows, not stops)
+            accept = verify_cycle and (d_true + fixed_eps + filter_game) > 0
+        elif arm == "gated":                                          # FRESH exogenous gate — freshness law
             accept = verify_cycle and (d_true + rng.normal(0.0, SIGMA_EXT)) > 0
-        elif arm == "screened":
+        elif arm == "screened":                                       # detect (self) then select (fresh truth)
             accept = verify_cycle and d_self > 0 and (d_true + rng.normal(0.0, SIGMA_EXT)) > 0
         else:
             raise ValueError(arm)
@@ -100,7 +107,13 @@ def run_arm(arm, seed, k=K_DEFAULT, cycles=CYCLES):
             (early if t < cycles // 2 else late)[1] += 1
             (early if t < cycles // 2 else late)[0] += int(d_true > 0)
             if arm == "ungrounded":
-                bias += ETA * (d_self - d_true)   # flattery reinforces the assessor
+                bias += ETA * (d_self - d_true)          # flattery reinforces the assessor (fast)
+            elif arm == "fixed_filter":
+                # Rubber-stamp drift (2606.28438): on EVERY accept the proposal distribution shifts
+                # to exploit the STATIC verifier's blind spot, so its score inflates independent of
+                # correctness — eventually flipping bad proposals through. (A FRESH gate re-draws its
+                # check each cycle, so this drift can't accumulate — the freshness law.)
+                filter_game += ETA_FILTER * SIGMA_PROP
     prec = goods / accepts if accepts else float("nan")
     prec_e = early[0] / early[1] if early[1] else float("nan")
     prec_l = late[0] / late[1] if late[1] else float("nan")
@@ -123,53 +136,63 @@ def summarize(rows):
 
 
 def main():
-    arms = {a: summarize([run_arm(a, s) for s in range(SEEDS)])
-            for a in ("ungrounded", "gated", "screened")}
-    print(f"== RSI toy: {CYCLES} cycles, {SEEDS} seeds, verify every k={K_DEFAULT} ==")
+    ARMS = ("ungrounded", "deanchored", "fixed_filter", "gated", "screened")
+    arms = {a: summarize([run_arm(a, s) for s in range(SEEDS)]) for a in ARMS}
+    print(f"== RSI toy (5 arms = the 2026 RSI-stabilizer spectrum): {CYCLES} cycles, {SEEDS} seeds, verify k={K_DEFAULT} ==")
+    tags = {"ungrounded": "self,anchored [2607.05904 basin]", "deanchored": "commit-first [2607.05904 fix]",
+            "fixed_filter": "reused verifier [2606.28438]", "gated": "fresh gate [freshness law]",
+            "screened": "detect+select"}
     for a, r in arms.items():
-        print(f"  {a:>10}: true×{r['true_median']:.2f} (IQR {r['true_iqr']:.2f}, crash {r['crash_rate']:.0%})"
-              f"  delusion×{r['delusion_median']:.2f}  precision early→late "
-              f"{(r['precision_early'] or 0):.2f}→{(r['precision_late'] or 0):.2f}")
+        print(f"  {a:>12}: true×{r['true_median']:.2f} (IQR {r['true_iqr']:.2f}, crash {r['crash_rate']:.0%})"
+              f"  delusion×{r['delusion_median']:.2f}  prec e→l "
+              f"{(r['precision_early'] or 0):.2f}→{(r['precision_late'] or 0):.2f}   {tags[a]}")
 
-    sweep = {k: summarize([run_arm("gated", s, k=k) for s in range(SEEDS)])["true_median"]
-             for k in K_SWEEP}
+    sweep = {k: summarize([run_arm("gated", s, k=k) for s in range(SEEDS)])["true_median"] for k in K_SWEEP}
     print("  throughput sweep (gated, true median by verify-every-k): "
           + "  ".join(f"k={k}:×{v:.2f}" for k, v in sweep.items()))
 
-    u, g, sc = arms["ungrounded"], arms["gated"], arms["screened"]
-    h1 = (u["precision_late"] < u["precision_early"] - 0.05) and \
-         (u["delusion_median"] > 3 * max(g["delusion_median"], sc["delusion_median"]))
-    h2 = (g["true_median"] >= u["true_median"]) and (g["true_iqr"] < u["true_iqr"]) and \
-         (g["crash_rate"] <= u["crash_rate"])
+    u, da, ff, g, sc = (arms[a] for a in ARMS)
+    dec = lambda r: (r["precision_early"] - r["precision_late"])  # noqa: E731  precision decay
+    h1 = (dec(u) > 0.05) and (u["delusion_median"] > 3 * g["delusion_median"])
+    h2 = (g["true_median"] >= u["true_median"]) and (g["true_iqr"] < u["true_iqr"]) and (g["crash_rate"] <= u["crash_rate"])
     ks = list(K_SWEEP)
-    h3 = all(sweep[ks[i]] >= sweep[ks[i + 1]] - 0.02 for i in range(len(ks) - 1)) and \
-         (sweep[1] > sweep[8] + 0.05)
-    kill = (abs(u["true_median"] - g["true_median"]) < 0.02 and
-            u["precision_late"] is not None and g["precision_late"] is not None and
-            abs(u["precision_late"] - g["precision_late"]) < 0.02)
-    ok = h1 and h2 and h3 and not kill
+    h3 = all(sweep[ks[i]] >= sweep[ks[i + 1]] - 0.02 for i in range(len(ks) - 1)) and (sweep[1] > sweep[8] + 0.05)
+    # H4 (2607.05904): de-anchoring (commit-first) prevents the basin WITHOUT external truth —
+    #     no precision decay and no delusion, using only self-signal.
+    h4 = (abs(dec(da)) < 0.05) and (da["delusion_median"] < 1.3) and (da["crash_rate"] < 0.1)
+    # H5 (2606.28438): a REUSED exogenous filter SLOWS but does not STOP collapse — its precision
+    #     DECAYS over cycles (the fresh gate does NOT), yet it stays ABSOLUTELY better than the
+    #     ungrounded self-gate (slows, doesn't collapse to rubber-stamp). "Fixed filters slow but
+    #     don't stop; a fresh gate stops." (ungrounded precision is low THROUGHOUT — it crashes —
+    #     so the right contrast is decay-vs-fresh + absolute-level-vs-ungrounded, not decay magnitude.)
+    h5 = (dec(ff) > 0.05) and (abs(dec(g)) < 0.05) and \
+         (ff["precision_late"] > u["precision_late"] + 0.1) and (ff["crash_rate"] < u["crash_rate"])
+    kill = abs(u["true_median"] - g["true_median"]) < 0.02
+    ok = h1 and h2 and h3 and h4 and h5 and not kill
 
-    report = {"claim": "ungrounded RSI self-corrupts (assessor-bias ratchet -> precision decay "
-                       "+ believed/true delusion); a Σ_θ-style external gate bounds it and still "
-                       "improves; improvement rate is verification-throughput-limited",
-              "params": {"cycles": CYCLES, "seeds": SEEDS, "mu_prop": MU_PROP, "sigma_prop": SIGMA_PROP,
-                         "sigma_self": SIGMA_SELF, "sigma_ext": SIGMA_EXT, "eta": ETA, "k": K_DEFAULT},
+    report = {"claim": "RSI stabilizer spectrum: ungrounded self-review collapses (flattery ratchet); "
+                       "DE-ANCHORING (commit-first) prevents the basin with no external truth; a REUSED "
+                       "exogenous filter slows but does not stop collapse (must be FRESH); a fresh gate "
+                       "bounds and improves; rate is verification-throughput-limited",
+              "sources": {"2607.05904": "self-play reward hacking; commit-first fix; gap<=1-acc",
+                          "2606.28438": "code self-training collapse; self-gate degenerates to ungated; "
+                                        "fixed filters slow not stop; covariance concentration (=cert §2)",
+                          "2601.22513": "self-rewarding is stable but to internal consistency, not correctness",
+                          "openai.com/careers": "RSI Safety/Preparedness roles (verified 2026-07-18)"},
+              "params": {"cycles": CYCLES, "seeds": SEEDS, "eta": ETA, "eta_filter": ETA_FILTER, "k": K_DEFAULT},
               "arms": arms, "throughput_sweep_true_median": {str(k): round(v, 3) for k, v in sweep.items()},
-              "verdicts": {"H1_delusion_and_precision_decay": bool(h1),
-                           "H2_gated_bounded_and_no_worse": bool(h2),
+              "verdicts": {"H1_ungrounded_delusion_decay": bool(h1), "H2_fresh_gate_bounded": bool(h2),
                            "H3_throughput_limited": bool(h3),
+                           "H4_deanchoring_prevents_basin_no_external_truth": bool(h4),
+                           "H5_reused_filter_slows_not_stops": bool(h5),
                            "kill_grounding_adds_nothing": bool(kill)},
               "reproduced": bool(ok),
-              "verified_context": "OpenAI 'Researcher, Recursive Self-Improvement Safety/"
-                                  "Preparedness' roles (openai.com/careers, verified 2026-07-18)",
-              "evidence_class": "MEASURED (toy illustration; demonstrates cert results at RSI "
-                                "scale — NOT new theory)"}
+              "evidence_class": "MEASURED (toy; demonstrates 3 real 2026 results + the cert at RSI scale — NOT new theory)"}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f"\n  H1 delusion+decay: {'PASS' if h1 else 'FAIL'} | H2 gated bounded/no-worse: "
-          f"{'PASS' if h2 else 'FAIL'} | H3 throughput-limited: {'PASS' if h3 else 'FAIL'} | "
-          f"kill: {kill}")
-    print(f"{'REPRODUCED: ungrounded RSI deludes itself; the gate makes improvement real and bounded' if ok else 'NOT reproduced — inspect before citing'}")
+    for name, v in report["verdicts"].items():
+        print(f"  {'PASS' if (v if not name.startswith('kill') else not v) else 'FAIL'}  {name}")
+    print(f"\n{'REPRODUCED: the full RSI-stabilizer spectrum — de-anchoring AND fresh grounding both prevent the basin; reused filters do not' if ok else 'NOT reproduced — inspect before citing'}")
     print(f"-> {OUT.relative_to(REPO)}")
     sys.exit(0 if ok else 1)
 
