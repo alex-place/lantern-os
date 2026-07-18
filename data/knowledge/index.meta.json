@@ -1,5 +1,5 @@
 {
-  "built_at": 1784313189.7107217,
+  "built_at": 1784356576.995887,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -224,6 +224,7 @@
     "docs/research/2026-07-05-halueval-surprise-gated.md",
     "docs/research/2026-07-10-swebench-verifier.md",
     "docs/TEST-AUTH.md",
+    "docs/AGI-CONVERGENCE-BLUEPRINT.md",
     "docs/research/2026-07-04-pr-outcome-signal.md",
     "docs/research/2026-07-05-grounding-deadline.md",
     "docs/research/2026-07-09-truth-probe-transfer.md",
@@ -231,6 +232,7 @@
     "docs/UNISONA-SHARPE-CERTIFICATE.md",
     "docs/research/2026-07-03-verso-competitive-analysis.md",
     "docs/SIGMA-THETA-ABC-HARNESS-SPEC.md",
+    "docs/investing-2k-plan-collapse-certificate.md",
     "docs/research/2026-07-02-weather-oracle-constant-fit.md",
     "docs/lore/CAST.md",
     "hff/CONVERGENCE-EVIDENCE-REPORT.md",
@@ -644,7 +646,7 @@
       ]
     }
   },
-  "sections": 2561,
+  "sections": 2579,
   "external": 34,
-  "sha256": "d664c8e8288b84c42fa82018c32455aaeb3af843c302fead9e1f18cc81d22a02"
+  "sha256": "886c68ad20284aefd6387902c7bc3421b1cce455fe095cc37a5db1b16622226e"
 }
