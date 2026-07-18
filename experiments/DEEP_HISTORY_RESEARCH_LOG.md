@@ -378,3 +378,31 @@ against the 45 configs tried in iter-2.
 3. **What this does NOT prove:** that the edge is as large *out-of-sample* as in-sample
    (iter-2's 2000+ validation already addressed magnitude), nor that future regimes match
    the past. It proves the historical risk-adjusted improvement is not statistical luck.
+
+---
+
+## Iteration 9 (Σ₀) — production-EXACT weighting (monthly capped tangency), not equal-weight
+
+`deep_history_tangency.py` ports the live weighting (capped shrunk tangency, cap 0.35 /
+covShrink 0.35 / muShrink 0.5, minObs 60, monthly recompute — exactly champion-book.js
+`targetWeights`) onto the 4-asset proxy panel {S&P, bond, gold, Nasdaq}, 2000-2026.
+
+| book (2000+) | final | CAGR | Sharpe | maxDD | trades/yr |
+|---|---|---|---|---|---|
+| tangency buy&hold | $199k | 8.4% | 0.84 | −23% | 0 |
+| **tangency + no_margin** | $149k | 7.2% | **0.92** | **−13%** | **4.5** |
+| eq-weight buy&hold | $183k | 8.0% | 0.74 | −30% | 0 |
+| eq-weight + no_margin | $177k | 7.9% | **0.98** | −14% | 3.1 |
+
+**Findings (iteration 9).**
+1. **Conclusion holds with production weighting.** Tangency + brake still lifts Sharpe
+   (0.84→0.92) and roughly halves drawdown (−23%→−13%) at ~4.5 trades/yr. The recommendation
+   is not an artifact of the equal-weight simplification.
+2. **Nuance (evidence-backed):** the brake adds *less* on top of tangency (+0.08 Sharpe) than
+   on top of equal-weight (+0.24). Mechanistic reason: production tangency already tilts
+   toward low-vol assets (bonds), so it's partly "self-braked" — the vol-target/trend overlay
+   has less risk left to remove. **The brake matters most when the base book is more
+   aggressive.** So the two risk tools (smart weighting, the brake) are partial substitutes,
+   consistent with iter-5.
+3. **Honest caveat:** single window (2000-2026); the 2000-2020 bond bull flatters tangency
+   (which loads bonds) and the whole panel. Not a claim about future bond regimes.
