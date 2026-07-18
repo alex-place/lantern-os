@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **2** (extend-to-1927; low-trade tuning). Next planned:
+> fabrication). Iterations done: **3** (extend-to-1927; low-trade tuning). Next planned:
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -115,10 +115,44 @@ trend=12mo`** — and it holds out-of-sample:
 **Recommendation forming:** default the overlay to **Conservative (no-margin), band 0.30
 / brake 0.20 / trend 12mo**; keep 2× leverage as an explicit opt-in.
 
+---
+
+## Iteration 3 — under REAL DCA deposits, the overlay is risk-protection, not return-max
+
+`deep_history_dca.py` re-runs the three books with a $20/mo deposit from $0 (matching the
+live champion plan) instead of a lump sum.
+
+| S&P DCA (1927+) | final | deposited | mult | Sharpe | maxDD | trades/yr |
+|---|---|---|---|---|---|---|
+| buyhold | $4.39M | $23.7k | 185× | 0.42 | −57% | 0 |
+| leveraged 2× | $3.40M | $23.7k | 144× | 0.54 | −32% | 54 |
+| no_margin | $2.80M | $23.7k | 118× | **0.68** | **−27%** | **8** |
+
+| Nasdaq DCA (1971+) | final | deposited | mult | Sharpe | maxDD | trades/yr |
+|---|---|---|---|---|---|---|
+| buyhold | $906k | $13.3k | 68× | 0.60 | −78% | 0 |
+| no_margin | $663k | $13.3k | 50× | **0.90** | **−28%** | **11** |
+
+**Finding (iteration 3) — the honest reversal.** Under DCA-from-zero, **buy-and-hold makes
+MORE final money** than the overlay (opposite of the lump-sum case). The mechanism is real
+and not a bug: continuous deposits already "buy the dip," so de-risking to cash during
+crashes fights DCA's built-in advantage of accumulating cheap shares. The no-margin overlay
+still **halves the drawdown (−27% vs −57%) and lifts Sharpe (0.68 vs 0.42) at 8 trades/yr** —
+it's a **risk-management overlay, not a return maximizer**, and its edge is deployment-
+dependent:
+- **Existing balance / lump sum** (a funded account — the portfolio-advisor & champion-book
+  use case): no-margin wins on *both* return and risk (iters 1-2). Apply it here.
+- **Small DCA from zero:** buy-and-hold accumulates more; the overlay trades ~35% of final
+  value for half the drawdown and 2× the Sharpe. A risk-tolerance choice, stated plainly.
+
+**Refined recommendation:** apply the Conservative (no-margin) brake to the *accumulated
+balance* (protect capital you already have), and let fresh DCA contributions go in at full
+weight (keep buying dips with new money). That hybrid is the next thing to test.
+
 ### Next (later iterations)
-- Re-run with the real DCA $20/mo deposit schedule (not lump sum) to match the live plan.
-- Test a blended S&P+Nasdaq+gold panel + a bond-proxy from ^TNX over deep history.
-- Web-research low-turnover tactical-allocation literature to sanity-check the band/trend
-  choice against published dual-momentum / trend-following-with-cash results.
-- If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the
-  live model rather than adding a parallel system (extend, don't sprawl).
+- **Hybrid**: brake the existing balance but deposit new cash at 100% — best of both?
+- Blended S&P+Nasdaq+gold panel + a bond-proxy from ^TNX over deep history.
+- Web-research low-turnover tactical-allocation literature (dual-momentum, trend+cash) to
+  sanity-check the band/trend choice against published results.
+- If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the live
+  model rather than adding a parallel system (extend, don't sprawl).
