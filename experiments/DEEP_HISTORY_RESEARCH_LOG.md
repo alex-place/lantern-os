@@ -438,3 +438,40 @@ it is TC-invariant.
 3. **Honest loss:** at 20bp on the S&P, final value dips below buy&hold ($8.5M vs $10.5M) —
    at pessimistic fills the *return* give-up grows, though the risk-adjusted and drawdown
    advantages persist. A higher-turnover overlay would have failed this test.
+
+---
+
+## Iteration 11 (Σ₀) — regime attribution: where the brake wins and where it costs
+
+`deep_history_regime.py` splits every day by trailing-12mo trend sign × drawdown bucket
+(no look-ahead) and attributes each book's return within the regime.
+
+**S&P 1927+ (annualized excess = no_margin − buy&hold, per regime):**
+
+| regime | days | buy&hold %/yr | no_margin %/yr | excess |
+|---|---|---|---|---|
+| UP · calm (>−10%) — normal bull | 11,100 | 9.8 | 9.4 | **−0.4** |
+| DOWN · correction (−10..−20) — the turn down | 2,011 | −10.0 | +1.7 | **+11.7** |
+| DOWN · bear (<−20%) | 4,636 | 5.0 | 3.7 | −1.3 |
+| UP · correction — recovery | 1,845 | 6.4 | 8.6 | +2.1 |
+| DOWN · calm (>−10%) — false down-flip near highs | 760 | 7.1 | 0.1 | **−7.0** |
+
+Nasdaq echoes it: DOWN·correction **+4.9%/yr**, UP·correction +3.1%, UP·calm **−1.3%**, and
+the worst cell **DOWN·calm −30.2%/yr** (217 days).
+
+**Findings (iteration 11).**
+1. **The entire edge comes from the down-trending correction regime** — it converts
+   buy&hold's −10%/yr bleed into ~flat. That IS the crash protection, concentrated where it
+   matters (2000/2008/1929/1973 all live here).
+2. **It pays for that by lagging normal bulls** (−0.4 to −1.3%/yr in UP·calm, the *majority*
+   of days) — the documented give-up-upside cost, consistent with the iter-3 DCA reversal.
+3. **Worst regime = "DOWN·calm": a false down-flip while still near highs** → sells → market
+   rebounds (−7% S&P, **−30%/yr Nasdaq**). Rare but the sharpest single drag.
+4. **Signal is noisy:** ~3-4 trend flips/yr, **80-84% reverse within 3 months.** The 12mo
+   trend gate fires many false signals; the no-trade band + drawdown gating contain most of
+   the damage, but this is the clear lever → **iter-12 tests a better/confirmed signal to cut
+   false flips**, iter-13 tests event-triggered rebalancing.
+
+> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative mode + iters 1-10) MERGED to master
+> at 14:14Z. Loop-2 continues on branch `claude/trading-research-loop2`; a new PR will
+> collect iters 11+.
