@@ -1,0 +1,54 @@
+{
+  "claim": "ungrounded RSI self-corrupts (assessor-bias ratchet -> precision decay + believed/true delusion); a \u03a3_\u03b8-style external gate bounds it and still improves; improvement rate is verification-throughput-limited",
+  "params": {
+    "cycles": 60,
+    "seeds": 200,
+    "mu_prop": -0.01,
+    "sigma_prop": 0.06,
+    "sigma_self": 0.04,
+    "sigma_ext": 0.01,
+    "eta": 0.35,
+    "k": 4
+  },
+  "arms": {
+    "ungrounded": {
+      "true_median": 0.7739374033565425,
+      "true_iqr": 0.5654854270816144,
+      "crash_rate": 0.535,
+      "delusion_median": Infinity,
+      "precision_early": 0.5471541566050978,
+      "precision_late": 0.47212165487768937
+    },
+    "gated": {
+      "true_median": 1.3417828974988613,
+      "true_iqr": 0.21168462147115452,
+      "crash_rate": 0.0,
+      "delusion_median": 0.9996318949876342,
+      "precision_early": 0.9458901651112707,
+      "precision_late": 0.9302721088435373
+    },
+    "screened": {
+      "true_median": 1.2829829610190888,
+      "true_iqr": 0.25023430669963287,
+      "crash_rate": 0.0,
+      "delusion_median": 1.0552834790189722,
+      "precision_early": 0.9670175438596492,
+      "precision_late": 0.9657167530224524
+    }
+  },
+  "throughput_sweep_true_median": {
+    "1": 3.068,
+    "2": 1.773,
+    "4": 1.342,
+    "8": 1.149
+  },
+  "verdicts": {
+    "H1_delusion_and_precision_decay": true,
+    "H2_gated_bounded_and_no_worse": true,
+    "H3_throughput_limited": true,
+    "kill_grounding_adds_nothing": false
+  },
+  "reproduced": true,
+  "verified_context": "OpenAI 'Researcher, Recursive Self-Improvement Safety/Preparedness' roles (openai.com/careers, verified 2026-07-18)",
+  "evidence_class": "MEASURED (toy illustration; demonstrates cert results at RSI scale \u2014 NOT new theory)"
+}
