@@ -1,0 +1,90 @@
+{
+ "^GSPC": {
+  "wrate_4": {
+   "buy&hold": {
+    "p_ruin": 0.21739130434782608,
+    "median_terminal": 2320929.6348567917
+   },
+   "always_brake": {
+    "p_ruin": 0.2463768115942029,
+    "median_terminal": 1155856.897147388
+   },
+   "glide_5y": {
+    "p_ruin": 0.2028985507246377,
+    "median_terminal": 2092497.5164633053
+   },
+   "glide_10y": {
+    "p_ruin": 0.17391304347826086,
+    "median_terminal": 1781661.8382780005
+   }
+  },
+  "wrate_5": {
+   "buy&hold": {
+    "p_ruin": 0.4057971014492754,
+    "median_terminal": 1070299.0804666155
+   },
+   "always_brake": {
+    "p_ruin": 0.463768115942029,
+    "median_terminal": 222001.86532420147
+   },
+   "glide_5y": {
+    "p_ruin": 0.37681159420289856,
+    "median_terminal": 811727.4019094245
+   },
+   "glide_10y": {
+    "p_ruin": 0.42028985507246375,
+    "median_terminal": 392304.29686875816
+   }
+  },
+  "bootstrap_ruin_5pct": {
+   "buy&hold": 0.752,
+   "always_brake": 0.459,
+   "glide_5y": 0.706,
+   "glide_10y": 0.664
+  }
+ },
+ "^IXIC": {
+  "wrate_4": {
+   "buy&hold": {
+    "p_ruin": 0.0,
+    "median_terminal": 9051863.978789054
+   },
+   "always_brake": {
+    "p_ruin": 0.0,
+    "median_terminal": 10938902.24657609
+   },
+   "glide_5y": {
+    "p_ruin": 0.0,
+    "median_terminal": 8264753.821560383
+   },
+   "glide_10y": {
+    "p_ruin": 0.0,
+    "median_terminal": 8835772.217982635
+   }
+  },
+  "wrate_5": {
+   "buy&hold": {
+    "p_ruin": 0.07692307692307693,
+    "median_terminal": 6663021.849525137
+   },
+   "always_brake": {
+    "p_ruin": 0.0,
+    "median_terminal": 8219572.900287608
+   },
+   "glide_5y": {
+    "p_ruin": 0.0,
+    "median_terminal": 5997932.95515408
+   },
+   "glide_10y": {
+    "p_ruin": 0.0,
+    "median_terminal": 6060540.070741881
+   }
+  },
+  "bootstrap_ruin_5pct": {
+   "buy&hold": 0.197,
+   "always_brake": 0.09,
+   "glide_5y": 0.164,
+   "glide_10y": 0.134
+  }
+ }
+}

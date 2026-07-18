@@ -438,3 +438,217 @@ it is TC-invariant.
 3. **Honest loss:** at 20bp on the S&P, final value dips below buy&hold ($8.5M vs $10.5M) —
    at pessimistic fills the *return* give-up grows, though the risk-adjusted and drawdown
    advantages persist. A higher-turnover overlay would have failed this test.
+
+---
+
+## Iteration 11 (Σ₀) — regime attribution: where the brake wins and where it costs
+
+`deep_history_regime.py` splits every day by trailing-12mo trend sign × drawdown bucket
+(no look-ahead) and attributes each book's return within the regime.
+
+**S&P 1927+ (annualized excess = no_margin − buy&hold, per regime):**
+
+| regime | days | buy&hold %/yr | no_margin %/yr | excess |
+|---|---|---|---|---|
+| UP · calm (>−10%) — normal bull | 11,100 | 9.8 | 9.4 | **−0.4** |
+| DOWN · correction (−10..−20) — the turn down | 2,011 | −10.0 | +1.7 | **+11.7** |
+| DOWN · bear (<−20%) | 4,636 | 5.0 | 3.7 | −1.3 |
+| UP · correction — recovery | 1,845 | 6.4 | 8.6 | +2.1 |
+| DOWN · calm (>−10%) — false down-flip near highs | 760 | 7.1 | 0.1 | **−7.0** |
+
+Nasdaq echoes it: DOWN·correction **+4.9%/yr**, UP·correction +3.1%, UP·calm **−1.3%**, and
+the worst cell **DOWN·calm −30.2%/yr** (217 days).
+
+**Findings (iteration 11).**
+1. **The entire edge comes from the down-trending correction regime** — it converts
+   buy&hold's −10%/yr bleed into ~flat. That IS the crash protection, concentrated where it
+   matters (2000/2008/1929/1973 all live here).
+2. **It pays for that by lagging normal bulls** (−0.4 to −1.3%/yr in UP·calm, the *majority*
+   of days) — the documented give-up-upside cost, consistent with the iter-3 DCA reversal.
+3. **Worst regime = "DOWN·calm": a false down-flip while still near highs** → sells → market
+   rebounds (−7% S&P, **−30%/yr Nasdaq**). Rare but the sharpest single drag.
+4. **Signal is noisy:** ~3-4 trend flips/yr, **80-84% reverse within 3 months.** The 12mo
+   trend gate fires many false signals; the no-trade band + drawdown gating contain most of
+   the damage, but this is the clear lever → **iter-12 tests a better/confirmed signal to cut
+   false flips**, iter-13 tests event-triggered rebalancing.
+
+> **LOOP 2 COMPLETE (2026-07-18):** 8 iterations (8-15). Shipped Conservative config CONFIRMED (significant, tangency-robust, TC-robust, regime-understood); SMA "improvement" REJECTED as OOS-failing overfit; decumulation = tail insurance, glidepath best on the realistic roll. No further live change justified. Branch `claude/trading-research-loop2` (PR #2731); PR #2728 (the shipped mode) merged to master.
+> at 14:14Z. Loop-2 continues on branch `claude/trading-research-loop2`; a new PR will
+> collect iters 11+.
+
+---
+
+## Iteration 12 (Σ₀) — signal choice: the 200-day SMA gate BEATS the shipped momentum gate
+
+`deep_history_signals.py` swaps the trend gate in the no-margin Conservative overlay:
+`mom` = 12mo momentum≥0 (shipped default), `sma` = price≥200-day SMA, `dual` = de-risk only
+when BOTH say down.
+
+| S&P 1927+ | Sharpe | maxDD | final | trades/yr | flips/yr |
+|---|---|---|---|---|---|
+| mom (shipped) | 0.69 | −34% | $16.5M | 8.4 | 3.9 |
+| **sma** | **0.80** | **−26%** | $41.5M | 9.5 | 6.0 |
+| dual | 0.75 | −34% | $42.2M | 8.6 | 3.8 |
+
+| Nasdaq 1971+ | Sharpe | maxDD | final | trades/yr | flips/yr |
+|---|---|---|---|---|---|
+| mom (shipped) | 0.90 | −27% | $6.34M | 10.8 | 2.9 |
+| **sma** | **0.95** | −27% | $5.93M | 11.6 | 5.6 |
+| dual | 0.94 | −27% | $8.84M | 12.3 | 3.5 |
+
+**Findings (iteration 12).**
+1. **The 200-day SMA gate dominates the shipped 12mo-momentum gate** on Sharpe (0.69→0.80
+   S&P, 0.90→0.95 Nasdaq) AND drawdown (−34%→−26% S&P) AND final value — at trivially more
+   trades (9.5 vs 8.4/yr, still far under PDT). The shipped `mom` signal is the weakest of
+   the three. **This is the first candidate live improvement of loop 2.**
+2. **`dual` maximizes return** (2.5× the mom book's final on S&P, highest on Nasdaq) with the
+   fewest flips — but **gives back crash protection** (−34% vs sma's −26%): requiring both
+   signals to confirm de-risks slower, eating more of the initial drop. A return-vs-drawdown
+   trade-off; for the *non-risky* mandate, `sma` is the better pick (best drawdown too).
+3. **Σ₀ caveat — NOT yet actionable.** This is full-history (in-sample) signal selection. The
+   shipped config earned its keep via a train/validate split; the SMA claim MUST get the same
+   OOS treatment before any live change. **Iter-13 validates sma-vs-mom train(pre-2000)/
+   validate(2000+) — only then does it become a live champion-book/brake-monitor refinement
+   (money-path → PR #2731, tests, human review).**
+
+---
+
+## Iteration 13 (Σ₀-critical) — the SMA "improvement" was in-sample overfitting; REJECTED
+
+`deep_history_signal_oos.py` re-tested iter-12's SMA gate on a clean split (TRAIN pre-2000,
+VALIDATE 2000-2026).
+
+| signal | S&P train Sh | S&P **validate** Sh | Nasdaq train Sh | Nasdaq **validate** Sh |
+|---|---|---|---|---|
+| mom (shipped) | 0.69 | **0.69** | 1.13 | **0.71** |
+| sma | 0.85 | **0.68** | 1.25 | **0.68** |
+| dual | 0.77 | 0.74 | 1.19 | 0.73 |
+
+Bootstrap validate ΔSharpe (sma − mom): S&P **[−0.22, +0.20]** (P=44%), Nasdaq **[−0.23, +0.17]**
+(P=37%) — both CIs straddle 0. **VERDICT on both indices: sma does NOT beat mom OOS.**
+
+**Findings (iteration 13) — a Σ₀ win: a false positive caught before shipping.**
+1. **The iter-12 SMA dominance did not generalize.** Its big in-sample edge (Sharpe 0.85/1.25
+   train) collapsed to *slightly worse than momentum* out-of-sample (0.68 vs 0.69 / 0.71). The
+   full-history win was pre-2000 regime-specific luck — exactly the overfitting trap OOS
+   validation exists to catch. **No signal change is warranted; the shipped 12mo-momentum gate
+   stands. No live edit made.**
+2. **`dual` is a weak, non-significant maybe** (validate P(dual>mom) 79%/59%, CIs include 0,
+   no drawdown gain) — not enough evidence to justify a money-path change either.
+3. **Net for the model:** loop-2 has now *confirmed the shipped config's robustness*
+   (significant edge, holds under production weighting, TC-robust, understood by regime) and
+   *rejected one tempting-but-false improvement*. The honest, evidence-first outcome. The
+   `signal` param stays a research knob, not a live default.
+
+---
+
+## Iteration 14 (Σ₀) — decumulation: the brake is TAIL insurance, not an average-case win
+
+`deep_history_decumulation.py`: $1M start, withdraw 4% and a stressed 5%/yr (real, inflated
+3%/yr — a labeled assumption), 30-year retirement, start rolled every 12 months across deep
+history. Plus a full-history block-bootstrap P(ruin) (1000 × 30y paths, 21d blocks).
+
+| S&P 1927+ | P(ruin) buy&hold | P(ruin) no_margin | median terminal B&H | median nm |
+|---|---|---|---|---|
+| withdraw 4%/yr | 22% | **25%** | $2.32M | $1.16M |
+| withdraw 5%/yr | 41% | **46%** | $1.07M | $0.22M |
+| **block-bootstrap 5%** | **76%** | **48%** | — | — |
+
+| Nasdaq 1971+ | P(ruin) B&H | P(ruin) nm | median B&H | median nm | worst terminal |
+|---|---|---|---|---|---|
+| withdraw 4%/yr | 0% | 0% | $9.05M | $10.94M | B&H $2.3M / nm $6.6M |
+| withdraw 5%/yr | 8% | **0%** | $6.66M | $8.22M | B&H $0 (ruin) / nm $4.44M |
+| **block-bootstrap 5%** | 18% | **8%** | — | — | — |
+
+**Findings (iteration 14).**
+1. **In average/benign historical sequences the brake does NOT reduce ruin** — S&P rolling
+   ruin is slightly *higher* (25% vs 22% at 4%) and median terminal ~half. Over 30y the
+   accumulation return give-up compounds against you when the feared crash doesn't hit early.
+   Stated plainly — it is not a free decumulation win.
+2. **In worst-case sequences it substantially reduces ruin** — the block-bootstrap (which
+   strings bad periods together = the sequence-of-returns nightmare) shows **S&P P(ruin)
+   76%→48%, Nasdaq 18%→8%**, and Nasdaq's 5% historical ruin 8%→0% with a far higher worst-
+   case terminal ($4.4M vs $0). This is exactly the tail the drawdown brake is built for.
+3. **Framing:** the Conservative overlay is **sequence-of-returns *insurance*** — it costs
+   median wealth in good sequences and pays off by preventing catastrophe in bad ones. Right
+   for a retiree/withdrawer who weights "don't run out" above "maximize the median." Consistent
+   with the whole study: risk-management, not return-max.
+4. **Honest caveats:** the 3%/5% inflation/withdrawal figures are labeled assumptions (no CPI
+   series); the block-bootstrap is full-history (crises enter via resampling), not crisis-only;
+   small crisis-start window counts (n=1-3) on the historical roll.
+
+---
+
+## Iteration 15 (Σ₀) — decumulation glidepath: brake the early years, then un-brake
+
+`deep_history_glidepath.py` tests brake ONLY for the first 5 or 10 years of a 30y retirement
+(sequence risk concentrates early), then buy&hold. Same $1M / real-withdrawal / roll +
+block-bootstrap harness as iter-14.
+
+| S&P, withdraw 4%/yr | P(ruin) | median terminal |
+|---|---|---|
+| buy&hold | 22% | $2.32M |
+| always-brake | 25% | $1.16M |
+| **glide 10y** | **17%** | $1.78M |
+| glide 5y | 20% | $2.09M |
+
+| S&P, block-bootstrap 5% (worst-case tail) | P(ruin) |
+|---|---|
+| buy&hold | 75% |
+| **always-brake** | **46%** |
+| glide 10y | 66% |
+| glide 5y | 71% |
+
+Nasdaq: glidepaths eliminate the 5%-rule historical ruin (8%→0%) like always-brake, with
+medians between buy&hold and always-brake; in the bootstrap tail always-brake wins (9% vs
+13-16%).
+
+**Findings (iteration 15).**
+1. **On the realistic historical roll the glidepath is the best of both** — glide-10y cuts
+   ruin below BOTH buy&hold and always-brake (17% vs 22%/25% at 4%) while keeping a median
+   near buy&hold. Front-loading protection to the early danger zone, then un-braking, captures
+   sequence-of-returns protection without the full 30y return drag.
+2. **In the extreme bootstrap tail, always-brake still wins** (S&P 46% vs glide 66-71%) —
+   un-braking re-exposes you to *late* crashes. Honest trade-off: glidepath optimizes the
+   realistic distribution; always-on optimizes the worst case.
+3. **This is a USAGE insight, not a code change** — the live champion book is an
+   accumulation/allocation engine, not a decumulation/withdrawal engine. The takeaway for a
+   retiree is: turn the Conservative mode ON near/into early retirement, consider relaxing it
+   after the danger decade. No live edit made.
+4. **Caveats:** overlapping rolling windows (not independent); the 5/10y switch is a clean
+   return-splice (ignores the one rebalance at the switch); 10y is the established sequence-
+   risk window, not a fitted parameter, but 5y-vs-10y was chosen after seeing the data.
+
+---
+
+# LOOP 2 SYNTHESIS (Σ₀) — what 8 iterations established
+
+**The question:** keep improving the ADR-0028 Conservative overlay under Σ₀ rigor.
+
+**What was CONFIRMED about the shipped config** (band 0.30 / brake 0.20 / 12mo-trend, ≤1×,
+~monthly):
+- **Statistically real** — block-bootstrap ΔSharpe 95% CI excludes 0 on S&P [+0.10,+0.43] and
+  Nasdaq [+0.09,+0.52]; survives deflation for the config search (iter-8).
+- **Not a weighting artifact** — holds under the live capped-tangency weighting (iter-9).
+- **Cost-robust** — Sharpe ranking never flips from 2 to 20 bp; low turnover is what buys this
+  (iter-10).
+- **Mechanistically understood** — the entire edge is the down-trending correction regime
+  (+11.7%/yr S&P); it lags normal bulls and whipsaws on false down-flips (iter-11).
+
+**What was REJECTED** (Σ₀ working as intended):
+- **The 200-day SMA "improvement"** looked dominant in-sample (Sharpe 0.85 train) but FAILED
+  out-of-sample (0.68 vs momentum 0.69; CI straddles 0). A regime-luck false positive, caught
+  before it could reach money-path code. **No signal change shipped** (iters 12-13).
+
+**What was CHARACTERIZED** (honest use-cases):
+- **Funded balance:** the brake wins on both return and risk (loop-1 iters 1-2).
+- **Decumulation:** it's **sequence-of-returns tail insurance** — cuts worst-case ruin
+  (bootstrap 76→48% S&P) but costs median wealth in benign sequences (iter-14). A **glidepath**
+  (brake the early retirement years, then un-brake) is better on the realistic historical
+  record; always-on is better in the extreme tail (iter-15).
+
+**STANDING RECOMMENDATION:** the shipped Conservative (no-margin) mode is **sound, robust, and
+correctly scoped**. **No further live change is justified by the evidence** — the one tempting
+improvement (SMA) was a false positive. Position it as: default for the funded/advisor book;
+opt-in capital-preservation for near/into-retirement users; keep 2× leverage strictly opt-in.
+The most valuable loop-2 output is negative-space knowledge: we now know what NOT to change.
