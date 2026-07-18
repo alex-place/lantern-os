@@ -406,3 +406,35 @@ covShrink 0.35 / muShrink 0.5, minObs 60, monthly recompute — exactly champion
    consistent with iter-5.
 3. **Honest caveat:** single window (2000-2026); the 2000-2020 bond bull flatters tangency
    (which loads bonds) and the whole panel. Not a claim about future bond regimes.
+
+---
+
+## Iteration 10 (Σ₀) — robust to transaction costs (the payoff of trading less)
+
+`deep_history_tcost.py` re-runs the no-margin Conservative config at TC = 2/5/10/20 bp
+(the last is 10× the base assumption — a pessimistic fill). Buy&hold has zero turnover, so
+it is TC-invariant.
+
+| S&P no-margin | TC 2bp | TC 5bp | TC 10bp | TC 20bp | buy&hold |
+|---|---|---|---|---|---|
+| Sharpe | 0.69 | 0.68 | 0.66 | 0.63 | 0.42 |
+| maxDD | −34% | −34% | −34% | −34% | −86% |
+| beats B&H Sharpe? | ✔ | ✔ | ✔ | ✔ | — |
+
+| Nasdaq no-margin | TC 2bp | TC 5bp | TC 10bp | TC 20bp | buy&hold |
+|---|---|---|---|---|---|
+| Sharpe | 0.90 | 0.89 | 0.88 | 0.86 | 0.60 |
+| maxDD | −27% | −27% | −27% | −26% | −78% |
+| beats B&H Sharpe? | ✔ | ✔ | ✔ | ✔ | — |
+
+**Findings (iteration 10).**
+1. **Robust to realistic-to-pessimistic fills.** Even at 20bp the no-margin Sharpe
+   (0.63/0.86) still comfortably beats buy&hold (0.42/0.60) and the drawdown advantage is
+   untouched. The Sharpe ranking never flips across a 10× cost range.
+2. **This is *because* turnover is tiny** (2.7-3.6 units/yr, ~8-11 trade-days/yr): low
+   turnover × even a high per-trade cost = small total drag. The "trade less" design is
+   what buys the cost-robustness — a clean internal consistency with Alex's don't-over-trade
+   constraint.
+3. **Honest loss:** at 20bp on the S&P, final value dips below buy&hold ($8.5M vs $10.5M) —
+   at pessimistic fills the *return* give-up grows, though the risk-adjusted and drawdown
+   advantages persist. A higher-turnover overlay would have failed this test.
