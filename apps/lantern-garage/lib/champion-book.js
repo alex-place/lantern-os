@@ -119,10 +119,19 @@ function targetWeights(closesBySym, { minObs = 60 } = {}) {
  * Given target weights, live gross, prices and current positions, produce the
  * rebalance orders. Only legs whose drift exceeds bandPct of equity are traded
  * (no-churn). Fractional shares. Pure.
- *   target$_i = equity · gross · weight_i   (gross clamped [0, MAX_GROSS])
+ *   target$_i = equity · gross · weight_i   (gross clamped [0, min(maxGross, MAX_GROSS)])
+ *
+ * `maxGross` caps the leverage the live brake can request. Default MAX_GROSS (2×,
+ * unchanged). Pass maxGross=1.0 for the "Conservative (no-margin)" book — it NEVER
+ * borrows and only ever de-risks toward cash. Deep-history research (S&P 1927+, Nasdaq
+ * 1971+; experiments/DEEP_HISTORY_RESEARCH_LOG.md) found the ≤1× cash-defensive book
+ * had the best Sharpe (0.71-0.90 vs 0.42-0.60 buy&hold) and shallowest drawdown at
+ * ~1 trade/month — and matches Faber/AQR/Antonacci. `maxGross` can only LOWER the
+ * ceiling, never raise it above the hard MAX_GROSS.
  */
-function computeRebalance({ equity, gross, weights, prices, positions = [], bandPct = DEFAULT_BAND_PCT }) {
-  const g = Math.max(0, Math.min(MAX_GROSS, Number(gross) || 0));
+function computeRebalance({ equity, gross, weights, prices, positions = [], bandPct = DEFAULT_BAND_PCT, maxGross = MAX_GROSS }) {
+  const cap = Math.max(0, Math.min(MAX_GROSS, Number.isFinite(Number(maxGross)) ? Number(maxGross) : MAX_GROSS));
+  const g = Math.max(0, Math.min(cap, Number(gross) || 0));
   const eq = Number(equity) || 0;
   const held = {};
   for (const p of positions) held[String(p.symbol).toUpperCase()] = Number(p.market_value) || 0;
@@ -141,7 +150,7 @@ function computeRebalance({ equity, gross, weights, prices, positions = [], band
     orders.push({ symbol: s, side: diff > 0 ? 'buy' : 'sell', qty, notional: Math.round(Math.abs(diff)) });
   }
   orders.sort((a, b) => (a.side === b.side ? 0 : a.side === 'sell' ? -1 : 1));   // sells first (free buying power)
-  return { orders, targets, grossUsed: g, equity: eq };
+  return { orders, targets, grossUsed: g, grossCap: cap, equity: eq };
 }
 
 function logLedger(rec) {
@@ -162,7 +171,12 @@ function _liveGross() {
  * Compute the current plan (weights, targets, drift orders) WITHOUT trading.
  * Reads the paper Alpaca account, daily bars for the universe, and the live brake.
  */
-async function plan(userId, { bandPct = DEFAULT_BAND_PCT } = {}) {
+async function plan(userId, { bandPct = DEFAULT_BAND_PCT, conservative = false, maxGross } = {}) {
+  // Conservative (no-margin) mode: cap gross at 1.0 (never borrow) and widen the
+  // no-churn band so the book rebalances less (deep-history research: ~1 trade/month
+  // is the low-turnover optimum). Both are strict de-risking knobs.
+  const cap = conservative ? 1.0 : (Number.isFinite(Number(maxGross)) ? Number(maxGross) : MAX_GROSS);
+  if (conservative && bandPct === DEFAULT_BAND_PCT) bandPct = 1.5;
   const alpaca = require('./alpaca-adapter');
   const yahoo = require('./market-data-yahoo');
   const acct = await alpaca.getAccount(userId).catch(() => null);
@@ -181,16 +195,16 @@ async function plan(userId, { bandPct = DEFAULT_BAND_PCT } = {}) {
   // prefer the broker's live price for held names
   for (const p of pos.positions) if (p.current_price > 0) prices[String(p.symbol).toUpperCase()] = p.current_price;
   const gross = _liveGross();
-  const reb = computeRebalance({ equity, gross, weights, prices, positions: pos.positions, bandPct });
-  return { ok: true, env: acct.env || 'paper', equity, gross, weights, used, dropped, prices, positions: pos.positions, ...reb };
+  const reb = computeRebalance({ equity, gross, weights, prices, positions: pos.positions, bandPct, maxGross: cap });
+  return { ok: true, env: acct.env || 'paper', mode: conservative ? 'conservative' : 'standard', equity, gross, weights, used, dropped, prices, positions: pos.positions, ...reb };
 }
 
 /**
  * Rebalance the paper book toward the target. DRY unless BOTH arm:true AND
  * CHAMPION_ARM=1. Refuses a non-paper account. Places fractional PAPER market orders.
  */
-async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT } = {}) {
-  const p = await plan(userId, { bandPct });
+async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT, conservative = false, maxGross } = {}) {
+  const p = await plan(userId, { bandPct, conservative, maxGross });
   if (!p.ok) return p;
   const armed = arm && process.env.CHAMPION_ARM === '1';
   // Hard refuse: never trade a live account from this engine.

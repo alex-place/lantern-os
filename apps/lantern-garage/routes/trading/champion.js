@@ -46,7 +46,11 @@ module.exports = async function championRoutes(req, res, url, ctx) {
   try {
     // ── Operator allocation book (paper, dry-by-default) ──
     if (p === '/api/trading/champion' && req.method === 'GET') {
-      const plan = await champion.plan(userId);
+      // ?conservative=1 (or ?mode=conservative) → the no-margin, low-turnover book:
+      // caps gross at 1.0 (never borrows) and widens the no-churn band. Read-only plan.
+      const conservative = url.searchParams.get('conservative') === '1'
+        || url.searchParams.get('mode') === 'conservative';
+      const plan = await champion.plan(userId, { conservative });
       return sendJson(res, plan, plan.ok ? 200 : 503), true;
     }
     if (p === '/api/trading/champion/rebalance' && req.method === 'POST') {

@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **6** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification vs brake; literature match). Next: wire Conservative mode into live model + tests -> final synthesis + PR.
+> fabrication). Iterations done: **7** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification; literature match; LIVE wiring). DONE — opening PR.
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -251,10 +251,51 @@ Sources: [Faber GTAA](https://mebfaber.com/wp-content/uploads/2016/05/SSRN-id962
 [AQR Time Series Momentum](https://www.aqr.com/Insights/Research/Journal-Article/Time-Series-Momentum) ·
 [Antonacci Dual Momentum](https://awealthofcommonsense.com/2015/07/my-thoughts-on-gary-antonaccis-dual-momentum/)
 
-### Next (final iterations)
-- Wire a selectable **"Conservative (no-margin)"** overlay mode into the LIVE model (extend
-  the existing overlay in apps/lantern-garage — don't add a parallel system) + tests.
-- Final synthesis + open PR to master.
+---
+
+## Iteration 7 — wire "Conservative (no-margin)" into the LIVE model (+ tests)
+
+Extended the live champion book (`apps/lantern-garage/lib/champion-book.js`) — **no parallel
+system** (respects the anti-sprawl gate). The live book already computes tangency weights ×
+live brake gross (0-2×) → dollar targets. The change adds a **gross cap**:
+- `computeRebalance({ …, maxGross = MAX_GROSS })` — clamps gross to `[0, min(maxGross,
+  MAX_GROSS)]`. Default 2.0 = **unchanged behavior**. `maxGross` can only *lower* the ceiling.
+- `plan()/rebalanceNow({ conservative })` — `conservative:true` caps gross at **1.0 (never
+  borrow)** and widens the no-churn band (0.6%→1.5%) to trade less. Returns `mode` + `grossCap`.
+- Route: `GET /api/trading/champion?conservative=1` serves the no-margin plan (read-only, dry).
+
+Tests (`apps/lantern-garage/test/champion-book.test.js`, +4, **11/11 pass**): maxGross caps a
+1.8× brake request to 1.0×; can't exceed the hard 2× ceiling; de-risking (0.3× storm gross)
+still passes through; default 2× behavior unchanged. `node --check` clean on both files.
+
+**Safety.** Money-path / protected file → **PR for human review, NOT self-merged.** The
+change is strictly de-risking (a cap that can only reduce leverage) and default-off, so it
+cannot make the existing book riskier.
+
+## FINAL SYNTHESIS
+
+**What Alex asked:** improve the trading model — research farther back, deep-dive trades/
+regimes, find non-risky improvements, without over-trading or margin risk.
+
+**What the evidence says (7 iterations, all measured, S&P 1927+ / Nasdaq 1971+ / 60-40 &
+3-asset blends, train/validate split, literature-checked):**
+1. **The single best non-risky improvement is a cash-defensive, never-borrow (≤1×) overlay
+   at ~1 trade/month** (band 0.30 / brake 0.20 / **12-mo** trend). On a funded balance it had
+   the **best Sharpe** (0.71-0.90 vs 0.42-0.60 buy&hold) and **shallowest drawdown** (−25 to
+   −30% vs −78 to −86%), never borrowing, at **9-19 rebalances/yr** — far under any PDT
+   threshold. Validated out-of-sample; matches Faber/AQR/Antonacci.
+2. **Trade LESS, not more.** Widening the band + lengthening the trend window cut trades to
+   ~monthly while *improving* out-of-sample results — the daily retrade was pure cost.
+3. **Diversification is a free risk win** (the live 8-asset book already does this); brake +
+   diversification is the best risk profile at the fewest trades (2.4-4.3/yr).
+4. **Honest limits:** under small DCA-from-zero the overlay trails buy&hold on final value
+   (it's risk-protection, not return-max — a documented feature); 1987-style one-day crashes
+   can't be pre-empted by a daily brake; leverage was retired (worse Sharpe, more trades,
+   margin risk — the opposite of the ask).
+
+**Shipped:** a selectable **Conservative (no-margin)** mode in the live champion book, default
+off, PR for human review. Recommend making it the **default for the advisor / funded-balance
+book** and keeping 2× leverage strictly opt-in.
 - Web-research low-turnover tactical-allocation literature (dual-momentum, trend+cash) to
   sanity-check the band/trend choice against published results.
 - If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the live

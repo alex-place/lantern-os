@@ -74,3 +74,42 @@ test('computeRebalance: gross clamps to [0, MAX_GROSS]; sells ordered before buy
   });
   assert.strictEqual(r2.orders[0].side, 'sell', 'sells first (frees buying power)');
 });
+
+// ── Conservative (no-margin) mode: maxGross caps leverage; deep-history research
+//    (experiments/DEEP_HISTORY_RESEARCH_LOG.md) says the ≤1× cash-defensive book is the
+//    best-Sharpe, lowest-drawdown, low-turnover profile — never borrow.
+test('computeRebalance: maxGross caps the live brake gross (no-margin never borrows)', () => {
+  // Brake asks for 1.8× but a no-margin book caps at 1.0×.
+  const r = cb.computeRebalance({
+    equity: 100000, gross: 1.8, maxGross: 1.0,
+    weights: { SPY: 1 }, prices: { SPY: 100 }, positions: [],
+  });
+  assert.strictEqual(r.grossCap, 1.0, 'cap reported');
+  assert.strictEqual(r.grossUsed, 1.0, '1.8x request clamped to the 1.0x no-margin cap');
+  // SPY target = 100000 * 1.0 * 1 = 100,000 (not 180,000) → no leverage
+  assert.strictEqual(r.targets.SPY, 100000);
+});
+
+test('computeRebalance: maxGross can only LOWER the ceiling, never exceed MAX_GROSS', () => {
+  const r = cb.computeRebalance({ equity: 100000, gross: 5, maxGross: 9, weights: { SPY: 1 }, prices: { SPY: 100 }, positions: [] });
+  assert.strictEqual(r.grossCap, cb.MAX_GROSS, 'maxGross=9 still clamped to the hard 2x ceiling');
+  assert.strictEqual(r.grossUsed, cb.MAX_GROSS);
+});
+
+test('computeRebalance: no-margin de-risks toward cash on a storm gross (0.3x honored)', () => {
+  // In a drawdown the brake sends gross to 0.3; no-margin must pass that through (de-risk).
+  const r = cb.computeRebalance({
+    equity: 100000, gross: 0.3, maxGross: 1.0,
+    weights: { SPY: 1 }, prices: { SPY: 100 },
+    positions: [{ symbol: 'SPY', market_value: 100000 }],   // fully invested → must sell down to 30k
+  });
+  assert.strictEqual(r.grossUsed, 0.3, 'de-risking gross passes through the cap');
+  const spy = r.orders.find((o) => o.symbol === 'SPY');
+  assert.ok(spy && spy.side === 'sell' && spy.notional === 70000, 'sells 70k to reach 30% invested');
+});
+
+test('computeRebalance: default maxGross is unchanged (2x still allowed, no behavior change)', () => {
+  const r = cb.computeRebalance({ equity: 100000, gross: 2, weights: { SPY: 1 }, prices: { SPY: 100 }, positions: [] });
+  assert.strictEqual(r.grossUsed, 2.0, 'standard book still permits the full 2x');
+  assert.strictEqual(r.grossCap, cb.MAX_GROSS);
+});
