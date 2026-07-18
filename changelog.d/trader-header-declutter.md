@@ -1,2 +1,0 @@
-### Changed
-- **Trader header decluttered (ADR-0027).** Removed the redundant **Explore →** link (already in the global site nav) and collapsed the three broker controls (switch + ⚡ Connect Alpaca + 🔗 Connect broker) into a **single broker pill** that shows which broker actually executes your trades (⚡ Alpaca / 🔗 IBKR / Connect broker) and links to Settings (orchestration#broker) to add, configure, or switch brokers. Switching still lives on the Settings broker page (#2663). Strengthens **Act**.

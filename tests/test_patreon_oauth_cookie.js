@@ -2,7 +2,7 @@
 // Issue #689 — OAuth state must survive the patreon.com → 127.0.0.1 redirect /
 // server restart via a signed short-TTL cookie. Run: node tests/test_patreon_oauth_cookie.js
 const assert = require("assert");
-const { signOauth, verifyOauth, readCookie } = require("../apps/lantern-garage/lib/patreon-auth");
+const { signOauth, verifyOauth, readCookie } = require("../apps/lantern-garage/lib/oauth-core");
 
 let pass = 0;
 const ok = (n, c) => { assert.ok(c, n); console.log("  ok -", n); pass++; };

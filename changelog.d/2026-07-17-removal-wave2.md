@@ -1,3 +1,0 @@
-### Removed
-
-- repo-slim: removal wave 2 (#2539) — the dead `src/hff-api/` legacy tree (31 files: 8 orphans + 15 weak intra-tree refs + 7 docs-only + 1 package marker). Zero external wiring: no launcher, route, CI job, hook, or import from live code launched it. The one live-code mention (a directory name in `consolidate_md_to_csf.py`'s scan list) is trimmed; `status_cube.py`'s `hff_api` health-face label is unrelated cube vocabulary and stays; the hff-500y raw dump under `data/csf_memory/raw/` is a separate archived artifact and stays; doc mentions remain as history. Founder sign-off: operator-directed 2026-07-17; recoverable via git history.

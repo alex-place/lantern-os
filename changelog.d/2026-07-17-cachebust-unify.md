@@ -1,3 +1,0 @@
-### Fixed
-
-- cache-bust unification (#2496): `dream-chat.html` requested `/css/dream-chat-terminal.css?v=20260630-terminal` while `kalshi-terminal.html` requested the same file with **no** version key, so browsers cached two copies of the shared stylesheet and a version bump on one page left the other stale. Both now use the identical `?v=20260630-terminal` URL, so the shared CSS is fetched and cached once. (The issue's second case — `/styles.css` diverging between `pricing.html` and `proof.html` — is already moot: `pricing.html` migrated to the `site.css` token system and no longer loads `styles.css`, so `proof.html` is its only referrer.)

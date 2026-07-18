@@ -1,3 +1,0 @@
-### Changed
-
-- docs/ARCHITECTURE.md accuracy pass (from the `lib/` orphan audit): removed the resolved "Orphaned nav modules" known-issue — `shared-header.js` / `header.js` no longer exist anywhere in the repo (live nav has been `auth-gate.js` + inline `.site-nav` for a while). Corrected the stale `lib/` module count (149 → ~270, both the §4 and §9 mentions). Added a truthful §9 divergence documenting the five **unwired-but-preserved** Creator-Suite pipeline experiments the audit surfaced (`render-pipeline-v2.js`, `scoring-engine-v2.js`, `sigma0-v10-ml-weights.js`, `test-pipeline.js`, `layout-debug.js`) so they're a conscious keep-or-retire decision rather than being silently deleted as dead code.

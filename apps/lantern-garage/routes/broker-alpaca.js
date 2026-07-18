@@ -137,8 +137,8 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       // default. On multi-user prod (auth on) each user's own id is authoritative,
       // so we do NOT hijack local-owner.
       try {
-        const { patreonAuthEnabled } = require('../lib/auth-middleware');
-        if (!patreonAuthEnabled() && prefUserId !== 'local-owner') prefs.set('local-owner', broker);
+        const { loginGateEnabled } = require('../lib/auth-middleware');
+        if (!loginGateEnabled() && prefUserId !== 'local-owner') prefs.set('local-owner', broker);
       } catch (_e) { /* auth module absent → nothing to mirror */ }
       // Persist the choice to the browser: a 1-year cookie so it survives reloads
       // and session-id drift. 'auto' clears the cookie (falls back to store/env).

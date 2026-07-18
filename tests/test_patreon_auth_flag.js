@@ -66,7 +66,7 @@ try {
 
   // ── Gate ON (flag absent → default on) ────────────────────────────────────
   ff.deleteFlag("patreon_auth"); ff._resetCache();
-  assert.strictEqual(auth.patreonAuthEnabled(), true, "absent flag defaults ON");
+  assert.strictEqual(auth.loginGateEnabled(), true, "absent flag defaults ON");
 
   check("gate ON: requireAuth redirects guest to /auth.html", () => {
     const res = mockRes();
@@ -82,7 +82,7 @@ try {
 
   // ── Gate OFF (flag created + disabled) ────────────────────────────────────
   ff.setFlag("patreon_auth", { enabled: false }); ff._resetCache();
-  assert.strictEqual(auth.patreonAuthEnabled(), false, "disabled flag → gate off");
+  assert.strictEqual(auth.loginGateEnabled(), false, "disabled flag → gate off");
 
   check("gate OFF: requireAuth allows guest (no redirect)", () => {
     const res = mockRes();
