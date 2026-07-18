@@ -202,6 +202,7 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+  .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
@@ -693,18 +694,26 @@
      ACTIONS + account panels are removed. The trade-gated data endpoints stay
      blocked server-side too (tradeApiGuard) — this is defence-in-depth, not the
      only gate. */
-  body.guest .footer,
+  /* Hidden for ALL guests, incl. demo: the trade ACTIONS + broker/account config
+     (a demo visitor can look around, not trade). */
   body.guest .footer-resize,
-  body.guest .badge-paper,
   body.guest #brokerBtn,           /* broker status/config — only for entitled traders */
-  body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
+  body.guest .tp-flat-btn,         /* per-position "Flatten" (market-close = a trade) */
+  body.guest .tp-flatten-all,      /* "Close all" (bulk market-close = a trade) */
   body.guest #otBg{ display:none !important; }
+  /* Hidden only for NON-demo guests. In demo mode (body.demo) these are SHOWN and
+     filled with the read-only simulated champion account: the header Equity / Day
+     P&L / Positions stats, the positions footer, and the mode badge (relabeled
+     DEMO in JS). */
+  body.guest:not(.demo) .footer,
+  body.guest:not(.demo) .badge-paper,
+  body.guest:not(.demo) .hstat.acct{ display:none !important; }
   /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
      chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
   /* No footer row for guests — the chart grid takes the full height. */
-  body.guest .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  body.guest:not(.demo) .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
   /* Uniform chart grid for guests: no "open" state spanning two columns and no
      per-state height changes, so every card is the same size. #guest-uniform-grid */
   body.guest .card.state-open{ grid-column:auto; }
@@ -4280,9 +4289,14 @@ function computeDayPnl(positions){
 }
 
 async function loadPortfolio(){
-  if(window.GUEST) return;   // account/positions are trade-gated; guest view is charts-only
+  // Non-demo guests get the charts-only view (account/positions are trade-gated).
+  // In demo mode a guest sees the READ-ONLY simulated champion account instead —
+  // fetched with ?demo=champion, which the server serves publicly (never a real
+  // account) so the trader isn't an empty shell for logged-out visitors.
+  if(window.GUEST && !window.DEMO_ACCT) return;
+  const demoQS = window.DEMO_ACCT ? '?demo=champion' : '';
   try{
-    const r  = await fetch('/api/trading/positions');
+    const r  = await fetch('/api/trading/positions' + demoQS);
     const d  = await r.json();
     const a  = d.account||{};
     const dayPnl = computeDayPnl(d.positions||[]);
@@ -4627,6 +4641,20 @@ async function detectGuestMode(){
   }catch(e){ window.GUEST = true; }
   if(window.GUEST){
     document.body.classList.add('guest');
+    // Demo showroom: instead of an empty, gated shell, a logged-out / non-entitled
+    // visitor sees the READ-ONLY simulated champion account. body.demo re-shows the
+    // account header stats + positions footer (CSS), the mode badge is relabeled
+    // DEMO, and loadPortfolio() fetches it with ?demo=champion. Trade actions stay
+    // hidden (still body.guest), so nothing here can place an order.
+    window.DEMO_ACCT = true;
+    document.body.classList.add('demo');
+    const badge=document.querySelector('.badge-paper');
+    if(badge){
+      badge.classList.remove('badge-paper'); badge.classList.add('badge-demo');
+      badge.textContent='DEMO';
+      badge.title='Demo account — a simulated "champion" strategy portfolio. Look around; sign in to trade your own.';
+      badge.setAttribute('aria-label','Demo account — simulated');
+    }
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
     const cta=document.getElementById('signinCta');
     if(cta){
