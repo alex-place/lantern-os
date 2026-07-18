@@ -58,3 +58,53 @@ momentum-crash / backtest-overfitting literature to the corpus.
 
 Reproduce: `experiments/survivorship_momentum/momentum_backtest.py` (+ `coverage_yahoo.json`,
 `results.json`). To do it *right*: a free Tiingo key or Sharadar + the fja05680 constituent CSV.
+
+---
+
+# Update 2026-07-18 — we got the data and MEASURED it (free path)
+
+Follow-up to the above: a Tiingo key was provided, and we then ran the whole data-vendor
+question to ground (`docs/research/2026-07-18-market-data-vendors-survivorship.md`, all 10
+vendors, live pricing). Two corrections and a measured result. Pipeline:
+`experiments/survivorship_momentum/free_data/` (point-in-time engine + loaders).
+
+## Correction 1 — Tiingo is NOT the "accessible fix" the table claimed
+Empirically probed: Tiingo's **free tier caps at 50 req/hr + 500 unique symbols/month** and
+its delisted coverage is **spotty** — it has Twitter/Xilinx/Celgene/**SVB-through-collapse**
+(2013+), but **not** Lehman/Enron/WorldCom/Bear/old-GM. A full survivorship-free S&P 500
+backtest needs ~440 names (the whole cross-section each month, survivors *and* delisted) →
+~9 hrs of dripping + the entire month's quota. **Not free-tier feasible.**
+
+## Correction 2 — the free stooq bulk is survivorship-biased too
+Downloaded the free `d_us_txt.zip` (13,165 US tickers, 2026-07-18). Coverage vs the S&P 500
+ever-member universe (`stooq_coverage.json`): **survivors 501/503 = 100%, but the delisted
+cohort only 120/292 = 41%** — and the "present" 120 are mostly *removed-but-still-trading*
+names (ANF/CLF/GME); the **172 truly-dead** (JCPenney, Heinz, Dean Foods, Big Lots, Avon,
+Safeway, Windstream, Molex…) are gone. stooq serves "what trades today." **No free price
+source is survivorship-free** — free membership yes (fja05680), free prices no.
+
+## The measured result (free data, point-in-time membership)
+12-1 momentum, long top quintile, monthly, 1-mo skip, S&P 500 with **point-in-time
+membership** (fixes the universe-selection bias that produced the earlier $2M mirage),
+prices = stooq bulk (survivorship-**inflated** upper bound). `results_measured.json`:
+
+| Window | Momentum Sharpe | Momentum CAGR | maxDD | SPY Sharpe (same window) |
+|---|--:|--:|--:|--:|
+| 2014–2026 (benign, no '08 crash) | 0.755 | 13.3% | −19% | **0.908** |
+| **2002–2026 (full cycle)** | **0.60** | 11.1% | **−54%** | 0.598 |
+
+- The 2014–2026 "win" was **entirely the benign window**; adding 2008–09 collapses momentum
+  0.755 → **0.60**, **dead even with plain SPY (0.598)** and with a **−54% drawdown**.
+- **survivors-only ≈ partial-debiased to 3 d.p. in BOTH windows** (`mid_hold_delist_frac
+  ≈ 0.0002`). This is the *proof* you can't de-bias with free data: the bias-carrying names
+  are exactly the ones missing, and a long-*top*-quintile book structurally avoids dying
+  (low-momentum) names anyway. So 0.60 is an **upper bound** — the true figure is below it,
+  at the published CRSP ~0.5.
+
+## Verdict (now measured, not cited)
+**Champion NOT upgraded.** Honest single-stock 12-1 momentum = **0.60 Sharpe full-cycle
+(inflated; true ~0.5), −54% maxDD** — it ties buy-and-hold SPY and sits **below the
+champion's 0.66**, which carries a fraction of the drawdown (brake-to-cash). Trustworthy
+momentum stays via the **XMMO/SPMO ETFs already in the champion**. To get a *clean* number
+(not an inflated upper bound) you need paid data — Sharadar ~$30/mo or HistoricalData.net
+$299 one-time; the pipeline runs unchanged against either.
