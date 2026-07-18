@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **7** (extend-1927; low-trade tune; DCA reversal; hybrid retired; diversification; literature match; LIVE wiring). DONE — opening PR.
+> fabrication). Iterations done: **7 + closing validation**. LOOP COMPLETE — PR #2728 open (48/48 CI green), awaiting human review.
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -300,3 +300,30 @@ book** and keeping 2× leverage strictly opt-in.
   sanity-check the band/trend choice against published results.
 - If it holds: wire a selectable **"Conservative (no-margin)"** overlay mode into the live
   model rather than adding a parallel system (extend, don't sprawl).
+
+---
+
+## Closing validation — the recommendation holds on the REAL 8-ETF live book
+
+Confirmed the Conservative config (band 0.30 / brake 0.20 / trend 12mo, maxGross=1.0) on the
+actual universe the live code trades (`deep_history_live_universe.py`, equal-weight blend as a
+stand-in for the tangency book). ETF histories are short — stated honestly.
+
+| Real live universe | window | buy&hold Sharpe / maxDD | no-margin Sharpe / maxDD | trades/yr |
+|---|---|---|---|---|
+| Full 8-ETF | 2015-2026 (10.7y) | 0.95 / −25% | **1.07 / −16%** | 6.1 |
+| 6-ETF sub-book | 2004-2026 (21.6y, incl. 2008) | 0.78 / −36% | **0.90 / −16%** | 4.7 |
+
+Same signature as the 1927+ proxy study: **higher Sharpe, ~half the drawdown, ~monthly
+trading, no margin**, with a modest final-value give-up. The live book is already diversified
+(6-8 assets incl. TLT bonds + GLD gold), so this is exactly the iter-5 "diversification + brake"
+result — now on the real instruments.
+
+## LOOP COMPLETE (2026-07-18)
+
+7 research iterations + closing validation, all measured, all pushed to
+`claude/trading-deep-history-research`. Shipped: a selectable **Conservative (no-margin)**
+mode in the live champion book (PR #2728, **48/48 CI green**, awaiting human review — money-path).
+Bottom line for Alex: the biggest non-risky win is **cap leverage at 1×, trade ~monthly not
+daily, stay diversified** — best Sharpe, ~half the drawdown, far under PDT limits, zero margin
+risk. Leverage and daily retrade were both net-negative. Full evidence trail above.
