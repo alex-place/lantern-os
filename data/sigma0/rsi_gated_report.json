@@ -1,0 +1,74 @@
+{
+  "claim": "RSI stabilizer spectrum: ungrounded self-review collapses (flattery ratchet); DE-ANCHORING (commit-first) prevents the basin with no external truth; a REUSED exogenous filter slows but does not stop collapse (must be FRESH); a fresh gate bounds and improves; rate is verification-throughput-limited",
+  "sources": {
+    "2607.05904": "self-play reward hacking; commit-first fix; gap<=1-acc",
+    "2606.28438": "code self-training collapse; self-gate degenerates to ungated; fixed filters slow not stop; covariance concentration (=cert \u00a72)",
+    "2601.22513": "self-rewarding is stable but to internal consistency, not correctness",
+    "openai.com/careers": "RSI Safety/Preparedness roles (verified 2026-07-18)"
+  },
+  "params": {
+    "cycles": 60,
+    "seeds": 200,
+    "eta": 0.35,
+    "eta_filter": 0.1,
+    "k": 4
+  },
+  "arms": {
+    "ungrounded": {
+      "true_median": 0.7787086850826673,
+      "true_iqr": 0.490975512464495,
+      "crash_rate": 0.525,
+      "delusion_median": Infinity,
+      "precision_early": 0.5359394084550531,
+      "precision_late": 0.4637379045182681
+    },
+    "deanchored": {
+      "true_median": 2.441876007534362,
+      "true_iqr": 0.9477371372944572,
+      "crash_rate": 0.0,
+      "delusion_median": 1.0085330392646417,
+      "precision_early": 0.7753262614148838,
+      "precision_late": 0.7831457350913621
+    },
+    "fixed_filter": {
+      "true_median": 1.2608378445027681,
+      "true_iqr": 0.19695968595608315,
+      "crash_rate": 0.0,
+      "delusion_median": 0.9831510644324649,
+      "precision_early": 0.8651591289782244,
+      "precision_late": 0.7040201005025125
+    },
+    "gated": {
+      "true_median": 1.2914388992496222,
+      "true_iqr": 0.18763724190825903,
+      "crash_rate": 0.0,
+      "delusion_median": 1.0032530355789884,
+      "precision_early": 0.9347667638483965,
+      "precision_late": 0.9536443148688046
+    },
+    "screened": {
+      "true_median": 1.2893614137188527,
+      "true_iqr": 0.19550186436284722,
+      "crash_rate": 0.0,
+      "delusion_median": 1.0512531000679992,
+      "precision_early": 0.974017094017094,
+      "precision_late": 0.9616928446771379
+    }
+  },
+  "throughput_sweep_true_median": {
+    "1": 2.982,
+    "2": 1.717,
+    "4": 1.291,
+    "8": 1.147
+  },
+  "verdicts": {
+    "H1_ungrounded_delusion_decay": true,
+    "H2_fresh_gate_bounded": true,
+    "H3_throughput_limited": true,
+    "H4_deanchoring_prevents_basin_no_external_truth": true,
+    "H5_reused_filter_slows_not_stops": true,
+    "kill_grounding_adds_nothing": false
+  },
+  "reproduced": true,
+  "evidence_class": "MEASURED (toy; demonstrates 3 real 2026 results + the cert at RSI scale \u2014 NOT new theory)"
+}

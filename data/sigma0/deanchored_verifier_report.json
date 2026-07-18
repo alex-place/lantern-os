@@ -1,0 +1,26 @@
+{
+  "source": "arXiv:2607.05904 (de-anchored/commit-first judging); niche per arXiv:2607.07663",
+  "model": "mock(self-test)",
+  "n_items": 24,
+  "anchored": {
+    "fpr": 0.625,
+    "tpr": 0.708,
+    "discrimination": 0.083,
+    "fp": 15,
+    "wrong": 24,
+    "tp": 17,
+    "correct": 24
+  },
+  "deanchored": {
+    "fpr": 0.0,
+    "tpr": 0.583,
+    "discrimination": 0.583,
+    "fp": 0,
+    "wrong": 24,
+    "tp": 14,
+    "correct": 24
+  },
+  "false_positive_reduction": 0.625,
+  "reproduced_deanchoring_beats_anchored": true,
+  "evidence_class": "MEASURED (harness self-tested; real-model row MEASURED on the model)"
+}
