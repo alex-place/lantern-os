@@ -277,9 +277,16 @@ function requireStaff(req, res) {
     res.end();
     return false;
   }
-  if (isStaffRole(session.role)) return true;
+  // #2627: gate on the PERSISTED profile role (effectiveRole), NOT the role
+  // snapshotted into the cookie at login — otherwise a demoted admin/tech_support
+  // keeps staff access for the cookie's whole lifetime. This mirrors requireRole /
+  // isStaff / isAdmin, which already re-derive; requireStaff was the lone gate still
+  // trusting session.role. (Currently exported-but-unwired — fixed so a future route
+  // that adopts it doesn't silently reintroduce the stale-role hole.)
+  const role = effectiveRole(req);
+  if (isStaffRole(role)) return true;
   res.writeHead(403, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "Staff access required", required: "admin or tech_support", current: session.role }));
+  res.end(JSON.stringify({ error: "Staff access required", required: "admin or tech_support", current: role }));
   return false;
 }
 
