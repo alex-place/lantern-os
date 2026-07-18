@@ -472,6 +472,41 @@ the worst cell **DOWN·calm −30.2%/yr** (217 days).
    the damage, but this is the clear lever → **iter-12 tests a better/confirmed signal to cut
    false flips**, iter-13 tests event-triggered rebalancing.
 
-> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative mode + iters 1-10) MERGED to master
+> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on branch `claude/trading-research-loop2` (PR #2731). Iters 8-12 done; iter-12 found the 200d-SMA gate beats the shipped momentum gate (needs OOS validation in iter-13).
 > at 14:14Z. Loop-2 continues on branch `claude/trading-research-loop2`; a new PR will
 > collect iters 11+.
+
+---
+
+## Iteration 12 (Σ₀) — signal choice: the 200-day SMA gate BEATS the shipped momentum gate
+
+`deep_history_signals.py` swaps the trend gate in the no-margin Conservative overlay:
+`mom` = 12mo momentum≥0 (shipped default), `sma` = price≥200-day SMA, `dual` = de-risk only
+when BOTH say down.
+
+| S&P 1927+ | Sharpe | maxDD | final | trades/yr | flips/yr |
+|---|---|---|---|---|---|
+| mom (shipped) | 0.69 | −34% | $16.5M | 8.4 | 3.9 |
+| **sma** | **0.80** | **−26%** | $41.5M | 9.5 | 6.0 |
+| dual | 0.75 | −34% | $42.2M | 8.6 | 3.8 |
+
+| Nasdaq 1971+ | Sharpe | maxDD | final | trades/yr | flips/yr |
+|---|---|---|---|---|---|
+| mom (shipped) | 0.90 | −27% | $6.34M | 10.8 | 2.9 |
+| **sma** | **0.95** | −27% | $5.93M | 11.6 | 5.6 |
+| dual | 0.94 | −27% | $8.84M | 12.3 | 3.5 |
+
+**Findings (iteration 12).**
+1. **The 200-day SMA gate dominates the shipped 12mo-momentum gate** on Sharpe (0.69→0.80
+   S&P, 0.90→0.95 Nasdaq) AND drawdown (−34%→−26% S&P) AND final value — at trivially more
+   trades (9.5 vs 8.4/yr, still far under PDT). The shipped `mom` signal is the weakest of
+   the three. **This is the first candidate live improvement of loop 2.**
+2. **`dual` maximizes return** (2.5× the mom book's final on S&P, highest on Nasdaq) with the
+   fewest flips — but **gives back crash protection** (−34% vs sma's −26%): requiring both
+   signals to confirm de-risks slower, eating more of the initial drop. A return-vs-drawdown
+   trade-off; for the *non-risky* mandate, `sma` is the better pick (best drawdown too).
+3. **Σ₀ caveat — NOT yet actionable.** This is full-history (in-sample) signal selection. The
+   shipped config earned its keep via a train/validate split; the SMA claim MUST get the same
+   OOS treatment before any live change. **Iter-13 validates sma-vs-mom train(pre-2000)/
+   validate(2000+) — only then does it become a live champion-book/brake-monitor refinement
+   (money-path → PR #2731, tests, human review).**
