@@ -54,6 +54,7 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | `src/mcp_server/server.py` | MCP server (port 8771) — tools with real implementations only. | `python src/mcp_server/server.py` |
 | `scripts/convergence_close_loop.py` | Closes convergence records. Anchors: `lib/convergence-status.js`, `lib/kalshi-convergence-outcomes.js`. | server-driven; manual: `python scripts/convergence_close_loop.py` |
 | `scripts/session_to_convergence.py` | Mines Claude Code session history into both-class ConvergenceRecords (claim + verified/refuted/corrected, confidence capped by grounding) → `data/convergence/records.jsonl`. `--records` appends a pre-extracted set (current session); `--transcript` extracts a past session via a Claude model. Idempotent (deterministic ids). Writer schema mirrors `lib/convergence-records.js`. | `python scripts/session_to_convergence.py --records <set.json>` · `… --transcript <session.jsonl>` |
+| `scripts/repair_convergence_records.py` | Retroactively makes ConvergenceRecords honest: demotes laundered `verified:True` records whose notes say single-source/unverified (keeps genuine multi-source corroboration), caps confidence, lifts source domains, and merges legacy research/training stores into the canonical ledger. Every change auditable (`repaired`, `original_verified`, `.bak`). | `python scripts/repair_convergence_records.py --normalize <store>` · `… --merge <src> --into <dst>` |
 
 ---
 
