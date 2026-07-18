@@ -20,7 +20,7 @@ const { higherRole } = require("./role-hierarchy");
 // The ONLY roles a Stripe purchase may resolve to. Never admin / tech_support / founder.
 const PURCHASABLE = new Set(["supporter", "deep_dreamer", "pilot"]);
 
-// USD-cent thresholds — mirror auth-providers TIER_CENTS so Stripe and Patreon agree.
+// USD-cent thresholds for the sold ladder: $5 supporter (legacy) / $20 Pro / $200 Pilot.
 const AMOUNT_CENTS = { supporter: 500, deep_dreamer: 2000, pilot: 20000 };
 
 // Env-configured Price ids per tier (read lazily so tests can set them).
