@@ -1,0 +1,478 @@
+﻿{
+    "MEDI":  {
+                 "ok":  true,
+                 "first":  "2022-11-17",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  917
+             },
+    "GDW":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "GLD":  {
+                "ok":  true,
+                "first":  "2004-11-18",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  5448
+            },
+    "OMX":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "GOOGL":  {
+                  "ok":  true,
+                  "first":  "2004-08-19",
+                  "err":  "",
+                  "last":  "2026-07-17",
+                  "n":  5512
+              },
+    "ANDW":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "XLE":  {
+                "ok":  true,
+                "first":  "1998-12-22",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  6933
+            },
+    "MER":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "AMZN":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "JCP":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "The remote server returned an error: (404) Not Found.",
+                "last":  "",
+                "n":  0
+            },
+    "GLK":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "SGP":  {
+                "ok":  true,
+                "first":  "2026-02-06",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  111
+            },
+    "NOVL":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "AAPL":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "RSHCQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "LEHMQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "DJ":  {
+               "ok":  false,
+               "first":  "",
+               "err":  "no-data",
+               "last":  "",
+               "n":  0
+           },
+    "GENZ":  {
+                 "ok":  true,
+                 "first":  "2008-01-24",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  4649
+             },
+    "KATE":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "AIG":  {
+                "ok":  true,
+                "first":  "1997-12-31",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  7179
+            },
+    "QQQ":  {
+                "ok":  true,
+                "first":  "1999-03-10",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  6881
+            },
+    "XOM":  {
+                "ok":  true,
+                "first":  "1997-12-31",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  7179
+            },
+    "SPMO":  {
+                 "ok":  true,
+                 "first":  "2015-10-12",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  2706
+             },
+    "CFC":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "GE":  {
+               "ok":  true,
+               "first":  "1997-12-31",
+               "err":  "",
+               "last":  "2026-07-17",
+               "n":  7179
+           },
+    "EKDKQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "The remote server returned an error: (404) Not Found.",
+                  "last":  "",
+                  "n":  0
+              },
+    "HD":  {
+               "ok":  true,
+               "first":  "1997-12-31",
+               "err":  "",
+               "last":  "2026-07-17",
+               "n":  7179
+           },
+    "ENRNQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "BSC":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "SLE":  {
+                "ok":  true,
+                "first":  "2019-02-26",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  1858
+            },
+    "AMD":  {
+                "ok":  true,
+                "first":  "1997-12-31",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  7179
+            },
+    "XMMO":  {
+                 "ok":  true,
+                 "first":  "2005-03-03",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  5377
+             },
+    "NVDA":  {
+                 "ok":  true,
+                 "first":  "1999-01-22",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  6913
+             },
+    "MTLQQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "SUNEQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "COST":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "BUD":  {
+                "ok":  true,
+                "first":  "2009-07-01",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  4287
+            },
+    "JPM":  {
+                "ok":  true,
+                "first":  "1997-12-31",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  7179
+            },
+    "CCTYQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "AVGO":  {
+                 "ok":  true,
+                 "first":  "2009-08-06",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  4262
+             },
+    "BMET":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "INTC":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "FRE":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "TLT":  {
+                "ok":  true,
+                "first":  "2002-07-30",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  6030
+            },
+    "TYC":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "CSCO":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "WB":  {
+               "ok":  true,
+               "first":  "2014-04-17",
+               "err":  "",
+               "last":  "2026-07-17",
+               "n":  3080
+           },
+    "BOL":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "WYE":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "NCC":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "NFLX":  {
+                 "ok":  true,
+                 "first":  "2002-05-23",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  6076
+             },
+    "WCOM":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "TLAB":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "no-data",
+                 "last":  "",
+                 "n":  0
+             },
+    "Q":  {
+              "ok":  true,
+              "first":  "2025-10-27",
+              "err":  "",
+              "last":  "2026-07-17",
+              "n":  181
+          },
+    "ABK":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "COMS":  {
+                 "ok":  true,
+                 "first":  "2008-08-15",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  4507
+             },
+    "FNM":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "YHOO":  {
+                 "ok":  false,
+                 "first":  "",
+                 "err":  "The remote server returned an error: (404) Not Found.",
+                 "last":  "",
+                 "n":  0
+             },
+    "BBBY":  {
+                 "ok":  true,
+                 "first":  "2002-05-30",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  6072
+             },
+    "WNDXQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "no-data",
+                  "last":  "",
+                  "n":  0
+              },
+    "DYN":  {
+                "ok":  true,
+                "first":  "2020-09-17",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  1464
+            },
+    "C":  {
+              "ok":  true,
+              "first":  "1997-12-31",
+              "err":  "",
+              "last":  "2026-07-17",
+              "n":  7179
+          },
+    "IWM":  {
+                "ok":  true,
+                "first":  "2000-05-26",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  6573
+            },
+    "MSFT":  {
+                 "ok":  true,
+                 "first":  "1997-12-31",
+                 "err":  "",
+                 "last":  "2026-07-17",
+                 "n":  7179
+             },
+    "SPY":  {
+                "ok":  true,
+                "first":  "1997-12-31",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  7179
+            },
+    "SOV":  {
+                "ok":  false,
+                "first":  "",
+                "err":  "no-data",
+                "last":  "",
+                "n":  0
+            },
+    "EFA":  {
+                "ok":  true,
+                "first":  "2001-08-27",
+                "err":  "",
+                "last":  "2026-07-17",
+                "n":  6258
+            },
+    "NRTLQ":  {
+                  "ok":  false,
+                  "first":  "",
+                  "err":  "The remote server returned an error: (404) Not Found.",
+                  "last":  "",
+                  "n":  0
+              }
+}
