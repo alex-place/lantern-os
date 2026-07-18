@@ -263,4 +263,55 @@ async function cancelOpenOrders(userId, symbol) {
   return n;
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };
+// Range → Alpaca (period, timeframe). Alpaca's portfolio-history takes a period
+// ("1D"/"1W"/"1M"/"3M"/"1A"/"all") + a bar timeframe. Intraday ranges use fine
+// bars; multi-month ranges use daily bars. YTD has no native period, so it's
+// computed as "<n>D" from Jan 1. The equity curve (Robinhood-style) is drawn from
+// the returned `equity[]` aligned to `timestamp[]`.
+const HISTORY_RANGES = {
+  '1D':  { period: '1D',  timeframe: '5Min' },
+  '1W':  { period: '1W',  timeframe: '1H' },
+  '1M':  { period: '1M',  timeframe: '1D' },
+  '3M':  { period: '3M',  timeframe: '1D' },
+  '1Y':  { period: '1A',  timeframe: '1D' },
+  'ALL': { period: 'all', timeframe: '1D' },
+};
+
+/** Portfolio equity history for the Robinhood-style chart. `range` is one of
+ *  1D/1W/1M/3M/YTD/1Y/ALL. Returns { ok, range, timestamps, equity, base_value,
+ *  timeframe } or { ok:false } when no Alpaca account is available. */
+async function getPortfolioHistory(userId, range = '1D') {
+  const auth = _authFor(userId);
+  if (!auth) return { ok: false, reason: 'no Alpaca account' };
+  let cfg = HISTORY_RANGES[range];
+  const params = new URLSearchParams({ extended_hours: 'true' });
+  if (range === 'YTD') {
+    const now = new Date();
+    const days = Math.max(1, Math.ceil((now - new Date(now.getUTCFullYear(), 0, 1)) / 86400000));
+    params.set('period', `${days}D`);
+    params.set('timeframe', '1D');
+  } else {
+    if (!cfg) cfg = HISTORY_RANGES['1D'];
+    params.set('period', cfg.period);
+    params.set('timeframe', cfg.timeframe);
+    // Intraday ranges: report continuously so the curve isn't chopped at each close.
+    if (cfg.timeframe !== '1D') params.set('intraday_reporting', 'continuous');
+  }
+  const r = await _req(auth, 'GET', `/v2/account/portfolio/history?${params.toString()}`);
+  if (!r.ok || !r.json || !Array.isArray(r.json.timestamp)) {
+    return { ok: false, reason: (r.json && r.json.message) || r.error || `HTTP ${r.status}` };
+  }
+  const ts = r.json.timestamp || [];
+  const eq = (r.json.equity || []).map((v) => (v == null ? null : Number(v)));
+  return {
+    ok: true,
+    range,
+    timeframe: r.json.timeframe || params.get('timeframe'),
+    base_value: Number(r.json.base_value) || (eq.find((v) => v != null) || 0),
+    timestamps: ts,
+    equity: eq,
+    source: 'alpaca',
+  };
+}
+
+module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };

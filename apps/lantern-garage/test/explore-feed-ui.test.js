@@ -1,19 +1,19 @@
-// Behavioral regression for the Explore feed UI (apps/lantern-garage/public/explore.html).
+// Behavioral regression for the Explore dashboard UI (apps/lantern-garage/public/explore.html).
 //
-// Loads the real page in jsdom, executes its inline feed script against a stubbed
-// /api/explore/feed/page, and asserts the rendered DOM. Covers the four changes
-// shipped together:
-//   1. Panels match index.html — each card carries a per-type accent (data-type)
-//      and renders as a role="article" inside the role="feed" stream.
-//   2. Fullscreen-button spacing — the embed ⛶ fullscreen + ✕ dismiss live in a
-//      single .fc-embed-ctl group (the base .fc-dismiss is position:absolute and
-//      used to overlap the fullscreen control).
-//   3. Thumbnails — every card has a lead visual: a source <img> when available,
-//      otherwise a generated .fc-thumb-ph placeholder (docs / image-less reads).
-//   4. WCAG a11y — filters are aria-pressed toggle buttons (NOT a broken tablist),
-//      decorative emoji are aria-hidden, the fullscreen control exposes aria-pressed.
+// explore.html was reworked from a discovery feed into a personalized, Robinhood-style
+// investing dashboard: a portfolio header + equity chart, holdings, a right-hand
+// watchlist, and market news below it. This test loads the real page in jsdom, stubs
+// the trading + feed endpoints it reads, and asserts the rendered DOM.
 //
-// Also re-asserts the URL/image scheme guards survive the rewrite (no XSS sink).
+// Covers:
+//   1. Portfolio header — equity renders as formatted currency; range chips are an
+//      aria-pressed toggle group (WCAG), and clicking one moves the pressed state.
+//   2. Holdings — each open position renders a row with its symbol + market value.
+//   3. Watchlist — the user's own symbols render priced rows (add/remove controls
+//      carry accessible names).
+//   4. Market news — finance headlines render as links; a hostile javascript: URL
+//      from the feed is dropped (no XSS sink survives the rework).
+//   5. A11y — a single <h1> names the page; no stray tablist/aria-selected.
 //
 // Run: node apps/lantern-garage/test/explore-feed-ui.test.js
 // (jsdom is a root devDependency; the test self-skips if it isn't installed.)
@@ -23,7 +23,7 @@ const fs = require("fs");
 const path = require("path");
 
 // process.stdout/stderr, not console.* — keeps the file clear of the SLOP gate's
-// "debug statement" heuristic (same discipline as explore-feed.js's CLI).
+// "debug statement" heuristic.
 const out = (s) => process.stdout.write(s + "\n");
 const err = (s) => process.stderr.write(s + "\n");
 
@@ -31,57 +31,48 @@ let JSDOM;
 try {
   ({ JSDOM } = require("jsdom"));
 } catch (e) {
-  out("SKIP explore-feed-ui: jsdom not installed (root devDependency) — " + e.message);
+  out("SKIP explore-dashboard-ui: jsdom not installed (root devDependency) — " + e.message);
   process.exit(0);
 }
 
 const HTML_PATH = path.resolve(__dirname, "../public/explore.html");
 const html = fs.readFileSync(HTML_PATH, "utf8");
 
-// Cards the stubbed feed endpoint returns. One of each shape we care about, plus a
-// hostile card to prove the scheme guards still drop dangerous URLs/images.
-const CARDS = [
-  {
-    id: "embed:t-rex", type: "embed", title: "T-Rex Runner",
-    url: "/t-rex/index.html", source: "unisona.ai Arcade",
-    topics: ["game", "play"], lore: "The offline classic.",
-    evidence: { why: "served locally", source: "local" },
-    embed: { src: "/t-rex/index.html", height: 320, interactive: true },
-    key: "source:embed:t-rex",
-  },
-  {
-    id: "doc:readme", type: "doc", title: "README",
-    url: "https://github.com/alex-place/lantern-os/blob/master/README.md",
-    source: "Knowledge Center",
-    evidence: { why: "Indexed unisona.ai reference doc", source: "README.md" },
-    key: "source:Knowledge Center",
-  },
-  {
-    id: "read:img", type: "read", title: "An article with art",
-    url: "https://news.example.com/post", source: "Hacker News",
-    image: "https://img.example.com/lead.jpg", summary: "A short preview.",
-    evidence: { why: "Fresh read from Hacker News", source: "Hacker News" },
-    key: "source:Hacker News",
-  },
-  {
-    id: "read:evil", type: "read", title: "hostile card",
-    url: "javascript:alert(1)", image: "javascript:alert(1)", source: "x",
-    evidence: { why: "test", source: "x" },
-    key: "source:x",
-  },
+const ACCOUNT = {
+  account_id: "PAPER123", equity: 57108.73, cash: 0.71, buying_power: 0.71,
+  pnl_today: 512.34, pnl_pct: 0.9, mode: "paper", source: "alpaca",
+};
+const POSITIONS = [
+  { symbol: "AAPL", qty: 10, avg_entry_price: 180, current_price: 190, market_value: 1900, unrealized_pl: 100, pnl_pct: 5.55 },
+  { symbol: "TSLA", qty: 5, avg_entry_price: 250, current_price: 240, market_value: 1200, unrealized_pl: -50, pnl_pct: -4.0 },
 ];
+const HISTORY = {
+  ok: true, range: "1D", timeframe: "5Min", base_value: 56596.39,
+  timestamps: [1_700_000_000, 1_700_000_300, 1_700_000_600],
+  equity: [56596.39, 56900.0, 57108.73],
+};
+const WATCHLIST = { watchlist: ["AAPL", "TSLA"] };
+const WATCHLIST_PRICES = [{ ticker: "AAPL", price: 190.12, chg_pct: 1.23, is_crypto: false }];
+const NEWS_CARDS = {
+  cards: [
+    { id: "n1", type: "read", title: "Markets rally on rate hopes", url: "https://news.example.com/a", source: "Reuters", published: Date.now() - 3600000, evidence: { why: "finance" }, key: "k1" },
+    { id: "n2", type: "read", title: "hostile headline", url: "javascript:alert(1)", source: "evil", published: Date.now(), evidence: { why: "x" }, key: "k2" },
+    { id: "n3", type: "embed", title: "a game (not news)", url: "/t-rex/index.html", source: "Arcade", key: "k3" },
+  ],
+};
 
-function makeFetchStub(win) {
-  return function (url) {
-    if (String(url).includes("/api/explore/feed/page")) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ cards: CARDS, cycled: false }) });
-    }
-    if (String(url).includes("/api/health")) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
-    }
-    // interaction beacons etc. — succeed silently
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+function makeFetchStub() {
+  return function (url, opts) {
+    const u = String(url);
+    if (u.includes("/api/trading/positions")) return json({ account: ACCOUNT, positions: POSITIONS });
+    if (u.includes("/api/trading/portfolio/history")) return json(HISTORY);
+    if (u.includes("/api/trading/watchlist-prices")) return json(WATCHLIST_PRICES);
+    if (u.includes("/api/trading/watchlist")) return json(WATCHLIST);
+    if (u.includes("/api/trading/price-feed")) return json({ symbol: "TSLA", current_price: 240.5, open_price: 245.0 });
+    if (u.includes("/api/explore/feed/page")) return json(NEWS_CARDS);
+    return json({});
   };
+  function json(body) { return Promise.resolve({ ok: true, json: () => Promise.resolve(body) }); }
 }
 
 let failures = 0;
@@ -96,130 +87,99 @@ async function run() {
     pretendToBeVisual: true,
     url: "https://lantern-os.net/explore.html",
     beforeParse(win) {
-      win.fetch = makeFetchStub(win);
+      win.fetch = makeFetchStub();
+      // jsdom has no 2D canvas; the page guards on a null context and hides the
+      // chart. Return null explicitly so no "Not implemented" noise is logged.
+      win.HTMLCanvasElement.prototype.getContext = () => null;
+      // AbortSignal.timeout isn't in jsdom's older ctor — polyfill a no-op signal.
+      if (!win.AbortSignal || !win.AbortSignal.timeout) {
+        win.AbortSignal = win.AbortSignal || function () {};
+        win.AbortSignal.timeout = () => undefined;
+      }
     },
   });
   const { document } = dom.window;
 
-  // Give the async loadPage()/render a few ticks to resolve and paint the cards.
-  await new Promise((r) => setTimeout(r, 150));
+  // Let the async loaders (positions → history, watchlist two-phase, news) settle.
+  await new Promise((r) => setTimeout(r, 300));
 
-  const stream = document.getElementById("feedStream");
-  const chips = document.getElementById("feedChips");
-
-  // ── 4. a11y: filters are an aria-pressed toggle group, not a broken tablist ──
-  check("feed-chips is a labelled group, not a tablist", () => {
-    assert.strictEqual(chips.getAttribute("role"), "group");
-    assert.ok(chips.getAttribute("aria-label"), "group needs an accessible name");
+  // ── 5. a11y: a single <h1> names the page; no stray tab semantics ──
+  check("page has exactly one <h1>", () => {
+    const h1s = document.querySelectorAll("h1");
+    assert.strictEqual(h1s.length, 1, "expected one h1, got " + h1s.length);
+    assert.ok(h1s[0].textContent.trim().length > 0, "h1 needs text");
   });
-  check("no tab roles / aria-selected remain anywhere", () => {
-    assert.strictEqual(document.querySelector('[role="tab"]'), null, "stray role=tab");
-    assert.strictEqual(document.querySelector('[role="tablist"]'), null, "stray role=tablist");
-    assert.strictEqual(document.querySelector("[aria-selected]"), null, "stray aria-selected");
-  });
-  check("every chip exposes aria-pressed", () => {
-    const cs = [...chips.querySelectorAll(".feed-chip")];
-    assert.ok(cs.length >= 6);
-    cs.forEach((b) => assert.ok(b.hasAttribute("aria-pressed"), b.textContent + " missing aria-pressed"));
-    assert.strictEqual(chips.querySelector('[data-type="all"]').getAttribute("aria-pressed"), "true");
-  });
-  check("chip emoji are decorative (aria-hidden)", () => {
-    const play = chips.querySelector('[data-type="embed"]');
-    const deco = play.querySelector("span[aria-hidden='true']");
-    assert.ok(deco, "Play chip emoji should be wrapped aria-hidden");
-    assert.ok(/Play/.test(play.textContent));
+  check("no tablist / aria-selected remain from the old feed", () => {
+    assert.strictEqual(document.querySelector('[role="tab"]'), null);
+    assert.strictEqual(document.querySelector('[role="tablist"]'), null);
+    assert.strictEqual(document.querySelector("[aria-selected]"), null);
   });
 
-  // ── feed landmark + articles (ARIA feed pattern) ──
-  check("stream is a role=feed and stops reporting busy after load", () => {
-    assert.strictEqual(stream.getAttribute("role"), "feed");
-    assert.strictEqual(stream.getAttribute("aria-busy"), "false");
+  // ── 1. Portfolio header + range chips ──
+  check("portfolio value renders as formatted currency", () => {
+    const v = document.getElementById("portValue").textContent;
+    assert.ok(/\$57,108\.73/.test(v), "expected equity $57,108.73, got: " + v);
   });
-  const cards = [...stream.querySelectorAll(".feed-card")];
-  check("all cards rendered as positioned articles", () => {
-    assert.strictEqual(cards.length, CARDS.length, "expected one card per stub card");
-    cards.forEach((el) => {
-      assert.strictEqual(el.getAttribute("role"), "article");
-      assert.ok(el.getAttribute("aria-label"), "article needs a label");
-      assert.ok(el.hasAttribute("aria-posinset"));
-      assert.strictEqual(el.getAttribute("aria-setsize"), "-1");
-    });
+  check("range chips are an aria-pressed toggle group", () => {
+    const row = document.getElementById("rangeRow");
+    assert.strictEqual(row.getAttribute("role"), "group");
+    const chips = [...row.querySelectorAll(".range-chip")];
+    assert.ok(chips.length >= 5);
+    chips.forEach((c) => assert.ok(c.hasAttribute("aria-pressed"), c.textContent + " missing aria-pressed"));
+    assert.strictEqual(row.querySelector('[data-range="1D"]').getAttribute("aria-pressed"), "true");
   });
-
-  // ── 1. panels match index: per-type accent identity via data-type ──
-  check("cards carry a per-type accent hook (data-type)", () => {
-    const types = cards.map((el) => el.dataset.type);
-    assert.ok(types.includes("embed") && types.includes("doc") && types.includes("read"));
-  });
-
-  const embed = cards.find((el) => el.classList.contains("is-embed"));
-  const doc = cards.find((el) => el.dataset.type === "doc");
-  const readImg = cards.find((el) => el.querySelector('.fc-title') && /article with art/.test(el.textContent));
-  const evil = cards.find((el) => /hostile card/.test(el.textContent));
-
-  // ── 3. thumbnails: image when present, generated placeholder otherwise ──
-  check("doc card (no source image) gets a generated placeholder thumbnail", () => {
-    assert.ok(doc, "doc card missing");
-    assert.ok(doc.querySelector(".fc-thumb-ph"), "expected .fc-thumb-ph placeholder");
-    assert.strictEqual(doc.querySelector("img.fc-thumb"), null, "doc should not have an <img> thumb");
-    const ph = doc.querySelector(".fc-thumb-ph");
-    assert.strictEqual(ph.getAttribute("aria-hidden"), "true");
-  });
-  check("read card with an image renders the source <img> thumbnail", () => {
-    assert.ok(readImg, "read+image card missing");
-    const img = readImg.querySelector("img.fc-thumb");
-    assert.ok(img, "expected <img class=fc-thumb>");
-    assert.ok(/lead\.jpg$/.test(img.getAttribute("src")));
-    assert.strictEqual(img.getAttribute("alt"), "", "lead image is decorative (empty alt)");
-  });
-  check("card thumbnail is the FIRST child (lead visual)", () => {
-    const first = doc.firstElementChild;
-    assert.ok(first.classList.contains("fc-thumb-ph"), "placeholder should lead the card");
+  check("clicking a range chip moves aria-pressed", () => {
+    const row = document.getElementById("rangeRow");
+    const oneD = row.querySelector('[data-range="1D"]');
+    const oneM = row.querySelector('[data-range="1M"]');
+    oneM.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
+    assert.strictEqual(oneM.getAttribute("aria-pressed"), "true");
+    assert.strictEqual(oneD.getAttribute("aria-pressed"), "false");
   });
 
-  // ── 2. fullscreen-button spacing: grouped controls, not an overlapping corner ──
-  check("embed controls are grouped (fullscreen + dismiss in .fc-embed-ctl)", () => {
-    assert.ok(embed, "embed card missing");
-    const ctl = embed.querySelector(".fc-embed-bar .fc-embed-ctl");
-    assert.ok(ctl, "expected .fc-embed-ctl control group");
-    assert.ok(ctl.querySelector(".fc-fullscreen"), "fullscreen button should live in the group");
-    assert.ok(ctl.querySelector(".fc-dismiss"), "dismiss button should live in the group (was abs-positioned)");
-  });
-  check("fullscreen control exposes aria-pressed + accessible name", () => {
-    const fs = embed.querySelector(".fc-fullscreen");
-    assert.strictEqual(fs.getAttribute("aria-pressed"), "false");
-    assert.ok(fs.getAttribute("aria-label"), "fullscreen needs a label");
-  });
-  check("embed renders a click-to-play poster (heavy iframe deferred)", () => {
-    const poster = embed.querySelector(".fc-poster");
-    assert.ok(poster, "expected play poster");
-    assert.ok(poster.getAttribute("aria-label"), "poster needs a label");
-    assert.strictEqual(embed.querySelector("iframe"), null, "iframe must NOT load before Play");
-  });
-  check("embed title emoji is decorative (aria-hidden)", () => {
-    const deco = embed.querySelector(".fc-embed-title span[aria-hidden='true']");
-    assert.ok(deco, "embed title glyph should be aria-hidden");
-  });
-  check("content-card type eyebrow emoji is decorative (aria-hidden)", () => {
-    assert.ok(doc.querySelector(".fc-type span[aria-hidden='true']"), "fc-type glyph should be aria-hidden");
+  // ── 2. Holdings ──
+  check("open positions render as rows with symbol + value", () => {
+    const rows = [...document.querySelectorAll("#holdingsList .holding")];
+    assert.strictEqual(rows.length, POSITIONS.length, "one row per position");
+    const text = document.getElementById("holdingsList").textContent;
+    assert.ok(/AAPL/.test(text) && /TSLA/.test(text), "position symbols should render");
+    assert.ok(/\$1,900\.00/.test(text), "market value should render");
   });
 
-  // ── scheme guards survive the rewrite (no javascript: sink) ──
-  check("hostile url/image are neutralized", () => {
-    assert.ok(evil, "hostile card missing");
-    const a = evil.querySelector(".fc-title");
-    assert.strictEqual(a.getAttribute("href"), "#", "javascript: url must be inert");
-    assert.strictEqual(evil.querySelector("img.fc-thumb"), null, "javascript: image must be dropped");
-    assert.ok(evil.querySelector(".fc-thumb-ph"), "dropped image should fall back to placeholder");
+  // ── 3. Watchlist ──
+  check("watchlist renders the user's own symbols", () => {
+    const rows = [...document.querySelectorAll("#wlList .wl-row")];
+    assert.strictEqual(rows.length, WATCHLIST.watchlist.length, "one row per watched symbol");
+    const tickers = rows.map((r) => r.querySelector(".wl-tk").textContent);
+    assert.ok(tickers.includes("AAPL") && tickers.includes("TSLA"));
+  });
+  check("watchlist remove buttons carry an accessible name", () => {
+    const btn = document.querySelector("#wlList .wl-remove");
+    assert.ok(btn, "expected a remove button");
+    assert.ok(btn.getAttribute("aria-label"), "remove needs an aria-label");
+  });
+  check("watchlist add input is labelled", () => {
+    const input = document.getElementById("wlInput");
+    assert.ok(input.getAttribute("aria-label"), "add input needs an aria-label");
   });
 
-  // ── chip toggle flips aria-pressed (interaction, synchronous) ──
-  check("clicking a filter chip moves aria-pressed", () => {
-    const all = chips.querySelector('[data-type="all"]');
-    const read = chips.querySelector('[data-type="read"]');
-    read.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true }));
-    assert.strictEqual(read.getAttribute("aria-pressed"), "true");
-    assert.strictEqual(all.getAttribute("aria-pressed"), "false");
+  // ── 4. Market news + scheme guard ──
+  check("finance headlines render as external links", () => {
+    const rows = [...document.querySelectorAll("#newsList .news-row")];
+    assert.ok(rows.length >= 1, "expected at least one news row");
+    const good = rows.find((r) => /Markets rally/.test(r.textContent));
+    assert.ok(good, "http news headline should render");
+    assert.strictEqual(good.getAttribute("href"), "https://news.example.com/a");
+    assert.strictEqual(good.getAttribute("target"), "_blank");
+  });
+  check("hostile javascript: news URL is dropped (no XSS sink)", () => {
+    const text = document.getElementById("newsList").textContent;
+    assert.ok(!/hostile headline/.test(text), "javascript: card must not render");
+    assert.strictEqual(document.querySelector('#newsList a[href^="javascript:"]'), null);
+  });
+  check("non-news card types (playable embeds) are excluded from news", () => {
+    const text = document.getElementById("newsList").textContent;
+    assert.ok(!/a game \(not news\)/.test(text), "embed card must not appear as news");
   });
 
   dom.window.close();
@@ -228,7 +188,7 @@ async function run() {
 run()
   .then(() => {
     if (failures) { err(`\n${failures} FAILED`); process.exit(1); }
-    out("\nall explore-feed-ui checks passed");
+    out("\nall explore-dashboard-ui checks passed");
     process.exit(0);
   })
-  .catch((e) => { err("explore-feed-ui test error: " + (e && e.stack || e)); process.exit(1); });
+  .catch((e) => { err("explore-dashboard-ui test error: " + (e && e.stack || e)); process.exit(1); });
