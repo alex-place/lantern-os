@@ -178,6 +178,14 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
   // header equity / Day P&L and the summary row reflect the broker they linked.
   // Falls back to the legacy Alpaca traderAgent when no IBKR account is connected.
   if (url.pathname === '/api/trading/positions' && req.method === 'GET') {
+    // Preview/demo: `?demo=champion` serves a simulated snapshot of the champion
+    // DCA strategy (lib/champion-demo) so the dashboard can be shown fully
+    // populated without a linked broker. Read-only + labeled demo; never touches
+    // a real account. Placed first so it short-circuits before any broker call.
+    if (url.searchParams.get('demo') === 'champion') {
+      sendJson(res, require('../../lib/champion-demo').positions(), 200);
+      return true;
+    }
     try {
       const uid = getEffectiveUserId(req);
       const alpaca = require('../../lib/alpaca-adapter');
@@ -273,6 +281,32 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     } catch (error) {
       console.error('[Trading] /positions error:', error.message);
       sendJson(res, { positions: [], account: {} }, 500);
+    }
+    return true;
+  }
+
+  // GET /api/trading/portfolio/history?range=1D
+  // Robinhood-style portfolio equity curve for the dashboard chart. Ranges:
+  // 1D/1W/1M/3M/YTD/1Y/ALL. Sourced from the user's Alpaca account (own OAuth or
+  // the operator's paper keys). Always 200 with { ok, ... }; ok:false carries an
+  // honest `reason` (no broker connected) so the chart degrades to a flat baseline
+  // rather than erroring.
+  if (url.pathname === '/api/trading/portfolio/history' && req.method === 'GET') {
+    try {
+      const ALLOWED = new Set(['1D', '1W', '1M', '3M', 'YTD', '1Y', 'ALL']);
+      const rangeParam = String(url.searchParams.get('range') || '1D').toUpperCase();
+      const range = ALLOWED.has(rangeParam) ? rangeParam : '1D';
+      // Preview/demo curve for the champion strategy (see the positions route).
+      if (url.searchParams.get('demo') === 'champion') {
+        sendJson(res, require('../../lib/champion-demo').history(range), 200);
+        return true;
+      }
+      const uid = getEffectiveUserId(req);
+      const alpaca = require('../../lib/alpaca-adapter');
+      const out = await alpaca.getPortfolioHistory(uid, range);
+      sendJson(res, out, 200);
+    } catch (error) {
+      sendJson(res, { ok: false, reason: error.message }, 200);
     }
     return true;
   }

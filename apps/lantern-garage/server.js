@@ -185,6 +185,14 @@ const PUBLIC_TRADING_READS = new Set([
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
   if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
+  // Champion demo showroom (read-only): positions + portfolio-history with
+  // ?demo=champion serve a SIMULATED account (lib/champion-demo) so logged-out /
+  // non-entitled visitors see a filled dashboard + trader instead of an empty,
+  // gated shell. The param is what the pages request for guests; the real,
+  // broker-backed paths (no param) stay trade-gated, so no real account leaks.
+  if (req.method === "GET" &&
+      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history") &&
+      url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.
   // (The list is the shared server watchlist.) #guest-watchlist
@@ -853,6 +861,15 @@ server.listen(port, host, () => {
     const brakeMonitor = require("./lib/brake-monitor");
     brakeMonitor.start();
     deps.brakeMonitor = brakeMonitor;
+
+    // ── Sigma Trader schedule (ADR-0028) — the long-horizon allocation book on its
+    // OWN account. Rebalances on drift + reacts to the brake's gross, market-hours
+    // only. Off by default; opt in with SIGMA_SCHEDULE=1. Places nothing unless also
+    // armed (SIGMA_ARM=1) with a dedicated Sigma account (SIGMA_ALPACA_*). Fully
+    // independent of the day-trader — separate engine, separate account.
+    const sigmaScheduler = require("./lib/sigma-scheduler");
+    sigmaScheduler.start();
+    deps.sigmaScheduler = sigmaScheduler;
 
     // ── Crypto Price & News Collector (30s polling) ──
     const CryptoCollector = require("./lib/crypto-collector");

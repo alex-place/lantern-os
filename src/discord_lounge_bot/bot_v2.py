@@ -62,22 +62,33 @@ SUBSCRIBER_DATA_PATH = Path(os.getenv("SUBSCRIBER_DATA_PATH", REPO_ROOT / "data"
 MAX_NOTEBOOK_TEXT_LENGTH = 2000
 
 # Role name constants — matched case-insensitively against member.roles
-# Server uses: Wanderer (free) / Deep Dreamer (paid) / Synthesasia Guild (pilot) / founder / admin
+# Server uses: Wanderer (free) / Deep Dreamer ($20 Pro) / Synthesasia Guild (pilot) / founder / admin
 ROLE_PUBLIC = "@everyone"
-ROLE_SUPPORTER = "supporter"       # canonical bot name
-ROLE_PILOT = "pilot"               # canonical bot name
-ROLE_FOUNDER = "founder"           # matches server role exactly
+ROLE_SUPPORTER = "supporter"          # canonical bot name
+ROLE_DEEP_DREAMER = "deep_dreamer"    # the web's $20 Pro tier (#2659)
+ROLE_PILOT = "pilot"                  # canonical bot name
+ROLE_FOUNDER = "founder"              # matches server role exactly
 
-# Aliases: server's actual role names map to canonical tiers
+# Aliases: server's actual role names map to canonical tiers. The Discord "Deep Dreamer"
+# server role is the $20 paid tier, so it maps to the web's `deep_dreamer` (Pro) — NOT to
+# `supporter`, which is a distinct, lower web tier (#2659). Keeping them separate stops the
+# lossy round-trip (web Pro → Discord "Deep Dreamer" → bot supporter) and frees the
+# "Deep Dreamer" label to mean the same tier on both surfaces.
 _ROLE_ALIASES: dict[str, str] = {
     "wanderer":           ROLE_PUBLIC,
-    "deep dreamer":       ROLE_SUPPORTER,
+    "deep dreamer":       ROLE_DEEP_DREAMER,
     "synthesasia guild":  ROLE_PILOT,
     "patreon":            ROLE_PILOT,    # treat Patreon supporters as pilot tier
     "admin":              ROLE_FOUNDER,  # admins get founder-level access
 }
 
-TIER_ORDER = {ROLE_PUBLIC: 0, ROLE_SUPPORTER: 1, ROLE_PILOT: 2, ROLE_FOUNDER: 3}
+TIER_ORDER = {
+    ROLE_PUBLIC: 0,
+    ROLE_SUPPORTER: 1,
+    ROLE_DEEP_DREAMER: 2,
+    ROLE_PILOT: 3,
+    ROLE_FOUNDER: 4,
+}
 
 # -- Lazy environment checks (called from main so imports don't crash) --
 GUILD_ID_INT: int | None = None
@@ -202,7 +213,8 @@ def format_recall(entries: list[dict]) -> str:
 
 _TIER_LABELS = {
     ROLE_PUBLIC: "Wanderer",
-    ROLE_SUPPORTER: "Deep Dreamer",
+    ROLE_SUPPORTER: "Supporter",
+    ROLE_DEEP_DREAMER: "Deep Dreamer",
     ROLE_PILOT: "Synthesasia Guild",
     ROLE_FOUNDER: "Founder",
 }
@@ -587,7 +599,7 @@ async def cmd_help(interaction: discord.Interaction):
     )
     
     # Notebook (Supporter+)
-    if tier in (ROLE_SUPPORTER, ROLE_PILOT, ROLE_FOUNDER):
+    if tier in (ROLE_SUPPORTER, ROLE_DEEP_DREAMER, ROLE_PILOT, ROLE_FOUNDER):
         embed.add_field(
             name="📓 Notebook",
             value="`/dream` — Save a dream\n`/note` — Save a note\n`/wish` — Save a wish\n`/recall` — Search entries\n`/mirror` — View all facets\n`/place` — Save a place\n`/character` — Save a character\n`/symbol` — Save a symbol\n`/wallet` — Subscription status",

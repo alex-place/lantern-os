@@ -81,7 +81,15 @@ def build_panel():
 
 
 def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
-              deposits=True, equity0=0.0, irx_flat=0.03):
+              deposits=True, equity0=0.0, irx_flat=0.03, band=0.08, band_mode="sym"):
+    """band > 0 installs a no-trade region: hold yesterday's exposure unless the
+    L1 drift to today's target exceeds `band` (units = fraction of equity, so
+    band=0.04 ~ the tranche's +-4pp). band_mode="brake_aware" always honors a
+    de-risking move (target gross < current) so the drawdown brake / trend gate
+    are never delayed by the band; "sym" bands both directions. DEFAULT band=0.08
+    is the measured turnover-optimal (experiments/overlay_notrade_band.py:
+    +2.4% full / +2.5% out-of-sample, ~20% less turnover, flat drawdown); pass
+    band=0.0 for the legacy every-day-retrade behavior."""
     n = len(UNIVERSE)
     i0 = next(i for i, d in enumerate(days) if d >= start)
     i1 = len(days) if end is None else next(i for i, d in enumerate(days) if d >= end)
@@ -91,6 +99,8 @@ def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
     cur_month = ""
     rets_out, eq_path, min_cushion = [], [], 1e9
     prev_expo = np.zeros(n)
+    gross_prev = 0.0
+    turnover_sum, trade_days = 0.0, 0
     for i in range(i0, i1):
         d = days[i]
         # monthly: recompute direction from trailing 60 months of daily data
@@ -140,15 +150,27 @@ def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
         if eq < MARGIN_MIN:
             g = min(g, 1.0)
         gross = g
+        # no-trade band: hold yesterday's exposure unless drift to today's
+        # target exceeds `band`. brake_aware never blocks a de-risking move.
+        target = w_dir * gross
+        drift = float(np.abs(target - prev_expo).sum())
+        derisk = gross < gross_prev - 1e-12
+        if band > 0 and drift <= band and not (band_mode == "brake_aware" and derisk):
+            expo = prev_expo
+        else:
+            expo = target
         # apply today's asset returns to yesterday's exposure
-        expo = w_dir * gross
         r_today = np.zeros(n)
         for k in range(n):
             if prev_expo[k] != 0 and not (np.isnan(px[UNIVERSE[k]][i]) or np.isnan(px[UNIVERSE[k]][i - 1])):
                 r_today[k] = px[UNIVERSE[k]][i] / px[UNIVERSE[k]][i - 1] - 1.0
         port_r = float(prev_expo @ r_today)
         fund = max(0.0, np.abs(prev_expo).sum() - 1.0) * (irx_flat + 0.015) / 252
-        tc = TC * float(np.abs(expo - prev_expo).sum())
+        moved = float(np.abs(expo - prev_expo).sum())
+        tc = TC * moved
+        turnover_sum += moved
+        if moved > 1e-12:
+            trade_days += 1
         eq_r = port_r - fund - tc
         rets_out.append(eq_r)
         eq *= (1.0 + eq_r)
@@ -159,6 +181,7 @@ def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
         if longv > 1:
             cushion = (1.0 + port_r - 0.25 * longv * (1 + port_r)) / max(longv, 1e-9)
             min_cushion = min(min_cushion, cushion)
+        gross_prev = float(np.abs(expo).sum())
         prev_expo = expo
         eq_path.append((d, eq))
     r = np.array(rets_out)
@@ -166,8 +189,11 @@ def run_daily(days, px, tv, trend_m, brake, start="2000-01-03", end=None,
     e = np.array([v for _, v in eq_path])
     peaks = np.maximum.accumulate(np.maximum(e, 1e-9))
     mdd = float(np.min(e / peaks - 1.0))
+    yrs = max((len(rets_out)) / 252.0, 1e-9)
     return {"final": eq, "sharpe": sh, "maxdd": mdd, "min_cushion": min_cushion,
-            "path": eq_path, "rets": r}
+            "path": eq_path, "rets": r,
+            "turnover": turnover_sum, "trade_days": trade_days,
+            "turnover_per_yr": turnover_sum / yrs}
 
 
 def main():

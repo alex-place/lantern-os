@@ -149,6 +149,26 @@ async function main() {
   assert.ok(postLogin.json.ok && postLogin.json.user, "post-verify login signs the user in");
   ok("login after verification → 200 signed in (hard gate opened)");
 
+  // ── 2b. Anti-enumeration (#2617): registering an ALREADY-REGISTERED email must NOT
+  //        reveal that the account exists. It returns the SAME non-error 202
+  //        pending-signup shape a fresh signup gets — never a 409 / email_taken — so
+  //        an attacker can't probe which emails have accounts. (`alice@example.com`
+  //        was registered + verified above, so it now exists.) The existing owner is
+  //        separately emailed a reset link, but the RESPONSE is indistinguishable.
+  //        (Known accepted residual: a proxied signup on a NO-SMTP host auto-admits
+  //        201 vs an existing email's 202 — an inherent tension with the #2065
+  //        no-mailer guard; production runs with SMTP, where both are 202.)
+  const freshReg = await call(handleLocalRegister, mkReq({ body: { email: "newcomer@example.com", password, name: "New" }, loopback: true }));
+  const dupeReg = await call(handleLocalRegister, mkReq({ body: { email, password, name: "Alice" }, loopback: true })); // email === alice (exists)
+  assert.strictEqual(dupeReg.status, 202, `existing-email register must mimic a fresh 202, got ${dupeReg.status}`);
+  assert.strictEqual(dupeReg.status, freshReg.status, "existing-email status must equal a fresh signup's status");
+  assert.notStrictEqual(dupeReg.status, 409, "must never 409 — the enumeration tell #2617 removed");
+  assert.ok(!dupeReg.json.error, `existing-email register must not leak an error, got ${dupeReg.json && dupeReg.json.error}`);
+  assert.strictEqual(dupeReg.json.pendingVerification, true, "existing-email response mimics a pending signup");
+  assert.ok(!dupeReg.json.user, "existing-email register must not sign anyone in");
+  assert.ok(!/taken|exists|already|registered|duplicate/i.test(dupeReg.body || ""), "response body must not textually reveal the account exists");
+  ok("register existing email → generic 202 pendingVerification, no 409/email_taken leak (#2617)");
+
   // ── 3. Brute-force throttle: MAX_ATTEMPTS bad logins → 429 ──────────────────────
   // Use a distinct email/ip pairing implicitly (same ip, new email) to avoid the
   // cleared-failure state above. Wrong password every time.

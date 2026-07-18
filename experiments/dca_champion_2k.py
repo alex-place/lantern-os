@@ -16,10 +16,13 @@ def ci(sh, T):
     s = sh / math.sqrt(252); se = math.sqrt((1 + s*s/2)/T) * math.sqrt(252)
     return sh - 1.96*se, sh + 1.96*se
 
-# 1) champion: momentum universe + brake-to-cash, $2k start
-ch = DB.run_daily_cash(days, px, 0.35, 6, 0.30, 0.0, init_cash=INIT)
+# 1) champion: momentum universe + brake-to-cash, $2k start, no-trade band on
+#    (sym 0.08 — measured turnover-optimal, ~44% fewer trades at flat return/risk;
+#    experiments/champion_notrade_band.py)
+ch = DB.run_daily_cash(days, px, 0.35, 6, 0.30, 0.0, init_cash=INIT, band=0.08, band_mode="sym")
 lo, hi = ci(ch["sharpe"], len(ch["rets"]))
-print(f"champion: final ${ch['final']:,.0f} sharpe {ch['sharpe']:.2f} [{lo:.2f},{hi:.2f}] maxDD {ch['maxdd']*100:.0f}%")
+print(f"champion: final ${ch['final']:,.0f} sharpe {ch['sharpe']:.2f} [{lo:.2f},{hi:.2f}] "
+      f"maxDD {ch['maxdd']*100:.0f}% trades {ch['trade_days']}")
 
 # 2) SPY buy&hold + DCA, $2k start (same engine style)
 i0 = next(i for i, d in enumerate(days) if d >= "2000-01-03")
@@ -70,7 +73,8 @@ def monthly(path):
     m = {}
     for dstr, v in path: m[dstr[:7]] = v
     return m
-extra = json.loads((HERE / "dca_champion_paths.json").read_text(encoding="utf-8"))
+_pp = HERE / "dca_champion_paths.json"
+extra = json.loads(_pp.read_text(encoding="utf-8")) if _pp.exists() else {}
 extra["k_champ"], extra["k_spy"], extra["k_nb"] = monthly(ch["path"]), monthly(path_spy), monthly(path_nb)
 (HERE / "dca_champion_paths.json").write_text(json.dumps(extra), encoding="utf-8")
 json.dump({"champion": {"final": ch["final"], "sharpe": ch["sharpe"], "maxdd": ch["maxdd"]},

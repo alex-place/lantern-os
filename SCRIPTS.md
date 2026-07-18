@@ -124,6 +124,9 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/rlvr_grpo_ouro.py` | `tests/test_sigma_theta_gate.py` | `python scripts/rlvr_grpo_ouro.py` |
 | `scripts/gen_sigma0_traces.py` | `apps/lantern-garage/lib/local-model-registry.js` | `python scripts/gen_sigma0_traces.py` |
 | `scripts/lightning_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI |
+| `scripts/modal_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI (Modal twin of lightning_dispatch) |
+| `scripts/reconcile_dual_provider.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §10 | `python scripts/reconcile_dual_provider.py --decision A B` |
+| `scripts/eb_prep_corpus.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §3; `scripts/{lightning,modal}_dispatch.py` prep-if-missing | `python scripts/eb_prep_corpus.py --allow-download` (egress host); `--dry-run` validates offline |
 | `scripts/weekly-training-orchestrator.py` | `scripts/Schedule-WeeklyTraining.ps1` | via scheduler |
 | `scripts/build_claude_session_dataset.py` | `tests/test_agent_session_dataset.py` | `python scripts/build_claude_session_dataset.py` |
 | `scripts/harvest_coding_corpus.py` | `apps/lantern-garage/lib/harvest-emitter.js` | server-driven |
