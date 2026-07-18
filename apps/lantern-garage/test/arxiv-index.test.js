@@ -93,6 +93,12 @@ check("gate accepts control-engineering questions (curated tranche)", () => {
   assert.ok(arxiv.looksLikeAIResearchQuestion("when should we rebalance under transaction costs"));
 });
 
+check("gate accepts survivorship-backtest questions (curated tranche)", () => {
+  assert.ok(arxiv.looksLikeAIResearchQuestion("how much does survivorship bias inflate returns"));
+  assert.ok(arxiv.looksLikeAIResearchQuestion("point-in-time index membership for delisted stocks"));
+  assert.ok(arxiv.looksLikeAIResearchQuestion("is trend following profitable over two centuries"));
+});
+
 check("gated query returns [] for non-AI message", () => {
   assert.deepStrictEqual(arxiv.queryArxiv("how do I bake bread"), []);
 });
