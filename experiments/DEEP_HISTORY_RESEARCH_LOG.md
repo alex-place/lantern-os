@@ -6,7 +6,7 @@
 > Each iteration: read this log for state → do ONE focused iteration → commit + push →
 > update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
 > trades low (well under PDT/day-trade thresholds)**, every number measured (no
-> fabrication). Iterations done: **3** (extend-to-1927; low-trade tuning). Next planned:
+> fabrication). Iterations done: **4** (extend-1927; low-trade tune; DCA reversal; hybrid retired). Next:
 > DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
 > "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
 
@@ -149,8 +149,35 @@ dependent:
 balance* (protect capital you already have), and let fresh DCA contributions go in at full
 weight (keep buying dips with new money). That hybrid is the next thing to test.
 
+---
+
+## Iteration 4 — the hybrid doesn't work (and it's clear WHY)
+
+`deep_history_hybrid.py` brakes the accumulated balance but invests each fresh $20/mo
+deposit at 100% (dollar-tracked invested/cash sleeves, never borrows). Hypothesis: capture
+buy&hold's dip-buying AND the overlay's protection.
+
+| DCA $20/mo | buyhold | no_margin | **hybrid** |
+|---|---|---|---|
+| S&P final | $4.39M | $2.80M | **$2.78M** |
+| S&P Sharpe / maxDD | 0.42 / −57% | 0.68 / −27% | **0.68 / −28%** |
+| Nasdaq final | $906k | $663k | **$668k** |
+| Nasdaq Sharpe / maxDD | 0.60 / −78% | 0.90 / −28% | **0.90 / −28%** |
+| overlay trades/yr | 0 | 8-11 | 12-14 |
+
+**Finding (iteration 4) — negative, and instructive.** The hybrid is ~identical to the pure
+no-margin overlay, **not** closer to buy&hold. Reason: a $20/mo deposit is negligible vs an
+accumulated balance, so "invest the deposit at full weight" can't move the needle — the
+dip-buying advantage only exists in the brief early phase when deposits ≈ balance. You
+**cannot** have both buy&hold's accumulation and the overlay's protection under small DCA;
+they're a genuine tradeoff, not an engineering gap. Idea retired.
+
+**Recommendation locked:** offer **Conservative (no-margin)** as a drawdown-protection
+overlay for an **existing/funded balance** (advisor + champion-book), where it wins on both
+return and risk (iters 1-2). For pure small-DCA, present it honestly as "half the drawdown,
+higher Sharpe, somewhat less final value" — a risk-tolerance choice, not a free lunch.
+
 ### Next (later iterations)
-- **Hybrid**: brake the existing balance but deposit new cash at 100% — best of both?
 - Blended S&P+Nasdaq+gold panel + a bond-proxy from ^TNX over deep history.
 - Web-research low-turnover tactical-allocation literature (dual-momentum, trend+cash) to
   sanity-check the band/trend choice against published results.
