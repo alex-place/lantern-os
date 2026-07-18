@@ -1454,6 +1454,44 @@ const REGISTRY = {
     },
   },
 
+  brake_status: {
+    policy: "read", // streams the ADR-0028 overlay's live brake state — PAPER ONLY, places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Read the live ADR-0028 leverage-overlay brake monitor: the current gross-exposure target (0–2×, from vol targeting × 6-month trend gate × drawdown taper — the brake-to-cash spec), each signal's state (ok/braking), the virtual $25k paper book's equity, and the recent gross-target changes. PAPER MODE: this is the overlay's live practice record — nothing is or can be placed; the Sharpe-mandate gate (meets_ci vs the Buffett bar) decides if/when a strategy ever touches real money. Use when the user asks about the brake, current leverage posture, or how the overlay is doing live.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        // Forward the chat user's id (x-keystone-user, PR #2450) — the brake route
+        // sits behind the same trade gate as the other trading GETs.
+        const d = await _localTradingGet("/api/trading/brake/status", 9000, _userHeaders(ctx));
+        if (!d || d.ok !== true) return "[brake_status: monitor unavailable — the server's brake loop is not running (BRAKE_MONITOR=0 or chat-only boot).]";
+        const pct = (x, dp = 1) => (x == null ? "—" : `${(x * 100).toFixed(dp)}%`);
+        const sig = d.signals || {};
+        const volLine = sig.vol
+          ? `vol ${pct(sig.vol.value)}/yr (target ${pct(sig.vol.target, 0)}, ${sig.vol.state}${sig.vol.intraday != null ? `; intraday leg ${pct(sig.vol.intraday)}` : ""})`
+          : "vol —";
+        const trendLine = sig.trend
+          ? `6-mo trend ${sig.trend.value != null ? (sig.trend.value >= 0 ? "+" : "") + pct(sig.trend.value) : "—"} (${sig.trend.state})`
+          : "trend —";
+        const ddLine = sig.drawdown
+          ? `drawdown ${pct(sig.drawdown.value)} vs peak (brake at ${pct(sig.drawdown.brakeAt, 0)}, ${sig.drawdown.state})`
+          : "drawdown —";
+        const b = d.book || {};
+        const changes = (d.history || []).slice(-3).map((h) =>
+          `  ${h.ts}: ${h.from == null ? "—" : h.from.toFixed(2) + "×"} → ${h.to.toFixed(2)}× (${h.action})`);
+        return [
+          `Brake monitor (ADR-0028 overlay, PAPER): gross target ${d.grossTarget != null ? d.grossTarget.toFixed(2) + "×" : "—"} — ${d.action}. Last tick ${d.lastTick || "—"}.`,
+          `Signals: ${volLine} · ${trendLine} · ${ddLine}.`,
+          `Paper book: $${(b.equity || 0).toLocaleString("en-US")} (started $${(b.startEquity || 0).toLocaleString("en-US")}, peak $${(b.peak || 0).toLocaleString("en-US")}, applied gross ${b.grossApplied != null ? b.grossApplied.toFixed(2) + "×" : "—"}; borrow at T-bill+150bp above 1×, cash earns T-bill below 1×).`,
+          ...(changes.length ? ["Recent gross changes:", ...changes] : []),
+          `Formula: ${d.formula}.`,
+          "Paper mode — the gate decides when this touches real money: only a strategy whose measured Sharpe clears the Buffett bar (0.79) at the CI lower bound (meets_ci) is eligible for live capital (ADR-0028). This is measurement, not investment advice.",
+        ].join("\n");
+      } catch (e) {
+        return `[brake_status error: ${e.message}]`;
+      }
+    },
+  },
+
   options_strategy: {
     policy: "read", // computes a covered/cash-secured options PROPOSAL from real chain data — places NOTHING (Act is gated by trading-guard/ADR-0020)
     desc: "Propose and price a covered options strategy from the REAL listed-options chain. NO API key required: the data layer tries the user's own connected Alpaca account first (real greeks), then the keyless public Yahoo chain (no greeks — a Black–Scholes delta from Yahoo's own IV is used for selection and labeled model(bs-from-iv)), then Alpha Vantage only if a key already exists; if every provider fails, the tool reports each provider's reason honestly instead of inventing data. Strategies: covered_call (needs shares ≥ 100), cash_secured_put (needs cash — contracts limited to what the cash fully collateralizes), collar (matched-expiry put+call around shares ≥ 100). Strikes are picked by |delta| closest to target inside the DTE window, falling back to ~3-7% OTM moneyness when no delta is available (the output says which path and which delta source was used). Premiums are quote MARKS ((bid+ask)/2), never fills, with the half-spread reported as an explicit cost. ADVISORY ONLY: it never places, simulates placing, or recommends executing orders, and naked short options are permanently out of scope. The user always decides.",

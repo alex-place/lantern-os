@@ -185,6 +185,14 @@ const PUBLIC_TRADING_READS = new Set([
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
   if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
+  // Champion demo showroom (read-only): positions + portfolio-history with
+  // ?demo=champion serve a SIMULATED account (lib/champion-demo) so logged-out /
+  // non-entitled visitors see a filled dashboard + trader instead of an empty,
+  // gated shell. The param is what the pages request for guests; the real,
+  // broker-backed paths (no param) stay trade-gated, so no real account leaks.
+  if (req.method === "GET" &&
+      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history") &&
+      url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.
   // (The list is the shared server watchlist.) #guest-watchlist
@@ -695,6 +703,9 @@ function shutdown(signal) {
   if (deps.newsCollector) {
     deps.newsCollector.stop();
   }
+  if (deps.brakeMonitor) {
+    deps.brakeMonitor.stop();
+  }
   prWatcher.stop();
   server.close(() => {
     process.exit(0);
@@ -711,6 +722,7 @@ function reapChildren() {
   try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
   try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }
   try { if (deps.newsCollector) deps.newsCollector.stop(); } catch { /* best-effort */ }
+  try { if (deps.brakeMonitor) deps.brakeMonitor.stop(); } catch { /* best-effort */ }
 }
 
 // #2066: without these, a throw in any background loop/child-spawn (collectors,
@@ -841,6 +853,23 @@ server.listen(port, host, () => {
     const kalshiCollector = require("./lib/kalshi-collector");
     kalshiCollector.start();
     deps.kalshiCollector = kalshiCollector; // Make available to routes
+
+    // ── ADR-0028 streaming brake monitor (60s, PAPER ONLY — places nothing) ──
+    // Intraday risk monitoring for the Phase-2 leverage overlay: vol targeting ×
+    // 6-mo trend gate × drawdown taper, gross clamped [0, 2×]. Kill switch:
+    // BRAKE_MONITOR=0. Status streams at GET /api/trading/brake/status.
+    const brakeMonitor = require("./lib/brake-monitor");
+    brakeMonitor.start();
+    deps.brakeMonitor = brakeMonitor;
+
+    // ── Sigma Trader schedule (ADR-0028) — the long-horizon allocation book on its
+    // OWN account. Rebalances on drift + reacts to the brake's gross, market-hours
+    // only. Off by default; opt in with SIGMA_SCHEDULE=1. Places nothing unless also
+    // armed (SIGMA_ARM=1) with a dedicated Sigma account (SIGMA_ALPACA_*). Fully
+    // independent of the day-trader — separate engine, separate account.
+    const sigmaScheduler = require("./lib/sigma-scheduler");
+    sigmaScheduler.start();
+    deps.sigmaScheduler = sigmaScheduler;
 
     // ── Crypto Price & News Collector (30s polling) ──
     const CryptoCollector = require("./lib/crypto-collector");

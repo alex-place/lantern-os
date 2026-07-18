@@ -53,7 +53,8 @@ const DEFAULTS = {
   persistScans: 2,         // act only after the same direction holds N consecutive scans
   persistWindowMs: 200000, // …seen within this window (≈3 scans) — else it's stale
   // ── Momentum / trailing exits — capture the peak instead of round-tripping it ──
-  trailPct: 3,             // trailing stop: exit a long if price falls this % from its PEAK
+  trailPct: 2.5,           // BASE trailing stop: exit a long if price falls this % from its PEAK
+                           //    (ratcheted TIGHTER as the peak gain grows — see trailTriggerPct)
   trailArmPct: 1.5,        // …but arm the trail only once the position has gained ≥ this %
                            //    (so it locks GAINS; the entry−stopPct broker stop covers losses)
   takeProfitPct: 0,        // hard take-profit % (0 = off — let the trailing stop run)
@@ -88,6 +89,8 @@ function cfg() {
     trailArmPct: n('TRADER_TRAIL_ARM_PCT', DEFAULTS.trailArmPct),
     takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
     momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
+    momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
+    entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
     // Lets the user protect open positions without arming full autopilot entries.
     manageExits: process.env.TRADER_MANAGE_EXITS === '1',
@@ -144,6 +147,68 @@ const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 
+// ── Persist the trailing state across restarts ──────────────────────────────────
+// The high-water mark (_peak) and the per-symbol timers live in memory. Without
+// persistence a server restart RESETS every position's peak to its price at boot,
+// so the trailing stop silently measures from a lower peak and lets a winner give
+// back a full leg before firing (the SOXS "+35% peak → gave back $3k, no exit" bug —
+// the box had been restarted repeatedly). Snapshot to disk each scan; reload at boot.
+const STATE_FILE = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
+function _saveState() {
+  try {
+    fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
+    fs.writeFileSync(STATE_FILE, JSON.stringify({
+      peak: Object.fromEntries(_peak),
+      entryAt: Object.fromEntries(_entryAt),
+      exitAt: Object.fromEntries(_exitAt),
+      lastOrderAt: Object.fromEntries(_lastOrderAt),
+      dirStreak: Object.fromEntries(_dirStreak),
+      savedAt: Date.now(),
+    }));
+  } catch (_e) { /* best-effort — a write failure must never break a scan */ }
+}
+function _loadState() {
+  try {
+    const o = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+    for (const [k, v] of Object.entries(o.peak || {})) _peak.set(k, v);
+    for (const [k, v] of Object.entries(o.entryAt || {})) _entryAt.set(k, v);
+    for (const [k, v] of Object.entries(o.exitAt || {})) _exitAt.set(k, v);
+    for (const [k, v] of Object.entries(o.lastOrderAt || {})) _lastOrderAt.set(k, v);
+    for (const [k, v] of Object.entries(o.dirStreak || {})) _dirStreak.set(k, v);
+  } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
+}
+_loadState();
+
+/**
+ * Falling-knife filter for ENTRIES. The autopilot buys mean-reversion dips (support
+ * / oversold RSI), which is right in theory but catches knives when down-momentum is
+ * still accelerating. Returns true when the recent trend is CRATERING — MACD histogram
+ * negative AND still falling (this bar more negative than the last) — i.e. don't buy
+ * yet; wait for the histogram to turn up (decelerating), even if still negative. A
+ * histogram that is rising (turning) passes: that's the stabilization we want to buy.
+ * Pure + testable; fail-open (insufficient data → NOT a knife, don't block entries).
+ */
+function isFallingKnife(closes) {
+  if (!Array.isArray(closes) || closes.length < 36) return false;   // need 2 MACD reads
+  const now = macd(closes);
+  const prev = macd(closes.slice(0, -1));
+  if (!now || !prev) return false;
+  return now.histogram < 0 && now.histogram < prev.histogram;        // negative AND deepening
+}
+
+/**
+ * Ratcheting trailing-stop distance: the more a winner has run, the TIGHTER we
+ * protect it. A position up +35% at its peak shouldn't be allowed to give back a
+ * flat 3% (≈a third of a leg) before exiting — lock big gains close. Returns the
+ * %-drop-from-peak that triggers the exit, always ≤ the base.
+ */
+function trailTriggerPct(peakGainPct, base) {
+  if (peakGainPct >= 25) return Math.min(base, 1.25);   // huge winner → lock tight
+  if (peakGainPct >= 12) return Math.min(base, 1.75);
+  if (peakGainPct >= 6) return Math.min(base, 2.25);
+  return base;                                            // small gain → base (room to develop)
+}
+
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
 async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
@@ -175,10 +240,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
   if (!longs.length) return;
 
-  // Recent 15m bars for momentum — one batched fetch for all held longs (fail-soft).
+  // Recent bars for the momentum-death read — one batched fetch for all held longs
+  // (fail-soft). Default 5m so a fading winner's trend-rollover is caught ~3× sooner
+  // than the old 15m read (nearer the peak); TRADER_MOMENTUM_TF overrides.
   let bars = {};
   if (c.momentumExit) {
-    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), '15m'); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
+    try { const bm = await yahoo.getBarsMulti(longs.map(([s]) => s), c.momentumTf); bars = (bm && bm.bars) || {}; } catch (_e) { bars = {}; }
   }
 
   for (const [sym, p] of longs) {
@@ -213,8 +280,11 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
       delete heldQty[sym]; continue;
     }
     // 2) Trailing stop — only after the position has run up (locks GAINS, not losses).
-    if (c.trailPct > 0 && peakGainPct >= c.trailArmPct && dropFromPeakPct >= c.trailPct) {
-      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
+    //    The trigger ratchets tighter as the peak gain grows (trailTriggerPct), so a
+    //    big winner locks in close instead of round-tripping a flat %.
+    const trailTrig = trailTriggerPct(peakGainPct, c.trailPct);
+    if (c.trailPct > 0 && peakGainPct >= c.trailArmPct && dropFromPeakPct >= trailTrig) {
+      await closeLong(bridge, userId, sym, qty, p, `trailing_stop (−${dropFromPeakPct.toFixed(1)}% from peak +${peakGainPct.toFixed(1)}%, trig ${trailTrig}%)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
     }
     // 3) Momentum death — fading winner: MACD histogram negative + below short EMA.
@@ -297,6 +367,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
   try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells }); } catch (_e) { /* fail-soft */ }
+  // manageHeldExits updates every held position's peak; persist NOW so the common
+  // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
+  _saveState();
 
   // Entries require the full autopilot arm; exits-only mode stops here.
   if (!c.enabled) { out.reason = 'exit-management only (TRADER_MANAGE_EXITS) — entries off'; return out; }
@@ -311,6 +384,18 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   if (haltEntries) out.circuit_breaker = { dayPnl, limit: -Math.round(dailyLimit) };
 
   let opened = 0;
+
+  // Falling-knife filter: one batched fetch of the momentum-timeframe bars for the
+  // ENTER candidates, so the BULLISH branch can veto buying into cratering momentum
+  // without a per-symbol fetch. Fail-soft — no bars → filter simply doesn't block.
+  let entryBars = {};
+  if (c.entryKnifeFilter && enters.length) {
+    try {
+      const syms = [...new Set(enters.map((s) => String(s.symbol).toUpperCase()))];
+      const bm = await yahoo.getBarsMulti(syms, c.momentumTf);
+      entryBars = (bm && bm.bars) || {};
+    } catch (_e) { entryBars = {}; }
+  }
 
   for (const s of enters) {
     const sym = String(s.symbol).toUpperCase();
@@ -378,6 +463,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
     if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bullish scans (persistence)` }); continue; }
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
+    // Falling-knife veto: don't buy the dip while down-momentum is still accelerating.
+    // Wait for the momentum to turn (histogram rising, even if negative). (#c)
+    if (c.entryKnifeFilter) {
+      const closes = ((entryBars[sym] && entryBars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
+      if (isFallingKnife(closes)) { out.skipped.push({ ...record, why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' }); continue; }
+    }
     // Defensive: on a stray short, clear any stale resting orders before re-entering.
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
 
@@ -406,10 +497,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     out.executed.push(exec);
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
   }
+  // Persist the updated peaks/timers so the trailing stop survives a restart.
+  _saveState();
   return out;
 }
 
-/** Test/ops helper: clear the per-symbol state. */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); }
+/** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _saveState(); }
 
-module.exports = { runAutoTrade, sizePosition, cfg, _resetCooldowns };
+module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };

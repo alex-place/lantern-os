@@ -1,5 +1,5 @@
 {
-  "built_at": 1784311510.5848336,
+  "built_at": 1784313189.7107217,
   "docs": [
     "README.md",
     "CLAUDE.md",
@@ -122,9 +122,11 @@
     "docs/adr/0021-serving-substrate-retain-ouro-custom-loop.md",
     "docs/adr/0024-sigma0-frontier-training-program.md",
     "docs/research/2026-07-04-serving-and-rho-convergence.md",
+    "docs/SIGMA0-EB-L4-RUNBOOK.md",
     "docs/research/2026-07-02-qwen-teacher-ouro-crystallization.md",
     "docs/research/2026-07-13-ouro-mbpp-distillation.md",
     "docs/research/2026-07-04-serving-design-sota.md",
+    "docs/SIGMA0-GROUNDING-LEDGER.md",
     "docs/SIGMA0-FRONTIER-TRAIN-BRIEF.md",
     "docs/SIGMA0-HONESTY-BENCHMARK.md",
     "docs/SIGMA0-MODEL-DESIGN.md",
@@ -642,7 +644,7 @@
       ]
     }
   },
-  "sections": 2538,
+  "sections": 2561,
   "external": 34,
-  "sha256": "986e26aeeb47e308fc3acabb07cc62016c7bffc96ed06bee9951a25bfaf14102"
+  "sha256": "d664c8e8288b84c42fa82018c32455aaeb3af843c302fead9e1f18cc81d22a02"
 }

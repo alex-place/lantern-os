@@ -1,0 +1,222 @@
+{
+  "claim": "one decisive grounding event: firing on the certificate-derived cadence succeeds at a fraction of the budget that firing on a critical-slowing-down alarm needs (the alarm premium); in the sliver regime timing is indifferent (the Ouro-null retrodiction)",
+  "verification": "exact trust-region escape check at fire time; canary swept over healthy-quantile thresholds (no cherry-picked calibration); n*(B) shown as the necessary-condition curve, context only",
+  "evidence_class": "MEASURED (synthetic maps; design-consequence check, not a theorem)",
+  "issue": "#2690",
+  "cases": [
+    {
+      "label": "well_conditioned",
+      "gamma": 0.9025,
+      "cond_P": 1.9,
+      "B_star_inf": 0.6245,
+      "half_life": 6.76,
+      "cadence": 3,
+      "canary": {
+        "quantile_pct": 2.0,
+        "theta": 0.024689,
+        "fpr": 0.015,
+        "fire_rate": 1.0,
+        "median_alarm": 14.0
+      },
+      "threshold_sweep": [
+        {
+          "quantile_pct": 0.05,
+          "theta": 0.01032,
+          "fpr": 0.0,
+          "fire_rate": 1.0,
+          "median_alarm": 25.0
+        },
+        {
+          "quantile_pct": 0.1,
+          "theta": 0.014561,
+          "fpr": 0.0,
+          "fire_rate": 1.0,
+          "median_alarm": 21.0
+        },
+        {
+          "quantile_pct": 0.5,
+          "theta": 0.019299,
+          "fpr": 0.005,
+          "fire_rate": 1.0,
+          "median_alarm": 17.0
+        },
+        {
+          "quantile_pct": 1.0,
+          "theta": 0.021837,
+          "fpr": 0.005,
+          "fire_rate": 1.0,
+          "median_alarm": 16.0
+        },
+        {
+          "quantile_pct": 2.0,
+          "theta": 0.024689,
+          "fpr": 0.015,
+          "fire_rate": 1.0,
+          "median_alarm": 14.0
+        },
+        {
+          "quantile_pct": 5.0,
+          "theta": 0.028499,
+          "fpr": 0.065,
+          "fire_rate": 1.0,
+          "median_alarm": 13.0
+        },
+        {
+          "quantile_pct": 10.0,
+          "theta": 0.031869,
+          "fpr": 0.205,
+          "fire_rate": 1.0,
+          "median_alarm": 12.0
+        },
+        {
+          "quantile_pct": 25.0,
+          "theta": 0.038173,
+          "fpr": 0.655,
+          "fire_rate": 1.0,
+          "median_alarm": 9.0
+        }
+      ],
+      "race": [
+        {
+          "budget": 0.0937,
+          "rel_budget": 0.15,
+          "scheduled_success": 0.0,
+          "reactive_success": 0.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": 2.1
+        },
+        {
+          "budget": 0.1249,
+          "rel_budget": 0.2,
+          "scheduled_success": 0.07,
+          "reactive_success": 0.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": 3.3
+        },
+        {
+          "budget": 0.1561,
+          "rel_budget": 0.25,
+          "scheduled_success": 0.355,
+          "reactive_success": 0.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": 4.6
+        },
+        {
+          "budget": 0.1873,
+          "rel_budget": 0.3,
+          "scheduled_success": 0.59,
+          "reactive_success": 0.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": 5.9
+        },
+        {
+          "budget": 0.2186,
+          "rel_budget": 0.35,
+          "scheduled_success": 0.835,
+          "reactive_success": 0.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": 7.4
+        },
+        {
+          "budget": 0.2498,
+          "rel_budget": 0.4,
+          "scheduled_success": 0.945,
+          "reactive_success": 0.01,
+          "median_alarm": 14.0,
+          "necessary_deadline": 8.9
+        },
+        {
+          "budget": 0.281,
+          "rel_budget": 0.45,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.06,
+          "median_alarm": 14.0,
+          "necessary_deadline": 10.6
+        },
+        {
+          "budget": 0.3122,
+          "rel_budget": 0.5,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.15,
+          "median_alarm": 14.0,
+          "necessary_deadline": 12.5
+        },
+        {
+          "budget": 0.3747,
+          "rel_budget": 0.6,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.305,
+          "median_alarm": 14.0,
+          "necessary_deadline": 16.8
+        },
+        {
+          "budget": 0.4371,
+          "rel_budget": 0.7,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.53,
+          "median_alarm": 14.0,
+          "necessary_deadline": 22.4
+        },
+        {
+          "budget": 0.4996,
+          "rel_budget": 0.8,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.745,
+          "median_alarm": 14.0,
+          "necessary_deadline": 30.4
+        },
+        {
+          "budget": 0.562,
+          "rel_budget": 0.9,
+          "scheduled_success": 1.0,
+          "reactive_success": 0.93,
+          "median_alarm": 14.0,
+          "necessary_deadline": 43.8
+        },
+        {
+          "budget": 0.6245,
+          "rel_budget": 1.0,
+          "scheduled_success": 1.0,
+          "reactive_success": 1.0,
+          "median_alarm": 14.0,
+          "necessary_deadline": null
+        }
+      ],
+      "min_budget_scheduled": 0.2498,
+      "min_budget_reactive": 0.562,
+      "alarm_premium": 2.25,
+      "alarm_premium_unbounded": false
+    },
+    {
+      "label": "nonnormal_sliver",
+      "gamma": 0.999999,
+      "cond_P": 626927.0,
+      "B_star_inf": 0.0024,
+      "fire_time_grid": {
+        "0.05": {
+          "1": 1.0,
+          "5": 1.0,
+          "10": 1.0,
+          "20": 1.0,
+          "39": 1.0
+        },
+        "0.2": {
+          "1": 1.0,
+          "5": 1.0,
+          "10": 1.0,
+          "20": 1.0,
+          "39": 1.0
+        },
+        "0.4": {
+          "1": 1.0,
+          "5": 1.0,
+          "10": 1.0,
+          "20": 1.0,
+          "39": 1.0
+        }
+      },
+      "timing_indifferent": true
+    }
+  ],
+  "verdict_ok": true
+}

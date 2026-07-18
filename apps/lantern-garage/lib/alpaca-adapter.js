@@ -35,9 +35,36 @@ function _serverKeys() {
   return { id, secret, env };
 }
 
+// The Sigma Trader (the long-horizon allocation book) runs on its OWN account so it
+// never collides with the day-trader on the shared book. Its identity resolves ONLY
+// to a dedicated account — its own connected OAuth (stored under SIGMA_USER) or its
+// own SIGMA_ALPACA_* keys — and DELIBERATELY does NOT fall back to the shared server
+// keys. No dedicated account → null → the engine plans but refuses to trade.
+const SIGMA_USER = 'sigma-trader';
+function _sigmaKeys() {
+  const id = process.env.SIGMA_ALPACA_API_KEY_ID || '';
+  const secret = process.env.SIGMA_ALPACA_API_SECRET_KEY || '';
+  if (!id || !secret) return null;
+  const env = process.env.SIGMA_ALPACA_ENV === 'live' ? 'live' : 'paper';
+  return { id, secret, env };
+}
+
 /** Resolve auth for a user: their OAuth token first, else server keys. Returns
  *  { host, headers, env, accountLabel } or null when neither is configured. */
 function _authFor(userId) {
+  // Sigma Trader → its OWN account only (never the shared server keys).
+  if (userId === SIGMA_USER) {
+    const own = store.load(SIGMA_USER);
+    if (own && own.access_token) {
+      const env = own.env === 'live' ? 'live' : 'paper';
+      return { host: HOSTS[env], env, source: 'sigma-oauth', accountLabel: own.account_number || null,
+        headers: { Authorization: `Bearer ${own.access_token}` } };
+    }
+    const sk = _sigmaKeys();
+    if (sk) return { host: HOSTS[sk.env], env: sk.env, source: 'sigma-keys', accountLabel: null,
+      headers: { 'APCA-API-KEY-ID': sk.id, 'APCA-API-SECRET-KEY': sk.secret } };
+    return null;   // no dedicated account — do NOT borrow the day-trader's
+  }
   const c = store.load(userId);
   if (c && c.access_token) {
     const env = c.env === 'live' ? 'live' : 'paper';
@@ -182,10 +209,109 @@ async function getOpenOrders(userId) {
   }));
 }
 
+/** Full order list (open + closed) for the Orders / Order-history tabs, newest first,
+ *  normalized to the UI shape. `status=all` so filled/cancelled orders populate history. */
+async function getAllOrders(userId, limit = 200) {
+  const auth = _authFor(userId);
+  if (!auth) return [];
+  const n = Math.min(500, Math.max(1, Number(limit) || 200));
+  const r = await _req(auth, 'GET', `/v2/orders?status=all&limit=${n}&direction=desc&nested=false`);
+  if (!r.ok || !Array.isArray(r.json)) return [];
+  const norm = (s) => {
+    const x = String(s || '').toLowerCase();
+    if (/fill/.test(x)) return 'filled';
+    if (/cancel|expired|rejected|replaced|done_for_day/.test(x)) return 'canceled';
+    if (/new|accepted|pending|held|partially/.test(x)) return 'open';
+    return x || 'unknown';
+  };
+  return r.json.map((o) => ({
+    id: o.id, symbol: o.symbol, side: String(o.side || '').toLowerCase(),
+    qty: Number(o.qty) || Number(o.filled_qty) || 0,
+    type: String(o.type || 'market').toLowerCase(),
+    limit_price: o.limit_price != null ? Number(o.limit_price) : (o.stop_price != null ? Number(o.stop_price) : null),
+    status: norm(o.status),
+    filled_avg_price: Number(o.filled_avg_price) || 0,
+    filled_at: o.filled_at || '', created_at: o.submitted_at || o.created_at || '',
+  }));
+}
+
 async function getDayPnl(userId) {
   const acct = await getAccount(userId).catch(() => null);
   if (!acct) return null;
   return { dailyPnl: acct.pnl_today, unrealizedPnl: acct.unrealized, realizedPnl: acct.realized_today };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getDayPnl, placeOrder, _authFor };
+/** Cancel a single working order by id. Returns true on 2xx/207. */
+async function cancelOrder(userId, orderId) {
+  const auth = _authFor(userId);
+  if (!auth || !orderId) return false;
+  const r = await _req(auth, 'DELETE', `/v2/orders/${encodeURIComponent(orderId)}`);
+  return r.ok || r.status === 207 || r.status === 404;   // 404 = already gone → treat as cancelled
+}
+
+/** Cancel every working order for a symbol (frees reserved shares before a rebalance
+ *  sell). Returns the count cancelled. */
+async function cancelOpenOrders(userId, symbol) {
+  const sym = String(symbol || '').toUpperCase();
+  const open = await getOpenOrders(userId).catch(() => []);
+  let n = 0;
+  for (const o of open) {
+    if (String(o.symbol || '').toUpperCase() === sym && o.order_id) {
+      if (await cancelOrder(userId, o.order_id)) n += 1;
+    }
+  }
+  return n;
+}
+
+// Range → Alpaca (period, timeframe). Alpaca's portfolio-history takes a period
+// ("1D"/"1W"/"1M"/"3M"/"1A"/"all") + a bar timeframe. Intraday ranges use fine
+// bars; multi-month ranges use daily bars. YTD has no native period, so it's
+// computed as "<n>D" from Jan 1. The equity curve (Robinhood-style) is drawn from
+// the returned `equity[]` aligned to `timestamp[]`.
+const HISTORY_RANGES = {
+  '1D':  { period: '1D',  timeframe: '5Min' },
+  '1W':  { period: '1W',  timeframe: '1H' },
+  '1M':  { period: '1M',  timeframe: '1D' },
+  '3M':  { period: '3M',  timeframe: '1D' },
+  '1Y':  { period: '1A',  timeframe: '1D' },
+  'ALL': { period: 'all', timeframe: '1D' },
+};
+
+/** Portfolio equity history for the Robinhood-style chart. `range` is one of
+ *  1D/1W/1M/3M/YTD/1Y/ALL. Returns { ok, range, timestamps, equity, base_value,
+ *  timeframe } or { ok:false } when no Alpaca account is available. */
+async function getPortfolioHistory(userId, range = '1D') {
+  const auth = _authFor(userId);
+  if (!auth) return { ok: false, reason: 'no Alpaca account' };
+  let cfg = HISTORY_RANGES[range];
+  const params = new URLSearchParams({ extended_hours: 'true' });
+  if (range === 'YTD') {
+    const now = new Date();
+    const days = Math.max(1, Math.ceil((now - new Date(now.getUTCFullYear(), 0, 1)) / 86400000));
+    params.set('period', `${days}D`);
+    params.set('timeframe', '1D');
+  } else {
+    if (!cfg) cfg = HISTORY_RANGES['1D'];
+    params.set('period', cfg.period);
+    params.set('timeframe', cfg.timeframe);
+    // Intraday ranges: report continuously so the curve isn't chopped at each close.
+    if (cfg.timeframe !== '1D') params.set('intraday_reporting', 'continuous');
+  }
+  const r = await _req(auth, 'GET', `/v2/account/portfolio/history?${params.toString()}`);
+  if (!r.ok || !r.json || !Array.isArray(r.json.timestamp)) {
+    return { ok: false, reason: (r.json && r.json.message) || r.error || `HTTP ${r.status}` };
+  }
+  const ts = r.json.timestamp || [];
+  const eq = (r.json.equity || []).map((v) => (v == null ? null : Number(v)));
+  return {
+    ok: true,
+    range,
+    timeframe: r.json.timeframe || params.get('timeframe'),
+    base_value: Number(r.json.base_value) || (eq.find((v) => v != null) || 0),
+    timestamps: ts,
+    equity: eq,
+    source: 'alpaca',
+  };
+}
+
+module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, _authFor, SIGMA_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER) };

@@ -180,6 +180,12 @@
   .adv-btn{background:var(--bg3);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:4px 12px;font-family:var(--mono);font-size:12px;cursor:pointer}
   .adv-btn:hover{border-color:var(--tv-text-secondary)}
   .adv-note{color:var(--text2);font-size:11px;line-height:1.5}
+  .brake-strip{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px}
+  .brake-gross{font-size:24px;font-weight:700;color:var(--text);line-height:1}
+  .brake-chip{font-size:11px;padding:2px 8px;border-radius:10px;border:1px solid var(--border);color:var(--text2)}
+  .brake-chip.ok{color:var(--green);border-color:var(--green)}
+  .brake-chip.braking{color:var(--amber);border-color:var(--amber)}
+  .brake-meta{color:var(--text2);font-size:11px}
   .tp-flat-btn,.tp-flatten-all{font-family:var(--mono);font-size:11px;padding:3px 9px;border-radius:4px;cursor:pointer;
     border:1px solid rgba(255,95,109,.45);background:rgba(255,95,109,.10);color:var(--red);white-space:nowrap;transition:background .15s}
   .tp-flat-btn:hover,.tp-flatten-all:hover{background:rgba(255,95,109,.25)}
@@ -196,6 +202,7 @@
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
   .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+  .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
   /* #2439: honest feed label — LIVE + poll cadence, flips red when polls fail.
@@ -687,18 +694,26 @@
      ACTIONS + account panels are removed. The trade-gated data endpoints stay
      blocked server-side too (tradeApiGuard) — this is defence-in-depth, not the
      only gate. */
-  body.guest .footer,
+  /* Hidden for ALL guests, incl. demo: the trade ACTIONS + broker/account config
+     (a demo visitor can look around, not trade). */
   body.guest .footer-resize,
-  body.guest .badge-paper,
   body.guest #brokerBtn,           /* broker status/config — only for entitled traders */
-  body.guest .hstat.acct,          /* Equity / Day P&L / Positions header stats */
   body.guest #ovnToggle,           /* overnight-scan toggle (mutates server state) */
   body.guest .order-ticket,        /* per-card + fullscreen BUY / SELL */
+  body.guest .tp-flat-btn,         /* per-position "Flatten" (market-close = a trade) */
+  body.guest .tp-flatten-all,      /* "Close all" (bulk market-close = a trade) */
   body.guest #otBg{ display:none !important; }
+  /* Hidden only for NON-demo guests. In demo mode (body.demo) these are SHOWN and
+     filled with the read-only simulated champion account: the header Equity / Day
+     P&L / Positions stats, the positions footer, and the mode badge (relabeled
+     DEMO in JS). */
+  body.guest:not(.demo) .footer,
+  body.guest:not(.demo) .badge-paper,
+  body.guest:not(.demo) .hstat.acct{ display:none !important; }
   /* Guests CAN edit the watchlist (add/remove tickers) — it's "which symbols to
      chart", not a trade — so .wl-add / .wl-remove stay visible for them. */
   /* No footer row for guests — the chart grid takes the full height. */
-  body.guest .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
+  body.guest:not(.demo) .layout{ grid-template-rows:52px minmax(0,1fr) 0; }
   /* Uniform chart grid for guests: no "open" state spanning two columns and no
      per-state height changes, so every card is the same size. #guest-uniform-grid */
   body.guest .card.state-open{ grid-column:auto; }
@@ -921,7 +936,6 @@
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
-    <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');renderJournal()" title="Every order placed from this device, tagged with the signal context at placement">Journal</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
   </div>
   <!-- Tab bodies -->
@@ -929,7 +943,6 @@
     <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
   </div>
 </div>
@@ -2650,21 +2663,6 @@ function journalLog(o){
     localStorage.setItem('trader.journal', JSON.stringify(_journal));
   }catch(e){}
 }
-function renderJournal(){
-  const el=document.getElementById('tp-journal'); if(!el) return;
-  if(!_journal.length){ el.innerHTML='<div class="tp-empty">No trades journaled on this device yet — place an order and its signal context is captured automatically.</div>'; return; }
-  el.innerHTML = `<table class="tp-table"><thead><tr>
-    <th>Time</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Px</th><th>Signal</th><th>Pattern</th><th>RVOL</th><th>Session</th><th>Via</th></tr></thead><tbody>`+
-    _journal.map(j=>`<tr>
-      <td style="color:var(--text2)">${_fmtOrderTime(j.ts)}</td>
-      <td><span class="tp-sym" onclick="focusTicker('${j.symbol}')">${j.symbol}</span></td>
-      <td class="tp-side ${j.side==='buy'?'long':'short'}">${(j.side||'').toUpperCase()}</td>
-      <td>${j.qty}</td><td>${j.price?'$'+fmt(j.price,2):'—'}</td>
-      <td>${j.signal||'—'}</td><td>${j.pattern||'—'}</td>
-      <td>${j.rvol!=null?j.rvol+'×':'—'}</td><td>${j.session||'—'}</td>
-      <td style="color:var(--text2)">${j.source}</td></tr>`).join('')+'</tbody></table>';
-}
-
 // ── Rapid order mode (#2445) — explicit, persisted opt-in ─────────────────────
 // ON: ticket submits + flatten skip the confirm dialog, and Shift+B / Shift+S
 // fire an instant market order for the focused symbol at the last-used quantity.
@@ -4134,8 +4132,38 @@ function _advSuggestions(a,r){
   return items;
 }
 
+// ── Live brake strip (ADR-0028 overlay monitor — paper mode, market math only).
+// Polls /api/trading/brake/status every 60s while the Advisor tab is visible;
+// the poller self-clears when the pane is hidden. Renders the gross target,
+// the three signal chips (vol/trend/drawdown), and the paper-book equity.
+let _brakeTimer=null;
+function startBrakePoll(){
+  loadBrakeStrip();
+  if(!_brakeTimer) _brakeTimer=setInterval(loadBrakeStrip,60000);
+}
+async function loadBrakeStrip(){
+  const el=document.getElementById('advBrake'), pane=document.getElementById('tp-advisor');
+  if(!el||!pane||pane.hidden){ if(_brakeTimer){clearInterval(_brakeTimer);_brakeTimer=null;} return; }
+  try{
+    const d=await fetch('/api/trading/brake/status').then(x=>x.json());
+    renderBrakeStrip(el,d);
+  }catch(e){ el.innerHTML=`<div class="adv-note">brake monitor unavailable (${_advEsc(e.message)})</div>`; }
+}
+function renderBrakeStrip(el,d){
+  if(!d||d.ok!==true){ el.innerHTML='<div class="adv-note">brake monitor not running on this server</div>'; return; }
+  const chip=(label,s)=>`<span class="brake-chip ${s==='braking'?'braking':(s==='ok'?'ok':'')}">${label}: ${_advEsc(s||'—')}</span>`;
+  const sig=d.signals||{}, b=d.book||{};
+  const pnl=(b.equity!=null&&b.startEquity)?b.equity-b.startEquity:null;
+  el.innerHTML=`<div class="brake-strip" title="${_advEsc(d.formula||'')}">
+    <span class="brake-gross">${d.grossTarget!=null?d.grossTarget.toFixed(2)+'×':'—'}</span>
+    ${chip('vol',sig.vol&&sig.vol.state)}${chip('trend',sig.trend&&sig.trend.state)}${chip('drawdown',sig.drawdown&&sig.drawdown.state)}
+    <span class="brake-meta">${_advEsc(d.action||'')}</span>
+    <span class="brake-meta">paper book $${fmt(b.equity,0)}${pnl!=null?` (${pnl>=0?'+':'−'}$${fmt(Math.abs(pnl),0)})`:''}</span>
+    <span class="brake-chip" title="${_advEsc(d.disclaimer||'')}">practice mode — places nothing</span>
+  </div>`;
+}
 function renderAdvisor(el,a,r){
-  if(!a||!a.ok){ el.innerHTML=`<div class="tp-empty">${_advEsc((a&&a.reason)||'analysis unavailable')}</div>`; return; }
+  if(!a||!a.ok){ el.innerHTML=`<div id="advBrake"></div><div class="tp-empty">${_advEsc((a&&a.reason)||'analysis unavailable')}</div>`; startBrakePoll(); return; }
   const p=a.portfolio;
   const stats=`<div class="adv-stats">
     <span>Sharpe (${a.window.years}y): <b>${_advSharpe(p.sharpe)}</b></span>
@@ -4164,6 +4192,7 @@ function renderAdvisor(el,a,r){
     </div>`;
   const excluded=(a.excluded&&a.excluded.length)?`<div class="adv-note">Excluded: ${a.excluded.map(e=>`${_advEsc(e.symbol)} (${_advEsc(e.reason)})`).join('; ')}</div>`:'';
   el.innerHTML=`<div class="adv-wrap">
+    <div id="advBrake"></div>
     ${stats}
     <div class="adv-h">Suggestions (computed, not AI)</div>
     <ul class="adv-list">${_advSuggestions(a,r).join('')}</ul>
@@ -4183,6 +4212,7 @@ function renderAdvisor(el,a,r){
     ${excluded}
     <div class="adv-note">Method: long-only shrunk tangency (w ∝ Σ⁻¹μ), max weight 35%, existing holdings only. Evidence: historical daily total returns; CI is an i.i.d. floor (Lo 2002); taxes/slippage not modeled. Backtest ≠ future performance — decision support, not personalized investment advice. The same numbers are available to the chat assistant via the portfolio_analysis / propose_rebalance / contribution_plan tools.</div>
   </div>`;
+  startBrakePoll();
 }
 
 async function planAdvisorContribution(btn){
@@ -4259,9 +4289,14 @@ function computeDayPnl(positions){
 }
 
 async function loadPortfolio(){
-  if(window.GUEST) return;   // account/positions are trade-gated; guest view is charts-only
+  // Non-demo guests get the charts-only view (account/positions are trade-gated).
+  // In demo mode a guest sees the READ-ONLY simulated champion account instead —
+  // fetched with ?demo=champion, which the server serves publicly (never a real
+  // account) so the trader isn't an empty shell for logged-out visitors.
+  if(window.GUEST && !window.DEMO_ACCT) return;
+  const demoQS = window.DEMO_ACCT ? '?demo=champion' : '';
   try{
-    const r  = await fetch('/api/trading/positions');
+    const r  = await fetch('/api/trading/positions' + demoQS);
     const d  = await r.json();
     const a  = d.account||{};
     const dayPnl = computeDayPnl(d.positions||[]);
@@ -4606,6 +4641,20 @@ async function detectGuestMode(){
   }catch(e){ window.GUEST = true; }
   if(window.GUEST){
     document.body.classList.add('guest');
+    // Demo showroom: instead of an empty, gated shell, a logged-out / non-entitled
+    // visitor sees the READ-ONLY simulated champion account. body.demo re-shows the
+    // account header stats + positions footer (CSS), the mode badge is relabeled
+    // DEMO, and loadPortfolio() fetches it with ?demo=champion. Trade actions stay
+    // hidden (still body.guest), so nothing here can place an order.
+    window.DEMO_ACCT = true;
+    document.body.classList.add('demo');
+    const badge=document.querySelector('.badge-paper');
+    if(badge){
+      badge.classList.remove('badge-paper'); badge.classList.add('badge-demo');
+      badge.textContent='DEMO';
+      badge.title='Demo account — a simulated "champion" strategy portfolio. Look around; sign in to trade your own.';
+      badge.setAttribute('aria-label','Demo account — simulated');
+    }
     const gb=document.getElementById('guestBadge'); if(gb) gb.style.display='';
     const cta=document.getElementById('signinCta');
     if(cta){

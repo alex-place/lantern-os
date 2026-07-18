@@ -1,0 +1,59 @@
+{
+  "seed": 20260717,
+  "created_for": "#2691 E-B run",
+  "licenses": {
+    "distill": [
+      "nvidia/OpenCodeInstruct",
+      "CC BY 4.0"
+    ],
+    "rlvr": [
+      "PRIME-RL/Eurus-2-RL-Data",
+      "MIT"
+    ],
+    "anchor": [
+      "allenai/tulu-3-sft-mixture",
+      "ODC-BY"
+    ],
+    "heldout": [
+      "livecodebench/code_generation_lite",
+      "competition-usage (internal eval only)"
+    ],
+    "mbpp": [
+      "google-research-datasets/mbpp",
+      "CC-BY-4.0 / Apache-2.0"
+    ],
+    "humaneval": [
+      "openai_humaneval",
+      "MIT"
+    ]
+  },
+  "counts": {
+    "distill": 2000,
+    "distill_replay": 2600,
+    "rlvr": 0,
+    "eval_pool": 1138
+  },
+  "block_sizes": {
+    "hidden": 93,
+    "retention": 93,
+    "sealed": 55,
+    "pool": 223,
+    "fresh": 447,
+    "world": 223
+  },
+  "decontamination": "13-gram overlap vs eval pool removed",
+  "hidden_block": {
+    "hidden_from_post_cutoff_lcb": 0,
+    "hidden_topped_up": 93,
+    "auto_scaled": true,
+    "scaled_spec": {
+      "retention": 93,
+      "sealed": 55,
+      "pool": 223,
+      "fresh": 447,
+      "world": 223,
+      "hidden": 93
+    },
+    "eval_pool_size": 1138
+  }
+}

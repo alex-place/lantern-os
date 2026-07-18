@@ -100,6 +100,7 @@ const SUBSYSTEMS = {
   "discord-bot":      { tier: "extension", module: "community", entry: "src/discord_lounge_bot/bot_v2.py",         flag: "DISCORD_BOT_TOKEN" },
   "news-collector":   { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/news-collector.js",   flag: "TRADING_ENABLED" },
   "kalshi-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/kalshi-collector.js", flag: "TRADING_ENABLED" },
+  "brake-monitor":    { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/brake-monitor.js",    flag: "BRAKE_MONITOR" },
   "crypto-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/crypto-collector.js", flag: "KALSHI_CRYPTO_OBSERVER" },
   "job-worker":       { tier: "extension", module: "creator",   entry: "apps/lantern-garage/lib/job-worker.js",       flag: "CREATOR_ENABLED" },
   "cloudflare-tunnel":{ tier: "extension", module: "ops",       entry: "apps/lantern-garage/server.js",               flag: "LANTERN_CLOUDFLARE_TUNNEL" },

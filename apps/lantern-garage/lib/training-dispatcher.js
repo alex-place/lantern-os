@@ -126,8 +126,87 @@ async function _logDispatchFailure(provider, errorRecord, steps) {
 
 function ensureDir(p) { fs.mkdirSync(path.dirname(p), { recursive: true }); }
 
+// Committed default provider registry. The on-disk data/pcsf/gpu-training.pcsf.json
+// is runtime-local (gitignored since #1729), so a fresh clone has none and the panel
+// 503s. This default un-bricks it AND guarantees newer providers (e.g. modal) appear
+// on hosts whose runtime file predates them — loadGpuPcsf() unions the two, with
+// on-disk provider entries winning so live state (last_dispatch_at, degraded, ...) is
+// never clobbered; only providers ABSENT on disk are appended from here.
+const DEFAULT_GPU_PCSF = {
+  pcsf_type: "gpu_training",
+  pcsf_version: "1.2.0",
+  component: "gpu_training",
+  state: "active",
+  checkpoint_transport: "csf",
+  checkpoint_repo_env: "HF_TRAINING_REPO",
+  checkpoint_repo_default: "ouro-checkpoints",
+  seq_len: 1536,
+  // Concurrent redundancy pair first: dispatch-all fans out to every automatable
+  // provider, so lightning + modal run the same seeded job on two independent clouds.
+  rotation_order: ["lightning", "modal", "kaggle", "sagemaker", "colab"],
+  weekly_total_hours: 132,
+  providers: [
+    {
+      provider_id: "lightning", display: "Lightning AI", priority: 1, state: "available",
+      automatable: true, auth_env: ["LIGHTNING_USER_ID", "LIGHTNING_API_KEY"],
+      gpu: "L4 (bf16) / A100", vram_gb: 24, quota_hours_per_week: 22,
+      steps_per_hour_estimate: 180, studio_name_default: "ouro-training",
+      api_key_url: "https://lightning.ai/", notes: "22 free credits/mo; bf16 L4. Proven venue (#2231).",
+    },
+    {
+      provider_id: "modal", display: "Modal", priority: 1, state: "available",
+      automatable: true, auth_env: ["MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET"],
+      gpu: "L4 (bf16)", vram_gb: 24, quota_hours_per_week: 30,
+      steps_per_hour_estimate: 180, api_key_url: "https://modal.com/settings/tokens",
+      notes: "$30/mo free credit (~30 L4-hrs); serverless, per-second billing. Independent "
+        + "infra from Lightning — the redundant twin for dual-provider concurrent runs.",
+      setup_steps: [
+        "1. Sign up at https://modal.com (GitHub/Google SSO)",
+        "2. modal.com → Settings → API Tokens → New token → copy Token ID + Token Secret",
+        "3. Save both from the orchestration page's Keys panel (MODAL_TOKEN_ID, MODAL_TOKEN_SECRET)",
+        "4. Set HF_TOKEN too so the trained adapter uploads back to HF for cross-provider handoff",
+        "5. Dispatch (or dispatch-all with Lightning for concurrent redundancy) — no other setup",
+      ],
+    },
+    {
+      provider_id: "kaggle", display: "Kaggle Notebooks", priority: 4, state: "available",
+      automatable: true, auth_env: ["KAGGLE_API_TOKEN"], username: "lanternfounder",
+      kernel_id: "lanternfounder/ouro-qlora", gpu: "T4 / P100", vram_gb: 16,
+      quota_hours_per_week: 30, steps_per_hour_estimate: 180,
+      api_key_url: "https://www.kaggle.com/settings/account",
+      notes: "30 free GPU-hrs/wk. Pre-Ampere (no bf16) — arch-tolerant FALLBACK only, behind Lightning/Modal.",
+    },
+    {
+      provider_id: "sagemaker", display: "AWS SageMaker Studio Lab", priority: 3,
+      state: "available", automatable: false, auth_env: [], gpu: "T4", vram_gb: 16,
+      quota_hours_per_week: 28, steps_per_hour_estimate: 180,
+      notes: "4h GPU sessions, manual launch. No AWS account/card needed.",
+    },
+    {
+      provider_id: "colab", display: "Google Colab", priority: 2, state: "available",
+      automatable: false, auth_env: [], gpu: "T4", vram_gb: 15, quota_hours_per_week: 22,
+      steps_per_hour_estimate: 180, notes: "No API; orchestrator emits a runnable notebook.",
+    },
+  ],
+};
+
 function loadGpuPcsf() {
-  try { return JSON.parse(fs.readFileSync(GPU_PCSF, "utf8")); } catch { return null; }
+  let onDisk = null;
+  try { onDisk = JSON.parse(fs.readFileSync(GPU_PCSF, "utf8")); } catch { /* absent = fresh clone */ }
+  if (!onDisk || !Array.isArray(onDisk.providers)) return DEFAULT_GPU_PCSF;
+  // Union: append any default provider missing on disk (on-disk state always wins).
+  const have = new Set(onDisk.providers.map(p => p.provider_id));
+  for (const dp of DEFAULT_GPU_PCSF.providers) {
+    if (!have.has(dp.provider_id)) onDisk.providers.push(dp);
+  }
+  if (!Array.isArray(onDisk.rotation_order) || onDisk.rotation_order.length === 0) {
+    onDisk.rotation_order = DEFAULT_GPU_PCSF.rotation_order;
+  } else if (!onDisk.rotation_order.includes("modal")) {
+    // Slot modal right after lightning so rotation reaches the redundant twin.
+    const i = onDisk.rotation_order.indexOf("lightning");
+    onDisk.rotation_order.splice(i >= 0 ? i + 1 : 0, 0, "modal");
+  }
+  return onDisk;
 }
 
 // Write updated provider state back to the PCSF JSON file.
@@ -240,6 +319,7 @@ async function dispatchTrainingJob(provider, checkpointUri, steps = 600) {
   if (provider === "paperspace") return _dispatchPaperspace(checkpointUri, steps);
   if (provider === "colab")      return _dispatchColab(checkpointUri, steps);
   if (provider === "lightning")  return _dispatchLightning(checkpointUri, steps);
+  if (provider === "modal")      return _dispatchModal(checkpointUri, steps);
 
   // SageMaker — basic manual-handoff record
   const cfg = getProviderConfig(provider);
@@ -709,6 +789,7 @@ async function pollJobStatus(provider, jobId) {
   if (provider === "kaggle")     return _pollKaggle(jobId);
   if (provider === "paperspace") return _pollPaperspace(jobId);
   if (provider === "lightning")  return _pollLightning(jobId);
+  if (provider === "modal")      return _pollModal(jobId);
   // SageMaker, Colab — manual check
   const update = { type: "training_poll", provider, jobId, status: "manual_required", polledAt: isoNow() };
   await logJob(update);
@@ -801,6 +882,90 @@ async function _pollLightning(studioName) {
     type: "training_poll", provider: "lightning", jobId: studioName,
     status: result.status, studioStatus: result.studio_status,
     lastLogLine: result.last_log_line, polledAt: isoNow(),
+  };
+  await logJob(update);
+  return update;
+}
+
+// --- Modal (modal.com) — the serverless redundant twin of Lightning ------------
+// Invoke scripts/modal_dispatch.py via execFileSync, return parsed JSON. Same shape
+// as _runLightningScript so the dispatch/poll bodies below mirror the Lightning ones.
+function _runModalScript(subcommand, extraArgs = []) {
+  const script = path.join(REPO_ROOT, "scripts", "modal_dispatch.py");
+  const env = {
+    ...process.env,
+    MODAL_TOKEN_ID:     process.env.MODAL_TOKEN_ID     || "",
+    MODAL_TOKEN_SECRET: process.env.MODAL_TOKEN_SECRET || "",
+    // L4 (Ada, cc 8.9) is the entry bf16 GPU — same constraint as Lightning; the Ouro
+    // QLoRA recipe NaNs in fp16 on pre-Ampere silicon. Override with MODAL_GPU.
+    MODAL_GPU:          process.env.MODAL_GPU          || "L4",
+    HF_TRAINING_REPO:   process.env.HF_TRAINING_REPO   || "ouro-checkpoints",
+    HF_TOKEN:           process.env.HF_TOKEN           || process.env.HUGGINGFACE_TOKEN || "",
+  };
+  try {
+    const pythonExe = process.env.MODAL_PYTHON || process.env.LIGHTNING_PYTHON || "python";
+    // Dispatch can take a while on a cold image build; give it a generous timeout.
+    const raw = execFileSync(pythonExe, [script, subcommand, ...extraArgs],
+      { encoding: "utf8", timeout: 300_000, env, stdio: ["pipe", "pipe", "pipe"] });
+    // modal_dispatch prints exactly one JSON line last; parse the final non-empty line.
+    const line = raw.trim().split(/\r?\n/).filter(Boolean).pop() || "{}";
+    return JSON.parse(line);
+  } catch (err) {
+    if (err.code === "ETIMEDOUT") {
+      return { error: "modal_timeout", message: "Modal CLI did not respond within 300 seconds." };
+    }
+    if ((err.message || "").includes("not found")) {
+      return { error: "modal_not_configured", message: "modal_dispatch.py not found or python missing." };
+    }
+    return { error: "modal_script_error", message: err.message };
+  }
+}
+
+async function _dispatchModal(checkpointUri, steps) {
+  const cfg = getProviderConfig("modal");
+  const hfRepo = process.env.HF_TRAINING_REPO || loadGpuPcsf()?.checkpoint_repo_default || "ouro-checkpoints";
+  let result;
+  try {
+    const modalArgs = ["--steps", String(steps), "--hf-repo", hfRepo];
+    if (checkpointUri) modalArgs.push("--checkpoint-uri", checkpointUri);
+    result = _runModalScript("dispatch", modalArgs);
+  } catch (err) {
+    return _logDispatchFailure("modal", { error: "modal_dispatch_failed", detail: err.message }, steps);
+  }
+  if (result.error) return _logDispatchFailure("modal", { error: result.error, provider: "modal", detail: result }, steps);
+  const hoursEstimated = Math.ceil(steps / (cfg?.steps_per_hour_estimate || 180));
+  const record = {
+    type: "training_dispatch",
+    provider: "modal",
+    status: result.status || "running",
+    jobId: result.jobId,
+    machine: result.gpu,
+    checkpointUri,
+    steps,
+    hoursEstimated,
+    dashboard: result.dashboard,
+    dispatchedAt: isoNow(),
+  };
+  await logJob(record);
+  return record;
+}
+
+async function _pollModal(jobId) {
+  const creds = _checkCredentials("modal");
+  if (creds.error) return creds;
+  let result;
+  try {
+    result = _runModalScript("poll", ["--job-id", jobId]);
+  } catch (err) {
+    return { error: "modal_poll_failed", detail: err.message };
+  }
+  if (result.error) return { error: result.error, provider: "modal" };
+  // Serverless: the worker is released automatically when the function returns, so
+  // (unlike Lightning) there is no studio to stop on "done".
+  const update = {
+    type: "training_poll", provider: "modal", jobId,
+    status: result.status, failureMessage: result.failureMessage || null,
+    polledAt: isoNow(),
   };
   await logJob(update);
   return update;

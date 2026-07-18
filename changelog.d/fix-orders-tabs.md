@@ -1,0 +1,4 @@
+### Fixed
+- **Trader Order-history was always "None" + Orders showed the wrong account.** The `GET /api/trading/orders` handler only ever fetched IBKR *open* orders — so on an Alpaca account the Orders tab showed IBKR's orders next to an Alpaca balance, and Order history (filled/cancelled) was permanently empty. It now resolves the SAME broker the Positions/account come from (`preferredBroker`) and, for Alpaca, fetches `status=all` (new `alpaca-adapter.getAllOrders`) so BOTH open orders and filled/cancelled history populate and reconcile with the shown account. IBKR path unchanged.
+### Removed
+- **Trader "Journal" tab** — the device-local order journal tab is gone from the footer (Positions / Orders / Order history / Advisor remain). The broker-truth Order history above is the real record; the localStorage journal added a parallel, device-only list that confused more than it helped.
