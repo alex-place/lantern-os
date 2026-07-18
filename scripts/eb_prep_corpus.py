@@ -155,35 +155,40 @@ def extract_eval_task(row, cols, source):
 def partition(eval_items, seed, cutoff_date=""):
     """Assign every eval task to exactly one block. The HIDDEN block is filled FIRST from
     contamination-free post-cutoff LiveCodeBench tasks (the fresh selector); everything else
-    is assigned by a stable per-(id,seed) hash so the split is reproducible and disjoint."""
+    is assigned by a stable per-(id,seed) hash so the split is reproducible and disjoint.
+    If the eval pool is smaller than the full block spec, the blocks are AUTO-SCALED down
+    proportionally (never a hard fail) and the scaling is recorded in the manifest."""
     items = sorted({it["id"]: it for it in eval_items}.values(), key=lambda x: x["id"])
-    total_needed = sum(BLOCKS.values())
-    if len(items) < total_needed:
-        raise SystemExit(f"[eb_prep] need {total_needed} eval tasks, have {len(items)}. "
-                         f"Increase LiveCodeBench pull or lower block sizes.")
+    spec = dict(BLOCKS)
+    need = sum(spec.values())
+    scaled = False
+    if len(items) < need:
+        scaled = True
+        f = len(items) / need
+        spec = {k: max(1, int(v * f)) for k, v in spec.items()}
+        while sum(spec.values()) > len(items):  # trim to fit exactly, largest block first
+            spec[max(spec, key=spec.get)] -= 1
 
     fresh_hidden = [it for it in items
                     if it["source"] == "livecodebench" and cutoff_date and it["date"] > cutoff_date]
     fresh_hidden.sort(key=lambda x: _h(x["id"], seed))
-    hidden = fresh_hidden[:BLOCKS["hidden"]]
-    if len(hidden) < BLOCKS["hidden"]:
-        # not enough post-cutoff LCB — top up from the general pool by hash (flagged in manifest)
+    hidden = fresh_hidden[:spec["hidden"]]
+    if len(hidden) < spec["hidden"]:
         rest = [it for it in items if it not in hidden]
         rest.sort(key=lambda x: _h("hidden-topup", x["id"], seed))
-        hidden += rest[:BLOCKS["hidden"] - len(hidden)]
+        hidden += rest[:spec["hidden"] - len(hidden)]
     hidden_ids = {it["id"] for it in hidden}
 
     remaining = [it for it in items if it["id"] not in hidden_ids]
     remaining.sort(key=lambda x: _h(x["id"], seed))
     blocks = {"hidden": [it["id"] for it in hidden]}
     i = 0
-    for name, size in BLOCKS.items():
+    for name, size in spec.items():
         if name == "hidden":
             continue
         blocks[name] = [it["id"] for it in remaining[i:i + size]]
         i += size
 
-    # disjointness proof
     seen, overlap = set(), []
     for name, ids in blocks.items():
         for x in ids:
@@ -192,8 +197,10 @@ def partition(eval_items, seed, cutoff_date=""):
             seen.add(x)
     if overlap:
         raise SystemExit(f"[eb_prep] BUG: blocks overlap on {overlap[:5]} — partition is not disjoint.")
-    return blocks, {"hidden_from_post_cutoff_lcb": len(fresh_hidden[:BLOCKS['hidden']]),
-                    "hidden_topped_up": BLOCKS["hidden"] - min(len(fresh_hidden), BLOCKS["hidden"])}
+    return blocks, {"hidden_from_post_cutoff_lcb": len(fresh_hidden[:spec["hidden"]]),
+                    "hidden_topped_up": spec["hidden"] - min(len(fresh_hidden), spec["hidden"]),
+                    "auto_scaled": scaled, "scaled_spec": spec if scaled else None,
+                    "eval_pool_size": len(items)}
 
 
 # ─────────────────────────── writers ───────────────────────────
@@ -212,10 +219,11 @@ def run_download(args):
     out = Path(args.out)
     base_cutoff = args.base_cutoff
 
-    def take(ds_id, n, extract, source=None, streaming=True, **load_kw):
+    def take(ds_id, n, extract, source=None, streaming=True, max_scan=None, **load_kw):
         print(f"[eb_prep] loading {ds_id} …")
         ds = load_dataset(ds_id, split="train", streaming=streaming, **load_kw)
         cols = set(getattr(ds, "column_names", None) or next(iter(ds)).keys())
+        cap = max_scan if max_scan is not None else n * 50  # scan budget for sparse filters
         rows, seen = [], 0
         for row in ds:
             seen += 1
@@ -224,38 +232,56 @@ def run_download(args):
                 rows.append(rec)
             if len(rows) >= n:
                 break
-            if seen > n * 50:  # guard: don't scan forever if the filter is too tight
+            if seen > cap:
                 break
         print(f"[eb_prep]   kept {len(rows)}/{seen} from {ds_id}")
         return rows
 
-    # 1. eval pool first (needed for decontamination + the partition)
+    # 1. eval pool first (needed for decontamination + the partition). MBPP "full" (974
+    #    across all splits) — the "sanitized" config is too small (257). LiveCodeBench is a
+    #    legacy SCRIPT dataset that datasets>=4 refuses to load, so it's best-effort; when
+    #    absent the hidden block loses its post-cutoff freshness (recorded in the manifest).
     eval_items = []
-    eval_items += [extract_eval_task(r, set(r.keys()), "mbpp")
-                   for r in load_dataset(SOURCES["mbpp"][0], "sanitized", split="test")]
+    for _split in ("train", "test", "validation", "prompt"):
+        try:
+            eval_items += [extract_eval_task(r, set(r.keys()), "mbpp")
+                           for r in load_dataset(SOURCES["mbpp"][0], "full", split=_split)]
+        except Exception:  # noqa: BLE001 — a missing split is fine
+            pass
     eval_items += [extract_eval_task(r, set(r.keys()), "humaneval")
                    for r in load_dataset(SOURCES["humaneval"][0], split="test")]
     try:
         lcb = load_dataset(SOURCES["heldout"][0], split="test", version_tag=args.lcb_version)
         eval_items += [extract_eval_task(r, set(r.keys()), "livecodebench") for r in lcb]
     except Exception as e:  # noqa: BLE001
-        print(f"[eb_prep] WARN: LiveCodeBench load failed ({e}); hidden block will lack post-cutoff freshness.")
+        print(f"[eb_prep] WARN: LiveCodeBench unavailable ({str(e)[:80]}); hidden block loses "
+              f"post-cutoff freshness (topped up from the general pool). Wire a parquet LCB mirror to restore it.")
     eval_items = [e for e in eval_items if e]
     eval_ngrams = build_eval_ngrams([e["prompt"] for e in eval_items])
     print(f"[eb_prep] eval pool: {len(eval_items)} tasks; {len(eval_ngrams)} decontam n-grams")
 
-    # 2. train sets, decontaminated against the eval pool
+    # 2. distill (the PRIMARY output — the continuation-training dispatch needs only this).
     distill = [r for r in take(SOURCES["distill"][0], args.distill_n, extract_distill)
                if not is_contaminated(r["instruction"], eval_ngrams)]
     anchor = [r for r in take(SOURCES["anchor"][0], args.anchor_n, extract_anchor)
               if not is_contaminated(r["instruction"], eval_ngrams)]
-    rlvr = [r for r in take(SOURCES["rlvr"][0], args.rlvr_n, extract_rlvr)
-            if not is_contaminated(r["instruction"], eval_ngrams)]
-
-    # 3. write
     n_distill = write_jsonl(out / "distill.jsonl", distill)
     n_replay = write_jsonl(out / "distill-replay.jsonl", distill + anchor)
-    n_rlvr = write_jsonl(out / "rlvr-train.jsonl", rlvr)
+    print(f"[eb_prep] WROTE distill.jsonl ({n_distill}) + distill-replay.jsonl ({n_replay}) — dispatch-ready.")
+
+    # 3. rlvr + partition are BEST-EFFORT (needed only for the full E-B A/B/C experiment, not
+    #    the continuation dispatch). Never let them block the distill output above.
+    n_rlvr = 0
+    try:
+        rlvr = [r for r in take(SOURCES["rlvr"][0], args.rlvr_n, extract_rlvr, max_scan=args.rlvr_max_scan)
+                if not is_contaminated(r["instruction"], eval_ngrams)]
+        n_rlvr = write_jsonl(out / "rlvr-train.jsonl", rlvr)
+        if n_rlvr == 0:
+            print("[eb_prep] NOTE: rlvr-train.jsonl is EMPTY — Eurus code rows sit deep in the "
+                  "stream (math-first); use a code-native RL source or a non-streaming filtered load.")
+    except Exception as e:  # noqa: BLE001
+        rlvr = []
+        print(f"[eb_prep] WARN: rlvr build skipped ({str(e)[:100]}).")
     blocks, hidden_meta = partition(eval_items, args.seed, base_cutoff)
     (out / "eb-partition.json").write_text(json.dumps(
         {"seed": args.seed, "base_cutoff": base_cutoff, "blocks": blocks,
@@ -339,6 +365,9 @@ def main():
     ap.add_argument("--distill-n", type=int, default=3000)
     ap.add_argument("--anchor-n", type=int, default=1000)
     ap.add_argument("--rlvr-n", type=int, default=1500)
+    ap.add_argument("--rlvr-max-scan", type=int, default=20000,
+                    help="max Eurus rows to stream for code rows (code is math-first/deep; "
+                         "best-effort — a code-native RL source is the real fix)")
     ap.add_argument("--lcb-version", default="release_v5", help="LiveCodeBench version_tag")
     ap.add_argument("--base-cutoff", default="2025-01-01",
                     help="Ouro base-model cutoff date; hidden block = LCB problems after this")
