@@ -472,7 +472,7 @@ the worst cell **DOWN·calm −30.2%/yr** (217 days).
    the damage, but this is the clear lever → **iter-12 tests a better/confirmed signal to cut
    false flips**, iter-13 tests event-triggered rebalancing.
 
-> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on `claude/trading-research-loop2` (PR #2731). Iters 8-13 done; iter-13 REJECTED the SMA signal (in-sample overfit, fails OOS) — shipped momentum gate stands, no live change.
+> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on `claude/trading-research-loop2` (PR #2731). Iters 8-14 done; iter-14 — the brake is decumulation TAIL insurance (bootstrap P(ruin) 76→48% S> **LOOP 2 note (2026-07-18):** PR #2728 (Conservative + iters 1-10) MERGED. Loop-2 on `claude/trading-research-loop2` (PR #2731). Iters 8-13 done; iter-13 REJECTED the SMA signal (in-sample overfit, fails OOS) — shipped momentum gate stands, no live change.P) but not an average-case win. Next: iter-15 synthesis.
 > at 14:14Z. Loop-2 continues on branch `claude/trading-research-loop2`; a new PR will
 > collect iters 11+.
 
@@ -539,3 +539,40 @@ Bootstrap validate ΔSharpe (sma − mom): S&P **[−0.22, +0.20]** (P=44%), Nas
    (significant edge, holds under production weighting, TC-robust, understood by regime) and
    *rejected one tempting-but-false improvement*. The honest, evidence-first outcome. The
    `signal` param stays a research knob, not a live default.
+
+---
+
+## Iteration 14 (Σ₀) — decumulation: the brake is TAIL insurance, not an average-case win
+
+`deep_history_decumulation.py`: $1M start, withdraw 4% and a stressed 5%/yr (real, inflated
+3%/yr — a labeled assumption), 30-year retirement, start rolled every 12 months across deep
+history. Plus a full-history block-bootstrap P(ruin) (1000 × 30y paths, 21d blocks).
+
+| S&P 1927+ | P(ruin) buy&hold | P(ruin) no_margin | median terminal B&H | median nm |
+|---|---|---|---|---|
+| withdraw 4%/yr | 22% | **25%** | $2.32M | $1.16M |
+| withdraw 5%/yr | 41% | **46%** | $1.07M | $0.22M |
+| **block-bootstrap 5%** | **76%** | **48%** | — | — |
+
+| Nasdaq 1971+ | P(ruin) B&H | P(ruin) nm | median B&H | median nm | worst terminal |
+|---|---|---|---|---|---|
+| withdraw 4%/yr | 0% | 0% | $9.05M | $10.94M | B&H $2.3M / nm $6.6M |
+| withdraw 5%/yr | 8% | **0%** | $6.66M | $8.22M | B&H $0 (ruin) / nm $4.44M |
+| **block-bootstrap 5%** | 18% | **8%** | — | — | — |
+
+**Findings (iteration 14).**
+1. **In average/benign historical sequences the brake does NOT reduce ruin** — S&P rolling
+   ruin is slightly *higher* (25% vs 22% at 4%) and median terminal ~half. Over 30y the
+   accumulation return give-up compounds against you when the feared crash doesn't hit early.
+   Stated plainly — it is not a free decumulation win.
+2. **In worst-case sequences it substantially reduces ruin** — the block-bootstrap (which
+   strings bad periods together = the sequence-of-returns nightmare) shows **S&P P(ruin)
+   76%→48%, Nasdaq 18%→8%**, and Nasdaq's 5% historical ruin 8%→0% with a far higher worst-
+   case terminal ($4.4M vs $0). This is exactly the tail the drawdown brake is built for.
+3. **Framing:** the Conservative overlay is **sequence-of-returns *insurance*** — it costs
+   median wealth in good sequences and pays off by preventing catastrophe in bad ones. Right
+   for a retiree/withdrawer who weights "don't run out" above "maximize the median." Consistent
+   with the whole study: risk-management, not return-max.
+4. **Honest caveats:** the 3%/5% inflation/withdrawal figures are labeled assumptions (no CPI
+   series); the block-bootstrap is full-history (crises enter via resampling), not crisis-only;
+   small crisis-start window counts (n=1-3) on the historical roll.

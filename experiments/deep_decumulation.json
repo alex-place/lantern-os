@@ -1,0 +1,58 @@
+{
+ "^GSPC": {
+  "wrate_4": {
+   "p_ruin_buyhold": 0.21739130434782608,
+   "p_ruin_no_margin": 0.2463768115942029,
+   "median_terminal_bh": 2320929.6348567917,
+   "median_terminal_nm": 1155856.897147388,
+   "worst_terminal_bh": 0.0,
+   "worst_terminal_nm": 0.0,
+   "n_windows": 69,
+   "crisis_ruin_bh": 0.6666666666666666,
+   "crisis_ruin_nm": 0.6666666666666666
+  },
+  "wrate_5": {
+   "p_ruin_buyhold": 0.4057971014492754,
+   "p_ruin_no_margin": 0.463768115942029,
+   "median_terminal_bh": 1070299.0804666155,
+   "median_terminal_nm": 222001.86532420147,
+   "worst_terminal_bh": 0.0,
+   "worst_terminal_nm": 0.0,
+   "n_windows": 69,
+   "crisis_ruin_bh": 1.0,
+   "crisis_ruin_nm": 1.0
+  },
+  "crisis_bootstrap": {
+   "p_ruin_boot_bh": 0.755,
+   "p_ruin_boot_nm": 0.476
+  }
+ },
+ "^IXIC": {
+  "wrate_4": {
+   "p_ruin_buyhold": 0.0,
+   "p_ruin_no_margin": 0.0,
+   "median_terminal_bh": 9051863.978789054,
+   "median_terminal_nm": 10938902.24657609,
+   "worst_terminal_bh": 2271870.7163987085,
+   "worst_terminal_nm": 6621031.287128797,
+   "n_windows": 26,
+   "crisis_ruin_bh": 0.0,
+   "crisis_ruin_nm": 0.0
+  },
+  "wrate_5": {
+   "p_ruin_buyhold": 0.07692307692307693,
+   "p_ruin_no_margin": 0.0,
+   "median_terminal_bh": 6663021.849525137,
+   "median_terminal_nm": 8219572.900287608,
+   "worst_terminal_bh": 0.0,
+   "worst_terminal_nm": 4440217.3787758015,
+   "n_windows": 26,
+   "crisis_ruin_bh": 1.0,
+   "crisis_ruin_nm": 0.0
+  },
+  "crisis_bootstrap": {
+   "p_ruin_boot_bh": 0.185,
+   "p_ruin_boot_nm": 0.076
+  }
+ }
+}
