@@ -1,8 +1,19 @@
 # Lantern OS — Cloudflare Tunnel Deployment Guide
 
 **Version:** 1.0  
-**Status:** Production Ready  
-**Last Updated:** 2026-06-13  
+**Status:** ⚠️ DEPRECATED — superseded by the GCE deployment (2026-07-18)  
+**Last Updated:** 2026-07-18  
+
+---
+
+> **Deprecated — not the production path.** This guide describes the legacy model: a
+> `cloudflared` tunnel from Cloudflare's edge to `server.js` running on the **local fleet
+> host** (port 4177). Per **[ADR-0018 (Accepted)](adr/0018-web-tier-split-and-cloud-multi-tenancy.md)**,
+> the production origin is now a **GCE VM** running `server.js`, with Cloudflare kept only as
+> the **edge/CDN** in front of it. Deploy and operate production via the
+> **[GCE Cloud Deploy Runbook](ops/gce-cloud-deploy-runbook.md)** — do not point live DNS at a
+> local tunnel. This tunnel remains usable for **local dev exposure or as a fallback** only;
+> the steps below are retained for that purpose and for historical reference.
 
 ---
 
