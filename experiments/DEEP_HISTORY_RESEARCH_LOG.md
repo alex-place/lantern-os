@@ -1,5 +1,15 @@
 # Trading-model deep-history research log
 
+> **LOOP STATE** (self-paced, autonomous while Alex sleeps). Branch:
+> `claude/trading-deep-history-research`. Started 2026-07-18 ~00:27 ET.
+> **Run until ~2026-07-18T16:30Z**, then stop scheduling and leave a summary.
+> Each iteration: read this log for state → do ONE focused iteration → commit + push →
+> update this log. Constraints (hard): **non-risky, never borrow (no margin), keep
+> trades low (well under PDT/day-trade thresholds)**, every number measured (no
+> fabrication). Iterations done: **2** (extend-to-1927; low-trade tuning). Next planned:
+> DCA-deposit version → blended/bonds panel → literature sanity-check → wire a
+> "Conservative (no-margin)" mode into the live overlay + tests → final synthesis.
+
 Goal (from Alex, 2026-07-18): improve the ADR-0028 leverage brake overlay. Research
 **farther back in time**, deep-dive the trades/regimes, and find **non-risky**
 improvements — **without over-trading** (day-trade / PDT pattern risk) or margin risk,
