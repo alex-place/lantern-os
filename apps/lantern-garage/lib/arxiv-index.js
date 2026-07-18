@@ -81,6 +81,10 @@ const AI_GATE_TERMS = [
   "feedback control", "optimal control", "model predictive", "sampled-data",
   "sampled data", "impulse control", "decay rate", "dwell time", "rebalanc",
   "transaction cost", "no-trade",
+  // Survivorship-free backtesting (curated 2026-07-18 tranche — selection-bias
+  // inference, drawdown significance, long-history trend canon)
+  "survivorship", "delist", "look-ahead", "lookahead", "point-in-time",
+  "overfitting", "trend following", "trend-following", "selection bias",
 ];
 
 function looksLikeAIResearchQuestion(message) {

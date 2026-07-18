@@ -83,8 +83,21 @@ Rules of the road:
 - The daily harvest does **not** track curated categories — a tranche grows only when someone
   curates it again. That's intentional (anti-sprawl): eess.SY/math.OC as a firehose would
   double the corpus for a field we cite selectively.
-- The chat gate (`AI_GATE_TERMS` in `lib/arxiv-index.js`) carries a small control-engineering
-  term group so trigger-scheduling questions actually retrieve the tranche.
+- The chat gate (`AI_GATE_TERMS` in `lib/arxiv-index.js`) carries a small term group per
+  tranche (control engineering; survivorship-free backtesting) so those questions actually
+  retrieve the tranche.
+
+Tranches so far:
+
+- **2026-07-17 · control engineering** (32 papers, eess.SY/math.OC) — trigger-scheduling canon;
+  `pdfs\REVIEW-2026-07-17-control-engineering.md`, analysis in
+  `docs/research/2026-07-17-control-engineering-tranche-analysis.md`.
+- **2026-07-18 · survivorship-free backtesting** (11 papers, q-fin.* + cs.AI + stat.ME) —
+  max-Sharpe/post-selection inference (Pav ×2, Benhamou), drawdown significance (Rej-Seager-
+  Bouchaud), the CFM long-history trend canon (1404.3274 + convexity/risk-premia companions),
+  hindsight best-stock benchmark, backtest-overfitting hypothesis testing;
+  `pdfs\REVIEW-2026-07-18-survivorship-backtest.md`, analysis in
+  `docs/research/2026-07-18-survivorship-backtest-tranche.md`.
 
 ## Wiring it into chat
 
