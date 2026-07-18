@@ -116,8 +116,9 @@ function resolveRole(provider, user) {
   let role = provider.mapRole(user) || "guest";
   // Defense in depth: a PROVIDER (a paid tier, a federated login) may NEVER resolve to
   // the operator `admin` role — that comes only from isAdminOverride above (or an
-  // explicit setUserRole). Cap any stray `admin` from a mapper down to the top paid role.
-  if (role === "admin") role = "deep_dreamer";
+  // explicit setUserRole). Cap any stray `admin` from a mapper down to the top PAID role
+  // (`pilot`, $200) — never admin, but don't skip the tier a paid patron earned.
+  if (role === "admin") role = "pilot";
   return roleLevel(role) >= 0 ? role : "guest";
 }
 

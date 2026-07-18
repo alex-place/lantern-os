@@ -1,0 +1,117 @@
+{
+  "file": "tight-band-2026-07-16.jsonl",
+  "ticks": 1711,
+  "segments": 1,
+  "durationHours": 2.85,
+  "marketsSeen": 92,
+  "note": "RMSE in cents vs recorded truth at every tick; moving = ticks where the true mid changed. baseline staleness is 0 by construction (it IS the recording).",
+  "policies": [
+    {
+      "policy": "baseline-every-tick",
+      "polls": 1711,
+      "pollShare": 1,
+      "avgIntervalSec": 6,
+      "rmseCents": 0.283,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 351.9
+    },
+    {
+      "policy": "fixed-every-2-ticks",
+      "polls": 856,
+      "pollShare": 0.5003,
+      "avgIntervalSec": 12,
+      "rmseCents": 0.347,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 176.1
+    },
+    {
+      "policy": "fixed-every-3-ticks",
+      "polls": 571,
+      "pollShare": 0.3337,
+      "avgIntervalSec": 18,
+      "rmseCents": 0.4,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 117.5
+    },
+    {
+      "policy": "fixed-every-5-ticks",
+      "polls": 343,
+      "pollShare": 0.2005,
+      "avgIntervalSec": 29.9,
+      "rmseCents": 0.487,
+      "rmseMovingCents": 2.702,
+      "maxErrCents": 21.5,
+      "estDiskMB": 70.6
+    },
+    {
+      "policy": "fixed-every-10-ticks",
+      "polls": 172,
+      "pollShare": 0.1005,
+      "avgIntervalSec": 59.7,
+      "rmseCents": 0.621,
+      "rmseMovingCents": 2.714,
+      "maxErrCents": 21.5,
+      "estDiskMB": 35.4
+    },
+    {
+      "policy": "adaptive-sigmaRef-0.01",
+      "polls": 1709,
+      "pollShare": 0.9988,
+      "avgIntervalSec": 6,
+      "rmseCents": 0.283,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 351.5,
+      "reasons": {
+        "hot": 1557,
+        "spike": 152
+      }
+    },
+    {
+      "policy": "adaptive-sigmaRef-0.02",
+      "polls": 1709,
+      "pollShare": 0.9988,
+      "avgIntervalSec": 6,
+      "rmseCents": 0.283,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 351.5,
+      "reasons": {
+        "hot": 1557,
+        "spike": 152
+      }
+    },
+    {
+      "policy": "adaptive-sigmaRef-0.04",
+      "polls": 1709,
+      "pollShare": 0.9988,
+      "avgIntervalSec": 6,
+      "rmseCents": 0.283,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 351.5,
+      "reasons": {
+        "hot": 1557,
+        "spike": 152
+      }
+    },
+    {
+      "policy": "adaptive-sigmaRef-0.08",
+      "polls": 1709,
+      "pollShare": 0.9988,
+      "avgIntervalSec": 6,
+      "rmseCents": 0.283,
+      "rmseMovingCents": 2.703,
+      "maxErrCents": 21.5,
+      "estDiskMB": 351.5,
+      "reasons": {
+        "hot": 1557,
+        "spike": 152
+      }
+    }
+  ],
+  "generatedAt": "2026-07-17T18:34:58.875Z"
+}

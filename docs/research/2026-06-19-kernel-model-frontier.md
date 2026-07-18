@@ -42,7 +42,7 @@ updated: 2026-06-21
 **Status:** Research-only. No serving code changed; no model selected. Recommends what to *bench*, not what to *ship*.
 **Grounding contract:** External Reality Rule — every model claim below carries a primary source (HF model card / vendor blog / arXiv). The prior report's `citeturn…` markers were ChatGPT rendering artifacts, **not citations**, and are treated as unsourced.
 
-Related canon: [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`OURO-LOOPLM.md`](../OURO-LOOPLM.md) · [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md) · [`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md)
+Related canon: [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · ``OURO-LOOPLM.md`` · [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md) · [`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md)
 
 ---
 
@@ -59,7 +59,7 @@ This note re-frames the question on the axis **Ouro's own paper uses — Gemma 3
 
 ## 1. The current kernel: Ouro LoopLM (what the external report omitted)
 
-**Paper:** *Scaling Latent Reasoning via Looped Language Models* — [arXiv:2510.25741](https://arxiv.org/abs/2510.25741) ([HF paper page](https://huggingface.co/papers/2510.25741)). PDF in repo: [`docs/research-papers/ouro-looped-llm-2510.25741.pdf`](../research-papers/ouro-looped-llm-2510.25741.pdf).
+**Paper:** *Scaling Latent Reasoning via Looped Language Models* — [arXiv:2510.25741](https://arxiv.org/abs/2510.25741) ([HF paper page](https://huggingface.co/papers/2510.25741)). PDF in repo: ``docs/research-papers/ouro-looped-llm-2510.25741.pdf``.
 
 **Mechanism (verified against the paper):** LoopLM reuses weight-tied layers **R times** in latent space (loop depth as a "third scaling axis"), with an **entropy-regularized objective for learned depth allocation** and **adaptive early-exit (Q-exit)**. Pre-trained to **7.7T tokens**. Core claim: the advantage is **knowledge *manipulation*, not knowledge *capacity*** — exactly the property a small grounded kernel wants (the KB supplies facts; the model reasons over them).
 
@@ -68,7 +68,7 @@ This note re-frames the question on the axis **Ouro's own paper uses — Gemma 3
 - **Ouro-2.6B** outperforms dense models up to **8B**: **80.46 on BBH**, surpassing **Qwen3-8B (77.65)** and **Llama-3.1-8B (71.56)**.
 - Net: 1.4B ≈ 4B-class, 2.6B ≈ 8B-class on reasoning (BBH, GSM8K, MATH500). The paper benchmarks against **Gemma 3 (1B/4B/12B)** and **Qwen3 (1.7B/4B/8B)** — that is the correct comparison axis for Lantern, **not** the 2024 models the external report listed.
 
-**What Lantern actually implements (from [`OURO-LOOPLM.md`](../OURO-LOOPLM.md)):**
+**What Lantern actually implements (from ``OURO-LOOPLM.md``):**
 - `Sigma0LoopLM` runs the paper's Q-exit policy (λ→survival→CDF→first-step ≥ q) on Ouro's pretrained weight-tied block + exit gate. We do **not** pretrain (that needs 7.7T tokens) — we activate adaptive inference the **stock checkpoint leaves off** (stock `generate()` runs fixed full depth).
 - **Two serving modes** (decided 2026-06-18, [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md)): **FAST** = stock `generate()` + `UniversalTransformerCache` + anti-repetition decode (product default, target <2 s); **DEEP** = native no-cache Q-exit loop (`OURO_NATIVE=1`, ~1 s/token, opt-in).
 - **Measured baseline** ([`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md), RTX 3070 8GB, `eval_keystone` golden set): `ouro-fast-merged-sdpa` = **80% (8/10) accuracy, 23.7 s avg latency** (`OURO_MERGE=1 OURO_ATTN=sdpa`, ~2.8× faster than the 65.8 s unmerged/eager row at equal accuracy). Persistent misses: #5 multi-step arithmetic, #6 primary-colors→RGB — small-model reasoning limits.
@@ -114,7 +114,7 @@ Every row verified against the HF model card / vendor blog. The external report'
 
 ## 3. Score on Lantern's OWN metrics, not MMLU
 
-Per the **Convergence Core Research Program** (Drive: *Instrumenting the Black Box — A Ten-Year Research Program*; repo PDFs [`Convergence-Core-Research-Program-v1.1.pdf`](../Convergence-Core-Research-Program-v1.1.pdf)) and [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md), Lantern grades a kernel on **whether it advances the single loop** (Observe→Remember→Reason→Act→Verify→Converge), not on leaderboard trivia. The kernel-relevant metrics:
+Per the **Convergence Core Research Program** (Drive: *Instrumenting the Black Box — A Ten-Year Research Program*; repo PDFs ``Convergence-Core-Research-Program-v1.1.pdf``) and [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md), Lantern grades a kernel on **whether it advances the single loop** (Observe→Remember→Reason→Act→Verify→Converge), not on leaderboard trivia. The kernel-relevant metrics:
 
 | Lantern metric | Loop stage | What it measures | Why a general benchmark misses it |
 |---|---|---|---|
@@ -176,4 +176,4 @@ LoopLM is one point in a **latent-reasoning** family; the kernel decision should
 - Llama 3.3 70B — [HF model card](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) · Llama 3.2 edge — [Meta blog](https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/)
 - **2026-06-21 frontier verification (primary):** Gemma 4 — [model card](https://ai.google.dev/gemma/docs/core/model_card_4) · [blog.google](https://blog.google/innovation-and-ai/technology/developers-tools/introducing-gemma-4-12b/) · Qwen3.5/3.6 — [QwenLM/Qwen3.6](https://github.com/QwenLM/Qwen3.6) · [CNBC](https://www.cnbc.com/2026/02/17/china-alibaba-qwen-ai-agent-latest-model.html) · Phi-4-mini still current — [Azure Phi](https://azure.microsoft.com/en-us/products/phi) · arXiv:2604.07035 = *Unified Deployment-Aware Evaluation of Open Reasoning Language Models* (Manik & Wang) — [arXiv](https://arxiv.org/abs/2604.07035)
 
-**Internal:** [`OURO-LOOPLM.md`](../OURO-LOOPLM.md) · [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md) · [`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md) · [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · [`lib/loop-reasoner.js`](../../apps/lantern-garage/lib/loop-reasoner.js)
+**Internal:** ``OURO-LOOPLM.md`` · [`SERVING-ARCHITECTURE-2026.md`](../SERVING-ARCHITECTURE-2026.md) · [`KEYSTONE-PRODUCT.md`](../KEYSTONE-PRODUCT.md) · [`RESEARCH-CANON.md`](../RESEARCH-CANON.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · [`lib/loop-reasoner.js`](../../apps/lantern-garage/lib/loop-reasoner.js)

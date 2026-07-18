@@ -1,0 +1,157 @@
+{
+  "issue": "#2692",
+  "claim": "freshness-law decomposition: selection value of an internal signal is set by its checkpoint-fixed bias, not its total error; re-drawn measurement noise cannot rescue a stuck bias",
+  "preregistered": {
+    "H-P1": "zero-bias corner >= 3x fixed-alone at n=50; value increases as error moves bias -> noise at fixed total",
+    "H-P2": "at fixed s_b=0.5 no s_m reaches 1.5x the s_m=0 corner"
+  },
+  "evidence_class": "MEASURED-by-simulation (shape, not constants)",
+  "baselines": {
+    "50": {
+      "fixed_alone": 0.612,
+      "fresh_alone": 12.901
+    },
+    "100": {
+      "fixed_alone": 1.982,
+      "fresh_alone": 18.138
+    },
+    "200": {
+      "fixed_alone": 7.503,
+      "fresh_alone": 25.427
+    }
+  },
+  "sweep_A_fixed_total": {
+    "50": {
+      "s_b=0.5,s_m=0.0": {
+        "best_w": 0.1,
+        "value": 0.811
+      },
+      "s_b=0.375,s_m=0.3307": {
+        "best_w": 0.25,
+        "value": 4.906
+      },
+      "s_b=0.25,s_m=0.433": {
+        "best_w": 0.25,
+        "value": 7.761
+      },
+      "s_b=0.125,s_m=0.4841": {
+        "best_w": 0.25,
+        "value": 8.982
+      },
+      "s_b=0.0,s_m=0.5": {
+        "best_w": 0.25,
+        "value": 9.357
+      }
+    },
+    "100": {
+      "s_b=0.5,s_m=0.0": {
+        "best_w": 0.0,
+        "value": 1.982
+      },
+      "s_b=0.375,s_m=0.3307": {
+        "best_w": 0.25,
+        "value": 6.803
+      },
+      "s_b=0.25,s_m=0.433": {
+        "best_w": 0.25,
+        "value": 10.15
+      },
+      "s_b=0.125,s_m=0.4841": {
+        "best_w": 0.25,
+        "value": 11.275
+      },
+      "s_b=0.0,s_m=0.5": {
+        "best_w": 0.25,
+        "value": 11.443
+      }
+    },
+    "200": {
+      "s_b=0.5,s_m=0.0": {
+        "best_w": 0.0,
+        "value": 7.503
+      },
+      "s_b=0.375,s_m=0.3307": {
+        "best_w": 0.1,
+        "value": 11.01
+      },
+      "s_b=0.25,s_m=0.433": {
+        "best_w": 0.1,
+        "value": 14.541
+      },
+      "s_b=0.125,s_m=0.4841": {
+        "best_w": 0.1,
+        "value": 16.528
+      },
+      "s_b=0.0,s_m=0.5": {
+        "best_w": 0.1,
+        "value": 17.162
+      }
+    }
+  },
+  "sweep_B_fixed_bias": {
+    "50": {
+      "0.0": {
+        "best_w": 0.1,
+        "value": 0.811
+      },
+      "0.25": {
+        "best_w": 0.25,
+        "value": 1.877
+      },
+      "0.5": {
+        "best_w": 0.25,
+        "value": 5.095
+      },
+      "1.0": {
+        "best_w": 0.1,
+        "value": 6.43
+      }
+    },
+    "100": {
+      "0.0": {
+        "best_w": 0.0,
+        "value": 1.982
+      },
+      "0.25": {
+        "best_w": 0.1,
+        "value": 3.246
+      },
+      "0.5": {
+        "best_w": 0.1,
+        "value": 6.528
+      },
+      "1.0": {
+        "best_w": 0.1,
+        "value": 9.719
+      }
+    }
+  },
+  "sweep_C_posthoc_dither": {
+    "50": {
+      "0.0": 0.636,
+      "0.05": 2.398,
+      "0.1": 6.024,
+      "0.2": 6.42,
+      "0.4": 4.159
+    },
+    "100": {
+      "0.0": 2.076,
+      "0.05": 7.244,
+      "0.1": 10.213,
+      "0.2": 7.674,
+      "0.4": 4.289
+    }
+  },
+  "verdicts": {
+    "H-P1_mechanism_confirmed": true,
+    "H-P1_detail": "n=50: zero-bias 9.36 vs all-bias 0.81 vs fixed-alone 0.61",
+    "H-P2_no_rescue": false,
+    "H-P2_detail": "n=50, s_b=0.5: s_m=0 -> 0.81; best rescue with s_m>0 -> 6.43 (7.93x) \u2014 KILL CONDITION FIRED",
+    "posthoc_dither_attribution": true,
+    "posthoc_detail": "zero-information dither alone reaches 6.42 (vs stochastic-signal rescue 6.43) \u2014 the rescue is de-ratcheting, not information",
+    "fresh_truth_still_dominates": true,
+    "ordering_n50": "fresh-alone 12.90 > zero-bias internal 9.36 > noise-rescued stuck bias 6.43 > deterministic 0.81 > fixed-alone 0.61"
+  },
+  "restated_law": "Selection error decomposes into a STUCK part (sets the ratchet) and a FRESH part (breaks it). Deterministic internal signals neither de-ratchet nor inform; stochastic internal signals de-ratchet but do not inform (zero-information dither reproduces their entire rescue); only re-drawn external truth does both \u2014 which is why fresh-alone still strictly dominates every internal arm.",
+  "sanity_ok": true
+}

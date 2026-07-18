@@ -315,16 +315,6 @@ test.describe("Dream Chat — local command routing", () => {
     expect(await page.evaluate(() => window.__convRequests.length)).toBe(0);
   });
 
-  test("!explore leaves chat for the Three Doors game route", async ({ page }) => {
-    // The command sets location.href to /three-doors-game.html. That page is not
-    // in auth-gate's PUBLIC list, so a guest is bounced on to /auth.html — either
-    // destination proves the command fired the redirect away from chat.
-    await page.goto(PAGE);
-    await page.fill("#input", "!explore");
-    await page.click("#send-btn");
-    await page.waitForURL(/three-doors-game\.html|auth\.html/, { timeout: 8000 });
-    expect(page.url()).toMatch(/three-doors-game\.html|auth\.html/);
-  });
 });
 
 test.describe("Dream Chat — settings, sessions, new chat", () => {

@@ -147,11 +147,17 @@ if CHECKPOINT_FILE:
 else:
     resume_arg = []
 
+# Ensure real SFT data exists — models/lantern-sigma0-coder/training-data.jsonl was never
+# in the repo. Prep from open datasets (the studio has egress) if absent.
+data_path = os.environ.get("OURO_TRAIN_DATA", "data/eval/distill.jsonl")
+if not os.path.exists(data_path):
+    subprocess.run([sys.executable, "scripts/eb_prep_corpus.py", "--allow-download",
+                    "--distill-n", "2000", "--rlvr-n", "1000"], check=True)
 train_env = {{**os.environ, "HF_HOME": "/tmp/hf-cache"}}
 subprocess.run(
     [sys.executable, "scripts/train-qlora-ouro.py",
      "--base", "ByteDance/Ouro-1.4B",
-     "--data", "models/lantern-sigma0-coder/training-data.jsonl",
+     "--data", data_path,
      "--out", "/tmp/output",
      "--max-steps", str(STEPS),
      "--seq", "1536",

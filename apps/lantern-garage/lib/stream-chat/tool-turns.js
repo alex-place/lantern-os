@@ -33,8 +33,11 @@ function anthropicToolTurn({ anthropicKey, model, system, messages, tools, maxTo
       headers,
     }, (upstream) => {
       if (upstream.statusCode !== 200) {
-        upstream.resume();
-        reject(new Error(`anthropic_status_${upstream.statusCode}`));
+        // Keep the provider's own reason (#2531 pattern) — a bare status hides
+        // actionable errors like unsupported params or a bad model name.
+        let ebody = "";
+        upstream.on("data", (c) => { if (ebody.length < 300) ebody += c.toString(); });
+        upstream.on("end", () => reject(new Error(`anthropic_status_${upstream.statusCode} [tool-turn]: ${ebody.slice(0, 200)}`)));
         return;
       }
       const blocks = [];      // index → { type:"text", text } | { type:"tool_use", id, name, jsonbuf }
@@ -113,7 +116,14 @@ function openaiCompatibleToolTurn({ host, path, apiKey, model, messages, tools, 
       agent: llmAgent, hostname: host, path: reqPath, method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}`, "Content-Length": Buffer.byteLength(payload) },
     }, (upstream) => {
-      if (upstream.statusCode !== 200) { upstream.resume(); reject(new Error(`${errTag}_status_${upstream.statusCode}`)); return; }
+      if (upstream.statusCode !== 200) {
+        // Keep the provider's own reason (#2531): a bare status hid grok's
+        // "does not support parameter frequencyPenalty" for weeks.
+        let ebody = "";
+        upstream.on("data", (c) => { if (ebody.length < 300) ebody += c.toString(); });
+        upstream.on("end", () => reject(new Error(`${errTag}_status_${upstream.statusCode} [tool-turn]: ${ebody.slice(0, 200)}`)));
+        return;
+      }
       let buf = "", text = "", finishReason = null;
       const calls = []; // index → { id, name, args }
       upstream.on("data", (chunk) => {

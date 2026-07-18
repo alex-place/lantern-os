@@ -215,7 +215,8 @@ Key runtime components:
 | Module | Responsibility |
 |--------|----------------|
 | `kalshi-api.js` | Kalshi REST client (auth, order placement, market data) |
-| `kalshi-collector.js` | 6s polling loop; 429 backoff with `Retry-After`; exposes `getStatus()` |
+| `kalshi-collector.js` | 6s polling loop (setTimeout chain); 429 backoff with `Retry-After`; exposes `getStatus()`. `KALSHI_ADAPTIVE_POLL=1` swaps the fixed clock for send-on-delta cadence (`kalshi-adaptive-poll.js`) |
+| `kalshi-adaptive-poll.js` | Pure send-on-delta scheduler: next poll delay = β/σ²ₘₐₓ from measured per-market variance (floor 6s, cap 60s, idle/spike handling); arXiv:1707.02531/1609.07534 |
 | `kalshi-suggest.js` | Tight-band entry suggestion engine |
 | `convergence-router.js` | Deterministic routing cache — 120 unisona.ai routes, >70% hit rate |
 | `trading-history-logger.js` | Trade/signal history JSONL persistence |
@@ -257,7 +258,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 - `PATREON_CLIENT_ID`, `PATREON_CLIENT_SECRET`, `PATREON_CAMPAIGN_ID`, `PATREON_REDIRECT_URI`, `SESSION_SECRET`
 - See **[PATREON-OAUTH.md](docs/PATREON-OAUTH.md)** for full setup guide
 - When configured, unauthenticated users redirect to `/auth.html` login page
-- Patreon tiers map to roles (guest → supporter → founder → admin)
+- Patreon tiers map to roles by pledge amount. Sold ladder: **Free** (`guest`/`supporter`) → **$20 Pro** (`deep_dreamer`) → **$200 Pilot** (`pilot`); `admin` is staff-only (`LANTERN_ADMIN_IDS`), never purchasable. The retired **$5 Member** tier still maps `$5 → supporter` for legacy patrons, but `supporter` now sits at the Free floor — see [PATREON-OAUTH.md](docs/PATREON-OAUTH.md) and `lib/plan-matrix.js`.
 
 `pytest.ini` sets `pythonpath = apps src` so tests can import from both trees without install.
 

@@ -163,7 +163,7 @@ const deps = {
 // non-entitled account (e.g. Deep Dreamer/founder without trade access) cannot
 // reach /api/trading/* directly. Runs before routes/trading. Admins and the
 // local bypass pass through (see auth-middleware.requireEntitlement).
-const { requireEntitlement, isAdmin } = require("./lib/auth-middleware");
+const { requireEntitlement, isAdmin, requireAuth, requireRole } = require("./lib/auth-middleware");
 // Read-only market-data GETs with NO account/order state — served to everyone so
 // the logged-out chart view (guest-mode stock-trader.html) renders from the exact
 // same endpoints the live terminal uses (a true 1:1 copy, no duplicated data
@@ -180,10 +180,19 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/symbol-info",       // name/exchange/asset_class
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
+  "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
 ]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
   if (req.method === "GET" && PUBLIC_TRADING_READS.has(url.pathname)) return false; // public read → fall through
+  // Champion demo showroom (read-only): positions + portfolio-history with
+  // ?demo=champion serve a SIMULATED account (lib/champion-demo) so logged-out /
+  // non-entitled visitors see a filled dashboard + trader instead of an empty,
+  // gated shell. The param is what the pages request for guests; the real,
+  // broker-backed paths (no param) stay trade-gated, so no real account leaks.
+  if (req.method === "GET" &&
+      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history") &&
+      url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.
   // (The list is the shared server watchlist.) #guest-watchlist
@@ -224,31 +233,84 @@ function orchestrationControlGuard(req, res, url) {
   return true;                                      // blocked
 }
 
-// ── Autonomous AI-trader gate ($200 Synthesasia Guild tier / admin) ──────────
-// The $20 Deep Dreamer tier unlocks manual trading + AI *suggestions* (the whole
-// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the
-// system records/executes trades on the user's behalf — is a $200 capability, so
-// its execution endpoint requires admin (the $200 Synthesasia Guild role; the
-// a dev/test session via test-auth passes, keeping the server-side autonomous loop
-// working). Runs after tradeApiGuard, so $20 users are already past the trade gate
-// and only get stopped here for autonomous execution.
-const AI_TRADER_ADMIN = {
-  "/api/trading/ai-trader/trades": "POST", // record/execute an autonomous trade
+// ── Autonomous AI-trader gate ($200 Pilot tier / admin) ──────────────────────
+// The $20 Pro tier (deep_dreamer) unlocks manual trading + AI *suggestions* (the whole
+// /api/trading/* surface, via tradeApiGuard). The AUTONOMOUS AI trader — where the system
+// STARTS/STOPS the scanner and RECORDS/EXECUTES trades on the user's behalf — is a $200
+// Pilot capability, gated on the `ai_trader` entitlement (granted at role `pilot`+; admin
+// passes implicitly). Runs AFTER tradeApiGuard, so Pro users are already past the trade
+// gate and are only stopped here for autonomous CONTROL. (Previously only the cosmetic
+// `/trades` log-write was gated — the real scanner-control endpoints were reachable by any
+// $20 user; this closes that.) Read-only AI-trader status (GET signals/status/watchlist/
+// zones) intentionally stays at the Pro trade tier — only the control/execution POSTs here
+// require Pilot.
+const AI_TRADER_GATED = {
+  "/api/trading/ai-trader/scanner/start": "POST",    // resume autonomous execution
+  "/api/trading/ai-trader/scanner/stop": "POST",     // pause autonomous execution
+  "/api/trading/ai-trader/signals/generate": "POST", // trigger a live market scan
+  "/api/trading/ai-trader/trades": "POST",           // record/execute an autonomous trade
 };
 function aiTraderGuard(req, res, url) {
-  const rule = AI_TRADER_ADMIN[url.pathname];
-  if (!rule || rule !== req.method) return false;   // not a gated autonomous op → continue
-  if (isAdmin(req)) return false;                    // $200 tier / local owner → allow
-  res.writeHead(403, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ error: "tier_required", detail: "The autonomous AI trader requires the $200 tier." }));
-  return true;                                        // blocked
+  const rule = AI_TRADER_GATED[url.pathname];
+  if (!rule || rule !== req.method) return false;         // not a gated autonomous op → continue
+  if (requireEntitlement(req, res, "ai_trader")) return false; // Pilot ($200) / admin → allow
+  return true;                                            // blocked → 403/302 already sent
+}
+
+// ── Premium feature gate (subscription-tier enforcement) ─────────────────────
+// Default-DENY for the premium API prefixes. The app historically registered every
+// /api/* route "open" and relied on three narrow guards (trade / ai-trader /
+// orchestration) plus PAGE-level gating; the premium DATA plane (Creator Suite,
+// image/vision/document generation, wide research, Alpaca broker connect, file ingest)
+// had NO server-side gate, so the paywall lived only in the UI and the endpoints were
+// reachable by a plain guest — or, on the 0.0.0.0 cloud deploy, an unauthenticated
+// caller. This guard enforces the subscription tier server-side, matching the tier map:
+//   • Pro ($20, deep_dreamer+ → "pro"): Creator Suite, image/vision/document generation,
+//     wide research. (Free callers of the shared image/vision endpoints — the guest-open
+//     Three Doors game, the issue reporter — degrade GRACEFULLY: they fall back to free
+//     Pollinations art / text-only, verified in three-doors-images.js + issue-reporter.js.)
+//   • Pro ($20 → "trade"): Alpaca broker connect (mirrors IBKR, which rides tradeApiGuard).
+//   • Signed-in (Free+ → requireAuth): file upload/extract — closes the anonymous
+//     key-spend / disk-fill / RAG-poisoning hole while keeping the chat file-attach free.
+//   • Admin: /api/code/apply — writes arbitrary repo files; must never be public.
+// Runs before the route modules. requireEntitlement/requireAuth/requireRole already send
+// the 403/302, so a blocked request returns true (handled) and never reaches the handler.
+const PREMIUM_PRO_PREFIXES = [
+  "/api/creator/", "/api/creator-entries", "/api/image/", "/api/vision/",
+  "/api/research/wide-search",
+];
+function premiumApiGuard(req, res, url) {
+  const p = url.pathname;
+  // Critical: arbitrary repo-file write was unauthenticated — admin only.
+  if (p === "/api/code/apply") {
+    return requireRole(req, res, "admin") ? false : true;
+  }
+  // Pro content features ($20+).
+  if (
+    p === "/api/document/generate" ||
+    p === "/api/dreamer/upload" ||
+    PREMIUM_PRO_PREFIXES.some((pre) => p === pre || p.startsWith(pre))
+  ) {
+    return requireEntitlement(req, res, "pro") ? false : true;
+  }
+  // Alpaca broker connect → same trade gate as IBKR ($20 Pro+).
+  if (p.startsWith("/api/broker/alpaca/")) {
+    return requireEntitlement(req, res, "trade") ? false : true;
+  }
+  // File upload/extract → any signed-in account (Free+); blocks anonymous callers.
+  if (p.startsWith("/api/files/")) {
+    return requireAuth(req, res) ? false : true;
+  }
+  return false; // not a premium path → continue
 }
 
 const routes = [
   tradeApiGuard,                        // gate /api/trading/* by "trade" entitlement ($20+)
-  aiTraderGuard,                        // gate autonomous AI-trader execution to $200/admin
+  aiTraderGuard,                        // gate autonomous AI-trader control/execution to Pilot ($200)/admin
   orchestrationControlGuard,            // gate orchestration control endpoints to admin
+  premiumApiGuard,                      // gate premium data plane (creator/image/vision/doc/wide-search/alpaca/files/code-apply) by tier
   require("./routes/v1"),               // OpenAI-compatible /v1/chat/completions shim (before auth: API clients use bearer keys, not sessions)
+  require("./routes/billing"),          // Stripe subscription billing (checkout/portal/webhook); webhook must stay ungated — Stripe posts with no session (#2568)
   require("./routes/auth"),             // Patreon OAuth + session
   require("./routes/pages"),            // Protected pages with server-side role checking (no flicker)
   require("./routes/profiles"),         // User profiles + role configuration (CSF-backed)
@@ -269,6 +331,7 @@ const routes = [
   require("./routes/rollover"), // #898: unisona.ai-vs-Claude landed-work share
   require("./routes/image"),
   require("./routes/web-images"),
+  require("./routes/web-search"),      // GET /api/web-search — real web-search over HTTP (#2506)
   require("./routes/youtube"),
   require("./routes/github-activity"), // Explore: latest releases + commits (cached)
   require("./routes/github-issue"),    // Chat screenshot reporter → files a GitHub issue
@@ -276,7 +339,6 @@ const routes = [
   require("./routes/explore"),         // Explore: single-pane PCSF-ranked feed + interaction logging (#1211)
   require("./routes/convergence-dispatch"),
   require("./routes/metrics"),          // #1411: outcome metrics (verified-patch / honesty / route-quality)
-  require("./routes/doors"),            // Three Doors: canon + journey + Σ₀ turns (1.8.18)
   require("./routes/factcheck"),        // #1430: personal fact-check button
   require("./routes/drift"),            // #1428: drift-canary observability
   require("./routes/replay"),           // #1419: convergence replay / time-travel debugger
@@ -346,7 +408,11 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
+    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
+    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
+    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
+    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
@@ -637,6 +703,9 @@ function shutdown(signal) {
   if (deps.newsCollector) {
     deps.newsCollector.stop();
   }
+  if (deps.brakeMonitor) {
+    deps.brakeMonitor.stop();
+  }
   prWatcher.stop();
   server.close(() => {
     process.exit(0);
@@ -653,6 +722,7 @@ function reapChildren() {
   try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
   try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }
   try { if (deps.newsCollector) deps.newsCollector.stop(); } catch { /* best-effort */ }
+  try { if (deps.brakeMonitor) deps.brakeMonitor.stop(); } catch { /* best-effort */ }
 }
 
 // #2066: without these, a throw in any background loop/child-spawn (collectors,
@@ -784,6 +854,23 @@ server.listen(port, host, () => {
     kalshiCollector.start();
     deps.kalshiCollector = kalshiCollector; // Make available to routes
 
+    // ── ADR-0028 streaming brake monitor (60s, PAPER ONLY — places nothing) ──
+    // Intraday risk monitoring for the Phase-2 leverage overlay: vol targeting ×
+    // 6-mo trend gate × drawdown taper, gross clamped [0, 2×]. Kill switch:
+    // BRAKE_MONITOR=0. Status streams at GET /api/trading/brake/status.
+    const brakeMonitor = require("./lib/brake-monitor");
+    brakeMonitor.start();
+    deps.brakeMonitor = brakeMonitor;
+
+    // ── Sigma Trader schedule (ADR-0028) — the long-horizon allocation book on its
+    // OWN account. Rebalances on drift + reacts to the brake's gross, market-hours
+    // only. Off by default; opt in with SIGMA_SCHEDULE=1. Places nothing unless also
+    // armed (SIGMA_ARM=1) with a dedicated Sigma account (SIGMA_ALPACA_*). Fully
+    // independent of the day-trader — separate engine, separate account.
+    const sigmaScheduler = require("./lib/sigma-scheduler");
+    sigmaScheduler.start();
+    deps.sigmaScheduler = sigmaScheduler;
+
     // ── Crypto Price & News Collector (30s polling) ──
     const CryptoCollector = require("./lib/crypto-collector");
     const cryptoCollector = new CryptoCollector();
@@ -795,6 +882,12 @@ server.listen(port, host, () => {
     const newsCollector = new NewsCollector();
     newsCollector.start(300000); // 5-min interval
     deps.newsCollector = newsCollector; // Make available to routes
+
+    // ── Weekly Level-1 traction rollup (#2547) ──
+    // Appends ONE weekly_rollup event per ISO week to data/traction/events.jsonl
+    // (actives · paying · M1 retention, all MEASURED). Checks on boot + daily;
+    // same-week re-runs no-op, so restarts can't double-append.
+    require("./lib/active-user-metric").startWeeklyRollupScheduler();
 
     // ── Kalshi Position Monitor (10s polling) ──
     const { startMonitoring } = require("./lib/kalshi-position-monitor");

@@ -46,8 +46,13 @@ function generatePkce() {
 // restart). We also carry {state, verifier, return_to, redirect_uri, provider} in a
 // signed, short-TTL HttpOnly cookie (SameSite=Lax) and recover from it on callback.
 const OAUTH_COOKIE = "lantern_oauth";
+const { resolveSessionSecret } = require("./session-secret");
 function _oauthSecret() {
-  return process.env.SESSION_SECRET || "lantern-oauth-secret";
+  // Sign the OAuth state cookie with the SAME fail-closed secret as the session
+  // (#2619): never a hardcoded literal. resolveSessionSecret returns the committed
+  // dev default only on loopback; beyond loopback a real SESSION_SECRET is required
+  // (and server.js already enforces it at boot, so this can't throw mid-flow there).
+  return resolveSessionSecret();
 }
 function signOauth(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");

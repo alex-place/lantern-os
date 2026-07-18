@@ -16,6 +16,16 @@
   <!-- Restore the opt-in Terminal (CRT) skin before paint, to avoid a flash of the default theme. -->
   <script>(function(){try{if(localStorage.getItem('keystone-skin')==='terminal')document.documentElement.setAttribute('data-skin','terminal');}catch(e){}})();</script>
   <title>Dream Chat — unisona.ai</title>
+  <!-- Social share (#2533) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="unisona.ai">
+  <meta property="og:title" content="unisona.ai Chat — one assistant, real tools">
+  <meta property="og:description" content="A persistent, local-first AI operator console — one assistant that remembers, reasons, acts, and verifies.">
+  <meta property="og:image" content="https://www.unisona.ai/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
 
 <style>
   /* Patreon auth gate */
@@ -137,7 +147,11 @@
     padding: 9px 11px; border-radius: 10px; cursor: pointer;
     font-size: 13.5px; color: var(--text); line-height: 1.2;
   }
-  .mp-item:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .mp-item:hover,
+  .mp-item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  /* Keyboard focus is on the listbox; the active option shows a clear ring (#2475). */
+  .mp-item.active { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .model-picker-menu:focus-visible { outline: none; }
   .mp-item .mp-item-emoji { width: 18px; text-align: center; flex-shrink: 0; }
   .mp-item .mp-item-name { flex: 1; }
   .mp-item .mp-check { color: var(--accent); opacity: 0; }
@@ -218,61 +232,10 @@
 
   </div><!-- /.app-main -->
 
-  <!-- Observer side panel (hidden by default for simplicity) -->
-  <aside class="observer-panel collapsed hidden" id="observer-panel" style="display:none">
-    <div class="observer-panel-header">
-      <span class="observer-panel-title">◈ Observer</span>
-      <button class="observer-panel-close" onclick="toggleObserver()" aria-label="Close observer panel" title="Close">×</button>
-    </div>
-    <div class="observer-panel-body">
-      <div>
-        <div class="obs-section-title">Mood Arc</div>
-        <div class="obs-value" id="obs-mood-arc">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-mood-fill" style="width:50%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Recurring Symbols</div>
-        <div class="obs-symbol-list" id="obs-symbols">—</div>
-      </div>
-      <div>
-        <div class="obs-section-title">Last Delta</div>
-        <div class="obs-value" id="obs-last-delta">—</div>
-      </div>
-      <div>
-        <div class="obs-section-title">Convergence</div>
-        <div class="obs-value" id="obs-convergence">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-conv-fill" style="width:0%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Loop Depth (Σ₀)</div>
-        <div class="obs-value" id="obs-loop-depth" style="font-family:'IBM Plex Mono',monospace;font-size:11px">⟳ — loops · — conf</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-fill" style="width:0%;background:var(--accent)"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Loop Records (Σ₀)</div>
-        <div class="obs-value" id="obs-loop-records" title="ConvergenceRecords emitted by chat replies (Reason→Act)">—</div>
-        <div class="obs-arc-bar"><div class="obs-arc-fill" id="obs-loop-records-fill" style="width:0%"></div></div>
-      </div>
-      <div>
-        <div class="obs-section-title">Dilation Ratio</div>
-        <div class="obs-value" id="obs-dilation">1.0×</div>
-      </div>
-      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
-      <div>
-        <div class="obs-section-title">Current Priorities</div>
-        <div id="priorities-panel">
-          <div style="font-size:11px;color:var(--muted)">Loading…</div>
-        </div>
-      </div>
-    </div>
-  </aside>
-</div>
-
-<!-- Performance Monitor -->
-<div class="perf-monitor" id="perf-monitor" style="display:none">
-  <div class="perf-row"><span class="perf-label">Tokens:</span><span class="perf-value" id="perf-tokens">0</span></div>
-  <div class="perf-row"><span class="perf-label">Cost:</span><span class="perf-value" id="perf-cost">$0</span></div>
-  <div class="perf-row"><span class="perf-label">Latency:</span><span class="perf-value" id="perf-latency">0ms</span></div>
+  <!-- The Observer side panel and the Performance Monitor were removed (#2476):
+       both were permanently hidden with no working opener (markup for their
+       toggles was cut earlier), so the JS that fed them polled/computed into
+       dead DOM. Their writers in dream-chat.js are null-guarded no-ops. -->
 </div>
 
 <!-- Settings (provider pick + API keys) moved to Profile → Orchestrator (#1904);
@@ -335,9 +298,11 @@
    */
   const LANTERN_ROLES = {
     guest:        { label: "Guest",        canChat: true,  dailyMessages: 10,  modelAccess: ["public"] }, // #739: limited guest chat (no account)
-    supporter:    { label: "Supporter",    canChat: true,  dailyMessages: 50,  modelAccess: ["keystone", "openai"] },
-    deep_dreamer: { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
-    founder:      { label: "Deep Dreamer", canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    supporter:    { label: "Free",         canChat: true,  dailyMessages: 100, modelAccess: ["keystone", "openai"] }, // legacy Member, grandfathered 100/day (matches chat-quota)
+    deep_dreamer: { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] },
+    founder:      { label: "Pro",          canChat: true,  dailyMessages: 250, modelAccess: ["keystone", "openai", "claude"] }, // legacy alias (#698)
+    pilot:        { label: "Pilot",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }, // #2633: $200 Pilot is unlimited, not "Guest · 10/day"
+    tech_support: { label: "Staff",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] },
     admin:        { label: "Admin",        canChat: true,  dailyMessages: -1,  modelAccess: ["all"] }
   };
 
@@ -472,10 +437,63 @@
 </script>
 
 <script src="js/voice-dictation.js?v=20260630-voice"></script>
-<script src="js/dream-chat.js?v=20260630-cap4"></script>
+<script src="js/dream-chat.js?v=20260716-dead-surfaces"></script>
+<script>
+/* ── PMF fit-check (#2551) — shown ONCE, only to composite-active users. ─────
+   GET /api/pmf/survey is the single gate: the server records pmf_prompted and
+   answers show:true exactly once per eligible user, so this client stays dumb —
+   no localStorage heuristics that could double-prompt across devices. */
+(function pmfSurvey() {
+  setTimeout(async () => {
+    let sv;
+    try { sv = await fetch('/api/pmf/survey').then((r) => r.json()); } catch { return; }
+    if (!sv || !sv.show) return;
+    const card = document.createElement('div');
+    card.id = 'pmf-card';
+    card.setAttribute('role', 'dialog');
+    card.setAttribute('aria-label', 'One quick question');
+    card.style.cssText = 'position:fixed;right:18px;bottom:84px;z-index:1200;max-width:340px;'
+      + 'background:var(--surface,#111827);border:1px solid var(--border,#1f2937);border-radius:14px;'
+      + 'padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.4);font-size:14px;color:var(--text,#f3f4f6)';
+    const FEELS = [
+      ['very_disappointed', 'Very disappointed'],
+      ['somewhat_disappointed', 'Somewhat disappointed'],
+      ['not_disappointed', 'Not disappointed'],
+    ];
+    card.innerHTML = '<div style="font-weight:700;margin-bottom:4px">One quick question</div>'
+      + '<div style="margin-bottom:10px">' + sv.question + '</div>'
+      + FEELS.map(([v, l]) => '<button type="button" data-feel="' + v + '" style="display:block;width:100%;margin:6px 0;'
+        + 'padding:9px 12px;border-radius:10px;border:1px solid var(--border,#1f2937);background:none;'
+        + 'color:inherit;cursor:pointer;text-align:left">' + l + '</button>').join('')
+      + '<textarea id="pmf-benefit" placeholder="Optional: the main benefit you get / what you would use instead" rows="2" '
+      + 'style="display:none;width:100%;margin-top:8px;border-radius:8px;border:1px solid var(--border,#1f2937);'
+      + 'background:none;color:inherit;padding:8px;font:inherit"></textarea>'
+      + '<button type="button" id="pmf-close" aria-label="Dismiss" '
+      + 'style="position:absolute;top:8px;right:10px;border:none;background:none;color:var(--muted,#9ca3af);cursor:pointer;font-size:15px">✕</button>';
+    document.body.appendChild(card);
+    let chosen = null;
+    card.querySelector('#pmf-close').addEventListener('click', () => card.remove());
+    card.querySelectorAll('[data-feel]').forEach((b) => b.addEventListener('click', async () => {
+      if (!chosen) {
+        chosen = b.dataset.feel;
+        card.querySelectorAll('[data-feel]').forEach((x) => { x.style.opacity = x === b ? '1' : '.4'; x.style.borderColor = x === b ? 'var(--accent,#06b6d4)' : ''; });
+        const ta = card.querySelector('#pmf-benefit');
+        ta.style.display = 'block';
+        b.textContent = '✓ ' + b.textContent + ' — click again to send';
+        return;
+      }
+      if (b.dataset.feel !== chosen) return;
+      const benefit = card.querySelector('#pmf-benefit').value;
+      try { await fetch('/api/pmf/response', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ feeling: chosen, benefit }) }); } catch {}
+      card.innerHTML = '<div style="font-weight:700">Thank you 🙏</div><div style="color:var(--muted,#9ca3af);margin-top:4px">Your answer shapes what gets built next.</div>';
+      setTimeout(() => card.remove(), 3500);
+    }));
+  }, 4000); // let the chat settle first — the survey must never beat the product to the screen
+})();
+</script>
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/terminal-skin.js?v=20260630-terminal"></script>
-<script src="/js/dream-chat-ui.js?v=20260703-feedback"></script>
+<script src="/js/dream-chat-ui.js?v=20260716-dead-surfaces"></script>
 <script src="/vendor/html2canvas/html2canvas.min.js"></script>
 <script src="/js/issue-reporter.js?v=20260628f-autoattach"></script>
 <script src="js/convergance-sync.js"></script>
@@ -522,43 +540,111 @@
     _toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2400);
   }
 
+  // The listbox itself takes focus while open; the active option is tracked with
+  // aria-activedescendant (WAI-ARIA listbox pattern) so keyboard + SR users can drive
+  // it (#2475). Options carry a stable id (mp-opt-<option index>) for the reference.
+  menu.tabIndex = -1;
+  let activeId = null;
+
+  const enabledItems = () => [...menu.querySelectorAll('.mp-item:not(.disabled)')];
+
+  function setActive(item) {
+    menu.querySelectorAll('.mp-item.active').forEach((el) => el.classList.remove('active'));
+    if (item) {
+      item.classList.add('active');
+      activeId = item.id;
+      menu.setAttribute('aria-activedescendant', item.id);
+      item.scrollIntoView({ block: 'nearest' });
+    } else {
+      activeId = null;
+      menu.removeAttribute('aria-activedescendant');
+    }
+  }
+
+  function pick(opt) {
+    select.value = opt.value;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    syncLabel(); close();
+    flashPicked(opt.textContent.trim());
+    btn.focus(); // return focus to the trigger, per the listbox pattern
+  }
+
   function buildMenu() {
     menu.innerHTML = '';
-    [...select.options].forEach((opt) => {
+    [...select.options].forEach((opt, i) => {
       const item = document.createElement('div');
       item.className = 'mp-item'
         + (opt.selected ? ' selected' : '')
         + (opt.disabled ? ' disabled' : '');
+      item.id = 'mp-opt-' + i;
       item.setAttribute('role', 'option');
       item.setAttribute('aria-selected', String(opt.selected));
+      if (opt.disabled) item.setAttribute('aria-disabled', 'true');
       item.innerHTML = `<span class="mp-item-emoji">${emojiFor(opt.value)}</span>`
         + `<span class="mp-item-name"></span>`
         + (opt.disabled ? `<span class="mp-lock">🔒 upgrade</span>` : `<span class="mp-check">✓</span>`);
       item.querySelector('.mp-item-name').textContent = opt.textContent.trim();
       if (!opt.disabled) {
-        item.addEventListener('click', () => {
-          select.value = opt.value;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          syncLabel(); buildMenu(); close();
-          flashPicked(opt.textContent.trim());
-        });
+        item.addEventListener('click', () => pick(opt));
       }
       menu.appendChild(item);
     });
   }
 
-  function open()  { picker.classList.add('open');  btn.setAttribute('aria-expanded', 'true');  buildMenu(); }
-  function close() { picker.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); }
+  // Point the active descendant at the selected option (or the first enabled one).
+  function resetActive() {
+    const sel = menu.querySelector('.mp-item.selected:not(.disabled)') || enabledItems()[0];
+    setActive(sel || null);
+  }
+
+  function moveActive(dir) {
+    const items = enabledItems();
+    if (!items.length) return;
+    let idx = items.findIndex((el) => el.id === activeId);
+    if (idx === -1) idx = dir > 0 ? -1 : 0;
+    idx = (idx + dir + items.length) % items.length;
+    setActive(items[idx]);
+  }
+
+  function open()  { picker.classList.add('open');  btn.setAttribute('aria-expanded', 'true');  buildMenu(); menu.focus(); resetActive(); }
+  function close() { picker.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); setActive(null); }
   function toggle(){ picker.classList.contains('open') ? close() : open(); }
 
   btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+  // Open with Down/Up from the (focused) trigger button; native button click already
+  // handles Enter/Space → toggle.
+  btn.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!picker.classList.contains('open')) open();
+      else moveActive(e.key === 'ArrowDown' ? 1 : -1);
+    }
+  });
+
+  menu.addEventListener('keydown', (e) => {
+    switch (e.key) {
+      case 'ArrowDown': e.preventDefault(); moveActive(1); break;
+      case 'ArrowUp':   e.preventDefault(); moveActive(-1); break;
+      case 'Home':      e.preventDefault(); setActive(enabledItems()[0]); break;
+      case 'End':       e.preventDefault(); { const it = enabledItems(); setActive(it[it.length - 1]); } break;
+      case 'Enter':
+      case ' ': {
+        e.preventDefault();
+        const cur = activeId && document.getElementById(activeId);
+        if (cur) { const idx = parseInt(cur.id.slice('mp-opt-'.length), 10); pick(select.options[idx]); }
+        break;
+      }
+      case 'Escape': e.preventDefault(); close(); btn.focus(); break;
+      case 'Tab': close(); break;
+    }
+  });
+
   document.addEventListener('click', (e) => { if (!picker.contains(e.target)) close(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
 
   // Keep the button label + (open) menu in sync when the select is repopulated or
   // re-gated by dream-chat-ui.js, or changed programmatically (?provider= handoff).
-  select.addEventListener('change', () => { syncLabel(); if (picker.classList.contains('open')) buildMenu(); });
-  new MutationObserver(() => { syncLabel(); if (picker.classList.contains('open')) buildMenu(); })
+  select.addEventListener('change', () => { syncLabel(); if (picker.classList.contains('open')) { buildMenu(); resetActive(); } });
+  new MutationObserver(() => { syncLabel(); if (picker.classList.contains('open')) { buildMenu(); resetActive(); } })
     .observe(select, { childList: true, subtree: true, attributes: true });
 
   syncLabel();

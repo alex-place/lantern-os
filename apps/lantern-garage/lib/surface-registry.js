@@ -55,10 +55,11 @@ const CORE = {
 // { surface: [module, flag|null] }
 const EXTENSION = {
   // trading terminal cluster
-  "trading.html":                  ["trading", "TRADING_ENABLED"],
+  // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
+  "demo.html":                     ["trading", "TRADING_ENABLED"], // public read-only demo-account spectator (#2548)
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
@@ -66,8 +67,6 @@ const EXTENSION = {
   "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
-  // game — playable surface beside the loop (linked from Explore as a game card)
-  "three-doors-game.html":         ["game", "GAMES_ENABLED"],
   // account / auth / billing
   "auth.html":                     ["account", null],
   "terms.html":                    ["account", null],
@@ -76,8 +75,9 @@ const EXTENSION = {
   "accounts.html":                 ["account", null], // staff account-support console (admin/tech_support): multi-auth + password fixes
   "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],
-  "upgrade-lab.html":              ["account", null],
-  "api-keys-settings.html":        ["account", null],
+  // upgrade-lab.html retired (#2473) — 302s to /pricing.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
+  // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
+  "settings.html":                 ["account", null], // tabbed settings: API keys + connectors + context modes
   // project meta
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
@@ -100,6 +100,7 @@ const SUBSYSTEMS = {
   "discord-bot":      { tier: "extension", module: "community", entry: "src/discord_lounge_bot/bot_v2.py",         flag: "DISCORD_BOT_TOKEN" },
   "news-collector":   { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/news-collector.js",   flag: "TRADING_ENABLED" },
   "kalshi-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/kalshi-collector.js", flag: "TRADING_ENABLED" },
+  "brake-monitor":    { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/brake-monitor.js",    flag: "BRAKE_MONITOR" },
   "crypto-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/crypto-collector.js", flag: "KALSHI_CRYPTO_OBSERVER" },
   "job-worker":       { tier: "extension", module: "creator",   entry: "apps/lantern-garage/lib/job-worker.js",       flag: "CREATOR_ENABLED" },
   "cloudflare-tunnel":{ tier: "extension", module: "ops",       entry: "apps/lantern-garage/server.js",               flag: "LANTERN_CLOUDFLARE_TUNNEL" },

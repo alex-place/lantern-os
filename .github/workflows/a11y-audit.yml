@@ -65,7 +65,7 @@ jobs:
       - name: Run accessibility tests
         run: node scripts/test-a11y.js
 
-      - name: Run Explore feed UI behavioral test
+      - name: Run Explore dashboard UI behavioral test
         run: node apps/lantern-garage/test/explore-feed-ui.test.js
 
       - name: Brand guard (user-visible brand is Unisona, #2250)

@@ -259,13 +259,25 @@
   <meta property="og:title" content="unisona.ai — your AI that actually remembers you">
   <meta property="og:description" content="Observe · Remember · Reason · Act · Verify · Converge. Local, private, and free.">
   <meta property="og:url" content="https://www.unisona.ai/">
-  <meta property="og:image" content="https://www.unisona.ai/mandala.svg">
-  <meta name="twitter:card" content="summary">
+  <!-- Raster og-image (1200×630) — SVG marks don't unfurl on social crawlers (#2533). -->
+  <meta property="og:image" content="https://www.unisona.ai/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="unisona.ai — your AI that actually remembers you">
   <meta name="twitter:description" content="Observe · Remember · Reason · Act · Verify · Converge. Local, private, and free.">
-  <meta name="twitter:image" content="https://www.unisona.ai/mandala.svg">
+  <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
 </head>
 <body>
+<script>
+  /* #2554: capture a referral code from ?ref= and persist it so it survives the
+     auth redirect and reaches the register POST. Stored once; never overwritten by
+     a later bare visit, so the first referrer wins. */
+  (function(){try{
+    var m=new URLSearchParams(location.search).get('ref');
+    if(m && /^[a-z0-9]{6,16}$/.test(m) && !localStorage.getItem('unisona_ref')) localStorage.setItem('unisona_ref', m);
+  }catch(e){}})();
+</script>
 
 <!-- ── Whole-screen file drop overlay ── -->
 <div id="home-drop-overlay" aria-hidden="true">📄 Drop to upload<span class="drop-sub">files → attached to chat &nbsp;·&nbsp; .docx → improve &amp; rewrite</span></div>
@@ -337,12 +349,14 @@
       unisona.ai
     </span>
     <span class="sep">·</span>
+    <!-- Link set kept in lock-step with site-chrome.js NAV_LINKS so the home
+         footer matches the shared footer + the top nav on every page (#2479). -->
     <a href="/">Home</a>
     <a href="/dream-chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
-    <a href="/create.html">Create</a>
+    <a href="/orchestration.html">Settings</a>
+    <a href="/work.html">Work</a>
     <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Help</a>
     <span class="sep">·</span>
     <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
     <span class="visually-hidden" id="status-label">connecting…</span>
@@ -436,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
       el.textContent = prefix + 'v' + v;
       el.style.cursor = 'pointer';
       el.title = 'View changelog';
-      el.onclick = () => window.open('/repo/CHANGELOG.MD', '_blank');
+      el.onclick = () => window.open('/changelog.html', '_blank');
     });
   }
 

@@ -25,6 +25,12 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { destroyUserSessions } = require("../lib/session-file-store");
+
+// Where the session store persists its files (mirrors server.js). A privileged role
+// change invalidates the target's live sessions here so revoked access takes effect
+// immediately, not at the next natural logout (#2627).
+const SESSION_DIR = path.join(__dirname, "..", "..", "..", "data", "sessions");
 
 const {
   listProfiles,
@@ -53,7 +59,7 @@ const MIN_PASSWORD = 8;
 
 // Roles an operator may assign from the console. `founder` is a legacy alias and is
 // intentionally omitted from the picker (deep_dreamer is its canonical name).
-const ASSIGNABLE_ROLES = ["guest", "supporter", "deep_dreamer", "tech_support", "admin"];
+const ASSIGNABLE_ROLES = ["guest", "supporter", "deep_dreamer", "pilot", "tech_support", "admin"];
 
 function actorOf(req) {
   return getSessionUserId(req) || "local-owner";
@@ -199,8 +205,13 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
       return true;
     }
     const updated = setUserRole(target.id, role);
-    audit(req, "set_role", target.id, { from: target.role, to: role });
-    sendJson(res, { ok: true, account: toAccountView(updated) });
+    // Invalidate the target's live sessions so a revoked/downgraded role takes effect
+    // now — otherwise a demoted admin keeps isAdmin/isStaff until their session expires
+    // (disk-persisted across restarts), the exact gap #2627 flags. They re-auth into the
+    // new role. A no-op when they have no active session.
+    const killedSessions = destroyUserSessions(SESSION_DIR, target.id);
+    audit(req, "set_role", target.id, { from: target.role, to: role, sessionsInvalidated: killedSessions });
+    sendJson(res, { ok: true, account: toAccountView(updated), sessionsInvalidated: killedSessions });
     return true;
   }
 

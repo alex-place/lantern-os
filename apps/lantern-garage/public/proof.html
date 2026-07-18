@@ -6,17 +6,50 @@
   <meta name="loop-stage" content="verify">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Cache-Control" content="no-store">
+  <script>
+    /* Theme bootstrap — set before first paint so dark-mode users don't get a
+       white flash (matches index.html / knowledgecenter.html, #2481). */
+    (function () {
+      try {
+        var stored = localStorage.getItem('lantern-theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var isDark = stored ? stored === 'dark' : prefersDark;
+        document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <title>unisona.ai — Live Proof</title>
-  <link rel="stylesheet" href="styles.css?v=20260531-proof-v1">
+  <!-- Social share (#2533) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="unisona.ai">
+  <meta property="og:title" content="unisona.ai — Live Proof">
+  <meta property="og:description" content="Fed by the real local APIs. Every number is current. Every claim is source-linked.">
+  <meta property="og:image" content="https://www.unisona.ai/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://www.unisona.ai/og-image.png">
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="styles.css?v=20260715-proof-v2">
+  <style>
+    /* Dark-theme mapping for the legacy styles.css token set so this page honors
+       data-theme instead of forcing light (#2481). Scoped to this page. */
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --ink: #e6edf3;
+      --muted: #9aa7b2;
+      --paper: #0f151a;
+      --panel: #161d24;
+      --line: #2a343d;
+    }
+    [data-theme="dark"] body { background: var(--paper); }
+  </style>
   <script defer src="proof.js?v=20260531-proof-v1"></script>
 </head>
 <body>
-<div style="position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:4px;padding:0 16px;height:44px;background:#fff;border-bottom:1px solid rgba(0,0,0,0.08);font-family:system-ui,sans-serif;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,0.06)">
-  <a href="/" style="font-weight:700;color:#111;text-decoration:none;display:flex;align-items:center;gap:6px;margin-right:8px"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:18px;height:18px;vertical-align:middle"> unisona.ai</a>
-  <a href="/dream-chat.html" style="color:#6b7280;text-decoration:none;padding:5px 9px;border-radius:6px" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">Chat</a>
-  <a href="/settings/providers.html" style="color:#6b7280;text-decoration:none;padding:5px 9px;border-radius:6px" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='transparent'">Providers</a>
-  <a href="/" style="margin-left:auto;color:#6b7280;text-decoration:none;font-size:12px" onmouseover="this.style.color='#111'" onmouseout="this.style.color='#6b7280'">← Home</a>
-</div>
+<!-- Site nav + footer injected by /js/site-chrome.js (#2481) -->
   <a class="skip-link" href="#main">Skip to proof</a>
   <main id="main" class="shell" tabindex="-1">
     <header class="hero os-hero compact-hero">
@@ -27,7 +60,6 @@
         <nav class="link-dock" aria-label="Navigation">
           <a href="/">Dashboard</a>
           <a href="/pricing.html">Pricing</a>
-          <a href="/pitch.html">Pitch</a>
         </nav>
       </div>
     </header>
@@ -108,6 +140,8 @@
       </ul>
     </section>
   </main>
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
 </html>

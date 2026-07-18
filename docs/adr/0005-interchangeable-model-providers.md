@@ -29,16 +29,16 @@ outage or key problem would break chat ("all providers failed").
 
 Providers are **data, not code**. The declared providers, fallback order, and default models
 live in the PCSF layer: `data/pcsf/provider.pcsf.json` (the registry — a **gitignored runtime
-file**, documented in [PROVIDERS.md:17](../PROVIDERS.md)) plus the committed model roster
-[`data/pcsf/model.pcsf.json`](../data/pcsf/model.pcsf.json) (default + available models per
+file**, documented in [PROVIDERS.md:17](../../PROVIDERS.md)) plus the committed model roster
+[`data/pcsf/model.pcsf.json`](../../data/pcsf/model.pcsf.json) (default + available models per
 provider). The server reads `.env` for keys at startup and supports **hot reload** via
-`POST /api/settings/providers` without a restart ([PROVIDERS.md:17-22](../PROVIDERS.md)).
+`POST /api/settings/providers` without a restart ([PROVIDERS.md:17-22](../../PROVIDERS.md)).
 
 All LLM calls route through a selector (`provider-router.js` / `selectProvider`,
-imported by [`dream-chat.js`](../apps/lantern-garage/lib/dream-chat.js)) with a defined
+imported by [`dream-chat.js`](../../apps/lantern-garage/lib/dream-chat.js)) with a defined
 **fallback chain**: Gemini → Claude → OpenAI → Ollama (local Σ₀/Ouro at
-`http://127.0.0.1:11434`, default `ouro:latest`) ([PROVIDERS.md:156-161](../PROVIDERS.md),
-[`dream-chat.js:430-431`](../apps/lantern-garage/lib/dream-chat.js)). No module hardcodes a
+`http://127.0.0.1:11434`, default `ouro:latest`) ([PROVIDERS.md:156-161](../../PROVIDERS.md),
+[`dream-chat.js:430-431`](../../apps/lantern-garage/lib/dream-chat.js)). No module hardcodes a
 single provider as a hard dependency.
 
 ## Options Considered
@@ -66,7 +66,7 @@ what lets the local Σ₀ model and any future model plug in without touching th
 - **Negative / trade-offs:** the registry can list providers that aren't actually wired.
 - **Follow-ups:** [ARCHITECTURE.md §9.4](../ARCHITECTURE.md#9-known-divergences--debt) — Grok,
   Mistral, Cohere, Perplexity are declared in PCSF but not in the fallback chain
-  ([PROVIDERS.md:167-170](../PROVIDERS.md)); either wire them or mark them clearly as future.
+  ([PROVIDERS.md:167-170](../../PROVIDERS.md)); either wire them or mark them clearly as future.
 
 ## Alternatives considered
 
@@ -76,9 +76,9 @@ See Options. "Do nothing" (hardcode the current best model) is the lock-in the N
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| Providers declared as data (PCSF) | `data/pcsf/provider.pcsf.json` (gitignored runtime) + committed [`model.pcsf.json`](../data/pcsf/model.pcsf.json); [PROVIDERS.md:17](../PROVIDERS.md) | High | code + doc |
-| Calls route through a selector | `provider-router.js` import in [`dream-chat.js:9`](../apps/lantern-garage/lib/dream-chat.js) | High | code |
-| Fallback chain Gemini→Claude→OpenAI→Ollama | [PROVIDERS.md:156-161](../PROVIDERS.md) | High | doc |
-| Local model is a peer in the chain | [`dream-chat.js:430-431`](../apps/lantern-garage/lib/dream-chat.js) | High | code |
-| Keys hot-reload without restart | [PROVIDERS.md:22](../PROVIDERS.md) | Medium | doc |
+| Providers declared as data (PCSF) | `data/pcsf/provider.pcsf.json` (gitignored runtime) + committed [`model.pcsf.json`](../../data/pcsf/model.pcsf.json); [PROVIDERS.md:17](../../PROVIDERS.md) | High | code + doc |
+| Calls route through a selector | `provider-router.js` import in [`dream-chat.js:9`](../../apps/lantern-garage/lib/dream-chat.js) | High | code |
+| Fallback chain Gemini→Claude→OpenAI→Ollama | [PROVIDERS.md:156-161](../../PROVIDERS.md) | High | doc |
+| Local model is a peer in the chain | [`dream-chat.js:430-431`](../../apps/lantern-garage/lib/dream-chat.js) | High | code |
+| Keys hot-reload without restart | [PROVIDERS.md:22](../../PROVIDERS.md) | Medium | doc |
 | Never hardcode a provider | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) #3 | High | project doc |

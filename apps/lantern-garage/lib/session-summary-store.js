@@ -123,7 +123,7 @@ function readSessionSummary(sessionId) {
 // compactHistory(history) output. Synchronous: the log read is sync and the
 // summary persist is fire-and-forget.
 function assembleSessionContext({ sessionId, userId = null, clientHistory, currentMessage, requestedProvider, surfaceMode } = {}) {
-  const maxOutputTokens = surfaceMode === "three-doors" ? 1536 : 1024;
+  const maxOutputTokens = 1024;
   const contextWindow = contextWindowFor({ requestedProvider });
 
   const logTurns = sessionTurnsFromLog(sessionId, userId);

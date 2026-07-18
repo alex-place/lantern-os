@@ -1,0 +1,115 @@
+\documentclass[11pt]{article}
+
+% --- packages (matches docs/sigma0-collapse-certificate.tex conventions) ---
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue]{hyperref}
+\usepackage{tcolorbox}
+
+\newtcolorbox{verifybox}{colback=green!4,colframe=green!45!black,boxrule=0.6pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
+\newtcolorbox{caveatbox}{colback=yellow!8,colframe=orange!70!black,boxrule=0.6pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,arc=2pt}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\DeclareMathOperator{\cond}{cond}
+
+\emergencystretch=3em
+
+\title{\textbf{$\Sigma_G$ --- The Grounding Ledger}\\[4pt]
+\large Grounding has a price, a schedule, and a budget --- and each is computable}
+\author{Lantern OS \\ \texttt{docs/SIGMA0-GROUNDING-LEDGER.md} (source of record)}
+\date{2026-07-17}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We compose three measured results about external grounding in self-improving loops into one
+accounting frame. \textbf{Price}: a scoring signal's selection value decomposes by its error
+structure --- a \emph{stuck} (checkpoint-fixed) error component sets a selection ratchet, a
+\emph{fresh} (re-drawn) component breaks it, and only re-drawn external truth also ranks;
+a pre-registered falsification of our own earlier law found that even zero-information
+re-drawn noise (dither) recovers a large fraction of a stale holdout's lost value.
+\textbf{Schedule}: inside a certified basin the anchor budget needed to escape grows
+geometrically at the certified contraction rate and saturates, giving a computable grounding
+cadence; critical-slowing-down alarms are structurally late (measured alarm premium
+$2.25\times$), and which regime applies is decided --- prospectively --- by $\cond(P)$.
+\textbf{Budget}: safe promotion rate is capped by fresh-task sourcing, stretched but never
+uncapped by Thresholdout-style reuse; the mechanism buys scoreboard validity while an
+accumulated burned pool buys extraction. Everything here is simulation- or
+small-real-system-grade evidence; the markdown ledger is the source of record for evidence
+classes and run pointers, and this document must never be cited above it.
+\end{abstract}
+
+\begin{caveatbox}
+\textbf{Status.} A \emph{ledger}, not a certificate: no new theorem, no claim above
+MEASURED-by-simulation except where a real learned system is named. Prior-art positioning is
+deliberate: the schedule column applies self-triggered control (Heemels--Johansson--Tabuada,
+CDC 2012; arXiv:1803.08980) to a new plant; the budget column applies Thresholdout (Dwork et
+al., arXiv:1506.02629) to checkpoint promotion, with the Ladder (arXiv:1502.04585) as the
+problem-shape prior and Roelofs et al.\ (NeurIPS 2019) as the standing counterpoint.
+\end{caveatbox}
+
+\section{Price: what a scoring signal is worth}
+
+Selection error decomposes as $\text{score} = \theta + e_{\text{stuck}} + e_{\text{fresh}}$.
+The stuck part (a fixed holdout's lucky draw; a deterministic self-check's bias) anchors the
+champion's seat; the fresh part re-rolls per gate and shakes it. Measured (32 seeds,
+oracle-weight sweep per cell; kill test pre-registered and \emph{fired}):
+zero-information dither reproduces the entire rescue of a stuck-bias signal
+($6.42$ vs $6.43$ at $n{=}50$), while fresh truth strictly dominates every internal arm
+($12.90 > 9.36 > 6.43 > 0.81 > 0.61$). The law, re-stated:
+\emph{internal signals detect; fresh randomness de-ratchets; only fresh truth informs.}
+
+\section{Schedule: when grounding must arrive}
+
+Inside a certified basin $\{V \le c\}$ with $V(F(x)) \le \gamma V(x)$, $V = x^\top P x$:
+\[
+B^*(n) \;=\; \frac{\sqrt{c} - \gamma^{n/2}\sqrt{V_0}}{\sqrt{\lambda_{\max}(P)}}
+\;\xrightarrow{\;n\to\infty\;}\; \sqrt{c/\lambda_{\max}(P)},
+\qquad
+t_{1/2} \;=\; \frac{\ln 2}{\ln(1/\gamma)} .
+\]
+Ground on a cadence below $t_{1/2}$; the race (200 seeds, canary swept over all
+healthy-quantile thresholds) measures an alarm premium of $2.25\times$ in the
+well-conditioned regime and full timing-indifference in the sliver regime. The regime is
+decided by $\cond(P)$, prospectively: on the trained \S6 reservoir (a real learned loop,
+$\rho(J){=}0.9836$, $\cond(P){\approx}4.8{\cdot}10^4$) the pre-registered sliver call held
+--- the realistic per-turn grounding kick is $1.4{\cdot}10^4\times$ the escape ceiling.
+Both real learned loops measured so far (Ouro: expansive; reservoir: near-critical) sit
+outside the well-conditioned regime; the schedule's bite may exist only on deliberately
+JSRR-stabilized loops.
+
+\section{Budget: how fast the system may safely improve}
+
+$\text{rate(safe promotions)} \le \text{rate(fresh verified sourcing)}$, stretched by
+controlled reuse. The Thresholdout decomposition (measured, then re-validated at task-level
+Bernoulli-stuck fidelity): the \emph{mechanism} buys validity (reported-vs-true gap
+$0.482 \to 0.187$ at $n{=}50$), the \emph{burned pool} buys extraction; retired promotion
+sets remain useful. At task level the dither knob is the cheapest intervention
+($0.617 \to 0.856$ true extraction at identical task cost). The planted teeth pass through
+the real seven-condition gate with arm-appropriate reasons: naive reuse catches a
+contaminated hack only via a provenance ledger; a fresh flow rejects it on measured merit.
+
+\section{The composed operating point}
+
+A self-improving loop must ground \emph{at least} on the schedule's cadence, may promote
+\emph{at most} at the budget's rate, and must price signals by their stuck/fresh error
+decomposition. All three constraints are computable from measured quantities of the same
+object; none can be bought with deterministic internal signals.
+
+\begin{verifybox}
+\textbf{Audit.} Every number above maps to a runnable artifact; see the markdown ledger's
+audit table. As of 2026-07-17: eight pytest suites, 91 passing; open gaps are exactly the
+JSRR-stabilized Phase-1/2 schedule test (\#2690) and the L4 gated-training run (\#2691,
+runbook committed).
+\end{verifybox}
+
+\end{document}

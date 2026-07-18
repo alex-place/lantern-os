@@ -36,8 +36,6 @@ const PAGES = [
   '/proof.html',
   '/rag-house.html',
   '/settings/providers.html',
-  '/three-doors.html',
-  '/three-doors-game.html',
   '/trader-dashboard.html',
   '/trading.html',
   '/trading-news.html',

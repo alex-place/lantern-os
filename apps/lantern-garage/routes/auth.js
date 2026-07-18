@@ -24,9 +24,29 @@ const {
 const { handleLocalRegister, handleLocalLogin } = require("../lib/local-auth");
 const { loginGateEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
-const { createToken, verifyToken } = require("../lib/auth-tokens");
+const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/auth-tokens");
+const { destroyUserSessions } = require("../lib/session-file-store");
+const _pathAuth = require("path");
+// Session store dir (mirrors server.js) — a password reset invalidates the account's live
+// sessions so a hijacked session can't survive the remediation (#2614).
+const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
 const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
-const { isLoopback } = require("../lib/request-auth");
+const { isLoopback, clientIp } = require("../lib/request-auth");
+const { canonicalOrigin } = require("../lib/base-url");
+
+// Lightweight per-IP limiter for the UNAUTHENTICATED email endpoints (password
+// reset, resend verification) so they can't be used to email-bomb a victim or scan
+// (#2615). Best-effort in-memory; keyed on the real client IP (#2616).
+const _emailHits = new Map();
+function emailEndpointThrottled(req, max = 12, windowMs = 15 * 60 * 1000) {
+  const ip = clientIp(req);
+  const now = Date.now();
+  const rec = _emailHits.get(ip);
+  if (!rec || now - rec.first > windowMs) { _emailHits.set(ip, { count: 1, first: now }); return false; }
+  rec.count++;
+  if (_emailHits.size > 5000) { for (const [k, v] of _emailHits) if (now - v.first > windowMs) _emailHits.delete(k); }
+  return rec.count > max;
+}
 const { recordTractionEvent } = require("../lib/traction");
 const {
   getProfile,
@@ -35,26 +55,61 @@ const {
   setLocalPassword,
 } = require("../lib/user-profiles");
 
-// Absolute origin of the current request (honors the tunnel's forwarded proto).
+// Absolute origin for links emailed to the user (verify-email, password reset).
+// Built from the operator-configured canonical origin, NOT the raw Host header, so
+// a forged Host can't point a genuine security email at an attacker's domain
+// (reset poisoning, #2604). Falls back to Host only for loopback dev.
 function originOf(req) {
-  const host = (req.headers && req.headers.host) || "127.0.0.1";
-  const proto =
-    (req.headers["x-forwarded-proto"] || "").split(",")[0].trim() ||
-    (req.socket && req.socket.encrypted ? "https" : "http");
-  return `${proto}://${host}`;
+  return canonicalOrigin(req);
 }
 
 function readJsonBody(req) {
   return new Promise((resolve) => {
     let body = "";
-    req.on("data", (c) => { body += c; if (body.length > 1e6) req.destroy(); });
-    req.on("end", () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } });
+    // Over the 1MB cap: settle (null) BEFORE destroying — req.destroy() fires neither
+    // 'end' nor 'error', so otherwise the awaiting auth handler never responds and its
+    // frames leak (#2650). 'close' can fire before/instead of 'end' (over-cap destroy, or
+    // undici's ordering), so it settles from whatever body arrived rather than clobbering a
+    // good parse with null — the over-cap path already resolved(null) first. resolve() is
+    // idempotent, so the races are harmless; the caller answers 413/400.
+    req.on("data", (c) => { body += c; if (body.length > 1e6) { resolve(null); req.destroy(); } });
+    const done = () => { try { resolve(JSON.parse(body || "{}")); } catch { resolve(null); } };
+    req.on("end", done);
     req.on("error", () => resolve(null));
+    req.on("close", done);
   });
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
+
+// Confirmation interstitial for a pending EMAIL CHANGE (#2646). Rendered inline by the
+// verify-email route (NOT a new public .html surface), so an email prefetcher/scanner that
+// auto-GETs the link gets a page but applies nothing — the change needs the explicit POST
+// the button fires. `token` is a url-safe base64url.hmac string; the address is escaped.
+function emailChangeInterstitial(token, newEmail) {
+  const esc = (s) => String(s || "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">
+<title>Confirm email change</title><style>
+body{font-family:system-ui,sans-serif;background:#0f151a;color:#e6edf3;display:grid;place-items:center;min-height:100vh;margin:0}
+.card{max-width:420px;padding:28px 26px;border:1px solid #2a343d;border-radius:14px;background:#161d24;text-align:center}
+h1{font-size:1.15rem;margin:0 0 10px}p{color:#9aa7b2;line-height:1.5;margin:0 0 18px}strong{color:#e6edf3}
+button{font:inherit;padding:11px 18px;border-radius:9px;border:0;background:#3b82f6;color:#fff;cursor:pointer;width:100%}
+button[disabled]{opacity:.6;cursor:progress}#s{margin:12px 0 0;font-size:14px;min-height:18px}
+</style></head><body><div class="card">
+<h1>Confirm your email change</h1>
+<p>Confirm to change your account email to <strong>${esc(newEmail)}</strong>. This link only works once.</p>
+<button id="c" type="button">Confirm email change</button>
+<p id="s"></p>
+<script>
+document.getElementById('c').addEventListener('click',function(){this.disabled=true;
+fetch('/api/auth/verify-email',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:${JSON.stringify(token || "")}})})
+.then(function(r){return r.json().then(function(d){return{s:r.status,d:d};});})
+.then(function(res){if(res.s===200){location.href=(res.d.dest||'/profile.html')+'?verify=1';}else{document.getElementById('c').disabled=false;document.getElementById('s').textContent='Could not confirm: '+((res.d&&res.d.error)||'please try the link again');}})
+.catch(function(){document.getElementById('c').disabled=false;document.getElementById('s').textContent='Network error — try again.';});});
+</script></div></body></html>`;
+}
 
 const START_RE = /^\/api\/auth\/([a-z]+)\/start$/;
 const CALLBACK_RE = /^\/api\/auth\/([a-z]+)\/callback$/;
@@ -187,38 +242,58 @@ module.exports = async function authRoutes(req, res, url, deps) {
 
   // GET /api/auth/verify-email?token=… — confirm an email address (new account or
   // a pending email change). Applies the pending email if the token carries one.
-  if (method === "GET" && path === "/api/auth/verify-email") {
-    // Hard email gate: a fresh signup has no session, so land them on the login
-    // page (where they now sign in). A signed-in email change lands on profile.
+  if (path === "/api/auth/verify-email" && (method === "GET" || method === "POST")) {
+    const isPost = method === "POST";
+    const token = isPost ? String(((await readJsonBody(req)) || {}).token || "") : url.searchParams.get("token");
+    // Hard email gate: a fresh signup has no session, so land them on the login page; a
+    // signed-in email change lands on profile.
     const dest = getSessionUser(req)?.id ? "/profile.html" : "/auth.html";
-    const payload = verifyToken(url.searchParams.get("token"), "verify_email");
-    if (!payload) {
-      res.writeHead(302, { Location: `${dest}?verify=invalid` });
-      return res.end();
-    }
+    // Uniform failure: POST callers (the confirm interstitial) get JSON; GET callers a banner.
+    const fail = (reason, code) => {
+      if (isPost) { res.writeHead(code || 400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: reason })); }
+      res.writeHead(302, { Location: `${dest}?verify=${reason}` }); return res.end();
+    };
+    const payload = verifyToken(token, "verify_email");
+    if (!payload) return fail("invalid");
     const profile = getProfile(payload.sub);
-    if (!profile) {
-      res.writeHead(302, { Location: `${dest}?verify=invalid` });
-      return res.end();
+    if (!profile) return fail("invalid");
+    // Single-use: a spent link (leaked, double-clicked, scanner re-fetch) lands on the
+    // benign already-verified state rather than re-applying (#2614).
+    if (isConsumed(payload.jti)) {
+      if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, already: true, dest })); }
+      res.writeHead(302, { Location: `${dest}?verify=1` }); return res.end();
     }
-    const updates = { emailVerified: true, pendingEmail: null };
-    // If the token was minted for a pending email change, apply it now (unless
-    // someone else claimed that email in the meantime).
-    if (payload.email && payload.email !== profile.email) {
-      const clash = getProfileByEmail(payload.email);
-      if (clash && clash.id !== profile.id) {
-        res.writeHead(302, { Location: `${dest}?verify=email_taken` });
-        return res.end();
+    // The token carries the exact address it was minted for (#2624); an address that
+    // differs from the profile's current one is a pending email CHANGE.
+    const isEmailChange = !!(payload.email && payload.email !== profile.email);
+    // #2646: an email CHANGE is a sensitive mutation and must NOT be applied by a GET that
+    // a link-prefetcher/scanner auto-fetches. Serve a confirmation interstitial whose
+    // button POSTs the token; only the POST applies. Plain signup verification stays a GET.
+    if (isEmailChange && !isPost) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+      return res.end(emailChangeInterstitial(token, payload.email));
+    }
+    const updates = { emailVerified: true, emailAssumed: false, pendingEmail: null };
+    if (isEmailChange) {
+      // Apply ONLY when it matches the recorded pending change; otherwise it's a stale
+      // signup/resend token from before the address changed and must not revert it (#2624).
+      if (profile.pendingEmail && payload.email === profile.pendingEmail) {
+        const clash = getProfileByEmail(payload.email);
+        if (clash && clash.id !== profile.id) return fail("email_taken", 409);
+        updates.email = payload.email;
+        // Move the local login identity to the new address so the OLD email stops being a
+        // working login key / email_taken squatter (#2625).
+        updates.identities = (profile.identities || []).map((i) =>
+          i.provider === "local" ? { ...i, email: payload.email } : i);
+      } else {
+        return fail("invalid");
       }
-      updates.email = payload.email;
     }
-    // Emit a verified `signup` traction event exactly once — email confirmation is
-    // the moment a local signup clears the hard email gate (OBSERVE stage). Guard on
-    // the pre-update flag so repeat clicks on the same link don't re-count. The
-    // ledger's classifyActor() files the operator's own confirmations as "operator",
-    // so this never inflates external adoption. Best-effort; never blocks the redirect.
+    // Emit a verified `signup` traction event exactly once (OBSERVE stage). Guard on the
+    // pre-update flag so repeat confirmations don't re-count. Best-effort.
     const wasVerified = profile.emailVerified === true;
     updateProfile(profile.id, updates);
+    consumeToken(payload.jti, payload.exp); // burn the link so it can't be replayed (#2614)
     if (!wasVerified) {
       recordTractionEvent({
         kind: "signup",
@@ -229,6 +304,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
         note: "email address confirmed via verify-email link",
       }).catch(() => {});
     }
+    if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, dest })); }
     res.writeHead(302, { Location: `${dest}?verify=1` });
     return res.end();
   }
@@ -237,13 +313,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // link. Always 200 (no account enumeration); sends only for an existing account
   // whose email is still unconfirmed.
   if (method === "POST" && path === "/api/auth/resend-verification") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     const respBody = { ok: true };
     if (EMAIL_RE.test(email)) {
       const profile = getProfileByEmail(email);
       if (profile && profile.emailVerified !== true) {
-        const token = createToken("verify_email", profile.id, null);
+        const token = createToken("verify_email", profile.id, profile.email);
         const link = `${originOf(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
         sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
         // Dev-only self-service: no mail server + direct loopback hit → return the
@@ -259,6 +336,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   // POST /api/auth/request-password-reset { email } — always 200 (no account
   // enumeration); sends a reset link only if a local-capable account exists.
   if (method === "POST" && path === "/api/auth/request-password-reset") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true })); }
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     if (EMAIL_RE.test(email)) {
@@ -278,7 +356,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
     const b = await readJsonBody(req);
     if (!b) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_json" })); }
     const payload = verifyToken(b.token, "reset_password");
-    if (!payload) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_or_expired" })); }
+    // Reject a replayed link: a reset token is single-use, so once spent it can't reset
+    // the password again for the rest of its TTL even if leaked (#2614).
+    if (!payload || isConsumed(payload.jti)) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "invalid_or_expired" })); }
     const newPassword = String(b.newPassword || "");
     if (newPassword.length < MIN_PASSWORD) {
       res.writeHead(400, { "Content-Type": "application/json" });
@@ -286,9 +366,15 @@ module.exports = async function authRoutes(req, res, url, deps) {
     }
     if (!getProfile(payload.sub)) { res.writeHead(404, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "unknown_account" })); }
     setLocalPassword(payload.sub, newPassword);
+    consumeToken(payload.jti, payload.exp);              // burn the token — no replay
+    destroyUserSessions(AUTH_SESSION_DIR, payload.sub);  // sign out any hijacked session
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
 
   return false;
 };
+
+// Test seam (#2650): the body reader is otherwise module-private. Exposed so the
+// route-body-robustness suite can drive the oversize/teardown paths directly.
+module.exports.readJsonBody = readJsonBody;

@@ -21,1138 +21,357 @@
     })();
   </script>
   <link rel="stylesheet" href="/css/site.css">
-  <title>Explore & Discover — unisona.ai</title>
+  <title>Dashboard — unisona.ai</title>
   <style>
-    .explore-hero {
-      text-align: center;
-      padding: 50px 20px 40px;
-    }
-    .explore-hero h1 {
-      font-size: clamp(2rem, 5vw, 2.8rem);
-      font-weight: 800;
-      letter-spacing: -0.03em;
-      margin-bottom: 12px;
-      line-height: 1.1;
-    }
-    .explore-hero .subtitle {
-      font-size: 1rem;
-      color: var(--muted);
-      max-width: 560px;
-      margin: 0 auto;
-      line-height: 1.5;
-    }
+    /* ─────────────────────────────────────────────────────────────────────────
+       Personalized dashboard (Robinhood-style). Left/main column: portfolio
+       header + equity chart + holdings. Right column: buying power, the user's
+       watchlist, then market news. Loop stage: Remember (surfaces your state).
+       ───────────────────────────────────────────────────────────────────────── */
+    :root { --gain: var(--green); --loss: var(--danger); }
 
-    /* ── Single-pane ranked feed (#1217) ── */
-    .feed-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 0 auto 24px;
-      max-width: 920px;
-    }
-    .feed-chip {
-      font: inherit;
-      font-size: 0.78rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      padding: 7px 14px;
-      border-radius: 999px;
-      border: 1.5px solid var(--border);
-      background: var(--surface);
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-    .feed-chip:hover { border-color: var(--accent); color: var(--text); }
-    .feed-chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .feed-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    /* FB-style single feed column: one centered stream of larger posts,
-       not a 2–3-up grid. The whole page reads as a modern social feed. */
-    .feed-stream {
+    .dash {
       display: grid;
-      gap: 16px;
-      grid-template-columns: 1fr;
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    .feed-chips { max-width: 600px; }
-
-    /* ── Layout toolbar: single-column (FB) ↔ grid (IG 4-up) ── */
-    .feed-toolbar {
-      display: flex; align-items: center; justify-content: flex-end;
-      gap: 10px; max-width: 600px; margin: 0 auto 12px;
-    }
-    .feed-layout { display: inline-flex; gap: 2px; padding: 2px;
-      border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); }
-    .feed-layout-btn {
-      font: inherit; font-size: 0.95rem; line-height: 1;
-      width: 34px; height: 28px; border: none; border-radius: 8px;
-      background: transparent; color: var(--muted); cursor: pointer;
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: background 0.15s, color 0.15s;
-    }
-    .feed-layout-btn:hover { color: var(--text); }
-    .feed-layout-btn.active { background: var(--accent); color: #fff; }
-    .feed-layout-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    /* Grid (Instagram-style multi-up) — the same cards, tiled. Embed/video/art
-       full-bleed cards still span the whole row (grid-column: 1 / -1). Widen the
-       chip row + toolbar to match the wider stream when grid is active. */
-    body.layout-grid .feed-chips,
-    body.layout-grid .feed-toolbar { max-width: 1180px; }
-    .feed-stream.is-grid {
-      max-width: 1180px;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      gap: 28px;
       align-items: start;
+      padding: 24px 0 8px;
     }
-    @media (max-width: 1100px) { .feed-stream.is-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-    @media (max-width: 820px)  { .feed-stream.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    /* Phones: grid = 2-up (single view stays 1-up). */
-    @media (max-width: 560px) {
-      .feed-stream.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 900px) {
+      .dash { grid-template-columns: 1fr; gap: 20px; }
+      .dash-side { position: static !important; }
     }
-    .feed-stream.is-grid .feed-card { padding: 14px 14px 13px; }
-    .feed-stream.is-grid .feed-card .fc-thumb,
-    .feed-stream.is-grid .feed-card .fc-thumb-ph {
-      width: calc(100% + 28px); height: 150px; margin: -14px -14px 1px;
-    }
-    .feed-stream.is-grid .feed-card .fc-title { font-size: 0.98rem; }
-    /* Full-bleed interactive cards keep their own width; span all columns. */
-    .feed-stream.is-grid .feed-card.is-embed,
-    .feed-stream.is-grid .feed-card.is-video,
-    .feed-stream.is-grid .feed-card.is-art { grid-column: 1 / -1; }
-    /* …except on phones, where watch/play (video/embed/art) tile 2-up like everything else
-       so they can be shown smaller too (single view still shows them big). Placed AFTER the
-       rule above so it wins on ≤560px. */
-    @media (max-width: 560px) {
-      .feed-stream.is-grid .feed-card.is-embed,
-      .feed-stream.is-grid .feed-card.is-video,
-      .feed-stream.is-grid .feed-card.is-art { grid-column: auto; }
+    .dash-main { min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+    .dash-side {
+      display: flex; flex-direction: column; gap: 16px;
+      position: sticky; top: 78px;
     }
 
-    /* ── Share control (per card) — parallel to the dismiss ✕ ── */
-    .feed-card .fc-share {
-      position: absolute; top: 6px; right: 36px;
-      width: 28px; height: 28px; border: none; border-radius: 6px;
-      background: transparent; color: var(--muted);
-      font-size: 15px; line-height: 1; cursor: pointer; opacity: 0;
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: opacity 0.15s, background 0.15s, color 0.15s;
-    }
-    .feed-card:hover .fc-share, .feed-card:focus-within .fc-share { opacity: 1; }
-    .feed-card .fc-share:hover { background: var(--surface2); color: var(--text); }
-    .feed-card .fc-share:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
-    /* Embed cards: the share button lives inline in the title-bar control group. */
-    .feed-card.is-embed .fc-share {
-      position: static; opacity: 0.75; width: 30px; height: 30px; font-size: 15px;
-    }
-    .feed-card.is-embed .fc-share:hover { opacity: 1; background: var(--surface2); color: var(--text); }
-
-    /* ── Share menu popover (desktop fallback when Web Share API is absent) ── */
-    .share-menu {
-      position: absolute; z-index: 1200; min-width: 176px;
-      background: var(--surface); border: 1.5px solid var(--border);
-      border-radius: 12px; box-shadow: var(--shadow-hover);
-      padding: 6px; display: none;
-    }
-    .share-menu.open { display: block; }
-    .share-menu button, .share-menu a {
-      display: flex; align-items: center; gap: 10px; width: 100%;
-      padding: 9px 11px; border: none; background: transparent; color: var(--text);
-      font: inherit; font-size: 0.85rem; text-align: left; text-decoration: none;
-      border-radius: 8px; cursor: pointer; box-sizing: border-box;
-    }
-    .share-menu button:hover, .share-menu a:hover { background: var(--surface2); }
-    .share-menu button:focus-visible, .share-menu a:focus-visible {
-      outline: 2px solid var(--accent); outline-offset: -1px;
-    }
-    .share-menu .sm-ico { font-size: 1rem; width: 20px; text-align: center; }
-    .share-toast {
-      position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%) translateY(12px);
-      background: var(--text); color: var(--bg); font-size: 0.82rem; font-weight: 600;
-      padding: 9px 16px; border-radius: 999px; box-shadow: var(--shadow-hover);
-      opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; z-index: 1300;
-    }
-    .share-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-
-    /* ── First-paint skeletons (perceived speed) ── */
-    .feed-skel {
-      border: 1.5px solid var(--border); border-radius: 14px; background: var(--surface);
-      overflow: hidden;
-    }
-    .feed-skel .sk-img { height: 180px; background: var(--surface2); }
-    .feed-skel .sk-line { height: 12px; margin: 14px 16px 0; border-radius: 6px; background: var(--surface2); }
-    .feed-skel .sk-line.short { width: 45%; margin-bottom: 16px; }
-    .feed-skel .sk-img, .feed-skel .sk-line {
-      background-image: linear-gradient(90deg,
-        transparent 0%, color-mix(in srgb, var(--accent) 10%, transparent) 50%, transparent 100%);
-      background-size: 200% 100%; animation: sk-shimmer 1.25s ease-in-out infinite;
-    }
-    @keyframes sk-shimmer { to { background-position: -200% 0; } }
-
-    .feed-card {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      gap: 9px;
-      padding: 18px 18px 16px;
-      overflow: hidden;
-      border: 1.5px solid var(--border);
-      border-radius: 14px;
+    /* ── Card shell ── */
+    .card {
       background: var(--surface);
-      color: inherit;
-      text-decoration: none;
-      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
     }
-    /* Lead image — bleeds to the card edges, clipped by the card's radius. */
-    .feed-card .fc-thumb {
-      width: calc(100% + 36px);
-      height: 216px;
-      object-fit: cover;
-      display: block;
-      margin: -18px -18px 1px;
-      background: var(--surface2);
+    .card-head {
+      display: flex; align-items: center; gap: 8px;
+      margin: 0 0 14px;
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em;
+      text-transform: uppercase; color: var(--muted);
     }
-    /* Company-logo lead (finance cards with no source photo): CONTAIN the brand
-       mark on a tile (not cropped to a wide cover). The tile colour is chosen
-       PER LOGO at render time (cardEl analyses the logo's brightness): a dark
-       logo gets a light tile, a bright logo gets a dark tile — so it always has
-       contrast. Generous padding keeps it from reading as "zoomed in". Falls back
-       to the minimal generated cover if the logo 404s (.is-logo* removed first). */
-    .feed-card .fc-thumb.is-logo {
-      object-fit: contain;
-      padding: 44px;
-      box-sizing: border-box;
-      background: #1b2330; /* neutral until cardEl picks light/dark; no flash */
-      border-bottom: 1px solid var(--border);
-    }
-    .feed-card .fc-thumb.is-logo-light { background: #f4f6fa; }
-    .feed-card .fc-thumb.is-logo-dark  { background: #0f1722; }
-    /* Logo PNG that ships its OWN (opaque) background — still CONTAIN it (cover-cropping
-       a small brand mark upscales + crops it, which reads as zoomed-in and pixelated).
-       Tighter padding than a transparent mark since its own background fills the edges. */
-    .feed-card .fc-thumb.is-logo-ownbg { padding: 18px; }
-    /* Generated lead thumbnail for cards with no (or a broken) source image —
-       docs, image-less reads, beliefs. A type-tinted gradient block with the type
-       glyph, so EVERY card has a consistent lead visual instead of reading as a
-       bare, thumbnail-less "?" tile. */
-    .feed-card .fc-thumb-ph {
-      width: calc(100% + 36px);
-      height: 216px;
-      margin: -18px -18px 1px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-bottom: 1px solid var(--border);
-      background:
-        radial-gradient(circle at 32% 28%,
-          color-mix(in srgb, var(--tile) 40%, var(--surface)) 0%,
-          color-mix(in srgb, var(--tile) 14%, var(--surface)) 55%,
-          var(--surface) 100%);
-    }
-    .feed-card .fc-thumb-ph .fc-ph-icon {
-      font-size: 46px;
-      line-height: 1;
-      opacity: 0.92;
-      filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
-    }
-    /* Preview excerpt (reads) / good-news frame (beliefs) — clamped to 3 lines. */
-    .feed-card .fc-summary {
-      font-size: 0.85rem;
-      color: var(--muted);
-      line-height: 1.5;
-      margin: 0;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    /* Per-type accent identity + top accent-bar wipe-in on hover — mirrors the
-       index.html home tiles, so Explore reads as the same product surface. */
-    .feed-card { --tile: var(--accent); }
-    .feed-card[data-type="watch"]  { --tile: #a78bfa; }
-    .feed-card[data-type="listen"] { --tile: #f472b6; }
-    .feed-card[data-type="build"]  { --tile: #10b981; }
-    .feed-card[data-type="doc"]    { --tile: #f59e0b; }
-    .feed-card[data-type="belief"] { --tile: #22c55e; }
-    .feed-card[data-type="read"]   { --tile: #06b6d4; }
-    .feed-card[data-type="embed"]  { --tile: #06b6d4; }
-    .feed-card[data-type="art"]    { --tile: #ec4899; }
-
-    /* Image showcase card — Kingdome of Hearts art + Gage sprites. The
-       lead art bleeds to the card edges and opens the shared lightbox full-size
-       (the button carries .showcase-tile[data-full], picked up by the global
-       lightbox delegate). */
-    .feed-card .fc-media {
-      width: calc(100% + 36px);
-      margin: -18px -18px 1px;
-      padding: 0;
-      border: 0;
-      border-radius: 0;
-      background: var(--surface2);
-      cursor: zoom-in;
-      display: block;
-      line-height: 0;
-      overflow: hidden;
-    }
-    .feed-card .fc-media:hover, .feed-card .fc-media:focus-visible {
-      transform: none;
-      box-shadow: none;
-    }
-    .feed-card .fc-media-img {
-      width: 100%;
-      height: auto;
-      max-height: 560px;
-      object-fit: cover;
-      display: block;
-    }
-    /* Pixel art (game sprites) renders crisp and CONTAINED, not cropped/blurred. */
-    .feed-card .fc-media-img.pixelated {
-      image-rendering: pixelated;
-      object-fit: contain;
-      max-height: 420px;
-      background: #0d1117;
-      padding: 18px 0;
-      box-sizing: border-box;
-    }
-
-    /* Inline video card — Gage's BFDM episodes (self-hosted mp4). preload
-       none so seven posters don't all fetch; a single 'play' handler pauses any
-       other video / open embed so only one plays at a time. */
-    .feed-card.is-video .fc-video {
-      width: calc(100% + 36px);
-      margin: -18px -18px 1px;
-      background: #000;
-      line-height: 0;
-    }
-    .feed-card.is-video .fc-video video {
-      width: 100%;
-      max-height: 560px;
-      display: block;
-      background: #000;
-    }
-    .feed-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--tile);
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform 0.25s ease;
-      z-index: 2;
-    }
-    .feed-card.is-embed::before { display: none; }
-    .feed-card:hover::before,
-    .feed-card:focus-within::before { transform: scaleX(1); }
-    .feed-card:hover, .feed-card:focus-within {
-      transform: translateY(-2px);
-      border-color: var(--tile);
-      box-shadow: var(--shadow-hover);
-    }
-    .feed-card .fc-top {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-    }
-    .feed-card .fc-type { color: var(--tile); }
-    .feed-card .fc-date { color: var(--muted); margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; }
-    .feed-card .fc-title {
-      font-size: 1.06rem;
-      font-weight: 700;
-      line-height: 1.32;
-      color: var(--text);
+    .card-head .ch-action {
+      margin-left: auto; font-size: 0.72rem; font-weight: 700;
+      letter-spacing: 0.02em; text-transform: none; color: var(--accent-strong);
       text-decoration: none;
     }
-    .feed-card .fc-title:hover { color: var(--accent); }
-    .feed-card .fc-why {
-      font-size: 0.74rem;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-    .feed-card .fc-why .fc-src { color: var(--tile); font-weight: 700; }
-    /* WCAG 2.5.8 (Target Size, AA) — interactive controls are ≥24×24 CSS px. */
-    .feed-card .fc-dismiss {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      width: 28px;
-      height: 28px;
-      border: none;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1;
-      cursor: pointer;
-      opacity: 0;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: opacity 0.15s, background 0.15s, color 0.15s;
-    }
-    .feed-card:hover .fc-dismiss, .feed-card:focus-within .fc-dismiss { opacity: 1; }
-    .feed-card .fc-dismiss:hover { background: var(--surface2); color: var(--text); }
-    .feed-card .fc-dismiss:focus-visible { opacity: 1; outline: 2px solid var(--accent); }
-    .feed-status { max-width: 920px; margin: 0 auto; color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
+    .card-head .ch-action:hover { text-decoration: underline; }
 
-    /* ── Infinite-scroll loading sentinel (endless feed) ── */
-    .feed-sentinel {
-      max-width: 920px;
-      margin: 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      min-height: 28px;
-      padding: 22px 0 40px;
-      color: var(--muted);
-      font-size: 0.8rem;
+    /* ── Portfolio header ── */
+    .port-hero { padding: 24px 22px 8px; }
+    .port-greeting {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-size: 0.82rem; color: var(--muted); margin-bottom: 4px;
     }
-    .feed-sentinel::before {
-      content: '';
-      width: 16px; height: 16px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      opacity: 0;
-      transition: opacity 0.15s;
+    .port-greeting .acct-pill {
+      font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; padding: 3px 8px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--surface2); color: var(--muted);
     }
-    .feed-sentinel.is-loading::before { opacity: 1; animation: feed-spin 0.7s linear infinite; }
-    @keyframes feed-spin { to { transform: rotate(360deg); } }
+    .port-greeting .acct-pill.live { color: var(--loss); border-color: color-mix(in srgb, var(--loss) 40%, var(--border)); }
+    .port-value {
+      font-size: clamp(2.1rem, 5.5vw, 3rem);
+      font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;
+      color: var(--text); font-variant-numeric: tabular-nums;
+    }
+    .port-change {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 8px; font-size: 0.98rem; font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .port-change .pc-money.up, .port-change .pc-pct.up { color: var(--gain); }
+    .port-change .pc-money.down, .port-change .pc-pct.down { color: var(--loss); }
+    .port-change .pc-arrow.up { color: var(--gain); }
+    .port-change .pc-arrow.down { color: var(--loss); }
+    .port-change .pc-range {
+      color: var(--muted); font-weight: 600; font-size: 0.86rem;
+    }
 
-    /* ── Embed cards (#1217) — open-archive games + listening, rendered inline.
-       Full-width "panels" with a small retro window chrome (a nod to the CSF/XP
-       door) so an emulated DOS game or a public-domain record reads as a thing
-       you operate, not a link you leave for. ── */
-    .feed-card.is-embed {
-      grid-column: 1 / -1;
-      padding: 0;
-      overflow: hidden;
-      border-width: 2px;
+    /* ── Equity chart ── */
+    .chart-wrap { position: relative; margin: 14px -22px 0; }
+    .chart-canvas { display: block; width: 100%; height: 220px; touch-action: pan-y; }
+    .chart-readout {
+      position: absolute; top: -30px; left: 0; transform: translateX(-50%);
+      font-size: 0.68rem; font-weight: 700; color: var(--muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 3px 8px; border-radius: 6px; white-space: nowrap;
+      opacity: 0; transition: opacity 0.1s; pointer-events: none;
     }
-    .feed-card.is-embed:hover, .feed-card.is-embed:focus-within { transform: none; }
-    .fc-embed-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px 12px;
-      background: linear-gradient(180deg,
-        color-mix(in srgb, var(--accent) 22%, var(--surface)) 0%,
-        var(--surface) 100%);
-      border-bottom: 1.5px solid var(--border);
-    }
-    .fc-embed-bar .fc-dots { display: flex; gap: 5px; }
-    .fc-embed-bar .fc-dots i {
-      width: 10px; height: 10px; border-radius: 50%;
-      background: var(--border); display: inline-block;
-    }
-    .fc-embed-bar .fc-dots i:nth-child(1) { background: #ff5f57; }
-    .fc-embed-bar .fc-dots i:nth-child(2) { background: #febc2e; }
-    .fc-embed-bar .fc-dots i:nth-child(3) { background: #28c840; }
-    .fc-embed-bar .fc-embed-title {
-      font-size: 0.85rem; font-weight: 700; color: var(--text);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .fc-embed-bar .fc-embed-src {
-      margin-left: auto; font-size: 0.62rem; font-weight: 700;
-      letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent);
-      white-space: nowrap;
-    }
-    .feed-card.is-embed .fc-frame { background: #000; line-height: 0; }
-    .feed-card.is-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
-
-    /* Cover art behind the Play button — a real poster (archive art / generated
-       cover) instead of a black void, dimmed so the play affordance stays legible. */
-    .feed-card.is-embed .fc-poster { position: relative; }
-    .feed-card.is-embed .fc-poster-img {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      object-fit: cover; opacity: 0.5; z-index: 0; pointer-events: none;
-    }
-    .feed-card.is-embed .fc-poster .fc-play,
-    .feed-card.is-embed .fc-poster .fc-playlabel { position: relative; z-index: 1; }
-
-    /* Fullscreen: letterbox the iframe to its real aspect (--arw/--arh) instead of
-       stretching. Inline aspect-ratio/max-width on the frame is overridden here. */
-    .feed-card.is-embed .fc-frame:fullscreen {
-      display: flex; align-items: center; justify-content: center;
-      background: #000; width: 100% !important; max-width: none !important; aspect-ratio: auto !important;
-    }
-    .feed-card.is-embed .fc-frame:fullscreen iframe {
-      width: auto; height: 100%; max-width: 100%;
-      aspect-ratio: var(--arw, 16) / var(--arh, 9);
-    }
-    .feed-card.is-embed .fc-foot {
-      display: flex; align-items: flex-start; gap: 10px;
-      padding: 11px 14px 13px;
-    }
-    .feed-card.is-embed .fc-lore {
-      font-size: 0.82rem; line-height: 1.5; color: var(--muted);
-      font-style: italic; margin: 0; flex: 1;
-    }
-    .feed-card.is-embed .fc-why { padding: 0 14px 12px; }
-
-    /* ── Single-active embed player: fullscreen control + click-to-play poster ── */
-    /* The embed controls (⛶ fullscreen + ✕ dismiss) live INLINE in the title bar,
-       grouped and spaced away from the source label. The base .fc-dismiss is
-       position:absolute (pinned to the card corner), which made the ✕ overlap the
-       ⛶ button — reset it to static here so the group lays out in flow. */
-    .fc-embed-bar .fc-embed-ctl {
-      display: flex; align-items: center; gap: 4px; margin-left: 12px;
-    }
-    .feed-card.is-embed .fc-dismiss {
-      position: static; opacity: 0.75;
-      width: 30px; height: 30px; font-size: 15px;
-      display: inline-flex; align-items: center; justify-content: center;
-    }
-    .feed-card.is-embed .fc-dismiss:hover { opacity: 1; }
-    .fc-embed-bar .fc-fullscreen {
-      border: none; background: transparent; color: var(--muted);
-      font-size: 16px; line-height: 1; cursor: pointer;
-      width: 30px; height: 30px; border-radius: 6px;
-      display: inline-flex; align-items: center; justify-content: center;
-      transition: background 0.15s, color 0.15s;
-    }
-    .fc-embed-bar .fc-fullscreen:hover { background: var(--surface2); color: var(--text); }
-    .fc-embed-bar .fc-fullscreen:focus-visible { outline: 2px solid var(--accent); }
-    .fc-embed-bar .fc-fullscreen[aria-pressed="true"] { color: var(--accent); background: var(--surface2); }
-    .feed-card.is-embed .fc-poster {
+    .chart-readout.show { opacity: 1; }
+    .chart-empty {
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 12px; width: 100%; height: 100%; box-sizing: border-box;
-      border: 0; cursor: pointer; font: inherit; color: #fff;
-      padding: 30px 16px; overflow: hidden;
-      background: radial-gradient(circle at 50% 38%,
-        color-mix(in srgb, var(--accent) 20%, #000) 0%, #000 78%);
+      gap: 6px; height: 220px; color: var(--muted); font-size: 0.85rem; text-align: center;
+      padding: 0 24px;
     }
-    .feed-card.is-embed .fc-poster .fc-play {
-      width: 58px; height: 58px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 23px; padding-left: 4px;
-      background: color-mix(in srgb, var(--accent) 88%, #000);
-      box-shadow: 0 4px 20px rgba(0,0,0,0.45);
-      transition: transform 0.15s ease;
-    }
-    .feed-card.is-embed .fc-poster:hover .fc-play,
-    .feed-card.is-embed .fc-poster:focus-visible .fc-play { transform: scale(1.09); }
-    .feed-card.is-embed .fc-poster .fc-playlabel {
-      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
-      opacity: 0.92;
-    }
-    .feed-card.is-embed .fc-poster:focus-visible {
-      outline: 2px solid var(--accent); outline-offset: -4px;
-    }
-    .feed-card.is-embed.is-playing .fc-embed-bar {
-      background: linear-gradient(180deg,
-        color-mix(in srgb, var(--accent) 36%, var(--surface)) 0%, var(--surface) 100%);
-    }
+    /* The class sets display:flex, which would otherwise beat the [hidden] UA
+       display:none — so the empty-state text stayed visible under a drawn chart.
+       Make `hidden` win. */
+    .chart-empty[hidden] { display: none; }
 
-    /* ── Slim quick-links row — replaces the old static panel grid. ── */
+    /* ── Range chips + chart-type toggle ── */
+    .chart-controls {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px 12px; flex-wrap: wrap;
+      padding: 14px 22px 4px; border-top: 1px solid var(--border); margin-top: 8px;
+    }
+    .range-row { display: flex; gap: 4px; flex-wrap: wrap; }
+    .range-chip {
+      font: inherit; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.02em;
+      padding: 6px 13px; border-radius: 999px; border: 1.5px solid transparent;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .range-chip:hover { color: var(--text); background: var(--surface2); }
+    .range-chip.active { background: var(--accent); color: #fff; }
+    .range-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Line ↔ Candlestick toggle — mirrors the trader's chart-type control. */
+    .chart-type {
+      display: inline-flex; gap: 2px; padding: 2px;
+      border: 1.5px solid var(--border); border-radius: 10px; background: var(--bg);
+    }
+    .ct-btn {
+      font: inherit; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em;
+      padding: 5px 11px; border: none; border-radius: 8px;
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: background 0.12s, color 0.12s;
+    }
+    .ct-btn:hover { color: var(--text); }
+    .ct-btn.active { background: var(--accent); color: #fff; }
+    .ct-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* ── Holdings ── */
+    .holding {
+      display: grid; grid-template-columns: 1fr auto; gap: 4px 12px;
+      align-items: center; padding: 13px 4px;
+      border-bottom: 1px solid var(--border); text-decoration: none; color: inherit;
+    }
+    .holding:last-child { border-bottom: none; }
+    .holding:hover { background: var(--surface2); border-radius: 8px; }
+    .h-sym { font-weight: 700; font-size: 0.96rem; color: var(--text); }
+    .h-sub { font-size: 0.72rem; color: var(--muted); }
+    .h-val { text-align: right; font-weight: 700; font-size: 0.94rem; font-variant-numeric: tabular-nums; color: var(--text); }
+    .h-pnl { text-align: right; font-size: 0.76rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .h-pnl.up { color: var(--gain); }
+    .h-pnl.down { color: var(--loss); }
+
+    /* ── Buying power ── */
+    .bp-value { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; color: var(--text); font-variant-numeric: tabular-nums; }
+    .bp-sub { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+    .bp-cta {
+      display: block; text-align: center; margin-top: 14px;
+      font-size: 0.82rem; font-weight: 700; padding: 10px; border-radius: 10px;
+      background: var(--accent); color: #fff; text-decoration: none;
+    }
+    .bp-cta:hover { background: var(--accent-hover); }
+
+    /* ── Watchlist ── */
+    .wl-add { display: flex; gap: 6px; margin-bottom: 10px; }
+    .wl-add input {
+      flex: 1; min-width: 0; font: inherit; font-size: 0.82rem;
+      padding: 7px 10px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: var(--bg); color: var(--text); text-transform: uppercase;
+    }
+    .wl-add input:focus-visible { outline: none; border-color: var(--accent); }
+    .wl-add button {
+      font: inherit; font-size: 0.82rem; font-weight: 700; padding: 7px 12px;
+      border: none; border-radius: 8px; background: var(--surface2); color: var(--text); cursor: pointer;
+    }
+    .wl-add button:hover { background: var(--accent); color: #fff; }
+    .wl-row {
+      display: grid; grid-template-columns: 1fr auto auto; gap: 4px 10px;
+      align-items: center; padding: 9px 2px; border-bottom: 1px solid var(--border);
+      text-decoration: none; color: inherit; position: relative;
+    }
+    .wl-row:last-child { border-bottom: none; }
+    .wl-row:hover { background: var(--surface2); border-radius: 8px; }
+    .wl-tk { font-weight: 700; font-size: 0.86rem; color: var(--text); }
+    .wl-px { text-align: right; font-size: 0.84rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text); }
+    .wl-chg {
+      text-align: right; font-size: 0.72rem; font-weight: 700; min-width: 58px;
+      padding: 2px 7px; border-radius: 6px; font-variant-numeric: tabular-nums;
+    }
+    .wl-chg.up { color: var(--gain); background: color-mix(in srgb, var(--gain) 14%, transparent); }
+    .wl-chg.down { color: var(--loss); background: color-mix(in srgb, var(--loss) 14%, transparent); }
+    .wl-chg.flat { color: var(--muted); background: var(--surface2); }
+    .wl-remove {
+      position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+      width: 22px; height: 22px; border: none; border-radius: 6px; background: var(--surface);
+      color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; opacity: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+    }
+    .wl-row:hover .wl-remove { opacity: 1; }
+    .wl-remove:hover { color: var(--loss); background: var(--surface2); }
+
+    /* ── News ── */
+    .news-row {
+      display: block; padding: 11px 2px; border-bottom: 1px solid var(--border);
+      text-decoration: none; color: inherit;
+    }
+    .news-row:last-child { border-bottom: none; }
+    .news-row:hover .nr-title { color: var(--accent-strong); }
+    .nr-meta { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; }
+    .nr-meta .nr-src { color: var(--accent-strong); }
+    .nr-title { font-size: 0.85rem; font-weight: 600; line-height: 1.4; color: var(--text); }
+
+    /* ── Skeleton shimmer ── */
+    .sk { background: var(--surface2); border-radius: 6px;
+      background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent) 10%, transparent) 50%, transparent 100%);
+      background-size: 200% 100%; animation: sk-sh 1.25s ease-in-out infinite; }
+    @keyframes sk-sh { to { background-position: -200% 0; } }
+    .sk-line { height: 12px; margin: 10px 0; }
+
+    .muted-note { color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+
+    /* ── Connect-broker prompt ── */
+    .connect-card { text-align: center; padding: 34px 24px; }
+    .connect-card h2 { font-size: 1.15rem; font-weight: 800; margin: 0 0 8px; }
+    .connect-card p { color: var(--muted); font-size: 0.92rem; line-height: 1.5; max-width: 420px; margin: 0 auto 16px; }
+    .connect-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .connect-actions a {
+      font-size: 0.85rem; font-weight: 700; padding: 10px 18px; border-radius: 10px; text-decoration: none;
+    }
+    .connect-actions a.primary { background: var(--accent); color: #fff; }
+    .connect-actions a.primary:hover { background: var(--accent-hover); }
+    .connect-actions a.ghost { border: 1.5px solid var(--border); color: var(--text); }
+    .connect-actions a.ghost:hover { border-color: var(--accent); }
+
+    /* ── Footer quick-links (keep the old Explore tool jumps discoverable) ── */
     .quick-links {
-      display: flex; flex-wrap: wrap; justify-content: center;
-      gap: 6px 18px;
-      max-width: 920px; margin: 40px auto 0;
-      padding: 18px 16px 4px;
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px;
+      max-width: 920px; margin: 40px auto 0; padding: 18px 16px 4px;
       border-top: 1px solid var(--border);
     }
-    .quick-links a {
-      font-size: 0.8rem; font-weight: 600; color: var(--muted);
-      text-decoration: none; transition: color 0.15s;
-    }
+    .quick-links a { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-decoration: none; }
     .quick-links a:hover { color: var(--accent); }
     .quick-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 
-    .all-tools {
-      max-width: 920px;
-      margin: 48px auto 0;
-      border-top: 1px solid var(--border);
-      padding-top: 8px;
-    }
-    .all-tools > summary {
-      cursor: pointer;
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      padding: 14px 0;
-      list-style: none;
-    }
-    .all-tools > summary::-webkit-details-marker { display: none; }
-    .all-tools > summary::before { content: '▸ '; }
-    .all-tools[open] > summary::before { content: '▾ '; }
-
-    .explore-section {
-      margin: 40px 0;
-    }
-    .explore-section-title {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin-bottom: 16px;
-    }
-    .explore-panels {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 14px;
-    }
-    @media (min-width: 740px) {
-      .explore-panels {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-    .panel {
-      position: relative;
-      padding: 20px 18px;
-      background: var(--surface);
-      border: 2px solid var(--border);
-      border-radius: 12px;
-      text-decoration: none;
-      color: inherit;
-      display: block;
-      transition: all 0.15s ease;
-      outline: none;
-    }
-    .panel::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--accent);
-      border-radius: 12px 12px 0 0;
-      transform: scaleX(0);
-      transform-origin: left;
-      transition: transform 0.2s ease;
-    }
-    .panel:hover,
-    .panel:focus-visible {
-      border-color: var(--accent);
-      box-shadow: var(--shadow-hover);
-      transform: translateY(-2px);
-    }
-    .panel:hover::before,
-    .panel:focus-visible::before {
-      transform: scaleX(1);
-    }
-    .panel:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-    .panel-icon {
-      font-size: 20px;
-      margin-bottom: 8px;
-    }
-    .panel-label {
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--accent);
-      display: block;
-      margin-bottom: 6px;
-    }
-    .panel h2 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin: 0 0 8px;
-      color: var(--text);
-    }
-    .panel p {
-      font-size: 0.9rem;
-      color: var(--muted);
-      line-height: 1.5;
-      margin: 0;
-    }
-    .panel-arrow {
-      display: inline-block;
-      font-size: 0.85rem;
-      color: var(--accent);
-      font-weight: 600;
-      margin-top: 8px;
-    }
-
-    /* ── Image showcase tile (feed art cards) — opens the shared lightbox ── */
-    .showcase-tile {
-      position: relative; display: block; padding: 0; border: 1px solid var(--border);
-      border-radius: 10px; overflow: hidden; cursor: zoom-in; background: #0a0a12;
-      transition: border-color .15s ease, transform .15s ease;
-    }
-    .showcase-tile:hover, .showcase-tile:focus-visible {
-      border-color: var(--accent); transform: translateY(-2px);
-      outline: none;
-    }
-    .showcase-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .showcase-tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
-    .showcase-tile.feature img { aspect-ratio: 4 / 5; }
-    .showcase-tile.small img { aspect-ratio: 3 / 4; }
-    .showcase-cap {
-      position: absolute; left: 0; right: 0; bottom: 0;
-      padding: 6px 10px; font-size: 0.72rem; color: #fff;
-      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.72));
-    }
-    /* lightbox preview */
-    .lightbox {
-      position: fixed; inset: 0; z-index: 1000;
-      display: none; align-items: center; justify-content: center;
-      background: rgba(0,0,0,0.86); padding: 24px;
-    }
-    .lightbox.open { display: flex; }
-    .lightbox img {
-      max-width: 92vw; max-height: 86vh; border-radius: 10px;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-    }
-    .lightbox img.pixelated { image-rendering: pixelated; }
-    .lightbox-cap {
-      position: absolute; bottom: 18px; left: 0; right: 0; text-align: center;
-      color: #ddd; font-size: 0.85rem;
-    }
-    .lightbox-close {
-      position: absolute; top: 16px; right: 20px;
-      background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.25);
-      width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; cursor: pointer;
-    }
-    .lightbox-close:hover { background: rgba(255,255,255,0.2); }
-
-    .explore-info-box {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 28px 24px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-    }
-    .explore-info-box h2 {
-      margin-top: 0;
-      margin-bottom: 14px;
-      font-size: 1.05rem;
-      font-weight: 700;
-    }
-    .explore-info-box p {
-      color: var(--muted);
-      line-height: 1.6;
-      margin-bottom: 12px;
-      font-size: 0.95rem;
-    }
-    .explore-info-box p:last-of-type {
-      margin-bottom: 0;
-    }
-
-    .video-embed {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 16 / 9;
-      border-radius: 10px;
-      overflow: hidden;
-      background: #000;
-      border: 1px solid var(--border);
-      margin-bottom: 16px;
-    }
-    .video-embed iframe {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      border: 0;
-    }
-
-    .video-carousel {
-      display: flex;
-      gap: 10px;
-      overflow-x: auto;
-      padding: 0 0 8px;
-      -webkit-overflow-scrolling: touch;
-    }
-    .video-thumb {
-      flex: 0 0 auto;
-      width: 160px;
-      cursor: pointer;
-      padding: 0;
-      text-align: left;
-      border-radius: 8px;
-      overflow: hidden;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: inherit;
-      font: inherit;
-      transition: transform 0.15s, border-color 0.15s;
-    }
-    .video-thumb:hover,
-    .video-thumb:focus-visible {
-      transform: translateY(-2px);
-      border-color: var(--accent);
-    }
-    .video-thumb:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-    .video-thumb.active {
-      border-color: var(--accent);
-    }
-    .video-thumb img {
-      width: 100%;
-      height: 90px;
-      object-fit: cover;
-      display: block;
-      background: #000;
-    }
-    .video-thumb .vt-title {
-      padding: 6px 8px;
-      font-size: 0.75rem;
-      line-height: 1.3;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .discover-grid {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: 1fr;
-    }
-    @media (min-width: 620px) {
-      .discover-grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-    }
-    @media (min-width: 920px) {
-      .discover-grid {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-    .discover-card {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 14px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
-      color: inherit;
-      text-decoration: none;
-      transition: transform 0.15s, border-color 0.15s;
-    }
-    .discover-card:hover,
-    .discover-card:focus-visible {
-      transform: translateY(-2px);
-      border-color: var(--accent);
-    }
-    .discover-card:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-    .discover-card .dc-title {
-      font-size: 0.9rem;
-      font-weight: 600;
-      line-height: 1.3;
-    }
-    .discover-card .dc-meta {
-      font-size: 0.7rem;
-      color: var(--muted);
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .discover-card .dc-source {
-      color: var(--accent);
-      font-weight: 700;
-    }
-    .discover-loading {
-      color: var(--muted);
-      font-size: 0.85rem;
-      padding: 6px 0;
-    }
-
-    .gh-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .gh-stars {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 700;
-      font-size: 0.8rem;
-      padding: 5px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: var(--bg);
-    }
-    .gh-cta {
-      font-size: 0.8rem;
-      font-weight: 700;
-      color: var(--accent);
-      text-decoration: none;
-    }
-    .gh-cta:hover {
-      text-decoration: underline;
-    }
-    .gh-grid {
-      display: grid;
-      gap: 20px;
-      grid-template-columns: 1fr;
-    }
-    @media (min-width: 700px) {
-      .gh-grid {
-        grid-template-columns: 1fr 1fr;
-      }
-    }
-    .gh-col h3 {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--accent);
-      margin: 0 0 12px;
-    }
-    .gh-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .gh-item {
-      display: flex;
-      gap: 8px;
-      align-items: baseline;
-      color: inherit;
-      text-decoration: none;
-      font-size: 0.85rem;
-      padding: 4px 4px;
-      border-radius: 4px;
-      outline: none;
-      transition: background-color 0.15s ease;
-    }
-    .gh-item:hover .gh-item-text,
-    .gh-item:focus-visible .gh-item-text {
-      color: var(--accent);
-    }
-    .gh-item:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 1px;
-    }
-    .gh-tag {
-      flex: 0 0 auto;
-      font-family: ui-monospace, 'Courier New', monospace;
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--accent);
-    }
-    .gh-item-text {
-      line-height: 1.4;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .gh-item-date {
-      display: block;
-      font-size: 0.65rem;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-    .gh-loading {
-      color: var(--muted);
-      font-size: 0.85rem;
-      padding: 6px 0;
-    }
-
-    .support-tiers {
-      display: grid;
-      gap: 12px;
-      grid-template-columns: 1fr;
-      margin-top: 14px;
-    }
-    @media (min-width: 620px) {
-      .support-tiers {
-        grid-template-columns: repeat(3, 1fr);
-      }
-    }
-    .tier-card {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding: 16px 14px;
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      background: var(--surface);
-      color: inherit;
-      text-decoration: none;
-      text-align: center;
-      transition: transform 0.15s, border-color 0.15s;
-    }
-    .tier-card:hover,
-    .tier-card:focus-visible {
-      transform: translateY(-2px);
-      border-color: var(--accent);
-    }
-    .tier-card:focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-    }
-    .tier-name {
-      font-weight: 700;
-      font-size: 0.95rem;
-    }
-    .tier-price {
-      font-size: 1.4rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-    }
-    .tier-price span {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--muted);
-    }
-    .tier-perk {
-      font-size: 0.75rem;
-      color: var(--muted);
-      line-height: 1.4;
-    }
-
-    /* ── Accessibility: Reduced Motion ── */
     @media (prefers-reduced-motion: reduce) {
-      * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
     }
-
-    /* ── Accessibility: High Contrast ── */
-    @media (prefers-contrast: more) {
-      .panel,
-      .feed-card {
-        border-width: 2px;
-      }
-      .panel:focus-visible {
-        outline-width: 3px;
-      }
-      .discover-card:focus-visible,
-      .video-thumb:focus-visible,
-      .tier-card:focus-visible,
-      .gh-item:focus-visible,
-      .feed-chip:focus-visible,
-      .feed-card:focus-within,
-      .fc-embed-bar .fc-fullscreen:focus-visible,
-      .feed-card .fc-dismiss:focus-visible,
-      .feed-card.is-embed .fc-poster:focus-visible {
-        outline-width: 3px;
-      }
-    }
-
-    /* ── Accessibility: Forced Colors ── */
     @media (forced-colors: active) {
-      .panel,
-      .discover-card,
-      .video-thumb,
-      .tier-card,
-      .feed-card {
-        border: 2px solid CanvasText;
-      }
-      .panel::before,
-      .discover-card::before,
-      .video-thumb::before,
-      .tier-card::before,
-      .feed-card::before {
-        background: CanvasText;
-      }
-      .feed-card .fc-thumb-ph { border: 1px solid CanvasText; }
+      .card, .holding, .wl-row, .news-row { border-color: CanvasText; }
     }
   </style>
 </head>
 <body>
 
-<!-- ── Skip to content link ── -->
 <a href="#main-content" class="skip-link">Skip to main content</a>
 
 <!-- Site nav injected by /js/site-chrome.js -->
 
 <div class="page">
-
-  <!-- ── Hero ── -->
-  <div class="explore-hero">
-    <h1>Explore & Discover</h1>
-    <p class="subtitle">Access advanced features, community tools, and additional experiences beyond the core journaling and trading platforms.</p>
-  </div>
-
   <main id="main-content">
+    <h1 class="visually-hidden">Your investing dashboard</h1>
+    <div class="dash">
 
-    <!-- ── Single ranked content pane (#1217) — /api/explore/feed ──
-         Filters are toggle buttons (aria-pressed), NOT an ARIA tablist: there are
-         no separate tabpanels and the feed stays in place, so the tab pattern would
-         have promised keyboard semantics (arrow-key roving, tabpanel) we don't
-         implement. A labelled button group is the honest, accessible model. -->
-    <div class="feed-chips" id="feedChips" role="group" aria-label="Filter feed by type">
-      <button type="button" class="feed-chip active" data-type="all" aria-pressed="true">All</button>
-      <button type="button" class="feed-chip" data-type="embed" aria-pressed="false"><span aria-hidden="true">🕹️</span> Play</button>
-      <button type="button" class="feed-chip" data-type="read" aria-pressed="false"><span aria-hidden="true">📰</span> Read</button>
-      <button type="button" class="feed-chip" data-topic="finance" aria-pressed="false"><span aria-hidden="true">📈</span> Finance</button>
-      <button type="button" class="feed-chip" data-type="watch" aria-pressed="false"><span aria-hidden="true">🎬</span> Watch</button>
-      <button type="button" class="feed-chip" data-type="listen" aria-pressed="false"><span aria-hidden="true">🎵</span> Listen</button>
-      <button type="button" class="feed-chip" data-type="build" aria-pressed="false"><span aria-hidden="true">🛠️</span> Build</button>
-      <button type="button" class="feed-chip" data-type="doc" aria-pressed="false"><span aria-hidden="true">📚</span> Docs</button>
-      <button type="button" class="feed-chip" data-type="belief" aria-pressed="false"><span aria-hidden="true">🌍</span> Beliefs</button>
-      <button type="button" class="feed-chip" data-topic="kingdome" aria-pressed="false"><span aria-hidden="true">♥</span> Kingdome</button>
-      <button type="button" class="feed-chip" data-topic="gage" aria-pressed="false"><span aria-hidden="true">✏️</span> Gage</button>
-    </div>
-    <div class="feed-toolbar">
-      <div class="feed-layout" id="feedLayout" role="group" aria-label="Feed layout">
-        <button type="button" class="feed-layout-btn active" data-layout="single" aria-pressed="true" aria-label="Single column" title="Single column"><span aria-hidden="true">▤</span></button>
-        <button type="button" class="feed-layout-btn" data-layout="grid" aria-pressed="false" aria-label="Grid layout" title="Grid"><span aria-hidden="true">▦</span></button>
-      </div>
-    </div>
-    <div class="feed-status" id="feedStatus" role="status" aria-live="polite">Loading your feed…</div>
-    <div class="feed-stream" id="feedStream" role="feed" aria-busy="true" aria-label="Ranked content feed"></div>
+      <!-- ══ LEFT / MAIN: portfolio + holdings ══ -->
+      <div class="dash-main">
 
-    <!-- Desktop share-menu popover (Web Share API fallback); positioned per-click. -->
-    <div class="share-menu" id="shareMenu" role="menu" aria-label="Share this post" hidden></div>
-    <div class="share-toast" id="shareToast" role="status" aria-live="polite"></div>
+        <!-- Portfolio header + equity chart -->
+        <section class="card port-hero" id="portCard" aria-label="Portfolio overview">
+          <div class="port-greeting">
+            <span id="greeting">Portfolio overview</span>
+            <span class="acct-pill" id="acctPill" hidden></span>
+          </div>
+          <div class="port-value" id="portValue">$—</div>
+          <div class="port-change" id="portChange" aria-live="polite">
+            <span class="pc-range">Loading your account…</span>
+          </div>
 
-    <!-- The Kingdome of Hearts gallery + Gage's showcase are no longer static walls
-         glued to the bottom of every view: each image/video is now a ranked `art`
-         feed card (lib/explore-feed galleryCards/gageCards), filterable via the
-         ♥ Kingdome / ✏️ Gage chips and fed through the same PCSF algorithm.
-         Only this shared lightbox markup remains — feed `art` cards reuse it. -->
+          <div class="chart-wrap">
+            <div class="chart-readout" id="chartReadout" role="status" aria-live="off"></div>
+            <canvas class="chart-canvas" id="equityChart" aria-label="Portfolio value over time"></canvas>
+            <div class="chart-empty" id="chartEmpty" hidden></div>
+          </div>
 
-    <!-- lightbox preview overlay (shared by every feed art card) -->
-    <div class="lightbox" id="kohLightbox" role="dialog" aria-modal="true" aria-label="Image preview">
-      <button type="button" class="lightbox-close" id="kohClose" aria-label="Close preview">✕</button>
-      <img id="kohLightboxImg" src="" alt="Image preview">
-      <div class="lightbox-cap" id="kohLightboxCap"></div>
-    </div>
+          <div class="chart-controls">
+            <div class="range-row" id="rangeRow" role="group" aria-label="Chart time range">
+              <button type="button" class="range-chip active" data-range="1D" aria-pressed="true">1D</button>
+              <button type="button" class="range-chip" data-range="1W" aria-pressed="false">1W</button>
+              <button type="button" class="range-chip" data-range="1M" aria-pressed="false">1M</button>
+              <button type="button" class="range-chip" data-range="3M" aria-pressed="false">3M</button>
+              <button type="button" class="range-chip" data-range="YTD" aria-pressed="false">YTD</button>
+              <button type="button" class="range-chip" data-range="1Y" aria-pressed="false">1Y</button>
+              <button type="button" class="range-chip" data-range="ALL" aria-pressed="false">ALL</button>
+            </div>
+            <div class="chart-type" id="chartType" role="group" aria-label="Chart type">
+              <button type="button" class="ct-btn active" data-type="line" aria-pressed="true" title="Line chart"><span aria-hidden="true">〜</span> Line</button>
+              <button type="button" class="ct-btn" data-type="candle" aria-pressed="false" title="Candlestick chart"><span aria-hidden="true">▮</span> Candles</button>
+            </div>
+          </div>
+        </section>
 
+        <!-- Holdings -->
+        <section class="card" id="holdingsCard" aria-label="Your positions">
+          <h2 class="card-head">Positions <a class="ch-action" href="/stock-trader.html">Trade →</a></h2>
+          <div id="holdingsList">
+            <div class="sk sk-line" style="width:70%"></div>
+            <div class="sk sk-line" style="width:55%"></div>
+            <div class="sk sk-line" style="width:62%"></div>
+          </div>
+        </section>
 
-    <!-- ── Single slim quick-links row — the feed is the page; everything else
-         is a text link, not an engagement-less panel (#1217 single-pane). ── -->
+      </div><!-- /dash-main -->
+
+      <!-- ══ RIGHT: buying power → watchlist → news ══ -->
+      <aside class="dash-side">
+
+        <div class="card" id="bpCard" aria-label="Buying power">
+          <h2 class="card-head">Buying power</h2>
+          <div class="bp-value" id="bpValue">$—</div>
+          <div class="bp-sub" id="bpSub">Available to invest</div>
+          <a class="bp-cta" href="/stock-trader.html">Open trader</a>
+        </div>
+
+        <div class="card" id="wlCard" aria-label="Your watchlist">
+          <h2 class="card-head">Watchlist <a class="ch-action" href="/stock-trader.html">Manage →</a></h2>
+          <form class="wl-add" id="wlAdd" autocomplete="off">
+            <input type="text" id="wlInput" placeholder="Add symbol (e.g. AAPL)" aria-label="Add a symbol to your watchlist" maxlength="10">
+            <button type="submit">Add</button>
+          </form>
+          <div id="wlList">
+            <div class="sk sk-line" style="width:80%"></div>
+            <div class="sk sk-line" style="width:65%"></div>
+          </div>
+        </div>
+
+        <div class="card" id="newsCard" aria-label="Market news">
+          <h2 class="card-head">Market news</h2>
+          <div id="newsList">
+            <div class="sk sk-line" style="width:90%"></div>
+            <div class="sk sk-line" style="width:75%"></div>
+            <div class="sk sk-line" style="width:85%"></div>
+          </div>
+        </div>
+
+      </aside>
+
+    </div><!-- /dash -->
+
+    <!-- Keep the old Explore tool jumps reachable -->
     <nav class="quick-links" aria-label="Jump to Unisona tools">
+      <a href="/stock-trader.html">📈 Trader</a>
+      <a href="/kalshi-terminal.html">🎯 Kalshi</a>
       <a href="/fallout-radio.html">📻 Radio</a>
       <a href="/orchestration.html">Work board</a>
-      <a href="/knowledgecenter.html#library">Library</a>
       <a href="/knowledgecenter.html">Knowledge Center</a>
-      <a href="/api-keys-settings.html">Settings</a>
+      <a href="/settings.html">Settings</a>
       <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
-      <a href="https://www.patreon.com/cw/UnisonaAI" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
+      <a href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">♥ Patreon ↗</a>
     </nav>
 
   </main>
-
 </div>
 
 <!-- Site footer injected by /js/site-chrome.js -->
@@ -1161,739 +380,534 @@
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 <script>
-/* Theme toggle event listener */
-document.addEventListener('DOMContentLoaded', () => {
-  // NOTE: the global-header theme button (injected by site-chrome.js) already
-  // calls toggleTheme() via its onclick. Do NOT add a second click listener here
-  // — two handlers fire per click and cancel out, so the toggle appears dead.
-
-  /* Shared image-preview lightbox — serves every .showcase-tile[data-full]
-     rendered by the feed (Kingdome of Hearts + Gage `art` cards, the explore showcase→feed change). */
-  const box = document.getElementById('kohLightbox');
-  const boxImg = document.getElementById('kohLightboxImg');
-  const boxCap = document.getElementById('kohLightboxCap');
-  const closeBtn = document.getElementById('kohClose');
-  let lastFocus = null;
-  if (box) {
-    const open = (tile) => {
-      lastFocus = tile;
-      boxImg.src = tile.getAttribute('data-full');
-      boxImg.alt = tile.getAttribute('data-cap') || '';
-      boxImg.classList.toggle('pixelated', tile.getAttribute('data-pixel') === '1');
-      boxCap.textContent = tile.getAttribute('data-cap') || '';
-      box.classList.add('open');
-      closeBtn.focus();
-    };
-    const close = () => {
-      box.classList.remove('open');
-      boxImg.src = '';
-      if (lastFocus) lastFocus.focus();
-    };
-    document.addEventListener('click', (e) => {
-      const tile = e.target.closest('.showcase-tile[data-full]');
-      if (tile) open(tile);
-    });
-    closeBtn.addEventListener('click', close);
-    box.addEventListener('click', (e) => { if (e.target === box) close(); });
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && box.classList.contains('open')) close();
-    });
-  }
-});
-
-/* Status connection indicator */
-(async function() {
-  const $ = id => document.getElementById(id);
-
-  async function checkStatus() {
-    const dot = $('status-dot');
-    const label = $('status-label');
-    if (!dot) return;
-    try {
-      const r = await fetch('/api/health', { cache: 'no-store', signal: AbortSignal.timeout(3000) });
-      const data = r.ok ? await r.json() : null;
-      const online = !!(data && data.ok);
-      dot.className = online ? 'dot online' : 'dot offline';
-      if (label) label.textContent = online ? 'Server online' : 'Server unreachable';
-    } catch {
-      dot.className = 'dot offline';
-      if (label) label.textContent = 'Server unreachable';
-    }
-  }
-
-  checkStatus();
-  setInterval(checkStatus, 30000);
-})();
-</script>
-
-<script>
-/* Single ranked content pane (#1217) — /api/explore/feed.
-   One PCSF-ranked stream of typed cards with filter chips. Every card carries a
-   "why surfaced" line (the Verify rule, made visible). Click = engagement,
-   ✕ = dismiss; both POST to /api/explore/interaction so the leaderboard learns. */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Personalized dashboard controller.
+   Reads the SAME trading endpoints the trader page uses:
+     • GET /api/trading/positions            → equity, buying power, holdings
+     • GET /api/trading/portfolio/history    → equity curve (Robinhood chart)
+     • GET /api/trading/watchlist            → the user's own symbols
+     • GET /api/trading/watchlist-prices     → live prices (global map)
+     • GET /api/trading/price-feed?symbol=   → price for uncovered symbols
+     • POST /api/explore/feed/page (finance) → market news headlines
+   Everything degrades honestly: no broker → connect prompt; no history → flat
+   baseline; feed offline → a quiet note. Nothing here places an order.
+   ═══════════════════════════════════════════════════════════════════════════ */
 (function () {
-  const stream = document.getElementById('feedStream');
-  const statusEl = document.getElementById('feedStatus');
-  const chips = document.getElementById('feedChips');
-  if (!stream) return;
-
-  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const ICON = { embed: '🕹️', read: '📰', watch: '🎬', listen: '🎵', build: '🛠️', doc: '📚', belief: '🌍', art: '🎨', action: '⚡' };
+  const usd = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtMoney = (n) => usd.format(Number(n) || 0);
+  const fmtPct = (n) => (n >= 0 ? '+' : '') + (Number(n) || 0).toFixed(2) + '%';
+  const cssVar = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
 
-  // Share affordance — rendered on every card (parallel to the ✕ dismiss). Data
-  // is stamped onto the button after render (shareUrlFor); a delegated handler
-  // opens the native share sheet (Web Share API) or the desktop popover menu.
-  const SHARE_BTN = '<button type="button" class="fc-share" aria-label="Share this post" title="Share">↗</button>';
+  let account = null;
+  let positions = [];
+  let curRange = '1D';
+  let series = null;   // { timestamps:[], equity:[], baseline }
 
-  // Only http(s) and root-relative URLs are linkable. A card url is sourced from
-  // 3rd-party RSS/API data, so a `javascript:`/`data:` scheme must never reach an
-  // href (esc() escapes quotes but not the scheme). Anything else renders inert.
-  const safeUrl = u => (/^https?:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '#';
+  // Demo showroom: logged-out / non-entitled visitors see the simulated champion
+  // account (read-only) instead of a "connect a broker" prompt, so the dashboard is
+  // never empty for them. `demoMode` is set to 'champion' either by an explicit
+  // ?demo=champion in the URL or, in init(), when the session lacks the trade
+  // entitlement. Entitled traders leave it null → their own broker data loads.
+  let demoMode = new URLSearchParams(location.search).get('demo') || null;
+  const demoParam = (sep) => (demoMode ? sep + 'demo=' + encodeURIComponent(demoMode) : '');
 
-  // Lead-image src guard — only https or root-relative URLs render as an <img>.
-  const safeImg = u => (/^https:\/\//i.test(u) || /^\/[^/]/.test(u)) ? u : '';
-
-  // An embed src may only be a root-relative path (our own /t-rex/) or an https
-  // archive.org/youtube embed URL. Anything else is dropped — never framed.
-  const EMBED_HOSTS = /^https:\/\/(archive\.org|[a-z0-9-]+\.github\.io|www\.youtube(?:-nocookie)?\.com|player\.vimeo\.com)\//i;
-  const safeEmbedSrc = u => (/^\/[^/]/.test(u) || EMBED_HOSTS.test(u)) ? u : '';
-
-  function shortDate(d) {
-    if (!d) return '';
-    const t = typeof d === 'number' ? (d > 1e12 ? d : d * 1000) : Date.parse(d);
-    if (!t || Number.isNaN(t)) return '';
-    try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); }
-    catch { return ''; }
-  }
-
-  function record(key, event, dwellMs) {
-    if (!key) return;
+  // ── Portfolio header + holdings ──────────────────────────────────────────
+  async function loadPositions() {
+    let data = null;
     try {
-      navigator.sendBeacon
-        ? navigator.sendBeacon('/api/explore/interaction',
-            new Blob([JSON.stringify({ key, event, dwellMs })], { type: 'application/json' }))
-        : fetch('/api/explore/interaction', { method: 'POST', keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, event, dwellMs }) });
-    } catch (e) { /* non-blocking */ }
+      const r = await fetch('/api/trading/positions' + demoParam('?'), { cache: 'no-store', signal: AbortSignal.timeout(9000) });
+      data = r.ok ? await r.json() : null;
+    } catch (_e) { data = null; }
+    account = (data && data.account) || {};
+    positions = (data && Array.isArray(data.positions)) ? data.positions : [];
+    const connected = (Number(account.equity) > 0) || positions.length > 0;
+
+    if (!connected) { renderNotConnected(); return false; }
+
+    // Account label pill (demo / paper / live).
+    const pill = $('acctPill');
+    if (account.mode) {
+      pill.hidden = false;
+      pill.textContent = account.mode === 'live' ? 'Live' : account.mode === 'demo' ? 'Demo' : 'Paper';
+      pill.classList.toggle('live', account.mode === 'live');
+    }
+    $('greeting').textContent = account.demo
+      ? 'Demo portfolio — the champion strategy'
+      : (account.account_id ? ('Account · ' + account.account_id) : 'Portfolio overview');
+
+    renderHoldings();
+    renderBuyingPower();
+    return true;
   }
 
-  // ── Share to socials ──────────────────────────────────────────────────────
-  // Resolve a card to an absolute, shareable URL. External links share directly;
-  // local art/embeds resolve to an absolute origin URL; anything else falls back
-  // to the Explore page itself so a share is never a dead link.
-  function shareUrlFor(c) {
-    const u = (c && (c.url || (c.media && c.media.full))) || '';
-    if (/^https?:\/\//i.test(u)) return u;
-    if (/^\/[^/]/.test(u)) { try { return new URL(u, location.origin).href; } catch (_) {} }
-    return location.origin + '/explore.html';
+  function renderNotConnected() {
+    $('portValue').textContent = 'Get started';
+    $('portChange').innerHTML = '<span class="pc-range">Connect a brokerage to see your portfolio</span>';
+    $('chartEmpty').hidden = false;
+    $('chartEmpty').textContent = 'Your equity curve appears here once an account is linked.';
+    $('equityChart').style.display = 'none';
+    $('holdingsCard').innerHTML =
+      '<div class="connect-card">' +
+        '<h2>No brokerage connected yet</h2>' +
+        '<p>Link an Interactive Brokers or Alpaca account to track positions, buying power, and your equity curve here. Paper trading works with no money down.</p>' +
+        '<div class="connect-actions">' +
+          '<a class="primary" href="/ibkr-connect.html">Connect brokerage</a>' +
+          '<a class="ghost" href="/stock-trader.html">Explore the trader</a>' +
+        '</div>' +
+      '</div>';
+    $('bpValue').textContent = '$0.00';
+    $('bpSub').textContent = 'Connect an account to fund';
   }
 
-  const shareMenu = document.getElementById('shareMenu');
-  const shareToast = document.getElementById('shareToast');
-  let toastTimer = null;
-  function toast(msg) {
-    if (!shareToast) return;
-    shareToast.textContent = msg;
-    shareToast.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => shareToast.classList.remove('show'), 1900);
+  function renderBuyingPower() {
+    const bp = Number(account.buying_power);
+    const cash = Number(account.cash);
+    const val = Number.isFinite(bp) && bp > 0 ? bp : (Number.isFinite(cash) ? cash : 0);
+    $('bpValue').textContent = fmtMoney(val);
+    $('bpSub').textContent = Number.isFinite(cash)
+      ? ('Cash ' + fmtMoney(cash) + ' · available to invest')
+      : 'Available to invest';
   }
 
-  // Social share targets — public intent URLs, no SDK/tracker. {u}=url, {t}=title.
-  const SHARE_TARGETS = [
-    { id: 'x',        ico: '𝕏',  label: 'Share on X',        href: (u, t) => 'https://twitter.com/intent/tweet?url=' + u + '&text=' + t },
-    { id: 'facebook', ico: 'f',  label: 'Share on Facebook', href: (u) => 'https://www.facebook.com/sharer/sharer.php?u=' + u },
-    { id: 'reddit',   ico: '🅡', label: 'Share on Reddit',   href: (u, t) => 'https://www.reddit.com/submit?url=' + u + '&title=' + t },
-    { id: 'linkedin', ico: 'in', label: 'Share on LinkedIn', href: (u) => 'https://www.linkedin.com/sharing/share-offsite/?url=' + u },
-    { id: 'whatsapp', ico: '🟢', label: 'Share on WhatsApp', href: (u, t) => 'https://api.whatsapp.com/send?text=' + t + '%20' + u },
-  ];
-
-  function closeShareMenu() {
-    if (!shareMenu) return;
-    shareMenu.classList.remove('open');
-    shareMenu.hidden = true;
-    shareMenu.innerHTML = '';
-  }
-
-  function openShareMenu(anchor, url, title) {
-    if (!shareMenu) return;
-    const eu = encodeURIComponent(url), et = encodeURIComponent(title);
-    let html = '';
-    SHARE_TARGETS.forEach((s) => {
-      html += '<a role="menuitem" href="' + esc(s.href(eu, et)) + '" target="_blank" rel="noopener noreferrer">' +
-        '<span class="sm-ico" aria-hidden="true">' + s.ico + '</span>' + esc(s.label) + '</a>';
-    });
-    html += '<button type="button" role="menuitem" class="sm-copy">' +
-      '<span class="sm-ico" aria-hidden="true">🔗</span>Copy link</button>';
-    shareMenu.innerHTML = html;
-    shareMenu.hidden = false;
-    shareMenu.classList.add('open');
-    // Position under the button, kept within the viewport.
-    const r = anchor.getBoundingClientRect();
-    const mw = shareMenu.offsetWidth || 180;
-    let left = window.scrollX + r.right - mw;
-    left = Math.max(window.scrollX + 8, left);
-    shareMenu.style.top = (window.scrollY + r.bottom + 6) + 'px';
-    shareMenu.style.left = left + 'px';
-    const copyBtn = shareMenu.querySelector('.sm-copy');
-    if (copyBtn) copyBtn.addEventListener('click', () => {
-      const done = () => { toast('Link copied'); closeShareMenu(); };
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(url).then(done, done);
-      } else {
-        try { const ta = document.createElement('textarea'); ta.value = url; document.body.appendChild(ta);
-          ta.select(); document.execCommand('copy'); ta.remove(); } catch (_) {}
-        done();
-      }
-    });
-    shareMenu.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => { toast('Opening share…'); closeShareMenu(); }));
-    const first = shareMenu.querySelector('a, button');
-    if (first) first.focus();
-  }
-
-  function doShare(btn) {
-    const url = btn.dataset.url || (location.origin + '/explore.html');
-    const title = btn.dataset.title || 'Unisona Explore';
-    record(btn.dataset.key || '', 'like', 0);   // sharing = a strong positive signal
-    if (navigator.share) {
-      navigator.share({ title, url }).catch(() => {});
+  function renderHoldings() {
+    const box = $('holdingsList');
+    if (!box) return;
+    if (!positions.length) {
+      box.innerHTML = '<p class="muted-note">No open positions. Head to the trader to place your first order.</p>';
       return;
     }
-    if (shareMenu && shareMenu.classList.contains('open')) { closeShareMenu(); return; }
-    openShareMenu(btn, url, title);
+    // Sort by market value, biggest first.
+    const rows = positions.slice().sort((a, b) =>
+      Math.abs(Number(b.market_value) || 0) - Math.abs(Number(a.market_value) || 0));
+    box.innerHTML = rows.map((p) => {
+      const qty = Number(p.qty) || 0;
+      const avg = Number(p.avg_entry_price) || 0;
+      const mv = Number(p.market_value) || 0;
+      const pnl = Number(p.unrealized_pl) || 0;
+      const pct = Number(p.pnl_pct) || 0;
+      const up = pnl >= 0;
+      const sub = (qty % 1 === 0 ? qty : qty.toFixed(4)) + ' sh · avg ' + fmtMoney(avg);
+      return '<a class="holding" href="/stock-trader.html?symbol=' + encodeURIComponent(p.symbol) + '">' +
+        '<span class="h-sym">' + esc(p.symbol) + '</span>' +
+        '<span class="h-val">' + fmtMoney(mv) + '</span>' +
+        '<span class="h-sub">' + esc(sub) + '</span>' +
+        '<span class="h-pnl ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '') + fmtMoney(pnl) + ' (' + fmtPct(pct) + ')</span>' +
+      '</a>';
+    }).join('');
   }
 
-  // Delegated share handler + dismissal of the popover on outside click / Esc.
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest && e.target.closest('.fc-share');
-    if (btn) { e.preventDefault(); e.stopPropagation(); doShare(btn); return; }
-    if (shareMenu && shareMenu.classList.contains('open') && !e.target.closest('.share-menu')) closeShareMenu();
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && shareMenu && shareMenu.classList.contains('open')) closeShareMenu();
-  });
-  window.addEventListener('scroll', () => { if (shareMenu && shareMenu.classList.contains('open')) closeShareMenu(); }, { passive: true });
-
-  // Impression logging (#1221): the CTR denominator. Fire one 'impression' per card
-  // the first time it actually scrolls into view (not merely rendered off-screen),
-  // then stop observing it. Click/dwell/dismiss (the numerator) are logged elsewhere,
-  // so /api/explore/metrics can compute a real CTR = engagements / impressions.
-  const impressed = new Set();
-  const impressionObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting) return;
-      const key = entry.target.dataset.key;
-      if (key && !impressed.has(key)) { impressed.add(key); record(key, 'impression', 0); }
-      impressionObserver.unobserve(entry.target);
-    });
-  }, { threshold: 0.5 }) : null;
-
-  let filter = 'all';
-  let filterKind = 'type';           // 'type' (media type chip) | 'topic' (cross-cutting, e.g. finance)
-  const seen = new Set();            // stable card ids already shown (dedup across pages)
-  let loading = false, totalShown = 0, cycles = 0;
-
-  // ── Single-active embed player (YouTube / TikTok-style) ──
-  // Game / film / radio iframes are heavy: a live frame keeps emulating or
-  // playing audio forever. With an endless scroll that means many run at once —
-  // overlapping sound, no keyboard focus, a melted CPU. So an embed renders as a
-  // POSTER until you press Play. Activating one tears DOWN every other active
-  // iframe (only ONE plays at a time), focuses it so the keyboard drives the
-  // game, and exposes fullscreen. Scrolling an active embed fully off-screen
-  // unloads it (no audio from off-screen panels). Activation = the engagement
-  // signal (a real "played it", stronger than passive dwell).
-  let activeEmbed = null;
-
-  // Stop an active embed once it scrolls fully out of view. Re-entry needs another
-  // Play click — never auto-blasts audio.
-  const playObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (!entry.isIntersecting && entry.target === activeEmbed) deactivateEmbed(entry.target);
-    });
-  }, { threshold: 0 }) : null;
-
-  function deactivateEmbed(el) {
-    if (!el) return;
-    const frame = el.querySelector('.fc-frame');
-    if (frame && el._posterHTML != null) frame.innerHTML = el._posterHTML; // unload → stops audio/emulation
-    el.classList.remove('is-playing');
-    if (playObserver) playObserver.unobserve(el);
-    if (activeEmbed === el) activeEmbed = null;
-  }
-
-  function activateEmbed(el) {
-    const e = el._embed; if (!e) return;
-    if (activeEmbed && activeEmbed !== el) deactivateEmbed(activeEmbed); // enforce single active
-    const frame = el.querySelector('.fc-frame');
-    // Fill the aspect-sized frame (w>0) or the fixed-height bar (audio, w=0).
-    const iframeStyle = e.w > 0 ? 'width:100%;height:100%;display:block' : 'width:100%;height:' + e.h + 'px;display:block';
-    frame.innerHTML =
-      '<iframe src="' + esc(e.src) + '" style="' + iframeStyle + '" ' +
-        'title="' + esc(e.title) + '" allow="autoplay; fullscreen; gamepad" ' +
-        'referrerpolicy="no-referrer" ' +
-        'sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-pointer-lock"></iframe>';
-    el.classList.add('is-playing');
-    activeEmbed = el;
-    record(e.key, 'click', 0);                       // activation = engagement
-    const iframe = frame.querySelector('iframe');
-    const focusIt = () => { try { iframe.focus(); } catch (_) {} };
-    iframe.addEventListener('load', focusIt);
-    setTimeout(focusIt, 60);
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    if (playObserver) playObserver.observe(el);      // stop it when scrolled away
-  }
-
-  function toggleFullscreen(el) {
-    if (document.fullscreenElement) { document.exitFullscreen && document.exitFullscreen(); return; }
-    // Fullscreen the FRAME (not the bare iframe) so the :fullscreen CSS can
-    // letterbox the iframe to its real aspect (--arw/--arh) instead of stretching.
-    const node = el.querySelector('.fc-frame') || el;
-    const req = node.requestFullscreen || node.webkitRequestFullscreen || node.msRequestFullscreen;
-    if (req) { try { req.call(node); } catch (_) {} }
-  }
-
-  // Keep the ⛶ button's aria-pressed in sync with real fullscreen state — including
-  // when the user exits via Esc / the browser chrome (not just our button).
-  document.addEventListener('fullscreenchange', () => {
-    stream.querySelectorAll('.fc-fullscreen[aria-pressed="true"]')
-      .forEach(b => b.setAttribute('aria-pressed', 'false'));
-    const fsEl = document.fullscreenElement;
-    const card = fsEl && fsEl.closest ? fsEl.closest('.feed-card.is-embed') : null;
-    const btn = card && card.querySelector('.fc-fullscreen');
-    if (btn) btn.setAttribute('aria-pressed', 'true');
-  });
-
-  // Generated lead thumbnail for cards with no (or a broken) source image. The
-  // type glyph is decorative (aria-hidden) — the card already exposes its type via
-  // the fc-type eyebrow and its title via the article label.
-  function placeholderThumb(type) {
-    const ph = document.createElement('div');
-    ph.className = 'fc-thumb-ph';
-    ph.setAttribute('aria-hidden', 'true');
-    ph.innerHTML = '<span class="fc-ph-icon">' + (ICON[type] || '◈') + '</span>';
-    return ph;
-  }
-
-  // Pick the best tile for a company logo by reading its pixels (CORS-enabled):
-  //  • mostly-opaque logo (its own baked background) → fill the tile like a photo
-  //  • transparent dark logo  → LIGHT tile (so it's visible)
-  //  • transparent bright logo → DARK tile
-  // CORS taint / any failure → safe default (light tile, where most logos read).
-  function pickLogoTile(im) {
-    if (im.dataset.tiled) return;
-    im.dataset.tiled = '1';
+  // ── Equity chart ─────────────────────────────────────────────────────────
+  async function loadHistory(range) {
+    curRange = range;
+    let data = null;
     try {
-      const w = im.naturalWidth, h = im.naturalHeight;
-      if (!w || !h) { im.classList.add('is-logo-light'); return; }
-      const cv = document.createElement('canvas');
-      cv.width = Math.min(w, 64); cv.height = Math.min(h, 64);
-      const cx = cv.getContext('2d');
-      cx.drawImage(im, 0, 0, cv.width, cv.height);
-      const d = cx.getImageData(0, 0, cv.width, cv.height).data;
-      let lum = 0, a = 0, opaque = 0, total = 0;
-      for (let i = 0; i < d.length; i += 4) {
-        total++;
-        const al = d[i + 3] / 255;
-        if (al > 0.9) opaque++;
-        if (al < 0.15) continue;
-        lum += (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) * al;
-        a += al;
-      }
-      const avg = a ? lum / a : 128;
-      // ALWAYS contain the mark — cover-cropping a small company logo upscales and
-      // crops it, which reads as "zoomed in and pixelated". Only the TILE shade changes.
-      if (total && opaque / total > 0.9) {
-        // Opaque logo ships its own background → sit it on a tile MATCHING that
-        // background's brightness so it blends seamlessly (contained, not cropped).
-        im.classList.add(avg >= 140 ? 'is-logo-light' : 'is-logo-dark', 'is-logo-ownbg');
-      } else {
-        // Transparent mark → CONTRASTING tile so it stays visible.
-        im.classList.add(avg >= 140 ? 'is-logo-dark' : 'is-logo-light');
-      }
-    } catch (e) {
-      im.classList.add('is-logo-light'); // tainted canvas → safe default
-    }
-  }
+      const r = await fetch('/api/trading/portfolio/history?range=' + encodeURIComponent(range) + demoParam('&'), { cache: 'no-store', signal: AbortSignal.timeout(9000) });
+      data = r.ok ? await r.json() : null;
+    } catch (_e) { data = null; }
 
-  function cardEl(c, posinset) {
-    const el = document.createElement('div');
-    el.dataset.type = c.type;
-    el.dataset.key = c.key || '';
-    // ARIA feed pattern: each card is an article with an accessible name (the
-    // title) and a position. The feed is endless, so set size is unknown (-1).
-    el.setAttribute('role', 'article');
-    if (c.title) el.setAttribute('aria-label', String(c.title));
-    if (posinset) { el.setAttribute('aria-posinset', String(posinset)); el.setAttribute('aria-setsize', '-1'); }
-    const why = c.evidence && c.evidence.why ? c.evidence.why : '';
-    const embedSrc = (c.embed && c.embed.src) ? safeEmbedSrc(c.embed.src) : '';
-    const media = c.media || null;
-    const date = shortDate(c.published);
-
-    if (media && media.kind === 'video') {
-      // Self-hosted video card — Gage's BFDM episodes. Native controls,
-      // preload="none" so the poster shows without fetching the mp4; a 'play'
-      // handler enforces single-active (pause other videos, stop any open embed).
-      el.className = 'feed-card is-video';
-      const vsrc = safeImg(media.src || '');           // https / root-relative only
-      const poster = safeImg(media.poster || c.image || '');
-      el.innerHTML =
-        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '🎬') + '</span> ' + esc(c.type) + '</span>' +
-          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
-        '<div class="fc-frame fc-video">' +
-          (vsrc
-            ? '<video controls preload="none" playsinline' + (poster ? ' poster="' + esc(poster) + '"' : '') + '>' +
-                '<source src="' + esc(vsrc) + '" type="video/mp4"></video>'
-            : '<div class="fc-thumb-ph" aria-hidden="true"><span class="fc-ph-icon">🎬</span></div>') +
-        '</div>' +
-        '<span class="fc-title">' + esc(c.title) + '</span>' +
-        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
-        SHARE_BTN +
-        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
-      const vid = el.querySelector('video');
-      if (vid) vid.addEventListener('play', () => {
-        stream.querySelectorAll('video').forEach((v) => { if (v !== vid) { try { v.pause(); } catch (_) {} } });
-        if (activeEmbed) deactivateEmbed(activeEmbed);   // a game/film yields to the video
-        record(c.key, 'click', 0);                       // playing = engagement
-      });
-    } else if (media && media.kind === 'image') {
-      // Image showcase card — Kingdome of Hearts art + Gage sprites. The
-      // lead art opens the shared lightbox full-size: the button carries
-      // .showcase-tile[data-full], picked up by the global lightbox delegate.
-      el.className = 'feed-card is-art';
-      const full = safeImg(media.full || '');
-      const thumb = safeImg(c.image || media.thumb || '') || full;
-      const fb = safeImg(c.imageFallback || '');
-      const pixCls = media.pixel ? ' pixelated' : '';
-      el.innerHTML =
-        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '🎨') + '</span> ' + esc(c.type) + '</span>' +
-          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
-        (full
-          ? '<button type="button" class="fc-media showcase-tile" data-full="' + esc(full) + '" data-cap="' + esc(c.title || '') + '"' + (media.pixel ? ' data-pixel="1"' : '') + '>' +
-              '<img class="fc-media-img' + pixCls + '" src="' + esc(thumb) + '" alt="' + esc(c.title || '') + '" loading="lazy" referrerpolicy="no-referrer">' +
-            '</button>'
-          : '<div class="fc-thumb-ph" aria-hidden="true"><span class="fc-ph-icon">🎨</span></div>') +
-        '<a class="fc-title" href="' + esc(full || '#') + '"' + (full ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' + esc(c.title) + '</a>' +
-        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
-        SHARE_BTN +
-        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
-      const im = el.querySelector('.fc-media-img');
-      // A broken CDN cover swaps to the generated same-origin thumbnail, then a glyph.
-      if (im && fb) im.addEventListener('error', () => {
-        if (im.src.indexOf('/api/explore/thumb.svg') === -1) { im.classList.remove('pixelated'); im.src = fb; }
-      }, { once: true });
-      const mediaBtn = el.querySelector('.fc-media');
-      if (mediaBtn) mediaBtn.addEventListener('click', () => record(c.key, 'click', 0));
-      const titleLink = el.querySelector('a.fc-title');
-      if (titleLink) titleLink.addEventListener('click', () => record(c.key, 'click', 0));
-    } else if (embedSrc) {
-      // Open-archive game / film / listening panel. The heavy iframe does NOT
-      // load until the user presses Play — it renders as a poster and the
-      // single-active player (activateEmbed) injects + focuses the frame, tearing
-      // down whatever was playing before. archive.org runs in its own sandbox.
-      el.className = 'feed-card is-embed';
-      const h = Math.max(120, Math.min(720, (+c.embed.height) || 360));
-      // Preferred resolution → the frame's real aspect, so the inline player and
-      // fullscreen FIT the embed (4:3 game, portrait 2048, wide audio bar) instead
-      // of squishing one fixed-height box. w=0 ⇒ full-bleed (audio).
-      const w = Math.max(0, (+c.embed.width) || 0);
-      const frameStyle = w > 0
-        ? 'style="aspect-ratio:' + w + '/' + h + ';max-width:' + w + 'px;width:100%;margin-inline:auto;--arw:' + w + ';--arh:' + h + '"'
-        : 'style="height:' + h + 'px"';
-      const cover = safeImg(c.image || '');
-      const openHref = safeUrl(c.url);
-      const verb = (c.topics || []).includes('listen') ? 'Listen'
-        : (c.topics || []).some(t => t === 'watch' || t === 'film') ? 'Watch' : 'Play';
-      el._embed = { src: embedSrc, h: h, w: w, title: c.title || '', key: c.key };
-      el._posterHTML =
-        '<button type="button" class="fc-poster" aria-label="' + esc(verb + ' — ' + (c.title || '')) + '">' +
-          (cover ? '<img class="fc-poster-img" src="' + esc(cover) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '') +
-          '<span class="fc-play" aria-hidden="true">▶</span>' +
-          '<span class="fc-playlabel">' + verb + '</span>' +
-        '</button>';
-      el.innerHTML =
-        '<div class="fc-embed-bar">' +
-          '<span class="fc-dots" aria-hidden="true"><i></i><i></i><i></i></span>' +
-          '<span class="fc-embed-title"><span aria-hidden="true">' + (ICON[c.type] || '🕹️') + '</span> ' + esc(c.title) + '</span>' +
-          '<span class="fc-embed-src">' + esc(c.source) + '</span>' +
-          '<span class="fc-embed-ctl">' +
-            SHARE_BTN +
-            '<button type="button" class="fc-fullscreen" aria-label="Fullscreen" aria-pressed="false" title="Fullscreen">⛶</button>' +
-            '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>' +
-          '</span>' +
-        '</div>' +
-        '<div class="fc-frame" ' + frameStyle + '>' + el._posterHTML + '</div>' +
-        (c.lore ? '<div class="fc-foot"><p class="fc-lore">' + esc(c.lore) + '</p></div>' : '') +
-        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') +
-          (openHref !== '#' ? ' · <a class="fc-open" href="' + esc(openHref) + '" target="_blank" rel="noopener noreferrer">open ↗</a>' : '') +
-        '</div>';
-      // Delegate on the frame so the poster still works after deactivate re-renders it.
-      el.querySelector('.fc-frame').addEventListener('click', (ev) => {
-        if (ev.target.closest('.fc-poster')) activateEmbed(el);
-      });
-      el.querySelector('.fc-fullscreen').addEventListener('click', (ev) => {
-        ev.preventDefault(); ev.stopPropagation();
-        if (!el.classList.contains('is-playing')) activateEmbed(el);
-        toggleFullscreen(el);
-      });
-      const open = el.querySelector('.fc-open');
-      if (open) open.addEventListener('click', () => record(c.key, 'click', 0));
+    if (data && data.ok && Array.isArray(data.equity)) {
+      // Keep aligned (timestamp, equity) pairs where equity is present.
+      const pts = [];
+      for (let i = 0; i < data.equity.length; i++) {
+        const v = data.equity[i];
+        if (v != null && Number.isFinite(Number(v)) && Number(v) > 0) {
+          pts.push({ t: Number(data.timestamps[i]) * 1000, v: Number(v) });
+        }
+      }
+      const baseline = Number(data.base_value) || (pts.length ? pts[0].v : 0);
+      series = pts.length >= 2 ? { pts, baseline } : null;
     } else {
-      el.className = 'feed-card';
-      const href = safeUrl(c.url);
-      const ext = /^https?:/i.test(href);
-      const img = safeImg(c.image || '');
-      const summary = c.summary ? esc(c.summary) : '';
-      el.innerHTML =
-        '<div class="fc-top"><span class="fc-type"><span aria-hidden="true">' + (ICON[c.type] || '•') + '</span> ' + esc(c.type) + '</span>' +
-          (date ? '<span class="fc-date">' + esc(date) + '</span>' : '') + '</div>' +
-        '<a class="fc-title" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener noreferrer"' : '') + '>' +
-          esc(c.title) + '</a>' +
-        (summary ? '<p class="fc-summary">' + summary + '</p>' : '') +
-        '<div class="fc-why"><span class="fc-src">' + esc(c.source) + '</span>' + (why ? ' — ' + esc(why) : '') + '</div>' +
-        SHARE_BTN +
-        '<button type="button" class="fc-dismiss" aria-label="Dismiss this card" title="Show less like this">✕</button>';
-      // Lead thumbnail: the source image when we have one, otherwise a generated
-      // type-tinted placeholder — so every card carries a lead visual (docs and
-      // image-less reads no longer render as bare "?" tiles). Prepended as a node
-      // so a broken hotlink can swap to the SAME placeholder on error rather than
-      // leaving a broken-image glyph or an empty gap.
-      if (img) {
-        const thumb = document.createElement('img');
-        const isLogo = c.imageFit === 'contain';
-        thumb.className = 'fc-thumb' + (isLogo ? ' is-logo' : '');
-        // crossOrigin only for logos — it lets us read pixels to pick a contrasting
-        // tile. Source photos may not send CORS headers, so never set it there.
-        if (isLogo) thumb.crossOrigin = 'anonymous';
-        thumb.src = img; thumb.alt = '';
-        thumb.loading = 'lazy'; thumb.referrerPolicy = 'no-referrer';
-        // A broken external cover (archive art / GitHub OG / OWID chart / a missing
-        // company logo) swaps to the same-origin generated thumbnail; if THAT
-        // fails, the glyph block. Drop logo classes first so the fallback fills.
-        const fb = safeImg(c.imageFallback || '');
-        thumb.addEventListener('error', () => {
-          if (fb && thumb.src.indexOf('/api/explore/thumb.svg') === -1) {
-            thumb.classList.remove('is-logo', 'is-logo-light', 'is-logo-dark', 'is-logo-ownbg');
-            thumb.crossOrigin = null; thumb.src = fb;
-          } else thumb.replaceWith(placeholderThumb(c.type));
-        });
-        if (isLogo) thumb.addEventListener('load', () => pickLogoTile(thumb), { once: true });
-        el.insertBefore(thumb, el.firstChild);
-      } else {
-        el.insertBefore(placeholderThumb(c.type), el.firstChild);
-      }
-      el.querySelector('.fc-title').addEventListener('click', () => record(c.key, 'click', 0));
+      series = null;
     }
-
-    // Stamp share metadata onto the card's share button (delegated handler reads it).
-    const shareBtn = el.querySelector('.fc-share');
-    if (shareBtn) {
-      shareBtn.dataset.url = shareUrlFor(c);
-      shareBtn.dataset.title = c.title || 'Unisona Explore';
-      if (c.key) shareBtn.dataset.key = c.key;
-    }
-
-    el.querySelector('.fc-dismiss').addEventListener('click', (e) => {
-      e.preventDefault(); e.stopPropagation();
-      record(c.key, 'dismiss', 0);
-      if (el.classList.contains('is-playing')) deactivateEmbed(el);
-      el.style.opacity = '0';
-      setTimeout(() => el.remove(), 150);
-    });
-    return el;
+    drawChart();
+    updateHeader(null);
   }
 
-  // ── Endless scroll (TikTok / YouTube-Shorts-style) ──
-  // The feed never loads all at once. Each page is a FRESH server re-rank that
-  // already reflects the dwell/click/dismiss recorded on the cards above it — so
-  // your engagement steers what loads next. When the bounded catalog is
-  // exhausted the server cycles, so the scroll never ends. We append (never
-  // rebuild) and dedupe by stable card id; a bottom sentinel pulls the next page
-  // as it nears the viewport. /api/explore/feed/page → lib/explore-feed pagedFeed.
-  let filterEpoch = 0;        // bumped on filter change to cancel in-flight pages
-  const PAGE = 24;   // fuller first load — 9 left the finance filter looking sparse before auto-load kicked in
-  const MAX_CYCLES = 2;       // after looping the catalog this many times, stop auto-loading
-
-  // Sentinel below the stream — when it nears view, pull the next page.
-  const sentinel = document.createElement('div');
-  sentinel.className = 'feed-sentinel';
-  sentinel.setAttribute('aria-hidden', 'true');
-  stream.after(sentinel);
-
-  // First-paint skeletons — shown while the very first page is in flight so the
-  // feed reads as "loading fast" instead of an empty gap. Cleared on first append.
-  function showSkeletons(n) {
-    const frag = document.createDocumentFragment();
-    for (let i = 0; i < n; i++) {
-      const d = document.createElement('div');
-      d.className = 'feed-skel';
-      d.setAttribute('aria-hidden', 'true');
-      d.innerHTML = '<div class="sk-img"></div><div class="sk-line"></div><div class="sk-line short"></div>';
-      frag.appendChild(d);
+  // Header value + change for the current range (or a hovered point).
+  function updateHeader(hover) {
+    if (!series || !series.pts.length) {
+      // Fall back to the live account snapshot.
+      const eq = Number(account && account.equity) || 0;
+      const day = Number(account && account.pnl_today) || 0;
+      const dayPct = Number(account && account.pnl_pct) || 0;
+      $('portValue').textContent = eq ? fmtMoney(eq) : '$—';
+      if (eq) renderChange(day, dayPct, 'Today');
+      return;
     }
-    stream.appendChild(frag);
+    const last = series.pts[series.pts.length - 1];
+    const point = hover || last;
+    const base = series.baseline || series.pts[0].v;
+    const change = point.v - base;
+    const pct = base ? (change / base) * 100 : 0;
+    $('portValue').textContent = fmtMoney(point.v);
+    renderChange(change, pct, hover ? fmtWhen(point.t) : rangeLabel(curRange));
   }
 
-  function appendCards(cards) {
-    // Clear any first-paint skeletons before the real cards land.
-    if (stream.querySelector('.feed-skel')) stream.innerHTML = '';
-    const frag = document.createDocumentFragment();
-    const els = [];
-    cards.forEach((c, i) => { seen.add(c.id || c.key); const el = cardEl(c, totalShown + i + 1); els.push(el); frag.appendChild(el); });
-    stream.appendChild(frag);
-    if (impressionObserver) els.forEach((el) => { if (el.dataset.key) impressionObserver.observe(el); });
-    totalShown += cards.length;
+  function renderChange(change, pct, label) {
+    const up = change >= 0;
+    $('portChange').innerHTML =
+      '<span class="pc-arrow ' + (up ? 'up' : 'down') + '" aria-hidden="true">' + (up ? '▲' : '▼') + '</span>' +
+      '<span class="pc-money ' + (up ? 'up' : 'down') + '">' + (up ? '+' : '−') + fmtMoney(Math.abs(change)) + '</span>' +
+      '<span class="pc-pct ' + (up ? 'up' : 'down') + '">(' + fmtPct(pct) + ')</span>' +
+      '<span class="pc-range">' + esc(label) + '</span>';
   }
 
-  async function loadPage() {
-    if (loading) return;
-    loading = true;
-    const epoch = filterEpoch;
-    sentinel.classList.add('is-loading');
-    stream.setAttribute('aria-busy', 'true');
-    if (statusEl && !totalShown) statusEl.textContent = 'Loading your feed…';
-    try {
-      const r = await fetch('/api/explore/feed/page', {
-        method: 'POST', cache: 'no-store',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          seen: [...seen], limit: PAGE,
-          type: (filterKind === 'type' && filter !== 'all') ? filter : null,
-          topic: filterKind === 'topic' ? filter : null,
-        }),
+  function rangeLabel(r) {
+    return ({ '1D': 'Today', '1W': 'Past week', '1M': 'Past month', '3M': 'Past 3 months', 'YTD': 'Year to date', '1Y': 'Past year', 'ALL': 'All time' })[r] || '';
+  }
+  function fmtWhen(t) {
+    const d = new Date(t);
+    if (curRange === '1D') return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    if (curRange === '1W') return d.toLocaleDateString(undefined, { weekday: 'short', hour: 'numeric' });
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: (curRange === '1Y' || curRange === 'ALL') ? '2-digit' : undefined });
+  }
+
+  const canvas = $('equityChart');
+  let geom = null;   // last-drawn geometry for hit-testing
+  let chartType = 'line';
+  try { chartType = localStorage.getItem('explore-chart-type') === 'candle' ? 'candle' : 'line'; } catch (_e) {}
+
+  // Aggregate the fine equity ticks into `count` OHLC candles. A portfolio-value
+  // series carries one value per tick, so each candle's open/high/low/close is the
+  // first / max / min / last of the ticks in its time bucket.
+  function buildCandles(pts, count) {
+    const n = pts.length;
+    const size = Math.max(1, Math.ceil(n / count));
+    const candles = [];
+    for (let i = 0; i < n; i += size) {
+      const slice = pts.slice(i, i + size);
+      if (!slice.length) continue;
+      let hi = -Infinity, lo = Infinity;
+      for (const p of slice) { if (p.v > hi) hi = p.v; if (p.v < lo) lo = p.v; }
+      candles.push({ o: slice[0].v, c: slice[slice.length - 1].v, h: hi, l: lo, t: slice[slice.length - 1].t });
+    }
+    return candles;
+  }
+
+  function drawChart() {
+    const empty = $('chartEmpty');
+    if (!series || series.pts.length < 2) {
+      canvas.style.display = 'none';
+      empty.hidden = false;
+      empty.textContent = (Number(account && account.equity) > 0)
+        ? 'No price history for this range yet.'
+        : 'Your equity curve appears here once an account is linked.';
+      geom = null;
+      return;
+    }
+    canvas.style.display = 'block';
+    empty.hidden = true;
+
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.clientWidth || canvas.parentElement.clientWidth || 600;
+    const cssH = 220;
+    canvas.width = Math.round(cssW * dpr);
+    canvas.height = Math.round(cssH * dpr);
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) { canvas.style.display = 'none'; geom = null; return; }  // no 2D context (headless) → hide gracefully
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const pts = series.pts;
+    const padX = 22, padTop = 14, padBot = 14;
+    const vals = pts.map((p) => p.v);
+    let min = Math.min(...vals, series.baseline);
+    let max = Math.max(...vals, series.baseline);
+    if (min === max) { min -= 1; max += 1; }
+    const range = max - min;
+    const W = cssW - padX * 2;
+    const H = cssH - padTop - padBot;
+    const y = (v) => padTop + H - ((v - min) / range) * H;
+
+    const up = pts[pts.length - 1].v >= series.baseline;
+    const line = up ? cssVar('--gain') : cssVar('--loss');
+
+    // Baseline (previous close / range start) — dashed grey reference line.
+    const by = y(series.baseline);
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = cssVar('--border');
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(padX, by); ctx.lineTo(cssW - padX, by); ctx.stroke();
+    ctx.restore();
+
+    if (chartType === 'candle') {
+      // ── Candlestick view ── each candle green/red by its own open→close.
+      const gain = cssVar('--gain'), loss = cssVar('--loss');
+      const count = Math.max(8, Math.min(pts.length, Math.floor(W / 9)));
+      const candles = buildCandles(pts, count);
+      const slot = W / candles.length;
+      const bodyW = Math.max(1.5, Math.min(slot * 0.68, 12));
+      const cx = (i) => padX + slot * (i + 0.5);
+      candles.forEach((cd, i) => {
+        const x0 = cx(i);
+        const col = cd.c >= cd.o ? gain : loss;
+        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
+        // wick (high → low)
+        ctx.beginPath(); ctx.moveTo(x0, y(cd.h)); ctx.lineTo(x0, y(cd.l)); ctx.stroke();
+        // body (open ↔ close), min 1px tall so flat candles stay visible
+        const top = Math.min(y(cd.o), y(cd.c));
+        ctx.fillRect(x0 - bodyW / 2, top, bodyW, Math.max(1, Math.abs(y(cd.c) - y(cd.o))));
       });
-      const data = r.ok ? await r.json() : null;
-      if (epoch !== filterEpoch) return;                 // a filter change superseded this page
-      const cards = (data && data.cards) || [];
-      // "Infinite scroll WITHOUT repeats" (user request): when the server reports
-      // the catalog looped (`cycled`), STOP rather than re-serving already-seen
-      // posts. The feed keeps pulling fresh, unique cards until the whole catalog
-      // has been shown once, then says you're caught up — never a duplicate.
-      if (data && data.cycled) {
-        if (io) io.unobserve(sentinel);
-        if (statusEl) statusEl.textContent = totalShown
-          ? (totalShown + (filter === 'all' ? '' : ' ' + filter) + " · you're all caught up")
-          : 'No content available right now.';
-        return;
-      }
-      if (!cards.length) {
-        if (io) io.unobserve(sentinel);
-        // Small filtered category fully shown → say "caught up", don't blank or
-        // re-stack duplicates (the server no longer cycles a single-page catalog).
-        if (statusEl) statusEl.textContent = totalShown
-          ? (totalShown + (filter === 'all' ? '' : ' ' + filter) + " · that's everything")
-          : 'No content available right now.';
-        return;
-      }
-      appendCards(cards);
-      if (cycles >= MAX_CYCLES) {                          // looped the catalog enough — stop pulling
-        if (io) io.unobserve(sentinel);
-        if (statusEl) statusEl.textContent = totalShown + " loaded · you're all caught up";
-      } else if (statusEl) {
-        statusEl.textContent = (filter === 'all'
-          ? totalShown + ' loaded · ranked by your engagement'
-          : totalShown + ' ' + filter) + ' — keep scrolling';
-      }
-    } catch (e) {
-      if (statusEl) statusEl.textContent = totalShown ? '' : 'Feed is offline right now — use the quick links below.';
-    } finally {
-      if (epoch === filterEpoch) loading = false;
-      sentinel.classList.remove('is-loading');
-      stream.setAttribute('aria-busy', 'false');
+      geom = { mode: 'candle', candles, y, cx, padX, W, cssW, cssH, line };
+    } else {
+      // ── Line view (default) — area fill + stroke ──
+      const x = (i) => padX + (W * i) / (pts.length - 1);
+      const grad = ctx.createLinearGradient(0, padTop, 0, cssH - padBot);
+      grad.addColorStop(0, up ? 'rgba(16,185,129,0.22)' : 'rgba(239,68,68,0.22)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.moveTo(x(0), y(pts[0].v));
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(x(i), y(pts[i].v));
+      ctx.lineTo(x(pts.length - 1), cssH - padBot);
+      ctx.lineTo(x(0), cssH - padBot);
+      ctx.closePath();
+      ctx.fillStyle = grad; ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x(0), y(pts[0].v));
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(x(i), y(pts[i].v));
+      ctx.strokeStyle = line; ctx.lineWidth = 2;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.stroke();
+      geom = { mode: 'line', pts, x, y, padX, W, cssW, cssH, line };
     }
   }
 
-  const io = ('IntersectionObserver' in window)
-    ? new IntersectionObserver((entries) => {
-        if (entries.some(e => e.isIntersecting)) loadPage();
-      }, { rootMargin: '700px 0px' })
-    : null;
-
-  function reset() {
-    filterEpoch++;
-    loading = false; totalShown = 0; cycles = 0;
-    seen.clear();
-    if (activeEmbed) deactivateEmbed(activeEmbed);   // stop any playing game/film/radio
-    if (playObserver) playObserver.disconnect();
-    stream.innerHTML = '';
-    showSkeletons(6);
-    if (io) { io.unobserve(sentinel); io.observe(sentinel); }
-    loadPage();
+  // Crosshair + header scrub on pointer move — works in both line and candle modes.
+  function onScrub(clientX) {
+    if (!geom) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const rel = Math.max(0, Math.min(1, (px - geom.padX) / geom.W));
+    let cx, cy, val, t;
+    if (geom.mode === 'candle') {
+      const idx = Math.max(0, Math.min(geom.candles.length - 1, Math.floor(rel * geom.candles.length)));
+      const cd = geom.candles[idx]; if (!cd) return;
+      cx = geom.cx(idx); cy = geom.y(cd.c); val = cd.c; t = cd.t;
+    } else {
+      const idx = Math.round(rel * (geom.pts.length - 1));
+      const p = geom.pts[idx]; if (!p) return;
+      cx = geom.x(idx); cy = geom.y(p.v); val = p.v; t = p.t;
+    }
+    drawChart();  // redraw base
+    const ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.save();
+    ctx.strokeStyle = cssVar('--muted'); ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, 8); ctx.lineTo(cx, geom.cssH - 8); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = geom.line; ctx.fill();
+    ctx.strokeStyle = cssVar('--surface'); ctx.lineWidth = 2; ctx.stroke();
+    ctx.restore();
+    updateHeader({ v: val, t: t });
+    const ro = $('chartReadout');
+    ro.textContent = fmtWhen(t);
+    ro.style.left = Math.max(30, Math.min(geom.cssW - 30, cx)) + 'px';
+    ro.classList.add('show');
   }
+  function endScrub() {
+    $('chartReadout').classList.remove('show');
+    drawChart();
+    updateHeader(null);
+  }
+  canvas.addEventListener('mousemove', (e) => onScrub(e.clientX));
+  canvas.addEventListener('mouseleave', endScrub);
+  canvas.addEventListener('touchstart', (e) => { if (e.touches[0]) onScrub(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => { if (e.touches[0]) onScrub(e.touches[0].clientX); }, { passive: true });
+  canvas.addEventListener('touchend', endScrub);
 
-  // ── Layout toggle: single column (Facebook) ↔ grid 4-up (Instagram) ──
-  const layout = document.getElementById('feedLayout');
-  function applyLayout(mode) {
-    const grid = mode === 'grid';
-    stream.classList.toggle('is-grid', grid);
-    document.body.classList.toggle('layout-grid', grid);
-    if (layout) layout.querySelectorAll('.feed-layout-btn').forEach((b) => {
-      const on = b.dataset.layout === mode;
+  let resizeT = null;
+  window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(drawChart, 150); }, { passive: true });
+
+  // Range chips.
+  $('rangeRow').addEventListener('click', (e) => {
+    const btn = e.target.closest('.range-chip');
+    if (!btn || btn.dataset.range === curRange) return;
+    $('rangeRow').querySelectorAll('.range-chip').forEach((b) => {
+      const on = b === btn;
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
-  }
-  let savedLayout = 'single';
-  try { savedLayout = localStorage.getItem('explore-layout') || 'single'; } catch (_) {}
-  applyLayout(savedLayout);
-  if (layout) layout.addEventListener('click', (e) => {
-    const b = e.target.closest('.feed-layout-btn');
-    if (!b) return;
-    applyLayout(b.dataset.layout);
-    try { localStorage.setItem('explore-layout', b.dataset.layout); } catch (_) {}
+    loadHistory(btn.dataset.range);
   });
 
-  if (chips) {
-    chips.addEventListener('click', (e) => {
-      const btn = e.target.closest('.feed-chip');
-      if (!btn) return;
-      const val = btn.dataset.topic || btn.dataset.type || 'all';
-      const kind = btn.dataset.topic ? 'topic' : 'type';
-      if (val === filter && kind === filterKind) return;
-      filter = val; filterKind = kind;
-      chips.querySelectorAll('.feed-chip').forEach(b => {
-        const on = b === btn;
-        b.classList.toggle('active', on);
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      });
-      reset();
+  // Chart-type toggle (line ↔ candlestick). Redraws in place — the same series,
+  // rendered differently — and persists the choice.
+  const typeRow = $('chartType');
+  function applyChartType(t) {
+    chartType = (t === 'candle') ? 'candle' : 'line';
+    if (typeRow) typeRow.querySelectorAll('.ct-btn').forEach((b) => {
+      const on = b.dataset.type === chartType;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
+    try { localStorage.setItem('explore-chart-type', chartType); } catch (_e) {}
+    drawChart();
+    updateHeader(null);
   }
+  if (typeRow) typeRow.addEventListener('click', (e) => {
+    const b = e.target.closest('.ct-btn');
+    if (b) applyChartType(b.dataset.type);
+  });
+  applyChartType(chartType);   // reflect the persisted choice on load
 
-  // Deep-link preselect (#1581): /explore.html?topic=finance (or ?filter=finance)
-  // opens straight on that chip — e.g. the trader page "News →" link. Falls back to
-  // the default 'all' feed when the param names no real chip.
-  if (chips) {
-    const params = new URLSearchParams(location.search);
-    const want = (params.get('topic') || params.get('filter') || '').toLowerCase();
-    const wantType = (params.get('type') || '').toLowerCase();
-    let preBtn = null, preKind = 'type';
-    if (want) {
-      preBtn = chips.querySelector('.feed-chip[data-topic="' + (window.CSS && CSS.escape ? CSS.escape(want) : want) + '"]');
-      if (preBtn) { filter = want; preKind = 'topic'; }
-      else { const t = chips.querySelector('.feed-chip[data-type="' + want + '"]'); if (t) { preBtn = t; filter = want; preKind = 'type'; } }
-    } else if (wantType) {
-      preBtn = chips.querySelector('.feed-chip[data-type="' + wantType + '"]');
-      if (preBtn) { filter = wantType; preKind = 'type'; }
-    }
-    if (preBtn) {
-      filterKind = preKind;
-      chips.querySelectorAll('.feed-chip').forEach(b => {
-        const on = b === preBtn;
-        b.classList.toggle('active', on);
-        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  // ── Watchlist ────────────────────────────────────────────────────────────
+  let priceMap = {};   // ticker → { price, chg_pct } from the global feed
+
+  async function loadWatchlist() {
+    let syms = [];
+    try {
+      const r = await fetch('/api/trading/watchlist', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+      const d = r.ok ? await r.json() : null;
+      syms = (d && Array.isArray(d.watchlist)) ? d.watchlist : [];
+    } catch (_e) { syms = []; }
+
+    // Global priced feed first (covers the seeded symbols instantly).
+    try {
+      const r = await fetch('/api/trading/watchlist-prices', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+      const arr = r.ok ? await r.json() : [];
+      (Array.isArray(arr) ? arr : []).forEach((w) => {
+        if (w && w.ticker) priceMap[w.ticker.toUpperCase()] = { price: Number(w.price), chg: Number(w.chg_pct) };
       });
+    } catch (_e) { /* map stays partial */ }
+
+    if (!syms.length) {
+      $('wlList').innerHTML = '<p class="muted-note">Your watchlist is empty. Add a symbol above to track it.</p>';
+      return;
     }
+    renderWatchlist(syms);
+
+    // Fill in any symbol the global feed didn't price, from the per-symbol feed.
+    const missing = syms.filter((s) => !priceMap[s.toUpperCase()]);
+    await Promise.allSettled(missing.map(async (s) => {
+      try {
+        const r = await fetch('/api/trading/price-feed?symbol=' + encodeURIComponent(s) + '&range=1D', { cache: 'no-store', signal: AbortSignal.timeout(6000) });
+        const d = r.ok ? await r.json() : null;
+        if (d && d.current_price) {
+          const op = Number(d.open_price) || Number(d.current_price);
+          priceMap[s.toUpperCase()] = { price: Number(d.current_price), chg: op ? ((Number(d.current_price) - op) / op) * 100 : 0 };
+        }
+      } catch (_e) { /* leave unpriced */ }
+    }));
+    renderWatchlist(syms);
   }
 
-  // Kick off, then keep the sentinel observed. Fallback for no IntersectionObserver.
-  showSkeletons(6);
-  loadPage();
-  if (io) io.observe(sentinel);
-  else window.addEventListener('scroll', () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 700) loadPage();
-  }, { passive: true });
+  function renderWatchlist(syms) {
+    $('wlList').innerHTML = syms.map((s) => {
+      const key = s.toUpperCase();
+      const q = priceMap[key];
+      const price = q && Number.isFinite(q.price) ? fmtMoney(q.price) : '—';
+      const chg = q && Number.isFinite(q.chg) ? q.chg : null;
+      const cls = chg == null ? 'flat' : (chg >= 0 ? 'up' : 'down');
+      const chgTxt = chg == null ? '·' : fmtPct(chg);
+      return '<a class="wl-row" href="/stock-trader.html?symbol=' + encodeURIComponent(key) + '">' +
+        '<span class="wl-tk">' + esc(key) + '</span>' +
+        '<span class="wl-px">' + price + '</span>' +
+        '<span class="wl-chg ' + cls + '">' + chgTxt + '</span>' +
+        '<button type="button" class="wl-remove" data-sym="' + esc(key) + '" title="Remove ' + esc(key) + '" aria-label="Remove ' + esc(key) + '">✕</button>' +
+      '</a>';
+    }).join('');
+  }
+
+  // Add / remove.
+  $('wlAdd').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = $('wlInput');
+    const sym = input.value.trim().toUpperCase();
+    if (!sym) return;
+    input.value = '';
+    try {
+      const r = await fetch('/api/trading/watchlist', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker: sym }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { input.value = sym; alert(d.error || 'Could not add symbol.'); return; }
+      priceMap = {};
+      loadWatchlist();
+    } catch (_e) { input.value = sym; }
+  });
+  $('wlList').addEventListener('click', async (e) => {
+    const btn = e.target.closest('.wl-remove');
+    if (!btn) return;
+    e.preventDefault(); e.stopPropagation();
+    const sym = btn.dataset.sym;
+    btn.disabled = true;
+    try {
+      await fetch('/api/trading/watchlist/' + encodeURIComponent(sym), { method: 'DELETE' });
+      loadWatchlist();
+    } catch (_e) { btn.disabled = false; }
+  });
+
+  // ── Market news (reuses the Explore finance feed) ─────────────────────────
+  async function loadNews() {
+    let cards = [];
+    try {
+      const r = await fetch('/api/explore/feed/page', {
+        method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seen: [], limit: 18, topic: 'finance' }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const d = r.ok ? await r.json() : null;
+      cards = (d && Array.isArray(d.cards)) ? d.cards : [];
+    } catch (_e) { cards = []; }
+
+    // Headline-style items only (skip playable embeds / art / video).
+    const news = cards.filter((c) => c && c.title && c.url &&
+      ['read', 'doc', 'belief', 'build'].includes(c.type) &&
+      /^https?:\/\//i.test(c.url)).slice(0, 8);
+
+    const box = $('newsList');
+    if (!news.length) {
+      box.innerHTML = '<p class="muted-note">Market news is offline right now. <a href="/stock-trader.html">Open the trader →</a></p>';
+      return;
+    }
+    box.innerHTML = news.map((c) => {
+      const when = relTime(c.published);
+      return '<a class="news-row" href="' + esc(c.url) + '" target="_blank" rel="noopener noreferrer">' +
+        '<div class="nr-meta"><span class="nr-src">' + esc(c.source || 'News') + '</span>' + (when ? ' · ' + esc(when) : '') + '</div>' +
+        '<div class="nr-title">' + esc(c.title) + '</div>' +
+      '</a>';
+    }).join('');
+  }
+
+  function relTime(d) {
+    if (!d) return '';
+    const t = typeof d === 'number' ? (d > 1e12 ? d : d * 1000) : Date.parse(d);
+    if (!t || Number.isNaN(t)) return '';
+    const diff = Date.now() - t;
+    if (diff < 0) return '';
+    const m = Math.floor(diff / 60000);
+    if (m < 60) return m + 'm ago';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + 'h ago';
+    const days = Math.floor(h / 24);
+    if (days < 7) return days + 'd ago';
+    try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch { return ''; }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  (async function init() {
+    // Decide demo vs real up front: a visitor without the "trade" entitlement
+    // (logged out, or a Free account) sees the champion demo account. An explicit
+    // ?demo=champion in the URL already forced it; entitled traders keep their own.
+    if (!demoMode) {
+      try {
+        const s = await (await fetch('/api/auth/session', { cache: 'no-store', signal: AbortSignal.timeout(5000) })).json();
+        if (!(s && s.entitlements && s.entitlements.trade)) demoMode = 'champion';
+      } catch (_e) { demoMode = 'champion'; }   // fail toward the populated demo
+    }
+    const connected = await loadPositions();
+    if (connected) loadHistory('1D');
+    // These run regardless of broker state.
+    loadWatchlist();
+    loadNews();
+  })();
 })();
 </script>
 </body>

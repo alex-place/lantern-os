@@ -97,7 +97,7 @@ function sanitizePersonalContext(context) {
 
 async function loadPersonalCube() {
   try {
-    const resp = await fetch('/api/cubes/alex/personal');
+    const resp = await fetch('/api/cubes/alex/personal', { signal: AbortSignal.timeout(8000) });
     if (resp.ok) {
       personalContext = await resp.json();
       updatePersonalInsights(personalContext);
@@ -369,6 +369,11 @@ function fillToolSlot(slot, evt) {
   slot.style.display = 'block';
 }
 function renderMarkdown(text) {
+  // The [DOORS:…] tag is a Three-Doors CONTROL marker (door chips are parsed from
+  // the raw text elsewhere) — never part of the prose. Strip it here, in the one
+  // renderer, so every path shows the same clean text: streaming, finalize, and
+  // history replay of persisted messages that still carry it (#2497).
+  text = String(text ?? '').replace(/\[DOORS:[^\]]*\]?/gi, '').trimEnd();
   // Extract tool-call blocks (closed, then a trailing unclosed one while streaming)
   // into placeholders that survive HTML-escaping; restore as cards at the very end.
   const _toolCards = [];
@@ -1164,9 +1169,8 @@ async function sendMessage(opts = {}) {
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const nativeToolCalls = [];  // cloud-model (Claude/OpenAI/Gemini) tool *calls* — they emit no <tool_call> text, so we synthesize the cards at finalize
   const requestedProvider = document.getElementById('provider-select')?.value || '';
-  // Model pin (#1127): only meaningful alongside a pinned provider; the server
-  // re-validates against its allowlist, so this is a preference, not authority.
-  const requestedModel = requestedProvider ? (document.getElementById('model-select')?.value || '') : '';
+  // The #1127 model pin (`requestedModel` from #model-select) was removed (#2476):
+  // its markup was cut, so the value was always '' and no model was ever sent.
 
   try {
     const provider = requestedProvider;
@@ -1186,7 +1190,6 @@ async function sendMessage(opts = {}) {
         message: text,
         user: 'dream-chat',
         provider,
-        model: requestedModel || undefined,
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
@@ -1335,7 +1338,7 @@ async function sendMessage(opts = {}) {
     fullText = blocks + '\n\n' + fullText;
   }
 
-  bubble.innerHTML = renderMarkdown(fullText);
+  bubble.innerHTML = renderMarkdown(fullText); // [DOORS:…] stripped inside renderMarkdown (#2497)
 
   // Convergence-agent action chips (Stage 3): the server streamed a deterministic
   // work/ask answer + actions through the one endpoint — render the chips here.
@@ -1850,107 +1853,10 @@ document.getElementById('input').addEventListener('input', e => {
   build();
 })();
 
-// ── Model dropdown (#1127 work item 1) ──────────────────────────────────────
-// Follows the provider selection: cloud providers with server-listed choices show
-// a Model select (default = the server's effective modelFor() resolution); Auto,
-// local and keystone-ft hide it. Selection persists per provider in localStorage.
-(function wireModelSelect() {
-  const providerSel = document.getElementById('provider-select');
-  const modelSel = document.getElementById('model-select');
-  const group = document.getElementById('model-select-group');
-  if (!providerSel || !modelSel || !group) return;
-  let catalog = null; // { claude: {default, options:[{id,label}]}, ... }
-
-  function storeKey(p) { return `lantern_model_pin_${p}`; }
-
-  function render() {
-    const p = providerSel.value;
-    const entry = catalog && p ? catalog[p] : null;
-    if (!entry || !entry.options || !entry.options.length) {
-      group.style.display = 'none';
-      modelSel.innerHTML = '<option value="">Default</option>';
-      return;
-    }
-    const saved = localStorage.getItem(storeKey(p)) || '';
-    modelSel.innerHTML = '';
-    const def = document.createElement('option');
-    def.value = '';
-    def.textContent = `Default (${entry.default})`;
-    modelSel.appendChild(def);
-    for (const m of entry.options) {
-      const o = document.createElement('option');
-      o.value = m.id;
-      o.textContent = m.label || m.id;
-      if (m.id === saved) o.selected = true;
-      modelSel.appendChild(o);
-    }
-    group.style.display = '';
-  }
-
-  modelSel.addEventListener('change', () => {
-    const p = providerSel.value;
-    if (!p) return;
-    if (modelSel.value) localStorage.setItem(storeKey(p), modelSel.value);
-    else localStorage.removeItem(storeKey(p));
-  });
-  providerSel.addEventListener('change', render);
-
-  fetch('/api/providers/models')
-    .then(r => (r.ok ? r.json() : null))
-    .then(data => { catalog = (data && data.providers) || null; render(); })
-    .catch(() => { /* endpoint absent → dropdown stays hidden */ });
-})();
-
-// ── Observer side panel ───────────────────────────────────────────────────────
-function toggleObserver() {
-  const panel = document.getElementById('observer-panel');
-  const btn = document.getElementById('observer-toggle-btn');
-  const collapsed = panel.classList.toggle('collapsed');
-  if (btn) btn.classList.toggle('active', !collapsed);
-  if (!collapsed) refreshObserver();
-}
-
-function refreshObserver() {
-  fetch('/api/csf/stats').then(r => r.ok ? r.json() : null).then(data => {
-    if (!data) return;
-    const symList = document.getElementById('obs-symbols');
-    if (data.top10 && data.top10.length > 0) {
-      symList.innerHTML = data.top10.slice(0, 8).map(s =>
-        `<span class="obs-symbol-chip${s.count >= 3 ? ' hot' : ''}">${s.token} ×${s.count}</span>`
-      ).join('');
-    } else { symList.textContent = 'none yet'; }
-    document.getElementById('obs-dilation').textContent =
-      data.delta_count ? `${data.delta_count} entries` : '—';
-  }).catch(() => {});
-
-  fetch('/api/csf/deltas?limit=5').then(r => r.ok ? r.json() : null).then(data => {
-    if (!data || !data.length) return;
-    const last = data[data.length - 1];
-    const moods = data.filter(d => d.mood_abs != null).map(d => d.mood_abs);
-    if (moods.length >= 2) {
-      const first = moods[0], latest = moods[moods.length - 1];
-      const diff = latest - first;
-      const label = Math.abs(diff) < 0.1 ? 'stable' : diff > 0 ? '↑ rising' : '↓ falling';
-      document.getElementById('obs-mood-arc').textContent = `${label} (${first.toFixed(1)} → ${latest.toFixed(1)})`;
-      document.getElementById('obs-mood-fill').style.width = `${Math.round(latest * 100)}%`;
-    }
-    const deltaLines = [];
-    if (last.symbols_added?.length) deltaLines.push(`+symbols: ${last.symbols_added.slice(0,3).join(', ')}`);
-    if (last.tags_added?.length) deltaLines.push(`+tags: ${last.tags_added.slice(0,3).join(', ')}`);
-    if (last.mood_delta != null && Math.abs(last.mood_delta) >= 0.05)
-      deltaLines.push(`mood ${last.mood_delta > 0 ? '+' : ''}${last.mood_delta}`);
-    document.getElementById('obs-last-delta').textContent = deltaLines.join(' · ') || 'no change';
-    if (last.convergence != null) {
-      const pct = Math.round(last.convergence * 100);
-      document.getElementById('obs-convergence').textContent = `${pct}%`;
-      document.getElementById('obs-conv-fill').style.width = `${pct}%`;
-    }
-  }).catch(() => {});
-}
-
-setInterval(() => {
-  if (!document.getElementById('observer-panel').classList.contains('collapsed')) refreshObserver();
-}, 30000);
+// The model sub-picker (wireModelSelect, #1127) and the Observer side panel
+// (toggleObserver/refreshObserver + its 30s poll) were removed (#2476): their
+// markup was cut long ago, so the picker IIFE early-returned forever and the
+// observer JS polled /api/csf/* into a permanently hidden, opener-less panel.
 
 // ── Context management ────────────────────────────────────────────────────────
 let contextMode = { search: true, memory: true, trading: false };
@@ -1972,42 +1878,11 @@ try {
   document.getElementById('ctx-trading').checked = contextMode.trading;
 } catch (e) {}
 
-// ── Performance monitoring ────────────────────────────────────────────────────
-let perfStats = { totalTokens: 0, totalCost: 0, lastLatency: 0 };
-
-function togglePerfMonitor() {
-  const enabled = document.getElementById('ctx-perf').checked;
-  document.getElementById('perf-monitor').style.display = enabled ? 'block' : 'none';
-  localStorage.setItem('perfMonitorEnabled', enabled);
-}
-
-const perfEnabled = localStorage.getItem('perfMonitorEnabled') === 'true';
-if (perfEnabled) {
-  document.getElementById('ctx-perf').checked = true;
-  document.getElementById('perf-monitor').style.display = 'block';
-}
-
-function updatePerfStats(tokens, cost, latency) {
-  perfStats.totalTokens += tokens || 0;
-  perfStats.totalCost += cost || 0;
-  perfStats.lastLatency = latency || 0;
-  document.getElementById('perf-tokens').textContent = perfStats.totalTokens.toLocaleString();
-  document.getElementById('perf-cost').textContent = '$' + perfStats.totalCost.toFixed(3);
-  document.getElementById('perf-latency').textContent = perfStats.lastLatency + 'ms';
-}
-
-const origFetch = window.fetch;
-window.fetch = async function(...args) {
-  const startTime = Date.now();
-  const response = await origFetch.apply(this, args);
-  if (args[0] && args[0].includes('dream/chat')) {
-    const latency = Date.now() - startTime;
-    const tokens = parseInt(response.headers?.get('X-Tokens-Used') || '0');
-    const cost = parseFloat(response.headers?.get('X-Cost-Usd') || '0');
-    if (tokens || cost) updatePerfStats(tokens, cost, latency);
-  }
-  return response;
-};
+// The Performance monitor (perfStats/togglePerfMonitor/updatePerfStats and the
+// global window.fetch wrapper that fed it) was removed (#2476): its #ctx-perf
+// toggle markup was cut long ago, so the panel was permanently invisible —
+// worse, the orphaned init threw on load for anyone whose localStorage still
+// had perfMonitorEnabled='true', and every fetch on the page paid for the wrap.
 
 // ── Workspace — Sigma-0 observable autonomous coding (issue #527) ─────────────
 // Pillar 1 (A2): live step log + diff viewer

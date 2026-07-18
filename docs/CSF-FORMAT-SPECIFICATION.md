@@ -327,8 +327,7 @@ produces these formats anymore; existing archives open **read-only** through
 
 ## 5. Consolidation pointers (previously scattered)
 - `docs/CSF-Whitepaper-v0.3.pdf` — original whitepaper
-- `docs/PHASE-1-CSF-BACKEND.md` — backend phase notes
-- `caad/README.md`, `caad/dollhouse-csf-upgrade.md` — CADD layer
+- `caad/README.md` — CADD layer
 - `CSF-IMAGE-TRAINING.md` — image-LoRA training over CSF
 - `csf/ingest/` — CSF *ingest* docs are the memory/task queue, **not** format specs
 

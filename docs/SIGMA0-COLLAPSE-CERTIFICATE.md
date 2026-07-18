@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-07
+updated: 2026-07-17
 ---
 
 # Σ — The Convergence Certificate
@@ -59,8 +59,9 @@ since carry a verified-on date.
 
 ## How to audit this document
 
-Every load-bearing claim maps to a runnable artifact in this repo. All commands below were run
-against this revision on 2026-07-07 (68 tests, all passing, plus the gate self-test):
+Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
+were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
+last run 2026-07-07):
 
 | Claim | Class | Verify with |
 |---|---|---|
@@ -68,9 +69,13 @@ against this revision on 2026-07-07 (68 tests, all passing, plus the gate self-t
 | Region-of-attraction certification (§5, #1991) | PROVEN (interval arithmetic) | `python -m pytest tests/test_sigma0_roa_certified.py -q` → 4 passed |
 | 900-run collapse-prevention sweep (§3) | MEASURED | `data/sigma0_regime_sweep_report.json`; regenerate: `python experiments/sigma0_regime_sweep.py` |
 | Four-signal trigger calibration: precision 1.0, recall ≈0.08 (§2, #1990) | MEASURED | `data/sigma0/trigger_calibration_report.json`; regenerate: `python experiments/sigma0_trigger_calibration.py` |
+| Scheduled-vs-reactive grounding race: alarm premium 2.25×, sliver timing-indifference (§3.1, [#2690]) | MEASURED | `python -m pytest tests/test_sigma0_scheduled_grounding.py -q` → 6 passed; full run: `python experiments/sigma0_scheduled_grounding.py` |
+| Phase 0.5 prospective shot-call on the trained reservoir: sliver call held; anchor/ceiling ratio 1.4·10⁴ (§3.1, [#2690]) | MEASURED (real learned system) | `python -m pytest tests/test_sigma0_reservoir_deadline.py -q` → 5 passed; full run: `python experiments/sigma0_reservoir_deadline.py` |
 | Σ_θ release-gate logic + A/B/C decision tree (§8.1.2) | machine-checked logic | `python experiments/sigma_theta_abc/harness.py --self-test`; `python -m pytest tests/test_sigma_theta_gate.py -q` → 11 passed |
 | Holdout staleness: n-graded fresh-flow dominance + Thresholdout third road (§8.4) | MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_thresholdout.py -q` → 7 passed; full run: `python experiments/sigma_update_holdout_staleness.py` |
 | Intrinsic signals cannot extend the selection budget — freshness law (§8.4.1) | MEASURED (simulation) | `python experiments/sigma_update_internal_signal_value.py` (pure Python, 32 seeds, prints verdict + weight sweep) |
+| Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
+| Three-arm promotion-evidence protocol (F/Fd/R/T) at task-level stuck fidelity + arm-differentiated teeth (§8.6-4, [#2691]) | machine-checked protocol; MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed; full run: `python experiments/sigma_theta_abc/holdout_protocol.py --simulate` |
 | Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
 | §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
 
@@ -611,6 +616,17 @@ and no parameter being identified — only a state kept off a manifold. So Σ₀
 established**. (Canonical attribution is **Anderson 1977**, consistent across the
 `.md` and `.tex` variants — issue [#660].)
 
+**Nearer classical kin (added 2026-07-17 corner audit).** Condition-triggered,
+direction-targeted covariance re-excitation is classical in recursive least squares:
+**covariance resetting** and **directional forgetting** (Kulhavý & Kárný 1984;
+variable-direction forgetting, arXiv:2003.03523; SIFt-RLS, arXiv:2404.10844) keep an
+estimator's information matrix from degenerating in unexcited directions, with boundedness
+theorems of their own. Σ₀⁻¹'s covariance floor is the state-space mirror of that family
+(they prevent covariance *windup* under poor excitation; Σ₀⁻¹ prevents covariance
+*flatness* on the near-null band). Mechanism novelty is therefore **not** claimed for the
+operator; the C3 anti-freeze theorem is the one piece with no located counterpart, and it
+lives on this synthetic SDE, not a real model.
+
 **Latent code defect — RESOLVED (2026-06-15).** `AntiCollapseOperator.__init__`
 annotated `detector: Optional[...]` while `collapse.py` imported only `from typing
 import Dict`, so `typing.get_type_hints()` raised `NameError: name 'Optional' is
@@ -678,6 +694,55 @@ retrodiction of our own null, not a prospective test.
    deadline is a hard constraint (well-conditioned) or soft (sliver). Measuring it is
    cheap and should accompany any certified rate.
 
+**Now MEASURED — the schedule-vs-alarm race ([#2690], 2026-07-17).** Design-shift items 1–2
+are no longer only a corollary reading. `experiments/sigma0_scheduled_grounding.py` races two
+*single-shot* grounding policies over the same certified basins — timing the only variable;
+escape checked by exact trust-region maximization (not by the inequality); the
+critical-slowing-down canary swept over **all** healthy-quantile thresholds rather than one
+calibration. Result (`data/sigma0/scheduled_grounding_report.json`, 200 seeds;
+`tests/test_sigma0_scheduled_grounding.py` → 6 passing): in a **well-conditioned** basin
+(cond(P)≈2) the charitably-calibrated canary (FPR 1.5%) has median alarm at step 14 vs the
+cadence tick at step 3, and the **alarm premium is 2.25×** — grounding on the
+certificate-derived cadence reaches ≥90% escape at 0.40·B*_∞ while waiting for the alarm
+needs 0.90·B*_∞, the expensive end of the window, exactly as item 2 states (reactive is not
+hopeless; it is *late*). In the **sliver** basin (cond(P)≈6·10⁵) a forced fire-time sweep is
+fully timing-indifferent (every budget × depth cell ≥ 0.95) — item 3's measured-Ouro-regime
+null, now *produced*, not only retrodicted. Honest scope: synthetic maps; single-shot
+policies; one detector family; the canary is calibrated on the true healthy distribution
+(charitable — strengthens a lateness verdict, weakens an earliness one).
+
+**Phase 0.5 — the prospective shot-call on a real LEARNED system ([#2690], 2026-07-17).**
+The race above is on hand-built maps; the first *prospective* test ran on the §6 trained
+reservoir (`router_reservoir_G.py`, seed 42 — a real learned nonlinear loop nobody's Jacobian
+was picked for). `experiments/sigma0_reservoir_deadline.py` computes every §3.1 quantity from
+the linearization **first** — fixed point (residual 1.4e-15), analytic Jacobian (max err vs
+numeric 1.3e-4), **ρ(J)=0.9836**, **cond(P)≈4.8·10⁴ → pre-registered regime call: SLIVER,
+timing-indifferent** — then grades the call on the true nonlinear dynamics with the regime's
+own instrument: the measured realistic per-turn grounding kick of the actual conversation
+stream (B_real=0.113) is **1.4·10⁴× the escape ceiling** B*_∞=8.3·10⁻⁶, and a forced
+fire-time sweep is fully timing-indifferent even at B_real/100 — **the shot-call held**
+(`data/sigma0/reservoir_deadline_report.json`; `tests/test_sigma0_reservoir_deadline.py`, 5
+passing). The deadline rows are consistent but deliberately noted as *without bite* here
+(necessary-condition bound, loose in the sliver regime; the measured last-escape rising with
+B shows a commitment window exists at micro-basin scale only). **Accumulating pattern worth
+stating plainly: both real learned loops measured so far (Ouro, this reservoir — one
+expansive, one near-critical) land OUTSIDE the well-conditioned regime, even though the
+reservoir's design spectral radius was 0.9.** The schedule's practical bite may exist only on
+deliberately stabilized loops — which is exactly the Phase-1 JSRR/STARS motivation, now
+evidence-backed rather than assumed. A first-run harness vacuity (the basin-entry race is the
+wrong instrument in the sliver regime) is kept on the record in the script docstring.
+
+**Prior-art positioning (2026-07-17 corner audit).** "Compute the next intervention time from
+a certified decay rate" is **self-triggered control** — a mature field (Heemels, Johansson &
+Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012;
+Lyapunov event-triggered stabilization with a known convergence rate, arXiv:1803.08980). §3.1
+is that field's recipe applied to this certificate's objects, and cites it rather than
+re-deriving it. The LLM literature has the *event-triggered* side only — FLARE
+(arXiv:2305.06983) and DRAGIN (arXiv:2403.10081) trigger retrieval reactively on uncertainty —
+plus naive fixed-interval retrieval; a cadence *derived from measured loop dynamics* appears
+to be an open lane, tracked with the Phase-1/2 real-model plan in [#2690] and composed in
+[SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) §2.
+
 **Honest limits.** The additive-anchor model is a simplification — real grounding enters
 as tokens through attention, not as a clean latent displacement. The qualitative
 phenomenon ("early intervention beats late; models commit") is independently published
@@ -686,6 +751,8 @@ phenomenon ("early intervention beats late; models commit") is independently pub
 quantities. A prospective test needs a **well-conditioned** loop (e.g. STARS-trained,
 arXiv:2605.26733) where the deadline should bite; on Ouro the theory predicts its own
 null.
+
+[#2690]: https://github.com/alex-place/lantern-os/issues/2690
 
 ---
 
@@ -1389,6 +1456,37 @@ reuse. What intrinsic signals *are* measurably good for is **detection**, not se
 §8.6 item 5 result. One sentence: **internal signals detect; only fresh truth selects.**
 [MEASURED-by-simulation; shape, not a closed-form constant.]
 
+**RE-STATED (2026-07-17, [#2692] E-P — the law's own pre-registered kill test fired).** The
+paragraph above is correct for **deterministic** intrinsic signals but overstated as a general
+law. `experiments/sigma_update_stochastic_signal.py` (pre-registered H-P1/H-P2, 32 seeds,
+oracle-weight sweep per cell so no combiner alibi; `data/sigma0/stochastic_signal_report.json`;
+regression `tests/test_sigma_update_stochastic_signal.py`, 6 passing) decomposed the internal
+signal into a checkpoint-fixed **bias** `b` (sticks) and re-drawn **measurement noise** `m`
+(re-rolls — self-consistency over seeds, MC-dropout, resampled prompts):
+
+- **H-P1 CONFIRMED (mechanism):** at fixed total error, extraction rises steeply as error mass
+  moves from stuck bias to re-drawn noise (n=50: 0.81 → 9.36; fixed-alone 0.61).
+- **H-P2 REFUTED — the kill condition fired:** at *fixed* bias `s_b=0.5`, adding pure re-drawn
+  noise rescued extraction **7.9×** (0.81 → 6.43). Re-drawn measurement noise is *not* inert.
+- **Post-hoc attribution (labeled as such):** a **zero-information dither** — fresh noise added
+  to every score comparison, carrying no signal whatsoever — reproduces the entire rescue
+  (6.42 vs 6.43) with an interior optimum (too much dither hurts). So the rescue is pure
+  **de-ratcheting**, not information: the same mechanism Thresholdout exploits deliberately
+  with Laplace noise (§8.4 third road), arising for free from any stochastic measurement.
+- **Fresh truth still strictly dominates** every internal arm (n=50 ordering: fresh-alone
+  12.90 > zero-bias internal 9.36 > noise-rescued stuck bias 6.43 > deterministic 0.81 >
+  fixed-alone 0.61).
+
+**The law, re-stated:** selection error decomposes into a **stuck** part (sets the ratchet) and
+a **fresh** part (breaks it). Deterministic internal signals neither de-ratchet nor inform;
+stochastic internal signals **de-ratchet but do not inform**; only re-drawn external truth does
+both. Three sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh
+truth informs.* Design consequence (cheap, actionable): a scarce fixed holdout should be read
+**with deliberate dither** (or through a stochastic self-check) — in this harness that recovers
+≈50% of the fresh-flow value at `n=50` — but dither is a de-ratcheting knob with an optimum,
+never a substitute for sourcing fresh verified tasks. [MEASURED-by-simulation; shape, not
+constants; the real-model arm folds into the A/B/C run, [#2691].]
+
 **Operationalizing the fresh flow — the rotating-holdout tiers (convergent synthesis).** The
 freshness law becomes concrete as a four-tier data discipline, so the anchor a gate promotes against
 is never one it has already leaked into:
@@ -1413,8 +1511,11 @@ the compounding effect is MEASURED-by-simulation.]**
 
 **Claimed:** a computable three-leg gate anchored to an external holdout; a proven
 monotonic-improvement backbone (TRPO); a known overoptimization curve for the budget (Gao);
-evidence that naïve fixed-holdout reuse degrades under adaptive selection; that intrinsic signals
-cannot substitute for fresh verified data in the *selection* role (§8.4.1, MEASURED-by-simulation);
+evidence that naïve fixed-holdout reuse degrades under adaptive selection; that **deterministic**
+intrinsic signals cannot substitute for fresh verified data in the *selection* role, while
+**stochastic** intrinsic signals recover part of the budget purely by de-ratcheting — an effect
+fully reproduced by zero-information dither, with fresh truth still strictly dominant (§8.4.1
+as re-stated 2026-07-17, MEASURED-by-simulation, [#2692]);
 and that an internal-signal bundle adds *detection* power for gross degradation exactly when the
 external gate is smallest (§8.6 item 5, MEASURED on one model). **NOT claimed:** an in-repo theorem
 for the full gate; real-model validation of its training behavior; that "two fates" is exhaustive
@@ -1449,13 +1550,40 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    fresh-flow law** — see the MEASURED block in §8.4. **✅ Thresholdout follow-up DONE (2026-07-07,
    third arm + pool ablation, same harness):** the mechanism buys **validity**, the burned pool buys
    **extraction**, and in this harness the mechanism supports safe reuse of the pool — see the
-   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. *(Steps 1–3 at real-model
+   third-road MEASURED block in §8.4 and `tests/test_sigma_theta_thresholdout.py`. **✅ PROTOCOL
+   LAYER DONE (2026-07-17, [#2691]):** the three-arm promotion-evidence protocol itself — Fixed /
+   Fixed+dither (the [#2692] knob, promoted to an arm) / Fresh-flow / Thresholdout+pool, with
+   per-candidate provenance ledgers, Thresholdout budget accounting, and disjoint task-id spaces —
+   is implemented model-agnostically (`experiments/sigma_theta_abc/holdout_protocol.py`, an
+   `eval_fn` callback so the L4 run swaps in the real exec evaluator) and validated at **task-level
+   Bernoulli-stuck fidelity** (per-(candidate,task) outcomes deterministic on re-evaluation — the
+   real stuck-luck mechanism, closer to reality than the Gaussian sims): 7/7 protocol checks,
+   16 seeds (`data/sigma0/holdout_protocol_report.json`;
+   `tests/test_sigma_theta_holdout_protocol.py`, 6 passing). Orderings reproduce at the higher
+   fidelity — fixed gap +0.108 worst / fresh extraction 0.934 best at 61× task consumption /
+   Thresholdout best per-task efficiency among fresh-consuming arms — and one new result:
+   **Fixed+dither reaches 0.856 true extraction at zero extra fresh-task cost** (vs fixed 0.617),
+   the cheapest intervention measured. The planted teeth run through the *real* seven-condition
+   gate with **arm-appropriate reasons**: the fixed arm can catch a contaminated reward-hack only
+   via the cond-6 provenance ledger, while the fresh arm rejects it on measured merit (cond 1) —
+   the load-bearing demonstration of why the freshness tiers exist. *(Steps 1–3 at real-model
    level still require the A/B/C run on cloud L4 — this box cannot train locally; that is the
-   remaining empirical gap.)*
+   remaining empirical gap, unchanged: this validates the PROTOCOL, not real training. The L4
+   run is now fully specified as a self-contained handoff —
+   [SIGMA0-EB-L4-RUNBOOK.md](SIGMA0-EB-L4-RUNBOOK.md): inventory, task partition, the
+   eval→7-metric glue contract, teeth recipes, pre-registered verdicts incl. the Roelofs rule,
+   and a cost-approval gate.)*
 5. **Incremental-validity teeth (the strongest genuine research question here):** does an internal
    signal **add detection power** for bad checkpoints over the external gate alone? No prior art
    surfaced for internal-state monitors as an *incremental* checkpoint-gate signal (bounded search,
-   2026-07-07). **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
+   2026-07-07). **Correction (2026-07-17 corner audit): that "no prior art" line is now stale** —
+   the detection lane is occupied: internal-state readouts predicting model quality without
+   validation data (*Model-Centric Diagnostics*, arXiv:2601.16874), statistical detection of
+   degraded/quantized checkpoints (arXiv:2602.10144), and a two-failure-mode account of LLM
+   quantization matching the binary cliff measured below (arXiv:2604.19884). The *incremental*
+   ΔAUC-over-a-tiny-external-gate design may remain unique; the lane is not. The follow-on
+   falsification (stochastic-internal-signal test: re-drawable noise vs re-drawn truth) is
+   tracked as [#2692]. **✅ MEASURED — corruption-regime half (2026-07-07, pre-registered N2,
    `experiments/sigma_incremental_validity_ouro.py`, real Ouro-1.4B, PR #2240):** a 9-checkpoint
    corruption-ladder generator (int8 / Gaussian noise 3–15% / partial+full naive ternary / int4)
    with exec pass rate as truth. Adding an internal bundle {perplexity, predictive entropy,
@@ -1469,7 +1597,8 @@ is holdout theater, the same collapse it exists to prevent, one level up.
    matching the measured quantization cliff. So the **still-open half is subtle, training-induced
    badness** (reward hacks, forgetting): only the real A/B/C artifacts (teeth 2–3) can produce it.
    Caveats: one model, 8-task truth, coarse AUC granularity. Joint law with §8.4.1: **internal
-   signals detect; only fresh truth selects.**
+   signals detect; only fresh truth selects** — *as re-stated 2026-07-17 ([#2692]): internal
+   signals detect; fresh randomness de-ratchets; only fresh truth informs.*
 
 ### 8.7 Adversarial review (2026-07-07, grok-4) and what survives
 
@@ -1494,7 +1623,11 @@ overclaimed certificate into an honest gate plus one falsifiable design constrai
 - EvalStop (arXiv:2606.04145, 2026); Provably Mitigating Overoptimization (arXiv:2510.05526); Wasserstein-DRO RLHF (arXiv:2605.00155) — post-cutoff corroboration that gating on *world feedback / held-out eval* (not the proxy) is the live direction.
 - **Primary SOTA for the RLVR-forgetting premise (added 2026-07-08 research pass; all ids title-verified against the local arXiv corpus):** *RL's Razor: Why Online RL Forgets Less* (arXiv:2509.04259 — on-policy updates are KL-minimal w.r.t. the base; forgetting is predicted by KL-from-base); *Reinforcement Fine-Tuning Naturally Mitigates Forgetting in Continual Post-Training* (arXiv:2507.05386); *Mechanistic origins of catastrophic forgetting: why RL preserves circuits better than SFT* (arXiv:2605.28860). **Counterpoint, same pass:** *RL Forgets! Towards Continual Policy Optimization* (arXiv:2607.04364 — RL still forgets in continual settings; drift control needed) and *The Choice of Divergence* (arXiv:2509.07430 — divergence choice governs diversity collapse). The gate assumes only the relative advantage, not immunity.
 - Close prior art surfaced by the harder novelty search (2026-07-07, all corpus/web-verified): ADOWIP budgeted when-to-update gating (arXiv:2606.25068); Uncertainty-Guided Checkpoint Selection for RL finetuning (arXiv:2511.09864); *Signed Compression Progress on a Sealed Audit is Goodhart-Resistant* (arXiv:2606.11417) — nearest neighbor to the §8.4 sealed-promotion-set discipline; *Learning, Fast and Slow* (arXiv:2605.12484) — prior art for the fast/slow timescale framing itself.
-- Backing research: [data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md](../data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md); decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
+- Added by the 2026-07-17 corner audit (both verified that date): **the Ladder** (Blum & Hardt, *The Ladder: A Reliable Leaderboard for Machine Learning Competitions*, arXiv:1502.04585) — adaptive leaderboard maintenance *is* champion-promotion gating with limited feedback, the §8.4 problem shape, and was missing here; and the standing **counterpoint** Roelofs et al., *A Meta-Analysis of Overfitting in Machine Learning* (NeurIPS 2019) — ~100 Kaggle competitions showed *little* adaptive overfitting in practice, so whether §8.4's severe small-`n` staleness materializes at realistic scale is exactly what the real A/B/C run must answer ([#2691]).
+
+[#2691]: https://github.com/alex-place/lantern-os/issues/2691
+[#2692]: https://github.com/alex-place/lantern-os/issues/2692
+- Backing research: `data/research/reports/20260707T180737-rlvr-continual-learning-dreaming-stability-cert-weight-updates.md`; decision record [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - *Citations verified 2026-07-07 (TRPO/Gao IDs confirmed via search; Dwork by venue). Per this doc's own §References caution — an earlier draft once carried four fabricated arXiv IDs — no Part II id is cited unverified.*
 
 ---
@@ -1545,6 +1678,9 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - **Self-supervised anti-collapse regularization — the distributional counterpart to §1's spectral bound.** The SSL literature fights *representation collapse* (the §0/§2 "frozen self-agreement" fate) not by bounding a Jacobian but by **conditioning the embedding covariance**: VICReg (Bardes et al., [arXiv:2105.04906](https://arxiv.org/abs/2105.04906)) variance/covariance terms; Barlow Twins ([arXiv:2103.03230](https://arxiv.org/abs/2103.03230)) redundancy reduction; W-MSE ([arXiv:2007.06346](https://arxiv.org/abs/2007.06346)) whitening; and most sharply **SIGReg/LeJEPA** (Balestriero & LeCun, [arXiv:2511.08544](https://arxiv.org/abs/2511.08544)) — regularize toward an **isotropic Gaussian**, heuristics-free. These are a *complementary* anti-collapse condition on the same object: §1 bounds the recurrent map's spectrum (the map can't amplify), while covariance-conditioning keeps the state distribution full-rank (the representation can't degenerate). Falsifiable import for the Ouro latent loop: does a covariance-conditioning term reduce measured collapse proximity (§4 canary, §6) without harming golden/confab? Verified 2026-07-06; folded into [`RESEARCH-CANON.md`](RESEARCH-CANON.md) [11].
 - **arXiv:2310.01798** — Huang, Chen, Mishra, Zheng, Yu, Song & Zhou, *Large Language Models Cannot Self-Correct Reasoning Yet* (ICLR 2024) — the **inference-time twin** of §7's collapse claim: intrinsic self-correction *without external feedback* degrades reasoning (GPT-4 95.5→91.5 on GSM8K). The model-collapse citations above are the *training-time* version of the same "no contact with outside reality → degradation" mechanism; this is the same law one timescale down, and the escape (external feedback) matches §7's grounding. Title/authors/venue verified against arXiv 2026-07-07.
 - **arXiv:2406.15927** — Kossen et al., *Semantic Entropy Probes: Robust and Cheap Hallucination Detection in LLMs* (2024) — a **linear probe on a single generation's hidden state** predicting semantic entropy; nearest prior for §7.3's confabulation-detection honesty layer. The §7.2 rule "bind every honesty signal to an external check" is the product-form guard around exactly this internal signal. Verified against arXiv 2026-07-07.
+- W. P. M. H. Heemels, K. H. Johansson & P. Tabuada, *An Introduction to Event-triggered and Self-triggered Control*, IEEE CDC 2012; **arXiv:1803.08980** — Lyapunov event-triggered stabilization with a known convergence rate. The mature prior-art field for §3.1's schedule consequence (intervention timing from a certified decay rate). Verified 2026-07-17.
+- R. Kulhavý & M. Kárný (1984), directional forgetting in recursive identification; **arXiv:2003.03523** — *RLS with Variable-Direction Forgetting*; **arXiv:2404.10844** — *SIFt-RLS: Subspace of Information Forgetting RLS*. Classical kin of Σ₀⁻¹'s covariance leg (§3). Verified 2026-07-17.
+- **arXiv:2604.09979** — *A Minimal Model of Representation Collapse* (2026) — dynamical-systems analysis of representation collapse in SSL (stop-gradient / frustration); adjacent, uncited-until-now prior for Part I's framing. Verified 2026-07-17.
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -1935,5 +2071,89 @@ for produced results and Appendix A for the original design sketch.*
 > truth selects.** Also fixed in the same pass: `tests/test_sigma0_jsrr_gate.py` imported torch
 > unguarded, breaking collection on torch-free CI — the audit table's "tests pass on a fresh clone"
 > contract; now `pytest.importorskip`-guarded per repo convention.
+
+> **Maintenance log — 2026-07-17 (external-novelty corner audit; Σ_G ledger split out; schedule
+> race measured).** A reviewer-style pass over the corners the 2026-07-07 audits did *not* sweep
+> (those closed the headline claims: loop spectral radius, Σ_θ components, the grounding thesis).
+> Findings, all folded in this pass. **(1) Prior-art additions.** §3.1's schedule consequence is
+> **self-triggered control** applied to this certificate's objects (Heemels-Johansson-Tabuada,
+> CDC 2012; arXiv:1803.08980 — now cited in §3.1 + References); Σ₀⁻¹'s covariance leg has
+> classical kin in RLS **covariance resetting / directional forgetting** (Kulhavý-Kárný 1984;
+> arXiv:2003.03523, arXiv:2404.10844 — now cited in §3, mechanism novelty explicitly disclaimed);
+> §8.4's problem shape is **the Ladder** (Blum & Hardt, arXiv:1502.04585 — now in §8.8) with
+> Roelofs et al. (NeurIPS 2019) as the standing counterpoint; adjacent Part-I prior
+> arXiv:2604.09979 added to References. **(2) Stale claim corrected.** §8.6 item 5's
+> "no prior art surfaced" no longer holds — the detection lane is occupied (arXiv:2601.16874,
+> 2602.10144, 2604.19884); corrected in place, per this document's own discipline. **(3) The
+> three thin still-open corners** are now tracked as issues and composed in a new companion doc,
+> [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md) (*grounding has a price, a schedule,
+> and a budget*): [#2690] schedule (self-triggered grounding), [#2691] budget
+> (Thresholdout-gated promotion — the real A/B/C run), [#2692] price (freshness-law
+> falsification: re-drawable noise vs re-drawn truth). The companion is deliberately a *ledger*,
+> not a certificate — it upgrades nothing here, and if the two disagree this document wins.
+> **(4) New measurement ([#2690] Phase 0).** `experiments/sigma0_scheduled_grounding.py` — the
+> scheduled-vs-reactive grounding race: in the well-conditioned basin the **alarm premium is
+> 2.25×** (charitable canary FPR 1.5%, median alarm step 14 vs cadence tick 3; reactive needs
+> 0.90·B*_∞ where scheduled needs 0.40·B*_∞); the sliver basin is fully timing-indifferent (the
+> Ouro-null, now produced rather than retrodicted). §3.1 gains the MEASURED block; audit table
+> +1 row; `tests/test_sigma0_scheduled_grounding.py` (6 passing). Fresh audit run this pass:
+> `pytest tests/test_cio_sde.py tests/test_sigma0_roa_certified.py tests/test_sigma_theta_gate.py
+> tests/test_sigma_theta_thresholdout.py tests/test_sigma0_scheduled_grounding.py` → **74 passed**.
+> Frontmatter `updated:` → 2026-07-17.
+
+> **Maintenance log — 2026-07-17 (E-P run: the freshness law's own kill test fired; §8.4.1
+> re-stated).** [#2692]'s pre-registered experiment ran the same day it was filed
+> (`experiments/sigma_update_stochastic_signal.py`, 32 seeds, oracle-weight sweep per cell —
+> no combiner alibi). **H-P1 CONFIRMED:** at fixed total error, moving error mass from
+> checkpoint-fixed bias to re-drawn noise raises extraction steeply (n=50: 0.81 → 9.36 vs
+> fixed-alone 0.61). **H-P2 REFUTED — the kill condition fired:** at fixed bias, pure re-drawn
+> measurement noise rescued extraction 7.9× (0.81 → 6.43). A post-hoc, labeled-as-such control
+> attributes the entire rescue to **zero-information dither** (6.42 vs 6.43, interior optimum)
+> — de-ratcheting, not information; the same mechanism Thresholdout buys with Laplace noise,
+> obtained free from any stochastic measurement. Fresh truth still strictly dominates every
+> internal arm (12.90 > 9.36 > 6.43 > 0.81 > 0.61). §8.4.1 gains the RE-STATED block (three
+> sentences now: *internal signals detect; fresh randomness de-ratchets; only fresh truth
+> informs*), §8.5's claimed list is corrected to deterministic-only, §8.6-5's joint-law line
+> carries the re-statement, audit table +1 row
+> (`tests/test_sigma_update_stochastic_signal.py`, 6 passing — one test pins the refutation
+> itself so it cannot be silently forgotten). This is the §8.7 protocol applied to our own
+> law: a pre-registered falsification found the overstatement, and the correction — not the
+> original claim — is the recorded result. Real-model arm folds into the A/B/C run ([#2691]).
+
+> **Maintenance log — 2026-07-17 ([#2691] protocol layer: the three promotion-evidence arms,
+> implemented and validated pre-L4).** The E-B gap splits into two halves — the *protocol* (who
+> reads which task set, when, with what ledgers and budgets) and the *training* (real
+> RLVR/distill steps on L4). The protocol half is now closed:
+> `experiments/sigma_theta_abc/holdout_protocol.py` implements Fixed / Fixed+dither / Fresh-flow
+> / Thresholdout+pool model-agnostically (an `eval_fn` callback; the L4 run swaps in the real
+> exec evaluator) and validates them at **task-level Bernoulli-stuck fidelity** — per-
+> (candidate,task) outcomes are a deterministic hash, so re-evaluation returns the same pass set,
+> which is the *actual* stuck-luck mechanism (an upgrade over every Gaussian sim so far). 16
+> seeds, 7/7 checks (`data/sigma0/holdout_protocol_report.json`;
+> `tests/test_sigma_theta_holdout_protocol.py`, 6 passing; audit run now **86 passed** across the
+> seven suites). Orderings reproduce at the higher fidelity (fixed gap +0.108 worst; fresh 0.934
+> best extraction at 61× task consumption; Thresholdout best fresh-task efficiency), plus one new
+> measured result: **Fixed+dither extracts 0.856 vs fixed 0.617 at identical task consumption** —
+> the [#2692] de-ratcheting knob survives the fidelity upgrade and is the cheapest intervention
+> in the set. Teeth run through the real seven-condition gate with arm-appropriate reasons (fixed
+> catches the contaminated hack only via the cond-6 provenance ledger; fresh rejects it on
+> merit, cond 1). §8.6 item 4 and the audit table updated. **The honest gap is unchanged and
+> now precisely one thing: executing this protocol around real training on L4.**
+
+> **Maintenance log — 2026-07-17 ([#2690] Phase 0.5: the prospective shot-call on a real
+> learned system).** `experiments/sigma0_reservoir_deadline.py` ran the §3.1 machinery
+> prospectively on the trained §6 reservoir: every quantity computed from the linearization
+> FIRST (ρ(J)=0.9836, cond(P)≈4.8·10⁴ → pre-registered SLIVER call), then graded on the true
+> nonlinear dynamics — the measured realistic grounding kick is 1.4·10⁴× the escape ceiling
+> and forced fire-times are fully timing-indifferent even at B_real/100: **the call held**
+> (5 new tests; audit suites now 8 files / 91 passed). Two honest records kept: (1) the
+> first-run harness applied the basin-entry race unconditionally and it is VACUOUS in the
+> sliver regime (1/100 usable traces, cadence ≫ horizon) — the instrument now branches on the
+> pre-registered regime call, and the vacuity note stays in the script docstring; (2) the
+> deadline rows are consistent-but-without-bite here, said so in the report. New
+> evidence-backed pattern recorded in §3.1: both real learned loops measured so far (Ouro
+> expansive, reservoir near-critical) land outside the well-conditioned regime — the
+> schedule's bite may require deliberately JSRR-stabilized loops, which upgrades Phase 1's
+> motivation from assumption to measurement.
 
 ---

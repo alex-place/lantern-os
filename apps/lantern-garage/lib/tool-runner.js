@@ -1359,6 +1359,8 @@ const REGISTRY = {
       properties: {
         years: { type: "number", description: "history window in years (2–10, default 5)" },
         max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+        objective: { type: "string", enum: ["sharpe", "max_return"], description: "optimization objective: 'sharpe' (default, shrunk tangency) or 'max_return' (max expected return under the vol ceiling — ADR-0028)" },
+        max_vol: { type: "number", description: "annualized volatility ceiling for objective=max_return, as a fraction (0.05–0.60, default 0.20)" },
       },
     },
     async run(i, ctx) {
@@ -1370,7 +1372,7 @@ const REGISTRY = {
         const pos = Array.isArray(d.positions) ? d.positions : [];
         if (!pos.length) return "[propose_rebalance: no open positions — nothing to rebalance.]";
         const pa = require("./portfolio-analytics");
-        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight });
+        const r = await pa.proposeRebalance(pos, { years: i.years, maxWeight: i.max_weight, objective: i.objective, maxVol: i.max_vol });
         if (!r.ok) return `[propose_rebalance: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
         const wRows = r.symbols.map((s, idx) =>
           `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.proposedWeights[idx]).padStart(6)}`);
@@ -1380,10 +1382,15 @@ const REGISTRY = {
         const verdict = r.distinguishable
           ? "the proposed allocation's Sharpe CI clears the current one on this window — a measurable improvement"
           : "the 95% CIs OVERLAP — current and proposed are statistically indistinguishable on this window; taxes, simplicity, or preference may reasonably decide";
+        const taxLine = r.tax && r.orders.some((o) => o.action === "SELL")
+          ? `Tax (est.): realized gain $${r.tax.estRealizedGain.toLocaleString("en-US")} → ~$${r.tax.estTaxCost.toLocaleString("en-US")} at ${Math.round(r.tax.rate * 100)}% (${r.tax.basis}).`
+          : "Tax: no sells in this proposal — nothing realized.";
         return [
-          `Rebalance PROPOSAL — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
+          `Rebalance PROPOSAL (objective: ${r.objective}) — ${_pfWindow(r.window)}. Nothing has been placed; execution is a separate, gated action.`,
           `Current : ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
           `Proposed: ex-ante Sharpe ${_pfSharpe(r.proposed.sharpe)} · vol ${_pfPct(r.proposed.volAnnual)}/yr · worst drawdown ${_pfPct(r.proposed.maxDD)}`,
+          `Sharpe mandate (ADR-0028, target ${r.mandate.target}): current ${r.mandate.current}, proposed ${r.mandate.proposed} — ${r.mandate.note}.`,
+          taxLine,
           `Verdict: ${verdict}.`,
           "Weights (current → proposed):",
           ...wRows,
@@ -1396,6 +1403,164 @@ const REGISTRY = {
         ].filter(Boolean).join("\n");
       } catch (e) {
         return `[propose_rebalance error: ${e.message}]`;
+      }
+    },
+  },
+
+  contribution_plan: {
+    policy: "read", // operator-only; computes a PLAN — places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Plan where a NEW cash contribution should go across the operator's existing holdings: buy-only, deterministic dollar fill toward the shrunk tangency target (most-underweight first), fractional-share estimates, and ex-ante Sharpe of the resulting weights vs current (both with 95% CIs). Use when the user asks where to put a deposit ('I'm adding $20/month — which holding should it buy?'). It never sells, never suggests new symbols, and NEVER places orders — execution is a separate, human-gated action. The user always decides.",
+    schema: {
+      type: "object",
+      properties: {
+        cash: { type: "number", description: "the contribution in dollars (required, > 0)" },
+        years: { type: "number", description: "history window in years (2–10, default 5)" },
+        max_weight: { type: "number", description: "per-position weight ceiling as a fraction (0.10–1.0, default 0.35)" },
+      },
+      required: ["cash"],
+    },
+    async run(i, ctx) {
+      try {
+        const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[contribution_plan: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no holdings to allocate toward. Say so honestly.]`;
+        }
+        const pos = Array.isArray(d.positions) ? d.positions : [];
+        if (!pos.length) return "[contribution_plan: no open positions — there is no existing allocation to fill toward.]";
+        const pa = require("./portfolio-analytics");
+        const r = await pa.planContribution(pos, i.cash, { years: i.years, maxWeight: i.max_weight });
+        if (!r.ok) return `[contribution_plan: ${r.reason}.${r.excluded && r.excluded.length ? ` ${_pfExcluded(r.excluded)}` : ""}]`;
+        const wRows = r.symbols.map((s, idx) =>
+          `  ${s.padEnd(6)} ${_pfPct(r.currentWeights[idx]).padStart(6)} → ${_pfPct(r.afterWeights[idx]).padStart(6)} (target ${_pfPct(r.targetWeights[idx])})`);
+        const oRows = r.orders.length
+          ? r.orders.map((o) => `  BUY $${o.dollars.toFixed(2)} ${o.symbol}${o.estShares != null ? ` (≈${o.estShares} sh @ $${o.price.toFixed(2)})` : ""}`)
+          : ["  none — every slice fell under the dust floor; the amount is too small to split"];
+        return [
+          `Contribution PLAN for $${r.contribution.toFixed(2)} — ${_pfWindow(r.window)}. Buy-only; nothing has been placed.`,
+          `Current: ex-ante Sharpe ${_pfSharpe(r.current.sharpe)} · vol ${_pfPct(r.current.volAnnual)}/yr · worst drawdown ${_pfPct(r.current.maxDD)}`,
+          `After  : ex-ante Sharpe ${_pfSharpe(r.after.sharpe)} · vol ${_pfPct(r.after.volAnnual)}/yr · worst drawdown ${_pfPct(r.after.maxDD)}`,
+          "Buy list (NOT placed):",
+          ...oRows,
+          "Weights (current → after contribution):",
+          ...wRows,
+          `Method: ${r.method.objective}; ${r.method.constraints}; shrinkage: ${r.method.shrinkage}.`,
+          ...(r.notes.length ? [`Notes: ${r.notes.join("; ")}`] : []),
+          _pfExcluded(r.excluded),
+          PF_DISCLAIMER,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[contribution_plan error: ${e.message}]`;
+      }
+    },
+  },
+
+  brake_status: {
+    policy: "read", // streams the ADR-0028 overlay's live brake state — PAPER ONLY, places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Read the live ADR-0028 leverage-overlay brake monitor: the current gross-exposure target (0–2×, from vol targeting × 6-month trend gate × drawdown taper — the brake-to-cash spec), each signal's state (ok/braking), the virtual $25k paper book's equity, and the recent gross-target changes. PAPER MODE: this is the overlay's live practice record — nothing is or can be placed; the Sharpe-mandate gate (meets_ci vs the Buffett bar) decides if/when a strategy ever touches real money. Use when the user asks about the brake, current leverage posture, or how the overlay is doing live.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        // Forward the chat user's id (x-keystone-user, PR #2450) — the brake route
+        // sits behind the same trade gate as the other trading GETs.
+        const d = await _localTradingGet("/api/trading/brake/status", 9000, _userHeaders(ctx));
+        if (!d || d.ok !== true) return "[brake_status: monitor unavailable — the server's brake loop is not running (BRAKE_MONITOR=0 or chat-only boot).]";
+        const pct = (x, dp = 1) => (x == null ? "—" : `${(x * 100).toFixed(dp)}%`);
+        const sig = d.signals || {};
+        const volLine = sig.vol
+          ? `vol ${pct(sig.vol.value)}/yr (target ${pct(sig.vol.target, 0)}, ${sig.vol.state}${sig.vol.intraday != null ? `; intraday leg ${pct(sig.vol.intraday)}` : ""})`
+          : "vol —";
+        const trendLine = sig.trend
+          ? `6-mo trend ${sig.trend.value != null ? (sig.trend.value >= 0 ? "+" : "") + pct(sig.trend.value) : "—"} (${sig.trend.state})`
+          : "trend —";
+        const ddLine = sig.drawdown
+          ? `drawdown ${pct(sig.drawdown.value)} vs peak (brake at ${pct(sig.drawdown.brakeAt, 0)}, ${sig.drawdown.state})`
+          : "drawdown —";
+        const b = d.book || {};
+        const changes = (d.history || []).slice(-3).map((h) =>
+          `  ${h.ts}: ${h.from == null ? "—" : h.from.toFixed(2) + "×"} → ${h.to.toFixed(2)}× (${h.action})`);
+        return [
+          `Brake monitor (ADR-0028 overlay, PAPER): gross target ${d.grossTarget != null ? d.grossTarget.toFixed(2) + "×" : "—"} — ${d.action}. Last tick ${d.lastTick || "—"}.`,
+          `Signals: ${volLine} · ${trendLine} · ${ddLine}.`,
+          `Paper book: $${(b.equity || 0).toLocaleString("en-US")} (started $${(b.startEquity || 0).toLocaleString("en-US")}, peak $${(b.peak || 0).toLocaleString("en-US")}, applied gross ${b.grossApplied != null ? b.grossApplied.toFixed(2) + "×" : "—"}; borrow at T-bill+150bp above 1×, cash earns T-bill below 1×).`,
+          ...(changes.length ? ["Recent gross changes:", ...changes] : []),
+          `Formula: ${d.formula}.`,
+          "Paper mode — the gate decides when this touches real money: only a strategy whose measured Sharpe clears the Buffett bar (0.79) at the CI lower bound (meets_ci) is eligible for live capital (ADR-0028). This is measurement, not investment advice.",
+        ].join("\n");
+      } catch (e) {
+        return `[brake_status error: ${e.message}]`;
+      }
+    },
+  },
+
+  options_strategy: {
+    policy: "read", // computes a covered/cash-secured options PROPOSAL from real chain data — places NOTHING (Act is gated by trading-guard/ADR-0020)
+    desc: "Propose and price a covered options strategy from the REAL listed-options chain. NO API key required: the data layer tries the user's own connected Alpaca account first (real greeks), then the keyless public Yahoo chain (no greeks — a Black–Scholes delta from Yahoo's own IV is used for selection and labeled model(bs-from-iv)), then Alpha Vantage only if a key already exists; if every provider fails, the tool reports each provider's reason honestly instead of inventing data. Strategies: covered_call (needs shares ≥ 100), cash_secured_put (needs cash — contracts limited to what the cash fully collateralizes), collar (matched-expiry put+call around shares ≥ 100). Strikes are picked by |delta| closest to target inside the DTE window, falling back to ~3-7% OTM moneyness when no delta is available (the output says which path and which delta source was used). Premiums are quote MARKS ((bid+ask)/2), never fills, with the half-spread reported as an explicit cost. ADVISORY ONLY: it never places, simulates placing, or recommends executing orders, and naked short options are permanently out of scope. The user always decides.",
+    schema: {
+      type: "object",
+      properties: {
+        symbol: { type: "string", description: "underlying ticker, e.g. IBM" },
+        strategy: { type: "string", enum: ["covered_call", "cash_secured_put", "collar"], description: "which covered structure to propose" },
+        shares: { type: "number", description: "shares held of the underlying (covered_call/collar; 100 per contract required)" },
+        cash: { type: "number", description: "cash available as collateral in dollars (cash_secured_put)" },
+        target_delta: { type: "number", description: "target |delta| for the short leg (default 0.30; collar put leg defaults to 0.25)" },
+        min_dte: { type: "number", description: "minimum days to expiration (default 21)" },
+        max_dte: { type: "number", description: "maximum days to expiration (default 60)" },
+        price: { type: "number", description: "underlying price override; omitted = the provider's own underlying quote, else put-call parity at the ATM strike" },
+      },
+      required: ["symbol", "strategy"],
+    },
+    async run(i, ctx) {
+      try {
+        const qs = new URLSearchParams({ symbol: String(i.symbol || ""), strategy: String(i.strategy || "") });
+        for (const [param, val] of [
+          ["shares", i.shares], ["cash", i.cash], ["target_delta", i.target_delta],
+          ["min_dte", i.min_dte], ["max_dte", i.max_dte], ["price", i.price],
+        ]) {
+          if (val !== undefined && val !== null) qs.set(param, String(val));
+        }
+        // 20s bound: a cold Yahoo path is a cookie+crumb handshake plus one
+        // request per expiry — slower than the other loopback tools' 9s.
+        const d = await _localTradingGet(`/api/trading/options/strategies?${qs.toString()}`, 20000, _userHeaders(ctx));
+        if (!d || d.available === false) {
+          return `[options_strategy: options chain unavailable${d && d.reason ? ` (${d.reason})` : ""} — relay each provider's reason honestly; never invent chain data.]`;
+        }
+        const p = d.proposal;
+        if (!p || p.ok === false) {
+          return `[options_strategy: ${p && p.reason ? p.reason : "no proposal"} — report this honestly; do not substitute a made-up strike or premium.]`;
+        }
+        const head = `${p.strategy} PROPOSAL for ${d.symbol} (chain: ${d.source}, session ${d.session || "unknown"}) — ADVISORY ONLY; nothing is or will be placed.`;
+        const px = `Underlying: $${p.price} (${d.priceSource}).`;
+        const lines = [head, px];
+        if (p.strategy === "collar") {
+          lines.push(
+            `Matched expiry ${p.expiration} (${p.dte} DTE), ${p.contractsWritable} contract(s) on ${p.sharesCovered} of the covered shares:`,
+            `  BUY put  ${p.put.contract} — strike $${p.put.strike} (floor, ${_pfPct(p.floorPct)} vs spot) @ mark $${p.put.premium}/sh [${p.put.selectionPath} path${p.put.deltaSource ? `, Δ ${p.put.deltaSource}` : ""}]`,
+            `  SELL call ${p.call.contract} — strike $${p.call.strike} (ceiling, +${_pfPct(p.ceilingPct)} vs spot) @ mark $${p.call.premium}/sh [${p.call.selectionPath} path${p.call.deltaSource ? `, Δ ${p.call.deltaSource}` : ""}]`,
+            `Net at marks: $${Math.abs(p.netCost).toFixed(2)}/sh ${p.netDirection} ($${Math.abs(p.netCostPerContract).toFixed(2)}/contract).`,
+            `Bounds per share: max loss $${p.maxLossPerShare} · max gain $${p.maxGainPerShare}.`,
+            `Half-spread cost both legs: $${p.spreadCost}/sh ($${p.spreadCostPerContract}/contract) — real option spreads are the dominant execution cost (arXiv:2511.02518).`,
+            p.tradeoffNote
+          );
+        } else {
+          const isCsp = p.strategy === "cash_secured_put";
+          lines.push(
+            `SELL ${p.contractsWritable}x ${p.contract} — ${p.type} strike $${p.strike}, exp ${p.expiration} (${p.dte} DTE). Strike picked by the ${p.selectionPath} path${p.selectionPath === "delta" ? ` (|Δ| ${p.assignmentRiskProxy.value} vs target ${p.targetDelta}, delta source: ${p.deltaSource || "provider"})` : " (no usable delta — ~3-7% OTM moneyness ranking)"}.`,
+            `Premium at MARK: $${p.premium}/sh ($${p.premiumPerContract}/contract; $${p.premiumTotal} total) · annualized yield ${_pfPct(p.premiumYieldAnnualized)} (${p.yieldBasis}).`,
+            `Breakeven: $${p.breakeven} · assignment-risk proxy: ${p.assignmentRiskProxy.value} (${p.assignmentRiskProxy.basis}) — ${p.assignmentRiskProxy.note}.`,
+            `Half-spread cost: $${p.spreadCost}/sh ($${p.spreadCostPerContract}/contract) — real option spreads are the dominant execution cost (arXiv:2511.02518).`,
+            isCsp
+              ? `Collateral: $${p.collateralPerContract}/contract → $${p.collateralRequired} committed, $${p.cashUncommitted} uncommitted. Fully cash-secured — never naked.`
+              : `Coverage: ${p.sharesCovered} shares back ${p.contractsWritable} contract(s). Fully covered — never naked.`
+          );
+        }
+        // p.disclaimer is this tool's PF_DISCLAIMER-tone line (same "decision
+        // support only, NOT personalized investment advice" contract) with the
+        // CORRECT evidence basis — PF_DISCLAIMER itself cites Yahoo adjclose
+        // return history, which would be false for option-chain quotes.
+        lines.push(p.disclaimer);
+        return lines.filter(Boolean).join("\n");
+      } catch (e) {
+        return `[options_strategy error: ${e.message}]`;
       }
     },
   },

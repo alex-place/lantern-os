@@ -99,6 +99,20 @@ function applyOpenAIDecodeParams(body, mode) {
   return b;
 }
 
+/**
+ * xAI variant (#2531): Grok reasoning models (grok-3-mini et al.) hard-reject
+ * penalty params — probed live 2026-07-16: `{"code":"invalid-argument","error":
+ * "Model grok-3-mini does not support parameter frequencyPenalty."}` → HTTP 400.
+ * That 400 silently cascaded EVERY xai dispatch (even explicit pins) to the next
+ * provider. top_p alone is accepted (probed → 200).
+ */
+function applyXAIDecodeParams(body, mode) {
+  const b = body || {};
+  const dp = getDecodeParams(mode);
+  b.top_p = dp.top_p;
+  return b;
+}
+
 module.exports = {
   FAST_MODE,
   DEEP_MODE,
@@ -106,4 +120,5 @@ module.exports = {
   getDecodeParams,
   applyOllamaDecodeParams,
   applyOpenAIDecodeParams,
+  applyXAIDecodeParams,
 };

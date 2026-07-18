@@ -210,31 +210,9 @@
   }
   loadAgents();
 
-  // ── Convergence loop status (CONVERGE stage) — live sidebar panel ──────────
-  // Reads /api/convergence/status (records.jsonl + patterns) and lights up the
-  // "Convergence" observability slot so the loop the chat feeds is visible.
-  function refreshConvergence() {
-    fetch(`${serverBase}/api/convergence/status`, { signal: AbortSignal.timeout(3000) })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => {
-        if (!s) return;
-        // Dedicated "Loop Records" row — do NOT reuse #obs-convergence (that slot
-        // is the dream-delta convergence score, owned by dream-chat-ui.js).
-        const el = document.getElementById("obs-loop-records");
-        const fill = document.getElementById("obs-loop-records-fill");
-        if (el) {
-          el.textContent = s.total
-            ? `${s.total} rec · ${Math.round((s.avgConfidence || 0) * 100)}% conf · ${s.topReasoner || "—"}`
-            : "no records yet";
-          el.title = s.total
-            ? `${s.total} convergence records · ${Math.round((s.groundedPct || 0) * 100)}% grounded · ${s.verified || 0} verified · ${s.patternsCount || 0} patterns`
-            : "Reason→Act emits a ConvergenceRecord per reply";
-        }
-        if (fill) fill.style.width = Math.round((s.avgConfidence || 0) * 100) + "%";
-      })
-      .catch(() => {});
-  }
-  refreshConvergence();
+  // refreshConvergence() was removed with the Observer panel (#2476): its only
+  // sinks (#obs-loop-records) lived in that unreachable panel, so it fetched
+  // /api/convergence/status on load and after every reply for nothing.
 
   // ── Load conversation history (REMEMBER stage — issue #647) ───────────────
   async function loadConversationHistory() {
@@ -709,17 +687,6 @@
       scrollToBottom();
       return;
     }
-    // Special handling for Kingdome of Hearts game
-    const kingdomeMatch = text.match(/^!(?:three-doors|threedoors|doors|kingdome|kingdome-of-hearts)\b/i);
-    if (kingdomeMatch) {
-      if (emptyState) emptyState.style.display = "none";
-      inputEl.value = "";
-      analytics.messagesSent++;
-      analytics.record("send", "Kingdome of Hearts game started");
-      startThreeDoors();
-      return;
-    }
-
     // !convergance log an issue <title> — POST to non-stream handler
     if (/^!converg(?:ence|ance)\s+log\s+an?\s+issue\s+/i.test(text)) {
       if (emptyState) emptyState.style.display = "none";
@@ -970,18 +937,8 @@
                 if (evt.cleanText && evt.cleanText !== fullText) {
                   bubble.textContent = evt.cleanText;
                 }
-                // Update Loop Depth observer panel (Ouro Σ₀ CDF exit)
-                try {
-                  const loopN = evt.loop_n ?? 1;
-                  const conf = evt.confidence ?? (evt.sigma0?.claims ? Math.min(1, 0.5 + evt.sigma0.claims * 0.08) : 0.5);
-                  const exitReason = evt.exit_reason ?? 'single_pass';
-                  const loopEl = document.getElementById('obs-loop-depth');
-                  const fillEl = document.getElementById('obs-loop-fill');
-                  if (loopEl) loopEl.textContent = `⟳ ${loopN} loop${loopN !== 1 ? 's' : ''} · ${Math.round(conf * 100)}% conf · ${exitReason}`;
-                  if (fillEl) fillEl.style.width = (conf * 100) + '%';
-                } catch (_) {}
-                // CONVERGE: this reply just emitted a record — refresh the loop panel.
-                try { refreshConvergence(); } catch (_) {}
+                // (Observer-panel loop-depth writer + per-reply refreshConvergence()
+                // removed with the unreachable panel, #2476.)
 
                 // Parse [DOORS: A name | B name | C name] from full text if backend didn't extract
                 let suggestions = evt.suggestions;
@@ -1230,8 +1187,7 @@
       row.appendChild(webChips);
     }
 
-    // ── Three Doors banner (disabled — appendDoorsBanner not yet implemented) ──
-    // Show image prompt when AI suggests SD generation for doors
+    // Show image prompt when AI suggests SD generation
     if (imagePrompt) {
       const imgNote = document.createElement("div");
       imgNote.className = "source-badge";
@@ -2256,101 +2212,4 @@
   initVoice();
   loadVoiceSettings();
 
-  // ── Kingdome of Hearts Game Integration ────────────────────────────────
-  let doorsGameState = null;
-  let doorsUserId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-
-  async function startThreeDoors() {
-    console.log("[Kingdome] Starting game...");
-    const row = document.createElement("div");
-    row.className = "msg-row agent";
-    row.innerHTML = `<div class="msg-label">🚪 Kingdome of Hearts</div><div class="bubble"><b>Opening the first door...</b></div>`;
-    messagesEl.appendChild(row);
-    scrollToBottom();
-
-    try {
-      const r = await fetch(`${serverBase}/api/dream/doors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: doorsUserId, action: "start" }),
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-
-      if (data.error) {
-        row.querySelector(".bubble").textContent = `⚠️ Error: ${data.error}`;
-        return;
-      }
-
-      doorsGameState = data;
-      renderDoorsScene(row, data);
-    } catch (error) {
-      console.error("[Kingdome] Error:", error);
-      row.querySelector(".bubble").textContent = `❌ Failed to start game: ${error.message}`;
-    }
-  }
-
-  function renderDoorsScene(row, scene) {
-    const bubble = row.querySelector(".bubble");
-    const html = `
-      <div style="margin: 8px 0;">
-        <div style="margin-bottom: 12px; line-height: 1.6; color: #e2e8f0;">${scene.text}</div>
-        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;">
-          ${(scene.doors || [])
-            .map((door) => `
-            <button onclick="window.chooseDoorsPath('${door.label}')"
-              style="padding: 8px 12px; background: #4c1d95; border: 1px solid #7c3aed; color: #c4b5fd; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s; font-weight: 500;"
-              onmouseover="this.style.background='#6d28d9'; this.style.borderColor='#a78bfa';"
-              onmouseout="this.style.background='#4c1d95'; this.style.borderColor='#7c3aed';">
-              ${door.label}. ${door.name}
-            </button>
-          `)
-            .join("")}
-        </div>
-        ${scene.image_prompt ? `
-          <div style="background: #1e1b4b; border-left: 3px solid #7c3aed; padding: 8px; border-radius: 4px; margin-top: 12px; font-size: 11px; color: #a78bfa; max-height: 80px; overflow-y: auto;">
-            <div style="font-weight: 600; margin-bottom: 4px;">📸 Stable Diffusion Prompt:</div>
-            <div style="font-family: monospace; line-height: 1.4; color: #c4b5fd;">${scene.image_prompt}</div>
-          </div>
-        ` : ""}
-        ${scene.fox_present ? `<div style="color: #fbbf24; font-size: 12px; margin-top: 8px; font-style: italic;">🦊 The fox is here.</div>` : ""}
-      </div>
-    `;
-    bubble.innerHTML = html;
-  }
-
-  window.chooseDoorsPath = async (doorLabel) => {
-    if (!doorsGameState) return;
-
-    const row = document.createElement("div");
-    row.className = "msg-row agent";
-    row.innerHTML = `<div class="msg-label">🚪 Choosing door ${doorLabel}...</div><div class="bubble"><em>traversing...</em></div>`;
-    messagesEl.appendChild(row);
-    scrollToBottom();
-
-    try {
-      const r = await fetch(`${serverBase}/api/dream/doors`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: doorsUserId, action: "choose", choice: doorLabel }),
-      });
-
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = await r.json();
-
-      if (data.error) {
-        row.querySelector(".bubble").textContent = `⚠️ ${data.error}`;
-        return;
-      }
-
-      doorsGameState = data;
-      renderDoorsScene(row, data);
-    } catch (error) {
-      console.error("[Kingdome] Choice error:", error);
-      row.querySelector(".bubble").textContent = `❌ Failed: ${error.message}`;
-    }
-  };
-
-  window.startThreeDoors = startThreeDoors;
 

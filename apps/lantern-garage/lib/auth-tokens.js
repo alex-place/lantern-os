@@ -8,6 +8,8 @@
  */
 
 const crypto = require("crypto");
+const fs = require("fs");
+const path = require("path");
 const { resolveSessionSecret } = require("./session-secret");
 
 function secret() {
@@ -28,10 +30,12 @@ const TTL = {
   reset_password: 60 * 60 * 1000,    // 1h
 };
 
-/** Create a token for `purpose` bound to a profile id (and optional email). */
+/** Create a token for `purpose` bound to a profile id (and optional email). Each token
+ *  carries a random `jti` so it can be marked single-use via consumeToken() (#2614). */
 function createToken(purpose, profileId, email = null) {
   const exp = Date.now() + (TTL[purpose] || 60 * 60 * 1000);
-  const payload = b64url(JSON.stringify({ p: purpose, sub: String(profileId), e: email || null, exp }));
+  const jti = crypto.randomBytes(9).toString("base64url");
+  const payload = b64url(JSON.stringify({ p: purpose, sub: String(profileId), e: email || null, exp, jti }));
   return `${payload}.${sign(payload)}`;
 }
 
@@ -55,7 +59,44 @@ function verifyToken(token, expectedPurpose) {
   }
   if (payload.p !== expectedPurpose) return null;
   if (!payload.exp || Date.now() > payload.exp) return null;
-  return { sub: payload.sub, email: payload.e || null };
+  return { sub: payload.sub, email: payload.e || null, jti: payload.jti || null, exp: payload.exp };
 }
 
-module.exports = { createToken, verifyToken };
+// ── Single-use ledger — a signed token is otherwise replayable for its whole TTL, so a
+// leaked reset/verify link works again even after the legitimate user used it (#2614).
+// jti → expiry, in-memory + cwd-relative append log (survives restart), pruned on load.
+function ledgerPath() { return path.resolve(process.cwd(), "data", "auth", "consumed-tokens.jsonl"); }
+let _consumed = null; // Map<jti, exp>
+function _load() {
+  if (_consumed) return _consumed;
+  _consumed = new Map();
+  const now = Date.now();
+  try {
+    for (const line of fs.readFileSync(ledgerPath(), "utf8").split("\n")) {
+      if (!line) continue;
+      try { const o = JSON.parse(line); if (o.jti && o.exp > now) _consumed.set(o.jti, o.exp); } catch { /* skip */ }
+    }
+  } catch { /* no ledger yet */ }
+  return _consumed;
+}
+
+/** Has this token id already been spent? */
+function isConsumed(jti) { return !!(jti && _load().has(jti)); }
+
+/**
+ * Mark a token id spent. Returns true if this call consumed it (first use), false if it
+ * was ALREADY consumed (a replay) — callers reject on false. `exp` bounds ledger growth.
+ */
+function consumeToken(jti, exp) {
+  if (!jti) return true; // legacy token without a jti — nothing to dedupe against
+  const map = _load();
+  if (map.has(jti)) return false;
+  map.set(jti, exp || Date.now() + 24 * 60 * 60 * 1000);
+  try {
+    fs.mkdirSync(path.dirname(ledgerPath()), { recursive: true });
+    fs.appendFileSync(ledgerPath(), JSON.stringify({ jti, exp: map.get(jti) }) + "\n");
+  } catch { /* best-effort; the in-memory set still blocks replays this process */ }
+  return true;
+}
+
+module.exports = { createToken, verifyToken, isConsumed, consumeToken, ledgerPath };

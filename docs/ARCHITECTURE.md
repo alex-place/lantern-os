@@ -14,8 +14,8 @@ evidence (`file:line` / commit / PR) per the Σ₀ External Reality Rule. Where 
 intent diverge, that is called out in [§9 Known divergences](#9-known-divergences--debt) rather
 than papered over.
 
-> Supersedes the dated [ARCHITECTURE-AUDIT-2026-06-13.md](ARCHITECTURE-AUDIT-2026-06-13.md).
-> Companion docs: [CODEMAP.md](CODEMAP.md) (feature/status roadmap),
+> Supersedes the dated ARCHITECTURE-AUDIT-2026-06-13 (removed; in git history).
+> Companion docs: (feature/status roadmap retired 2026-07-16 — the GitHub milestone board is the roadmap),
 > [convergence-core-mapping.md](convergence-core-mapping.md) (code → core-object mapping),
 > [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) (immutable North Star).
 
@@ -92,7 +92,7 @@ modules ([`server.js:128+`](../apps/lantern-garage/server.js)); each module is
 (e.g. [`routes/status.js:68`](../apps/lantern-garage/routes/status.js)). The first module to claim
 the URL wins; LLM replies stream via SSE.
 
-Business logic lives in **[`apps/lantern-garage/lib/`](../apps/lantern-garage/lib/) — 149 modules**.
+Business logic lives in **[`apps/lantern-garage/lib/`](../apps/lantern-garage/lib/) — ~270 modules**.
 Grouped by loop stage / domain:
 
 | Domain | Representative modules |
@@ -205,10 +205,15 @@ Named honestly so they become follow-up issues, not surprises:
    external-marks-only benchmark registry.)*
 4. **Declared-but-unwired providers** (Grok, Mistral, Cohere, Perplexity) appear in PCSF but not in
    the fallback chain — config implies capability the code doesn't yet have.
-5. **Orphaned nav modules.** `shared-header.js` / `header.js` are unused; live nav is `auth-gate.js`
-   + inline per-page `.site-nav`.
-6. **149 `lib/` modules, framework-free routing.** Powerful and dependency-light, but discovery and
+5. **~270 `lib/` modules, framework-free routing.** Powerful and dependency-light, but discovery and
    ordering are manual; no central route registry beyond the array in `server.js`.
+6. **Unwired Creator-Suite pipeline experiments (preserved, not junk).** Five `lib/` modules are
+   referenced by nothing in the live path — `render-pipeline-v2.js` (documented "unused/aspirational"
+   in [FACECAM_DETECTION.md](FACECAM_DETECTION.md)), `scoring-engine-v2.js`, `sigma0-v10-ml-weights.js`,
+   `test-pipeline.js` (a manual debugger), and `layout-debug.js` (a QA overlay). They are
+   *intentionally* kept shorts/video research (commit "Preserve Sigma0 video pipeline and shorts
+   research work"); the live media path uses `facecam-v3.js` + `video-pipeline-*.js`. Flagged here so
+   they are a conscious keep-or-retire founder decision, not silently deleted as dead code.
 
 Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 

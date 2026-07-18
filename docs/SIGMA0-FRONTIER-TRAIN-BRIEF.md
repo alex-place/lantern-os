@@ -1,8 +1,8 @@
 # Σ₀ Frontier Training Brief — the honesty-native pretrained model
 
-**Date:** 2026-07-06 · **Status:** Living brief · **Companion:** [SIGMA0-MODEL-DESIGN-BRIEF.md](SIGMA0-MODEL-DESIGN-BRIEF.md) (the ≤8GB *serving* layer)
+**Date:** 2026-07-06 · **Status:** Living brief · **Companion:** [SIGMA0-MODEL-DESIGN.md](SIGMA0-MODEL-DESIGN.md) — appendix carries the serving-layer design brief (the ≤8GB *serving* layer)
 **Governance:** the program this brief designs requires an accepted ADR
-([ADR-0023](adr/0023-sigma0-frontier-training-program.md), Status: Proposed — operator approval only).
+([ADR-0024](adr/0024-sigma0-frontier-training-program.md), Status: Proposed — operator approval only; renumbered from 0023 in the ADR-collision fix).
 
 **The two-layer contract:** TRAIN frontier → SERVE everywhere. The serving brief's constraints
 (local ≤8GB, 4-bit, format parity) are this brief's **distillation target**, not its ceiling.
