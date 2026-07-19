@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1920, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #0F1518; }
+      body { font-family: "Segoe UI", Inter, Arial, sans-serif; color: #EBEAE2; }
+      .serif { font-family: Georgia, "Times New Roman", serif; }
+      .scene { position: absolute; inset: 0; }
+      .kicker { font-size: 26px; font-weight: 700; letter-spacing: 6px; color: #54BE9F; }
+      .marble { color: #93A29B; }
+      .gold { color: #F0C24C; }
+      .cyan { color: #5BC8E8; }
+      .storm { color: #6E93C8; }
+      .chip {
+        background: #151D22; border: 1px solid #26313A; border-radius: 10px;
+        padding: 18px 30px; font-size: 26px; color: #93A29B; display: flex; gap: 14px; align-items: center;
+      }
+      .chip b { color: #EBEAE2; font-size: 27px; }
+      .dot { width: 14px; height: 14px; border-radius: 50%; background: #54BE9F; box-shadow: 0 0 12px #54BE9F; }
+      .card {
+        background: #151D22; border: 1px solid #26313A; border-left: 6px solid #F0C24C;
+        border-radius: 12px; padding: 34px 44px;
+      }
+      #stars { position: absolute; inset: 0; }
+      #stars i { position: absolute; width: 3px; height: 3px; border-radius: 50%; background: #93A29B; opacity: .35; }
+      .grid { position: absolute; inset: 0;
+        background-image: linear-gradient(#26313A 1px, transparent 1px), linear-gradient(90deg, #26313A 1px, transparent 1px);
+        background-size: 160px 160px; opacity: .12; }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="66.5" data-width="1920" data-height="1080">
+
+      <!-- ambient background: whole run -->
+      <div id="bg" class="clip" data-start="0" data-duration="66.5" data-track-index="1">
+        <div class="grid"></div>
+        <div id="stars"></div>
+        <div style="position:absolute; inset:0; background: radial-gradient(1200px 700px at 62% 30%, rgba(240,194,76,.07), transparent 60%)"></div>
+      </div>
+
+      <!-- S1 · title 0–7.9 -->
+      <div id="s1" class="scene clip" data-start="0" data-duration="7.9" data-track-index="2">
+        <div id="s1-comet" style="position:absolute; top:250px; left:-420px; width:380px; height:6px;
+             background: linear-gradient(90deg, transparent, #F0C24C); border-radius:3px;
+             box-shadow: 0 0 24px rgba(240,194,76,.8); transform: rotate(-7deg)">
+          <div style="position:absolute; right:-10px; top:-9px; width:24px; height:24px; border-radius:50%;
+               background:#F0C24C; box-shadow: 0 0 34px 10px rgba(240,194,76,.65)"></div>
+        </div>
+        <div style="position:absolute; left:0; right:0; top:330px; text-align:center">
+          <div id="s1-kicker" class="kicker">UNISONA.AI MONTHLY &middot; VOL. 1</div>
+          <div id="s1-title" class="serif gold" style="font-size:170px; font-weight:700; line-height:1.05; margin-top:18px">The July Leap</div>
+          <div id="s1-sub" class="marble" style="font-size:34px; margin-top:22px">Sigma Trader Report &middot; July 2026 &middot; the answer first, then the receipts</div>
+        </div>
+        <div id="s1-board" style="position:absolute; left:0; right:0; bottom:120px; display:flex; gap:22px; justify-content:center">
+          <div class="chip"><span class="dot"></span><b>SPY $743.29</b></div>
+          <div class="chip"><span class="dot"></span><b>VIX 18.77</b></div>
+          <div class="chip"><span class="dot"></span><b>10-YR 4.55%</b></div>
+          <div class="chip"><span class="dot" style="background:#F0C24C; box-shadow:0 0 12px #F0C24C"></span><b>GOLD $4,017</b></div>
+          <div class="chip"><span class="dot"></span><b>FED JUL 28-29</b></div>
+        </div>
+      </div>
+
+      <!-- S2 · the arc 7.9–21.9 -->
+      <div id="s2" class="scene clip" data-start="7.9" data-duration="14" data-track-index="2">
+        <div style="position:absolute; left:160px; top:100px">
+          <div class="kicker">THE WHOLE FLIGHT &middot; 2000 &rarr; 2026</div>
+          <div class="serif" style="font-size:56px; margin-top:10px">$2,000 + $20 a month &mdash; every crash included</div>
+        </div>
+        <svg id="chart" width="1600" height="700" viewBox="0 0 1600 700" style="position:absolute; left:160px; top:260px">
+          <line x1="70" y1="620" x2="1560" y2="620" stroke="#26313A" stroke-width="2"/>
+          <line x1="70" y1="420" x2="1560" y2="420" stroke="#26313A" stroke-width="1"/>
+          <line x1="70" y1="220" x2="1560" y2="220" stroke="#26313A" stroke-width="1"/>
+          <text x="60" y="425" fill="#93A29B" font-size="22" text-anchor="end">$50k</text>
+          <text x="60" y="225" fill="#93A29B" font-size="22" text-anchor="end">$100k</text>
+          <polyline id="paidLine" fill="none" stroke="#93A29B" stroke-width="2.5" stroke-dasharray="8 8" opacity="0"/>
+          <polyline id="spLine" fill="none" stroke="#5BC8E8" stroke-width="4"/>
+          <polyline id="chLine" fill="none" stroke="#F0C24C" stroke-width="6" stroke-linejoin="round"
+                    style="filter: drop-shadow(0 0 12px rgba(240,194,76,.75))"/>
+          <g id="storms"></g>
+          <circle id="nodeGlow" cx="0" cy="0" r="26" fill="rgba(240,194,76,.25)" opacity="0"/>
+          <circle id="node" cx="0" cy="0" r="11" fill="#F0C24C" opacity="0"/>
+        </svg>
+        <div id="lbl-ch" style="position:absolute; right:120px; top:300px; text-align:right; opacity:0">
+          <div class="serif gold" style="font-size:74px; font-weight:700"><span id="n-ch">$0</span></div>
+          <div class="marble" style="font-size:26px">the champion, tonight</div>
+        </div>
+        <div id="lbl-sp" style="position:absolute; right:120px; top:560px; text-align:right; opacity:0">
+          <div class="cyan" style="font-size:46px; font-weight:700"><span id="n-sp">$0</span></div>
+          <div class="marble" style="font-size:24px">the same drip, plain S&amp;P</div>
+        </div>
+        <div id="lbl-paid" style="position:absolute; right:120px; bottom:120px; text-align:right; opacity:0">
+          <div class="marble" style="font-size:30px">money paid in: <b style="color:#EBEAE2">$8,380</b></div>
+        </div>
+      </div>
+
+      <!-- S3 · july 21.9–37.0 -->
+      <div id="s3" class="scene clip" data-start="21.9" data-duration="15.1" data-track-index="2">
+        <div style="position:absolute; left:160px; top:110px">
+          <div class="kicker">JULY &middot; THE ROTATION</div>
+          <div class="serif" style="font-size:56px; margin-top:10px">The hot stocks cooled. The rules held.</div>
+        </div>
+        <div id="s3-num" class="serif storm" style="position:absolute; left:160px; top:300px; font-size:190px; font-weight:700">-6.4%</div>
+        <div id="s3-cap" class="marble" style="position:absolute; left:170px; top:540px; font-size:32px; max-width:640px; line-height:1.5">
+          the champion&rsquo;s July, as chip stocks slid<br/>and oil jumped on the Middle East
+        </div>
+        <div id="s3-badge" class="card" style="position:absolute; right:150px; top:300px; width:760px">
+          <div class="gold" style="font-size:30px; font-weight:800; letter-spacing:3px">THE 24-FOR-24 BADGE</div>
+          <div id="s3-dots" style="display:flex; gap:12px; margin:26px 0 20px; flex-wrap:wrap"></div>
+          <div style="font-size:30px; line-height:1.5">A dip this size has visited <b class="gold">24 times</b> since 2000 &mdash;<br/>
+            and after all 24: <b class="gold">a brand-new high.</b></div>
+          <div class="marble" style="font-size:24px; margin-top:14px">worst-ever dip -25% &middot; this one, so far: -11%</div>
+        </div>
+      </div>
+
+      <!-- S4 · the twenty 37.0–48.5 -->
+      <div id="s4" class="scene clip" data-start="37" data-duration="11.5" data-track-index="2">
+        <div style="position:absolute; left:160px; top:120px">
+          <div class="kicker">YOUR NEXT $20</div>
+          <div class="serif" style="font-size:56px; margin-top:10px">One twenty, eight tickers &mdash; poured automatically</div>
+        </div>
+        <div id="s4-twenty" class="serif gold" style="position:absolute; left:160px; top:290px; font-size:150px; font-weight:700">$20</div>
+        <div id="splitbar" style="position:absolute; left:160px; top:520px; width:1600px; height:110px; display:flex; border-radius:14px; overflow:hidden"></div>
+        <div id="s4-small" class="marble" style="position:absolute; left:160px; top:670px; font-size:28px; opacity:0">
+          + IWM $1.10 &middot; EFA $0.90 &middot; XMMO $0.75 &middot; SPMO $0.55 &nbsp;&mdash;&nbsp; fractional shares make every slice fit
+        </div>
+        <div id="s4-note" style="position:absolute; left:160px; top:790px; font-size:34px; opacity:0">
+          A little more of whatever drifted below its target &mdash; <b class="gold">you quietly buy what&rsquo;s on sale.</b>
+        </div>
+      </div>
+
+      <!-- S5 · road ahead 48.5–60.1 -->
+      <div id="s5" class="scene clip" data-start="48.5" data-duration="11.6" data-track-index="2">
+        <div style="position:absolute; left:160px; top:120px">
+          <div class="kicker">THE ROAD AHEAD</div>
+          <div class="serif" style="font-size:56px; margin-top:10px">What the pros have circled</div>
+        </div>
+        <div id="s5-c1" class="card" style="position:absolute; left:160px; top:300px; width:1600px">
+          <div class="gold" style="font-size:28px; font-weight:800">WED &middot; JUL 22</div>
+          <div style="font-size:36px; margin-top:8px">Alphabet &amp; Tesla report &mdash; <span class="marble">Alphabet&rsquo;s AI spending is THE tell for the chip story</span></div>
+        </div>
+        <div id="s5-c2" class="card" style="position:absolute; left:160px; top:470px; width:1600px; border-left-color:#6E93C8">
+          <div class="storm" style="font-size:28px; font-weight:800">TUE-WED &middot; JUL 28-29</div>
+          <div style="font-size:36px; margin-top:8px">The Fed meets &mdash; <span class="marble">hold expected; the tone under new chair Warsh is the story</span></div>
+        </div>
+        <div id="s5-c3" class="card" style="position:absolute; left:160px; top:640px; width:1600px; border-left-color:#54BE9F">
+          <div style="color:#54BE9F; font-size:28px; font-weight:800">EVERY MARKET MINUTE</div>
+          <div style="font-size:36px; margin-top:8px; display:flex; align-items:center; gap:18px">
+            Our robot re-checks its three tripwires
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="marble">all green &middot; cruising 2.0&times; &middot; boring by design</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- S6 · outro 60.1–66.5 -->
+      <div id="s6" class="scene clip" data-start="60.1" data-duration="6.4" data-track-index="2">
+        <div style="position:absolute; left:0; right:0; top:360px; text-align:center">
+          <div id="s6-line" class="serif gold" style="font-size:96px; font-weight:700">Keep the drip alive.</div>
+          <div id="s6-desk" class="marble" style="font-size:34px; margin-top:26px">&mdash; the unisona.ai trading desk &middot; see you at the August Leap</div>
+        </div>
+        <div id="s6-fine" class="marble" style="position:absolute; left:0; right:0; bottom:90px; text-align:center; font-size:23px; opacity:0">
+          Practice mode: a simulation + paper account &middot; educational, not investment advice &middot; past performance does not predict future results
+        </div>
+      </div>
+
+      <!-- audio: narration per scene + music bed -->
+      <audio id="vo1" src="assets/vo1.wav" data-duration="7.29" data-start="0.4" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo2" src="assets/vo2.wav" data-duration="13.69" data-start="8.2" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo3" src="assets/vo3.wav" data-duration="14.81" data-start="22.2" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo4" src="assets/vo4.wav" data-duration="11.17" data-start="37.3" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo5" src="assets/vo5.wav" data-duration="11.25" data-start="48.8" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo6" src="assets/vo6.wav" data-duration="5.61" data-start="60.4" data-track-index="10" data-volume="1"></audio>
+      <audio id="bgm" src="assets/music.wav" data-start="0" data-duration="66.5" data-track-index="11" data-volume="0.2"></audio>
+    </div>
+
+    <script>
+      // ---- pinned monthly data (walk-forward run 2026-07-17), downsampled ----
+      const CH = [2056,2132,1965,1917,1939,1945,1994,2044,2095,2145,2195,2247,2298,2272,1909,1958,2008,2059,1915,1866,2267,2414,2474,2823,3252,3260,3319,3298,3252,3535,3442,3381,3197,3680,3624,3812,4133,4402,4034,3529,3609,3935,4199,4212,4791,4323,4443,4604,4231,3920,3943,4003,4063,4124,4184,4245,4520,5239,5987,6051,5509,5923,6499,6586,7638,7894,7613,8283,9109,9464,10293,11238,11925,11678,11606,12356,13231,12695,12288,11938,11771,10993,10793,11203,11439,12087,12804,13134,13570,14944,15846,15860,15610,14927,13869,13460,12200,13394,13640,15256,15176,13945,14726,15648,16714,17146,17746,19170,20708,19242,20251,20654,21480,18109,18228,19487,19538,21753,22908,23734,25842,23221,26268,31305,30145,30322,30838,26917,29556,31486,29713,32327,30641,30645,29678,29864,30061,30251,31784,34426,34424,37440,32673,37859,41444,48868,50368,55041,60174,64182,66304,63960,61245,65370,66263,69881,78719,81797,84292,85355,94141,98905,84514,94707,103189,97743,91537];
+      const SP = [1938,2137,2068,2115,2168,2034,2155,1876,2067,2036,1794,2002,2034,2104,2008,1750,1614,1897,1783,1803,2106,2208,2269,2457,2674,2713,2748,2748,2822,3028,3088,3135,3216,3386,3421,3528,3646,3768,3740,3806,4036,4288,4451,4455,4852,4669,4954,4866,4558,4439,4761,4362,4049,3179,2985,2928,3451,3749,4067,4277,4239,4680,4411,4511,4735,4957,5453,5684,5823,5649,5004,5571,5932,6431,6041,6403,6771,6725,7174,7583,7953,8294,8340,9027,8974,9502,9831,9939,10229,10799,10492,10947,11238,11298,10378,11343,10630,11378,11657,12166,12221,12493,13015,13584,13953,14372,14745,15595,16716,15706,16212,16951,17637,16761,16550,17438,17031,18533,18618,19760,20367,16445,19463,21017,21682,23484,24146,25986,27582,28930,28441,30233,30002,30252,27697,27795,24232,27702,27788,28135,28757,31665,29710,31763,33784,36752,37095,38910,40697,42782,42914,40047,42237,44428,45472,46425,48100,49267,49383,49443,50191,49777,47338,52333,55108,54561,54278];
+      const NM = 319, ORIG = j => (j < 153 ? 2 * j : 305 + (j - 153));
+      const X0 = 70, X1 = 1560, Y0 = 620, YMAX = 110000, YT = 40;
+      const X = i => X0 + (X1 - X0) * i / (NM - 1);
+      const Y = v => Y0 - (Y0 - YT) * v / YMAX;
+      const pts = a => a.map((v, j) => X(ORIG(j)).toFixed(1) + "," + Y(v).toFixed(1)).join(" ");
+      document.getElementById("chLine").setAttribute("points", pts(CH));
+      document.getElementById("spLine").setAttribute("points", pts(SP));
+      document.getElementById("paidLine").setAttribute("points",
+        Array.from({length: NM}, (_, i) => X(i).toFixed(1) + "," + Y(2020 + 20 * i).toFixed(1)).join(" "));
+      const nodeX = X(318), nodeY = Y(CH[CH.length - 1]);
+      document.getElementById("node").setAttribute("cx", nodeX);
+      document.getElementById("node").setAttribute("cy", nodeY);
+      document.getElementById("nodeGlow").setAttribute("cx", nodeX);
+      document.getElementById("nodeGlow").setAttribute("cy", nodeY);
+      const STORMS = [[32, "'02"], [106, "'08"], [242, "'20"], [272, "'22"]];
+      const sg = document.getElementById("storms");
+      STORMS.forEach(([idx, lbl]) => {
+        const j = idx / 2, cx = X(idx), cy = Y(CH[j]);
+        sg.innerHTML += `<g class="storm-g" opacity="0"><circle cx="${cx}" cy="${cy}" r="7" fill="#6E93C8"/>` +
+          `<text x="${cx}" y="${cy + 34}" fill="#6E93C8" font-size="22" text-anchor="middle">${lbl}</text></g>`;
+      });
+
+      // deterministic starfield
+      const stars = document.getElementById("stars");
+      for (let i = 0; i < 60; i++) {
+        const x = (i * 137.5) % 1920, y = (i * 89.3 + 60) % 1080, s = 2 + (i % 3);
+        stars.innerHTML += `<i style="left:${x.toFixed(0)}px; top:${y.toFixed(0)}px; width:${s}px; height:${s}px"></i>`;
+      }
+
+      // $20 split bar segments
+      const SPLIT = [["SPY", "$6.75", 6.75, "#F0C24C"], ["TLT", "$4.15", 4.15, "#6E93C8"],
+                     ["QQQ", "$3.00", 3.00, "#5BC8E8"], ["GLD", "$2.80", 2.80, "#D9A441"],
+                     ["IWM", "$1.10", 1.10, "#54BE9F"], ["EFA", "$0.90", 0.90, "#8FB8D8"],
+                     ["XMMO", "$0.75", 0.75, "#C88A5B"], ["SPMO", "$0.55", 0.55, "#B4622D"]];
+      const bar = document.getElementById("splitbar");
+      SPLIT.forEach(([tkr, lbl, amt, col]) => {
+        const seg = document.createElement("div");
+        seg.className = "seg";
+        seg.style.cssText = `width:${(amt / 20 * 100)}%; background:${col}; display:flex; flex-direction:column; ` +
+          `align-items:center; justify-content:center; color:#0F1518; font-weight:800; overflow:hidden`;
+        seg.innerHTML = amt >= 2.5 ? `<div style="font-size:34px">${lbl}</div><div style="font-size:22px">${tkr}</div>` : "";
+        bar.appendChild(seg);
+      });
+
+      // 24 badge dots
+      const dots = document.getElementById("s3-dots");
+      for (let i = 0; i < 24; i++) {
+        dots.innerHTML += `<span class="bdot" style="width:20px; height:20px; border-radius:50%; background:#F0C24C; ` +
+          `box-shadow:0 0 10px rgba(240,194,76,.7)"></span>`;
+      }
+
+      // ---- timeline ----
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+      const fmt = v => "$" + Math.round(v).toLocaleString("en-US");
+
+      // S1
+      tl.fromTo("#s1-comet", { x: 0 }, { x: 2700, y: -120, duration: 2.6, ease: "power1.inOut" }, 0.2);
+      tl.from("#s1-kicker", { opacity: 0, y: 24, duration: 0.7 }, 0.5);
+      tl.from("#s1-title", { opacity: 0, y: 60, scale: 0.96, duration: 1.1, ease: "power2.out" }, 0.8);
+      tl.from("#s1-sub", { opacity: 0, y: 24, duration: 0.8 }, 1.5);
+      tl.from("#s1-board .chip", { opacity: 0, y: 40, duration: 0.6, stagger: 0.12 }, 2.4);
+      tl.to("#s1", { opacity: 0, duration: 0.5 }, 7.4);
+      tl.set("#s1", { opacity: 0 }, 7.9);
+
+      // S2 — draw the arc
+      const chLine = document.getElementById("chLine"), spLine = document.getElementById("spLine");
+      const chLen = chLine.getTotalLength(), spLen = spLine.getTotalLength();
+      gsap.set(chLine, { strokeDasharray: chLen, strokeDashoffset: chLen });
+      gsap.set(spLine, { strokeDasharray: spLen, strokeDashoffset: spLen });
+      tl.from("#s2", { opacity: 0, duration: 0.5 }, 7.9);
+      tl.to("#paidLine", { opacity: 0.8, duration: 1.0 }, 8.4);
+      tl.to(spLine, { strokeDashoffset: 0, duration: 7.5, ease: "power1.inOut" }, 8.8);
+      tl.to(chLine, { strokeDashoffset: 0, duration: 7.5, ease: "power1.inOut" }, 9.2);
+      tl.to(".storm-g", { opacity: 1, duration: 0.4, stagger: 1.1 }, 10.4);
+      const nCh = { v: 0 }, nSp = { v: 0 };
+      tl.to("#lbl-ch", { opacity: 1, duration: 0.5 }, 10.0);
+      tl.to(nCh, { v: 91537, duration: 6.6, ease: "power1.inOut",
+        onUpdate: () => { document.getElementById("n-ch").textContent = fmt(nCh.v); } }, 10.0);
+      tl.to("#lbl-sp", { opacity: 1, duration: 0.5 }, 10.6);
+      tl.to(nSp, { v: 54278, duration: 6.0, ease: "power1.inOut",
+        onUpdate: () => { document.getElementById("n-sp").textContent = fmt(nSp.v); } }, 10.6);
+      tl.to("#lbl-paid", { opacity: 1, duration: 0.6 }, 12.0);
+      tl.to("#node", { opacity: 1, duration: 0.3 }, 16.7);
+      tl.to("#nodeGlow", { opacity: 1, duration: 0.4 }, 16.8);
+      tl.fromTo("#nodeGlow", { scale: 0.7, transformOrigin: "center" },
+        { scale: 1.5, duration: 1.6, repeat: 2, yoyo: true, ease: "sine.inOut" }, 17.0);
+      tl.to("#s2", { opacity: 0, duration: 0.5 }, 21.4);
+      tl.set("#s2", { opacity: 0 }, 21.9);
+
+      // S3 — rotation + badge
+      tl.from("#s3", { opacity: 0, duration: 0.5 }, 21.9);
+      tl.fromTo("#s3-num", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 0.9, ease: "back.out(1.6)" }, 22.4);
+      tl.from("#s3-cap", { opacity: 0, y: 24, duration: 0.7 }, 23.2);
+      tl.from("#s3-badge", { opacity: 0, x: 90, duration: 0.8, ease: "power2.out" }, 26.0);
+      tl.from(".bdot", { opacity: 0.12, scale: 0.4, duration: 0.25, stagger: 0.14 }, 27.0);
+      tl.to("#s3", { opacity: 0, duration: 0.5 }, 36.5);
+      tl.set("#s3", { opacity: 0 }, 37.0);
+
+      // S4 — the twenty
+      tl.from("#s4", { opacity: 0, duration: 0.5 }, 37.0);
+      tl.fromTo("#s4-twenty", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.8, ease: "power2.out" }, 37.4);
+      tl.from("#splitbar .seg", { width: 0, duration: 0.85, ease: "power2.inOut", stagger: 0.28 }, 38.2);
+      tl.to("#s4-small", { opacity: 1, duration: 0.6 }, 42.6);
+      tl.to("#s4-note", { opacity: 1, duration: 0.7 }, 44.0);
+      tl.to("#s4", { opacity: 0, duration: 0.5 }, 48.0);
+      tl.set("#s4", { opacity: 0 }, 48.5);
+
+      // S5 — road ahead
+      tl.from("#s5", { opacity: 0, duration: 0.5 }, 48.5);
+      tl.from("#s5-c1", { opacity: 0, y: 70, duration: 0.7, ease: "power2.out" }, 49.0);
+      tl.from("#s5-c2", { opacity: 0, y: 70, duration: 0.7, ease: "power2.out" }, 50.6);
+      tl.from("#s5-c3", { opacity: 0, y: 70, duration: 0.7, ease: "power2.out" }, 52.4);
+      tl.to("#s5", { opacity: 0, duration: 0.5 }, 59.6);
+      tl.set("#s5", { opacity: 0 }, 60.1);
+
+      // S6 — outro
+      tl.from("#s6-line", { opacity: 0, scale: 0.94, duration: 1.0, ease: "power2.out" }, 60.3);
+      tl.from("#s6-desk", { opacity: 0, y: 20, duration: 0.8 }, 61.2);
+      tl.to("#s6-fine", { opacity: 1, duration: 0.8 }, 62.2);
+
+      // bgm shape: swell in, duck under VO, breathe up in gaps, fade out
+      tl.fromTo("#bgm", { volume: 0 }, { volume: 0.30, duration: 1.6, ease: "power1.out" }, 0);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 0.4);
+      tl.to("#bgm", { volume: 0.30, duration: 0.8 }, 7.7);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 8.2);
+      tl.to("#bgm", { volume: 0.30, duration: 0.8 }, 21.9);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 22.2);
+      tl.to("#bgm", { volume: 0.30, duration: 0.8 }, 36.5);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 37.3);
+      tl.to("#bgm", { volume: 0.30, duration: 0.8 }, 48.0);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 48.8);
+      tl.to("#bgm", { volume: 0.30, duration: 0.8 }, 60.0);
+      tl.to("#bgm", { volume: 0.16, duration: 0.6 }, 60.4);
+      tl.to("#bgm", { volume: 0.0, duration: 2.0, ease: "power1.in" }, 64.5);
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

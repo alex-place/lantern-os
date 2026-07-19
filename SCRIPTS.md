@@ -61,6 +61,7 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | Script | Purpose | How to run |
 |--------|---------|-----------|
 | `scripts/reports/sigma_trader_report_2026_07.py` | Builds the July 2026 Sigma Trader Report PDF (`apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf`) — the champion's monthly balance, current events, suggestions, receipts. All numbers pinned in-file; reproducible offline. Next month: copy to a new dated file, update the DATA + prose. | `python scripts/reports/sigma_trader_report_2026_07.py` |
+| `scripts/reports/leap-video-2026-07/` (`make_narration.py`, `make_music.py`, `index.html`) | The July Leap video edition (~66s, 16:9): HyperFrames composition + Gemini-TTS narration (Vertex ADC) + synthesized bed → `public/reports/sigma-trader-report-2026-07.mp4`. See its README for the rebuild chain. | `python make_narration.py && python make_music.py && npm run render` (in that dir) |
 
 ---
 
