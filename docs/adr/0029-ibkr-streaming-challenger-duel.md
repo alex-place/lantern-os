@@ -178,6 +178,45 @@ check: flat-3% series reproduces the Champion to **$0.0000**). Results
 - **Still open (paid or IBKR-gated):** minute-accurate history, streaming cadence beyond 60s, and
   real fills — the remaining Phase A upgrades this run could not touch for free.
 
+## Phase A results — cadence duel: real-time vs the hourly brake (run 2026-07-19)
+
+Operator follow-up: *if the Contender could brake in real time, compare it to the Champion's
+hourly brake.* Free method (`experiments/challenger_realtime_brake.py`): the hourly-brake
+experiment's exact panel and engine (Yahoo hourly, 730 trading days 2023-08→2026-07, $25k book,
+identical monthly direction), extended with OHLC lows so a **realtime** variant can act *inside*
+the hour — when the trend gate (or dd-taper) crosses on the linear path to the bar's clamped low,
+it cuts at the trigger price (5bp fill haircut; re-levering waits for bar closes — defensive
+asymmetry). Fake-wick guard: 131 close repairs + 3,118 low clamps at 4× the rolling median move.
+Results (`experiments/challenger_realtime.json`, sim 2024-03→2026-07):
+
+| Variant | Final | Sharpe (Lo CI) | maxDD | Intra-bar cuts |
+|---|---|---|---|---|
+| daily brake | $46,663 | 1.16 [−0.11, 2.43] | −22.2% | — |
+| **hourly brake (Champion)** | $50,902 | 1.30 [0.03, 2.57] | −19.8% | — |
+| **realtime brake (Contender)** | **$51,543** | **1.33 [0.06, 2.60]** | −19.8% | **1** (0 whipsaw, median λ 0.80) |
+| static 2× (control) | $57,410 | 1.41 | −22.8% | — |
+
+- **The marginal-cadence curve is now measured end to end:** daily→hourly = **+$4,239**;
+  hourly→realtime = **+$641** (≈ +0.5%/yr on this window). Diminishing returns, exactly as this
+  ADR pre-registered ("expect small, 0–1%/yr").
+- **The whole realtime edge came from ONE event** — a single mid-hour trend-gate crossing where
+  the realtime book de-levered at λ=0.80 (~12 minutes before the hourly close), whipsaw-free.
+  The paired bootstrap says so honestly: **+0.07%/yr, 95% CI [+0.00, +0.21], P(>0)=63%** — a real
+  mechanism, a fragile sample (n=1 trigger in 2.4y). Fill-haircut sensitivity 0/5/10bp barely
+  moves it ($51,598/$51,543/$51,489).
+- **Bull-window caveat, stated plainly:** static 2× (no brake at all) won this window on final
+  dollars — 2024–26 was mostly up, and brakes are risk-protection that trails strong bulls (the
+  deep-history/Faber result). Cadence conclusions here are about crash-response mechanism, not
+  expected returns.
+- **Package interaction:** on this high-rate window the real-IRX carry *costs* the levered book
+  (hourly+IRX $49,490 < hourly-flat $50,902; real bills averaged 4.25% > the 3% model) — the
+  mirror of the 26-year result where truth paid +11.6%. Accurate frictions cut both ways; over
+  the full history they net positive.
+- **Verdict for the build:** the streaming Contender's real-time cadence is worth building only
+  as the cheap extension it is (the monitor already ticks at 60s; send-on-delta makes it
+  event-driven for free) — its measured value is one good crash-day cut per couple of years, not
+  a return engine. The return engine remains the friction-accuracy fixes and the brake itself.
+
 ## Consequences
 
 - (+) The Champion's own book gets truer funding/cash numbers regardless of who wins.
