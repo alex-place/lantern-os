@@ -660,7 +660,7 @@ The most valuable loop-2 output is negative-space knowledge: we now know what NO
 Loops 1-2 validated the shipped Conservative config on US indices (S&P/Nasdaq) — markets that
 always recovered. Loop 3 attacks the untested variables: non-US markets (survivorship bias),
 inflation/real returns, interest-rate regimes, decade stability, vol-target sensitivity.
-> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). Iters done: **17** (international/Japan; real/inflation returns). Next: rate-regime sensitivity → decade stability → vol-target sweep → synthesis.
+> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). Iters done: **18** (intl/Japan; real returns; rate-regime). Next: decade stability → vol-target sweep → synthesis.
 
 ## Iteration 16 (Σ₀) — survivorship-bias test: the brake OUTSIDE the US (incl. Japan)
 
@@ -727,3 +727,39 @@ fair. Caveat: run_overlay's cash carry is flat 3%, which UNDERSTATES 1970s-80s T
    the true 1970s real result is better than shown; but qualitatively cash-parking still isn't
    an inflation hedge. → **iter-18 tests rate-regime sensitivity directly** (how much of the edge
    depends on the cash yield).
+
+---
+
+## Iteration 18 (Σ₀) — the edge is CASH-YIELD dependent (ZIRP is the weak spot)
+
+`deep_history_rates.py` varies the idle-cash yield (0/3/6%) for the no-margin book (buy&hold
+holds no cash → RF-invariant).
+
+| S&P 1927+ | cash 0% | cash 3% | cash 6% | buy&hold |
+|---|---|---|---|---|
+| no_margin Sharpe | **0.09** | 0.69 | 0.79 | 0.42 |
+| no_margin final | $33k | $16.5M | $50.7M | $10.5M |
+| beats B&H Sharpe? | **NO** | yes | yes | — |
+
+| Nasdaq 1971+ | cash 0% | cash 3% | cash 6% | buy&hold |
+|---|---|---|---|---|
+| no_margin Sharpe | **0.82** | 0.90 | 0.98 | 0.60 |
+| beats B&H Sharpe? | yes | yes | yes | — |
+
+**Findings (iteration 18).**
+1. **The brake's edge scales strongly with the cash yield — this is a real, material
+   sensitivity.** On the S&P over a century, at 0% cash the Sharpe collapses to 0.09 (below
+   buy&hold's 0.42) and terminal wealth is decimated: sitting in cash earning nothing ~40% of
+   the time forgoes ~98 years of compounding. At the historically-normal ~3% it's solid; at 6%
+   it dominates.
+2. **On the Nasdaq the RISK-ADJUSTED edge survives even 0% cash** (Sharpe 0.82 > 0.60) — its
+   crashes (dot-com −78%) are violent enough that avoidance pays regardless of cash interest —
+   but final value still lags buy&hold at 0%.
+3. **Practical caveat (important):** the brake works best when cash earns a real yield (≥3%,
+   like 2023-2026). In a sustained **ZIRP world (cash ≈ 0%, like 2009-2021)** it loses much of
+   its appeal on broad indices — you sit in cash earning nothing while missing the recovery.
+   The full-history 0% run is a counterfactual (cash didn't earn 0% for a century; the realistic
+   long-run yield is ~3-4%, where the brake holds), but it correctly flags that **the strategy's
+   value is regime-dependent on rates.** Combined with iter-17 (not an inflation hedge), the
+   honest boundary is now sharp: the Conservative brake is *nominal crash insurance that pays a
+   cash coupon* — strong when cash yields are positive, weak under ZIRP or pure inflation.
