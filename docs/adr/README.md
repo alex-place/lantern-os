@@ -92,5 +92,6 @@ against the *merged* master, not your branch's base.
 | [0026](0026-ternary-serving-artifact-distillation-target.md) | Ternary (1.58-bit / W1.58A8) as the distillation-target format for the ≤8GB serving artifact — BitDistill-style QAT-distill from the FP teacher, accepted by the Σ_θ gate, served as a layer-level kernel swap inside the custom Ouro loop (resolves ADR-0024 Phase-2 / D7) | Accepted (Alex Place, 2026-07-07) |
 | [0027](0027-one-click-broker-oauth2.md) | One-click broker connect — per-user OAuth2 (Alpaca now, IBKR when they ship it); replaces the five-step IBKR key-upload wizard with provider login → Approve | Accepted (Alex Place, 2026-07-15) |
 | [0028](0028-managed-strategy-sharpe-gate-tax-aware.md) | Managed-strategy mode — Sharpe-mandate acceptance gate, tax-aware management, contained execution | Accepted (operator approval given in-session, 2026-07-15) |
+| [0029](0029-ibkr-streaming-challenger-duel.md) | IBKR streaming Challenger — Champion's core + send-on-delta cadence + real IBKR funding/cash-sweep frictions + minute-accurate history, in a pre-registered backtest + live-paper duel vs the Champion; fold path adopts the friction fixes on a loss; ADR-0028 gate unchanged | Proposed (awaiting Alex's approval) |
 
 <!-- Add new ADRs to this table on merge. -->
