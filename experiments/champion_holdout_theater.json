@@ -1,0 +1,108 @@
+{
+ "grid": {
+  "tv": [
+   0.2,
+   0.35,
+   0.5
+  ],
+  "brake": [
+   0.15,
+   0.3,
+   0.45
+  ],
+  "trend": [
+   3,
+   6,
+   12
+  ],
+  "band": [
+   0.0,
+   0.08,
+   0.16
+  ]
+ },
+ "windows": {
+  "train": "<2013",
+  "val": "2013-2019",
+  "test": ">=2020"
+ },
+ "k_queries": 40,
+ "seeds": 24,
+ "regimes": {
+  "naive": {
+   "n": 1,
+   "picked_modal": [
+    0,
+    2,
+    0,
+    2
+   ],
+   "reported_sharpe": 0.8546274905258311,
+   "val_true_sharpe": 0.8546274905258311,
+   "report_inflation": 0.0,
+   "test_sharpe": 0.9147899140007112,
+   "test_growth_x": 2.5169428902375794,
+   "full_final_usd": 68098.92792848586,
+   "full_maxdd": -0.2024688662970393
+  },
+  "thresholdout": {
+   "n": 24,
+   "picked_modal": [
+    0,
+    2,
+    0,
+    0
+   ],
+   "reported_sharpe": 1.0956761442960723,
+   "val_true_sharpe": 0.8267676888608012,
+   "report_inflation": 0.2689084554352711,
+   "test_sharpe": 0.9241422715877029,
+   "test_growth_x": 2.6311498286530592,
+   "full_final_usd": 68073.78306543715,
+   "full_maxdd": -0.2203014520468581
+  },
+  "fresh": {
+   "n": 24,
+   "picked_modal": [
+    0,
+    2,
+    0,
+    0
+   ],
+   "reported_sharpe": 1.4151023127977693,
+   "val_true_sharpe": 0.8241188126881539,
+   "report_inflation": 0.5909835001096154,
+   "test_sharpe": 0.9050054498078772,
+   "test_growth_x": 2.643583891189266,
+   "full_final_usd": 69002.65858659714,
+   "full_maxdd": -0.2350828618494365
+  }
+ },
+ "champion_ref": {
+  "config": [
+   1,
+   1,
+   1,
+   1
+  ],
+  "val_sharpe": 0.6416137883654189,
+  "test_sharpe": 1.0185843217820623,
+  "test_growth_x": 3.650978791047993,
+  "full_final_usd": 91702.93247741563,
+  "full_maxdd": -0.2546435041993351
+ },
+ "oracle_test": {
+  "config": [
+   0,
+   1,
+   1,
+   1
+  ],
+  "test_sharpe": 1.1385241328317626
+ },
+ "notes": [
+  "fresh = moving-block bootstrap proxy for a fresh flow",
+  "thresholdout: T=0.25, sigma=0.15 Sharpe units, budget 10 - shape is the claim, not the constants",
+  "engine identical to the published champion walk-forward"
+ ]
+}

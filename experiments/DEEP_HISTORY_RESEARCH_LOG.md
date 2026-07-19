@@ -438,3 +438,43 @@ it is TC-invariant.
 3. **Honest loss:** at 20bp on the S&P, final value dips below buy&hold ($8.5M vs $10.5M) —
    at pessimistic fills the *return* give-up grows, though the risk-adjusted and drawdown
    advantages persist. A higher-turnover overlay would have failed this test.
+
+---
+
+## Iteration 11 (Σ-cert) — holdout theater measured on the Champion's own selection (2026-07-19)
+
+Applied the Collapse Certificate's §8.4 result (fixed-holdout reuse inflates adaptive research;
+Thresholdout keeps evidence honest; Dwork arXiv:1506.02629) to the champion's selection process
+and MEASURED it (`experiments/champion_holdout_theater.py`, 81-config grid tv×brake×trend×band,
+one full $2k+$20 walk-forward each; TRAIN <2013 / VAL 2013-19 / TEST ≥2020 touched once; a
+greedy 40-query researcher hill-climbs VAL under three regimes; 24 seeds for stochastic arms).
+
+| selection regime | reported Sh | TEST Sh | TEST growth | full-period $ | maxDD |
+|---|---|---|---|---|---|
+| naive holdout reuse | 0.855 | 0.915 | 2.52× | $68,099 | −20.2% |
+| thresholdout (T=.25, σ=.15, budget 10) | 1.096 (infl.) | 0.924 | 2.63× | $68,074 | −22.0% |
+| fresh-flow proxy (block bootstrap) | 1.415 (infl.) | 0.905 | 2.64× | $69,003 | −23.5% |
+| **CHAMPION as actually chosen** | — | **1.019** | **3.65×** | **$91,703** | −25.5% |
+| test-window oracle | — | 1.139 | 3.43× | $86,865 | −24.5% |
+
+**Findings.**
+1. **The champion survives the certificate's audit.** Chosen once (max final value with a Sharpe
+   floor), it beats every adaptive val-Sharpe-optimizing researcher on the untouched 2020-26
+   window on BOTH growth (3.65× vs 2.5-2.6×) and Sharpe (1.02 vs ~0.91), and sits near the test
+   oracle (whose full-period final it actually exceeds). No evidence its selection was
+   holdout-noise-mining.
+2. **At this grid granularity, naive reuse did NOT corrupt picks** — all three regimes land the
+   same low-vol config family with equal test quality. The landscape is coarse and smooth; the
+   cert's 22× penalty regime is fine-grained noise-chasing. Consequence: adopt Thresholdout when
+   the search gets fine (the 100+-strategy meta-hunts), not for 81-cell grids.
+3. **Where the cert's warning DID bite: reported scores, not picks.** Noisy query channels
+   inflate the reported Sharpe (+0.27 thresholdout, +0.59 fresh-proxy) while true quality stays
+   flat — winner's curse on the reporting path. Protocol rule: publish re-measured truth, never
+   the search's own reported score (our walk-forward re-runs already do this; now it's a rule).
+4. **Objective choice dominated holdout discipline ~10:1.** Val-Sharpe maximization under-earns
+   the champion's $-objective by ~$24k (−26%) at only slightly better drawdown. Fix the
+   objective (final wealth s.t. floors) before optimizing the reuse mechanism.
+
+Honest limits: fresh-flow arm is a bootstrap proxy, not truly fresh data; constants (T, σ,
+budget) at the noise scale — shape is the claim; single val/test split (2013-19 → 2020-26);
+Sharpe-greedy researcher is one adversary, not the worst one.
