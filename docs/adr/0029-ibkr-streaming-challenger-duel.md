@@ -146,6 +146,38 @@ subscriptions only if/when Phase C ever arrives). **≤ ~$60/mo during the duel,
 - **Two data planes, one seam.** Polygon-vs-IBKR reconciliation is a hard requirement, not a nice-
   to-have; unreconciled seams void Phase A.
 
+## Phase A results — free-data variant (run 2026-07-19)
+
+Operator directive: free data only, run now. The free slice of upgrade #2 was executed:
+`experiments/challenger_free_rates.py` swaps the engine's flat 3% cash / 3%+150bp borrow for the
+**real daily 13-week T-bill yield (^IRX, Yahoo, free, 7,161 obs 1998→2026: mean 2.10%, min 0.00%,
+max 6.22%, 3.71% today)** — signals, weights, band, premise byte-identical (engine-equivalence
+check: flat-3% series reproduces the Champion to **$0.0000**). Results
+(`experiments/challenger_free.json`, panel through 2026-07-17):
+
+| Book | Final | Sharpe | maxDD | Funding paid | Verdict |
+|---|---|---|---|---|---|
+| Champion (flat 3%) | $91,702 | 0.648 | −25.5% | (modeled flat) | baseline |
+| **Challenger (real IRX, +150bp)** | **$102,294** | **0.667** | **−25.2%** | $17,250 | **+11.6% final, shallower DD** |
+| Sensitivity: IBKR-Lite spread (+250bp) | $90,072 | 0.641 | −25.3% | $19,615 | win erased |
+
+- **Attribution:** the flat model *overcharged* the ZIRP era — the challenger's equity gap runs
+  −7.5% (2009, real rates were high 2000-07) → +18.3% (2022, borrowing at ~1.65% real vs 4.5%
+  modeled) → +11.6% final (2022-26 hikes give some back). Exactly the accurate-history story.
+- **Pre-registered significance test:** paired block-bootstrap Δreturn **+0.34%/yr, 95% CI
+  [−0.11%, +0.74%], P(>0) = 93.2%** — positive but **does not exclude zero**, so under this ADR's
+  own win conditions the duel is NOT declared won on returns. However, this delta is a
+  **deterministic model-accuracy correction** (true rates vs a wrong constant), not a mined edge —
+  the fold-path rule applies: *adopt the friction fix into the Champion regardless*.
+- **Spread sensitivity is decisive for live:** the entire gain requires Pro-tier (+150bp-class)
+  margin pricing; Lite-class (+250bp) erases it. Broker/tier choice is a return decision.
+- **Immediate adoptable fixes (pending approval, money-path):** (1) the walk-forward and the
+  published Champion numbers should carry real-IRX carry (truer record: ~$102.3k, Sharpe 0.667);
+  (2) `brake-monitor.js` should mark with the live bill yield (^IRX 3.71% today) instead of
+  `BRAKE_TBILL_RATE` default 3% — both are Verify-stage truth fixes, not strategy changes.
+- **Still open (paid or IBKR-gated):** minute-accurate history, streaming cadence beyond 60s, and
+  real fills — the remaining Phase A upgrades this run could not touch for free.
+
 ## Consequences
 
 - (+) The Champion's own book gets truer funding/cash numbers regardless of who wins.
