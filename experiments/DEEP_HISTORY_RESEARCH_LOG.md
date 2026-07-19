@@ -660,7 +660,7 @@ The most valuable loop-2 output is negative-space knowledge: we now know what NO
 Loops 1-2 validated the shipped Conservative config on US indices (S&P/Nasdaq) — markets that
 always recovered. Loop 3 attacks the untested variables: non-US markets (survivorship bias),
 inflation/real returns, interest-rate regimes, decade stability, vol-target sensitivity.
-> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). Iters done: **16** (international/Japan survivorship test). Next: real/inflation returns → rate-regime sensitivity → decade stability → vol-target sweep → synthesis. Σ₀: measured only, no fabrication.
+> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). Iters done: **17** (international/Japan; real/inflation returns). Next: rate-regime sensitivity → decade stability → vol-target sweep → synthesis.
 
 ## Iteration 16 (Σ₀) — survivorship-bias test: the brake OUTSIDE the US (incl. Japan)
 
@@ -697,3 +697,33 @@ reclaim its 1989 high):
    decades (the trend gate kept it in cash). A market that chops sideways with no sustained
    trend would whipsaw (iter-11); Japan's sustained downtrend is the brake's best case, and it's
    real.
+
+---
+
+## Iteration 17 (Σ₀) — REAL (inflation-adjusted) returns: brake protects crashes, NOT inflation
+
+`deep_history_real.py` deflates both books by an encoded annual US CPI table (BLS historical —
+labeled assumption; FRED was unreachable). Both books deflated identically → the comparison is
+fair. Caveat: run_overlay's cash carry is flat 3%, which UNDERSTATES 1970s-80s T-bill yields
+(5-15%) — so the stagflation result is CONSERVATIVE (pessimistic) for the brake.
+
+| S&P, REAL | buy&hold realSharpe / realDD / real× | no_margin realSharpe / realDD / real× |
+|---|---|---|
+| full 1927-2026 | 0.26 / −84% / ×22.5 | **0.40 / −57% / ×35.3** ✓ |
+| **1970-82 stagflation** | −0.23 / −62% / ×0.6 | **−0.45 / −56% / ×0.6** ✗ |
+| 2000-2026 | 0.29 / −65% / ×2.7 | **0.46 / −20% / ×3.3** ✓ |
+| 2021-26 inflation spike | 0.58 / −30% / ×1.6 | **0.64 / −21% / ×1.5** ✓ |
+
+**Findings (iteration 17).**
+1. **The brake improves REAL returns in most regimes** — full history (real Sharpe 0.40 vs
+   0.26, real DD −57% vs −84%, higher real multiple), the modern 2000-2026 crashes, and even
+   the recent 2021-22 inflation spike. It is not merely a nominal illusion.
+2. **BUT in the 1970s stagflation it gave NO real edge — slightly worse real Sharpe (−0.45 vs
+   −0.23), same real loss (both ×0.6).** Cash is a poor inflation hedge: when the enemy is
+   *inflation* (not a nominal crash), parking in cash doesn't preserve purchasing power. **The
+   brake protects nominal drawdowns, not inflation.** A real inflation hedge (TIPS / commodities
+   / gold) is a different tool. This is the honest limit.
+3. **Caveat softens #2:** the flat-3% cash assumption badly understates 1970s T-bill yields, so
+   the true 1970s real result is better than shown; but qualitatively cash-parking still isn't
+   an inflation hedge. → **iter-18 tests rate-regime sensitivity directly** (how much of the edge
+   depends on the cash yield).
