@@ -478,3 +478,41 @@ greedy 40-query researcher hill-climbs VAL under three regimes; 24 seeds for sto
 Honest limits: fresh-flow arm is a bootstrap proxy, not truly fresh data; constants (T, σ,
 budget) at the noise scale — shape is the claim; single val/test split (2013-19 → 2020-26);
 Sharpe-greedy researcher is one adversary, not the worst one.
+
+---
+
+## Iteration 12 — the contender cook-off: 6 challengers, any honest means (2026-07-19)
+
+Operator: beat the champion with any strategy, any means necessary. Discipline held (iteration-11
+rules): all free params tuned pre-2020 only, 2020→2026-07 graded ONCE, every entrant reported,
+engine-equivalence asserted ($91,703 vs published $91,702). `experiments/contender_cookoff.py`.
+
+| entrant | full $ | maxDD | full Sh | TEST Sh | TEST growth |
+|---|---|---|---|---|---|
+| CHAMPION (ref) | $91,703 | −25.5% | 0.65 | 1.02 | 3.65× |
+| C1 grid-refit (tv.2/bk.3/tr12/bd.16) | $81,945 | −25.1% | 0.73 | 0.97 | 2.87× |
+| C2 dual momentum top5, 1× | $62,745 | −23.3% | 0.80 | 0.86 | 2.27× |
+| C3 dualmom top5 + brake | $90,797 | −35.0% | 0.65 | 0.67 | 2.42× |
+| C4 Moreira-Muir σ² (c=.04) | $75,736 | −42.9% | 0.57 | 0.70 | 2.35× |
+| **C5 champion + 10% BTC sleeve** | **$277,980** | −27.9% | 0.83 | 1.19 | 5.74× |
+| **C6 = C5 + real ^IRX carry** | **$312,092** | −28.0% | 0.84 | 1.19 | 5.73× |
+
+**Findings.**
+1. **Within its own 8-ETF universe, the champion remains unbeaten on wealth** — six more
+   challengers join the 100+ prior failures. C1/C2 lift Sharpe by giving up dollars (the
+   objective split, again); C3 ties on money at far worse drawdown; naive σ² scaling (C4) blows
+   the DD envelope on a multi-asset book.
+2. **The only thing that beat it was a new asset, not a new strategy.** A 10% BTC-USD sleeve
+   (monthly-rebalanced, live from BTC's 2014 listing, sleeve size tuned pre-2020 where it already
+   ran 8.8×) triples the final: $277,980, and KEPT winning out-of-sample (test growth 5.74× vs
+   3.65× through two crypto winters incl. 2022's −75%) at only 2.4pt deeper worst dip — the
+   capped, rebalanced sleeve harvests the vol without owning the ruin. Stacking the measured
+   IRX carry fix gives $312,092 (+240% over the champion).
+3. **THE FLAG, unmissable: universe selection is where hindsight hides.** BTC is on the menu
+   *because* 2026 knows its history — the same survivorship-of-the-menu bias as failure-map #1.
+   The pre-2020 tuning discipline bounds parameter hindsight, not ASSET hindsight. No backtest
+   can clear that; only ADR-0029's Phase-B live paper duel can earn it forward.
+4. Verdict: promote **champion+BTC-sleeve (5-10%) + IRX carry** to a live paper duel candidate
+   (Alpaca supports BTC, so the paper book can actually hold it); universe expansion is an
+   operator decision (ADR approval), not a research decision. Everything else retires with its
+   numbers on the record.
