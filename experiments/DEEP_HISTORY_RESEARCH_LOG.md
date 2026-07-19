@@ -660,7 +660,7 @@ The most valuable loop-2 output is negative-space knowledge: we now know what NO
 Loops 1-2 validated the shipped Conservative config on US indices (S&P/Nasdaq) — markets that
 always recovered. Loop 3 attacks the untested variables: non-US markets (survivorship bias),
 inflation/real returns, interest-rate regimes, decade stability, vol-target sensitivity.
-> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). Iters done: **18** (intl/Japan; real returns; rate-regime). Next: decade stability → vol-target sweep → synthesis.
+> **LOOP 3 STATE:** run until ~2026-07-19T23:56Z. Branch `claude/trading-research-loop3` (PR to follow). LOOP 3 COMPLETE. Iters 16-20 + synthesis: brake works outside US (Japan doubled buyIters done: **18** (intl/Japan; real returns; rate-regime). Next: decade stability → vol-target sweep → synthesis.hold); boundaries mapped (not an inflation hedge; ZIRP-weak; small drag in crash-free bulls); tv=0.20 robust. Shipped config sound, no live change.
 
 ## Iteration 16 (Σ₀) — survivorship-bias test: the brake OUTSIDE the US (incl. Japan)
 
@@ -763,3 +763,78 @@ holds no cash → RF-invariant).
    value is regime-dependent on rates.** Combined with iter-17 (not an inflation hedge), the
    honest boundary is now sharp: the Conservative brake is *nominal crash insurance that pays a
    cash coupon* — strong when cash yields are positive, weak under ZIRP or pure inflation.
+
+---
+
+## Iteration 19-20 (Σ₀) — decade stability + vol-target robustness
+
+**Decade-by-decade (S&P; excess = no_margin − buy&hold Sharpe):**
+
+| decade | ΔSharpe | B&H maxDD → nm maxDD |
+|---|---|---|
+| 1920s | +0.56 | −45% → −21% |
+| 1930s | +0.30 | −83% → −28% |
+| 1970s | +0.14 | −48% → −26% |
+| **2000s** | **+0.58** | −57% → −10% |
+| 2020s | +0.11 | −34% → −19% |
+| 1980s | −0.03 | −34% → −27% *(brake worse Sharpe)* |
+| 1990s | −0.03 | −20% → −17% *(brake worse Sharpe)* |
+| 2010s | −0.11 | −20% → −17% *(brake worse Sharpe)* |
+
+Nasdaq echoes it: crisis decades win big (1970s +0.73, 2000s +0.49), strong-bull decades cost
+a little (1980s −0.02, 1990s −0.03, 2010s −0.13).
+
+**vol-target (tv) sweep, S&P (shipped tv=0.20; buy&hold Sharpe 0.42):**
+
+| tv | Sharpe | maxDD | final | trades/yr |
+|---|---|---|---|---|
+| 0.10 | 0.77 | −26% | $6.5M | 25.7 |
+| 0.15 | 0.72 | −33% | $11.5M | 12.8 |
+| **0.20** | 0.69 | −34% | **$16.5M** | **8.4** |
+| 0.25 | 0.66 | −33% | $16.2M | 7.0 |
+| 0.30 | 0.62 | −34% | $14.1M | 6.5 |
+
+**Findings (iter 19-20).**
+1. **The edge is structurally "crisis insurance," consistent across 10 decades:** the brake
+   REDUCES drawdown in *every* decade on both indices, wins Sharpe big in crisis decades
+   (1920s/30s/70s/2000s), and costs a little Sharpe in strong-bull decades (80s/90s/2010s). It
+   is not a fragile few-era artifact — the direction is stable; the magnitude tracks how bad the
+   decade was. Honestly: in a decade-long bull with no crash, the brake is a small drag.
+2. **tv=0.20 is robust, not a knife-edge:** the whole 0.10-0.30 range beats buy&hold on Sharpe,
+   varying smoothly. Lower tv (0.10-0.15) gives higher Sharpe/shallower drawdown but 2-3× the
+   trades; tv=0.20 is the low-turnover sweet spot and maximizes final value. Consistent with the
+   don't-over-trade mandate. (If Sharpe were the sole goal and turnover didn't matter, tv≈0.10-15
+   would edge it — stated for completeness.)
+
+---
+
+# LOOP 3 SYNTHESIS (Σ₀) — the operating envelope, mapped
+
+**Question:** keep improving/validating the shipped Conservative overlay on variables loops 1-2
+never touched (non-US markets, inflation, rates, decade + parameter robustness).
+
+**CONFIRMED (the model is more robust than loops 1-2 could show):**
+- **Works outside the US — including where buy&hold FAILED.** Improves Sharpe+drawdown on all 6
+  non-US markets; on Japan-from-the-1989-peak it MORE THAN DOUBLED buy&hold ($99k vs $43k) and
+  cut drawdown −82%→−32%. Decisive refutation of survivorship-bias (iter-16).
+- **Improves REAL returns in most regimes** (full history, 2000s, the 2021-22 inflation spike)
+  (iter-17).
+- **Structurally consistent across 10 decades** — reduces drawdown every decade; wins in crises,
+  small drag in strong bulls (iter-19).
+- **tv=0.20 is a robust, low-turnover choice**, not a knife-edge (iter-20).
+
+**HONEST BOUNDARIES (newly sharpened — when it does NOT help):**
+- **Not an inflation hedge.** In the 1970s stagflation it gave no real edge — cash is poor
+  inflation protection; it insures *nominal* crashes (iter-17).
+- **Cash-yield / rate dependent.** Under sustained ZIRP (cash≈0%) its edge collapses on broad
+  indices (S&P Sharpe 0.09 at 0% cash) — it needs cash to earn a real yield (≥3%, like now).
+  Nasdaq keeps a risk-adjusted edge even at 0% (iter-18).
+- **A drag in long crash-free bull decades** (1980s/90s/2010s) — small give-up, always with less
+  drawdown (iter-19).
+
+**STANDING RECOMMENDATION:** the shipped Conservative (no-margin) config remains **sound and
+correctly scoped** — loop 3 found NO reason to change it and NO new false-improvement to chase.
+Its value is now precisely bounded: **nominal crash insurance that pays a cash coupon** — most
+valuable in crisis-prone or downtrending markets with positive cash yields (the present regime),
+least valuable in a crash-free bull, under ZIRP, or against pure inflation. Position it as an
+opt-in capital-preservation mode with these conditions stated to the user. No live change.
