@@ -1,0 +1,3 @@
+### Changed
+
+- docs(knowledge): registered the recent flagship docs in the Knowledge Center catalog so they are discoverable and RAG-grounded (previously invisible to product search) — AGI Convergence Blueprint, Σ_G Grounding Ledger, Unisona Sharpe Certificate, the 2026-07-18 market-data-vendor survey, the $2k-plan collapse certificate, and the E-B L4 runbook. Regenerated `knowledgecenter.html` (`build_doc_library.js`, 166 keep-cards) and the grounding index (`build_knowledge_index.py`, 2,598 sections from 237 docs). arXiv corpus delta-harvested + reindexed (114,499 papers; 0 new — already current).
