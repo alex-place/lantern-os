@@ -162,6 +162,22 @@ proven (in-regime) and measured across this document's sibling work.*
   golden set + council; 8 test suites / 91 passing.
 - **GAP.** The Verify machinery is validated in **simulation / one model / synthetic** — *no real
   training run has exercised it yet* (the E-B run, [#2691], is the pending real-model validation).
+- **Worked example — the discipline on a live market surface (2026-07-18).** The formal machinery
+  is still simulation-bound (the GAP above), but the *principle* it encodes — internal signals
+  detect, only fresh truth informs — was run end-to-end on a real question: does single-stock 12-1
+  momentum upgrade the trader's champion? An internal signal said yes emphatically — an in-house
+  backtest printed +33,937% (Sharpe 1.19); a "12-1 champion" printed ~$2M. Fresh external truth
+  killed it: reconstructing the **point-in-time** S&P 500 universe (including the delisted names
+  Yahoo / Alpaca / IBKR / stooq-bulk all silently drop) and measuring survivorship-free gave Sharpe
+  **0.60** (−54% maxDD, dead even with SPY, *below* the champion's 0.66). Independent confirmation
+  arrived from outside the loop: arXiv:2603.19380 measures the identical bias (+4.94pp/yr
+  overstatement) on a different index. The "$2M upgrade" was a survivorship mirage the freshness law
+  predicts — a survivor-biased backtest is an internal signal that *detects* nothing wrong, and only
+  fresh point-in-time truth *informs*. This is also the fresh-market-truth surface the
+  reverse-engineering section names, exercised for real. Evidence:
+  `experiments/survivorship_momentum/` (FINDINGS.md), [UNISONA-SHARPE-CERTIFICATE.md](UNISONA-SHARPE-CERTIFICATE.md),
+  [research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
+  **[class: OURS (Verify) — the discipline, not the machinery, MEASURED on a real surface]**
 
 ## CONVERGE — how the system gets better over time
 
