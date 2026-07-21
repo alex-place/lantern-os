@@ -137,6 +137,47 @@ log(range/ε)), and as the home of the surviving field/budget instruments (lapse
 water-filling). Verdict: not a new lever — the **mechanism of the existing floor**, which is
 precisely why nothing hand-rolled beats that floor.
 
+## 2.6 The optimum number of levels — why the wire stopped at 3 and the cell at 16 (researched)
+
+One law governs both, and it is the physical twin of the archive's entropy floor:
+**distinguishable levels are linear in the physical budget, information is logarithmic in the
+levels, and the cost of one more bit is exponential.** With window W and *lifetime* noise σ
+(jitter over a symbol on a wire; ten years of charge leakage in a cell), usable levels are
+M ≈ 1 + W/(kσ), bits = log₂M — and holding one more bit means doubling W or halving σ.
+
+**The wire (GDDR7 = PAM-3, verified):** eye height shrinks as 1/(M−1) ⇒ required SNR grows
+~6 dB per halving. NRZ baseline; **PAM-3: −6.0 dB for 1.5 bits/symbol** (2 symbols = 9 states
+≥ 8 ⇒ 3 bits/2 clocks, 94% packing); PAM-4: **−9.5 dB** for 2 bits
+([ProLabs](https://www.prolabs.com/understanding-nrz-vs-pam4-modulation-techniques) ·
+[Samtec](https://blog.samtec.com/post/understanding-nrz-and-pam4-signaling/) ·
+[I-PEX](https://www.i-pex.com/library/article/what-is-pam)); PAM-300 would need ≈ −49.5 dB —
+categorically beyond a 24 Gbaud single-ended memory channel's capacity (Shannon–Hartley:
+usable bits/symbol = log₂(1+SNR) ≈ 1.5 here). Best margin-per-bit at speed picked 3
+([Micron](https://www.micron.com/about/blog/memory/dram/unveiling-the-next-generation-of-graphics-memory-gddr7) ·
+[Rambus](https://www.rambus.com/blogs/all-you-need-to-know-about-gddr7/)). Under linear
+cost-per-level the optimal radix is **e ≈ 2.718** (radix economy, in canon) — the fastest bus
+on earth landed on its nearest integer.
+
+**The cell (NAND ≤16 levels, verified):** fixed ~5–6 V window; σ_lifetime = years of leakage +
+P/E oxide damage + disturb + temperature
+([TechTarget](https://www.techtarget.com/searchstorage/definition/TLC-flash-triple-level-cell-flash) ·
+[arXiv:1706.08642](https://arxiv.org/pdf/1706.08642)). Measured ladder: SLC 2 levels
+~100k P/E → MLC 4 ~10k → TLC 8 ~3–10k (3D) → **QLC 16 ~150–1,000**
+([Flexxon](https://www.flexxon.com/nand-flash-explained/) ·
+[Lexar](https://lexarenterprise.com/comparing-nand-flash-slc-mlc-tlc-qlc-industrial-application/)).
+Each added bit buys a shrinking capacity gain (+100% → +50% → +33% → +25%) at ~10× endurance
+cost + heavier ECC — QLC is the economic knee. PLC (32 levels) has been in pilot since 2023
+([IEEE](https://ieeexplore.ieee.org/document/10873308/) ·
+[Kioxia/WD](https://blocksandfiles.com/2019/12/17/kioxia-twin-bics-plc-nand-flash-meanufacture/))
+and the 2026 flagship push is **more layers, not more levels**
+([Tom's Hardware](https://www.tomshardware.com/pc-components/ssds/kioxias-next-gen-3d-nand-production-gets-expedited-to-2026-report-claims-high-capacity-332-layer-bics10-devices-to-sate-growing-demand-from-ai-data-centers)) —
+the market's revealed optimum: buying more cells beats buying more distinguishability per cell.
+
+**Unified:** both maximize `value(log₂M) − cost(M)` with convex-to-exponential cost ⇒ optima
+are tiny (2–4 on wires, 8–32 in cells). The levers that escape the law are exactly this doc's
+ladder: **organization** (states you never spend — dedup, restructuring, dust) and
+**amortization** (one generator/model shared across a corpus).
+
 ## 3. The Library of Congress program (F2–F3)
 
 **Scale, verified:** the Library manages **21 PB of digital collections across 914 million
