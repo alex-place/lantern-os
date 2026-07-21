@@ -386,3 +386,77 @@ def test_non_solid_archives_unchanged():
         m = csf_pack.pack_blobs(blobs, out)
         assert m["version"] == "0.8" and "solid" not in m
         assert csf_pack.unpack_blobs(out) == blobs
+
+
+# ── generative members (v0.9): recomputation-as-storage, registry-only ─────────
+
+
+def test_generative_members_roundtrip_and_ratio():
+    """A 16 MiB lawful stream stored as a ~hundred-byte description, materialized
+    on read and sha-verified — generator coding as a container primitive."""
+    size = 16 * 1024 * 1024
+    blobs = {
+        "streams/lawful.bin": {"generator": {"kind": "sha256-ctr", "seed": "universe-42", "size": size}},
+        "streams/zeros.bin": {"generator": {"kind": "zeros", "size": 4096}},
+        "streams/pattern.bin": {"generator": {"kind": "repeat", "pattern_hex": "deadbeef", "size": 1000}},
+        "notes/readme.md": b"# normal member alongside generative ones\n" * 20,
+    }
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "gen.csf"
+        m = csf_pack.pack_blobs(blobs, str(out))
+        assert m["version"] == "0.9"
+        archive_bytes = out.stat().st_size
+        assert archive_bytes < 4096  # 16 MiB member, tiny archive
+        got = csf_pack.unpack_blobs(str(out))
+        assert len(got["streams/lawful.bin"]) == size
+        assert got["streams/zeros.bin"] == b"\x00" * 4096
+        assert got["streams/pattern.bin"][:4] == bytes.fromhex("deadbeef")
+        assert got["notes/readme.md"] == blobs["notes/readme.md"]
+        # determinism: same spec -> same bytes -> sha passes on a fresh read
+        assert csf_pack.read_file(str(out), "streams/lawful.bin")[:32] == got["streams/lawful.bin"][:32]
+
+
+def test_generative_member_tamper_detected():
+    blobs = {"g.bin": {"generator": {"kind": "sha256-ctr", "seed": "s", "size": 4096}}}
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "g.csf"
+        csf_pack.pack_blobs(blobs, str(out))
+        raw = out.read_bytes()
+        # flip the seed inside the manifest: sha over materialized bytes must fail
+        tampered = raw.replace(b'"seed":"s"', b'"seed":"x"')
+        assert tampered != raw
+        out.write_bytes(tampered)
+        try:
+            csf_pack.unpack_blobs(str(out))
+            assert False, "tampered generator must not verify"
+        except ValueError:
+            pass  # footer digest or member sha catches it
+
+
+def test_generative_unknown_kind_and_guard():
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "x.csf")
+        try:
+            csf_pack.pack_blobs({"a": {"generator": {"kind": "evil-eval", "size": 10}}}, out)
+            assert False, "unknown generator kind must be rejected"
+        except ValueError:
+            pass
+        try:
+            csf_pack.pack_blobs({"a": {"generator": {"kind": "zeros", "size": 1 << 40}}}, out)
+            assert False, "materialization guard must reject huge sizes"
+        except ValueError:
+            pass
+
+
+def test_generative_plus_solid_combo():
+    blobs = {
+        "doc1.md": b"shared boilerplate\n" * 50,
+        "doc2.md": b"shared boilerplate\n" * 50 + b"tail",
+        "law.bin": {"generator": {"kind": "sha256-ctr", "seed": "k", "size": 8192}},
+    }
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "combo.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True)
+        assert m.get("solid") and m["version"] == "0.9"
+        got = csf_pack.unpack_blobs(out)
+        assert got["doc2.md"].endswith(b"tail") and len(got["law.bin"]) == 8192

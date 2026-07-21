@@ -112,6 +112,20 @@ decompresses the whole stream — keep the default per-file layout for hot /
 random-access archives; solid is for cold, read-rarely, whole-set archives
 (profile packs, research pools, grounding corpora).
 
+### 2.2.2 Generative members (v0.9) — recomputation-as-storage
+
+A member may be defined by a tiny **generator spec** instead of stored bytes:
+`pack_blobs({"path": {"generator": {"kind": ..., ...}}})`. The entry records the spec plus the
+`sha256` and `size` of the **materialized** bytes; readers regenerate deterministically and
+verify — *observation = verified materialization*. Closed registry only (no eval, no user
+code): `zeros`, `repeat` (pattern fill), `sha256-ctr` (counter-mode SHA-256 stream —
+stdlib-pure, deterministic forever); 1 GiB materialization guard. Archives containing
+generative members stamp **v0.9** (same gating as solid). Measured: a 16 MiB `sha256-ctr`
+member + siblings archives to **~3.5 KB** — a description-length win for recipe-bearing
+(lawful/simulated) data, explicitly *not* an entropy claim. Frontier ladder (slice-addressable
+reads, registered scientific generators, corpus tiers):
+[`research/2026-07-21-csf-cosmological-frontier.md`](research/2026-07-21-csf-cosmological-frontier.md).
+
 ### 2.3 Integrity & safety
 - **Footer digest** (sha256 of everything before the footer) is verified *before*
   the manifest is parsed — any tampering fails with a clean integrity error.

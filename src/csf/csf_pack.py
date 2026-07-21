@@ -179,6 +179,60 @@ def decompress_bytes(blob: bytes) -> bytes:
     return _decompress_blob(blob[1:], codec)
 
 
+# ---------------------------------------------------------------------------
+# Generative members (v0.9) — recomputation-as-storage
+# ---------------------------------------------------------------------------
+# A generative member stores a tiny DESCRIPTION instead of bytes; readers
+# materialize it deterministically and verify against the recorded sha256.
+# This is generator coding (the repo's own pi measurement: 6,666x) shipped as a
+# container primitive for data that HAS a compact recipe — lawful/simulated
+# streams — not a claim against Shannon: the bytes were never random. Closed
+# registry only (no eval, no user code): each kind is a pure function of its
+# JSON params, stable across platforms/versions by construction.
+
+_GEN_MAX_BYTES = 1 << 30  # 1 GiB materialization guard
+
+
+def _gen_zeros(spec: dict) -> bytes:
+    return b"\x00" * int(spec["size"])
+
+
+def _gen_repeat(spec: dict) -> bytes:
+    pat = bytes.fromhex(spec["pattern_hex"])
+    if not pat:
+        raise ValueError("generator repeat: empty pattern")
+    n = int(spec["size"])
+    return (pat * (n // len(pat) + 1))[:n]
+
+
+def _gen_sha256_ctr(spec: dict) -> bytes:
+    """Counter-mode SHA-256 DRBG: block_i = sha256(seed || i). Deterministic
+    forever (stdlib-only, no PRNG version drift) — the reference 'lawful
+    high-entropy stream' generator."""
+    seed = str(spec["seed"]).encode("utf-8")
+    n = int(spec["size"])
+    out = bytearray()
+    i = 0
+    while len(out) < n:
+        out += hashlib.sha256(seed + i.to_bytes(8, "big")).digest()
+        i += 1
+    return bytes(out[:n])
+
+
+_GENERATORS = {"zeros": _gen_zeros, "repeat": _gen_repeat, "sha256-ctr": _gen_sha256_ctr}
+
+
+def materialize_generator(gen: dict) -> bytes:
+    """Materialize a generative member's bytes from its spec (registry-only)."""
+    kind = gen.get("kind")
+    fn = _GENERATORS.get(kind)
+    if fn is None:
+        raise ValueError(f"unknown generator kind: {kind!r}")
+    if int(gen.get("size", 0)) > _GEN_MAX_BYTES:
+        raise ValueError("generator size exceeds materialization guard")
+    return fn(gen)
+
+
 def _train_dict(raws: list[bytes]) -> "object | None":
     """Train a zstd dictionary over file contents. Returns dict or None if not viable."""
     if _zstd is None:
@@ -268,7 +322,13 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
     elif codec is None:
         codec = DEFAULT_CODEC
 
-    raws = [(arc, raw) for arc, raw in items]
+    raws = []
+    gens = []   # (arc, generator_spec) — v0.9 generative members, no stored bytes
+    for arc, raw in items:
+        if isinstance(raw, dict) and "generator" in raw:
+            gens.append((arc, dict(raw["generator"])))
+        else:
+            raws.append((arc, raw))
 
     dict_data = None
     dict_bytes = b""
@@ -276,6 +336,21 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
         dict_data = _train_dict([raw for _, raw in raws])
         if dict_data is not None:
             dict_bytes = dict_data.as_bytes()
+
+    def _gen_entry(arc: str, gen: dict) -> dict:
+        raw = materialize_generator(gen)   # materialized once at pack time to hash
+        entry = {
+            "path": arc, "size": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "offset": 0, "compressed": False, "codec": "store",
+            "generator": gen,
+        }
+        desc, md = _annotation_for(annotations, arc)
+        if desc:
+            entry["description"] = desc
+        if md:
+            entry["metadata"] = md
+        return entry
 
     files = []
     if solid:
@@ -314,10 +389,13 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
             files.append(entry)
             blob.extend(stored)
         solid_meta = None
+    for arc, gen in gens:
+        files.append(_gen_entry(arc, gen))
 
+    uses_v9 = bool(solid_meta) or bool(gens)   # v0.9 features: solid / generative
     manifest = {
         "format": "csf-pack",
-        "version": "0.9" if solid else "0.8",
+        "version": "0.9" if uses_v9 else "0.8",
         "created_at": time.time(),
         "compressed": codec != "store", "codec": codec,
         "file_count": len(files), "files": files,
@@ -333,7 +411,7 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
 
     body = bytearray()
     body += MAGIC
-    body += struct.pack(">BB", *(SOLID_VERSION if solid_meta else VERSION))
+    body += struct.pack(">BB", *(SOLID_VERSION if uses_v9 else VERSION))
     body += struct.pack(">H", FLAG_COMPRESSED if codec != "store" else 0)
     body += struct.pack(">I", len(manifest_bytes))
     body += manifest_bytes
@@ -460,8 +538,10 @@ def annotations(archive: str) -> dict:
 
 
 def _member_raw(fe: dict, data: bytes, blob_start: int, dict_data, stream: bytes | None) -> bytes:
-    """Decode + sha-verify one member from either layout (per-file or solid)."""
-    if stream is not None:
+    """Decode + sha-verify one member from any layout (per-file / solid / generative)."""
+    if fe.get("generator"):
+        raw = materialize_generator(fe["generator"])   # recomputation-as-decompression
+    elif stream is not None:
         raw = stream[fe["offset"]:fe["offset"] + fe["size"]]
     else:
         start = blob_start + fe["offset"]
