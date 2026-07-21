@@ -1258,6 +1258,15 @@ module.exports = async (req, res, url, deps) => {
             // consulted (not retrained) each run; 0.5 until grounded by real outcomes.
             calibratedTrust,
           },
+          // #2803: every confidence field declares its basis — "prior" = a formula
+          // constant chosen by hand (NOT a measurement), "measured" = calibrated from
+          // real recorded outcomes. Only calibratedTrust is measured today; the record
+          // must not perform calibration it doesn't have.
+          confidenceBasis: {
+            codebaseResearch: "prior", webGrounded: "prior", testsPassed: "prior",
+            observable: "prior", grounded: "prior", overall: "prior-formula",
+            calibratedTrust: "measured",
+          },
           sources: {
             issue: `github.com/alex-place/lantern-os/issues/${issueNumber}`,
             pr: prUrl,
@@ -1297,6 +1306,9 @@ module.exports = async (req, res, url, deps) => {
             verify: c.testsPassed,                                   // tests actually ran/passed
             converge: c.overall                                      // confidence record + PR
           },
+          // #2803: these dimension scores are heuristic formula constants, not
+          // measured capability — consumers must not read them as calibration.
+          basis: "prior-formula",
           overall: c.overall
         };
         const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
@@ -1323,6 +1335,7 @@ module.exports = async (req, res, url, deps) => {
           },
           evidence: convergenceRecord.evidence,
           sources: convergenceRecord.sources,
+          confidenceBasis: convergenceRecord.confidenceBasis,   // #2803: priors vs measured
         };
         send("done", {
           ok: true,

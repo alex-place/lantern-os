@@ -640,7 +640,11 @@ function renderConvergenceSummary(fin, d) {
   if (conf && typeof conf.overall === 'number') {
     const pct = Math.max(0, Math.min(100, Math.round(conf.overall * 100)));
     const fmt = v => (typeof v === 'number' ? v.toFixed(2) : '–');
-    chips.push(`<span class="aw-chip" title="research ${fmt(conf.research)} · grounded ${fmt(conf.grounded)} · tests ${fmt(conf.testsPassed)}">confidence <span class="aw-conf-bar"><span style="width:${pct}%"></span></span> ${pct}%</span>`);
+    // #2803: don't let the meter perform calibration the record doesn't have — when the
+    // server declares the basis, say which terms are formula priors vs measured.
+    const basisNote = (conv && conv.confidenceBasis)
+      ? ' · basis: formula priors (measured: calibratedTrust only)' : '';
+    chips.push(`<span class="aw-chip" title="research ${fmt(conf.research)} · grounded ${fmt(conf.grounded)} · tests ${fmt(conf.testsPassed)}${basisNote}">confidence <span class="aw-conf-bar"><span style="width:${pct}%"></span></span> ${pct}%</span>`);
   }
   const card = document.createElement('div');
   card.className = 'aw-conv';
