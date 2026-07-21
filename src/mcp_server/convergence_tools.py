@@ -650,7 +650,14 @@ def lantern_command(command: str = "") -> Dict[str, Any]:
         if not arg.isdigit():
             return {"ok": False, "command": name, "error": "usage: !autonomous-work <issue_number>"}
         return {"ok": True, "command": name, "issue": int(arg), "routed_to": "github_work_issue(investigate)",
-                "note": "patch/pr modes land in the follow-up github_work_issue tool",
+                # #2804: this route only INVESTIGATES. The relay instruction below is for the
+                # chat model summarizing this result — models reliably relay tool-result
+                # guidance where system-prompt instructions get lost, so the user learns the
+                # real pipeline command instead of mistaking the investigation for the run.
+                "note": ("investigation only — no patch, tests, or PR were produced. "
+                         f"RELAY TO THE USER: to run the full autowork pipeline "
+                         f"(research → plan → patch → tests → draft PR) with the live run "
+                         f"panel, type `!work #{int(arg)}` in this chat."),
                 "result": _investigate_issue(owner, repo, int(arg))}
     if name == "!pr-status":
         if not arg.isdigit():
