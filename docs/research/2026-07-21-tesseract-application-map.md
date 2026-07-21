@@ -40,7 +40,9 @@ never re-argued), or **[design — falsifiable]** (proposed here with a kill cri
 >
 > An addendum (§5) answers the follow-up asks — *qutrit ↔ binary compression* and the
 > *higher-dimensional binary compression* landscape — with a web-verified brief and a graded
-> brainstorm. Trit-packing is a solved 99% craft whose one real home here is the **ADR-0026
+> brainstorm. A companion slate of **owned-math conjectures** (M1–M6, first tests already run,
+> issues #2786–#2791) lives in
+> [`2026-07-21-owned-math-conjectures.md`](2026-07-21-owned-math-conjectures.md). Trit-packing is a solved 99% craft whose one real home here is the **ADR-0026
 > ternary serving artifact** (llama.cpp TQ1_0, 1.6875 bpw); ternary's honest wins are
 > hardware/serving economics (GDDR7 PAM-3, BitNet kernels), never codecs. The 2026
 > higher-dimensional literature adds two more: a **RaBitQ 1-bit/dim embedding cache** for the
