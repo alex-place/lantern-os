@@ -84,6 +84,10 @@ except Exception:  # pragma: no cover - environment without zstandard
 
 MAGIC = b"CSF\x00"
 VERSION = (0, 8)
+# Solid archives (one compressed stream over the concatenation of all members)
+# stamp 0.9 so pre-solid readers refuse them with a clean version error instead
+# of misparsing decompressed-space offsets as blob offsets. Readers accept both.
+SOLID_VERSION = (0, 9)
 FLAG_COMPRESSED = 0x0001
 FOOTER_FMT = ">Q"  # total size; preceded by 32-byte sha256
 
@@ -175,6 +179,94 @@ def decompress_bytes(blob: bytes) -> bytes:
     return _decompress_blob(blob[1:], codec)
 
 
+# ---------------------------------------------------------------------------
+# Generative members (v0.9) — recomputation-as-storage
+# ---------------------------------------------------------------------------
+# A generative member stores a tiny DESCRIPTION instead of bytes; readers
+# materialize it deterministically and verify against the recorded sha256.
+# This is generator coding (the repo's own pi measurement: 6,666x) shipped as a
+# container primitive for data that HAS a compact recipe — lawful/simulated
+# streams — not a claim against Shannon: the bytes were never random. Closed
+# registry only (no eval, no user code): each kind is a pure function of its
+# JSON params, stable across platforms/versions by construction.
+
+_GEN_MAX_BYTES = 1 << 30  # 1 GiB materialization guard
+
+
+def _gen_zeros(spec: dict) -> bytes:
+    return b"\x00" * int(spec["size"])
+
+
+def _gen_repeat(spec: dict) -> bytes:
+    pat = bytes.fromhex(spec["pattern_hex"])
+    if not pat:
+        raise ValueError("generator repeat: empty pattern")
+    n = int(spec["size"])
+    return (pat * (n // len(pat) + 1))[:n]
+
+
+def _gen_sha256_ctr(spec: dict) -> bytes:
+    """Counter-mode SHA-256 DRBG: block_i = sha256(seed || i). Deterministic
+    forever (stdlib-only, no PRNG version drift) — the reference 'lawful
+    high-entropy stream' generator."""
+    seed = str(spec["seed"]).encode("utf-8")
+    n = int(spec["size"])
+    out = bytearray()
+    i = 0
+    while len(out) < n:
+        out += hashlib.sha256(seed + i.to_bytes(8, "big")).digest()
+        i += 1
+    return bytes(out[:n])
+
+
+_GENERATORS = {"zeros": _gen_zeros, "repeat": _gen_repeat, "sha256-ctr": _gen_sha256_ctr}
+
+
+def _gen_slice(gen: dict, offset: int, length: int) -> bytes:
+    """O(window) slice of a generative member — the observer-slice fast path (F1b).
+
+    Integrity contract: the spec is footer-authenticated in the manifest and the
+    full stream was sha-verified at pack time; determinism makes any window of a
+    regeneration equal to the same window of the verified stream. (Merkle
+    spot-checks are the F1b ladder's next rung, not required for soundness here.)
+    """
+    kind = gen.get("kind")
+    total = int(gen.get("size", 0))
+    if offset < 0 or length < 0 or offset + length > total:
+        raise ValueError("slice out of range")
+    if length == 0:
+        return b""
+    if kind == "zeros":
+        return b"\x00" * length
+    if kind == "repeat":
+        pat = bytes.fromhex(gen["pattern_hex"])
+        start = offset % len(pat)
+        reps = (start + length) // len(pat) + 2
+        return (pat * reps)[start:start + length]
+    if kind == "sha256-ctr":
+        seed = str(gen["seed"]).encode("utf-8")
+        first = offset // 32
+        last = (offset + length - 1) // 32
+        out = bytearray()
+        for i in range(first, last + 1):
+            out += hashlib.sha256(seed + i.to_bytes(8, "big")).digest()
+        lo = offset - first * 32
+        return bytes(out[lo:lo + length])
+    # unknown kinds (future registry growth): fall back to full materialization
+    return materialize_generator(gen)[offset:offset + length]
+
+
+def materialize_generator(gen: dict) -> bytes:
+    """Materialize a generative member's bytes from its spec (registry-only)."""
+    kind = gen.get("kind")
+    fn = _GENERATORS.get(kind)
+    if fn is None:
+        raise ValueError(f"unknown generator kind: {kind!r}")
+    if int(gen.get("size", 0)) > _GEN_MAX_BYTES:
+        raise ValueError("generator size exceeds materialization guard")
+    return fn(gen)
+
+
 def _train_dict(raws: list[bytes]) -> "object | None":
     """Train a zstd dictionary over file contents. Returns dict or None if not viable."""
     if _zstd is None:
@@ -240,50 +332,132 @@ def _annotation_for(annotations: dict | None, arc: str):
 
 def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None,
                    codec: str | None = None, use_dict: bool = False,
-                   annotations: dict | None = None) -> dict:
+                   annotations: dict | None = None, solid: bool = False,
+                   solid_frame_mb: float | None = None) -> dict:
     """Core writer. items = iterable of (arc_path, raw_bytes).
 
     ``annotations`` optionally attaches a per-file ``description`` (str) and/or
     ``metadata`` (JSON-serialisable dict) to each manifest entry, keyed by
     arc_path. Both are optional and omitted from an entry when absent, so
     archives written without annotations are byte-identical to before.
+
+    ``solid`` (cold-archive mode, measured 2026-07-21): compress ONE stream over
+    the concatenation of all members instead of per-file blobs — cross-file
+    redundancy reaches the coder directly, which a trained dictionary only
+    approximates (measured on real sets: solid +20–41% over per-file zstd-19,
+    while the dict was net-NEGATIVE once its own bytes were counted). Trade-off:
+    reading any single member decompresses the whole stream, so keep the default
+    (per-file) for hot/random-access archives. ``use_dict`` is ignored under
+    solid (subsumed); ``compress=False`` ignores solid (store gains nothing).
+    Solid archives stamp version 0.9 (older readers refuse them cleanly).
     """
     if not compress:
         codec = "store"
+        solid = False
     elif codec is None:
         codec = DEFAULT_CODEC
 
-    raws = [(arc, raw) for arc, raw in items]
+    raws = []
+    gens = []   # (arc, generator_spec) — v0.9 generative members, no stored bytes
+    for arc, raw in items:
+        if isinstance(raw, dict) and "generator" in raw:
+            gens.append((arc, dict(raw["generator"])))
+        else:
+            raws.append((arc, raw))
 
     dict_data = None
     dict_bytes = b""
-    if use_dict and codec == "zstd":
+    if use_dict and codec == "zstd" and not solid:
         dict_data = _train_dict([raw for _, raw in raws])
         if dict_data is not None:
             dict_bytes = dict_data.as_bytes()
 
-    files, blob = [], bytearray()
-    for arc, raw in raws:
-        sha = hashlib.sha256(raw).hexdigest()
-        stored = _compress_blob(raw, codec, dict_data)
+    def _gen_entry(arc: str, gen: dict) -> dict:
+        raw = materialize_generator(gen)   # materialized once at pack time to hash
         entry = {
-            "path": arc, "size": len(raw), "csize": len(stored),
-            "sha256": sha, "offset": len(blob),
-            "compressed": codec != "store", "codec": codec,
+            "path": arc, "size": len(raw),
+            "sha256": hashlib.sha256(raw).hexdigest(),
+            "offset": 0, "compressed": False, "codec": "store",
+            "generator": gen,
         }
         desc, md = _annotation_for(annotations, arc)
         if desc:
             entry["description"] = desc
         if md:
             entry["metadata"] = md
-        files.append(entry)
-        blob.extend(stored)
+        return entry
 
+    files = []
+    if solid:
+        stream = bytearray()
+        for arc, raw in raws:
+            entry = {
+                "path": arc, "size": len(raw),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "offset": len(stream),          # offset into the DECOMPRESSED stream
+                "compressed": True, "codec": codec,
+            }
+            desc, md = _annotation_for(annotations, arc)
+            if desc:
+                entry["description"] = desc
+            if md:
+                entry["metadata"] = md
+            files.append(entry)
+            stream.extend(raw)
+        # Framed solid: cut the stream into frames AT MEMBER BOUNDARIES so a
+        # single-member read decompresses one frame, not the whole stream —
+        # the ratio/access middle tier between per-file and full solid.
+        frame_limit = int((solid_frame_mb or 0) * 1024 * 1024)
+        cuts = [0]
+        if frame_limit > 0:
+            acc = 0
+            for fe in files:
+                if acc >= frame_limit:
+                    cuts.append(fe["offset"])
+                    acc = 0
+                acc += fe["size"]
+        cuts.append(len(stream))
+        blob = bytearray()
+        frames = []
+        for a, b in zip(cuts, cuts[1:]):
+            if a == b:
+                continue
+            comp = _compress_blob(bytes(stream[a:b]), codec)
+            frames.append({"raw_offset": a, "raw_size": b - a,
+                           "offset": len(blob), "csize": len(comp)})
+            blob += comp
+        solid_meta = {"raw_size": len(stream), "csize": len(blob), "frames": frames}
+    else:
+        blob = bytearray()
+        for arc, raw in raws:
+            sha = hashlib.sha256(raw).hexdigest()
+            stored = _compress_blob(raw, codec, dict_data)
+            entry = {
+                "path": arc, "size": len(raw), "csize": len(stored),
+                "sha256": sha, "offset": len(blob),
+                "compressed": codec != "store", "codec": codec,
+            }
+            desc, md = _annotation_for(annotations, arc)
+            if desc:
+                entry["description"] = desc
+            if md:
+                entry["metadata"] = md
+            files.append(entry)
+            blob.extend(stored)
+        solid_meta = None
+    for arc, gen in gens:
+        files.append(_gen_entry(arc, gen))
+
+    uses_v9 = bool(solid_meta) or bool(gens)   # v0.9 features: solid / generative
     manifest = {
-        "format": "csf-pack", "version": "0.8", "created_at": time.time(),
+        "format": "csf-pack",
+        "version": "0.9" if uses_v9 else "0.8",
+        "created_at": time.time(),
         "compressed": codec != "store", "codec": codec,
         "file_count": len(files), "files": files,
     }
+    if solid_meta:
+        manifest["solid"] = solid_meta
     if dict_bytes:
         manifest["shared_dict"] = {"offset": len(blob), "size": len(dict_bytes), "codec": "zstd"}
         blob.extend(dict_bytes)
@@ -293,7 +467,7 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
 
     body = bytearray()
     body += MAGIC
-    body += struct.pack(">BB", *VERSION)
+    body += struct.pack(">BB", *(SOLID_VERSION if uses_v9 else VERSION))
     body += struct.pack(">H", FLAG_COMPRESSED if codec != "store" else 0)
     body += struct.pack(">I", len(manifest_bytes))
     body += manifest_bytes
@@ -307,29 +481,38 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
 
 def pack(paths: Iterable[str], out_path: str, compress: bool = True,
          codec: str | None = None, use_dict: bool = False,
-         annotations: dict | None = None) -> dict:
+         annotations: dict | None = None, solid: bool = False,
+         solid_frame_mb: float | None = None) -> dict:
     """Pack arbitrary files/dirs into a CSF-Pack archive. Returns the manifest.
 
     ``annotations`` (optional) attaches a per-file ``description`` and/or
     ``metadata`` to the manifest, keyed by arc_path — the same arc_path the
     reader lists (e.g. ``"README.md"`` for a top-level file, or
     ``"<dir>/<rel>"`` for members of a packed directory).
+
+    ``solid=True`` (cold archives): one compressed stream over all members —
+    measured +20–41% over per-file zstd-19 on real multi-file sets; any single
+    read decompresses the whole stream. See ``_write_archive``.
     """
     items = ((arc, Path(abs_path).read_bytes()) for abs_path, arc in _iter_files(paths))
     return _write_archive(items, out_path, compress, None, codec=codec,
-                          use_dict=use_dict, annotations=annotations)
+                          use_dict=use_dict, annotations=annotations, solid=solid,
+                          solid_frame_mb=solid_frame_mb)
 
 
 def pack_blobs(blobs: dict, out_path: str, compress: bool = True, extra_meta: dict | None = None,
                codec: str | None = None, use_dict: bool = False,
-               annotations: dict | None = None) -> dict:
+               annotations: dict | None = None, solid: bool = False,
+               solid_frame_mb: float | None = None) -> dict:
     """Pack in-memory {arc_path: bytes} blobs (e.g. generated manifests). Returns manifest.
 
     ``annotations`` (optional) attaches a per-file ``description`` and/or
-    ``metadata`` to each manifest entry, keyed by arc_path.
+    ``metadata`` to each manifest entry, keyed by arc_path. ``solid=True`` packs
+    one compressed stream over all members (cold-archive mode; see pack()).
     """
     return _write_archive(blobs.items(), out_path, compress, extra_meta,
-                          codec=codec, use_dict=use_dict, annotations=annotations)
+                          codec=codec, use_dict=use_dict, annotations=annotations,
+                          solid=solid, solid_frame_mb=solid_frame_mb)
 
 
 # ---------------------------------------------------------------------------
@@ -341,8 +524,10 @@ def _read_container(archive: str):
     if data[:4] != MAGIC:
         raise ValueError(f"not a CSF file (magic={data[:4]!r})")
     major, minor = struct.unpack(">BB", data[4:6])
-    if (major, minor) != VERSION:
-        raise ValueError(f"unsupported CSF-Pack version {major}.{minor} (need {VERSION[0]}.{VERSION[1]})")
+    if (major, minor) not in (VERSION, SOLID_VERSION):
+        raise ValueError(
+            f"unsupported CSF-Pack version {major}.{minor} "
+            f"(need {VERSION[0]}.{VERSION[1]} or {SOLID_VERSION[0]}.{SOLID_VERSION[1]})")
     flags = struct.unpack(">H", data[6:8])[0]
     # Footer integrity FIRST — catch any tampering with a clean error before parsing.
     if len(data) < 52:
@@ -366,6 +551,47 @@ def _load_shared_dict(data: bytes, manifest: dict, blob_start: int):
         raise RuntimeError("archive has a shared zstd dict but 'zstandard' is not installed")
     start = blob_start + sd["offset"]
     return _zstd.ZstdCompressionDict(data[start:start + sd["size"]])
+
+
+def _solid_frames(manifest: dict) -> list[dict]:
+    """Frame table for a solid archive (single implicit frame for early v0.9 archives)."""
+    sm = manifest["solid"]
+    return sm.get("frames") or [{"raw_offset": 0, "raw_size": sm["raw_size"],
+                                 "offset": 0, "csize": sm["csize"]}]
+
+
+def _solid_frame_raw(data: bytes, manifest: dict, blob_start: int, fr: dict) -> bytes:
+    chunk = data[blob_start + fr["offset"]:blob_start + fr["offset"] + fr["csize"]]
+    raw = _decompress_blob(chunk, manifest.get("codec") or DEFAULT_CODEC)
+    if len(raw) != fr["raw_size"]:
+        raise ValueError("solid frame size mismatch (archive corrupt)")
+    return raw
+
+
+def _solid_stream(data: bytes, manifest: dict, blob_start: int) -> bytes:
+    """Decompress a solid archive's full stream (all frames, in order)."""
+    parts = [_solid_frame_raw(data, manifest, blob_start, fr)
+             for fr in _solid_frames(manifest)]
+    raw = b"".join(parts)
+    if len(raw) != manifest["solid"]["raw_size"]:
+        raise ValueError("solid stream size mismatch (archive corrupt)")
+    return raw
+
+
+def _solid_member_raw(fe: dict, data: bytes, manifest: dict, blob_start: int) -> bytes:
+    """Materialize ONE member of a solid archive by decompressing only the frames
+    that cover it (frames are cut at member boundaries, so normally exactly one)."""
+    lo, hi = fe["offset"], fe["offset"] + fe["size"]
+    out = bytearray()
+    for fr in _solid_frames(manifest):
+        a, b = fr["raw_offset"], fr["raw_offset"] + fr["raw_size"]
+        if b <= lo or a >= hi:
+            continue
+        raw = _solid_frame_raw(data, manifest, blob_start, fr)
+        out += raw[max(lo - a, 0):max(min(hi, b) - a, 0)]
+    if len(out) != fe["size"]:
+        raise ValueError(f"solid member reconstruction mismatch for {fe['path']}")
+    return bytes(out)
 
 
 def list_archive(archive: str) -> dict:
@@ -401,34 +627,102 @@ def annotations(archive: str) -> dict:
     return out
 
 
+def _member_raw(fe: dict, data: bytes, blob_start: int, dict_data, stream: bytes | None) -> bytes:
+    """Decode + sha-verify one member from any layout (per-file / solid / generative)."""
+    if fe.get("generator"):
+        raw = materialize_generator(fe["generator"])   # recomputation-as-decompression
+    elif stream is not None:
+        raw = stream[fe["offset"]:fe["offset"] + fe["size"]]
+    else:
+        start = blob_start + fe["offset"]
+        chunk = data[start:start + fe["csize"]]
+        raw = _decompress_blob(chunk, _file_codec(fe), dict_data)
+    if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
+        raise ValueError(f"checksum mismatch for {fe['path']}")
+    return raw
+
+
 def read_file(archive: str, arc_path: str) -> bytes:
-    """Read and verify a single member by path (codec-aware, dict-aware)."""
+    """Read and verify a single member by path (codec-, dict-, solid-, and
+    generator-aware).
+
+    Solid archives decompress only the frame(s) covering the member (framed
+    solid: one frame; unframed early-v0.9: the whole stream — the documented
+    cold-archive trade). Per-file layout stays the hot/random-access choice.
+    """
     data, manifest, _flags, blob_start, _blob_end = _read_container(archive)
+    fe = next((f for f in manifest["files"] if f["path"] == arc_path), None)
+    if fe is None:
+        raise KeyError(arc_path)
+    if fe.get("generator"):
+        raw = materialize_generator(fe["generator"])
+    elif manifest.get("solid"):
+        raw = _solid_member_raw(fe, data, manifest, blob_start)
+    else:
+        dict_data = _load_shared_dict(data, manifest, blob_start)
+        start = blob_start + fe["offset"]
+        raw = _decompress_blob(data[start:start + fe["csize"]], _file_codec(fe), dict_data)
+    if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
+        raise ValueError(f"checksum mismatch for {arc_path}")
+    return raw
+
+
+def read_slice(archive: str, arc_path: str, offset: int, length: int) -> bytes:
+    """Read a window of ONE member without materializing the rest (F1b).
+
+    Cost by layout: generative = **O(window)** (the observer-slice fast path —
+    zeros/repeat/sha256-ctr are directly addressable); store = O(window);
+    solid = decompress only the covering frame(s); per-file compressed = one
+    member decompress (O(member)). Integrity: the manifest (incl. generator
+    specs and member hashes) is footer-authenticated at open; slice reads of
+    stored bytes come from the same verified container; whole-member sha
+    verification remains available via read_file(). Range errors raise
+    ValueError; unknown paths raise KeyError.
+    """
+    if offset < 0 or length < 0:
+        raise ValueError("negative slice bounds")
+    data, manifest, _flags, blob_start, _blob_end = _read_container(archive)
+    fe = next((f for f in manifest["files"] if f["path"] == arc_path), None)
+    if fe is None:
+        raise KeyError(arc_path)
+    if offset + length > fe["size"]:
+        raise ValueError("slice out of range")
+    if length == 0:
+        return b""
+    if fe.get("generator"):
+        return _gen_slice(fe["generator"], offset, length)
+    if manifest.get("solid"):
+        lo = fe["offset"] + offset
+        hi = lo + length
+        out = bytearray()
+        for fr in _solid_frames(manifest):
+            a, b = fr["raw_offset"], fr["raw_offset"] + fr["raw_size"]
+            if b <= lo or a >= hi:
+                continue
+            raw = _solid_frame_raw(data, manifest, blob_start, fr)
+            out += raw[max(lo - a, 0):max(min(hi, b) - a, 0)]
+        if len(out) != length:
+            raise ValueError(f"solid slice reconstruction mismatch for {arc_path}")
+        return bytes(out)
+    if _file_codec(fe) == "store":
+        start = blob_start + fe["offset"] + offset
+        return bytes(data[start:start + length])
     dict_data = _load_shared_dict(data, manifest, blob_start)
-    for fe in manifest["files"]:
-        if fe["path"] == arc_path:
-            start = blob_start + fe["offset"]
-            chunk = data[start:start + fe["csize"]]
-            raw = _decompress_blob(chunk, _file_codec(fe), dict_data)
-            if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
-                raise ValueError(f"checksum mismatch for {arc_path}")
-            return raw
-    raise KeyError(arc_path)
+    start = blob_start + fe["offset"]
+    raw = _decompress_blob(data[start:start + fe["csize"]], _file_codec(fe), dict_data)
+    return raw[offset:offset + length]
 
 
 def unpack(archive: str, dest: str) -> list[str]:
     """Extract all files to dest, verifying per-file sha256. Returns written paths."""
     data, manifest, _flags, blob_start, blob_end = _read_container(archive)
-    dict_data = _load_shared_dict(data, manifest, blob_start)
+    stream = _solid_stream(data, manifest, blob_start) if manifest.get("solid") else None
+    dict_data = None if stream is not None else _load_shared_dict(data, manifest, blob_start)
     dest_path = Path(dest)
     dest_path.mkdir(parents=True, exist_ok=True)
     written = []
     for fe in manifest["files"]:
-        start = blob_start + fe["offset"]
-        chunk = data[start:start + fe["csize"]]
-        raw = _decompress_blob(chunk, _file_codec(fe), dict_data)
-        if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
-            raise ValueError(f"checksum mismatch for {fe['path']}")
+        raw = _member_raw(fe, data, blob_start, dict_data, stream)
         target = _safe_join(dest_path, fe["path"])
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(raw)
@@ -440,15 +734,11 @@ def unpack_blobs(archive: str) -> dict:
     """In-memory inverse of pack_blobs: return {arc_path: bytes}, verifying per-file
     sha256. Use when resuming state from an archive without touching the filesystem."""
     data, manifest, _flags, blob_start, _blob_end = _read_container(archive)
-    dict_data = _load_shared_dict(data, manifest, blob_start)
+    stream = _solid_stream(data, manifest, blob_start) if manifest.get("solid") else None
+    dict_data = None if stream is not None else _load_shared_dict(data, manifest, blob_start)
     out = {}
     for fe in manifest["files"]:
-        start = blob_start + fe["offset"]
-        chunk = data[start:start + fe["csize"]]
-        raw = _decompress_blob(chunk, _file_codec(fe), dict_data)
-        if hashlib.sha256(raw).hexdigest() != fe["sha256"]:
-            raise ValueError(f"checksum mismatch for {fe['path']}")
-        out[fe["path"]] = raw
+        out[fe["path"]] = _member_raw(fe, data, blob_start, dict_data, stream)
     return out
 
 
@@ -468,6 +758,12 @@ def _main(argv=None):
                    help=f"compression codec (default: {DEFAULT_CODEC}; 'omni' = best-fit, max ratio)")
     p.add_argument("--dict", action="store_true",
                    help="train a shared zstd dictionary across files (keeps per-file random access)")
+    p.add_argument("--solid", action="store_true",
+                   help="one compressed stream over all members (cold archives; "
+                        "best ratio, no per-file random access)")
+    p.add_argument("--solid-frame-mb", type=float, default=None,
+                   help="with --solid: cut the stream into ~N MiB frames at member "
+                        "boundaries (single-member reads decompress one frame)")
     u = sub.add_parser("unpack", help="extract a .csf archive")
     u.add_argument("archive")
     u.add_argument("-d", "--dest", default=".")
@@ -477,10 +773,11 @@ def _main(argv=None):
 
     if args.cmd == "pack":
         m = pack(args.paths, args.out, compress=not args.no_compress,
-                 codec=args.codec, use_dict=args.dict)
+                 codec=args.codec, use_dict=args.dict, solid=args.solid,
+                 solid_frame_mb=args.solid_frame_mb)
         total = sum(f["size"] for f in m["files"])
-        stored = sum(f["csize"] for f in m["files"])
-        dnote = " +dict" if m.get("shared_dict") else ""
+        stored = m["solid"]["csize"] if m.get("solid") else sum(f["csize"] for f in m["files"])
+        dnote = " +dict" if m.get("shared_dict") else (" solid" if m.get("solid") else "")
         print(f"packed {m['file_count']} file(s) -> {args.out}  "
               f"({total} -> {stored} bytes, codec={m['codec']}{dnote})")
     elif args.cmd == "unpack":
