@@ -1,0 +1,4 @@
+### Changed
+
+- chat(#2759): the chat's GitHub tools (`github_issue`, `list_pull_requests`) now resolve their target repo via a shared `lib/gh-repo.resolveRepo()` — `GH_REPO` env override, else **auto-detected `owner/repo` from `git remote get-url origin`**, else the project default. A clone/fork with a different origin now points its issue/PR lookups at its *own* repo instead of the hardcoded `alex-place/lantern-os`. Covered by `apps/lantern-garage/test/gh-repo.test.js`.
+- chat(#2759): the per-provider reply-length caps (Anthropic 512, Gemini 4096, xAI 512 output tokens) are now env-overridable via `CHAT_MAX_TOKENS_<PROVIDER>` (with `CHAT_MAX_TOKENS` as a shared fallback). Defaults are unchanged, so behaviour is identical unless configured. Together with the earlier `MCP_HOST`/`MCP_PORT` work this closes the last "assume the wrong repository/host/budget for my setup" gaps; new vars documented in `.env.example`.

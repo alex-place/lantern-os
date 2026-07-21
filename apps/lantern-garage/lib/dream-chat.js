@@ -15,6 +15,20 @@ const { formatGrounding: _oracleGrounding } = require("./convergence-oracle");
 const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding");
 const { defaultRings } = require("./grounding-rings");
 
+// ── Per-model output-token budgets (#2759) ──────────────────────────────────
+// The reply-length cap per provider used to be a baked-in literal, so a caller
+// with a different model/quota couldn't tune it. Each is now env-overridable with
+// the historical literal as the default, so behaviour is unchanged unless set:
+//   CHAT_MAX_TOKENS_ANTHROPIC (512) · CHAT_MAX_TOKENS_GEMINI (4096) · CHAT_MAX_TOKENS_XAI (512)
+// CHAT_MAX_TOKENS sets a fallback default for any provider without its own var.
+function outputTokenBudget(provider, fallback) {
+  const generic = parseInt(process.env.CHAT_MAX_TOKENS, 10);
+  const perProvider = parseInt(process.env[`CHAT_MAX_TOKENS_${String(provider).toUpperCase()}`], 10);
+  if (perProvider > 0) return perProvider;
+  if (generic > 0) return generic;
+  return fallback;
+}
+
 // ── Convergence Oracle grounding ────────────────────────────────────────────
 // Wire the oracle into every question: each gets a time-banded observer slice — the KNOWNs
 // become evidence, the UNKNOWNs honest caveats, and the boundary pins (the singularity, the
@@ -826,7 +840,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
       // Anthropic intentionally left unmodified (no frequency_penalty; matches PR #723).
       const payload = JSON.stringify({
         model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
-        max_tokens: 512,
+        max_tokens: outputTokenBudget("anthropic", 512),
         // Cache the (stable) persona system prompt. Engages only when the prefix
         // clears the model's min cacheable length (4096 tok for Haiku 4.5); a
         // silent no-op otherwise. Helps repeated large-context callers (PR watcher).
@@ -934,7 +948,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
         const payload = JSON.stringify({
           contents: [{ role: "user", parts: [{ text: `${agent.systemPrompt}\n\n${userPrompt}` }] }],
           generationConfig: {
-            maxOutputTokens: 4096,
+            maxOutputTokens: outputTokenBudget("gemini", 4096),
             temperature: 0.7,
             // thinkingBudget:0 only on 2.5/3.x — a caller-requested gemini-1.5 model 400s on thinkingConfig.
             ...(supportsThinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
@@ -1088,7 +1102,7 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           { role: "system", content: agent.systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 512,
+        max_tokens: outputTokenBudget("xai", 512),
       });
       const reply = await new Promise((resolve, reject) => {
         const req2 = https.request({

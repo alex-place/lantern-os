@@ -34,6 +34,7 @@ const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
 const { getCreatorRuntime } = require("./creator-runtime");
 const jobSearch = require("./job-search");
+const { resolveRepo } = require("./gh-repo");
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 // User workspace: outside the repo, for user artifacts (resumes, exports, generated docs).
@@ -599,7 +600,7 @@ const REGISTRY = {
       const n = parseInt(String(i.number == null ? "" : i.number).replace(/^#/, ""), 10);
       if (!Number.isInteger(n) || n <= 0) return "[github_issue error: a positive issue/PR number is required]";
       const { execFile } = require("child_process");
-      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const repo = resolveRepo();
       const ghView = (kind) => new Promise((resolve) => {
         execFile("gh", [kind, "view", String(n), "--repo", repo, "--json",
           "number,title,state,labels,body,url"],
@@ -632,7 +633,7 @@ const REGISTRY = {
     },
     async run(i) {
       const limit = Math.min(50, Math.max(1, parseInt(i && i.limit, 10) || 20));
-      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const repo = resolveRepo();
       let out;
       try {
         out = safeExec(
