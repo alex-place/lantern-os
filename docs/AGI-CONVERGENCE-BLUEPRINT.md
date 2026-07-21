@@ -310,10 +310,10 @@ Three consequences this blueprint adopts:
 
 | Faculty | v1.10 status | Class |
 |---|---|---|
-| Perception | text strong; images partial (vision transport); audio/video absent | RENTED (partial) |
+| Perception | text strong; images partial (vision transport); audio absent; video ungoverned — Creator highlight analyzer only, cede-or-plan [#2784] | RENTED (partial) |
 | Generation | text, code, documents, images; speech + motor absent | RENTED · CEDED (speech, motor) |
-| Attention | context management exists; distraction robustness never tested | UNMEASURED |
-| Learning | in-context + retrieval; retention measured (LongMemEval), skill acquisition not | RENTED (partial) |
+| Attention | context management exists; distraction robustness never tested — eval plan [#2782] | UNMEASURED |
+| Learning | in-context + retrieval; retention measured (LongMemEval), skill acquisition not ([#2783]) | RENTED (partial) |
 | Memory | CSF archive, confidence-decay, per-user storage, recall — strongest owned area | IN-REPO |
 | Reasoning | provider chain + Ouro LoopLM; task benchmarks in registry | RENTED, measured |
 | Metacognition | the OURS bet (table above); validation simulation-bound until E-B ([#2691]) | OURS (argued) |

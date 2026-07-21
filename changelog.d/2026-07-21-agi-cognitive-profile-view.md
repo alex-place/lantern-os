@@ -12,5 +12,8 @@
   convergence records, inhibitory control ↔ Σ_θ gate), explicit on-the-record cessions (speech,
   motor, audio, social cognition), and the moat-is-a-lead finding — DeepMind is instrumenting the
   same metacognition gap, so validation must parallelize (E-B #2691 + external metacognition
-  evals #2776), not serialize. Follow-up work filed: #2776 (metacognition external evals) and
-  #2777 (tool-gated faculty eval conditions). Closes #2774, #2775.
+  evals #2776), not serialize. Follow-up work filed: #2776 (metacognition external evals),
+  #2777 (tool-gated faculty eval conditions), and — from the 2026-07-21 gap audit the view
+  enabled — #2782 (attention eval plan), #2783 (skill-acquisition eval plan), #2784 (video
+  perception cede-or-plan decision), wired into the profile rows so every faculty now has a
+  plan, a cession, or a tracked decision. Closes #2774, #2775.
