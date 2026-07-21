@@ -95,6 +95,35 @@ is the physics; none of this is physics.)
 
 ---
 
+## 2.5 The organizational reading of the geometry (the steelman, adopted)
+
+The tesseract/qutrit design's durable value — stated by the project owner and adopted here —
+is **organizational, not entropic**: *restructure data so compression and dedup can act.* This
+is the half of the old geometry that every measurement this session vindicated, and it splits
+cleanly:
+
+- **The dust principle is the real inheritance.** The lattice's deep idea was never base-3 —
+  it is *"absence is free: store a baseline, pay only for deviations."* That principle,
+  extracted from the geometry, is what Col v2 does across fields (+5.2–5.8%), what solid mode
+  does across files (+18.4–30.8%), what generative members do in the limit (a lawful stream is
+  one large duplicate of its recipe, 16 MiB → 3.5 KB), and what F2's chunk store does at
+  corpus scale (canonical chunk + references = baseline + dust). RKD (#1594) is the same body
+  in delta clothing.
+- **The trit types *state*, not *storage*.** `{-1, 0, +1}` is the natural type for what the
+  system tracks — refuted/unknown/confirmed; superseded/baseline/novel — and makes a clean
+  lifecycle vocabulary for a chunk store (retired / dust-reference / live delta). Measured
+  fact: a 3-symbol column costs the entropy stage ≤ log₂3 bits automatically, so this elegance
+  is free — and worth exactly zero extra compressed bytes. Use the trit because it is the
+  right type; never expect it to compress.
+- **Where base-3 pays in bytes it is already registered elsewhere:** trit-packing for the
+  ternary serving artifact (application map Q1) and PAM-3 signaling — regimes with no entropy
+  coder in the path. Inside an archive, hand-rolled ternary arrangement measurably adds
+  nothing (base3_cyclic lost to delta+zstd; re-verified this cycle).
+
+One line: **the geometry earns its keep as a discipline — baseline-plus-deviation,
+observe-only-the-slice, three-state lifecycle — and the discipline now has measured hardware
+under it; base-3 is the notation, not the mechanism.**
+
 ## 3. The Library of Congress program (F2–F3)
 
 **Scale, verified:** the Library manages **21 PB of digital collections across 914 million
