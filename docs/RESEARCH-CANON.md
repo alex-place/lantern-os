@@ -225,6 +225,28 @@ Not a separate system.
   - End-to-end task completion
   - Practical measurement
 
+### AGI-scope capability measurement (added 2026-07-21)
+- **Measuring Progress Toward AGI: A Cognitive Framework** (Burnell et al., Google DeepMind,
+  [arXiv:2605.28405](https://arxiv.org/abs/2605.28405)) — **read in full 2026-07-21**
+  - Ten-faculty Cognitive Taxonomy (perception, generation, attention, learning, memory, reasoning,
+    metacognition, executive functions + composite problem solving, social cognition) with a
+    three-stage protocol: held-out cognitive tasks → representative human baselines → per-faculty
+    **cognitive profiles**
+  - §4.3: evaluate **the system with its tools**, not the bare model — external legitimization of
+    the rent-capability/own-grounding strategy ([AGI-CONVERGENCE-BLUEPRINT.md](AGI-CONVERGENCE-BLUEPRINT.md))
+  - §4.1: names **metacognition** among the field's largest benchmark coverage gaps — the faculty
+    our Verify discipline occupies (calibration scoring, drift canaries, convergence records,
+    honesty probe); external metacognition evals tracked in #2776
+  - §4.3: tools contaminate faculty measurement (web search vs memory) — the #2322
+    groundedness-noise class; prescription = tool-gated eval conditions (#2777)
+- **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212))
+  — web-verified 2026-07-21, abstract-level only
+  - Companion ten-domain framework (Cattell–Horn–Carroll theory); scores AGI as % of
+    well-educated-adult cognitive versatility (reports GPT-4 27%, GPT-5 58%); finds frontier
+    profiles sharply **jagged**
+  - Headline deficit: **long-term memory storage** — independent confirmation that owned persistent
+    memory (CSF + confidence-decay + per-user storage) targets a measured frontier weakness
+
 ### Theory
 - **Σ₀ Anti-Collapse Verification Loop** (Lantern-native)
   - Surprise monitor (NIS canary)
@@ -462,6 +484,6 @@ Never retrain. Accumulate.
 4. **Remove entries when superseded by implementation or better alternative**
 5. **This is not a bookmarks list. It is the architecture research trail.**
 
-**Last Updated:** 2026-07-06 (SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
+**Last Updated:** 2026-07-21 (AGI-scope measurement frameworks added to [07] — Burnell arXiv:2605.28405 read-in-full + Hendrycks arXiv:2510.18212 web-verified; adopted as the blueprint's cognitive-profile yardstick. Prior: 2026-07-06 SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
 **Maintained By:** Lantern OS team  
 **Immutability:** Read-only; update via PR + issue comment only

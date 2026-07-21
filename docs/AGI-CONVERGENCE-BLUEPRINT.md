@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-07-18
-updated: 2026-07-18
+updated: 2026-07-21
 ---
 
 # The Convergence Blueprint — one loop, everything we know
@@ -264,13 +264,88 @@ cannot. The Certificate's rule is unchanged and non-negotiable: no claimed edge,
 or novelty counts until it survives fresh, out-of-sample verification on the actual surface.
 That is the plus-ultra that is actually beyond what they ship, *because it is grounded*.
 
+---
+
+## The cognitive-profile view — the capability-space companion (added 2026-07-21)
+
+*The loop is a **process** decomposition; capability is an orthogonal axis. A faculty the loop
+has no stage for never gets a GAP row — attention and social cognition were invisible to every
+table above. This section closes that structural blind spot using the strongest external
+measurement frame available.*
+
+**External frame (ESTABLISHED).** Two frameworks now define AGI-scope measurement.
+**(a)** DeepMind's ten-faculty **Cognitive Taxonomy** + three-stage protocol — held-out cognitive
+tasks → representative human baselines → per-faculty "cognitive profiles"
+([Burnell et al., arXiv:2605.28405](https://arxiv.org/abs/2605.28405) — **read in full
+2026-07-21**, per the no-ID-cited-unread rule). **(b)** The CHC-based ten-domain **AGI score**
+([Hendrycks et al., arXiv:2510.18212](https://arxiv.org/abs/2510.18212) — web-verified
+2026-07-21, abstract-level), which reports frontier profiles as sharply **jagged** and names
+**long-term memory storage** the critical frontier deficit — independent confirmation that the
+owned Remember stage targets a measured weakness.
+
+Three consequences this blueprint adopts:
+
+1. **The system, not the model, is the unit of assessment.** Burnell §4.3: isolating the core
+   model is "increasingly impractical" and less informative; evaluate "the system as a whole,
+   including any built-in tools or modules." This is the strongest external legitimization the
+   rent-capability/own-grounding strategy has received: the 10-provider chain + ~35 native tools
+   + PCSF router *is* the system under test.
+2. **The one OURS claim has an external name: metacognition** — and Burnell §4.1 names it among
+   the field's largest benchmark coverage gaps. The taxonomy's sub-abilities map one-to-one onto
+   shipped v1.10 machinery:
+
+   | Taxonomy (Burnell §7.7–7.8) | Live in v1.10 |
+   |---|---|
+   | Confidence calibration | decision journal + calibration scoring |
+   | Error monitoring | drift canaries, Σ₀ collapse detection |
+   | Source judgments | convergence records — `[claim, evidence, confidence, source]` |
+   | Knowledge of limitations | honesty probe + golden set |
+   | Inhibitory control (§7.8.3) | Σ_θ acceptance gate — inhibition applied to weight updates |
+
+3. **Tools contaminate faculty measurement.** Burnell §4.3: a system that can search the web is
+   no longer being measured on memory. This is the #2322 groundedness-noise class with a name;
+   faculty evals need tool-gated conditions (tracked: [#2777]).
+
+**The v1.10 cognitive profile (honest).**
+
+| Faculty | v1.10 status | Class |
+|---|---|---|
+| Perception | text strong; images partial (vision transport); audio/video absent | RENTED (partial) |
+| Generation | text, code, documents, images; speech + motor absent | RENTED · CEDED (speech, motor) |
+| Attention | context management exists; distraction robustness never tested | UNMEASURED |
+| Learning | in-context + retrieval; retention measured (LongMemEval), skill acquisition not | RENTED (partial) |
+| Memory | CSF archive, confidence-decay, per-user storage, recall — strongest owned area | IN-REPO |
+| Reasoning | provider chain + Ouro LoopLM; task benchmarks in registry | RENTED, measured |
+| Metacognition | the OURS bet (table above); validation simulation-bound until E-B ([#2691]) | OURS (argued) |
+| Executive functions | autowork planning, council, Σ_θ gate; partially measured via SWE-bench | IN-REPO (partial) |
+| Problem solving | rented; HumanEval / SWE-bench / LongMemEval in registry | RENTED, measured |
+| Social cognition | absent — the preference model is adjacent at best | CEDED |
+
+**Ceded on the record.** Speech generation, motor control, audio perception, and social cognition
+are deliberate product cessions — the AI cockpit needs none of them — not oversights. Burnell's
+criterion is accepted with them: a significant weakness in any faculty predicts real-world task
+classes the system cannot perform, and those classes are declined, not claimed. Any AGI-scope
+claim made in this repo carries this cession list.
+
+**The moat is a lead, not a structure.** Burnell et al. state DeepMind is building held-out
+metacognition evaluations with academic partners — the frontier is now instrumenting the exact
+gap we own. The Verify edge is a discipline lead measured in quarters, not a structural
+advantage. Consequence: close E-B ([#2691]) and stand up external metacognition evals
+([#2776]) in **parallel**, not in sequence. **[claim: our differentiated faculty is the
+least-benchmarked one · confidence: High for the gap (stated by the field's own measurers),
+Medium for our occupancy of it (E-B pending) · source: arXiv:2605.28405 §4.1/§4.3 + the Verify
+stage above]**
+
 ## The honest AGI-scope assessment
 
 **Could this become the best model possible?** Not from what we own. Six of the seven load-bearing
 capabilities (data, architecture, optimizer, scaling, pretraining, frontier post-training, systems)
 are **gaps we would fill with the outside research above**, not with anything in-repo. That is not a
 failure — it matches the 2026 consensus that the frontier is *execution + data*, and those are
-capital/compute problems more than idea problems.
+capital/compute problems more than idea problems. Scored in capability space (the
+cognitive-profile view above), the same verdict lands with sharper edges: sub-median or absent in
+at least three faculties (perception beyond text/images, social cognition, skill-retaining
+learning), unmeasured in two more (attention; metacognition externally).
 
 **What is genuinely ours, and where it matters:** the **Verify** discipline (the Collapse Certificate
 + Grounding Ledger + Σ_θ gate), and its extension into **Converge** as the update gate. The bet that
@@ -290,12 +365,16 @@ and our Verify work is the stability layer that curve needs.
    verify-gated update loop is the realistic path to an *owned* small model that inherits frontier
    capability and adds the grounding discipline.
 4. **Close the one real-model gap** — run E-B ([#2691]) so the Verify claims graduate from
-   simulation to MEASURED-on-a-real-model. Until then, our edge is argued, not proven.
+   simulation to MEASURED-on-a-real-model — and in **parallel**, stand up external metacognition
+   evals ([#2776]): the moat-is-a-lead finding makes a sequential validation schedule a losing
+   one. Until then, our edge is argued, not proven.
 
 **The trap (stated so it can't be laundered):** treating a rigorous Verify layer as an AGI recipe.
 It is the seatbelt and the dashboard warning light — indispensable, and worthless without the engine,
 which we rent. The whole-loop win is *rented capability + owned grounding*, delivered as one
-convergent product, not a home-grown frontier model.
+convergent product, not a home-grown frontier model. The edge is also a wasting asset: the
+frontier's own measurers are now instrumenting the same gap (cognitive-profile view above), so it
+holds only at the speed the discipline lead is maintained.
 
 ---
 
