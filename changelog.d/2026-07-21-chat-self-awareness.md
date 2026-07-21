@@ -14,7 +14,7 @@
   term (`calibratedTrust`, #1011); every field now declares its basis (`prior` /
   `prior-formula` / `measured`) in the record, the done-event summary, and the finale
   tooltip, so the numbers stop performing calibration they don't have (full calibration
-  remains open in #2803). **User-facing self-check** (#2805) — the council verdict was
-  operator-only (#2332), so users saw confident answers the system itself distrusted;
-  non-operators now get a plain-language chip on non-healthy verdicts only (unverified /
-  failed a live check / no verifiable answer), grounded stays quiet, operator view unchanged.
+  remains open in #2803). **User-facing self-check** (#2805) — implemented
+  independently and better in PR #2807 (adds the "show what failed" disclosure on refuted
+  verdicts); this PR's duplicate implementation was reverted in favor of it — the second
+  same-day double-build, tracked as a lane-claim-convention gap.
