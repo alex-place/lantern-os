@@ -16,9 +16,10 @@
  *       built-in tool on the canonical tool-runner executor untouched.
  *
  * Execution goes through the MCP server's JSON-RPC `/messages` `tools/call`
- * endpoint (the same reliable path the stdio bridge uses). NOTE: lib/mcp-client.js
- * posts to `/tool/<name>`, which the server does not expose (it 404s) — so we call
- * `/messages` directly here rather than reuse that broken path.
+ * endpoint (the same reliable path the stdio bridge uses). This module keeps its own
+ * lightweight `_mcpRpc` for the operational-tool discovery + call flow; lib/mcp-client.js
+ * now speaks the same `/messages` protocol too (it previously posted to a `/tool/<name>`
+ * route the server never exposed — fixed in #2760).
  *
  * The operational tool DESCRIPTORS are discovered from the live server (tools/list,
  * filtered to `_meta.lantern.kind === "mcp_specific_operational"`), cached in
