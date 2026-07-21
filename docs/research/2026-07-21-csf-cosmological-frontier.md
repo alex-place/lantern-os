@@ -124,6 +124,19 @@ One line: **the geometry earns its keep as a discipline — baseline-plus-deviat
 observe-only-the-slice, three-state lifecycle — and the discipline now has measured hardware
 under it; base-3 is the notation, not the mechanism.**
 
+**Companion question, graded (owner, 2026-07-21): "use the infinite values between 0–2 as
+space to shrink bytes."** The pure form dies on distinguishability: storage holds states, not
+reals — n bits of precision distinguish exactly 2ⁿ points of any interval (precision *is*
+bytes), and analog level-packing is taxed by noise (Shannon–Hartley; why PAM-3 stops at 3
+levels and flash at ~16). But the rigorous form of the intuition **is arithmetic coding** —
+the whole message as one point in an interval, narrowed per-symbol by probability, code length
+= −log₂P = the Shannon optimum — which is exactly the FSE/ANS/range-coder stage inside every
+CSF backend codec. The continuum is load-bearing three ways here already: as probability space
+(shipped in every codec), as precision-priced floats (F1c error-bounded tier: bits ∝
+log(range/ε)), and as the home of the surviving field/budget instruments (lapse, dilation,
+water-filling). Verdict: not a new lever — the **mechanism of the existing floor**, which is
+precisely why nothing hand-rolled beats that floor.
+
 ## 3. The Library of Congress program (F2–F3)
 
 **Scale, verified:** the Library manages **21 PB of digital collections across 914 million
