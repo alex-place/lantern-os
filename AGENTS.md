@@ -427,6 +427,30 @@ their branches with their own name gets their own concurrent lane:
 - A branch with **no `/`** (ad-hoc, unprefixed) falls back to a single shared `human`
   lane, so stray branches can't spawn unlimited free lanes.
 
+### Claim an issue before you work it (#2808)
+No open-PR cap means many lanes run at once — but nothing marked an issue "in progress",
+so on 2026-07-21 two lanes twice built the same issue in one day (#2774/#2775, reconciled
+by a manual dedupe merge; and #2805, resolved by reverting one copy) and paid a
+merge/reconcile tax. Lightweight convention, **no new infra**:
+
+**Before you start** an issue, check it isn't already claimed:
+- `gh issue view <N> --json assignees,labels` — is it assigned, or labeled `claimed`?
+- `gh pr list --repo alex-place/lantern-os --state open --search "<N>"` — is there already
+  an open PR referencing it?
+
+  If any is true, pick a different issue or coordinate — don't parallel-build it.
+
+**When you start**, claim it in the same two moves:
+- self-assign (`gh issue edit <N> --add-assignee @me`) **or** add a `claimed` label, **and**
+- drop a one-line comment naming your branch (e.g. `working on claude/<N>-<slug>`).
+
+**When you finish or abandon** it, the claim releases: the merged PR closes the issue, or —
+if you drop it — unassign / remove the label and say so in a comment.
+
+Enforcement stays **soft**: a `/refinement` pass flags double-claims, and the pr-watcher can
+warn when two open PRs reference the same issue. The autowork pipeline already does this
+server-side via per-issue claim files; this is the human/agent **chat-lane** equivalent.
+
 ### Auto-merge (green + review-APPROVE)
 The single merger (`apps/lantern-garage/lib/pr-watcher.js`) auto-merges a PR once it is
 **green** (all CI checks pass, minus deploy-preview/base-red self-heal), **conflict-free**,
