@@ -1,0 +1,188 @@
+{
+  "config": {
+    "N": 200,
+    "gamma": 1.0,
+    "budgets": [
+      20.0,
+      60.0,
+      150.0
+    ]
+  },
+  "rows": [
+    {
+      "population": "uniform_u",
+      "budget": 20.0,
+      "true_exp": {
+        "uniform": 99.13,
+        "shipped": 98.7,
+        "waterfill": 94.65,
+        "wf_vs_shipped_gain_%": 4.1,
+        "wf_vs_uniform_gain_%": 4.5
+      },
+      "misspec_pow": {
+        "uniform": 94.96,
+        "shipped": 94.41,
+        "waterfill": 90.89,
+        "wf_vs_shipped_gain_%": 3.7,
+        "wf_vs_uniform_gain_%": 4.3
+      }
+    },
+    {
+      "population": "uniform_u",
+      "budget": 60.0,
+      "true_exp": {
+        "uniform": 81.16,
+        "shipped": 80.13,
+        "waterfill": 73.74,
+        "wf_vs_shipped_gain_%": 8.0,
+        "wf_vs_uniform_gain_%": 9.1
+      },
+      "misspec_pow": {
+        "uniform": 73.91,
+        "shipped": 72.87,
+        "waterfill": 69.08,
+        "wf_vs_shipped_gain_%": 5.2,
+        "wf_vs_uniform_gain_%": 6.5
+      }
+    },
+    {
+      "population": "uniform_u",
+      "budget": 150.0,
+      "true_exp": {
+        "uniform": 51.75,
+        "shipped": 50.21,
+        "waterfill": 44.65,
+        "wf_vs_shipped_gain_%": 11.1,
+        "wf_vs_uniform_gain_%": 13.7
+      },
+      "misspec_pow": {
+        "uniform": 47.32,
+        "shipped": 46.17,
+        "waterfill": 43.63,
+        "wf_vs_shipped_gain_%": 5.5,
+        "wf_vs_uniform_gain_%": 7.8
+      }
+    },
+    {
+      "population": "mostly_confident (Beta(2,5))",
+      "budget": 20.0,
+      "true_exp": {
+        "uniform": 49.74,
+        "shipped": 49.7,
+        "waterfill": 46.65,
+        "wf_vs_shipped_gain_%": 6.1,
+        "wf_vs_uniform_gain_%": 6.2
+      },
+      "misspec_pow": {
+        "uniform": 47.65,
+        "shipped": 47.6,
+        "waterfill": 45.13,
+        "wf_vs_shipped_gain_%": 5.2,
+        "wf_vs_uniform_gain_%": 5.3
+      }
+    },
+    {
+      "population": "mostly_confident (Beta(2,5))",
+      "budget": 60.0,
+      "true_exp": {
+        "uniform": 40.72,
+        "shipped": 40.63,
+        "waterfill": 36.3,
+        "wf_vs_shipped_gain_%": 10.7,
+        "wf_vs_uniform_gain_%": 10.9
+      },
+      "misspec_pow": {
+        "uniform": 37.09,
+        "shipped": 37.0,
+        "waterfill": 34.41,
+        "wf_vs_shipped_gain_%": 7.0,
+        "wf_vs_uniform_gain_%": 7.2
+      }
+    },
+    {
+      "population": "mostly_confident (Beta(2,5))",
+      "budget": 150.0,
+      "true_exp": {
+        "uniform": 25.97,
+        "shipped": 25.83,
+        "waterfill": 22.08,
+        "wf_vs_shipped_gain_%": 14.5,
+        "wf_vs_uniform_gain_%": 15.0
+      },
+      "misspec_pow": {
+        "uniform": 23.74,
+        "shipped": 23.64,
+        "waterfill": 21.7,
+        "wf_vs_shipped_gain_%": 8.2,
+        "wf_vs_uniform_gain_%": 8.6
+      }
+    },
+    {
+      "population": "mostly_uncertain (Beta(5,2))",
+      "budget": 20.0,
+      "true_exp": {
+        "uniform": 127.57,
+        "shipped": 127.32,
+        "waterfill": 125.45,
+        "wf_vs_shipped_gain_%": 1.5,
+        "wf_vs_uniform_gain_%": 1.7
+      },
+      "misspec_pow": {
+        "uniform": 122.21,
+        "shipped": 121.89,
+        "waterfill": 120.74,
+        "wf_vs_shipped_gain_%": 0.9,
+        "wf_vs_uniform_gain_%": 1.2
+      }
+    },
+    {
+      "population": "mostly_uncertain (Beta(5,2))",
+      "budget": 60.0,
+      "true_exp": {
+        "uniform": 104.45,
+        "shipped": 103.85,
+        "waterfill": 101.53,
+        "wf_vs_shipped_gain_%": 2.2,
+        "wf_vs_uniform_gain_%": 2.8
+      },
+      "misspec_pow": {
+        "uniform": 95.12,
+        "shipped": 94.53,
+        "waterfill": 94.09,
+        "wf_vs_shipped_gain_%": 0.5,
+        "wf_vs_uniform_gain_%": 1.1
+      }
+    },
+    {
+      "population": "mostly_uncertain (Beta(5,2))",
+      "budget": 150.0,
+      "true_exp": {
+        "uniform": 66.6,
+        "shipped": 65.73,
+        "waterfill": 64.4,
+        "wf_vs_shipped_gain_%": 2.0,
+        "wf_vs_uniform_gain_%": 3.3
+      },
+      "misspec_pow": {
+        "uniform": 60.9,
+        "shipped": 60.27,
+        "waterfill": 59.97,
+        "wf_vs_shipped_gain_%": 0.5,
+        "wf_vs_uniform_gain_%": 1.5
+      }
+    }
+  ],
+  "summary": {
+    "wf_vs_shipped_gain_true_model_%": {
+      "min": 1.5,
+      "median": 6.1,
+      "max": 14.5
+    },
+    "wf_vs_shipped_gain_misspecified_%": {
+      "min": 0.5,
+      "median": 5.2,
+      "max": 8.2
+    }
+  },
+  "reading": "Positive gains under the true model = the linear ramp leaves measurable error on the table; the misspecified row is the robustness check \u2014 if gains collapse or go negative there, the live A/B (A8) must arbitrate before any policy change."
+}
