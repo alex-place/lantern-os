@@ -79,6 +79,7 @@ const EXTENSION = {
   // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "settings.html":                 ["account", null], // tabbed settings: API keys + connectors + context modes
   // project meta
+  "dream-chat.html":               ["meta", null], // legacy alias → chat.html (redirect stub kept for old links, #2751)
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
   "faq.html":                      ["meta", null],
