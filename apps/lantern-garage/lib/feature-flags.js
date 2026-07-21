@@ -38,7 +38,7 @@ const STORE_PATH = path.join(STORE_DIR, "feature-flags.json");
  * Add a page here + a link there.
  */
 const NAV_PAGES = [
-  { path: "/dream-chat.html",        label: "Chat" },
+  { path: "/chat.html",        label: "Chat" },
   { path: "/stock-trader.html",  label: "Trader" },
   { path: "/create.html",            label: "Create" },
   { path: "/explore.html",           label: "Explore" },

@@ -264,7 +264,7 @@
       if (button.dataset.research) {
         const prompt = OrchestrationResearch.buildResearchPrompt(item);
         researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
-        window.open(`/dream-chat.html?seed=${encodeURIComponent(prompt)}`, "_blank", "noopener");
+        window.open(`/chat.html?seed=${encodeURIComponent(prompt)}`, "_blank", "noopener");
         return;
       }
       const target = button.dataset.copyClaude ? "Claude Code" : "Codex";

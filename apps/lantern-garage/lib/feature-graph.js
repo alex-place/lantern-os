@@ -40,7 +40,7 @@ const DEFAULT_FEATURES = [
   {
     id: "dream-journal",
     label: "Dream Journal",
-    href: "/dream-chat.html",
+    href: "/chat.html",
     icon: "🌙",
     activation: { flag: null, minHealth: 0.0, maxLatencyMs: 60000, devOnly: false },
     implementation: "dream-journal-v1",

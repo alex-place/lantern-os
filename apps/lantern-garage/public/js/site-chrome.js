@@ -19,7 +19,7 @@
   "use strict";
 
   var NAV_LINKS = [
-    { href: "/dream-chat.html", label: "Chat" },
+    { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
     { href: "/orchestration.html", label: "Settings" },
     { href: "/work.html", label: "Work" },

@@ -2173,7 +2173,7 @@ async function handleStreamChat(req, url, res) {
               // back to the original text just in case nothing usable comes back.
               const _firstTurn = fullReply;
               let toolAnswer = "";
-              const MAX_TOOL_ITERS = 5;
+              const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 10;  // #2755 raised + configurable (local)
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
                 const result = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
                 const out = result.ok ? result.result : (result.error || `ERROR(${result.reason || "error"})`);
@@ -2304,7 +2304,7 @@ async function handleStreamChat(req, url, res) {
             ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
             { role: "user", parts: [{ text: message }] },
           ];
-          const MAX_TOOL_ITERS = 6;
+          const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           let toolCalls = 0;
           const geminiTransport = require("./gemini-transport").geminiTransport;
           for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
@@ -2532,7 +2532,7 @@ async function handleStreamChat(req, url, res) {
           if (tools.length) {
             const system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
             const convo = [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }];
-            const MAX_TOOL_ITERS = 6;
+            const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
             let toolCalls = 0;
             for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
               const { assistantContent, toolUses, stopReason } = await anthropicToolTurn({
@@ -2734,7 +2734,7 @@ async function handleStreamChat(req, url, res) {
           const openaiModelName = modelFor("openai");
           const decode = serving.applyOpenAIDecodeParams({});
           const messages = buildProviderMessages(systemPrompt, compacted, message);
-          const MAX_TOOL_ITERS = 6;
+          const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           let toolCalls = 0;
           for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
             const turn = await openaiCompatibleToolTurn({
@@ -2885,7 +2885,7 @@ async function handleStreamChat(req, url, res) {
           const xaiModelName = modelFor("xai");
           const decode = serving.applyXAIDecodeParams({}); // grok rejects penalty params (#2531)
           const messages = buildProviderMessages(systemPrompt, compacted, message);
-          const MAX_TOOL_ITERS = 6;
+          const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           let toolCalls = 0;
           for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
             const turn = await openaiCompatibleToolTurn({
@@ -3018,7 +3018,7 @@ async function handleStreamChat(req, url, res) {
         if (tools.length) {
           const cohereModelName = modelFor("cohere");
           const messages = buildProviderMessages(systemPrompt, compacted, message);
-          const MAX_TOOL_ITERS = 6;
+          const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           let toolCalls = 0;
           for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
             const turn = await openaiCompatibleToolTurn({

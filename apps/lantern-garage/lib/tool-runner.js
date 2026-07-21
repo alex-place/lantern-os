@@ -1651,6 +1651,33 @@ function renderToolPreamble() {
   return lines.join("\n");
 }
 
+// Minimal JSON-schema argument check (#2753): catch missing-required and hard type
+// mismatches BEFORE running a tool, so a malformed call returns a correctable error the
+// model can retry from, instead of silently degrading to {} and a mystery empty result.
+function _validateArgs(schema, input) {
+  if (!schema || schema.type !== "object") return null;
+  const inp = input || {};
+  const errs = [];
+  for (const req of (schema.required || [])) {
+    if (inp[req] === undefined || inp[req] === null) errs.push(`missing required '${req}'`);
+  }
+  const props = schema.properties || {};
+  for (const [k, v] of Object.entries(inp)) {
+    const want = props[k] && props[k].type;
+    if (!want || v === undefined || v === null) continue;
+    const t = Array.isArray(v) ? "array" : typeof v;
+    const ok = want === "integer" ? (t === "number" && Number.isInteger(v))
+      : want === "number"  ? t === "number"
+      : want === "boolean" ? t === "boolean"
+      : want === "array"   ? t === "array"
+      : want === "object"  ? (t === "object" && !Array.isArray(v))
+      : want === "string"  ? t === "string"
+      : true;   // unknown/loose schema types pass
+    if (!ok) errs.push(`'${k}' should be ${want}, got ${t}`);
+  }
+  return errs.length ? errs.join("; ") : null;
+}
+
 /**
  * Execute a parsed tool call under the policy.
  * @param {string} name  canonical tool name the model emitted
@@ -1694,6 +1721,19 @@ async function runTool(name, input, ctx = {}) {
       error: `'${name}' (${entry.policy}) requires operator access`,
     });
     await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
+    return result;
+  }
+
+  // Validate arguments against the tool's own schema (#2753) — reject with a coded,
+  // model-facing error rather than running the tool with silently-dropped args.
+  const argErr = _validateArgs(entry.schema, input);
+  if (argErr) {
+    const result = _outcome("unavailable", name, {
+      reason_code: "invalid_arguments",
+      policy: entry.policy,
+      error: `invalid arguments for '${name}': ${argErr}`,
+    });
+    await _logToolExecution(name, input, "unavailable", "invalid_arguments", startTime, ctx);
     return result;
   }
 

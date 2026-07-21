@@ -743,7 +743,7 @@
      A right-side docked panel that REFLOWS the deck (like the BUY/SELL order
      ticket), NOT a floating popup. Shares the order-ticket's visual language:
      same right-edge dock, border-left, slide-in, and content-shift. Talks to the
-     same backend as dream-chat.html (POST /api/dream/chat/stream, SSE tokens). */
+     same backend as chat.html (POST /api/dream/chat/stream, SSE tokens). */
   .dc-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1050;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .dc-bg.hidden{display:none}
   .dc-modal{pointer-events:auto;display:flex;flex-direction:column;background:var(--bg1);
@@ -959,7 +959,7 @@
   <aside class="dc-modal" role="dialog" aria-label="Unisona assistant chat" aria-hidden="true">
     <div class="dc-head">
       <span class="dc-title">💬 Unisona <span class="dc-sub">Assistant</span></span>
-      <a class="dc-x" href="/dream-chat.html" title="Open the full chat — files, models, voice">Full chat ↗</a>
+      <a class="dc-x" href="/chat.html" title="Open the full chat — files, models, voice">Full chat ↗</a>
       <button type="button" class="dc-x" onclick="dcToggle(false)" aria-label="Close chat" title="Close">✕ Close</button>
     </div>
     <div class="dc-log" id="dcLog" role="log" aria-live="polite">
@@ -4819,7 +4819,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 
 /* ── Dream-chat panel (#trader-chat) ───────────────────────────────────────────
    A minimal, self-contained chat with the one Unisona assistant. Streams from the
-   same endpoint dream-chat.html uses (POST /api/dream/chat/stream) and renders the
+   same endpoint chat.html uses (POST /api/dream/chat/stream) and renders the
    `token`/`route`/`error`/`done` SSE events. Kept independent of dream-chat-ui.js
    so it doesn't pull the full chat page's machinery into the trading terminal. */
 (function(){

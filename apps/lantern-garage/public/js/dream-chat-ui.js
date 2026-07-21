@@ -1021,7 +1021,7 @@ async function sendMessage(opts = {}) {
   // same forceGround path; used only to label the turn honestly.
   const autoVerify = !!(opts && opts.auto);
   // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
-  // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
+  // (gatedSendMessage in chat.html + the !convergance shim in convergance-sync.js);
   // they're folded in here so there is exactly one sendMessage, no monkey-patching.
   // Auth gate: block roles without chat access (all current roles allow; the server
   // enforces real limits — this fails open to that if the role globals aren't present).
