@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-08
-updated: 2026-06-20
+updated: 2026-07-20
 ---
 
 # unisona.ai Skills & Capabilities
@@ -28,6 +28,14 @@ Every skill must strengthen one stage. Nothing outside this loop is in scope.
 | **Σ₀ Overall** | **0.77** | **0.92** | |
 
 Scores updated per-run in `data/agi-benchmark.jsonl`.
+
+> **⚠️ These are INTERNAL self-assessed per-stage estimates, and the table above is stale
+> (2026-06-16) — not external marks.** For the current, grounded standing against *public*
+> benchmarks, read the eval ledgers (`data/eval/leaderboard.jsonl`, `data/longmemeval/runs.jsonl`)
+> and the maintained [BENCHMARKS.md](docs/BENCHMARKS.md) registry. **Latest review (2026-07-20):**
+> HumanEval-chat 0.83 (served qwen2.5-coder) / 0.70 (sigma0-coder distill) / 0.22 (raw Ouro-1.4B);
+> SWE-bench Lite **0/5** resolved; LongMemEval multi-recall@5 0.775 — the SWE-bench resolved rate
+> is the top capability gap (frontier ~95%).
 
 ---
 

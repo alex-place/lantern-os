@@ -180,7 +180,7 @@
   if (isStaticHost) {
     const banner = document.createElement("div");
     banner.style.cssText = "position:fixed;top:0;left:0;right:0;background:#1a1a2e;color:#e2c97e;padding:10px 16px;font-size:0.85rem;text-align:center;z-index:9999;border-bottom:1px solid #e2c97e44;";
-    banner.innerHTML = 'Dream Chat requires the local server. Run <code style="background:#0d0d1a;padding:2px 6px;border-radius:3px;">npm start --prefix apps/lantern-garage</code> then open <a href="http://127.0.0.1:4177/dream-chat.html" style="color:#e2c97e;">http://127.0.0.1:4177/dream-chat.html</a>';
+    banner.innerHTML = 'Dream Chat requires the local server. Run <code style="background:#0d0d1a;padding:2px 6px;border-radius:3px;">npm start --prefix apps/lantern-garage</code> then open <a href="http://127.0.0.1:4177/chat.html" style="color:#e2c97e;">http://127.0.0.1:4177/chat.html</a>';
     document.body.prepend(banner);
   }
 
@@ -261,7 +261,7 @@
         fragment.appendChild(row);
       }
       // Insert at the TOP, not the bottom. The `?q=` auto-submit handler
-      // (dream-chat.html — home starter chips like "Check the news" navigate
+      // (chat.html — home starter chips like "Check the news" navigate
       // here with ?q=…) can fire before this async fetch resolves and append a
       // live turn first; appending history then would drop older turns *below*
       // the new one. Prepending keeps chronology correct regardless of the race.
@@ -534,7 +534,7 @@
     });
   }
 
-  // #930: the textarea's inline onkeydown (dream-chat.html) already routes Enter to
+  // #930: the textarea's inline onkeydown (chat.html) already routes Enter to
   // the live global sendMessage in dream-chat-ui.js. A second keydown listener here
   // fired this file's *legacy* scoped sendMessage too, double-sending on every Enter
   // (and rendering into the dead .msg-row path). Removed — Send button + inline Enter

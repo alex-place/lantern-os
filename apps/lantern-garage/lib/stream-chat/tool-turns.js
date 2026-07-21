@@ -208,4 +208,74 @@ function geminiToolTurn({ transport, model, contents, tools, systemInstruction, 
   });
 }
 
-module.exports = { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn };
+// ── Unified agentic tool loop (#2756) ─────────────────────────────────────────
+// One driver for every provider. The five copy-pasted per-provider loops in
+// stream-chat.js are replaced by this + a thin adapter each. The loop mechanics
+// (iterate up to maxIters, run the turn's tool calls in PARALLEL (#2752), stream the
+// two-phase call/result SSE events, feed the results back) are shared; the wire
+// differences (turn helper, "wants more" test, assistant-turn shape, tool-result
+// shape) live in the adapter's four hooks.
+//
+// adapter = {
+//   maxIters,
+//   turn(): Promise<turnResult>,             // calls the provider turn helper (streams via its own onToken)
+//   toolCalls(turnResult): [{name, input, id?}],  // [] ⇒ the model gave its final answer
+//   pushAssistant(turnResult),               // append the model's turn to the provider convo
+//   pushToolResults(outcomes),               // outcomes: [{call, out, ok}] → append the provider tool-result turn
+// }
+// runTool(name, input): Promise<outcome>     // provided by the caller (closes over operator/userId)
+async function runToolLoop(adapter, { sse, res, runTool }) {
+  let toolCalls = 0;
+  for (let iter = 0; iter < adapter.maxIters; iter++) {
+    const turn = await adapter.turn();
+    const calls = adapter.toolCalls(turn) || [];
+    if (!calls.length) break;                 // final answer already streamed
+    adapter.pushAssistant(turn);
+    toolCalls += calls.length;
+    // #2752 — run this turn's tool calls concurrently. Promise.all preserves call
+    // order, so the tool-result messages stay aligned with the model's calls.
+    const outcomes = await Promise.all(calls.map(async (c) => {
+      sse.writeData(res, { type: "tool", phase: "call", name: c.name, input: c.input });
+      const r = await runTool(c.name, c.input);
+      const out = String(r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`).slice(0, 6000);
+      sse.writeData(res, { type: "tool", phase: "result", name: c.name,
+        ok: !!r.ok, status: r.status, reason_code: r.reason_code, receipt: r.receipt,
+        preview: out.slice(0, 240) });
+      return { call: c, out, ok: !!r.ok };
+    }));
+    adapter.pushToolResults(outcomes);
+  }
+  return { toolCalls };
+}
+
+// Adapters — `convo`/`messages`/`contents` are mutated in place (the turn helper reads
+// them by reference each iteration). `turn` is a thunk that calls the provider helper.
+function anthropicAdapter(convo, maxIters, turn) {
+  return {
+    maxIters, turn,
+    toolCalls: (t) => (t.stopReason === "tool_use" ? t.toolUses : []),   // preserves the original break condition
+    pushAssistant: (t) => convo.push({ role: "assistant", content: t.assistantContent }),
+    pushToolResults: (outs) => convo.push({ role: "user", content: outs.map((o) => ({ type: "tool_result", tool_use_id: o.call.id, content: o.out, is_error: !o.ok })) }),
+  };
+}
+function geminiAdapter(contents, maxIters, turn) {
+  return {
+    maxIters, turn,
+    toolCalls: (t) => t.functionCalls.map((fc) => ({ name: fc.name, input: fc.args || {} })),
+    pushAssistant: (t) => contents.push({ role: "model", parts: t.modelParts }),
+    pushToolResults: (outs) => contents.push({ role: "user", parts: outs.map((o) => ({ functionResponse: { name: o.call.name, response: { result: o.out } } })) }),
+  };
+}
+function openaiAdapter(messages, maxIters, turn) {
+  return {
+    maxIters, turn,
+    toolCalls: (t) => t.toolCalls,
+    pushAssistant: (t) => messages.push(t.assistantMessage),
+    pushToolResults: (outs) => outs.forEach((o) => messages.push({ role: "tool", tool_call_id: o.call.id, content: o.out })),
+  };
+}
+
+module.exports = {
+  anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn,
+  runToolLoop, anthropicAdapter, geminiAdapter, openaiAdapter,
+};

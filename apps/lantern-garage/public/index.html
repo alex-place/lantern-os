@@ -310,7 +310,7 @@
     <form class="home-chat" id="home-chat-form" onsubmit="homeChat(event)" role="search" aria-label="Start a chat">
       <button type="button" class="home-attach-btn" id="home-attach-btn" onclick="homeAttachPick()" aria-label="Attach a file (PDF or Word .docx)" title="Attach a file — PDF or .docx">+</button>
       <input id="home-chat-input" type="text" placeholder="Ask Unisona anything…" autocomplete="off" aria-label="Chat message">
-      <!-- Model selection now lives in the chat (dream-chat.html model picker),
+      <!-- Model selection now lives in the chat (chat.html model picker),
            not on the home bar. The pin-forwarding JS below is guarded on the
            now-absent #home-provider-pin, so it stays inert. -->
       <button type="submit" aria-label="Send" title="Send">
@@ -352,7 +352,7 @@
     <!-- Link set kept in lock-step with site-chrome.js NAV_LINKS so the home
          footer matches the shared footer + the top nav on every page (#2479). -->
     <a href="/">Home</a>
-    <a href="/dream-chat.html">Chat</a>
+    <a href="/chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
     <a href="/orchestration.html">Settings</a>
     <a href="/work.html">Work</a>
@@ -600,18 +600,18 @@ document.addEventListener('DOMContentLoaded', () => {
             instruction: q || null,
           }));
         } catch { /* storage full — skip, dream-chat will prompt */ }
-        window.location.href = '/dream-chat.html?autoprocess=docx';
+        window.location.href = '/chat.html?autoprocess=docx';
       };
       reader.readAsDataURL(pendingDocx);
       return;
     }
     if (!q) { document.getElementById('home-chat-input').focus(); return; }
-    window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
+    window.location.href = '/chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
   };
 
   /* Route picked/dropped files: .docx → chip (improve flow on submit),
      everything else (.pdf, images, text, code…) → forward to the chat as an
-     attachment so the LLM can read it directly. Mirrors dream-chat.html. */
+     attachment so the LLM can read it directly. Mirrors chat.html. */
   function forwardAttach(files) {
     const q = (document.getElementById('home-chat-input').value || '').trim();
     Promise.all(files.map(f => new Promise(res => {
@@ -624,7 +624,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('pendingAttach', JSON.stringify({ q, files: items.filter(Boolean) }));
       } catch { /* storage full — chat will fall back to its own picker */ }
       const qs = pinnedProviderQS(); // '&provider=…' or ''
-      window.location.href = '/dream-chat.html' + (qs ? ('?' + qs.slice(1)) : '');
+      window.location.href = '/chat.html' + (qs ? ('?' + qs.slice(1)) : '');
     });
   }
 
@@ -648,7 +648,7 @@ document.addEventListener('DOMContentLoaded', () => {
         input.focus();
         return;
       }
-      window.location.href = '/dream-chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
+      window.location.href = '/chat.html?q=' + encodeURIComponent(q) + pinnedProviderQS();
     });
   });
 

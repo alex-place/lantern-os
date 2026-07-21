@@ -301,7 +301,7 @@
         autocomplete="off">
       <button id="doc-ask" type="button">Ask</button>
     </div>
-    <div class="doc-hint">Filtering searches every document below. No match? Press <strong>Ask</strong> to search Unisona's guides, or just ask in <a href="/dream-chat.html">Unisona Chat</a>.</div>
+    <div class="doc-hint">Filtering searches every document below. No match? Press <strong>Ask</strong> to search Unisona's guides, or just ask in <a href="/chat.html">Unisona Chat</a>.</div>
     <div id="doc-answer" aria-live="polite"></div>
 
     <div class="doc-chips" id="doc-chips" role="tablist" aria-label="Filter by category">
@@ -1648,7 +1648,7 @@
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/CHAT-EVAL-RECIPE.md">
         <span class="doc-top"><span class="doc-ico">📄</span><span class="doc-fmt">MD</span></span>
         <span class="doc-title">Running a chat capability / benchmark test manually</span>
-        <span class="doc-sum">A runbook for driving dream-chat.html through a prompt suite (golden benchmark</span>
+        <span class="doc-sum">A runbook for driving chat.html through a prompt suite (golden benchmark</span>
         <span class="doc-foot"><span class="doc-cat">Library</span><span class="doc-badge b-status" data-s="unreviewed">Unreviewed</span></span>
       </a>
       <a class="doc-card" data-cat="library" data-type="md" data-status="unreviewed" href="/repo/docs/research/2026-07-08-gencast-forecast-core-scoping.md">
@@ -1946,7 +1946,7 @@
       <!-- Reports (PDFs) are injected here from /api/pdfs -->
 
     </div>
-    <p class="doc-empty" id="doc-empty" hidden>No documents match your filter. Try a different word, or <a href="/dream-chat.html" style="color:var(--accent)">ask Unisona Chat</a>.</p>
+    <p class="doc-empty" id="doc-empty" hidden>No documents match your filter. Try a different word, or <a href="/chat.html" style="color:var(--accent)">ask Unisona Chat</a>.</p>
   </section>
 
   <!-- ── Project ── -->
@@ -2053,7 +2053,7 @@
           '<pre>' + esc((d.text || '').slice(0, 900)) + '</pre></div>';
       } else {
         answer.innerHTML = '<span style="opacity:.6">No exact match in the guides — try ' +
-          '<a href="/dream-chat.html" style="color:var(--accent)">Unisona Chat</a> for a full answer.</span>';
+          '<a href="/chat.html" style="color:var(--accent)">Unisona Chat</a> for a full answer.</span>';
       }
     } catch (e) {
       answer.innerHTML = '<span style="opacity:.6">Search is unavailable right now: ' + e.message + '</span>';

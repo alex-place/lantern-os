@@ -302,7 +302,7 @@ async function handleOAuthCallback(providerId, req, res, query) {
     // First-run onboarding (#2079): a newly-created profile with no explicit destination
     // lands on the short welcome surface instead of a cold, possibly provider-less chat.
     // Returning users (and anyone with an explicit returnTo) go straight through.
-    const firstRunLanding = created ? "/welcome.html" : "/dream-chat.html";
+    const firstRunLanding = created ? "/welcome.html" : "/chat.html";
     const returnTo = safeReturnTo(req.session.return_to || (ck && ck.return_to), firstRunLanding);
 
     // establishSession regenerates the session id (anti-fixation) then persists.

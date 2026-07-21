@@ -22,8 +22,8 @@ def test_landing_page_is_clean_sales_page() -> None:
     html = read("apps/lantern-garage/public/index.html")
     # Title and branding (rebranded to unisona.ai — #1661)
     assert "unisona.ai" in html
-    # CTA panels
-    assert "dream-chat.html" in html
+    # CTA panels (chat surface renamed dream-chat.html → chat.html, #2751)
+    assert "chat.html" in html
     # The Patreon link was intentionally removed from the landing hero in 1be9d49f
     # ("remove Patreon link"); it still ships site-wide via the shared nav/footer.
     assert "github.com" in html
@@ -78,7 +78,7 @@ def test_dream_chat_has_provider_settings() -> None:
     # The in-chat Settings modal (provider pick + API keys) moved to
     # Profile -> Orchestrator in #1904; dream-chat keeps the provider picker,
     # and the API-key settings now live on orchestration.html.
-    chat = read("apps/lantern-garage/public/dream-chat.html")
+    chat = read("apps/lantern-garage/public/chat.html")
     assert "provider-select" in chat  # provider picker still on the chat surface
     keys = read("apps/lantern-garage/public/orchestration.html")
     # All 4 providers wired on the orchestrator settings surface
@@ -92,7 +92,7 @@ def test_dream_chat_has_provider_settings() -> None:
 
 
 def test_dream_chat_stream_reader_is_guarded() -> None:
-    html = read("apps/lantern-garage/public/dream-chat.html")
+    html = read("apps/lantern-garage/public/chat.html")
     js = read("apps/lantern-garage/public/js/dream-chat.js")
     # streamFinished guard prevents double finishStream (JS lives in external file)
     assert "streamFinished" in html or "streamFinished" in js
@@ -103,7 +103,7 @@ def test_dream_chat_stream_reader_is_guarded() -> None:
 
 
 def test_dream_chat_fails_fast_without_provider() -> None:
-    html = read("apps/lantern-garage/public/dream-chat.html")
+    html = read("apps/lantern-garage/public/chat.html")
     js = read("apps/lantern-garage/public/js/dream-chat.js")
     # failed source is handled in finishStream (JS lives in external file)
     assert '"failed"' in html or "failed" in html or '"failed"' in js or "failed" in js

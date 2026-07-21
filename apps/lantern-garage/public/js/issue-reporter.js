@@ -61,7 +61,7 @@
   }
 
   // ── Self-contained modal ────────────────────────────────────────────────────
-  // The modal markup ships in dream-chat.html; on pages that don't include it (e.g.
+  // The modal markup ships in chat.html; on pages that don't include it (e.g.
   // the home page) inject it + its styles once so the 📷 button works anywhere.
   var MODAL_CSS =
     ".modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;z-index:1000;opacity:0;pointer-events:none;transition:opacity .2s}" +
@@ -170,7 +170,7 @@
   // is unavailable, so a vision-down report still carries the reporter's own words
   // instead of being filed as a contentless screenshot (the #1567 noise class).
   // Injected in JS so it works for both modal sources (the copy shipped in
-  // dream-chat.html and the one this script injects elsewhere).
+  // chat.html and the one this script injects elsewhere).
   function ensureUserDescField() {
     var existing = $("issue-user-desc");
     if (existing) return existing;
@@ -197,7 +197,7 @@
 
   // The two report actions that sit under the summary — always available once a shot is
   // attached: re-run Unisona's AI report, or write the report yourself. Injected in JS so
-  // both modal sources (dream-chat.html's copy and the one injected elsewhere) get them.
+  // both modal sources (chat.html's copy and the one injected elsewhere) get them.
   function ensureReportActions() {
     var existing = $("issue-report-actions");
     if (existing) return existing;

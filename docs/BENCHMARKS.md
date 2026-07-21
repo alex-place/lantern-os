@@ -1,5 +1,7 @@
 # BENCHMARKS — External Marks Registry
 
+_Last reviewed 2026-07-20 — no new runs since 2026-07-10; ledgers re-read + competitor SOTA web-validated (Jul 2026). Newest measured rows: HumanEval-chat 0.829 (qwen2.5-coder, full-164, 07-05) / 0.701 (sigma0-coder distill, 07-08); SWE-bench Lite 0/5 graded (07-07); LongMemEval multi-recall@5 0.7745 (n=479, 07-10). Highest-value gap remains a nonzero SWE-bench resolved rate._
+
 **The maintained list of every *public, externally-defined* benchmark unisona.ai has run or
 plans to run.** "Real online marks" = benchmarks owned by someone else, with a fixed public
 dataset and a grading contract we don't control (HumanEval, SWE-bench, LongMemEval, …). This is

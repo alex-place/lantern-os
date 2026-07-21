@@ -54,10 +54,6 @@ function renderToolReplay(tool) {
       + `allow="encrypted-media;picture-in-picture" allowfullscreen loading="lazy"></iframe>`
       + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
   }
-  if (tool.kind === 'xenon-starship-art' && tool.url) {
-    const searchUrl = tool.url; // Assuming tool.url is the direct link to the generated art
-      + `<a href="${esc(searchUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline">▶ Open these results on YouTube ↗</a>`;
-  }
   if (tool.kind === 'document' && tool.url) {
     const kb = tool.bytes ? ' · ' + Math.round(tool.bytes / 1024) + ' KB' : '';
     return `✓ Generated <b>${esc(tool.title || 'document')}</b> <span style="opacity:.6;font-size:11px">(${esc(tool.format || '')}${kb})</span><br>`
@@ -100,7 +96,6 @@ async function loadPersonalCube() {
     const resp = await fetch('/api/cubes/alex/personal', { signal: AbortSignal.timeout(8000) });
     if (resp.ok) {
       personalContext = await resp.json();
-      updatePersonalInsights(personalContext);
     } else {
       personalContext = { error: 'API unavailable', timestamp: new Date().toISOString() };
     }
@@ -109,46 +104,7 @@ async function loadPersonalCube() {
   }
 }
 
-function updatePersonalInsights(cube) {
-  const githubBadge = document.getElementById('github-status-badge');
-  if (githubBadge && cube.github) {
-    const openIssues = cube.github.issues?.filter(i => i.state === 'open').length || 0;
-    const openPRs = cube.github.prs?.filter(p => p.state === 'open').length || 0;
-    githubBadge.textContent = `GitHub: ${openIssues} issues, ${openPRs} PRs`;
-    githubBadge.style.display = 'block';
-  }
-  if (cube.providers) {
-    for (const [provider, status] of Object.entries(cube.providers)) {
-      const indicator = document.getElementById(`provider-${provider}-status`);
-      if (indicator) {
-        indicator.className = status.configured ? 'status-indicator ok' : 'status-indicator err';
-        indicator.textContent = status.configured ? '✓' : '✗';
-      }
-    }
-  }
-  if (cube.environment) {
-    const envStatus = document.getElementById('environment-status');
-    if (envStatus) {
-      const serverStatus = cube.environment.server?.running ? 'Running' : 'Stopped';
-      const gitStatus = cube.environment.git?.isDirty ? 'Dirty' : 'Clean';
-      envStatus.textContent = `Env: ${serverStatus}, Git: ${gitStatus}`;
-    }
-  }
-  if (cube.priorities && cube.priorities.nextActions) {
-    const prioritiesPanel = document.getElementById('priorities-panel');
-    if (prioritiesPanel) {
-      prioritiesPanel.innerHTML = cube.priorities.nextActions.map(p =>
-        `<div class="priority-item">
-          <span class="priority-badge ${p.priority}">${p.priority}</span>
-          <span class="priority-title">#${p.number}: ${p.title}</span>
-        </div>`
-      ).join('');
-    }
-  }
-}
-
 loadPersonalCube();
-setInterval(loadPersonalCube, 300000);
 
 function startVoiceInput() {
   if (!window.voiceMode || !window.recognition) return;
@@ -169,119 +125,6 @@ async function writeCubeDelta(eventType, symbols, payloadRef) {
       }),
     });
   } catch (e) { /* silent — cube is best-effort */ }
-}
-
-// ── Connector sidecar ─────────────────────────────────────────────────────────
-function focusKey(inputId) {
-  const el = document.getElementById(inputId);
-  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); }
-}
-
-// The MCP connector talks to an MCP server on the operator's OWN machine
-// (127.0.0.1:8772), so it only makes sense when the page is served locally. On a
-// hosted deploy (cloud VM / unisona.ai) 127.0.0.1 is the visitor's box, not ours —
-// hide the card instead of firing pointless cross-origin requests at it.
-const isLocalHost = ['127.0.0.1', 'localhost', '::1'].includes(window.location.hostname);
-
-async function updateConnectorStatuses() {
-  const mcpStatus = document.getElementById('mcp-status');
-  const mcpBtn = document.getElementById('mcp-btn');
-  if (!isLocalHost) {
-    const card = mcpBtn ? mcpBtn.closest('.connector-card') : null;
-    if (card) card.style.display = 'none';
-  } else {
-    try {
-      const r = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
-      if (r.ok) {
-        if (mcpStatus) { mcpStatus.textContent = 'Connected'; mcpStatus.className = 'connector-card-status ok'; }
-        if (mcpBtn) { mcpBtn.textContent = 'Disconnect'; mcpBtn.onclick = disconnectMcp; mcpBtn.classList.remove('primary'); }
-      } else { throw new Error('HTTP ' + r.status); }
-    } catch (e) {
-      if (mcpStatus) { mcpStatus.textContent = 'Disconnected'; mcpStatus.className = 'connector-card-status pending'; }
-      if (mcpBtn) { mcpBtn.textContent = 'Connect'; mcpBtn.onclick = connectMcp; mcpBtn.classList.add('primary'); }
-    }
-  }
-
-  // Provider connector badges — authoritative source is server /api/settings/providers.
-  // localStorage is a fallback for offline mode only.
-  const providers = [
-    { key: 'ANTHROPIC_API_KEY', id: 'claude' },
-    { key: 'GEMINI_API_KEY', id: 'gemini' },
-    { key: 'OPENAI_API_KEY', id: 'openai' },
-    { key: 'XAI_API_KEY', id: 'grok' },
-  ];
-
-  let serverKeys = null;
-  try {
-    const pr = await fetch('/api/settings/providers', { signal: AbortSignal.timeout(3000) });
-    if (pr.ok) serverKeys = await pr.json();
-  } catch { /* fall through to localStorage */ }
-
-  for (const p of providers) {
-    const badge = document.getElementById('conn-status-' + p.id);
-    if (!badge) continue;
-
-    // Prefer server truth; fall back to input field or localStorage
-    const serverConfigured = serverKeys ? !!(serverKeys[p.key]) : null;
-    const input = document.getElementById('key-' + p.id);
-    const localConfigured = !!localStorage.getItem(p.key) || !!(input && input.value.length > 0);
-    const configured = serverConfigured !== null ? serverConfigured : localConfigured;
-
-    badge.textContent = configured ? 'Connected' : 'No key';
-    badge.className = `connector-card-status ${configured ? 'ok' : 'err'}`;
-  }
-}
-
-async function connectMcp() {
-  if (!isLocalHost) { alert('The MCP connector is a local-only feature — open this page from your own machine (http://127.0.0.1:4177) to connect.'); return; }
-  const mcpStatus = document.getElementById('mcp-status');
-  const mcpBtn = document.getElementById('mcp-btn');
-  mcpStatus.textContent = 'Connecting…';
-  mcpStatus.className = 'connector-card-status pending';
-  mcpBtn.disabled = true;
-  try {
-    const health = await fetch('http://127.0.0.1:8772/health', { method: 'GET', mode: 'cors', cache: 'no-store' });
-    if (!health.ok) throw new Error('MCP server not responding');
-    const width = 500, height = 600;
-    const left = (screen.width - width) / 2, top = (screen.height - height) / 2;
-    const popup = window.open(
-      'http://127.0.0.1:8772/oauth/register?client_name=LanternOSJournal&redirect_uri=http://127.0.0.1:4177/oauth/callback',
-      'mcpOAuth', `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
-    );
-    const checkClosed = setInterval(() => {
-      if (popup.closed) { clearInterval(checkClosed); updateConnectorStatuses(); mcpBtn.disabled = false; }
-    }, 500);
-  } catch (e) {
-    mcpStatus.textContent = 'Error'; mcpStatus.className = 'connector-card-status err';
-    mcpBtn.disabled = false;
-    alert('MCP connection failed: ' + e.message);
-  }
-}
-
-function disconnectMcp() {
-  localStorage.removeItem('MCP_OAUTH_TOKEN');
-  updateConnectorStatuses();
-}
-
-async function testWebSearch() {
-  if (!isLocalHost) { alert('The MCP web-search test is a local-only feature — open this page from your own machine (http://127.0.0.1:4177) to use it.'); return; }
-  const btn = event.target;
-  const original = btn.textContent;
-  btn.textContent = 'Testing…'; btn.disabled = true;
-  try {
-    const r = await fetch('http://127.0.0.1:8772/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'web_search', arguments: { query: 'unisona.ai', max_results: 3 } } }),
-    });
-    const data = await r.json();
-    if (data.result && data.result.success) {
-      alert('Web search works! Found ' + data.result.result_count + ' results.\nTop: ' + (data.result.results[0]?.title || '?'));
-    } else {
-      alert('Web search returned: ' + (data.result?.error || 'unknown error'));
-    }
-  } catch (e) { alert('Web search test failed: ' + e.message); }
-  finally { btn.textContent = original; btn.disabled = false; }
 }
 
 // Broken / hallucinated image URLs used to hide themselves with display:none.
@@ -380,9 +223,17 @@ function renderMarkdown(text) {
   text = text.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, false)) - 1) + '\x00');
   text = text.replace(/<tool_call>\s*([\s\S]*)$/i, (_, inner) => '\x00T' + (_toolCards.push(buildToolCard(inner, true)) - 1) + '\x00');
   let h = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="code-block"><code>$1</code></pre>');
+  // Fenced code → stash as a single placeholder so its newlines survive the block/line
+  // pass below (which would otherwise split it across "lines" and mangle the code).
+  const _code = [];
+  h = h.replace(/```[\w]*\n?([\s\S]*?)```/g, (_, code) => '\x00C' + (_code.push('<pre class="code-block"><code>' + code + '</code></pre>') - 1) + '\x00');
   h = h.replace(/`([^`\n]+)`/g, '<code class="inline-code">$1</code>');
   h = h.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  // Italics: *text* / _text_ — but not list bullets ("* " has a space after) nor
+  // intra-word underscores (snake_case). The negative lookahead on the opener (?!\s)
+  // keeps "* item" from being read as an italic open.
+  h = h.replace(/(^|[^*\w])\*(?!\s)([^*\n]+?)\*(?![*\w])/g, '$1<em>$2</em>');
+  h = h.replace(/(^|[^_\w])_(?!\s)([^_\n]+?)_(?![_\w])/g, '$1<em>$2</em>');
 
   // Stash rich media + links as placeholders BEFORE the URL linkifiers run, so those
   // never touch a URL that's already inside an image / iframe / anchor.
@@ -430,9 +281,62 @@ function renderMarkdown(text) {
   // Restore the stashed markdown-link anchors.
   h = h.replace(/\x00L(\d+)\x00/g, (_, i) => _stash[+i]);
 
-  h = h.replace(/\n/g, '<br>');
-  h = h.replace(/\x00T(\d+)\x00/g, (_, i) => _toolCards[+i]);  // restore tool-call cards last (after <br>) so their <pre> isn't mangled
+  // Block pass: headings, lists, tables, blockquotes; remaining prose joins with <br>.
+  h = renderMdBlocks(h);
+  h = h.replace(/\x00C(\d+)\x00/g, (_, i) => _code[+i]);       // restore fenced code (newlines intact)
+  h = h.replace(/\x00T(\d+)\x00/g, (_, i) => _toolCards[+i]);  // restore tool-call cards last
   return h;
+}
+
+// Block-level markdown on already-inline-formatted, HTML-escaped text (so `>` is `&gt;`
+// and no raw `<`/`>` can inject). A line that isn't a block is prose, joined with <br>.
+// Fenced code and tool cards are single-token placeholders (\x00C / \x00T) that pass
+// through untouched. Added #dream-chat-markdown — replies used to render flat.
+function renderMdBlocks(h) {
+  const lines = h.split('\n');
+  const out = [];
+  const sep = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+  const splitRow = (s) => s.trim().replace(/^\||\|$/g, '').split('|').map((c) => c.trim());
+  const startsBlock = (idx) => {
+    const l = lines[idx];
+    if (/^#{1,6}\s+/.test(l) || /^\s*[-*+]\s+/.test(l) || /^\s*\d+\.\s+/.test(l) || /^\s*&gt;\s?/.test(l)) return true;
+    if (/^\s*\|.*\|\s*$/.test(l) && idx + 1 < lines.length && sep.test(lines[idx + 1])) return true;   // real table (needs separator row)
+    return false;
+  };
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    let m;
+    if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {                       // heading
+      out.push(`<h${m[1].length} class="md-h">${m[2].trim()}</h${m[1].length}>`); i++; continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && sep.test(lines[i + 1])) {   // table
+      const head = splitRow(line); i += 2; const rows = [];
+      while (i < lines.length && lines[i].includes('|') && /^\s*\|.*\|?\s*$/.test(lines[i])) { rows.push(splitRow(lines[i])); i++; }
+      let t = '<table class="md-table"><thead><tr>' + head.map((c) => `<th>${c}</th>`).join('') + '</tr></thead>';
+      if (rows.length) t += '<tbody>' + rows.map((r) => '<tr>' + r.map((c) => `<td>${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+      out.push(t + '</table>'); continue;
+    }
+    if (/^\s*[-*+]\s+/.test(line)) {                                    // unordered list
+      const items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*+]\s+/, '')); i++; }
+      out.push('<ul class="md-list">' + items.map((x) => `<li>${x}</li>`).join('') + '</ul>'); continue;
+    }
+    if (/^\s*\d+\.\s+/.test(line)) {                                    // ordered list
+      const items = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++; }
+      out.push('<ol class="md-list">' + items.map((x) => `<li>${x}</li>`).join('') + '</ol>'); continue;
+    }
+    if (/^\s*&gt;\s?/.test(line)) {                                     // blockquote (">" escaped to "&gt;")
+      const q = [];
+      while (i < lines.length && /^\s*&gt;\s?/.test(lines[i])) { q.push(lines[i].replace(/^\s*&gt;\s?/, '')); i++; }
+      out.push('<blockquote class="md-quote">' + q.join('<br>') + '</blockquote>'); continue;
+    }
+    const prose = [];                                                  // prose → join with <br>
+    while (i < lines.length && !startsBlock(i)) { prose.push(lines[i]); i++; }
+    out.push(prose.join('<br>'));
+  }
+  return out.join('\n');
 }
 
 // ── Conversation state ────────────────────────────────────────────────────────
@@ -694,6 +598,46 @@ function renderPrReviewActions(container, prNum, base) {
   discard.onclick = () => doAction('discard', `Discard (close) PR #${prNum} and delete its branch?\n\n${prUrl}`);
   all.forEach(b => bar.appendChild(b));
   container.appendChild(bar);
+}
+
+// Convergence-agent action chips — the server may attach {label, href|command}
+// follow-up suggestions to a done event (see convergence-agent.js). Render them as a
+// chip row. NOTE: this was called at finalize but never defined, which threw a
+// ReferenceError mid-finalize and skipped the assistant history.push — the memory-loss
+// bug. Kept side-effect-free and no client-side keyword routing (a command chip only
+// drops its text into the composer for the user to review + send).
+function renderActionChips(bubble, actions, base) {
+  if (!bubble || !Array.isArray(actions) || !actions.length) return;
+  if (bubble.querySelector('.action-chips')) return;   // don't double-render
+  base = base || ((typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  const bar = document.createElement('div');
+  bar.className = 'action-chips';
+  bar.style.cssText = 'margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center';
+  const CHIP = 'font:600 11px var(--font-sans,sans-serif);padding:4px 10px;border-radius:8px;border:1px solid var(--accent,#06b6d4);background:transparent;color:var(--accent,#06b6d4);cursor:pointer;text-decoration:none';
+  actions.forEach((a) => {
+    if (!a || !a.label) return;
+    if (a.href) {
+      const link = document.createElement('a');
+      link.className = 'action-chip';
+      link.textContent = a.label;
+      link.href = (typeof safeUrl === 'function') ? safeUrl(a.href) : a.href;
+      if (/^https?:\/\//i.test(a.href)) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
+      link.style.cssText = CHIP;
+      bar.appendChild(link);
+    } else {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'action-chip';
+      btn.textContent = a.label;
+      btn.style.cssText = CHIP;
+      btn.addEventListener('click', () => {
+        const input = document.getElementById('input');
+        if (input) { input.value = a.command || a.label; input.focus(); input.dispatchEvent(new Event('input', { bubbles: true })); }
+      });
+      bar.appendChild(btn);
+    }
+  });
+  if (bar.children.length) bubble.appendChild(bar);
 }
 
 // `target` is either an issue number (number/numeric string — `!work #N`) or a
@@ -1077,7 +1021,7 @@ async function sendMessage(opts = {}) {
   // same forceGround path; used only to label the turn honestly.
   const autoVerify = !!(opts && opts.auto);
   // ── Single send entry ── These two checks used to be window.sendMessage WRAPPERS
-  // (gatedSendMessage in dream-chat.html + the !convergance shim in convergance-sync.js);
+  // (gatedSendMessage in chat.html + the !convergance shim in convergance-sync.js);
   // they're folded in here so there is exactly one sendMessage, no monkey-patching.
   // Auth gate: block roles without chat access (all current roles allow; the server
   // enforces real limits — this fails open to that if the role globals aren't present).
@@ -1340,10 +1284,19 @@ async function sendMessage(opts = {}) {
 
   bubble.innerHTML = renderMarkdown(fullText); // [DOORS:…] stripped inside renderMarkdown (#2497)
 
+  // Persist the assistant turn NOW — immediately after the reply renders — so a throw
+  // in any optional finalize decoration below (action chips, badges, TTS) can never
+  // drop it from the send-history. This is the memory-loss fix: renderActionChips was
+  // undefined and aborted finalize before the old tail-end push, so on a convergence
+  // reply the model "forgot what it just said" on the next turn.
+  if (!didError && fullText) history.push({ role: 'assistant', text: fullText });
+
   // Convergence-agent action chips (Stage 3): the server streamed a deterministic
   // work/ask answer + actions through the one endpoint — render the chips here.
   if (doneActions) {
-    renderActionChips(bubble, doneActions, (typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+    try {
+      renderActionChips(bubble, doneActions, (typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+    } catch (e) { console.warn('[dream-chat] action chips render failed:', e); }
   }
 
   // Re-apply tool results — the render above rebuilds the cards with empty result slots.
@@ -1741,7 +1694,8 @@ async function sendMessage(opts = {}) {
     msg.appendChild(fbRow);
   }
 
-  if (!didError) history.push({ role: 'assistant', text: fullText });
+  // (the assistant turn was pushed to history right after the reply rendered, above,
+  // so an error in any decoration between there and here can't erase it)
 }
 
 // ── Auto-expand textarea ──────────────────────────────────────────────────────
@@ -1857,236 +1811,3 @@ document.getElementById('input').addEventListener('input', e => {
 // (toggleObserver/refreshObserver + its 30s poll) were removed (#2476): their
 // markup was cut long ago, so the picker IIFE early-returned forever and the
 // observer JS polled /api/csf/* into a permanently hidden, opener-less panel.
-
-// ── Context management ────────────────────────────────────────────────────────
-let contextMode = { search: true, memory: true, trading: false };
-
-function updateContext() {
-  contextMode = {
-    search: document.getElementById('ctx-search').checked,
-    memory: document.getElementById('ctx-memory').checked,
-    trading: document.getElementById('ctx-trading').checked,
-  };
-  localStorage.setItem('contextMode', JSON.stringify(contextMode));
-}
-
-try {
-  const saved = JSON.parse(localStorage.getItem('contextMode') || '{}');
-  Object.assign(contextMode, saved);
-  document.getElementById('ctx-search').checked = contextMode.search;
-  document.getElementById('ctx-memory').checked = contextMode.memory;
-  document.getElementById('ctx-trading').checked = contextMode.trading;
-} catch (e) {}
-
-// The Performance monitor (perfStats/togglePerfMonitor/updatePerfStats and the
-// global window.fetch wrapper that fed it) was removed (#2476): its #ctx-perf
-// toggle markup was cut long ago, so the panel was permanently invisible —
-// worse, the orphaned init threw on load for anyone whose localStorage still
-// had perfMonitorEnabled='true', and every fetch on the page paid for the wrap.
-
-// ── Workspace — Sigma-0 observable autonomous coding (issue #527) ─────────────
-// Pillar 1 (A2): live step log + diff viewer
-// Pillar 2 (B1/B2/B3): approval gates before apply, commit, PR
-// Pillar 3 (C1/C2): receipt derived from what actually happened
-
-async function runWorkspace(request) {
-  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const uid = 'wks-' + Date.now();
-
-  if (!document.getElementById('wks-style')) {
-    const st = document.createElement('style');
-    st.id = 'wks-style';
-    st.textContent = `
-.wks{background:#12121e;border:1px solid rgba(124,58,237,.35);border-radius:10px;overflow:hidden;font-size:12px;margin-top:4px}
-.wks-hd{background:rgba(124,58,237,.12);padding:10px 14px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(124,58,237,.2)}
-.wks-step{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
-.wks-step-icon{font-size:14px;margin-top:1px;min-width:18px}
-.wks-step-info{flex:1;min-width:0}
-.wks-step-label{font-weight:500;display:flex;align-items:center;gap:6px;margin-bottom:2px}
-.wks-step-body{color:rgba(205,214,244,.55);line-height:1.55;margin-top:3px}
-.wks-badge{font-size:9px;padding:1px 5px;border-radius:3px;font-weight:600;letter-spacing:.04em}
-.wks-badge.run{background:rgba(245,166,35,.2);color:#f5a623}
-.wks-badge.ok{background:rgba(63,185,80,.2);color:#3fb950}
-.wks-badge.err{background:rgba(248,81,73,.2);color:#f85149}
-.wks-badge.wait{background:rgba(255,255,255,.06);color:rgba(205,214,244,.35)}
-.wks-badge.skip{background:rgba(255,255,255,.06);color:rgba(205,214,244,.35)}
-.wks-diff{background:#0d1117;padding:10px;border-radius:4px;font-family:monospace;font-size:10.5px;overflow:auto;max-height:240px;white-space:pre;margin:6px 0;line-height:1.4}
-.wks-diff .a{color:#3fb950}.wks-diff .d{color:#f85149}.wks-diff .h{color:#58a6ff}.wks-diff .m{color:#6e7681}
-.wks-actions{padding:10px 14px;display:flex;gap:8px;flex-wrap:wrap;border-top:1px solid rgba(255,255,255,.06)}
-.wks-btn{border:none;border-radius:5px;padding:6px 14px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:500;transition:opacity .15s}
-.wks-btn:disabled{opacity:.35;cursor:default}
-.wks-btn.g{background:rgba(63,185,80,.75);color:#fff}.wks-btn.g:hover:not(:disabled){background:#3fb950}
-.wks-btn.x{background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.3)}.wks-btn.x:hover:not(:disabled){background:rgba(248,81,73,.2)}
-.wks-btn.s{background:rgba(255,255,255,.07);color:rgba(205,214,244,.8);border:1px solid rgba(255,255,255,.1)}.wks-btn.s:hover:not(:disabled){background:rgba(255,255,255,.12)}
-.wks-tag{background:rgba(124,58,237,.18);border-radius:3px;padding:1px 6px;font-size:10px;color:rgba(205,214,244,.7);display:inline-block;margin:1px 2px}
-.wks-tag.risk-high{background:rgba(248,81,73,.18);color:#f85149}
-.wks-tag.risk-low{background:rgba(63,185,80,.18);color:#3fb950}
-.wks-tag.risk-medium{background:rgba(245,166,35,.18);color:#f5a623}
-.wks-receipt{padding:10px 14px;font-size:11px;border-top:1px solid rgba(63,185,80,.2);background:rgba(63,185,80,.04);color:rgba(205,214,244,.65);line-height:1.7}
-.wks-test{background:#0d1117;border-radius:4px;padding:6px 8px;font-size:10.5px;font-family:monospace;margin-top:4px}`.trim();
-    document.head.appendChild(st);
-  }
-
-  const container = document.getElementById('messages');
-  const el = document.createElement('div');
-  el.className = 'message agent';
-  el.innerHTML = `<div class="message-content"><div class="wks">
-    <div class="wks-hd">⚙&thinsp;Workspace&ensp;<span style="opacity:.5;font-weight:400;font-size:11px">${esc(request.slice(0,80))}${request.length>80?'…':''}</span></div>
-    <div id="${uid}-steps"></div>
-    <div id="${uid}-actions" class="wks-actions" style="display:none"></div>
-    <div id="${uid}-receipt" class="wks-receipt" style="display:none"></div>
-  </div></div>`;
-  container.appendChild(el);
-
-  const stEl = () => document.getElementById(uid+'-steps');
-  const actEl = () => document.getElementById(uid+'-actions');
-  const rcEl  = document.getElementById(uid+'-receipt');
-  const scroll = () => { container.scrollTop = container.scrollHeight; };
-
-  const BADGE = { run:'running…', ok:'done', err:'failed', wait:'waiting', skip:'skipped' };
-
-  function addStep(icon, label, status, body) {
-    const row = document.createElement('div');
-    row.className = 'wks-step';
-    row.innerHTML = `<div class="wks-step-icon">${icon}</div>
-      <div class="wks-step-info">
-        <div class="wks-step-label">${esc(label)}&ensp;<span class="wks-badge ${status}">${BADGE[status]||status}</span></div>
-        <div class="wks-step-body">${body||''}</div>
-      </div>`;
-    stEl().appendChild(row);
-    scroll();
-    return row;
-  }
-
-  function upStep(row, status, body) {
-    const b = row.querySelector('.wks-badge');
-    b.className = 'wks-badge '+status;
-    b.textContent = BADGE[status]||status;
-    if (body !== undefined) row.querySelector('.wks-step-body').innerHTML = body;
-    scroll();
-  }
-
-  function setAct(html) {
-    const a = actEl(); a.style.display = html ? 'flex' : 'none'; a.innerHTML = html||''; scroll();
-  }
-
-  function gate(choices) {
-    return new Promise(resolve => {
-      choices.forEach(({id, val}) => {
-        const btn = document.getElementById(id);
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-          choices.forEach(({id:bid}) => { const b=document.getElementById(bid); if(b) b.disabled=true; });
-          resolve(val);
-        }, {once:true});
-      });
-    });
-  }
-
-  const receipt = { ts: new Date().toISOString(), request, plan:null, applied:false, tests:null, committed:false, pushed:false, prUrl:null, decisions:[] };
-
-  // ── Step 1: Plan (A1) ─────────────────────────────────────────────────
-  const planRow = addStep('📋','Plan','run','');
-  let plan;
-  try {
-    const r = await fetch('/api/self-edit/plan', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({request})});
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error||'plan_failed');
-    plan = d.plan;
-    receipt.plan = {summary:plan.summary, riskLevel:plan.riskLevel, files:plan.affectedFiles};
-    const rCls = 'risk-'+(plan.riskLevel||'medium');
-    const tags = [`<span class="wks-tag ${rCls}">⚠ ${esc(plan.riskLevel)}</span>`,
-      ...(plan.affectedFiles||[]).map(f=>`<span class="wks-tag">${esc(f)}</span>`)].join('');
-    const stepsHtml = (plan.steps||[]).map((s,i)=>`${i+1}. <b>${esc(s.action)}</b> ${esc(s.file||'')} — ${esc(s.description)}`).join('<br>');
-    upStep(planRow,'ok',`<div style="margin-bottom:4px">${esc(plan.summary)}</div><div style="margin:4px 0">${tags}</div>${stepsHtml?`<div style="margin-top:4px">${stepsHtml}</div>`:''}`);
-  } catch(e) { upStep(planRow,'err',esc(e.message)); return; }
-
-  // ── Step 2: Diff preview (A2) ─────────────────────────────────────────
-  const patchRow = addStep('📄','Diff preview','run','');
-  let diffText, changedFiles;
-  try {
-    const r = await fetch('/api/self-edit/patch', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan})});
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error||'patch_failed');
-    diffText = d.diffText; changedFiles = d.changedFiles||[];
-    try { receipt.diffHash = btoa(diffText).slice(0,10); } catch{}
-    const lines = diffText.split('\n');
-    const diffHtml = lines.slice(0,200).map(ln=>{
-      if (ln.startsWith('+++') || ln.startsWith('---')) return `<span class="m">${esc(ln)}</span>`;
-      if (ln.startsWith('+')) return `<span class="a">${esc(ln)}</span>`;
-      if (ln.startsWith('-')) return `<span class="d">${esc(ln)}</span>`;
-      if (ln.startsWith('@@')) return `<span class="h">${esc(ln)}</span>`;
-      return esc(ln);
-    }).join('\n');
-    const trunc = lines.length>200 ? `<div style="opacity:.4;font-size:10px;margin-top:3px">…truncated (showing 200 of ${lines.length} lines)</div>` : '';
-    upStep(patchRow,'ok',`<div style="margin-bottom:4px;opacity:.7">${changedFiles.map(esc).join(', ')||'(no files)'}</div><div class="wks-diff">${diffHtml}</div>${trunc}`);
-  } catch(e) { upStep(patchRow,'err',esc(e.message)); return; }
-
-  // ── Gate B1: diff approval ─────────────────────────────────────────────
-  setAct(`<button class="wks-btn g" id="${uid}-b1y">✓ Apply changes</button><button class="wks-btn x" id="${uid}-b1n">✗ Cancel</button>`);
-  const approved = await gate([{id:uid+'-b1y',val:true},{id:uid+'-b1n',val:false}]);
-  setAct(null);
-  receipt.decisions.push({gate:'B1',choice:approved?'approve':'cancel',ts:new Date().toISOString()});
-  if (!approved) { addStep('🚫','Cancelled','skip','No files changed.'); showWksReceipt(receipt,rcEl); return; }
-
-  // ── Step 3: Apply + test (B2) ─────────────────────────────────────────
-  const applyRow = addStep('⚡','Apply + test','run','');
-  let allOk = false;
-  try {
-    const r = await fetch('/api/self-edit/apply', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({diffText, testsToRun:plan.testsToRun||[]})});
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error||'apply_failed');
-    receipt.applied = true;
-    allOk = d.allTestsOk !== false;
-    const tests = d.tests||[];
-    receipt.tests = {passed:allOk, count:tests.length};
-    const applied = [...(d.applied?.changed||[]),(d.applied?.created||[])].flat();
-    const errs = d.applied?.errors||[];
-    const testsHtml = tests.length===0
-      ? '<div style="opacity:.4;margin-top:4px">No tests configured</div>'
-      : tests.map(t=>`<div class="wks-test"><span style="color:${t.ok?'#3fb950':'#f85149'}">${t.ok?'✓':'✗'} ${esc(t.cmd)}</span>${t.output?`<pre style="margin:3px 0 0;opacity:.6;font-size:10px;max-height:80px;overflow:auto">${esc(t.output.slice(0,400))}</pre>`:''}${t.error?`<pre style="margin:3px 0 0;color:#f85149;font-size:10px">${esc(String(t.error).slice(0,300))}</pre>`:''}</div>`).join('');
-    upStep(applyRow, allOk?'ok':'err', `<div style="margin-bottom:4px">${applied.map(esc).join(', ')||'applied'}</div>${errs.length?`<div style="color:#f85149;margin-bottom:4px">${errs.map(e=>esc(e.file+': '+e.error)).join('<br>')}</div>`:''}${testsHtml}`);
-  } catch(e) { upStep(applyRow,'err',esc(e.message)); showWksReceipt(receipt,rcEl); return; }
-
-  // Gate B2: block commit if tests failed
-  if (!allOk) { addStep('🧪','Tests failed — commit blocked','err','Fix failing tests before opening a PR. Working tree was modified.'); showWksReceipt(receipt,rcEl); return; }
-
-  // ── Gate B3: commit/PR confirmation ──────────────────────────────────
-  setAct(`<button class="wks-btn g" id="${uid}-b3y">🔗 Create draft PR</button><button class="wks-btn s" id="${uid}-b3n">◉ Stop here (no commit)</button>`);
-  const wantPr = await gate([{id:uid+'-b3y',val:true},{id:uid+'-b3n',val:false}]);
-  setAct(null);
-  receipt.decisions.push({gate:'B3',choice:wantPr?'create_pr':'stop',ts:new Date().toISOString()});
-  if (!wantPr) { addStep('✓','Applied — no PR','ok','Changes applied locally. No commit created.'); showWksReceipt(receipt,rcEl); return; }
-
-  // ── Step 4: PR (B3) ──────────────────────────────────────────────────
-  const prRow = addStep('🔗','Commit + PR','run','');
-  try {
-    const r = await fetch('/api/self-edit/pr', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-      title: plan.summary||'auto: '+request.slice(0,60),
-      body: `Auto-generated via Workspace\n\n**Request:** ${request}\n\n**Plan:** ${plan.summary}`,
-      branch: plan.branchHint||'auto-change'
-    })});
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error||'pr_failed');
-    receipt.committed = true; receipt.pushed = d.pushed||false; receipt.prUrl = d.prUrl;
-    upStep(prRow,'ok',`Branch: <code style="opacity:.8">${esc(d.branch)}</code><br>${d.prUrl?`<a href="${esc(d.prUrl)}" target="_blank" style="color:#58a6ff">${esc(d.prUrl)}</a>`:'(no URL returned)'}${d.prError?`<br><span style="color:#f5a623;font-size:10px">${esc(d.prError)}</span>`:''}`);
-  } catch(e) { upStep(prRow,'err',esc(e.message)); }
-
-  showWksReceipt(receipt,rcEl);
-}
-
-// C1/C2: receipt derived only from what actually happened — no templated success
-function showWksReceipt(receipt, el) {
-  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const ts = receipt.ts.slice(0,16).replace('T',' ');
-  const dec = receipt.decisions.map(d=>`<b>${d.gate}</b>:${d.choice}`).join(' · ')||'none';
-  const testStr = receipt.tests ? `${receipt.tests.passed?'✓':'✗'} tests (${receipt.tests.count})` : 'no tests';
-  const prStr = receipt.prUrl ? `<a href="${esc(receipt.prUrl)}" target="_blank" style="color:#58a6ff">PR open →</a>` : receipt.committed ? 'committed (no PR URL)' : '—';
-  el.style.display = 'block';
-  el.innerHTML = `<b style="color:#3fb950">Receipt</b> · ${ts}<br>${testStr} · committed:${receipt.committed?'✓':'✗'} · pushed:${receipt.pushed?'✓':'✗'} · ${prStr}<br>Gates: ${dec}`;
-  try {
-    const log = JSON.parse(sessionStorage.getItem('wks-receipts')||'[]');
-    log.push(receipt);
-    sessionStorage.setItem('wks-receipts', JSON.stringify(log.slice(-20)));
-  } catch {}
-}

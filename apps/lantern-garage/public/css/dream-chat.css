@@ -1164,3 +1164,27 @@
 @media (max-width: 700px) {
   .observer-panel { display: none; }
 }
+
+/* ── Rich markdown in replies (renderMdBlocks) ─────────────────────────────── */
+.md-h { margin: 12px 0 6px; line-height: 1.25; font-weight: 700; }
+h1.md-h { font-size: 1.35em; }
+h2.md-h { font-size: 1.2em; }
+h3.md-h { font-size: 1.08em; }
+h4.md-h, h5.md-h, h6.md-h { font-size: 1em; opacity: .9; }
+.md-list { margin: 6px 0 6px 1.25em; padding: 0; }
+.md-list li { margin: 2px 0; }
+.md-quote {
+  margin: 8px 0; padding: 4px 12px;
+  border-left: 3px solid var(--accent, #06b6d4);
+  color: var(--muted, #9aa0aa); font-style: italic;
+}
+.md-table {
+  border-collapse: collapse; margin: 8px 0; width: auto; max-width: 100%;
+  display: block; overflow-x: auto; font-size: .95em;
+}
+.md-table th, .md-table td {
+  border: 1px solid var(--border, rgba(255,255,255,.14));
+  padding: 5px 10px; text-align: left; white-space: nowrap;
+}
+.md-table th { background: var(--surface2, rgba(255,255,255,.05)); font-weight: 600; }
+.md-table tbody tr:nth-child(even) td { background: rgba(255,255,255,.02); }

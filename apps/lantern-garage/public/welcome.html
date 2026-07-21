@@ -16,7 +16,7 @@
         var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
         document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
         if (localStorage.getItem('unisona_welcomed') === '1') {
-          location.replace('/dream-chat.html');
+          location.replace('/chat.html');
         }
       } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
     })();
@@ -58,7 +58,7 @@
   <p class="welcome-lede">Your local-first AI that remembers what matters to you, reasons over it, takes action with tools, and checks its answers against real evidence.</p>
 
   <div class="welcome-cta">
-    <a class="btn-primary" href="/dream-chat.html" id="start-chat">Start chatting →</a>
+    <a class="btn-primary" href="/chat.html" id="start-chat">Start chatting →</a>
   </div>
   <p class="welcome-hint">
     Want the strongest answers? <a href="/settings.html" id="add-key">Add a provider key</a> —
@@ -66,7 +66,7 @@
   </p>
 
   <div class="welcome-steps">
-    <a class="welcome-step" href="/dream-chat.html" data-first-value>
+    <a class="welcome-step" href="/chat.html" data-first-value>
       <div class="ico" aria-hidden="true">💬</div>
       <div class="st-title">Ask anything</div>
       <div class="st-sub">Start a conversation — it remembers context across sessions.</div>
@@ -83,7 +83,7 @@
     </a>
   </div>
 
-  <a class="welcome-skip" href="/dream-chat.html" id="skip-welcome">Skip for now</a>
+  <a class="welcome-skip" href="/chat.html" id="skip-welcome">Skip for now</a>
 </main>
 
 <script>
