@@ -1,0 +1,41 @@
+{
+  "note": "Honest bar: the #1593 prediction was 1.5-2.5x over zstd-19; measured reality is single-digit percent. The transform still pays (omni auto-selects it when it wins) and v2 extends coverage to corpora v1 declined entirely.",
+  "rows": [
+    {
+      "corpus": "csf_memory/raw.jsonl",
+      "raw": 2083668,
+      "layout": "v2",
+      "zstd19": 175354,
+      "col_zstd19": 166307,
+      "gain_vs_zstd19_pct": 5.4,
+      "brotli11": 165246,
+      "col_brotli11": 156195,
+      "gain_vs_brotli11_pct": 5.8,
+      "lossless_roundtrip": true
+    },
+    {
+      "corpus": "convergence/records.jsonl",
+      "raw": 963680,
+      "layout": "v2",
+      "zstd19": 134546,
+      "col_zstd19": 127913,
+      "gain_vs_zstd19_pct": 5.2,
+      "brotli11": 124533,
+      "col_brotli11": 119070,
+      "gain_vs_brotli11_pct": 4.6,
+      "lossless_roundtrip": true
+    },
+    {
+      "corpus": "conversations/garage-conversations.jsonl",
+      "raw": 1041565,
+      "layout": "v1",
+      "zstd19": 151037,
+      "col_zstd19": 145820,
+      "gain_vs_zstd19_pct": 3.6,
+      "brotli11": 141735,
+      "col_brotli11": 137890,
+      "gain_vs_brotli11_pct": 2.8,
+      "lossless_roundtrip": true
+    }
+  ]
+}

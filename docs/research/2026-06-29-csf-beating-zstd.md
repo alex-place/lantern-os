@@ -33,6 +33,19 @@ External grounding: Meta **OpenZL** (2025, structure-aware reversible transforms
 ([`sigma0_compressibility.py`](../../experiments/sigma0_compressibility.py)). **Prediction:** 1.5–2.5× over
 zstd-19 on `data/csf_memory/*.jsonl`. **Build first.**
 
+> **BUILT + MEASURED (v1 2026-07; v2 2026-07-21 — [`col_transform.py`](../../src/csf/col_transform.py), wired into omni).**
+> The prediction did **not** survive contact: measured gains are **single-digit percent**, not 1.5–2.5×
+> (zstd-19's entropy stage already captures most of what transposition exposes; the typed-column
+> sub-coders add nothing an entropy coder doesn't — see the hybrid probe in §4). v1 also **declined the
+> primary corpus entirely** (all-or-nothing flat-object rule → `raw.jsonl` NotApplicable). The **v2
+> build** fixed the two measured weaknesses — per-line passthrough (one weird line no longer disables a
+> corpus) and shape-keyed columns (mixed-schema ledgers stop interleaving fields) — with best-of-both
+> layout selection since neither dominates. Measured 2026-07-21
+> ([`csf_col_v2_bench.py`](../../experiments/csf_col_v2_bench.py), round-trip verified):
+> `raw.jsonl` NotApplicable → **+5.4% vs zstd-19 / +5.8% vs brotli-11**; `records.jsonl` +3.2% → **+5.2%**;
+> `conversations.jsonl` auto-selects v1, keeping **+3.6%**. Honest status: a real, wired, lossless win that
+> omni picks automatically — and a **falsified headline prediction**, recorded per the kill-criteria rule.
+
 ## 2. Technique 2 — retrieval-keyed lossless delta (RKD) · #1594
 
 At compaction, find the nearest prior record via the memory retrieval index and store a *lossless*

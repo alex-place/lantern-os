@@ -89,3 +89,61 @@ def test_omni_falls_back_on_non_jsonl():
     blob = omni.compress_best(data, effort="max")
     assert omni.decompress(blob) == data
     assert "col" not in omni.describe(blob)
+
+
+# ── v2: per-line passthrough + shape-keyed columns (#1593 second build) ─────────
+
+
+def test_v2_mixed_corpus_with_non_flat_lines_round_trips():
+    """v1 declined the WHOLE corpus on one nested line; v2 carries such lines in a
+    passthrough stream. This mirrors data/csf_memory/raw.jsonl, which v1 declined."""
+    from csf import col_transform as _col
+    rows = [json.dumps({"id": f"r{i}", "conf": 0.5}, separators=(",", ":")) for i in range(50)]
+    rows.insert(10, json.dumps({"nested": {"a": 1}}, separators=(",", ":")))  # not flat
+    rows.insert(30, "")                                                       # blank line
+    data = ("\n".join(rows) + "\n").encode()
+    payload = _col.forward(data)
+    assert payload[0] == 2  # v2 layout (v1 not applicable here)
+    assert _col.inverse(payload) == data
+
+
+def test_v2_shape_keyed_mixed_schemas_round_trip():
+    """Two interleaved record shapes: shape-keying must keep each field in its own
+    column and reconstruct byte-exactly."""
+    from csf import col_transform as _col
+    rows = []
+    for i in range(60):
+        if i % 2:
+            rows.append(json.dumps({"claim": f"c{i}", "refuted": False, "agent": "m"},
+                                   separators=(",", ":")))
+        else:
+            rows.append(json.dumps({"id": f"r{i}", "hypothesis": "h", "conf": 0.6},
+                                   separators=(",", ":")))
+    data = ("\n".join(rows) + "\n").encode()
+    payload = _col.forward(data)
+    assert _col.inverse(payload) == data
+
+
+def test_layout_selection_prefers_smaller_probe():
+    """When every line is flat, forward builds BOTH layouts and keeps the smaller
+    probe — on a single-shape corpus that is v1 (no per-line tag overhead, no
+    column fragmentation)."""
+    from csf import col_transform as _col
+    rows = [json.dumps({"id": f"r{i}", "conf": 0.7, "ok": True}, separators=(",", ":"))
+            for i in range(300)]
+    data = ("\n".join(rows) + "\n").encode()
+    payload = _col.forward(data)
+    assert payload[0] in (1, 2)          # selection is probe-driven, both must decode
+    assert _col.inverse(payload) == data
+
+
+def test_v1_payloads_still_decode():
+    """Existing archives embed v1 payloads — the reader must stay bilingual."""
+    from csf import col_transform as _col
+    rows = [json.dumps({"a": i, "b": f"x{i}"}, separators=(",", ":")) for i in range(40)]
+    data = ("\n".join(rows) + "\n").encode()
+    lines = data.decode().rstrip("\n").split("\n")
+    parsed = [_col._split_line(l) for l in lines]
+    v1 = _col._build_v1(lines, parsed, trailing_nl=True)
+    assert v1[0] == 1
+    assert _col.inverse(v1) == data
