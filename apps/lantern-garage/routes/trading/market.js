@@ -271,8 +271,13 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       // No IBKR account (or IBKR preferred but unavailable) → Alpaca fallback.
       if (await serveAlpaca()) return true;
     } catch (_e) { /* fall through to the legacy agent */ }
+    // No broker connected (no IBKR, no Alpaca account, no legacy agent). Emit an
+    // explicit `available:false` + reason so callers — the chat's trader_positions
+    // tool especially — can degrade honestly ("connect a broker") instead of
+    // mis-reading the empty `{account:{}}` as a real $0 account or surfacing a raw
+    // endpoint error. Additive: `positions`/`account` are still present. (#2725)
     if (!traderAgent) {
-      sendJson(res, { positions: [], account: {} }, 503);
+      sendJson(res, { available: false, reason: 'no trading backend configured', positions: [], account: {} }, 503);
       return true;
     }
     try {
@@ -280,7 +285,7 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       sendJson(res, positions, 200);
     } catch (error) {
       console.error('[Trading] /positions error:', error.message);
-      sendJson(res, { positions: [], account: {} }, 500);
+      sendJson(res, { available: false, reason: error.message || 'broker request failed', positions: [], account: {} }, 500);
     }
     return true;
   }
