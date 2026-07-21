@@ -1,0 +1,41 @@
+{
+  "note": "Whole-archive bytes via the real pack API, unpack-verified. The dict variant includes its stored dictionary \u2014 on small sets it is net-negative, which is why solid (not dict) is the cold-archive answer.",
+  "rows": [
+    {
+      "set": "docs/research (*.md)",
+      "n_files": 75,
+      "raw": 760097,
+      "per_file_zstd19": 339926,
+      "per_file_plus_dict": 333726,
+      "solid_zstd19": 264210,
+      "solid_omni": 246453,
+      "solid_gain_vs_per_file_pct": 28.7,
+      "solid_gain_vs_dict_pct": 26.3,
+      "solid_omni_gain_vs_solid_pct": 7.2
+    },
+    {
+      "set": "src/csf (*.py)",
+      "n_files": 12,
+      "raw": 144716,
+      "per_file_zstd19": 49390,
+      "per_file_plus_dict": 54673,
+      "solid_zstd19": 41723,
+      "solid_omni": 39209,
+      "solid_gain_vs_per_file_pct": 18.4,
+      "solid_gain_vs_dict_pct": 31.0,
+      "solid_omni_gain_vs_solid_pct": 6.4
+    },
+    {
+      "set": "changelog.d (*.md)",
+      "n_files": 41,
+      "raw": 43869,
+      "per_file_zstd19": 35821,
+      "per_file_plus_dict": 33052,
+      "solid_zstd19": 27387,
+      "solid_omni": 25053,
+      "solid_gain_vs_per_file_pct": 30.8,
+      "solid_gain_vs_dict_pct": 20.7,
+      "solid_omni_gain_vs_solid_pct": 9.3
+    }
+  ]
+}

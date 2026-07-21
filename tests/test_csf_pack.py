@@ -324,3 +324,65 @@ def test_pack_files_with_annotations():
         csf_pack.pack([str(f)], out,
                       annotations={"script.py": {"description": "a script", "metadata": {"loop_stage": "Infra"}}})
         assert csf_pack.file_annotation(out, "script.py")["description"] == "a script"
+
+
+# ── solid mode (one compressed stream over all members; v0.9, 2026-07-21) ───────
+
+
+def test_solid_roundtrip_blobs_and_read_file():
+    blobs = {f"logs/day{i}.jsonl": (b'{"n":%d,"msg":"the same structural line"}\n' % i) * 40
+             for i in range(12)}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "solid.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True)
+        assert m.get("solid") and m["version"] == "0.9"
+        assert csf_pack.unpack_blobs(out) == blobs               # full inverse
+        one = "logs/day7.jsonl"
+        assert csf_pack.read_file(out, one) == blobs[one]        # single-member read
+        # per-file entries carry decompressed-space offsets, no csize
+        assert all("csize" not in fe for fe in m["files"])
+
+
+def test_solid_beats_or_ties_per_file_on_redundant_set():
+    blobs = {f"f{i}.md": b"# shared header\ncommon boilerplate paragraph\n" * 30 + str(i).encode()
+             for i in range(20)}
+    with tempfile.TemporaryDirectory() as d:
+        a = str(pathlib.Path(d) / "perfile.csf")
+        b = str(pathlib.Path(d) / "solid.csf")
+        csf_pack.pack_blobs(blobs, a)
+        csf_pack.pack_blobs(blobs, b, solid=True)
+        assert pathlib.Path(b).stat().st_size <= pathlib.Path(a).stat().st_size
+
+
+def test_solid_tamper_detected():
+    blobs = {"a.txt": b"hello " * 100, "b.txt": b"world " * 100}
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "s.csf"
+        csf_pack.pack_blobs(blobs, str(out), solid=True)
+        raw = bytearray(out.read_bytes())
+        raw[len(raw) // 2] ^= 0xFF                                # flip a body byte
+        out.write_bytes(bytes(raw))
+        try:
+            csf_pack.unpack_blobs(str(out))
+            assert False, "tamper must not pass"
+        except ValueError:
+            pass                                                  # footer or sha catches it
+
+
+def test_solid_ignored_for_store_and_dict_subsumed():
+    blobs = {"x": b"abc" * 50, "y": b"def" * 50}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "s.csf")
+        m = csf_pack.pack_blobs(blobs, out, compress=False, solid=True)
+        assert not m.get("solid") and m["version"] == "0.8"       # store: solid ignored
+        m2 = csf_pack.pack_blobs(blobs, out, solid=True, use_dict=True)
+        assert m2.get("solid") and not m2.get("shared_dict")      # dict subsumed
+
+
+def test_non_solid_archives_unchanged():
+    blobs = {"a": b"payload-a" * 20}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "n.csf")
+        m = csf_pack.pack_blobs(blobs, out)
+        assert m["version"] == "0.8" and "solid" not in m
+        assert csf_pack.unpack_blobs(out) == blobs

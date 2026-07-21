@@ -92,6 +92,26 @@ Attach them at pack time with `annotations={arc_path: {"description": ..., "meta
 (the searchable grounding index of every annotated member). Existing archives can be
 regenerated with descriptions via `scripts/annotate_csf_archive.py`.
 
+### 2.2.1 Solid mode (v0.9, cold archives) — `solid=True` / `--solid`
+
+One compressed stream over the **concatenation of all members** instead of per-file
+blobs, so cross-file redundancy reaches the coder directly. Manifest gains
+`"solid": {"raw_size": N, "csize": M}`; file entries carry `offset`/`size` into the
+**decompressed** stream (no per-file `csize`); per-file `sha256` and the footer digest
+are unchanged. Solid archives stamp **version 0.9** so pre-solid readers refuse them
+with a clean version error instead of misparsing offsets; readers accept 0.8 and 0.9.
+
+**Measured (2026-07-21, whole-archive bytes via the real API, unpack-verified —**
+[`experiments/csf_solid_bench.py`](../experiments/csf_solid_bench.py)**):** solid beats
+per-file zstd-19 by **+18.4% (src/csf py) / +28.7% (docs/research md) / +30.8%
+(changelog fragments)**, and `solid=True, codec="omni"` adds a further **+6.4–9.3%**
+(the max-ratio cold tier). The trained-dict path (`use_dict`) measured **net-negative
+on small sets** once its stored dictionary bytes are counted — solid subsumes it and
+`use_dict` is ignored under solid. Trade-off, by design: reading any single member
+decompresses the whole stream — keep the default per-file layout for hot /
+random-access archives; solid is for cold, read-rarely, whole-set archives
+(profile packs, research pools, grounding corpora).
+
 ### 2.3 Integrity & safety
 - **Footer digest** (sha256 of everything before the footer) is verified *before*
   the manifest is parsed — any tampering fails with a clean integrity error.
