@@ -53,7 +53,8 @@ const { unifiedAgentStreamSSE: unifiedStreamSSE } = require("./unified-agent");
 // Extracted helper modules (split out of this file for smaller-context editing): 
 const { compactHistory, buildProviderMessages } = require("./stream-chat/history");
 const { FALLBACK_DOORS, extractDoors, stripModelArtifacts, doorsOrFallback, generateWebSuggestions } = require("./stream-chat/doors");
-const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn } = require("./stream-chat/tool-turns");
+const { anthropicToolTurn, openaiCompatibleToolTurn, geminiToolTurn,
+  runToolLoop, anthropicAdapter, geminiAdapter, openaiAdapter } = require("./stream-chat/tool-turns");
 const { buildBrainOrder } = require("./stream-chat/provider-order");
 const { appendJsonlQueued } = require("./file-queue");
 
@@ -2305,31 +2306,14 @@ async function handleStreamChat(req, url, res) {
             { role: "user", parts: [{ text: message }] },
           ];
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
-          let toolCalls = 0;
           const geminiTransport = require("./gemini-transport").geminiTransport;
-          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
-            const turn = await geminiToolTurn({
-              transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
-              model: geminiModelName, contents, tools,
-              systemInstruction: systemPrompt, generationConfig,
-              onToken: (t) => { fullReply += t; sendToken(t); },
-            });
-            if (!turn.functionCalls.length) break;
-            contents.push({ role: "model", parts: turn.modelParts });
-            const responseParts = [];
-            for (const fc of turn.functionCalls) {
-              toolCalls++;
-              const input = fc.args || {};
-              sse.writeData(res, { type: "tool", phase: "call", name: fc.name, input });
-              const r = await toolRunner.runTool(fc.name, input, { operator, userId: getEffectiveUserId(req) });
-              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
-              sse.writeData(res, { type: "tool", phase: "result", name: fc.name,
-                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
-                receipt: r.receipt, preview: String(out).slice(0, 240) });
-              responseParts.push({ functionResponse: { name: fc.name, response: { result: String(out).slice(0, 6000) } } });
-            }
-            contents.push({ role: "user", parts: responseParts });
-          }
+          const adapter = geminiAdapter(contents, MAX_TOOL_ITERS, async () => geminiToolTurn({
+            transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
+            model: geminiModelName, contents, tools,
+            systemInstruction: systemPrompt, generationConfig,
+            onToken: (t) => { fullReply += t; sendToken(t); },
+          }));
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");
@@ -2533,30 +2517,14 @@ async function handleStreamChat(req, url, res) {
             const system = [{ type: "text", text: systemPrompt, cache_control: { type: "ephemeral" } }];
             const convo = [...compacted.map(h => ({ role: h.role, content: h.text })), { role: "user", content: message }];
             const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
-            let toolCalls = 0;
-            for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
-              const { assistantContent, toolUses, stopReason } = await anthropicToolTurn({
-                anthropicKey, model: claudeModel, system, messages: convo, tools,
-                maxTokens: 4096, // #1210: room for multi-call tool reasoning + answer
-                onToken: (t) => { fullReply += t; sendToken(t); },
-                mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
-                onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
-              });
-              if (!toolUses.length || stopReason !== "tool_use") break; // model gave its answer
-              convo.push({ role: "assistant", content: assistantContent });
-              const results = [];
-              for (const tu of toolUses) {
-                toolCalls++;
-                sse.writeData(res, { type: "tool", phase: "call", name: tu.name, input: tu.input });
-                const r = await toolRunner.runTool(tu.name, tu.input, { operator, userId: getEffectiveUserId(req) });
-                const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
-                sse.writeData(res, { type: "tool", phase: "result", name: tu.name,
-                  ok: !!r.ok, status: r.status, reason_code: r.reason_code,
-                  receipt: r.receipt, preview: String(out).slice(0, 240) });
-                results.push({ type: "tool_result", tool_use_id: tu.id, content: String(out).slice(0, 6000), is_error: !r.ok });
-              }
-              convo.push({ role: "user", content: results });
-            }
+            const adapter = anthropicAdapter(convo, MAX_TOOL_ITERS, () => anthropicToolTurn({
+              anthropicKey, model: claudeModel, system, messages: convo, tools,
+              maxTokens: 4096, // #1210: room for multi-call tool reasoning + answer
+              onToken: (t) => { fullReply += t; sendToken(t); },
+              mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
+              onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
+            }));
+            const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
             const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
             await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName } }).catch(() => {});
             recordProviderSuccess("anthropic");
@@ -2735,25 +2703,11 @@ async function handleStreamChat(req, url, res) {
           const decode = serving.applyOpenAIDecodeParams({});
           const messages = buildProviderMessages(systemPrompt, compacted, message);
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
-          let toolCalls = 0;
-          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
-            const turn = await openaiCompatibleToolTurn({
-              host: "api.openai.com", apiKey: openaiKey, model: openaiModelName,
-              messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
-            });
-            if (!turn.toolCalls.length) break; // model gave its answer
-            messages.push(turn.assistantMessage);
-            for (const tc of turn.toolCalls) {
-              toolCalls++;
-              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
-              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
-              sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
-                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
-                receipt: r.receipt, preview: String(out).slice(0, 240) });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
-            }
-          }
+          const adapter = openaiAdapter(messages, MAX_TOOL_ITERS, () => openaiCompatibleToolTurn({
+            host: "api.openai.com", apiKey: openaiKey, model: openaiModelName,
+            messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
+          }));
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "openai", model: openaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("openai");
@@ -2886,25 +2840,11 @@ async function handleStreamChat(req, url, res) {
           const decode = serving.applyXAIDecodeParams({}); // grok rejects penalty params (#2531)
           const messages = buildProviderMessages(systemPrompt, compacted, message);
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
-          let toolCalls = 0;
-          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
-            const turn = await openaiCompatibleToolTurn({
-              host: "api.x.ai", apiKey: xaiKey, model: xaiModelName,
-              messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
-            });
-            if (!turn.toolCalls.length) break;
-            messages.push(turn.assistantMessage);
-            for (const tc of turn.toolCalls) {
-              toolCalls++;
-              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
-              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
-              sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
-                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
-                receipt: r.receipt, preview: String(out).slice(0, 240) });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
-            }
-          }
+          const adapter = openaiAdapter(messages, MAX_TOOL_ITERS, () => openaiCompatibleToolTurn({
+            host: "api.x.ai", apiKey: xaiKey, model: xaiModelName,
+            messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
+          }));
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("xai");
@@ -3019,25 +2959,11 @@ async function handleStreamChat(req, url, res) {
           const cohereModelName = modelFor("cohere");
           const messages = buildProviderMessages(systemPrompt, compacted, message);
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
-          let toolCalls = 0;
-          for (let iter = 0; iter < MAX_TOOL_ITERS; iter++) {
-            const turn = await openaiCompatibleToolTurn({
-              host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
-              messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
-            });
-            if (!turn.toolCalls.length) break;
-            messages.push(turn.assistantMessage);
-            for (const tc of turn.toolCalls) {
-              toolCalls++;
-              sse.writeData(res, { type: "tool", phase: "call", name: tc.name, input: tc.input });
-              const r = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
-              const out = r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`;
-              sse.writeData(res, { type: "tool", phase: "result", name: tc.name,
-                ok: !!r.ok, status: r.status, reason_code: r.reason_code,
-                receipt: r.receipt, preview: String(out).slice(0, 240) });
-              messages.push({ role: "tool", tool_call_id: tc.id, content: String(out).slice(0, 6000) });
-            }
-          }
+          const adapter = openaiAdapter(messages, MAX_TOOL_ITERS, () => openaiCompatibleToolTurn({
+            host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
+            messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
+          }));
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("cohere");
