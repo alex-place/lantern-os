@@ -1,0 +1,3 @@
+### Added
+
+- process(#2808): documented a lightweight **issue-claim convention** in `AGENTS.md` (under Multi-Contributor Workstream Rule). With no open-PR cap, concurrent lanes twice double-built the same issue in one day (#2774/#2775 and #2805), paying a merge/reconcile tax. The convention: before starting an issue, check it isn't already assigned / `claimed`-labeled / referenced by an open PR; when starting, self-assign (or add a `claimed` label) **and** comment naming your branch; the claim releases when the PR merges or you unassign. Enforcement stays soft (a `/refinement` pass flags double-claims; the pr-watcher can warn on two open PRs for one issue) — the chat-lane equivalent of the autowork pipeline's server-side per-issue claim files. No new infra.
