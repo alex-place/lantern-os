@@ -112,6 +112,15 @@ decompresses the whole stream — keep the default per-file layout for hot /
 random-access archives; solid is for cold, read-rarely, whole-set archives
 (profile packs, research pools, grounding corpora).
 
+**Framed solid** (`solid_frame_mb=N` / `--solid-frame-mb N`): the stream is cut into ~N MiB
+frames **at member boundaries** (`"solid": {..., "frames": [{raw_offset, raw_size, offset,
+csize}]}`), so a single-member read decompresses one frame instead of the whole stream — the
+ratio/access middle tier. Measured (7 MB corpus, 1 MiB frames → 7 frames): **+18.5% over
+per-file** (vs full solid's +24%, i.e. framing cost ≈ **+6%** of full-solid bytes at this
+scale; ≈0% when the corpus fits one frame) and **4.3× faster single-member reads** (3.4 ms vs
+14.6 ms warmed median) — a gap that grows linearly with corpus size. Members always lie in
+exactly one frame.
+
 ### 2.2.2 Generative members (v0.9) — recomputation-as-storage
 
 A member may be defined by a tiny **generator spec** instead of stored bytes:
@@ -125,6 +134,18 @@ member + siblings archives to **~3.5 KB** — a description-length win for recip
 (lawful/simulated) data, explicitly *not* an entropy claim. Frontier ladder (slice-addressable
 reads, registered scientific generators, corpus tiers):
 [`research/2026-07-21-csf-cosmological-frontier.md`](research/2026-07-21-csf-cosmological-frontier.md).
+
+### 2.2.3 Slice reads — `read_slice(archive, path, offset, length)` (F1b)
+
+Read a window of one member without materializing the rest. Cost by layout: **generative =
+O(window)** (the observer-slice fast path — `zeros`/`repeat` by arithmetic, `sha256-ctr` by
+computing only covering 32-byte blocks); `store` = O(window); **solid = only the covering
+frame(s)**; per-file compressed = one member decompress. Integrity: the manifest (member
+hashes + generator specs) is footer-authenticated at open, and whole-member sha verification
+remains available via `read_file`; per-slice Merkle spot-checks are the F1b ladder's next rung
+(epic #2799). This is the "observe a window of a universe-sized member at window cost" API:
+a 100 KB slice of a generative member costs the same whether the member is 16 MiB or the
+1 GiB guard limit.
 
 ### 2.3 Integrity & safety
 - **Footer digest** (sha256 of everything before the footer) is verified *before*

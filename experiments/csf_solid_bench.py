@@ -44,14 +44,18 @@ def main():
         per_file = archive_size(blobs, codec="zstd")
         with_dict = archive_size(blobs, codec="zstd", use_dict=True)
         solid = archive_size(blobs, codec="zstd", solid=True)
+        solid_framed = archive_size(blobs, codec="zstd", solid=True, solid_frame_mb=1.0)
         solid_omni = archive_size(blobs, codec="omni", solid=True)
         rows.append({
             "set": name, "n_files": len(blobs), "raw": raw,
             "per_file_zstd19": per_file,
             "per_file_plus_dict": with_dict,
             "solid_zstd19": solid,
+            "solid_framed_1mb": solid_framed,
             "solid_omni": solid_omni,
             "solid_gain_vs_per_file_pct": round((per_file / solid - 1) * 100, 1),
+            "framed_gain_vs_per_file_pct": round((per_file / solid_framed - 1) * 100, 1),
+            "framed_cost_vs_full_solid_pct": round((solid_framed / solid - 1) * 100, 1),
             "solid_gain_vs_dict_pct": round((with_dict / solid - 1) * 100, 1),
             "solid_omni_gain_vs_solid_pct": round((solid / solid_omni - 1) * 100, 1),
         })

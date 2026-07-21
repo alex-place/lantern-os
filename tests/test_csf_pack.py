@@ -460,3 +460,92 @@ def test_generative_plus_solid_combo():
         assert m.get("solid") and m["version"] == "0.9"
         got = csf_pack.unpack_blobs(out)
         assert got["doc2.md"].endswith(b"tail") and len(got["law.bin"]) == 8192
+
+
+# ── F1b: read_slice (observer-slice reads) + framed solid ──────────────────────
+
+
+def _slice_matches_full(out, path, cases):
+    full = csf_pack.read_file(out, path)
+    for off, ln in cases:
+        assert csf_pack.read_slice(out, path, off, ln) == full[off:off + ln], (path, off, ln)
+
+
+def test_read_slice_all_layouts_match_full_read():
+    blobs = {
+        "gen/law.bin": {"generator": {"kind": "sha256-ctr", "seed": "u", "size": 100_000}},
+        "gen/zeros.bin": {"generator": {"kind": "zeros", "size": 5_000}},
+        "gen/pat.bin": {"generator": {"kind": "repeat", "pattern_hex": "0badf00d51", "size": 7_777}},
+        "doc/a.md": b"alpha beta gamma delta " * 400,
+        "doc/b.md": b"epsilon zeta eta theta " * 300,
+    }
+    cases = [(0, 100), (31, 65), (999, 4001), (4_990, 10), (0, 0)]
+    with tempfile.TemporaryDirectory() as d:
+        # per-file layout
+        out1 = str(pathlib.Path(d) / "perfile.csf")
+        csf_pack.pack_blobs(blobs, out1)
+        for p in blobs:
+            _slice_matches_full(out1, p, cases)
+        # store layout
+        out2 = str(pathlib.Path(d) / "store.csf")
+        csf_pack.pack_blobs(blobs, out2, compress=False)
+        for p in ("doc/a.md", "doc/b.md"):
+            _slice_matches_full(out2, p, cases)
+        # solid (single frame) and framed solid
+        out3 = str(pathlib.Path(d) / "solid.csf")
+        csf_pack.pack_blobs(blobs, out3, solid=True)
+        out4 = str(pathlib.Path(d) / "framed.csf")
+        m4 = csf_pack.pack_blobs(blobs, out4, solid=True, solid_frame_mb=0.005)
+        assert len(m4["solid"]["frames"]) > 1  # framing actually happened
+        for p in blobs:
+            _slice_matches_full(out3, p, cases)
+            _slice_matches_full(out4, p, cases)
+        # tail slice of the big generative member
+        tail = csf_pack.read_slice(out1, "gen/law.bin", 100_000 - 7, 7)
+        assert tail == csf_pack.read_file(out1, "gen/law.bin")[-7:]
+
+
+def test_read_slice_bounds_and_missing():
+    blobs = {"x.bin": b"0123456789"}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "x.csf")
+        csf_pack.pack_blobs(blobs, out)
+        try:
+            csf_pack.read_slice(out, "x.bin", 8, 5)
+            assert False, "out-of-range slice must fail"
+        except ValueError:
+            pass
+        try:
+            csf_pack.read_slice(out, "nope", 0, 1)
+            assert False
+        except KeyError:
+            pass
+
+
+def test_framed_solid_roundtrip_and_frame_locality():
+    """Frames cut at member boundaries: every member lies in exactly one frame,
+    full unpack still byte-exact, and read_file on a framed archive works."""
+    blobs = {f"m{i:02d}.txt": (f"member {i} ".encode() * 500) for i in range(20)}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "framed.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True, solid_frame_mb=0.01)
+        frames = m["solid"]["frames"]
+        assert len(frames) > 1
+        assert sum(fr["raw_size"] for fr in frames) == m["solid"]["raw_size"]
+        # member->frame locality (boundaries respected)
+        for fe in m["files"]:
+            covering = [fr for fr in frames
+                        if not (fr["raw_offset"] + fr["raw_size"] <= fe["offset"]
+                                or fr["raw_offset"] >= fe["offset"] + fe["size"])]
+            assert len(covering) == 1, fe["path"]
+        assert csf_pack.unpack_blobs(out) == blobs
+        assert csf_pack.read_file(out, "m07.txt") == blobs["m07.txt"]
+
+
+def test_gen_slice_block_math_sha256_ctr():
+    """The sha256-ctr slicer computes only covering blocks — verify exact block
+    alignment across boundaries."""
+    gen = {"kind": "sha256-ctr", "seed": "blocks", "size": 320}
+    full = csf_pack.materialize_generator(gen)
+    for off, ln in [(0, 32), (31, 2), (32, 32), (33, 63), (300, 20), (0, 320)]:
+        assert csf_pack._gen_slice(gen, off, ln) == full[off:off + ln], (off, ln)

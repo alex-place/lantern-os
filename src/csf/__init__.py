@@ -51,6 +51,7 @@ from .csf_pack import (
     pack,
     pack_blobs,
     read_file,
+    read_slice,
     unpack,
 )
 
@@ -58,6 +59,7 @@ __all__ = [
     "pack",
     "pack_blobs",
     "unpack",
+    "read_slice",
     "list_archive",
     "read_file",
     "file_annotation",
