@@ -344,7 +344,7 @@ high_confidence_records = memory.query(
 | Kalshi trading | Standalone tight-band algorithm | Not linked to broader reasoning | Treat as Tool; suggest becomes ConvergenceRecord |
 | Discord bot | Separate message ingestion | Divergent input path | Route discord messages through same Observe → Memory pipeline |
 | 3-Doors game | Standalone game with own state | Not part of loop | Move to Tool (game_step callable) |
-| CSF format | Storage face of the 3¹² lattice (`src/csf/v07/`); same object as the Tesseract | No longer a leak — one Convergence-Core object | Keep; expose via Memory abstraction. See [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) |
+| CSF format | Storage face of the 3¹² lattice (`src/csf/v07/`); same object as the Tesseract | No longer a leak — one Convergence-Core object | Keep; expose via Memory abstraction. See [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) (thread closed 2026-06-28; surviving-primitive application map: [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md)) |
 
 ---
 

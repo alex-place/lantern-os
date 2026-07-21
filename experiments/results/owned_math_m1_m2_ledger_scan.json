@@ -1,0 +1,72 @@
+{
+  "records_path": "C:\\dev\\lantern-os\\data\\convergence\\records.jsonl",
+  "calibration_path": "C:\\dev\\lantern-os\\data\\convergence\\grounding-calibration.jsonl",
+  "m1_no_free_confidence": {
+    "n_records": 1205,
+    "confidence_mass_total": 870.73,
+    "confidence_mass_evidence_or_graded": 689.83,
+    "confidence_mass_FREE": 180.9,
+    "free_mass_fraction": 0.2078,
+    "n_high_conf_unanchored (c>=0.8, no evidence, ungraded)": 0,
+    "n_graded_any_class": 674,
+    "n_verified_true": 64,
+    "n_refuted_true (both-class)": 20,
+    "top_free_mass_by_reasoner": {
+      "gemini": 165.29999999999916,
+      "keystone": 8.399999999999999,
+      "ollama": 2.4,
+      "review": 2.4,
+      "cohere": 1.2
+    },
+    "fields_present": {
+      "timestamp": 1205,
+      "confidence": 1205,
+      "evidence": 930,
+      "source": 882,
+      "claim": 613,
+      "type": 613,
+      "sources": 613,
+      "refuted": 613,
+      "agent": 613,
+      "corrected": 613,
+      "userMessage": 603,
+      "id": 602,
+      "hypothesis": 602,
+      "result": 602,
+      "reasoner": 602,
+      "verified": 602,
+      "tags": 398,
+      "loop_stage": 330,
+      "fix": 317,
+      "priority": 317,
+      "verification_notes": 285,
+      "evidence_ids": 284,
+      "grounding_signals": 245,
+      "applied_evidence": 244,
+      "allowed_max_confidence": 244,
+      "repaired": 62,
+      "repair_note": 62,
+      "original_verified": 60,
+      "repaired_at": 60,
+      "session_id": 10
+    },
+    "n_malformed_lines": 0
+  },
+  "m2_grounding_half_life": {
+    "n_events": 371,
+    "n_keys": 6,
+    "n_burst_pairs_dropped (<60s)": 311,
+    "n_success_to_failure_flips": 1,
+    "exposure_hours_after_success": 486.35,
+    "rho_per_hour": 0.002056,
+    "staleness_half_life_hours": 337.11,
+    "median_flip_age_minutes": 1571.0,
+    "T_star_EOQ": {
+      "p_v/p_e=0.01": "3.1 min",
+      "p_v/p_e=0.1": "9.9 min",
+      "p_v/p_e=1.0": "31.2 min"
+    },
+    "shipped_GROUNDING_TICK": "30.0 min",
+    "n_malformed_lines": 0
+  }
+}

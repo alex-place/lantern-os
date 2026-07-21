@@ -34,6 +34,7 @@ const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
 const { getCreatorRuntime } = require("./creator-runtime");
 const jobSearch = require("./job-search");
+const { resolveRepo } = require("./gh-repo");
 
 const REPO = path.resolve(__dirname, "..", "..", "..");
 // User workspace: outside the repo, for user artifacts (resumes, exports, generated docs).
@@ -599,7 +600,7 @@ const REGISTRY = {
       const n = parseInt(String(i.number == null ? "" : i.number).replace(/^#/, ""), 10);
       if (!Number.isInteger(n) || n <= 0) return "[github_issue error: a positive issue/PR number is required]";
       const { execFile } = require("child_process");
-      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const repo = resolveRepo();
       const ghView = (kind) => new Promise((resolve) => {
         execFile("gh", [kind, "view", String(n), "--repo", repo, "--json",
           "number,title,state,labels,body,url"],
@@ -632,7 +633,7 @@ const REGISTRY = {
     },
     async run(i) {
       const limit = Math.min(50, Math.max(1, parseInt(i && i.limit, 10) || 20));
-      const repo = process.env.GH_REPO || "alex-place/lantern-os";
+      const repo = resolveRepo();
       let out;
       try {
         out = safeExec(
@@ -1249,8 +1250,17 @@ const REGISTRY = {
       try {
         const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         const acct = (d && d.account) || {};
-        if (!d || d.available === false) {
-          return `[trader_positions: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no live positions. Say so honestly; don't invent holdings.]`;
+        // Detect "no broker connected" robustly. The route signals it explicitly with
+        // available:false/ok:false (#2725); older/edge responses just carried an empty
+        // {account:{}} with no equity/cash/buying_power and no positions — which must be
+        // read as not-connected, NOT as a real $0 account. (#2725)
+        const hasAccount = acct.equity != null || acct.cash != null || acct.buying_power != null;
+        const hasPositions = Array.isArray(d && d.positions) && d.positions.length > 0;
+        const notConnected = !d || d.available === false || d.ok === false ||
+          (d.available == null && d.ok == null && !hasAccount && !hasPositions);
+        if (notConnected) {
+          const why = (d && (d.reason || d.error)) || "no broker connected";
+          return `[trader_positions: broker not connected (${why}) — no live positions. Say so honestly; don't invent holdings.]`;
         }
         const pos = Array.isArray(d.positions) ? d.positions : [];
         const head = `Account: equity $${acct.equity ?? 0}, cash $${acct.cash ?? 0}, buying power $${acct.buying_power ?? 0}` +
@@ -1264,7 +1274,10 @@ const REGISTRY = {
         });
         return `${head}\nOpen positions (${pos.length}):\n${rows.join("\n")}`;
       } catch (e) {
-        return `[trader_positions error: ${e.message}]`;
+        // A transient reach failure (timeout / feed down) is not a holdings answer —
+        // report it as an honest unavailable, not a bare error, so the model relays
+        // "couldn't reach your trading account" instead of inventing positions. (#2725)
+        return `[trader_positions: broker unavailable (${e.message}) — couldn't reach the trading account. Say so honestly; don't invent holdings.]`;
       }
     },
   },
@@ -1678,6 +1691,26 @@ function _validateArgs(schema, input) {
   return errs.length ? errs.join("; ") : null;
 }
 
+// Is `name` gated for this run? (#2777) The gate set is the union of the env
+// CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
+// case-insensitive. Used to enforce per-faculty measurement validity in capability
+// evals — e.g. gate web_search/web_fetch for a Remember-stage (memory) eval so the
+// model can't substitute search for recall (Burnell et al. arXiv:2605.28405 §4.3).
+function _gatedToolSet(ctx) {
+  const out = new Set();
+  const add = (v) => { const s = String(v || "").trim().toLowerCase(); if (s) out.add(s); };
+  String(process.env.CHAT_EVAL_GATED_TOOLS || "").split(/[,\s]+/).forEach(add);
+  const fromCtx = ctx && ctx.gatedTools;
+  if (Array.isArray(fromCtx)) fromCtx.forEach(add);
+  else if (fromCtx instanceof Set) fromCtx.forEach(add);
+  else if (typeof fromCtx === "string") fromCtx.split(/[,\s]+/).forEach(add);
+  return out;
+}
+function _isToolGated(name, ctx) {
+  const gated = _gatedToolSet(ctx);
+  return gated.size > 0 && gated.has(String(name || "").trim().toLowerCase());
+}
+
 /**
  * Execute a parsed tool call under the policy.
  * @param {string} name  canonical tool name the model emitted
@@ -1721,6 +1754,21 @@ async function runTool(name, input, ctx = {}) {
       error: `'${name}' (${entry.policy}) requires operator access`,
     });
     await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
+    return result;
+  }
+
+  // Per-faculty tool gating for capability evals (#2777). Burnell et al. §4.3: if a
+  // memory eval lets the model web_search, you measure search, not memory. An eval run
+  // sets CHAT_EVAL_GATED_TOOLS (comma-separated) — or passes ctx.gatedTools — to DENY
+  // the named tools for that run, so closed-context conditions are actually closed and
+  // the gating is recorded in the tool log (interpretable after the fact).
+  if (_isToolGated(name, ctx)) {
+    const result = _outcome("unavailable", name, {
+      reason_code: "tool_gated",
+      policy: entry.policy,
+      error: `'${name}' is gated for this eval run (measurement-validity gating, #2777)`,
+    });
+    await _logToolExecution(name, input, "unavailable", "tool_gated", startTime, ctx);
     return result;
   }
 

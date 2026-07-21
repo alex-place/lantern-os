@@ -376,7 +376,8 @@ module.exports = async (req, res, url, deps) => {
             workRoot,
             issueDetails.title + "\n\n" + issueDetails.body,
             scopeFiles.slice(0, 5),
-            researchContext ? [researchContext] : []);
+            [],                       // history (none here)
+            researchContext || null); // #2741: research grounds the generation prompt
         } catch (planErr) {
           const raw = String(planErr && planErr.message || planErr);
           const noCloud = /all_providers_failed|empty response|credit|quota|billing|spending limit/i.test(raw);
@@ -408,7 +409,7 @@ module.exports = async (req, res, url, deps) => {
           step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
           let gen;
           try {
-            gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+            gen = await generatePatch(workRoot, plan, { ...(feedback ? { feedback } : {}), research: researchContext || null }); // #2741
           } catch (genErr) {
             // generatePatch itself failed (e.g. diff_parse_failed — the model returned
             // no valid diff). Feed that back and retry instead of 500ing on attempt 1.
@@ -896,7 +897,9 @@ module.exports = async (req, res, url, deps) => {
         let plan;
         try {
           plan = await generatePlan(
-            workRoot, issueFullText, scopeFiles.slice(0, 5), [researchContext]);
+            workRoot, issueFullText, scopeFiles.slice(0, 5),
+            [],                       // history (none here)
+            researchContext || null); // #2741: research grounds the generation prompt
         } catch (planErr) {
           // The most common real failure here is "no cloud model available" —
           // every provider out of credits/quota, with the tiny local model
@@ -936,7 +939,7 @@ module.exports = async (req, res, url, deps) => {
           step("patch", attempt === 1 ? "start" : "retry", { attempt, of: MAX_PATCH_ATTEMPTS });
           let gen;
           try {
-            gen = await generatePatch(workRoot, plan, feedback ? { feedback } : {});
+            gen = await generatePatch(workRoot, plan, { ...(feedback ? { feedback } : {}), research: researchContext || null }); // #2741
           } catch (genErr) {
             // generatePatch failed (e.g. diff_parse_failed) — feed it back and retry.
             feedback = { priorDiff: "", errors:

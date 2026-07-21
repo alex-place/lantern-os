@@ -14,7 +14,8 @@
 
 const http = require("http");
 
-const MCP_URL = "http://127.0.0.1:8771";
+// Host/port are configurable (#2759) so a non-default MCP sidecar is reachable.
+const MCP_URL = `http://${process.env.MCP_HOST || "127.0.0.1"}:${Number(process.env.MCP_PORT) || 8771}`;
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const CACHE_DURATION_MS = 5000; // Cache availability for 5s to avoid hammering
 
@@ -47,11 +48,19 @@ async function isAvailable() {
 }
 
 /**
- * Call a tool via MCP server (only if available).
+ * Call a tool via the MCP server (only if available).
+ *
+ * Uses the server's JSON-RPC `tools/call` over `/messages` — the SAME endpoint the
+ * stdio bridge and lib/stream-chat/mcp-tools.js use. The old `/tool/<name>` route
+ * this posted to is not exposed by the server (it 404s), so every call errored and
+ * mcp-tools.js had to route around this client entirely (#2760). Now fixed, so there
+ * is one correct MCP client path.
  *
  * @param {string} toolName - Tool name (e.g., 'github_list_issues')
  * @param {Object} args - Tool arguments
- * @returns {Promise<Object>} Tool result or { status: 'unavailable', reason: 'mcp_offline' }
+ * @returns {Promise<Object>} The tool's own payload on success (JSON parsed when the
+ *   result is a JSON string), or a standardized { status, reason_code, error } on
+ *   offline / RPC error / tool error.
  */
 async function callTool(toolName, args = {}, timeoutMs = 30000) {
   if (!(await isAvailable())) {
@@ -63,10 +72,14 @@ async function callTool(toolName, args = {}, timeoutMs = 30000) {
   }
 
   try {
-    const response = await _fetchWithTimeout(`${MCP_URL}/tool/${toolName}`, {
+    const body = JSON.stringify({
+      jsonrpc: "2.0", id: 1, method: "tools/call",
+      params: { name: toolName, arguments: args || {} },
+    });
+    const response = await _fetchWithTimeout(`${MCP_URL}/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(args),
+      body,
       timeout: timeoutMs,
     });
 
@@ -78,7 +91,21 @@ async function callTool(toolName, args = {}, timeoutMs = 30000) {
       };
     }
 
-    return response.json();
+    const rpc = response.json();
+    if (rpc && rpc.error) {
+      return { status: "error", reason_code: "mcp_tool_error", error: rpc.error.message || "mcp error" };
+    }
+    // JSON-RPC result for tools/call: { content: [{ type:'text', text }], isError }.
+    const result = (rpc && rpc.result) || {};
+    const text = result.content && result.content[0] && result.content[0].text != null
+      ? String(result.content[0].text) : "";
+    if (result.isError) {
+      return { status: "error", reason_code: "mcp_tool_error", error: text || "tool reported isError" };
+    }
+    // Surface the tool's own payload: parse the text (usually a JSON string) so callers
+    // can read fields directly (e.g. list_skills → .skills); fall back to raw text.
+    if (text) { try { return JSON.parse(text); } catch { return { text }; } }
+    return result;
   } catch (err) {
     return {
       status: "error",

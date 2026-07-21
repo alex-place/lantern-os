@@ -93,12 +93,18 @@ Curated references organized by component. Not a bookmark dump. Living document 
 ### Lattice substrate — ternary storage (the 3¹² singularity, storage face)
 - **BitNet b1.58 — *The Era of 1-bit LLMs*** ([arXiv:2402.17764](https://arxiv.org/abs/2402.17764))
   - Ternary weights `{-1,0,+1}`, ~66% zeros, matmul→add; grounds CSF's qutrit engine
-  - The dust-sparsity in `quantum_dust.py` is the storage twin of BitNet's zero-sparsity
+  - X3 (2026-06-19) **refined**: dust value-sparsity is population-dependent — a *substrate*
+    resemblance to BitNet's learned zero-sparsity, **not the same mechanism** (the 0.66 match
+    is a population coincidence; see the singularity doc §6.1 and the IP register §3.1)
   - Status: external grounding for [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md)
 - **Sparse-BitNet** ([arXiv:2603.05168](https://arxiv.org/pdf/2603.05168)) · **T-SAR** ([arXiv:2511.13676](https://arxiv.org/pdf/2511.13676))
   - 1.58-bit models are naturally sparsity-friendly; CPU-only ternary inference
 - **Radix economy** ([Wikipedia](https://en.wikipedia.org/wiki/Radix_economy) · [Quanta](https://www.quantamagazine.org/how-base-3-computing-beats-binary-20240809/))
   - Base 3 is the most economical integer radix (optimum `e`); the principled reason the lattice is ternary
+- **Where ternary actually pays — hardware/serving, never entropy** (2026-07-21)
+  - GDDR7 ships **PAM-3** signaling: `{-1,0,+1}` levels, ~1.5 bits/cycle, +50% data per cycle vs NRZ ([Micron](https://www.micron.com/about/blog/memory/dram/unveiling-the-next-generation-of-graphics-memory-gddr7) · [Rambus](https://www.rambus.com/blogs/all-you-need-to-know-about-gddr7/))
+  - Trit-in-bit packing is a solved 99.06% craft: 5 trits/byte, llama.cpp **TQ1_0 = 1.6875 bpw** / TQ2_0 = 2.0625 bpw for BitNet/TriLM weights ([PR #8151](https://github.com/ggml-org/llama.cpp/pull/8151) · [Compilade](https://compilade.net/blog/ternary-packing) · [bitnet.cpp, arXiv:2502.11880](https://arxiv.org/pdf/2502.11880)) — the packing question for the ADR-0026 serving artifact
+  - Base-3 confers **no** codec advantage (Shannon is radix-invariant) — kill-doc verdict stands; application map: [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md) §5
 - **Hyperdimensional computing / VSA** ([arXiv:2111.06077](https://arxiv.org/abs/2111.06077))
   - Ternary `{-1,0,1}` sparse high-dimensional codes; reference for the 12-axis vector-symbolic substrate
 
@@ -225,28 +231,6 @@ Not a separate system.
   - End-to-end task completion
   - Practical measurement
 
-### AGI-scope capability measurement (added 2026-07-21)
-- **Measuring Progress Toward AGI: A Cognitive Framework** (Burnell et al., Google DeepMind,
-  [arXiv:2605.28405](https://arxiv.org/abs/2605.28405)) — **read in full 2026-07-21**
-  - Ten-faculty Cognitive Taxonomy (perception, generation, attention, learning, memory, reasoning,
-    metacognition, executive functions + composite problem solving, social cognition) with a
-    three-stage protocol: held-out cognitive tasks → representative human baselines → per-faculty
-    **cognitive profiles**
-  - §4.3: evaluate **the system with its tools**, not the bare model — external legitimization of
-    the rent-capability/own-grounding strategy ([AGI-CONVERGENCE-BLUEPRINT.md](AGI-CONVERGENCE-BLUEPRINT.md))
-  - §4.1: names **metacognition** among the field's largest benchmark coverage gaps — the faculty
-    our Verify discipline occupies (calibration scoring, drift canaries, convergence records,
-    honesty probe); external metacognition evals tracked in #2776
-  - §4.3: tools contaminate faculty measurement (web search vs memory) — the #2322
-    groundedness-noise class; prescription = tool-gated eval conditions (#2777)
-- **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212))
-  — web-verified 2026-07-21, abstract-level only
-  - Companion ten-domain framework (Cattell–Horn–Carroll theory); scores AGI as % of
-    well-educated-adult cognitive versatility (reports GPT-4 27%, GPT-5 58%); finds frontier
-    profiles sharply **jagged**
-  - Headline deficit: **long-term memory storage** — independent confirmation that owned persistent
-    memory (CSF + confidence-decay + per-user storage) targets a measured frontier weakness
-
 ### Theory
 - **Σ₀ Anti-Collapse Verification Loop** (Lantern-native)
   - Surprise monitor (NIS canary)
@@ -273,6 +257,41 @@ Not a separate system.
   `F:\arxiv-corpus\pdfs\REVIEW-2026-07-18-survivorship-backtest.md`.
 - **Data-source reality** — no free price source is survivorship-free; live-priced vendor survey in
   [research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
+
+### AGI-scope capability measurement — external yardstick (added 2026-07-21)
+The strongest external AGI-measurement standards, adopted as the yardstick for the
+Verify/Converge discipline (better convergence metrics — Feature Gate: allowed). See #2774;
+blueprint companion view tracked in #2775.
+- **Measuring Progress Toward AGI: A Cognitive Framework** (Burnell et al., Google DeepMind,
+  [arXiv:2605.28405](https://arxiv.org/abs/2605.28405), May 2026 — *full text read; §3 / §4.1 / §4.3 verified 2026-07-21*)
+  - A **ten-faculty cognitive taxonomy** — perception, generation, attention, learning, memory,
+    reasoning, **metacognition**, executive functions, problem solving, social cognition — grounded
+    in psychology / neuroscience / cognitive science.
+  - **Three-stage protocol** (§3): (1) cognitive assessment over targeted held-out tasks →
+    (2) human baselines on the same tasks → (3) per-system **cognitive profiles** of strengths and
+    weaknesses relative to human performance.
+  - **§4.3 — score the system WITH its tools, not the bare model** ("the intelligence attributed to a
+    given model depends on the harness built around it"). External legitimization of the
+    rent-capability / own-grounding strategy: the harness is part of the measured intelligence.
+  - **§4.1 — metacognition is among the largest benchmark coverage gaps** (with attention, learning,
+    social cognition) — precisely the faculty this Verify discipline occupies: calibration scoring,
+    drift canaries, convergence records, the honesty probe.
+  - **§4.3 — tools contaminate faculty measurement** ("if the system can simply search the internet …
+    we are no longer measuring the system's memory — only its ability to search"); baselines must get
+    the same tools. This is the #2322 groundedness-noise class, now named — prescription: tool-gated
+    per-faculty eval conditions, tracked in #2777.
+- **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212),
+  Oct 2025 — *abstract-level web-verified 2026-07-21*)
+  - Companion **ten-domain** framework grounded in Cattell–Horn–Carroll (the most empirically
+    validated model of human cognition); yields an AGI score (GPT-4 27% → GPT-5 57%).
+  - Current systems show **"jagged" profiles** with a critical deficit in **long-term memory
+    storage** — the frontier gap that maps to [02] MEMORY + the [07] VERIFY convergence-record trail.
+- **Why this lives in [07]:** both standards score capability by held-out profile + human baseline —
+  the same evidence discipline as the Verify loop — and both name **metacognition** as the frontier
+  gap. DeepMind states it is building held-out metacognition evals with academic partners, so the
+  frontier is instrumenting the exact gap this loop occupies; validation should parallelize (E-B
+  #2691 + external metacognition evals, tracked in #2776), not serialize. Status: **theory adopted
+  as the measurement yardstick**; held-out eval integration is roadmap.
 
 ### Integration
 - Unit tests → memory update
@@ -376,7 +395,13 @@ Memory.append(type=Pattern, confidence=X)
     Radius Regularisation; closes the spiral paper's open **non-normal-operator** gap
 - **SpiralFormer** ([arXiv:2602.11698](https://arxiv.org/pdf/2602.11698)) · **A Survey on Latent Reasoning** ([arXiv:2507.06203](https://arxiv.org/pdf/2507.06203))
 - **Ouro LoopLM** ([arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) — weight-tied recurrence + Q-exit; substrate the spiral extends
+- **Verdict (2026-06-28, run on the real Ouro-1.4B):** the latent loop does **not** contract in
+  its 4 trained steps — convergence-exit never fires and the spiral premise collapses to a
+  relabel of Q-exit; the usable adaptive-depth signal is the **trained Q-exit gate**. Closed in
+  [`research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md`](research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md)
 - Lattice consolidation: [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) · [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
+- Surviving-primitive application map (CSF · Convergence-IO · chat · trade · explore):
+  [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md)
 
 ### Self-supervised anti-collapse — the representation-learning twin of the collapse certificate
 The LeCun/FAIR non-generative-SSL lineage (DrLIM → JEPA → LeJEPA/LeWM) spends two decades
@@ -484,6 +509,7 @@ Never retrain. Accumulate.
 4. **Remove entries when superseded by implementation or better alternative**
 5. **This is not a bookmarks list. It is the architecture research trail.**
 
-**Last Updated:** 2026-07-21 (AGI-scope measurement frameworks added to [07] — Burnell arXiv:2605.28405 read-in-full + Hendrycks arXiv:2510.18212 web-verified; adopted as the blueprint's cognitive-profile yardstick. Prior: 2026-07-06 SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
+**Last Updated:** 2026-07-21 ([07] VERIFY — adopted the external AGI-measurement yardstick: Burnell et al. arXiv:2605.28405 ten-faculty cognitive framework [full-text read] + Hendrycks et al. arXiv:2510.18212 [abstract-verified]; metacognition named as the frontier gap this loop occupies. #2774)  
+**Prior Update:** 2026-07-06 (SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
 **Maintained By:** Lantern OS team  
 **Immutability:** Read-only; update via PR + issue comment only

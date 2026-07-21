@@ -1220,7 +1220,42 @@ Respond ONLY with valid JSON in this exact shape (no markdown, no commentary out
   "branchHint": "short-kebab-name"
 }`;
 
-async function generatePlan(repoRoot, userRequest, scopeFiles, history) {
+// Render the autowork research evidence (web + arXiv corpus) as a prompt block so it
+// grounds the code the model WRITES, not just the Verify stage (#2741). The dispatch
+// path used to pass this object as generatePlan's `history` param, where it rendered
+// as `undefined: undefined` (history expects {role,text}) — the research never reached
+// the generation prompt. Pure + exported so it can be unit-tested in isolation.
+function renderResearchContext(research) {
+  if (!research || typeof research !== "object") return "";
+  const clip = (s, n) => String(s == null ? "" : s).replace(/\s+/g, " ").trim().slice(0, n);
+  const web = Array.isArray(research.webEvidence) ? research.webEvidence : [];
+  const arxiv = Array.isArray(research.arxivEvidence) ? research.arxivEvidence : [];
+  const lines = [];
+  if (research.webSummary) lines.push(`Web summary: ${clip(research.webSummary, 800)}`);
+  if (web.length) {
+    lines.push("Web evidence:");
+    for (const e of web.slice(0, 5)) {
+      if (!e) continue;
+      const title = clip(e.title || e.url || "source", 160);
+      const snip = clip(e.snippet, 400);
+      lines.push(`  - ${title}${e.url ? ` (${e.url})` : ""}${snip ? `: ${snip}` : ""}`);
+    }
+  }
+  if (arxiv.length) {
+    lines.push("arXiv corpus evidence:");
+    for (const p of arxiv.slice(0, 5)) {
+      if (!p) continue;
+      const title = clip(p.title || p.id || "paper", 160);
+      const snip = clip(p.snippet, 400);
+      lines.push(`  - ${title}${p.id ? ` [${p.id}]` : ""}${snip ? `: ${snip}` : ""}`);
+    }
+  }
+  if (!lines.length) return "";
+  return "Research grounding (evidence gathered for this task — prefer it over guesses, and " +
+    "reflect it in the code you write):\n" + lines.join("\n") + "\n\n";
+}
+
+async function generatePlan(repoRoot, userRequest, scopeFiles, history, research) {
   let fileContext = "";
   if (Array.isArray(scopeFiles) && scopeFiles.length > 0) {
     for (const fp of scopeFiles) {
@@ -1236,8 +1271,9 @@ async function generatePlan(repoRoot, userRequest, scopeFiles, history) {
   const historyContext = Array.isArray(history) && history.length > 0
     ? `Chat history:\n${history.slice(-6).map(h => `${h.role}: ${h.text}`).join("\n")}\n\n`
     : "";
+  const researchBlock = renderResearchContext(research);
 
-  const userPrompt = `${historyContext}User request: ${userRequest}\n\nRelevant files:\n${fileContext || "(none specified — infer from request)"}\n\nProduce the JSON plan.`;
+  const userPrompt = `${historyContext}${researchBlock}User request: ${userRequest}\n\nRelevant files:\n${fileContext || "(none specified — infer from request)"}\n\nProduce the JSON plan.`;
 
   // Generate + parse with one retry: models intermittently wrap the JSON in a
   // code fence, add a trailing comma, or get cut off. extractJson recovers most
@@ -1305,7 +1341,10 @@ async function generatePatch(repoRoot, plan, opts = {}) {
     }
   }
 
-  let userPrompt = `Plan summary: ${plan.summary}\n\nSteps:\n${plan.steps.map((s, i) => `${i + 1}. [${s.action}] ${s.file}: ${s.description}`).join("\n")}\n\n${fileContext}\n\nGenerate the unified diff.`;
+  // Research grounding also informs the DIFF, not just the plan (#2741) — passed via
+  // opts.research so the positional signature stays stable.
+  const researchBlock = renderResearchContext(opts.research);
+  let userPrompt = `${researchBlock}Plan summary: ${plan.summary}\n\nSteps:\n${plan.steps.map((s, i) => `${i + 1}. [${s.action}] ${s.file}: ${s.description}`).join("\n")}\n\n${fileContext}\n\nGenerate the unified diff.`;
 
   // Feedback retry: when a prior diff failed to apply, show the model its own diff
   // and the exact apply errors, and insist it copy context EXACTLY from the file
@@ -1435,6 +1474,7 @@ module.exports = {
   taskTitle,
   runTests,
   generatePlan,
+  renderResearchContext,
   extractJson,
   generatePatch,
   callLlm,

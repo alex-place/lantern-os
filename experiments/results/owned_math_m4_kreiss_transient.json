@@ -1,0 +1,76 @@
+{
+  "family": "A(r,k) = [[r,k],[0,r]] \u2014 non-normal for k>0",
+  "rows": [
+    {
+      "r": 0.9,
+      "k": 0.0,
+      "spectral_radius": 0.9,
+      "max_transient_M": 1.0,
+      "argmax_t": 0,
+      "kreiss_K_est": 0.97,
+      "kreiss_envelope_e_n_K": 5.26,
+      "lemma_bound_holds (M <= e*n*K)": true,
+      "naive_spectral_bound_holds (M <= 1)": true,
+      "healthy (r<1)": true,
+      "naive_alarm_rate": 0.0,
+      "l3_alarm_rate": 0.0
+    },
+    {
+      "r": 0.9,
+      "k": 1.0,
+      "spectral_radius": 0.9,
+      "max_transient_M": 3.91,
+      "argmax_t": 9,
+      "kreiss_K_est": 2.6,
+      "kreiss_envelope_e_n_K": 14.14,
+      "lemma_bound_holds (M <= e*n*K)": true,
+      "naive_spectral_bound_holds (M <= 1)": false,
+      "healthy (r<1)": true,
+      "naive_alarm_rate": 1.0,
+      "l3_alarm_rate": 0.0
+    },
+    {
+      "r": 0.9,
+      "k": 5.0,
+      "spectral_radius": 0.9,
+      "max_transient_M": 19.38,
+      "argmax_t": 9,
+      "kreiss_K_est": 12.52,
+      "kreiss_envelope_e_n_K": 68.07,
+      "lemma_bound_holds (M <= e*n*K)": true,
+      "naive_spectral_bound_holds (M <= 1)": false,
+      "healthy (r<1)": true,
+      "naive_alarm_rate": 1.0,
+      "l3_alarm_rate": 0.0
+    },
+    {
+      "r": 0.9,
+      "k": 20.0,
+      "spectral_radius": 0.9,
+      "max_transient_M": 77.49,
+      "argmax_t": 9,
+      "kreiss_K_est": 50.0,
+      "kreiss_envelope_e_n_K": 271.85,
+      "lemma_bound_holds (M <= e*n*K)": true,
+      "naive_spectral_bound_holds (M <= 1)": false,
+      "healthy (r<1)": true,
+      "naive_alarm_rate": 1.0,
+      "l3_alarm_rate": 0.0
+    },
+    {
+      "r": 1.02,
+      "k": 5.0,
+      "spectral_radius": 1.02,
+      "max_transient_M": 5401304.25,
+      "argmax_t": 400,
+      "kreiss_K_est": 2154444.45,
+      "kreiss_envelope_e_n_K": 11712774.39,
+      "lemma_bound_holds (M <= e*n*K)": true,
+      "naive_spectral_bound_holds (M <= 1)": false,
+      "healthy (r<1)": false,
+      "naive_alarm_rate": 1.0,
+      "l3_alarm_rate": 1.0
+    }
+  ],
+  "reading": "For k>0 the naive spectral envelope is violated (transient growth) and the naive monitor false-alarms on HEALTHY decay; the Kreiss-inflated envelope e*n*K(A) bounds every healthy transient (lemma content) while still firing on genuine instability r>1."
+}

@@ -266,76 +266,6 @@ That is the plus-ultra that is actually beyond what they ship, *because it is gr
 
 ---
 
-## The cognitive-profile view — the capability-space companion (added 2026-07-21)
-
-*The loop is a **process** decomposition; capability is an orthogonal axis. A faculty the loop
-has no stage for never gets a GAP row — attention and social cognition were invisible to every
-table above. This section closes that structural blind spot using the strongest external
-measurement frame available.*
-
-**External frame (ESTABLISHED).** Two frameworks now define AGI-scope measurement.
-**(a)** DeepMind's ten-faculty **Cognitive Taxonomy** + three-stage protocol — held-out cognitive
-tasks → representative human baselines → per-faculty "cognitive profiles"
-([Burnell et al., arXiv:2605.28405](https://arxiv.org/abs/2605.28405) — **read in full
-2026-07-21**, per the no-ID-cited-unread rule). **(b)** The CHC-based ten-domain **AGI score**
-([Hendrycks et al., arXiv:2510.18212](https://arxiv.org/abs/2510.18212) — web-verified
-2026-07-21, abstract-level), which reports frontier profiles as sharply **jagged** and names
-**long-term memory storage** the critical frontier deficit — independent confirmation that the
-owned Remember stage targets a measured weakness.
-
-Three consequences this blueprint adopts:
-
-1. **The system, not the model, is the unit of assessment.** Burnell §4.3: isolating the core
-   model is "increasingly impractical" and less informative; evaluate "the system as a whole,
-   including any built-in tools or modules." This is the strongest external legitimization the
-   rent-capability/own-grounding strategy has received: the 10-provider chain + ~35 native tools
-   + PCSF router *is* the system under test.
-2. **The one OURS claim has an external name: metacognition** — and Burnell §4.1 names it among
-   the field's largest benchmark coverage gaps. The taxonomy's sub-abilities map one-to-one onto
-   shipped v1.10 machinery:
-
-   | Taxonomy (Burnell §7.7–7.8) | Live in v1.10 |
-   |---|---|
-   | Confidence calibration | decision journal + calibration scoring |
-   | Error monitoring | drift canaries, Σ₀ collapse detection |
-   | Source judgments | convergence records — `[claim, evidence, confidence, source]` |
-   | Knowledge of limitations | honesty probe + golden set |
-   | Inhibitory control (§7.8.3) | Σ_θ acceptance gate — inhibition applied to weight updates |
-
-3. **Tools contaminate faculty measurement.** Burnell §4.3: a system that can search the web is
-   no longer being measured on memory. This is the #2322 groundedness-noise class with a name;
-   faculty evals need tool-gated conditions (tracked: [#2777]).
-
-**The v1.10 cognitive profile (honest).**
-
-| Faculty | v1.10 status | Class |
-|---|---|---|
-| Perception | text strong; images partial (vision transport); audio absent; video ungoverned — Creator highlight analyzer only, cede-or-plan [#2784] | RENTED (partial) |
-| Generation | text, code, documents, images; speech + motor absent | RENTED · CEDED (speech, motor) |
-| Attention | context management exists; distraction robustness never tested — eval plan [#2782] | UNMEASURED |
-| Learning | in-context + retrieval; retention measured (LongMemEval), skill acquisition not ([#2783]) | RENTED (partial) |
-| Memory | CSF archive, confidence-decay, per-user storage, recall — strongest owned area | IN-REPO |
-| Reasoning | provider chain + Ouro LoopLM; task benchmarks in registry | RENTED, measured |
-| Metacognition | the OURS bet (table above); validation simulation-bound until E-B ([#2691]) | OURS (argued) |
-| Executive functions | autowork planning, council, Σ_θ gate; partially measured via SWE-bench | IN-REPO (partial) |
-| Problem solving | rented; HumanEval / SWE-bench / LongMemEval in registry | RENTED, measured |
-| Social cognition | absent — the preference model is adjacent at best | CEDED |
-
-**Ceded on the record.** Speech generation, motor control, audio perception, and social cognition
-are deliberate product cessions — the AI cockpit needs none of them — not oversights. Burnell's
-criterion is accepted with them: a significant weakness in any faculty predicts real-world task
-classes the system cannot perform, and those classes are declined, not claimed. Any AGI-scope
-claim made in this repo carries this cession list.
-
-**The moat is a lead, not a structure.** Burnell et al. state DeepMind is building held-out
-metacognition evaluations with academic partners — the frontier is now instrumenting the exact
-gap we own. The Verify edge is a discipline lead measured in quarters, not a structural
-advantage. Consequence: close E-B ([#2691]) and stand up external metacognition evals
-([#2776]) in **parallel**, not in sequence. **[claim: our differentiated faculty is the
-least-benchmarked one · confidence: High for the gap (stated by the field's own measurers),
-Medium for our occupancy of it (E-B pending) · source: arXiv:2605.28405 §4.1/§4.3 + the Verify
-stage above]**
-
 ## The honest AGI-scope assessment
 
 **Could this become the best model possible?** Not from what we own. Six of the seven load-bearing
@@ -343,7 +273,7 @@ capabilities (data, architecture, optimizer, scaling, pretraining, frontier post
 are **gaps we would fill with the outside research above**, not with anything in-repo. That is not a
 failure — it matches the 2026 consensus that the frontier is *execution + data*, and those are
 capital/compute problems more than idea problems. Scored in capability space (the
-cognitive-profile view above), the same verdict lands with sharper edges: sub-median or absent in
+cognitive-profile companion view below), the same verdict lands with sharper edges: sub-median or absent in
 at least three faculties (perception beyond text/images, social cognition, skill-retaining
 learning), unmeasured in two more (attention; metacognition externally).
 
@@ -364,17 +294,66 @@ and our Verify work is the stability layer that curve needs.
 3. **Distill, don't train from scratch** — the ternary ≤8GB serving artifact (ADR-0026) + the
    verify-gated update loop is the realistic path to an *owned* small model that inherits frontier
    capability and adds the grounding discipline.
-4. **Close the one real-model gap** — run E-B ([#2691]) so the Verify claims graduate from
-   simulation to MEASURED-on-a-real-model — and in **parallel**, stand up external metacognition
-   evals ([#2776]): the moat-is-a-lead finding makes a sequential validation schedule a losing
-   one. Until then, our edge is argued, not proven.
+4. **Close the one real-model gap — and race the frontier to instrument it.** Run E-B ([#2691]) so the
+   Verify claims graduate from simulation to MEASURED-on-a-real-model **and** validate metacognition
+   against the frontier's own emerging **held-out metacognition evals** ([#2776]; Burnell et al.
+   arXiv:2605.28405 §4.1 — canon [07]). These must **parallelize, not serialize**: the faculty we own
+   is the exact one DeepMind is now building held-out evals for, so the lead is real but shrinking.
+   Until then, our edge is argued, not proven — and unproven against an *external* standard is worth
+   less than proven against our own.
 
 **The trap (stated so it can't be laundered):** treating a rigorous Verify layer as an AGI recipe.
 It is the seatbelt and the dashboard warning light — indispensable, and worthless without the engine,
 which we rent. The whole-loop win is *rented capability + owned grounding*, delivered as one
-convergent product, not a home-grown frontier model. The edge is also a wasting asset: the
-frontier's own measurers are now instrumenting the same gap (cognitive-profile view above), so it
-holds only at the speed the discipline lead is maintained.
+convergent product, not a home-grown frontier model. **And the moat is a lead, not a wall:** the one
+faculty we own (metacognition) is the one the frontier has now named and is instrumenting — so the
+grounding discipline only stays a differentiator if it is measured against an external held-out
+standard before that standard becomes commodity.
+
+## The cognitive-profile companion view — ten faculties (added 2026-07-21, #2775)
+
+The Observe→…→Converge structure above is a **process** decomposition; Burnell et al.'s cognitive
+taxonomy (arXiv:2605.28405 — canon [07]) is a **capability** decomposition, and the two are
+*orthogonal*. A capability with no loop stage never earns a `GAP` row — which is why **attention**
+(unmeasured) and **social cognition** (ceded) are invisible in the process assessment above. This
+companion scores v1.10 by faculty, using the blueprint's evidence classes plus **CEDED** (a deliberate
+product non-goal) and **UNMEASURED** (real, but no instrument yet). It is a mirror of the same honest
+assessment, not a new claim.
+
+| Faculty (Burnell et al. taxonomy) | v1.10 status | Basis |
+|---|---|---|
+| Perception (text) | RENTED | input understanding rides the base model; non-text perception is CEDED (below) |
+| Generation (text) | RENTED | text generation is the base model's; speech generation is CEDED |
+| Attention | UNMEASURED | no instrument; never surfaced as a stage, so it earns no process-side GAP row — eval plan tracked in [#2782] |
+| Learning | RENTED + partial OURS | no frontier post-training (a `GAP` above); experiential learning via convergence records is ours-in-principle but simulation-bound; retention is measured (LongMemEval), skill *acquisition* is not — instrument tracked in [#2783] |
+| Memory | RENTED (parametric) + OURS (system) | working knowledge is rented from base weights; the memory *system* (append-only JSONL + CSF archive + multi-signal retrieval) is ours — yet **long-term-memory storage is the frontier's own named deficit** (Hendrycks et al. arXiv:2510.18212) |
+| Reasoning | RENTED | Ouro / base models; we do not train the reasoner |
+| **Metacognition** | **OWNED** | the one faculty we instrument — mapping below |
+| Executive functions | partial OURS | loop orchestration + the Σ_θ acceptance gate (inhibitory control) are ours; planning rides the base model |
+| Problem solving | RENTED | rides base-model reasoning + our tool harness |
+| Social cognition | CEDED | deliberate product non-goal (below) |
+
+**Cessions on the record** — deliberate product decisions for the AI cockpit, named the same way rented
+capabilities are (not silent omissions): **speech generation**, **motor control**, **audio perception**,
+**social cognition**. Ceding them is a scope choice, not a deficit to apologize for; naming them is what
+keeps the profile honest. **Video perception** is the one faculty still ungoverned either way — the
+in-repo `analyze_video` is the Creator Suite's motion/scene/audio *highlight* analyzer (a media-editing
+Act tool), not general dynamic-scene understanding; the cede-or-plan decision is the operator's call,
+tracked in [#2784].
+
+**Metacognition — the one OWNED faculty, restated in the externally-defined vocabulary:**
+- **confidence calibration** ↔ the decision journal / calibration scoring
+- **error monitoring** ↔ the drift canaries (critical-slowing-down + Kalman-NIS)
+- **source judgments** ↔ convergence records (`[claim, evidence, confidence, source]`)
+- **knowledge of limitations** ↔ the honesty / calibration probe
+- **inhibitory control** (an executive-function component) ↔ the Σ_θ acceptance gate (`ρ<1`) — withholding an un-grounded update
+
+**Why this belongs here:** the process view can score a capability only where the loop already has a
+stage for it, so genuinely-unmeasured (attention) and genuinely-ceded (social cognition) faculties go
+missing from an otherwise rigorous honest-assessment section. The faculty view closes that blind spot —
+and it lands on the same conclusion as the process view: *rented capability + owned grounding*, with
+metacognition as the single owned faculty and the reason validation must now parallelize (strategy item
+4 above).
 
 ---
 
