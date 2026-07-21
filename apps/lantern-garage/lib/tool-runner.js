@@ -1249,8 +1249,17 @@ const REGISTRY = {
       try {
         const d = await _localTradingGet("/api/trading/positions", 9000, _userHeaders(ctx));
         const acct = (d && d.account) || {};
-        if (!d || d.available === false) {
-          return `[trader_positions: broker not connected${d && d.reason ? ` (${d.reason})` : ""} — no live positions. Say so honestly; don't invent holdings.]`;
+        // Detect "no broker connected" robustly. The route signals it explicitly with
+        // available:false/ok:false (#2725); older/edge responses just carried an empty
+        // {account:{}} with no equity/cash/buying_power and no positions — which must be
+        // read as not-connected, NOT as a real $0 account. (#2725)
+        const hasAccount = acct.equity != null || acct.cash != null || acct.buying_power != null;
+        const hasPositions = Array.isArray(d && d.positions) && d.positions.length > 0;
+        const notConnected = !d || d.available === false || d.ok === false ||
+          (d.available == null && d.ok == null && !hasAccount && !hasPositions);
+        if (notConnected) {
+          const why = (d && (d.reason || d.error)) || "no broker connected";
+          return `[trader_positions: broker not connected (${why}) — no live positions. Say so honestly; don't invent holdings.]`;
         }
         const pos = Array.isArray(d.positions) ? d.positions : [];
         const head = `Account: equity $${acct.equity ?? 0}, cash $${acct.cash ?? 0}, buying power $${acct.buying_power ?? 0}` +
@@ -1264,7 +1273,10 @@ const REGISTRY = {
         });
         return `${head}\nOpen positions (${pos.length}):\n${rows.join("\n")}`;
       } catch (e) {
-        return `[trader_positions error: ${e.message}]`;
+        // A transient reach failure (timeout / feed down) is not a holdings answer —
+        // report it as an honest unavailable, not a bare error, so the model relays
+        // "couldn't reach your trading account" instead of inventing positions. (#2725)
+        return `[trader_positions: broker unavailable (${e.message}) — couldn't reach the trading account. Say so honestly; don't invent holdings.]`;
       }
     },
   },
