@@ -278,7 +278,8 @@ blueprint companion view tracked in #2775.
     drift canaries, convergence records, the honesty probe.
   - **§4.3 — tools contaminate faculty measurement** ("if the system can simply search the internet …
     we are no longer measuring the system's memory — only its ability to search"); baselines must get
-    the same tools. This is the #2322 groundedness-noise class, now named.
+    the same tools. This is the #2322 groundedness-noise class, now named — prescription: tool-gated
+    per-faculty eval conditions, tracked in #2777.
 - **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212),
   Oct 2025 — *abstract-level web-verified 2026-07-21*)
   - Companion **ten-domain** framework grounded in Cattell–Horn–Carroll (the most empirically
@@ -289,8 +290,8 @@ blueprint companion view tracked in #2775.
   the same evidence discipline as the Verify loop — and both name **metacognition** as the frontier
   gap. DeepMind states it is building held-out metacognition evals with academic partners, so the
   frontier is instrumenting the exact gap this loop occupies; validation should parallelize (E-B
-  #2691 + external metacognition evals), not serialize. Status: **theory adopted as the measurement
-  yardstick**; held-out eval integration is roadmap.
+  #2691 + external metacognition evals, tracked in #2776), not serialize. Status: **theory adopted
+  as the measurement yardstick**; held-out eval integration is roadmap.
 
 ### Integration
 - Unit tests → memory update

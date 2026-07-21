@@ -264,13 +264,18 @@ cannot. The Certificate's rule is unchanged and non-negotiable: no claimed edge,
 or novelty counts until it survives fresh, out-of-sample verification on the actual surface.
 That is the plus-ultra that is actually beyond what they ship, *because it is grounded*.
 
+---
+
 ## The honest AGI-scope assessment
 
 **Could this become the best model possible?** Not from what we own. Six of the seven load-bearing
 capabilities (data, architecture, optimizer, scaling, pretraining, frontier post-training, systems)
 are **gaps we would fill with the outside research above**, not with anything in-repo. That is not a
 failure — it matches the 2026 consensus that the frontier is *execution + data*, and those are
-capital/compute problems more than idea problems.
+capital/compute problems more than idea problems. Scored in capability space (the
+cognitive-profile companion view below), the same verdict lands with sharper edges: sub-median or absent in
+at least three faculties (perception beyond text/images, social cognition, skill-retaining
+learning), unmeasured in two more (attention; metacognition externally).
 
 **What is genuinely ours, and where it matters:** the **Verify** discipline (the Collapse Certificate
 + Grounding Ledger + Σ_θ gate), and its extension into **Converge** as the update gate. The bet that
@@ -291,11 +296,11 @@ and our Verify work is the stability layer that curve needs.
    capability and adds the grounding discipline.
 4. **Close the one real-model gap — and race the frontier to instrument it.** Run E-B ([#2691]) so the
    Verify claims graduate from simulation to MEASURED-on-a-real-model **and** validate metacognition
-   against the frontier's own emerging **held-out metacognition evals** (Burnell et al. arXiv:2605.28405
-   §4.1 — canon [07]). These must **parallelize, not serialize**: the faculty we own is the exact one
-   DeepMind is now building held-out evals for, so the lead is real but shrinking. Until then, our edge
-   is argued, not proven — and unproven against an *external* standard is worth less than proven against
-   our own.
+   against the frontier's own emerging **held-out metacognition evals** ([#2776]; Burnell et al.
+   arXiv:2605.28405 §4.1 — canon [07]). These must **parallelize, not serialize**: the faculty we own
+   is the exact one DeepMind is now building held-out evals for, so the lead is real but shrinking.
+   Until then, our edge is argued, not proven — and unproven against an *external* standard is worth
+   less than proven against our own.
 
 **The trap (stated so it can't be laundered):** treating a rigorous Verify layer as an AGI recipe.
 It is the seatbelt and the dashboard warning light — indispensable, and worthless without the engine,
@@ -319,8 +324,8 @@ assessment, not a new claim.
 |---|---|---|
 | Perception (text) | RENTED | input understanding rides the base model; non-text perception is CEDED (below) |
 | Generation (text) | RENTED | text generation is the base model's; speech generation is CEDED |
-| Attention | UNMEASURED | no instrument; never surfaced as a stage, so it earns no process-side GAP row |
-| Learning | RENTED + partial OURS | no frontier post-training (a `GAP` above); experiential learning via convergence records is ours-in-principle but simulation-bound |
+| Attention | UNMEASURED | no instrument; never surfaced as a stage, so it earns no process-side GAP row — eval plan tracked in [#2782] |
+| Learning | RENTED + partial OURS | no frontier post-training (a `GAP` above); experiential learning via convergence records is ours-in-principle but simulation-bound; retention is measured (LongMemEval), skill *acquisition* is not — instrument tracked in [#2783] |
 | Memory | RENTED (parametric) + OURS (system) | working knowledge is rented from base weights; the memory *system* (append-only JSONL + CSF archive + multi-signal retrieval) is ours — yet **long-term-memory storage is the frontier's own named deficit** (Hendrycks et al. arXiv:2510.18212) |
 | Reasoning | RENTED | Ouro / base models; we do not train the reasoner |
 | **Metacognition** | **OWNED** | the one faculty we instrument — mapping below |
@@ -331,7 +336,10 @@ assessment, not a new claim.
 **Cessions on the record** — deliberate product decisions for the AI cockpit, named the same way rented
 capabilities are (not silent omissions): **speech generation**, **motor control**, **audio perception**,
 **social cognition**. Ceding them is a scope choice, not a deficit to apologize for; naming them is what
-keeps the profile honest.
+keeps the profile honest. **Video perception** is the one faculty still ungoverned either way — the
+in-repo `analyze_video` is the Creator Suite's motion/scene/audio *highlight* analyzer (a media-editing
+Act tool), not general dynamic-scene understanding; the cede-or-plan decision is the operator's call,
+tracked in [#2784].
 
 **Metacognition — the one OWNED faculty, restated in the externally-defined vocabulary:**
 - **confidence calibration** ↔ the decision journal / calibration scoring
