@@ -8,6 +8,18 @@ introduced — this doc proves that the **CSF format** and the **Converged Tesse
 the *same* `3**12` ternary lattice viewed from two faces, and re-files them under a single
 Convergence-Core object so the project stops carrying two design threads.
 
+> **⚠️ STATUS UPDATE 2026-07-21.** The **unification itself stands** (one lattice, two faces —
+> a vocabulary consolidation over `[implemented]` code), but the research thread built on top of
+> it was **closed with evidence on 2026-06-28**: the compression/depth claims (Lapse Tesseract
+> E1/E2) were run on the real model and **killed**, and the 2026-07-18 IP consolidation folded
+> the "3¹² ternary-lattice novelty" into CSF as *engineering, novelty claim dropped* — the
+> X3 BitNet-sparsity match below is a population coincidence, not a shared mechanism. X1
+> (round-trip) and X2 (wavefront minimality) were never run. Evidence:
+> [`research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md`](research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md) ·
+> [`KEYSTONE-IP-AND-BUILDOUT.md`](KEYSTONE-IP-AND-BUILDOUT.md) §3.1. What *survived* and where
+> it is applied across CSF / Convergence-IO / chat / trade / explore:
+> [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md).
+
 **Grounding contract (External Reality Rule).** Every load-bearing claim is tagged
 **[implemented]** (code exists and runs), **[grounded]** (external peer literature supports
 it), or **[hypothesis — to be measured]**. Metaphor is labelled as metaphor.

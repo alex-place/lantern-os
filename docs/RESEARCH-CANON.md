@@ -93,12 +93,18 @@ Curated references organized by component. Not a bookmark dump. Living document 
 ### Lattice substrate — ternary storage (the 3¹² singularity, storage face)
 - **BitNet b1.58 — *The Era of 1-bit LLMs*** ([arXiv:2402.17764](https://arxiv.org/abs/2402.17764))
   - Ternary weights `{-1,0,+1}`, ~66% zeros, matmul→add; grounds CSF's qutrit engine
-  - The dust-sparsity in `quantum_dust.py` is the storage twin of BitNet's zero-sparsity
+  - X3 (2026-06-19) **refined**: dust value-sparsity is population-dependent — a *substrate*
+    resemblance to BitNet's learned zero-sparsity, **not the same mechanism** (the 0.66 match
+    is a population coincidence; see the singularity doc §6.1 and the IP register §3.1)
   - Status: external grounding for [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md)
 - **Sparse-BitNet** ([arXiv:2603.05168](https://arxiv.org/pdf/2603.05168)) · **T-SAR** ([arXiv:2511.13676](https://arxiv.org/pdf/2511.13676))
   - 1.58-bit models are naturally sparsity-friendly; CPU-only ternary inference
 - **Radix economy** ([Wikipedia](https://en.wikipedia.org/wiki/Radix_economy) · [Quanta](https://www.quantamagazine.org/how-base-3-computing-beats-binary-20240809/))
   - Base 3 is the most economical integer radix (optimum `e`); the principled reason the lattice is ternary
+- **Where ternary actually pays — hardware/serving, never entropy** (2026-07-21)
+  - GDDR7 ships **PAM-3** signaling: `{-1,0,+1}` levels, ~1.5 bits/cycle, +50% data per cycle vs NRZ ([Micron](https://www.micron.com/about/blog/memory/dram/unveiling-the-next-generation-of-graphics-memory-gddr7) · [Rambus](https://www.rambus.com/blogs/all-you-need-to-know-about-gddr7/))
+  - Trit-in-bit packing is a solved 99.06% craft: 5 trits/byte, llama.cpp **TQ1_0 = 1.6875 bpw** / TQ2_0 = 2.0625 bpw for BitNet/TriLM weights ([PR #8151](https://github.com/ggml-org/llama.cpp/pull/8151) · [Compilade](https://compilade.net/blog/ternary-packing) · [bitnet.cpp, arXiv:2502.11880](https://arxiv.org/pdf/2502.11880)) — the packing question for the ADR-0026 serving artifact
+  - Base-3 confers **no** codec advantage (Shannon is radix-invariant) — kill-doc verdict stands; application map: [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md) §5
 - **Hyperdimensional computing / VSA** ([arXiv:2111.06077](https://arxiv.org/abs/2111.06077))
   - Ternary `{-1,0,1}` sparse high-dimensional codes; reference for the 12-axis vector-symbolic substrate
 
@@ -354,7 +360,13 @@ Memory.append(type=Pattern, confidence=X)
     Radius Regularisation; closes the spiral paper's open **non-normal-operator** gap
 - **SpiralFormer** ([arXiv:2602.11698](https://arxiv.org/pdf/2602.11698)) · **A Survey on Latent Reasoning** ([arXiv:2507.06203](https://arxiv.org/pdf/2507.06203))
 - **Ouro LoopLM** ([arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) — weight-tied recurrence + Q-exit; substrate the spiral extends
+- **Verdict (2026-06-28, run on the real Ouro-1.4B):** the latent loop does **not** contract in
+  its 4 trained steps — convergence-exit never fires and the spiral premise collapses to a
+  relabel of Q-exit; the usable adaptive-depth signal is the **trained Q-exit gate**. Closed in
+  [`research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md`](research/2026-06-28-csf-tesseract-novelty-and-e1-kill.md)
 - Lattice consolidation: [`TESSERACT-CSF-SINGULARITY.md`](TESSERACT-CSF-SINGULARITY.md) · [`research/2026-06-19-convergence-tesseract-spiral.md`](research/2026-06-19-convergence-tesseract-spiral.md)
+- Surviving-primitive application map (CSF · Convergence-IO · chat · trade · explore):
+  [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md)
 
 ### Self-supervised anti-collapse — the representation-learning twin of the collapse certificate
 The LeCun/FAIR non-generative-SSL lineage (DrLIM → JEPA → LeJEPA/LeWM) spends two decades
