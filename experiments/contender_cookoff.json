@@ -1,0 +1,107 @@
+{
+ "asof": "2026-07-17",
+ "tuning": "all free params tuned pre-2020 only; test graded once",
+ "picks": {
+  "C1": [
+   0.2,
+   0.3,
+   12,
+   0.16
+  ],
+  "C2_K": 5,
+  "C4_c": 0.04,
+  "C5_s": 0.1
+ },
+ "rows": {
+  "CHAMPION (ref)": {
+   "final": 91702.93247741563,
+   "maxdd": -0.2546435041993351,
+   "sharpe": 0.6476962863580589,
+   "test": {
+    "sharpe": 1.0185843217820623,
+    "growth": 3.650978791047993,
+    "maxdd": -0.2328733782427801
+   },
+   "beats_champion_final": false,
+   "beats_with_dd": false
+  },
+  "C1 grid-refit": {
+   "final": 81944.82142573541,
+   "maxdd": -0.25126685873596033,
+   "sharpe": 0.7282807377099105,
+   "test": {
+    "sharpe": 0.9681879507925064,
+    "growth": 2.869805667573903,
+    "maxdd": -0.2615315303883985
+   },
+   "beats_champion_final": false,
+   "beats_with_dd": false
+  },
+  "C2 dualmom top5 1x": {
+   "final": 62744.79160668462,
+   "maxdd": -0.23254805528827183,
+   "sharpe": 0.7995186374559535,
+   "test": {
+    "sharpe": 0.8645979615520555,
+    "growth": 2.26968891316145,
+    "maxdd": -0.23566568230259544
+   },
+   "beats_champion_final": false,
+   "beats_with_dd": false
+  },
+  "C3 dualmom top5 +brake": {
+   "final": 90796.93085651945,
+   "maxdd": -0.350485443148156,
+   "sharpe": 0.6538135719505765,
+   "test": {
+    "sharpe": 0.6662105932511431,
+    "growth": 2.419711280051334,
+    "maxdd": -0.35716221137214266
+   },
+   "beats_champion_final": false,
+   "beats_with_dd": false
+  },
+  "C4 sigma2 c=0.04": {
+   "final": 75736.26661036677,
+   "maxdd": -0.4290783765794951,
+   "sharpe": 0.5696662940050558,
+   "test": {
+    "sharpe": 0.6998119556818986,
+    "growth": 2.3534511365515236,
+    "maxdd": -0.4324310275498481
+   },
+   "beats_champion_final": false,
+   "beats_with_dd": false
+  },
+  "C5 champion+10%BTC": {
+   "final": 277980.302489821,
+   "maxdd": -0.27850789409691257,
+   "sharpe": 0.8254992444725449,
+   "test": {
+    "sharpe": 1.1896527388433689,
+    "growth": 5.744096590822828,
+    "maxdd": -0.2807998728626655
+   },
+   "beats_champion_final": true,
+   "beats_with_dd": false
+  },
+  "C6 sink (+IRX)": {
+   "final": 312091.7304112653,
+   "maxdd": -0.28020927293011777,
+   "sharpe": 0.8432781254963557,
+   "test": {
+    "sharpe": 1.187799401513339,
+    "growth": 5.72612433173397,
+    "maxdd": -0.28214550624457535
+   },
+   "beats_champion_final": true,
+   "beats_with_dd": false
+  }
+ },
+ "flags": [
+  "C5/C6 BTC inclusion is hindsight-informed (asset chosen knowing its history) - capped sleeve + 2014-listing start mitigate but do not remove the bias",
+  "C2/C3 dual momentum externally validated (Antonacci) - portfolio-level, not the retired single-stock variant",
+  "engine equivalence asserted vs the published champion",
+  "carry = flat 3% for comparability except C6 (real ^IRX)"
+ ]
+}

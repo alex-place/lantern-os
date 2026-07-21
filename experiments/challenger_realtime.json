@@ -1,0 +1,133 @@
+{
+ "asof": "2026-07-17",
+ "window": [
+  "2024-03-01",
+  "2026-07-17"
+ ],
+ "panel": {
+  "bars": 5080,
+  "close_repairs": 131,
+  "low_clamps": 3118
+ },
+ "variants": {
+  "daily": {
+   "final": 46662.73172512861,
+   "sharpe": 1.1630393939414287,
+   "sharpe_lo": -0.10846605451574169,
+   "sharpe_hi": 2.434544842398599,
+   "maxdd": -0.22157923529524404,
+   "turnover_sum": 15.911784287660767,
+   "n_gross_changes": 108,
+   "n_intrabar_cuts": 0,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": null,
+   "avg_gross": 1.9198228123616476
+  },
+  "hourly": {
+   "final": 50902.24185310388,
+   "sharpe": 1.3011968832507204,
+   "sharpe_lo": 0.02962938213955323,
+   "sharpe_hi": 2.5727643843618875,
+   "maxdd": -0.19846706664169445,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 650,
+   "n_intrabar_cuts": 0,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": null,
+   "avg_gross": 1.9364569898600223
+  },
+  "realtime": {
+   "final": 51543.48513417369,
+   "sharpe": 1.3272473450018432,
+   "sharpe_lo": 0.05566736416480128,
+   "sharpe_hi": 2.598827325838885,
+   "maxdd": -0.19846706664169445,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 649,
+   "n_intrabar_cuts": 1,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": 0.7974156826906045,
+   "avg_gross": 1.9364569898600223
+  },
+  "static": {
+   "final": 57410.48447844426,
+   "sharpe": 1.4109885029001323,
+   "sharpe_lo": 0.13936673023205867,
+   "sharpe_hi": 2.682610275568206,
+   "maxdd": -0.22841656122643306,
+   "turnover_sum": 8.002382486056696,
+   "n_gross_changes": 1,
+   "n_intrabar_cuts": 0,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": null,
+   "avg_gross": 2.0
+  },
+  "hourly_irx": {
+   "final": 49490.09291919141,
+   "sharpe": 1.2548011653597109,
+   "sharpe_lo": -0.016744721754147665,
+   "sharpe_hi": 2.52634705247357,
+   "maxdd": -0.19902815278354113,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 650,
+   "n_intrabar_cuts": 0,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": null,
+   "avg_gross": 1.9364569898600223
+  },
+  "realtime_irx": {
+   "final": 50113.550850629086,
+   "sharpe": 1.2806145722355295,
+   "sharpe_lo": 0.00905675642930094,
+   "sharpe_hi": 2.5521723880417584,
+   "maxdd": -0.19902815278353936,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 649,
+   "n_intrabar_cuts": 1,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": 0.7974156826906045,
+   "avg_gross": 1.9364569898600223
+  },
+  "realtime_0bp": {
+   "final": 51598.37046067753,
+   "sharpe": 1.3294302958725261,
+   "sharpe_lo": 0.05784925804430172,
+   "sharpe_hi": 2.6010113337007508,
+   "maxdd": -0.1984670666416941,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 649,
+   "n_intrabar_cuts": 1,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": 0.7974156826906045,
+   "avg_gross": 1.9364569898600223
+  },
+  "realtime_10bp": {
+   "final": 51488.59980766963,
+   "sharpe": 1.3250576859493959,
+   "sharpe_lo": 0.05347876360749696,
+   "sharpe_hi": 2.596636608291295,
+   "maxdd": -0.1984670666416949,
+   "turnover_sum": 15.895247714554076,
+   "n_gross_changes": 649,
+   "n_intrabar_cuts": 1,
+   "n_whipsaw_cuts": 0,
+   "median_lambda": 0.7974156826906045,
+   "avg_gross": 1.9364569898600223
+  }
+ },
+ "bootstrap_rt_minus_hourly": {
+  "mean": 0.0007136533305322717,
+  "ci95": [
+   0.0,
+   0.002136686618360095
+  ],
+  "p_positive": 0.63
+ },
+ "notes": [
+  "realtime = hourly close logic + intra-bar trend-gate/dd pre-emption at the linear-path trigger on clamped lows; re-lever at closes only (defensive asymmetry).",
+  "~2.4 sim years - mechanism evidence, not an expected-return claim.",
+  "intra-bar fills at trigger minus 5bp haircut (0/10bp sensitivities run).",
+  "low excursions clamped at 4x rolling median hourly move (fake-wick guard)."
+ ],
+ "generated": "2026-07-19T14:24:52.315101+00:00"
+}
