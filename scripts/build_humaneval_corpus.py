@@ -2,9 +2,11 @@
 """
 Build a HumanEval-optimized coding corpus for the Ouro QLoRA adapter.
 
-WHY: the in-tree models/lantern-sigma0-coder/training-data.jsonl (243 rows) and the
-function-calling corpus (Hermes/ToolACE) train tool-calling, NOT free-form Python code
-generation. HumanEval pass@1 measures the latter. The grounded, best-cited recipe for
+WHY: the earlier in-tree coding corpus (models/lantern-sigma0-coder/training-data.jsonl,
+243 rows — since deleted in #1850) and the function-calling corpus (Hermes/ToolACE) train
+tool-calling, NOT free-form Python code generation. HumanEval pass@1 measures the latter.
+(The output dir models/lantern-sigma0-coder/ is a retired model's name repurposed for live
+Ouro datasets — see docs/LANTERN-SIGMA0-CODER.md.) The grounded, best-cited recipe for
 lifting HumanEval pass@1 on a small model is Magicoder's **OSS-Instruct + Evol-Instruct**
 (Wei et al., arXiv:2312.02120 — Magicoder S-CL-7B reaches 66.5% HumanEval+). We use the
 clean, execution-filtered members of that family and DECONTAMINATE against HumanEval so the
