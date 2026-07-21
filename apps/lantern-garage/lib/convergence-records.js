@@ -48,24 +48,42 @@ async function emitConvergenceRecord({
   applied_evidence = [],
   grounding_signals = [],
   allowed_max_confidence = null,
+  verified_by = [],
 } = {}) {
   try {
+    // Two write-gates that keep the ledger honest at the source (the #767 audit found
+    // ~88% of live records were thin/empty and 60 were laundered):
+    //   1) drop empty/whitespace hypotheses — a record with no claim is telemetry, not
+    //      a ConvergenceRecord. Return null (best-effort emit; caller never breaks).
+    //   2) `verified=true` is only legitimate with a CHECKABLE artifact in verified_by
+    //      (a merged PR / commit / passing test / exec outcome). Otherwise downgrade to
+    //      verified=false — you cannot claim reality confirmed a claim without a receipt.
+    const hyp = String(hypothesis == null ? "" : hypothesis).trim();
+    if (!hyp) return null;
+    const vb = Array.isArray(verified_by) ? verified_by.map(String).filter(Boolean) : [];
+    let isVerified = Boolean(verified);
+    let notes = verification_notes == null ? null : String(verification_notes);
+    if (isVerified && vb.length === 0) {
+      isVerified = false;
+      notes = (notes ? notes + " " : "") + "[downgraded: verified=true requires a verified_by artifact]";
+    }
     const record = {
       id: _id(),
-      hypothesis: String(hypothesis == null ? "" : hypothesis),
+      hypothesis: hyp,
       evidence_ids: Array.isArray(evidence_ids) ? evidence_ids.map(String) : [],
       result: result === undefined ? null : result,
       confidence: Math.max(0, Math.min(1, Number(confidence) || 0)),
       reasoner: String(reasoner || "unknown"),
       timestamp: new Date().toISOString(),
-      verified: Boolean(verified),
-      verification_notes: verification_notes == null ? null : String(verification_notes),
+      verified: isVerified,
+      verification_notes: notes,
       source: source == null ? null : String(source),
       applied_evidence: Array.isArray(applied_evidence) ? applied_evidence.map(String) : [],
       // Σ₀ grounding fields — mirror the Python ConvergenceRecord dataclass
       // (src/convergence/objects.py). Empty/null at emit; filled during Verify.
       grounding_signals: Array.isArray(grounding_signals) ? grounding_signals.map(String) : [],
       allowed_max_confidence: allowed_max_confidence == null ? null : Number(allowed_max_confidence),
+      verified_by: vb,  // hard, checkable artifacts (pr:/commit:/test:/exec:)
     };
     await appendJsonlQueued(RECORDS_PATH, record, { rotate: true }); // #872
     return record;

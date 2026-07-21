@@ -25,6 +25,7 @@ JS_EMITTED = {
     "applied_evidence": [],  # #764 G9 — folded-evidence hashes (empty at emit time)
     "grounding_signals": [],  # Σ₀ grounding — ExternalGroundingSensor ids (empty at emit)
     "allowed_max_confidence": None,  # Σ₀ grounding — confidence ceiling (null at emit)
+    "verified_by": [],  # hard checkable artifacts (pr:/commit:/test:/exec:) — empty at emit
 }
 
 EMITTER_KEYS = {
@@ -33,6 +34,7 @@ EMITTER_KEYS = {
     "source",
     "applied_evidence",  # #764 G9
     "grounding_signals", "allowed_max_confidence",  # Σ₀ grounding fields
+    "verified_by",  # hard, checkable verification artifacts
 }
 
 
@@ -50,6 +52,7 @@ def _load(d):
         verification_notes=d["verification_notes"],
         source=d.get("source"),
         applied_evidence=list(d.get("applied_evidence", [])),
+        verified_by=list(d.get("verified_by", [])),
     )
 
 
@@ -93,3 +96,24 @@ def test_evidence_ids_grounds_in_memory():
     ungrounded = _load({**JS_EMITTED, "evidence_ids": []})
     assert len(grounded.evidence_ids) > 0
     assert ungrounded.evidence_ids == []
+
+
+def test_verified_requires_checkable_artifact():
+    """`verified=True` is legitimate only with a checkable artifact in verified_by.
+
+    This is the structural anti-laundering gate (the #767 audit found 60 records claiming
+    verified=True on weak/absent evidence). A verified record with an empty verified_by is
+    NOT verification_ok; one carrying a merged-PR ref is.
+    """
+    launder = _load({**JS_EMITTED, "verified": True, "verified_by": []})
+    legit = _load({**JS_EMITTED, "verified": True, "verified_by": ["pr:2737"]})
+    unverified = _load({**JS_EMITTED, "verified": False, "verified_by": []})
+    assert launder.verification_ok() is False   # verified without a receipt = laundering
+    assert legit.verification_ok() is True       # merged PR is a checkable artifact
+    assert unverified.verification_ok() is True   # un-verified records are always fine
+
+
+def test_verified_by_roundtrips():
+    """verified_by survives the JSONL serialization contract."""
+    out = json.loads(_load({**JS_EMITTED, "verified_by": ["pr:2737", "commit:a980"]}).to_jsonl())
+    assert out["verified_by"] == ["pr:2737", "commit:a980"]
