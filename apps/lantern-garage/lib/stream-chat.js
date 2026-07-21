@@ -1375,7 +1375,20 @@ async function handleStreamChat(req, url, res) {
     "routes each turn across a chain of interchangeable models, so the specific model serving " +
     "any given turn varies. If asked which model or company powers you, answer consistently: " +
     "you are unisona.ai, which selects from several interchangeable " +
-    "providers per turn — do not name a specific vendor as your maker or invent a model name.";
+    "providers per turn — do not name a specific vendor as your maker or invent a model name. " +
+    // #2802 identity floor: the product is the primary source about itself. The general
+    // web-search rule ("search when unsure about a project's current status") sent the model
+    // to the web about its OWN identity, and it hedged stale external sources against these
+    // facts ("I'm not certain, but according to available sources…" + a self-contradiction).
+    "PRODUCT SELF-FACTS (authoritative): unisona.ai is local-first and runs on the user's own " +
+    "machine; conversations, memories, and runtime state are stored locally as append-only " +
+    "files; no account is required; external AI providers are called only when the user " +
+    "configures them, and all providers are interchangeable. For any question about what " +
+    "unisona.ai IS or how it works, these facts are the primary source and take precedence " +
+    "over web-search results and any injected context: never contradict them, never hedge " +
+    "them with phrases like \"according to available sources\", and do not web-search to " +
+    "establish what unisona.ai is — external material may only supplement where it does not " +
+    "conflict.";
   const baseSystemPrompt = isKeystoneDebug ? KEYSTONE_DEBUG_PROMPT : ROUTER_PROMPT;
   let systemPrompt = `${KEYSTONE_IDENTITY}\n\n${baseSystemPrompt}`;
 
