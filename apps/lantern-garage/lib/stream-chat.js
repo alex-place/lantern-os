@@ -1003,6 +1003,32 @@ async function handleStreamChat(req, url, res) {
       return;
     }
 
+    // !work #<issue> / !autowork #<issue> — start the observable autowork pipeline on a
+    // tracked issue. The server does NOT run the pipeline here: the client owns the one
+    // live SSE run panel (runAutowork → POST /api/convergence/autonomous-work/stream), so
+    // this deterministic route only validates the issue number and tags the done event
+    // source:"work" — the same server-tags/client-acts contract !review uses for its
+    // Approve/Discard bar. Explicit bang commands are the sanctioned deterministic path;
+    // NL phrasing stays with the model (no keyword routing). Fixes the dead-end where an
+    // explicit autowork request got a clarification reply and no affordance whenever the
+    // Ouro intent router (the only source of coding_change) is offline.
+    if (cmd.name === "work" || cmd.name === "autowork") {
+      sse.writeStreamHeaders(res);
+      const sendToken = (token) => sse.sendToken(res, token);
+      const sendDone = (source, meta) => sse.sendDone(res, source, meta);
+      const issueNum = (String(cmd.args || "").match(/#?(\d+)/) || [])[1];
+      if (!issueNum) {
+        sendToken("Usage: `!work #<issue number>` — e.g. `!work #2762`. Starts the observable autowork run (research → plan → patch → tests → draft PR) on that issue.");
+        sendDone("work", { agent: "unisona.ai", online: true });
+        res.end();
+        return;
+      }
+      sendToken(`🔧 Autowork on [issue #${issueNum}](https://github.com/alex-place/lantern-os/issues/${issueNum}) — the live run panel opens below.`);
+      sendDone("work", { agent: "unisona.ai", online: true, provider: "work" });
+      res.end();
+      return;
+    }
+
     if (cmd.name === "converge" || cmd.name === "convergance"   // already handled above
         || cmd.name === "ask") {   // !ask falls through to the convergence-agent short-circuit below
       // fall through to normal SSE chat routing below

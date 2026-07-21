@@ -15,8 +15,28 @@
   reason in the button, tooltip, and confirm dialog, so a chat-side merge can no longer silently
   launder unverified work.
 
+- chat(autowork): **deterministic `!work #<issue>` / `!autowork #<issue>` command** — the server
+  route validates the issue number and tags the done event `source:"work"` (the same
+  server-tags/client-acts contract `!review` uses); the client then opens the one real run panel
+  (`runAutowork`). Fixes the dead end where an explicit "run autowork on issue #N" request got a
+  clarification reply and **no autowork affordance at all** whenever the Ouro intent router — the
+  only source of `coding_change` — is offline (which is every fresh install: ollama down ⇒ no
+  offer, ever). Explicit bang-commands are the sanctioned deterministic path; NL phrasing stays
+  with the model.
+- chat(autowork): guests who trigger autowork now get an actionable auth message — the stream
+  endpoint (correctly) refuses non-operator sessions, but the panel showed the raw
+  "Connection lost — stream_unavailable_403"; it now explains autowork changes the repo, needs an
+  operator sign-in, and links `/auth.html` with the retry command.
+
 ### Fixed
 
+- chat(autowork): the loop strip derived stage state by forward-marking ("everything before the
+  current stage is done"), but the pipeline is not in loop order — `branch` (an Act phase) runs
+  before `research` (Remember) — so Reason lit as done before the plan step ever ran. Stage state
+  is now recomputed from the actual step rows (active if any phase active/retrying, error if one
+  errored, done once at least one finished) — order-independent. Caught live on the first real
+  run. `runAutowork` also null-guards its offer-button reference so command-started runs (no
+  button) can't crash the finale.
 - autowork(server): the `done` event's `convergence.confidence.research` was read from a
   nonexistent field (`confidence.research`; the record stores `codebaseResearch`) and was always
   `undefined` — now mapped correctly. The run log's `result` record now also persists the

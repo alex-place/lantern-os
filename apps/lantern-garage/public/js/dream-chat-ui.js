@@ -512,20 +512,37 @@ function awStepRowsHtml(phases, esc) {
   }).join('');
 }
 
-// Earlier stages are done, the current one is active (or error). A stage stays
-// lit until a later stage starts, so quick phases still register visually.
+// Recompute every node from the step rows. Order-independent on purpose: the
+// pipeline is NOT in loop order (branch — an Act phase — runs before research),
+// so "mark all earlier stages done" forward-marking lit Reason before the plan
+// step ever ran. Truth lives in the rows: a stage is active if any of its phases
+// is active/retrying, error if one errored, done once at least one finished.
 function awUpdateLoop(row, phase, status) {
-  const stageKey = AW_PHASE_STAGE[phase];
-  if (!stageKey || !row) return;
-  const idx = AW_LOOP_STAGES.findIndex(([k]) => k === stageKey);
-  if (idx < 0) return;
-  row.querySelectorAll('.aw-loop-node').forEach((node, i) => {
-    if (i < idx) { node.classList.remove('is-active', 'is-error'); node.classList.add('is-done'); }
-    else if (i === idx) {
-      node.classList.remove('is-done');
-      if (status === 'error') { node.classList.remove('is-active'); node.classList.add('is-error'); }
-      else { node.classList.remove('is-error'); node.classList.add('is-active'); }
-    }
+  if (!row) return;
+  const state = {};
+  const fold = (stageKey, cls) => {
+    if (!stageKey) return;
+    const st = state[stageKey] || (state[stageKey] = { active: false, error: false, done: false });
+    if (cls === 'active' || cls === 'retry') st.active = true;
+    else if (cls === 'error') st.error = true;
+    else if (cls === 'done' || cls === 'skipped') st.done = true;
+  };
+  row.querySelectorAll('.aw-step').forEach((el) => {
+    const cls = el.classList.contains('is-active') ? 'active'
+      : el.classList.contains('is-retry') ? 'retry'
+      : el.classList.contains('is-error') ? 'error'
+      : el.classList.contains('is-done') ? 'done'
+      : ((el.querySelector('.aw-ico') || {}).textContent === '⊘') ? 'skipped' : null;
+    fold(AW_PHASE_STAGE[el.dataset.phase], cls);
+  });
+  // The triggering event isn't in its row yet (setStep updates the row after this),
+  // and some phases have no row at all (agi-benchmark) — fold it in directly.
+  fold(AW_PHASE_STAGE[phase], status === 'start' ? 'active' : status);
+  row.querySelectorAll('.aw-loop-node').forEach((node) => {
+    const st = state[node.dataset.stage] || { active: false, error: false, done: false };
+    node.classList.toggle('is-active', st.active);
+    node.classList.toggle('is-error', st.error && !st.active);
+    node.classList.toggle('is-done', st.done && !st.active && !st.error);
   });
 }
 
@@ -926,8 +943,7 @@ async function runAutowork(target, btn, base) {
     // Render final state
     const fin = row.querySelector('.aw-final');
     if (finalDone && finalDone.ok) {
-      btn.textContent = '✓ Done';
-      btn.style.color = '#4ade80';
+      if (btn) { btn.textContent = '✓ Done'; btn.style.color = '#4ade80'; }
       fin.style.color = '#4ade80';
       fin.innerHTML = finalDone.prUrl
         ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
@@ -940,8 +956,7 @@ async function runAutowork(target, btn, base) {
       setActivity('Complete', finalDone.prUrl ? 'opened a pull request' : 'autonomous work finished', false);
       if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
-      btn.textContent = '✗ Failed';
-      btn.style.color = '#f87171';
+      if (btn) { btn.textContent = '✗ Failed'; btn.style.color = '#f87171'; }
       if (!fin.textContent) {
         fin.style.color = '#f87171';
         fin.textContent = `✗ ${esc((finalDone && finalDone.message) || 'Auto-work failed')}`;
@@ -950,8 +965,7 @@ async function runAutowork(target, btn, base) {
     }
     if (typeof scrollToBottom === 'function') scrollToBottom();
   } catch (e) {
-    btn.textContent = '✗ Error';
-    btn.style.color = '#f87171';
+    if (btn) { btn.textContent = '✗ Error'; btn.style.color = '#f87171'; }
     // The SSE connection dropped mid-run (long plan/patch steps can outlast an idle
     // proxy). Flip the still-spinning active step to an error glyph and stop the
     // mandala — otherwise the panel spins forever with no explanation.
@@ -961,6 +975,19 @@ async function runAutowork(target, btn, base) {
       activeStep.classList.add('is-error');
       const ai = activeStep.querySelector('.aw-ico');
       if (ai) { ai.textContent = '✗'; ai.style.color = '#f87171'; }
+    }
+    // 401/403 from the stream endpoint = not an outage, an auth gate: autowork
+    // mutates the repo, so the server (correctly) refuses guest sessions. Say that,
+    // with the door to fix it — "Connection lost — stream_unavailable_403" told the
+    // user nothing actionable.
+    const mAuth = String(e && e.message || '').match(/stream_unavailable_(401|403)/);
+    if (mAuth) {
+      setActivity('Autowork needs an operator sign-in', 'this session is a guest — autowork changes the repo, so it requires an operator account', false);
+      const finAuth = row.querySelector('.aw-final');
+      finAuth.style.color = '#f87171';
+      finAuth.innerHTML = `✗ Autowork requires an operator session (HTTP ${esc(mAuth[1])}). <a href="/auth.html?returnTo=%2Fchat.html" style="color:var(--accent)">Sign in</a> and re-run \`!work #${esc(String(issue == null ? '' : issue))}\`.`;
+      if (typeof scrollToBottom === 'function') scrollToBottom();
+      return;
     }
     const isNet = /network|failed to fetch|load failed/i.test(e && e.message || '');
     const fin = row.querySelector('.aw-final');
@@ -1617,6 +1644,16 @@ async function sendMessage(opts = {}) {
   if (doneProvider === 'review' && !didError) {
     const _prm = String(text || '').match(/#?(\d+)/);
     if (_prm) renderPrReviewActions(bubble, parseInt(_prm[1], 10), (typeof serverBase !== 'undefined') ? serverBase : window.location.origin);
+  }
+
+  // Deterministic `!work #N` (server tags the done event source "work", mirroring
+  // !review): start the observable autowork run panel on that issue. The server route
+  // only validates + tags — the client owns the one panel path (runAutowork), so
+  // command-started and offer-started runs render identically. `btn` is null here
+  // (no offer button exists); runAutowork guards it.
+  if (doneProvider === 'work' && !didError) {
+    const _wm = String(text || '').match(/#?(\d+)/);
+    if (_wm) runAutowork(parseInt(_wm[1], 10), null, (typeof serverBase !== 'undefined') ? serverBase : window.location.origin).catch(() => {});
   }
 
   // Signature line: always show a human-readable label + time. Raw provider/model id
