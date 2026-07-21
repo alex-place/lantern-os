@@ -49,6 +49,17 @@ function recordChatUsage(req) {
   } catch { /* traction never breaks the reply */ }
 }
 
+// Accept a caller-supplied `responseSchema` only if it's a plausible JSON Schema
+// object — an object with a `type` or a `properties` map. Anything else (string,
+// array, empty object, junk) → null, so the structured path stays a strict opt-in
+// and a malformed schema silently degrades to normal free-text chat. (#2757)
+function _validStructuredSchema(s) {
+  if (!s || typeof s !== "object" || Array.isArray(s)) return null;
+  const hasType = typeof s.type === "string" && s.type.length > 0;
+  const hasProps = s.properties && typeof s.properties === "object" && !Array.isArray(s.properties);
+  return hasType || hasProps ? s : null;
+}
+
 module.exports = async function dreamRoutes(req, res, url, deps) {
   const { fs, path, sendJson, collectRequestBody, appendJsonlQueued,
     repoRoot, maxDreamerTextLength, maxConversationTextLength,
@@ -345,11 +356,41 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
           : selectAgent(message);
         result = await handleConvergenceCommand(recentDreams, agent, message);
       } else {
+        // Structured-output mode (#2757): when the caller supplies `responseSchema`
+        // (a JSON Schema), lock the reply to that shape — steer the first reply with a
+        // schema hint, validate the JSON it returns, and do ONE repair round-trip if it
+        // doesn't conform. Provider-agnostic (rides whatever provider dreamChatReply
+        // picks); the validated object is returned as `result.structured`. Absent a
+        // schema this is a no-op and the path behaves exactly as before.
+        const { schemaHint, parseObject, buildRepairInstruction } = require("../lib/structured-output");
+        const responseSchema = _validStructuredSchema(body.responseSchema);
+        const modelMessage = responseSchema ? `${message}\n\n${schemaHint(responseSchema)}` : message;
         // body.mode: allowlisted one-shot mode (#2577, e.g. "review" from pr-watcher) —
         // no tools narrative, no context injection; unknown values are ignored.
-        result = await dreamChatReply(message, recentDreams, body.agent || "", body.provider || "", body.mode || "");
-        // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists)
-        if (result.reply && isVerifyEnabled()) {
+        result = await dreamChatReply(modelMessage, recentDreams, body.agent || "", body.provider || "", body.mode || "");
+        if (responseSchema && result.reply) {
+          let parsed = parseObject(result.reply, responseSchema);
+          if (!parsed.ok) {
+            try {
+              const repair = await dreamChatReply(
+                buildRepairInstruction(responseSchema, result.reply, parsed.errors),
+                recentDreams, result.agent || body.agent || "", body.provider || "", "review");
+              const reparsed = repair && repair.reply ? parseObject(repair.reply, responseSchema) : null;
+              // Keep the repair only if it's valid, or strictly closer (fewer errors).
+              if (reparsed && (reparsed.ok || reparsed.errors.length < parsed.errors.length)) {
+                result.reply = repair.reply;
+                parsed = reparsed;
+              }
+            } catch { /* repair round-trip non-fatal — return best-effort below */ }
+          }
+          result.structured = { ok: parsed.ok, value: parsed.value, errors: parsed.errors };
+          // On success, canonicalise the reply to the validated JSON so callers reading
+          // `reply` get clean, fence-free JSON (not the model's prose wrapper).
+          if (parsed.ok) result.reply = JSON.stringify(parsed.value, null, 2);
+        }
+        // Σ₀ self-correction pass (only when SIGMA0_VERIFY=true and reply exists). Skipped
+        // under a responseSchema: it hedges prose ("I believe…") and would break the JSON.
+        if (result.reply && isVerifyEnabled() && !responseSchema) {
           try {
             const { verified, corrected, records, skipped } = await verifyResponse(result.reply, message, result.agent || "lantern");
             if (corrected) result.reply = verified;
