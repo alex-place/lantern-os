@@ -816,6 +816,16 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
           upstream.on("end", () => {
             try {
               const json = JSON.parse(data);
+              // Ollama error envelope (e.g. the configured model isn't installed) is NOT
+              // content — capture it as lastProviderError so it surfaces as an honest,
+              // actionable message instead of a bare no_provider_configured. (#2725/#2760.)
+              const oerr = require("./ollama-error").classifyOllamaError(json, ollamaModel);
+              if (oerr) {
+                lastProviderError = oerr;
+                recordProviderFailureRouter("ollama", oerr.type);
+                resolve({ content: "", doors: [] });
+                return;
+              }
               const content = String(json.message?.content || "").trim();
               const doorsMatch = content.match(/\[DOORS:\s*([^\]]+)\]/i);
               const ollamaDoors = doorsMatch
