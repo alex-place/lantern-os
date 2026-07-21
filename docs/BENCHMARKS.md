@@ -51,6 +51,7 @@ pairs the runs' per-problem detail files on `task_id` and reports the paired mea
 | **Humanity's Last Exam** | Reason | Frontier expert-level QA | — | 📋 Planned | `data/benchmarks/humanitys-last-exam.json` |
 | **OSWorld** | Act | Real desktop/computer-use task success | — | 📋 Planned | `data/benchmarks/agi-capability-matrix.json` |
 | **SuperARC** | Reason | Compression/abstraction reasoning | — | 📋 Planned | `data/benchmarks/superarc.json` |
+| **AITDCC-2026** | Remember | Neutral lossless-compression grading: 16 heterogeneous files (public-train/hidden-test), ratio + Weissman + Pareto, ≤8 GB RAM, ≤1 MB decompressor | — (run CSF-Omni over the public corpus; compare leaderboard references) | 📋 Planned | External check of the CSF-Omni "ties-brotli envelope" claim, which has only ever been measured on our own corpora — [arXiv:2606.17712](https://arxiv.org/abs/2606.17712) · [leaderboard](https://aitdcc.github.io); proposed as **Q2** in [`research/2026-07-21-tesseract-application-map.md`](research/2026-07-21-tesseract-application-map.md) §4 |
 
 ---
 
