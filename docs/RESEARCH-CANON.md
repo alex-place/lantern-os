@@ -252,6 +252,40 @@ Not a separate system.
 - **Data-source reality** — no free price source is survivorship-free; live-priced vendor survey in
   [research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
 
+### AGI-scope capability measurement — external yardstick (added 2026-07-21)
+The strongest external AGI-measurement standards, adopted as the yardstick for the
+Verify/Converge discipline (better convergence metrics — Feature Gate: allowed). See #2774;
+blueprint companion view tracked in #2775.
+- **Measuring Progress Toward AGI: A Cognitive Framework** (Burnell et al., Google DeepMind,
+  [arXiv:2605.28405](https://arxiv.org/abs/2605.28405), May 2026 — *full text read; §3 / §4.1 / §4.3 verified 2026-07-21*)
+  - A **ten-faculty cognitive taxonomy** — perception, generation, attention, learning, memory,
+    reasoning, **metacognition**, executive functions, problem solving, social cognition — grounded
+    in psychology / neuroscience / cognitive science.
+  - **Three-stage protocol** (§3): (1) cognitive assessment over targeted held-out tasks →
+    (2) human baselines on the same tasks → (3) per-system **cognitive profiles** of strengths and
+    weaknesses relative to human performance.
+  - **§4.3 — score the system WITH its tools, not the bare model** ("the intelligence attributed to a
+    given model depends on the harness built around it"). External legitimization of the
+    rent-capability / own-grounding strategy: the harness is part of the measured intelligence.
+  - **§4.1 — metacognition is among the largest benchmark coverage gaps** (with attention, learning,
+    social cognition) — precisely the faculty this Verify discipline occupies: calibration scoring,
+    drift canaries, convergence records, the honesty probe.
+  - **§4.3 — tools contaminate faculty measurement** ("if the system can simply search the internet …
+    we are no longer measuring the system's memory — only its ability to search"); baselines must get
+    the same tools. This is the #2322 groundedness-noise class, now named.
+- **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212),
+  Oct 2025 — *abstract-level web-verified 2026-07-21*)
+  - Companion **ten-domain** framework grounded in Cattell–Horn–Carroll (the most empirically
+    validated model of human cognition); yields an AGI score (GPT-4 27% → GPT-5 57%).
+  - Current systems show **"jagged" profiles** with a critical deficit in **long-term memory
+    storage** — the frontier gap that maps to [02] MEMORY + the [07] VERIFY convergence-record trail.
+- **Why this lives in [07]:** both standards score capability by held-out profile + human baseline —
+  the same evidence discipline as the Verify loop — and both name **metacognition** as the frontier
+  gap. DeepMind states it is building held-out metacognition evals with academic partners, so the
+  frontier is instrumenting the exact gap this loop occupies; validation should parallelize (E-B
+  #2691 + external metacognition evals), not serialize. Status: **theory adopted as the measurement
+  yardstick**; held-out eval integration is roadmap.
+
 ### Integration
 - Unit tests → memory update
 - Integration tests → pattern extraction
@@ -462,6 +496,7 @@ Never retrain. Accumulate.
 4. **Remove entries when superseded by implementation or better alternative**
 5. **This is not a bookmarks list. It is the architecture research trail.**
 
-**Last Updated:** 2026-07-06 (SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
+**Last Updated:** 2026-07-21 ([07] VERIFY — adopted the external AGI-measurement yardstick: Burnell et al. arXiv:2605.28405 ten-faculty cognitive framework [full-text read] + Hendrycks et al. arXiv:2510.18212 [abstract-verified]; metacognition named as the frontier gap this loop occupies. #2774)  
+**Prior Update:** 2026-07-06 (SSL anti-collapse lineage folded into [11] — DrLIM→JEPA→LeJEPA/LeWM, all 27 IDs web-verified, 0 corrections; the distributional twin of the collapse certificate)  
 **Maintained By:** Lantern OS team  
 **Immutability:** Read-only; update via PR + issue comment only
