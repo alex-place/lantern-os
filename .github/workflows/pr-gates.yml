@@ -343,6 +343,10 @@ jobs:
             "__init__.py", "README.md", "README.rst", "setup.py",
             "conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg",
             ".gitignore", ".gitkeep", "index.html", "index.js",
+            # Node manifests are as legitimately-repeated as the Python ones above:
+            # every sub-package / tool dir carries its own. Flagging them as duplicates
+            # is a false positive (surfaced by #2744's leap-video report tooling).
+            "package.json", "package-lock.json", "tsconfig.json",
           }
 
           slop = []
