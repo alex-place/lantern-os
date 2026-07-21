@@ -226,8 +226,12 @@ Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 - **Patreon OAuth** optionally gates the whole site; currently the login *requirement* is behind a
   feature flag (`patreon_auth`) — guests browse, admin/trade stay gated. See
   [PATREON-OAUTH.md](PATREON-OAUTH.md) and the auth-flag memory.
-- **lantern-os.net** is a **Cloudflare tunnel → local 4177 stable server**, not Railway. Local-admin
-  bypass must gate on proxy-header absence, not socket IP.
+- **Production origin is a GCE VM** running `server.js`, fronted by Cloudflare (edge/CDN) — see
+  [ADR-0018](adr/0018-web-tier-split-and-cloud-multi-tenancy.md) + the
+  [GCE deploy runbook](ops/gce-cloud-deploy-runbook.md). The legacy **Cloudflare tunnel → local
+  4177** path ([CLOUDFLARE-TUNNEL-DEPLOYMENT.md](CLOUDFLARE-TUNNEL-DEPLOYMENT.md)) is
+  **deprecated** — local dev / fallback only. Local-admin bypass must gate on proxy-header
+  absence, not socket IP.
 - **Operator/keystone routes** are gated by a hardened `isOperatorRequest`; command execution is
   **shell-free** via `lib/safe-exec.js` (tokenize + `execFileSync shell:false`) — never reintroduce
   `execSync` on interpolated input.

@@ -234,6 +234,24 @@ Not a separate system.
   - A latent world model that flags *implausible events* is a learned grounding/verification
     signal; the video-SSL analogue of the surprise canary (predict-then-check in latent space)
 
+### Applied grounding — survivorship & backtest bias (added 2026-07-18)
+- **Survivorship-free single-stock momentum** (in-repo measurement) — the Verify discipline run
+  on a live market surface: point-in-time S&P 500 membership (fja05680) + delisted-inclusive prices
+  put 12-1 momentum at Sharpe **0.60** full-cycle (an inflated upper bound), tying SPY and below the
+  champion's 0.66. The "$2M momentum upgrade" was a survivorship mirage caught by fresh truth.
+  See `experiments/survivorship_momentum/FINDINGS.md` and [UNISONA-SHARPE-CERTIFICATE.md](UNISONA-SHARPE-CERTIFICATE.md) §E5.
+- **Survivorship Bias in Emerging-Market Small-Cap Indices** ([arXiv:2603.19380](https://arxiv.org/abs/2603.19380))
+  - Independent confirmation: reconstructs historical NIFTY Smallcap 250 composition, measures
+    **+4.94pp/yr** survivor-only overstatement. Same method, different market.
+- **Evaluating LLMs in Finance Requires Explicit Bias Consideration** ([arXiv:2602.14233](https://arxiv.org/abs/2602.14233))
+  - Taxonomy of look-ahead / survivorship / narrative biases that contaminate financial backtests.
+- **Backtest-overfitting canon** — Deflated-Sharpe / luck-vs-skill / IS-WFA-OOS
+  ([arXiv:1905.08042](https://arxiv.org/abs/1905.08042), [1906.00573](https://arxiv.org/abs/1906.00573),
+  [2603.09219](https://arxiv.org/abs/2603.09219)); full tranche in
+  `F:\arxiv-corpus\pdfs\REVIEW-2026-07-18-survivorship-backtest.md`.
+- **Data-source reality** — no free price source is survivorship-free; live-priced vendor survey in
+  [research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
+
 ### Integration
 - Unit tests → memory update
 - Integration tests → pattern extraction

@@ -148,7 +148,7 @@ unisona.ai is built on **Σ₀ (Sigma-Zero)** — a framework for verifying that
 - The five Σ₀ routing/feedback paradoxes identified in 2026-06 (agent-selection hard loop, unbounded provider retries, stale route cache, silent memory truncation, ignored escalation gates) are all fixed with measurement loops and feedback gates, verified under stress testing.
 - Verification surfaces are user-facing: fact-check button, grounding-diff viewer, drift canaries, and confidence-scored convergence records.
 
-Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[anti-collapse hardening](docs/ANTI-COLLAPSE-HARDENING.md)** · **[research canon](docs/RESEARCH-CANON.md)**.
+Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[AGI convergence blueprint](docs/AGI-CONVERGENCE-BLUEPRINT.md)** · **[collapse certificate](docs/SIGMA0-COLLAPSE-CERTIFICATE.md)** · **[grounding ledger](docs/SIGMA0-GROUNDING-LEDGER.md)** · **[anti-collapse hardening](docs/ANTI-COLLAPSE-HARDENING.md)** · **[research canon](docs/RESEARCH-CANON.md)**.
 
 ## Privacy & security
 
@@ -193,7 +193,7 @@ npm run test:auth
 | **Agents / contributors** | [CLAUDE.md](CLAUDE.md) · [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [QUICKSTART.md](QUICKSTART.md) |
 | **Members / product** | [unisona.ai chat product definition](docs/KEYSTONE-PRODUCT.md) · [Dream Journal quickstart](docs/DREAM-JOURNAL-QUICKSTART.md) · [Explore feed](docs/EXPLORE-FEED.md) |
 | **Architects** | [Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md) (start here) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [ADR index](docs/adr/README.md) · [CSF format spec](docs/CSF-FORMAT-SPECIFICATION.md) · [PCSF](docs/convergence-io/PCSF.md) · [convergence-core mapping](docs/convergence-core-mapping.md) |
-| **Traders / analysts** | [Trading API reference](docs/trading-api-reference.md) · [Kalshi API spec](docs/KALSHI-API-SPEC.md) · [experiments/](experiments/) |
+| **Traders / analysts** | [Trading API reference](docs/trading-api-reference.md) · [Kalshi API spec](docs/KALSHI-API-SPEC.md) · [Sharpe certificate](docs/UNISONA-SHARPE-CERTIFICATE.md) · [survivorship study](experiments/survivorship_momentum/FINDINGS.md) · [market-data vendors](docs/research/2026-07-18-market-data-vendors-survivorship.md) · [experiments/](experiments/) |
 | **Operators / deploy** | [PROVIDERS.md](PROVIDERS.md) · [Cloudflare tunnel deployment](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) · [repo contract](docs/REPO-CONTRACT.md) · [CHANGELOG.MD](CHANGELOG.MD) |
 
 Something broken? Search or file a [GitHub issue](https://github.com/alex-place/lantern-os/issues) (labels: `bug`, `p0`, `p1`, `convergence`).

@@ -71,7 +71,7 @@ for file in $(git diff --cached --name-only); do
   # 2. Debug pollution — but console.* is the intended interface in test files and
   # CLI/research tooling, so exempt those (mirrors .github/workflows/slop-check.yml).
   case "$file" in
-    */test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) ;;  # console.* expected here
+    test/*|tests/*|*/test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) ;;  # console.* expected here (top-level tests/ too, matching pr-gates.yml #1561)
     *)
       if echo "$content" | grep -qE \
         "(^|[^a-zA-Z])(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\)|import pdb)"; then

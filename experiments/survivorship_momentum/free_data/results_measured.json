@@ -1,0 +1,20 @@
+{
+  "_note": "12-1 momentum (long top quintile, monthly, 1-mo skip) on S&P 500 with POINT-IN-TIME membership (fja05680). Prices: free stooq bulk d_us_txt.zip (survivors 100%, delisted cohort 41% -> survivorship-inflated upper bound). Sharpe = excess over 2% rf, annualized.",
+  "data_source": "stooq free bulk (d_us_txt.zip, 2026-07-18) + fja05680 point-in-time S&P 500 membership",
+  "stooq_coverage": {"survivors": "501/503 (100%)", "delisted_cohort": "120/292 (41%)", "note": "the 172 missing are the truly-dead (JCPenney/Heinz/DeanFoods/BigLots/Avon/Safeway/...); the ~120 present are mostly removed-but-still-trading (ANF/CLF/GME). So this is a survivorship-INFLATED upper bound, not clean."},
+  "windows": {
+    "2014-2026_benign": {
+      "momentum_Sharpe": 0.755, "momentum_CAGR": 0.1335, "momentum_maxDD": -0.194,
+      "SPY_Sharpe": 0.908, "SPY_CAGR": 0.1489, "SPY_maxDD": -0.239,
+      "note": "excludes the 2008-09 momentum crash -> flatters momentum; still LOSES to SPY."
+    },
+    "2002-2026_full_cycle": {
+      "momentum_Sharpe": 0.60, "momentum_CAGR": 0.1105, "momentum_maxDD": -0.541, "worst_month": -0.186,
+      "SPY_Sharpe": 0.598, "SPY_CAGR": 0.1025, "SPY_maxDD": -0.522,
+      "note": "includes 2008-09 -> momentum Sharpe collapses 0.755->0.60, DEAD EVEN with SPY, worse drawdown."
+    }
+  },
+  "survivors_only_vs_partial_debias": "Sharpe identical to 3 d.p. in BOTH windows (0.755 / 0.60) with mid_hold_delist_frac ~= 0.0002. This is the proof you cannot de-bias with free data: the names carrying the bias are exactly the ones missing, and long-top-quintile momentum structurally avoids dying (low-momentum) names anyway.",
+  "champion_ref_Sharpe": 0.66,
+  "verdict": "Champion NOT upgraded. Survivorship-free-ish single-stock 12-1 momentum = 0.60 Sharpe full-cycle (INFLATED; true ~0.5 per CRSP), -54% maxDD, dead even with plain SPY and below the champion's 0.66 which has a fraction of the drawdown. Trustworthy momentum stays via the XMMO/SPMO ETFs already in the champion."
+}

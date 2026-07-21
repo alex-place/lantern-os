@@ -1109,8 +1109,13 @@ module.exports = async (req, res, url, deps) => {
         try {
           const { councilReview } = require("../lib/council-review");
           council = councilReview(councilText, {
-            groundingContext: [researchContext, ...(webEvidence || []).map((e) => e && e.snippet || "")]
-              .filter(Boolean).join("\n").slice(0, 4000),
+            groundingContext: [
+              ...(webEvidence || []).map((e) => (e && e.snippet) || ""),
+              // arXiv corpus grounding (flattened to citable lines — the bare researchContext
+              // object stringifies to "[object Object]", which is why evidence is flattened here).
+              ...(((researchContext && researchContext.arxivEvidence) || []).map(
+                (p) => (p && `arXiv:${p.id} — ${p.title}: ${p.snippet || ""}`) || "")),
+            ].filter(Boolean).join("\n").slice(0, 4000),
             execVerdict: { ran: ranTests, passed: testsPassed, output: _failedTest.output },
             reachable: true, // the operator is a reachable CallbackChannel for a code change
             context: { surface: "autowork-stream", issue: issueNumber, runId: _runId, branch: branchName },

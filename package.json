@@ -18,6 +18,7 @@
     "research-calibrate": "node scripts/open-video-research.js --calibrate",
     "test:ui": "node tests/ui-test.js",
     "test:auth": "playwright test --config tests/playwright-auth.config.ts",
+    "test:greenpath": "playwright test --config tests/playwright-greenpath.config.ts",
     "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever",
     "lint:consolidate": "node scripts/consolidation-lint.js",
     "lint:consolidate:json": "node scripts/consolidation-lint.js --json"

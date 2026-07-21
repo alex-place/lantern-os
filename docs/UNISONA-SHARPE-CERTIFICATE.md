@@ -44,6 +44,29 @@ daily-backtest-harness run on 2026-07-10 (git-stamped record:
 - **E1 remains CLAIMED** — positive net Sharpes per sleeve are logged, but
   multi-window (incl. bear-market) verification is still required.
 
+### Evidence update — 2026-07-18 (single-stock momentum measured survivorship-free; E5 added)
+
+Single-stock **12-1 momentum** — the sleeve most often proposed as a champion upgrade —
+was measured with **point-in-time S&P 500 membership** (fja05680) and delisted-inclusive
+prices, closing the survivorship hole that inflates naive runs. Records:
+`experiments/survivorship_momentum/free_data/results_measured.json`; method + data-source
+reality in `experiments/survivorship_momentum/FINDINGS.md` and
+[docs/research/2026-07-18-market-data-vendors-survivorship.md](research/2026-07-18-market-data-vendors-survivorship.md).
+
+- **Survivorship bias is large and one-directional.** A hand-picked-winners run printed
+  +33,937% (Sharpe 1.19); a benign-window survivor-heavy run (2014–2026) gave 0.755 — still
+  *below* same-window SPY (0.908). Full-cycle **2002–2026: Sharpe 0.60, −54% maxDD, dead even
+  with SPY (0.598)** and below the champion's 0.66. It is an *inflated upper bound* — no free
+  price source keeps all delisted names (stooq-bulk covers only 41% of the delisted cohort) —
+  so the true figure sits at the published CRSP ~0.5.
+- **Independent confirmation (external).** arXiv:2603.19380 measures the same bias
+  (+4.94pp/yr survivor-only overstatement) on the NIFTY Smallcap 250 by reconstructing
+  historical composition — the identical method, a different market.
+- **Verdict:** single-stock momentum does **not** clear the bar — it ties buy-and-hold with a
+  worse drawdown and loses to the diversified champion. Reinforces the §5 L/S-momentum
+  rejection; harvest momentum via the ETF sleeves (XMMO/SPMO) already in COMBO, whose
+  selection is survivorship-free by construction.
+
 ---
 
 ## 0. Definitions (so the theorems are unambiguous)
@@ -195,6 +218,7 @@ non-negotiable client-protection envelope.
 | E2 | *Our* strategies are mutually low-correlation (so Thm 1 fires) | **VERIFIED** — Gold ρ=0.10, MFtrend ρ=0.28 to SPY; mean-reversion ρ=0.61 and short-vol ρ=0.73 rejected (raised blend equity corr to 0.80, Sharpe 1.12→1.08) | correlation matrix + leaderboard, daily-backtest-harness 2026-07-10; COMBO3 aggregate S=1.12 [0.50,1.74], maxDD −11.9% |
 | E3 | *Our* 200d/GEM gate beats its base rate net of cost | **PARTIAL — 1 window consistent** | harness, multi-window |
 | E4 | The live system will deliver Sharpe > SPY's ≈ 0.5 for clients | **UNPROVEN — future** | live audited track record |
+| E5 | Single-stock 12-1 momentum clears the bar / upgrades the champion | **REJECTED — measured** | survivorship-free 2002–2026: Sharpe 0.60 (inflated upper bound), ties SPY, −54% maxDD, < champion 0.66; arXiv:2603.19380 confirms the bias (2026-07-18 evidence update) |
 
 **The certificate certifies C1–C6 and the design's faithful implementation of
 them. It explicitly does NOT certify E1–E4.** Those are the deliverables of §4.

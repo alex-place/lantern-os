@@ -143,7 +143,7 @@ from huggingface_hub import hf_hub_download, upload_file
 if CHECKPOINT_FILE:
     local_csf = hf_hub_download(repo_id=HF_REPO, filename=CHECKPOINT_FILE, repo_type="model")
     csf.unpack(local_csf, "/tmp/checkpoint")
-    resume_arg = ["--resume_from", "/tmp/checkpoint"]
+    resume_arg = ["--resume", "/tmp/checkpoint"]
 else:
     resume_arg = []
 

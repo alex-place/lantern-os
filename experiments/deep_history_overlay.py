@@ -62,7 +62,10 @@ def load_asset(sym):
 
 
 def run_overlay(days, px, tv, trend_m, brake, min_gross, max_gross, band,
-                start=None, end=None):
+                start=None, end=None, signal="mom"):
+    """signal selects the trend gate: "mom" = 12(trend_m)-mo momentum >= 0 (default,
+    the shipped behavior); "sma" = price >= 200-day SMA; "dual" = stay invested unless
+    BOTH momentum<0 AND price<200dSMA (confirmed de-risk — fewer false flips)."""
     i0 = 0 if start is None else next(i for i, d in enumerate(days) if d >= start)
     i1 = len(days) if end is None else next((i for i, d in enumerate(days) if d >= end), len(days))
     eq, peak = INIT, INIT
@@ -70,6 +73,7 @@ def run_overlay(days, px, tv, trend_m, brake, min_gross, max_gross, band,
     rets, eq_path = [], []
     turnover_sum, trade_days = 0.0, 0
     gross_hist = []
+    prev_trend_ok, trend_flips = None, 0
     for i in range(i0, i1):
         d = days[i]
         if i == i0:
@@ -79,9 +83,20 @@ def run_overlay(days, px, tv, trend_m, brake, min_gross, max_gross, band,
         seg = px[lo:i]
         r20 = np.diff(np.log(seg)) if seg.size > 2 else np.array([0.0])
         vol20 = float(np.std(r20, ddof=1)) * math.sqrt(252) if r20.size > 5 and np.std(r20) > 0 else tv
-        # 6-mo trend gate
+        # trend gate — one of three signals
         lo_t = max(0, i - 21 * trend_m)
-        trend_ok = px[i - 1] / px[lo_t] >= 1.0 if i - lo_t > 21 else True
+        mom_ok = px[i - 1] / px[lo_t] >= 1.0 if i - lo_t > 21 else True
+        lo_s = max(0, i - 200)
+        sma_ok = px[i - 1] >= float(np.mean(px[lo_s:i])) if i - lo_s > 50 else True
+        if signal == "sma":
+            trend_ok = sma_ok
+        elif signal == "dual":
+            trend_ok = mom_ok or sma_ok        # de-risk only when BOTH agree it's down
+        else:
+            trend_ok = mom_ok
+        if prev_trend_ok is not None and trend_ok != prev_trend_ok:
+            trend_flips += 1
+        prev_trend_ok = trend_ok
         dd = eq / peak - 1.0
         g = min(max_gross, max(min_gross, tv / max(vol20, 1e-6)))
         if not trend_ok:
@@ -123,6 +138,7 @@ def run_overlay(days, px, tv, trend_m, brake, min_gross, max_gross, band,
         "pct_derisked": float(np.mean(np.array(gross_hist) < 0.99)) if gross_hist else 0.0,
         "turnover_per_yr": turnover_sum / yrs, "trade_days": trade_days,
         "trade_days_per_yr": trade_days / yrs, "years": yrs,
+        "trend_flips": trend_flips, "trend_flips_per_yr": trend_flips / yrs,
         "path": eq_path, "rets": r,
     }
 

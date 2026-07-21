@@ -2062,5 +2062,77 @@
   "action": "keep",
   "mergeInto": "",
   "reason": "Knowledge-Center explainer for one convergence-loop stage; linked from the home hero motto and cross-linked to the other five stages."
+ },
+ {
+  "path": "docs/AGI-CONVERGENCE-BLUEPRINT.md",
+  "title": "The Convergence Blueprint — one loop, everything we know",
+  "category": "research",
+  "description": "AGI-scope synthesis organized by the Observe·Remember·Reason·Act·Verify·Converge loop: 2026 best practice + what's in-repo + the honest gap per stage. Thesis: rent the six capabilities we lack, own the Verify/grounding stage. Includes a worked Verify example (the survivorship-momentum grounding result).",
+  "status": "Living",
+  "updated": "2026-07-18",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Whole-loop map, every claim evidence-classed (ESTABLISHED/IN-REPO/OURS/GAP) with cited sources; honest about the six rented capabilities."
+ },
+ {
+  "path": "docs/SIGMA0-GROUNDING-LEDGER.md",
+  "title": "Σ_G — The Grounding Ledger",
+  "category": "research",
+  "description": "Composes three measured results — the price of fresh verified truth, the schedule grounding must arrive on, and the budget it imposes on safe self-improvement — into one accounting frame. Companion to the Collapse Certificate.",
+  "status": "Living",
+  "updated": "2026-07-17",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Every load-bearing number imported from the parent certificate's audit table with run pointers; honest that the composed frame is a framing contribution until the §5 experiments run."
+ },
+ {
+  "path": "docs/UNISONA-SHARPE-CERTIFICATE.md",
+  "title": "Unisona Sharpe Certificate",
+  "category": "trading",
+  "description": "Certifies the mathematics the chat + Σ₀ trader use to optimize client risk-adjusted return (diversification, tangency, vol-targeting, fractional-Kelly, regime-gating), separating proven theorems from empirical claims pending measured evidence. E5: single-stock momentum rejected — measured survivorship-free.",
+  "status": "Proposed",
+  "updated": "2026-07-18",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Proofs self-checked, empirical claims quarantined and settled only by the daily-backtest-harness; operator ratification still pending (draft)."
+ },
+ {
+  "path": "docs/research/2026-07-18-market-data-vendors-survivorship.md",
+  "title": "Market-data vendors for a survivorship-free backtest",
+  "category": "research",
+  "description": "Live 2026-07-18 pricing/coverage comparison of 10 market-data vendors for a survivorship-free US-equity backtest. Finding: no free price source is survivorship-free (stooq bulk keeps only 41% of the delisted cohort); clean data needs Sharadar ~$30/mo or HistoricalData.net $299.",
+  "status": "Living",
+  "updated": "2026-07-18",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Each vendor read from its live pricing page on the stated date; login-gated figures flagged as approximate."
+ },
+ {
+  "path": "docs/investing-2k-plan-collapse-certificate.md",
+  "title": "Σ₀ Collapse Certificate — the $2k investing plan",
+  "category": "trading",
+  "description": "Adversarial Σ₀ audit of the $2,000+$20/mo momentum-tilted DCA plan (investing-2k-plan.html): strict evidence classes, six collapse modes (incl. survivorship, now measured), and the minimal honest statement of what the plan does and does not prove.",
+  "status": "Living",
+  "updated": "2026-07-18",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Committed beside the artifact; receipts are the runnable experiments, not the prose; survivorship collapse mode now measured."
+ },
+ {
+  "path": "docs/SIGMA0-EB-L4-RUNBOOK.md",
+  "title": "E-B on L4 — the gated-training runbook",
+  "category": "training",
+  "description": "Self-contained handoff for the Σ_θ A/B/C gated-training run on cloud L4 with the four-arm promotion-evidence protocol (Fixed / Fixed+dither / Fresh-flow / Thresholdout+pool) and the real seven-condition gate; pre-registered verdicts + the Roelofs rule.",
+  "status": "Proposed",
+  "updated": "2026-07-17",
+  "grounding": "Grounded",
+  "action": "keep",
+  "mergeInto": "",
+  "reason": "Fully-specified runbook, zero context needed from the authoring session; the sole remaining gap for the grounding-ledger budget column."
  }
 ]
