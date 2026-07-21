@@ -795,6 +795,31 @@ def github_get_job_logs(owner: str, repo: str, job_id: str) -> Dict[str, Any]:
         return _err(exc)
 
 
+# ───────────────────────── SWE-bench ─────────────────────────
+
+def swebench_eval(context_size: str = "16k", limit: str = "") -> Dict[str, Any]:
+    """Run SWE-bench Lite evaluation.
+
+    context_size: The context window size to use for the model (e.g., "16k", "32k", "100k").
+                  Defaults to "16k". If LOCAL_CAPABILITY_FIRST is set, "32k" is used.
+    limit: Limit the number of issues to evaluate (e.g., "1", "5"). Defaults to all.
+    """
+    try:
+        cmd = ["python", "-m", "swebench_lite.run"]
+        if os.getenv("LOCAL_CAPABILITY_FIRST"):
+            cmd.extend(["--model_name", "claude-3-opus-20240229", "--context_window", "32k"])
+        else:
+            cmd.extend(["--context_window", context_size])
+        if limit:
+            cmd.extend(["--limit", limit])
+
+        proc = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return {"ok": True, "stdout": proc.stdout, "stderr": proc.stderr}
+    except subprocess.CalledProcessError as e:
+        return {"error": f"SWE-bench Lite evaluation failed: {e.stderr}",
+                "stdout": e.stdout, "stderr": e.stderr}
+    except Exception as exc:
+        return _err(exc)
 # ──────────────────────── Notifications ────────────────────
 
 def github_list_notifications(all: str = "false", participating: str = "false",
