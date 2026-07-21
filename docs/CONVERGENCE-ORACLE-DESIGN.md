@@ -165,16 +165,71 @@ genuine deep-time questions. This is the Oracle's first domain pack and its work
 4. **Answer-staleness decay.** Wire confidence-decay to Oracle outputs so an old `grounded` answer
    ages toward `seam_open` until re-grounded (the memory-staleness failure the blueprint names).
 
-**Not claimed:** that any of this is novel. Answerability classification, value-of-computation
-grounding budgets, and calibration-against-outcomes are established ideas
-([KEYSTONE-IP-AND-BUILDOUT](KEYSTONE-IP-AND-BUILDOUT.md) grades the family honestly). The Oracle's
-value is *composition + discipline*: one contract that makes every question carry its own
-answerability structure, positioned between the pins, calibrated by reality — which is the AI
-cockpit's core promise, "knows when it doesn't know," made into a single interface.
+## 6. The convergence target — "knows everything it *could* know"
+
+The fully-converged Oracle is **not omniscient** — that is Deep Thought's hubris (it falsely drove
+its UNKNOWN set to zero and returned a scalar). The Oracle's fixed point is the honest inversion:
+
+> **KNOWN** = the entire *knowable* manifold for the domain — everything grounding could reach,
+> reached. **UNKNOWN** = *exactly* the irreducible pins — the structurally-unknowable, nothing
+> more (no lazy abstention), nothing less (no overclaiming). The boundary between them located
+> **correctly**.
+
+This makes the Oracle's objective different from what selective-prediction / abstention systems
+optimize. They minimize a risk–coverage tradeoff on a *fixed* task ("answer or abstain on this
+question"). The Oracle's objective is to **drive the boundary outward**: relentlessly convert
+`seam_open → grounded` by *buying* grounding, until only the pins remain. Its loss is not "wrong
+answers" — it is **knowable-things-left-unknown** (laziness) **+ unknowable-things-falsely-claimed**
+(hubris). Convergence in a domain is diagnosable: new observations stop moving any claim
+`UNKNOWN → KNOWN` and stop refuting any `KNOWN`. The theoretical ceiling is the ideal inductive
+predictor (Solomonoff / AIXI — uncomputable); the Oracle is its **grounded, resource-bounded,
+honestly-bounded** approximation that *names its own null space* instead of hallucinating across it.
+
+## 7. Novelty — graded honestly, not dismissed
+
+An earlier draft of this doc flatly called the Oracle "not novel." That was wrong twice over: it
+conflated *part*-novelty with *system*-novelty, and it under-searched the prior art. The honest
+grade, with a real (if not exhaustive) 2026 prior-art scan:
+
+**Occupied ground (the parts — NOT novel):**
+- Answerability classification / unanswerable-question detection — SQuAD 2.0 (2018); linear
+  directions for (un)answerability ([arXiv:2509.22449](https://arxiv.org/abs/2509.22449)); "None of
+  the above" answerability detection.
+- The answerability × correctness two-axis split — **Two Axes of LLM Abstention**
+  ([arXiv:2607.08456](https://arxiv.org/abs/2607.08456)): "wrong-answerable and unanswerable states
+  with separate risk budgets." Close to Move 1.
+- Structured epistemic output — **Structured Ignorance Certificates**
+  ([arXiv:2606.08571](https://arxiv.org/abs/2606.08571)): "structured epistemic metadata rather than
+  just calibrating confidence." Close to the KNOWN/UNKNOWN envelope.
+- Uncertainty-priced routing — **UCCI** ([arXiv:2605.18796](https://arxiv.org/abs/2605.18796)):
+  calibrated-uncertainty cost-optimal cascade routing. Close to Move 2.
+- Per-domain selective answering — Selective QA under domain shift
+  ([arXiv:2006.09462](https://arxiv.org/abs/2006.09462)).
+
+**The seam I could not find occupied (candidate-novel as a *system*):** the *closed loop* that
+(a) makes answerability-class the **primary** key, not a post-hoc abstain gate; (b) acts on the
+`seam_open` class by **buying grounding** to move a question *unanswerable → answerable* (the
+literature *abstains*; the Oracle *purchases*); (c) calibrates per-domain against **streaming
+real-world resolution** (market settlements, test executions) rather than a static labelled set;
+and (d) draws the **buyable-unknown (`seam_open`) vs structural-unknown (`pin`)** distinction —
+grounding can dissolve the first, never the second. That last split is the one the binary
+abstain-or-not literature does not carry, and it is exactly what the "know everything you *could*
+know" objective (§6) requires.
+
+**Honest verdict — on the Oracle's own scale, this is `seam_open`, not `grounded` and not
+`refuted`:** candidate-novel as a system composition, *unproven*, because (1) only the cosmology
+SEED is built — the contract and the buying loop are GAP, and you cannot test-verify the novelty
+of an unbuilt system; and (2) two web searches is not a clearance search. What would move it to
+`grounded`: build the contract + one non-cosmology pack, and run a real prior-art search against
+active-inference / optimal-experiment-design / agentic-retrieval-abstention. "Works and is tested"
+(the seed does) establishes *function*, which is necessary but not sufficient for novelty — the
+missing evidence is the prior-art clearance and the built system, not more tests. This is the
+Oracle grading its own novelty by its own discipline: name the seam, price what would close it,
+never bluff the pin.
 
 ---
 
-## 6. Why this belongs in the loop (not sprawl)
+## 8. Why this belongs in the loop (not sprawl)
 
 Per the North-Star constraint, nothing ships that doesn't strengthen one loop stage. The Oracle
 touches three and adds no top-level subsystem:
