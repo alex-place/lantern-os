@@ -1639,6 +1639,28 @@ async function sendMessage(opts = {}) {
       });
       bubble.appendChild(retry);
     }
+  } else if (bubble.dataset.councilVerdict && !isSigma0OperatorView()) {
+    // #2805: the product's self-assessment reaches the USER, not only operators.
+    // #2332 hid the raw Σ₀ jargon (seam-open/pin/refuted read as errors) — honored
+    // here by translating, not exposing: grounded stays quiet (the healthy case),
+    // only the non-healthy verdicts surface, in plain words.
+    const v = bubble.dataset.councilVerdict;
+    const PLAIN = {
+      seam_open: ['⚠ unverified — worth double-checking', '#f5a623',
+        'unisona.ai self-check: this answer is internally consistent but has no external verification yet — treat it as unconfirmed.'],
+      refuted:   ['✗ failed a live check', '#f87171',
+        'unisona.ai self-check: a real execution check contradicted this answer — do not rely on it as-is.'],
+      pin:       ['? no verifiable answer exists', '#9ca3af',
+        'unisona.ai self-check: this question has no answer that can be verified — anything more specific would be a guess.'],
+    };
+    const m = PLAIN[v];
+    if (m) {
+      const badge = document.createElement('span');
+      badge.title = m[2];
+      badge.style.cssText = 'font-size:10px;opacity:0.85;margin-left:6px;vertical-align:middle;cursor:help;color:' + m[1];
+      badge.textContent = m[0];
+      bubble.appendChild(badge);
+    }
   }
 
   // In-chat PR review (#1503 follow-up): when this turn was a `!review #N` (the server
