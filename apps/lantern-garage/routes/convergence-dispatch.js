@@ -532,7 +532,12 @@ module.exports = async (req, res, url, deps) => {
         }
 
         // Step 4: Run tests from the plan. Empty test set = UNVERIFIED, not "passed".
-        const plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        // #2762 verify floor: same fallback as the stream path — never zero for a code change.
+        let plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        if (plannedTests.length === 0 && changedFiles.length > 0) {
+          const { deriveVerifyFloor } = require("../lib/self-edit-engine");
+          plannedTests = deriveVerifyFloor(workRoot, changedFiles);
+        }
         step("test", "start", { count: plannedTests.length });
         const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
@@ -1105,18 +1110,29 @@ module.exports = async (req, res, url, deps) => {
         step("apply", "done", { stats, changedFiles });
 
         // ── 6. tests (verification gate for commit/push) ─────────────────
-        const tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
-        step("tests", "start", { commands: tests });
+        // #2762 verify floor: a plan with zero tests left the Verify stage empty and
+        // shipped `verified: false` on the first end-to-end run. When the plan names
+        // no tests but code changed, derive the deterministic floor (syntax checks +
+        // the repo's real unit tests for the changed files) so verification is never
+        // zero for a code change.
+        let tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        let testsFromFloor = false;
+        if (tests.length === 0 && changedFiles.length > 0) {
+          const { deriveVerifyFloor } = require("../lib/self-edit-engine");
+          const floor = deriveVerifyFloor(workRoot, changedFiles);
+          if (floor.length) { tests = floor; testsFromFloor = true; }
+        }
+        step("tests", "start", { commands: tests, ...(testsFromFloor ? { floor: true } : {}) });
         const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
         const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
         const testsPassed = testResults.every((r) => r.ok !== false);  // inconclusive (timeout) ≠ failure
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         const _failedTest = testResults.find((r) => r.ok === false) || {};
-        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length,
+        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length, floor: testsFromFloor,
           detail: tests.length === 0
             ? "no tests were specified for this change"
             : (testsPassed
-                ? `${tests.length} test command(s) passed`
+                ? `${tests.length} test command(s) passed${testsFromFloor ? " (deterministic verify floor — the plan specified none)" : ""}`
                 : `failed: ${_failedTest.command || tests[0]} — ${String(_failedTest.output || "").split("\n").filter(Boolean).slice(-1)[0] || "see output"}`.slice(0, 240)) });
 
         // Σ₀ fast-layer plasticity (#1011): record this run's test gate as an external

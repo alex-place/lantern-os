@@ -776,10 +776,47 @@ const ALLOWED_TESTS = [
   /^python -m pytest tests\/[\w./-]+\.py$/,
   /^npm test$/,
   /^npm run test$/,
+  // #2762 verify floor — same closed-class discipline as the pytest pattern above.
+  // Syntax checks for changed files plus the repo's standalone node unit tests, so
+  // a run whose plan specified no tests still verifies SOMETHING real.
+  /^node --check [\w./-]+\.(js|mjs|cjs)$/,
+  /^python -m py_compile [\w./-]+\.py$/,
+  /^node apps\/lantern-garage\/test\/[\w.-]+\.test\.js$/,
 ];
 
 function isAllowedTest(cmd) {
   return ALLOWED_TESTS.some((re) => re.test(cmd));
+}
+
+// #2762: a plan with zero tests leaves the Verify stage empty — the run's first
+// end-to-end success shipped `verified: false` because nothing was specified. When
+// that happens, derive a deterministic verification floor from the files the patch
+// actually changed: a syntax/compile check per source file, plus the repo's real
+// unit tests for that file when they exist (tests/test_<base>.py, or the standalone
+// apps/lantern-garage/test/<base>.test.js convention). Weaker than planned tests,
+// never zero. Paths outside the allowlist's safe character class are skipped —
+// every emitted command must pass isAllowedTest unchanged.
+function deriveVerifyFloor(repoRoot, changedFiles) {
+  const cmds = [];
+  const seen = new Set();
+  const add = (c) => { if (!seen.has(c) && isAllowedTest(c)) { seen.add(c); cmds.push(c); } };
+  const SAFE = /^[\w./-]+$/;
+  for (const fp of (changedFiles || [])) {
+    const rel = String(fp || "").replace(/\\/g, "/");
+    if (!SAFE.test(rel)) continue;
+    const base = path.basename(rel).replace(/\.[^.]+$/, "");
+    if (/\.py$/.test(rel)) {
+      add(`python -m py_compile ${rel}`);
+      const t = `tests/test_${base}.py`;
+      if (fs.existsSync(path.join(repoRoot, t))) add(`python -m pytest ${t}`);
+    } else if (/\.(js|mjs|cjs)$/.test(rel)) {
+      add(`node --check ${rel}`);
+      const t = `apps/lantern-garage/test/${base}.test.js`;
+      if (fs.existsSync(path.join(repoRoot, t))) add(`node ${t}`);
+    }
+    if (cmds.length >= 12) break;
+  }
+  return cmds;
 }
 
 // Shell metacharacters that must never reach an executed command. The allowlist
@@ -1218,7 +1255,17 @@ Respond ONLY with valid JSON in this exact shape (no markdown, no commentary out
     { "action": "edit", "file": "path", "description": "what to change" }
   ],
   "branchHint": "short-kebab-name"
-}`;
+}
+
+testsToRun rules (#2762 — a plan with zero tests produces an UNVERIFIED patch):
+- For any code change, testsToRun MUST be non-empty. Only pure prose/docs changes may use [].
+- Commands must be REAL and runnable in this repo, from these families only:
+  "python -m pytest tests/<existing_test_file>.py", "node tests/<one of the repo's test_*.js>",
+  "python -m py_compile <changed_file>.py", "node --check <changed_file>.js",
+  "node apps/lantern-garage/test/<existing>.test.js", "npm test".
+- NEVER invent a test file path: name a test file only if it appears in the provided file list
+  or you are certain it exists; otherwise fall back to the syntax-check commands for the files
+  you are changing.`;
 
 // Render the autowork research evidence (web + arXiv corpus) as a prompt block so it
 // grounds the code the model WRITES, not just the Verify stage (#2741). The dispatch
@@ -1473,6 +1520,7 @@ module.exports = {
   patchSyntaxErrors,
   taskTitle,
   runTests,
+  deriveVerifyFloor,
   generatePlan,
   renderResearchContext,
   extractJson,

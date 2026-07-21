@@ -30,6 +30,20 @@
 
 ### Fixed
 
+- autowork(#2762): **deterministic verify floor** — the first end-to-end run shipped
+  `verified: false` because the plan specified zero tests, leaving the Verify stage empty.
+  Two-layer fix: the plan prompt now requires non-empty, REAL, allowlist-family test commands
+  for any code change (never invented paths); and when a plan still names none, the pipeline
+  derives a floor from the files the patch actually changed — a syntax/compile check per
+  source file plus the repo's real unit tests for that file where they exist
+  (`tests/test_<base>.py`, `apps/lantern-garage/test/<base>.test.js`) — so verification is
+  never zero for a code change. Floor commands are emitted only if they pass the existing
+  #873 closed-class test allowlist verbatim (extended with `node --check`, `py_compile`, and
+  the standalone-unit-test patterns); unit-tested in
+  `apps/lantern-garage/test/verify-floor.test.js` (8 checks, incl. shell-metachar paths
+  skipped and allowlist round-trip). Finale + step details say when the floor (not planned
+  tests) did the verifying.
+
 - autowork(#2762): the apply-retry's self-correction mechanism was poisoning itself. The
   retry feedback DID include the targeted file's real content — but line-numbered
   (`102: <line>`) with the instruction "copy context lines VERBATIM from here", so an obedient
