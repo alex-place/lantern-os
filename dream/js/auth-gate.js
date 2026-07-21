@@ -5,7 +5,7 @@
  * - Updates nav to show profile/logout (authed) or sign-in button (guest)
  */
 (function () {
-  // dream-chat.html is public so first-time visitors can reach the chat without an
+  // chat.html is public so first-time visitors can reach the chat without an
   // account, honoring the "no account needed" promise (#739). Guests get a limited
   // read-only experience; premium models/limits are still enforced by role.
   // Keep in lock-step with PUBLIC_PAGES in routes/pages.js. '/' and '/index.html'
@@ -19,7 +19,7 @@
   // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
   // body.is-guest and their endpoints are admin-gated server-side. So it must not
   // bounce here either.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html', '/pricing.html', '/demo.html'];
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html', '/pricing.html', '/demo.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest

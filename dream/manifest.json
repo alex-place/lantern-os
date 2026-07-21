@@ -2,7 +2,7 @@
   "name": "unisona.ai",
   "short_name": "Unisona",
   "description": "A local-first AI assistant that remembers you — runs on your machine, works with any model.",
-  "start_url": "/dream-chat.html",
+  "start_url": "/chat.html",
   "display": "standalone",
   "background_color": "#0a0e17",
   "theme_color": "#06b6d4",
