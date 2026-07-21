@@ -9,7 +9,7 @@
   <title>unisona.ai — Sign In</title>
   <script>
     /* Theme bootstrap — set before first paint to avoid a flash of wrong theme
-       (mirrors index.html / dream-chat.html). */
+       (mirrors index.html / chat.html). */
     (function () {
       try {
         var stored = localStorage.getItem('lantern-theme');
@@ -341,7 +341,7 @@
     </span>
     <span class="sep">·</span>
     <a href="/">Home</a>
-    <a href="/dream-chat.html">Chat</a>
+    <a href="/chat.html">Chat</a>
     <a href="/explore.html">Explore</a>
     <a href="/knowledgecenter.html">Help</a>
     <span class="sep">·</span>
@@ -371,7 +371,7 @@
   };
 
   // Honor the page the guest was trying to reach — auth-gate.js redirects with
-  // ?returnTo=/dream-chat.html, so after sign-in they land on the chat they came
+  // ?returnTo=/chat.html, so after sign-in they land on the chat they came
   // for instead of always bouncing to the home page. Only same-origin absolute
   // paths are allowed (no "//host" protocol-relative open redirects).
   function safeReturnTo() {

@@ -104,18 +104,18 @@ module.exports = async function indeedRoutes(req, res, url) {
     const state = url.searchParams.get("state");
     const err = url.searchParams.get("error");
     const clear = `${COOKIE}=; Path=/; Max-Age=0`;
-    if (err) { res.writeHead(302, { "Set-Cookie": clear, Location: `/dream-chat.html?indeed=error&reason=${encodeURIComponent(err)}` }); return res.end(), true; }
+    if (err) { res.writeHead(302, { "Set-Cookie": clear, Location: `/chat.html?indeed=error&reason=${encodeURIComponent(err)}` }); return res.end(), true; }
     const ck = _verify(_readCookie(req, COOKIE));
     if (!code || !state || !ck || ck.state !== state) {
-      res.writeHead(302, { "Set-Cookie": clear, Location: "/dream-chat.html?indeed=error&reason=state" });
+      res.writeHead(302, { "Set-Cookie": clear, Location: "/chat.html?indeed=error&reason=state" });
       return res.end(), true;
     }
     const client = await oauth.ensureClient(ck.redirectUri); // cached from /connect
-    if (!client.ok) { res.writeHead(302, { "Set-Cookie": clear, Location: "/dream-chat.html?indeed=error&reason=client" }); return res.end(), true; }
+    if (!client.ok) { res.writeHead(302, { "Set-Cookie": clear, Location: "/chat.html?indeed=error&reason=client" }); return res.end(), true; }
     const ex = await oauth.exchangeCode({ client, code, verifier: ck.verifier, redirectUri: ck.redirectUri });
-    if (!ex.ok) { res.writeHead(302, { "Set-Cookie": clear, Location: `/dream-chat.html?indeed=error&reason=${encodeURIComponent(ex.error)}` }); return res.end(), true; }
+    if (!ex.ok) { res.writeHead(302, { "Set-Cookie": clear, Location: `/chat.html?indeed=error&reason=${encodeURIComponent(ex.error)}` }); return res.end(), true; }
     tokens.save(ck.userId, ex.token);
-    res.writeHead(302, { "Set-Cookie": clear, Location: "/dream-chat.html?indeed=connected" });
+    res.writeHead(302, { "Set-Cookie": clear, Location: "/chat.html?indeed=connected" });
     return res.end(), true;
   }
 

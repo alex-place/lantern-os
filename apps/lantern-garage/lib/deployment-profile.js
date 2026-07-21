@@ -25,7 +25,8 @@ const { tenancyProfile } = require("./tenant");
 // is local-only and unreachable on a cloud instance.
 const HOSTED_SURFACES = new Set([
   "index.html", // landing / home
-  "dream-chat.html", // chat — the product
+  "chat.html", // chat — the product
+  "dream-chat.html", // legacy path → serves the redirect stub to /chat.html
   "explore.html", // explore — loop demo (logged-out) / own memory (logged-in)
   "faq.html", // help / FAQ / getting-started (+ "download the desktop app")
   "auth.html", // login

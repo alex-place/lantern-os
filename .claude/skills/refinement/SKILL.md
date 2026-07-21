@@ -225,6 +225,11 @@ any `p0` you raised (and why), and any issue you deliberately left alone.
   re-prioritize / re-type when the user explicitly asks ("re-prioritize the backlog").
 - **Don't over-promote to `p0`.** p0 means drop-everything; if everything is p0, nothing is.
   Reserve it for genuine urgency (security, data loss, prod down, broken build).
+- **Chunk the apply — a full backlog blows the 2-minute Bash timeout.** Each
+  `apply-refinement.sh` is ~4–5s of `gh` round-trips, so ~15 issues is about all that fits in
+  one Bash call. For a larger batch, run the apply loop in **sub-batches of ≤15** (the script is
+  idempotent, so re-running a partially-applied issue is safe). Observed 2026-07-20: 27 issues
+  needed two passes.
 
 ## Why these fields (grounded)
 

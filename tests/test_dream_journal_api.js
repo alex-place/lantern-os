@@ -239,7 +239,7 @@ async function run() {
     });
     assert.strictEqual(r.status, 200);
     assert.ok(r.body.includes("unisona.ai"), "Page should include unisona.ai heading");
-    assert.ok(r.body.includes("dream-chat.html"), "Landing page should link to dream chat");
+    assert.ok(r.body.includes("chat.html"), "Landing page should link to the chat (chat.html, #2751)");
   });
 
   await test("landing page has CTA panels", async () => {
@@ -255,7 +255,7 @@ async function run() {
     // The Patreon link moved off the landing hero (1be9d49f) — still site-wide via the
     // shared nav. Assert internal CTA markers, not a bare external hostname (CodeQL flags
     // host substrings as incomplete URL sanitization).
-    assert.ok(r.body.includes("/dream-chat.html"), "Landing page should link to the chat");
+    assert.ok(r.body.includes("/chat.html"), "Landing page should link to the chat");
     assert.ok(r.body.includes("home-chat"), "Landing page should have the chat hero CTA");
   });
 

@@ -31,7 +31,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
-  "dream-chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
+  "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
   "rag-house.html":         "Remember",  // RAG document house
@@ -79,6 +79,7 @@ const EXTENSION = {
   // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "settings.html":                 ["account", null], // tabbed settings: API keys + connectors + context modes
   // project meta
+  "dream-chat.html":               ["meta", null], // legacy alias → chat.html (redirect stub kept for old links, #2751)
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
   "faq.html":                      ["meta", null],

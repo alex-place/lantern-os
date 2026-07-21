@@ -430,7 +430,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     <span style="font-size:18px;font-weight:600">unisona.ai</span>
   </a>
   <div class="nav-links">
-    <a href="/dream-chat.html">Chat</a>
+    <a href="/chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>
@@ -457,7 +457,7 @@ function renderMarkdownDocument(markdown, sourcePath) {
     </span>
     <span class="sep">·</span>
     <a href="/">Home</a>
-    <a href="/dream-chat.html">Chat</a>
+    <a href="/chat.html">Chat</a>
     <a href="/stock-trader.html">Trader</a>
     <a href="/create.html">Create</a>
     <a href="/explore.html">Explore</a>

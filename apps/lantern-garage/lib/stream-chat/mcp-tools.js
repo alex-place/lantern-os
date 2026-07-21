@@ -30,8 +30,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 
-const MCP_HOST = "127.0.0.1";
-const MCP_PORT = 8771;
+const MCP_HOST = process.env.MCP_HOST || "127.0.0.1";       // #2759 configurable
+const MCP_PORT = Number(process.env.MCP_PORT) || 8771;      // #2759 configurable
 const WARM_FILE = path.resolve(__dirname, "../../../../data/mcp/operational-tools.json");
 const REFRESH_INTERVAL_MS = 60_000;
 

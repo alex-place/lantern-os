@@ -53,9 +53,10 @@ const PUBLIC_PAGES = {
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
   "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
   // Primary interface: the chat must be reachable without a Patreon login so the
-  // "no account needed" promise holds (#739). dream-chat.html handles the guest
+  // "no account needed" promise holds (#739). chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
-  "/dream-chat.html":     "dream-chat.html",
+  "/chat.html":     "chat.html",
+  "/dream-chat.html": "dream-chat.html", // legacy path → serves the redirect stub to /chat.html
   // The stock trader is served to everyone: entitled users get the full terminal,
   // guests get the same page in read-only "guest mode" (trading actions hidden
   // client-side; the trade-gated data endpoints stay blocked server-side by
