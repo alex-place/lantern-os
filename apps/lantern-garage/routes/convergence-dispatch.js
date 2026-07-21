@@ -636,6 +636,13 @@ module.exports = async (req, res, url, deps) => {
         succeeded: result ? result.status === "ok" : null,
         prUrl: (result && result.prUrl) || null,
         message: (result && result.message) || null,
+        // Verify/Converge evidence from the result record (persisted by finishLog),
+        // so re-attached clients render the same convergence summary + warn-aware
+        // Approve as a live SSE client. Absent on runs logged before this shipped.
+        councilVerdict: (result && result.councilVerdict) || null,
+        councilDelta: (result && result.councilDelta != null) ? result.councilDelta : null,
+        testsPassed: (result && typeof result.testsPassed === "boolean") ? result.testsPassed : null,
+        convergence: (result && result.convergence) || null,
         // Full step history so a client attaching to a run it didn't start (the
         // background-run watcher) can replay the panel, not just show the tail.
         steps: records.map((r) => ({
@@ -1300,26 +1307,38 @@ module.exports = async (req, res, url, deps) => {
         // assigned-issue merge gate (lib/pr-watcher.js) can land it. Fire-and-forget.
         try { require("../lib/autowork-research").markPrConverged(prUrl).catch(() => {}); } catch (_e) { /* best-effort */ }
 
+        // One summary object, sent on the live SSE `done` AND persisted in the run
+        // log's result record — a client that reconnects (or the background-run
+        // watcher) must render the same verify/converge evidence as a live one.
+        // `research` maps from confidence.codebaseResearch (the record's field name);
+        // it was previously read from a nonexistent `.research` and always undefined.
+        const convergenceSummary = {
+          hypothesis: convergenceRecord.hypothesis,
+          confidence: {
+            research: convergenceRecord.confidence.codebaseResearch,
+            testsPassed: convergenceRecord.confidence.testsPassed,
+            observable: convergenceRecord.confidence.observable,
+            grounded: convergenceRecord.confidence.grounded,
+            overall: convergenceRecord.confidence.overall
+          },
+          evidence: convergenceRecord.evidence,
+          sources: convergenceRecord.sources,
+        };
         send("done", {
           ok: true,
           ...receipt,
           councilVerdict: council ? council.verdict : null,
           councilDelta: council ? council.delta : null,
-          convergence: {
-            hypothesis: convergenceRecord.hypothesis,
-            confidence: {
-              research: convergenceRecord.confidence.research,
-              testsPassed: convergenceRecord.confidence.testsPassed,
-              observable: convergenceRecord.confidence.observable,
-              grounded: convergenceRecord.confidence.grounded,
-              overall: convergenceRecord.confidence.overall
-            },
-            evidence: convergenceRecord.evidence,
-            sources: convergenceRecord.sources,
-          },
+          convergence: convergenceSummary,
           message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (confidence: ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%)`
         });
-        finishLog(true, { prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}` });
+        finishLog(true, {
+          prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}`,
+          councilVerdict: council ? council.verdict : null,
+          councilDelta: council ? council.delta : null,
+          testsPassed: receipt.testsPassed,
+          convergence: convergenceSummary,
+        });
         res.end();
       } catch (err) {
         const stage = receipt.stoppedAt || (receipt.steps && receipt.steps[receipt.steps.length - 1]) || null;

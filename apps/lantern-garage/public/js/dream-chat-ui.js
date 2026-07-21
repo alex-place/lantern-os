@@ -471,6 +471,74 @@ const AUTOWORK_PHASES = [
   ['record',      'Log record',         'appending the run to the convergence log'],
 ];
 
+// Every autowork run IS one walk of the North-Star loop (Observe → Remember →
+// Reason → Act → Verify → Converge). The strip at the top of the panel makes that
+// visible; each step row also carries its stage so the mapping is inspectable.
+// `agi-benchmark` is streamed by the server but has no step row — it still lights
+// the Converge node, which is why the stage update runs before the row lookup.
+const AW_LOOP_STAGES = [
+  ['observe',  'Observe'],
+  ['remember', 'Remember'],
+  ['reason',   'Reason'],
+  ['act',      'Act'],
+  ['verify',   'Verify'],
+  ['converge', 'Converge'],
+];
+const AW_PHASE_STAGE = {
+  create_issue: 'observe', fetch_issue: 'observe',
+  research: 'remember',
+  plan: 'reason',
+  branch: 'act', patch: 'act', apply: 'act', commit: 'act', push: 'act', pr: 'act',
+  tests: 'verify',
+  convergence: 'converge', record: 'converge', 'agi-benchmark': 'converge',
+};
+
+function awLoopStripHtml() {
+  return '<div class="aw-loop" role="list" aria-label="Convergence loop progress">'
+    + AW_LOOP_STAGES.map(([k, label]) =>
+        `<span class="aw-loop-node" role="listitem" data-stage="${k}" title="${label}"><span class="aw-loop-dot"></span><span class="aw-loop-name">${label}</span></span>`
+      ).join('<span class="aw-loop-arrow" aria-hidden="true">→</span>')
+    + '</div>';
+}
+
+function awStepRowsHtml(phases, esc) {
+  return phases.map(([k, label, desc]) => {
+    const stageKey = AW_PHASE_STAGE[k] || '';
+    const stagePair = AW_LOOP_STAGES.find(([s]) => s === stageKey);
+    const stageChip = stagePair ? `<span class="aw-stage" data-stage="${stageKey}">${stagePair[1]}</span>` : '';
+    return `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
+      + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span>${stageChip}<span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
+      + `<div class="aw-detail" style="display:none"></div></div></div>`;
+  }).join('');
+}
+
+// Earlier stages are done, the current one is active (or error). A stage stays
+// lit until a later stage starts, so quick phases still register visually.
+function awUpdateLoop(row, phase, status) {
+  const stageKey = AW_PHASE_STAGE[phase];
+  if (!stageKey || !row) return;
+  const idx = AW_LOOP_STAGES.findIndex(([k]) => k === stageKey);
+  if (idx < 0) return;
+  row.querySelectorAll('.aw-loop-node').forEach((node, i) => {
+    if (i < idx) { node.classList.remove('is-active', 'is-error'); node.classList.add('is-done'); }
+    else if (i === idx) {
+      node.classList.remove('is-done');
+      if (status === 'error') { node.classList.remove('is-active'); node.classList.add('is-error'); }
+      else { node.classList.remove('is-error'); node.classList.add('is-active'); }
+    }
+  });
+}
+
+// On success light the whole loop; on failure freeze it where it stopped so the
+// strip itself answers "how far did the run get".
+function awFinishLoop(row, ok) {
+  if (!row) return;
+  row.querySelectorAll('.aw-loop-node').forEach((node) => {
+    if (ok) { node.classList.remove('is-active', 'is-error'); node.classList.add('is-done'); }
+    else node.classList.remove('is-active');
+  });
+}
+
 // Inject the autowork panel styles once: compact rows (white-space:normal kills the
 // chat bubble's pre-wrap that was blowing each step up to ~130px tall), the mandala
 // spinner for the active step, and a responsive layout that drops descriptions on
@@ -500,15 +568,91 @@ function ensureAutoworkStyles() {
     '.aw-extra{font-size:11px;opacity:.7;margin-left:auto;white-space:nowrap}',
     '.aw-detail{font-size:11.5px;opacity:.85;line-height:1.4;margin-top:2px}',
     '@media (max-width:520px){.aw-desc{display:none}.aw-extra{margin-left:0}}',
+    '.aw-loop{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px 9px;border:1px solid var(--border,#222);border-radius:10px;background:var(--surface2,rgba(127,127,127,.05))}',
+    '.aw-loop-node{display:inline-flex;align-items:center;gap:4px;opacity:.4;transition:opacity .2s}',
+    '.aw-loop-node.is-active,.aw-loop-node.is-error{opacity:1}',
+    '.aw-loop-node.is-done{opacity:.85}',
+    '.aw-loop-dot{width:8px;height:8px;border-radius:50%;background:var(--border,#555);flex:none;transition:background .2s}',
+    '.aw-loop-node.is-active .aw-loop-dot{background:var(--accent,#06b6d4);animation:aw-pulse 1.6s ease-in-out infinite}',
+    '.aw-loop-node.is-done .aw-loop-dot{background:#4ade80}',
+    '.aw-loop-node.is-error .aw-loop-dot{background:#f87171}',
+    '.aw-loop-name{font-size:10.5px;font-weight:600;letter-spacing:.02em}',
+    '.aw-loop-arrow{opacity:.3;font-size:10px}',
+    '@keyframes aw-pulse{50%{opacity:.55}}',
+    '.aw-stage{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;opacity:.5;border:1px solid var(--border,#333);border-radius:5px;padding:0 4px;flex:none}',
+    '.aw-conv{margin-top:8px;font-weight:400}',
+    '.aw-conv-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}',
+    '.aw-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;border:1px solid var(--border,#333)}',
+    '.aw-chip-ok{border-color:rgba(74,222,128,.45);color:#4ade80}',
+    '.aw-chip-warn{border-color:rgba(250,204,21,.5);color:#facc15}',
+    '.aw-chip-info{border-color:rgba(96,165,250,.45);color:#60a5fa}',
+    '.aw-conf-bar{display:inline-block;width:52px;height:6px;border-radius:4px;background:var(--surface2,rgba(127,127,127,.18));overflow:hidden;vertical-align:middle}',
+    '.aw-conf-bar>span{display:block;height:100%;border-radius:4px;background:var(--accent,#06b6d4)}',
+    '.aw-conv-ev{margin-top:6px;font-size:11.5px;font-weight:400}',
+    '.aw-conv-ev summary{cursor:pointer;opacity:.75}',
+    '.aw-conv-ev ul{margin:6px 0 0 16px;padding:0;opacity:.85;line-height:1.5}',
+    '@media (max-width:520px){.aw-loop-name{display:none}.aw-loop-node.is-active .aw-loop-name{display:inline}.aw-stage{display:none}}',
   ].join('\n');
   document.head.appendChild(st);
+}
+
+// The Verify + Converge stages rendered where the decision happens: council
+// verdict, tests outcome, and the convergence record's confidence, attached to
+// the finale the Approve button lives in. The server streams all of this on the
+// `done` event (and persists it in the run log's result record for reconnects) —
+// until now the client discarded it and showed only "View PR".
+function renderConvergenceSummary(fin, d) {
+  if (!fin || !d) return;
+  if (fin.querySelector('.aw-conv')) return;   // don't double-render on reconnect
+  const conv = d.convergence || null;
+  const verdict = d.councilVerdict || null;
+  const conf = conv && conv.confidence ? conv.confidence : null;
+  const testsPassed = (typeof d.testsPassed === 'boolean') ? d.testsPassed
+    : (conf && typeof conf.testsPassed === 'number') ? (conf.testsPassed >= 0.5 ? true : (conf.testsPassed > 0 ? false : null))
+    : null;
+  if (!conv && !verdict && testsPassed == null) return;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const chips = [];
+  if (verdict) {
+    const cls = verdict === 'grounded' ? 'ok' : verdict === 'seam_open' ? 'warn' : 'info';
+    const delta = (d.councilDelta != null) ? ` (Δ=${esc(d.councilDelta)})` : '';
+    chips.push(`<span class="aw-chip aw-chip-${cls}" title="Σ₀ council answerability verdict${delta}">${verdict === 'seam_open' ? '⚠ ' : ''}council: ${esc(verdict)}</span>`);
+  }
+  if (testsPassed != null) chips.push(`<span class="aw-chip aw-chip-${testsPassed ? 'ok' : 'warn'}">tests: ${testsPassed ? 'passed' : 'failed'}</span>`);
+  else if (conf && conf.testsPassed === 0) chips.push('<span class="aw-chip aw-chip-warn">tests: not run</span>');
+  if (conf && typeof conf.overall === 'number') {
+    const pct = Math.max(0, Math.min(100, Math.round(conf.overall * 100)));
+    const fmt = v => (typeof v === 'number' ? v.toFixed(2) : '–');
+    chips.push(`<span class="aw-chip" title="research ${fmt(conf.research)} · grounded ${fmt(conf.grounded)} · tests ${fmt(conf.testsPassed)}">confidence <span class="aw-conf-bar"><span style="width:${pct}%"></span></span> ${pct}%</span>`);
+  }
+  const card = document.createElement('div');
+  card.className = 'aw-conv';
+  card.innerHTML = `<div class="aw-conv-chips">${chips.join('')}</div>`
+    + (conv && Array.isArray(conv.evidence) && conv.evidence.length
+        ? `<details class="aw-conv-ev"><summary>convergence record — ${esc(conv.hypothesis || 'evidence')}</summary><ul>${conv.evidence.map(e => `<li>${esc(e)}</li>`).join('')}</ul></details>`
+        : '');
+  fin.appendChild(card);
+}
+
+// Why the Approve button should warn, or null when the run is clean. seam_open
+// (contested + no passing execution check) and failed/skipped tests are the two
+// states where a one-click merge silently launders unverified work.
+function awApproveWarnReason(d) {
+  if (!d) return null;
+  if (d.councilVerdict === 'seam_open') return 'Σ₀ council: seam_open — contested, no passing execution check';
+  if (d.testsPassed === false) return 'tests failed on this change';
+  const cf = d.convergence && d.convergence.confidence;
+  if (d.testsPassed == null && cf && typeof cf.testsPassed === 'number' && cf.testsPassed <= 0) return 'tests were not run on this change';
+  return null;
 }
 
 // In-chat review actions for an autowork draft PR (#1503): Approve (mark ready +
 // squash-merge), Rework (re-run autowork on the same issue), Discard (close + delete
 // branch). Approve/Discard hit POST /api/convergence/pr-action behind a confirm;
 // Rework just re-invokes runAutowork. No-op when there's no PR to act on.
-function renderAutoworkActions(fin, prUrl, issue, btn, base) {
+// `opts.warn` + `opts.warnReason` flip Approve into an explicit "Approve anyway"
+// with the unverified-state reason in the button, the tooltip, and the confirm.
+function renderAutoworkActions(fin, prUrl, issue, btn, base, opts) {
   if (!fin || !prUrl) return;
   if (fin.querySelector('.aw-actions')) return;   // don't double-render on reconnect
   const bar = document.createElement('div');
@@ -520,7 +664,11 @@ function renderAutoworkActions(fin, prUrl, issue, btn, base) {
     b.style.cssText = `font:600 11px var(--font-sans,sans-serif);padding:4px 10px;border-radius:8px;border:1px solid ${color};background:transparent;color:${color};cursor:pointer`;
     return b;
   };
-  const approve = mk('✓ Approve', 'Mark ready for review & squash-merge', '#4ade80');
+  const warn = !!(opts && opts.warn);
+  const warnWhy = (opts && opts.warnReason) || 'verification incomplete';
+  const approve = warn
+    ? mk('⚠ Approve anyway', 'Verification incomplete — ' + warnWhy + '. Merging skips the evidence gate.', '#facc15')
+    : mk('✓ Approve', 'Mark ready for review & squash-merge', '#4ade80');
   const rework  = mk('↻ Rework',  'Re-run autowork on this issue (supersedes this attempt)', '#a78bfa');
   const discard = mk('✕ Discard', 'Close the PR & delete its branch', '#f87171');
   const all = [approve, rework, discard];
@@ -542,7 +690,7 @@ function renderAutoworkActions(fin, prUrl, issue, btn, base) {
       else { setMsg('✗ ' + ((r && r.error) || 'Failed'), '#f87171'); all.forEach(b => b.disabled = false); }
     } catch (e) { setMsg('✗ ' + (e && e.message || 'request failed'), '#f87171'); all.forEach(b => b.disabled = false); }
   }
-  approve.onclick = () => doAction('approve', `Approve and squash-merge this PR?\n\n${prUrl}`);
+  approve.onclick = () => doAction('approve', (warn ? `⚠ ${warnWhy}.\n\n` : '') + `Approve and squash-merge this PR?\n\n${prUrl}`);
   discard.onclick = () => doAction('discard', `Discard (close) this PR and delete its branch?\n\n${prUrl}`);
   rework.onclick = () => {
     if (!window.confirm(`Re-run autowork on issue #${issue}? This supersedes the current attempt.`)) return;
@@ -664,16 +812,14 @@ async function runAutowork(target, btn, base) {
   // The "File issue" step only applies to task mode; drop it for issue-number runs.
   const phases = taskMode ? AUTOWORK_PHASES : AUTOWORK_PHASES.filter(([k]) => k !== 'create_issue');
   const PHASE_INFO = Object.fromEntries(AUTOWORK_PHASES.map((p) => [p[0], { label: p[1], desc: p[2] }]));
-  const stepRowsHtml = phases.map(([k, label, desc]) =>
-    `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
-    + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span><span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
-    + `<div class="aw-detail" style="display:none"></div></div></div>`).join('');
+  const stepRowsHtml = awStepRowsHtml(phases, esc);
   // Activity line = a live, streamed-feel header: the mandala spins while a step runs
   // and the text names what's happening right now (addresses "shows little/no info").
   row.innerHTML =
     `<div class="msg-label">Unisona · Autowork ${esc(panelLabel)}</div>`
     + `<div class="bubble aw-panel">`
     + `<div class="aw-activity"><img src="/mandala.svg" class="aw-spin" alt=""><div class="aw-act-text"><b>Starting autowork…</b> <span>${esc(taskMode ? 'filing the task as an issue' : 'on issue ' + panelLabel)}</span></div></div>`
+    + awLoopStripHtml()
     + `<div class="aw-steps">${stepRowsHtml}</div>`
     + `<div class="aw-diff" style="display:none;margin-top:8px"></div>`
     + `<div class="aw-final" style="margin-top:8px;font-weight:600"></div>`
@@ -689,6 +835,7 @@ async function runAutowork(target, btn, base) {
   };
 
   const setStep = (phase, status, extra, detail) => {
+    awUpdateLoop(row, phase, status);   // before the row lookup — agi-benchmark has no row but lights Converge
     const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
     if (!el) return;
     el.classList.remove('is-active', 'is-done', 'is-error', 'is-retry');
@@ -785,7 +932,11 @@ async function runAutowork(target, btn, base) {
       fin.innerHTML = finalDone.prUrl
         ? `✓ Auto-worked #${esc(finalDone.issue || issue)} — <a href="${esc(finalDone.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`
         : `✓ ${esc(finalDone.message || 'Done')}`;
-      renderAutoworkActions(fin, finalDone.prUrl, finalDone.issue || issue, btn, base);
+      awFinishLoop(row, true);
+      renderConvergenceSummary(fin, finalDone);
+      const liveWarn = awApproveWarnReason(finalDone);
+      renderAutoworkActions(fin, finalDone.prUrl, finalDone.issue || issue, btn, base,
+        liveWarn ? { warn: true, warnReason: liveWarn } : undefined);
       setActivity('Complete', finalDone.prUrl ? 'opened a pull request' : 'autonomous work finished', false);
       if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
@@ -832,7 +983,11 @@ async function runAutowork(target, btn, base) {
             setActivity('Complete', 'recovered after a dropped connection', false);
             fin.style.color = '#4ade80';
             fin.innerHTML = `✓ Auto-worked #${esc(s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : (issue || ''))} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a> <span style="opacity:.6;font-size:11px">(reconnected)</span>`;
-            renderAutoworkActions(fin, s.prUrl, (s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : issue), btn, base);
+            awFinishLoop(row, true);
+            renderConvergenceSummary(fin, s);
+            const reWarn = awApproveWarnReason(s);
+            renderAutoworkActions(fin, s.prUrl, (s.message && s.message.match(/#(\d+)/) ? RegExp.$1 : issue), btn, base,
+              reWarn ? { warn: true, warnReason: reWarn } : undefined);
           } else {
             setActivity('Stopped', s.message || 'run ended', false);
             fin.style.color = '#f87171';
@@ -881,10 +1036,8 @@ function attachBackgroundAutoworkPanel(run, base) {
     `<div class="msg-label">Unisona · ${esc(srcLabel)} · Autowork #${esc(issue)}</div>`
     + `<div class="bubble aw-panel">`
     + `<div class="aw-activity"><img src="/mandala.svg" class="aw-spin" alt=""><div class="aw-act-text"><b>Background autowork on #${esc(issue)}</b> <span>${esc(run.title || 'started by ' + srcLabel.toLowerCase() + ' — attaching live')}</span></div></div>`
-    + `<div class="aw-steps">${phases.map(([k, label, desc]) =>
-        `<div class="aw-step" data-phase="${k}"><div class="aw-ico">○</div><div class="aw-body">`
-        + `<div class="aw-row1"><span class="aw-label">${esc(label)}</span><span class="aw-desc">${esc(desc)}</span><span class="aw-extra"></span></div>`
-        + `<div class="aw-detail" style="display:none"></div></div></div>`).join('')}</div>`
+    + awLoopStripHtml()
+    + `<div class="aw-steps">${awStepRowsHtml(phases, esc)}</div>`
     + `<div class="aw-final" style="margin-top:8px;font-weight:600"></div>`
     + `</div>`;
   messages.appendChild(row);
@@ -897,6 +1050,7 @@ function attachBackgroundAutoworkPanel(run, base) {
     if (actImg) actImg.classList.toggle('aw-spin', spinning !== false);
   };
   const setStep = (phase, status, extra, detail) => {
+    awUpdateLoop(row, phase, status);   // before the row lookup — agi-benchmark has no row but lights Converge
     const el = row.querySelector(`.aw-step[data-phase="${phase}"]`);
     if (!el) return;
     el.classList.remove('is-active', 'is-done', 'is-error', 'is-retry');
@@ -940,7 +1094,11 @@ function attachBackgroundAutoworkPanel(run, base) {
             setActivity('Complete', 'background run opened a pull request', false);
             fin.style.color = '#4ade80';
             fin.innerHTML = `✓ Auto-worked #${esc(issue)} — <a href="${esc(s.prUrl)}" target="_blank" rel="noopener" style="color:var(--accent)">View PR</a>`;
-            renderAutoworkActions(fin, s.prUrl, issue, row.querySelector('.aw-ico'), base);
+            awFinishLoop(row, true);
+            renderConvergenceSummary(fin, s);
+            const bgWarn = awApproveWarnReason(s);
+            renderAutoworkActions(fin, s.prUrl, issue, row.querySelector('.aw-ico'), base,
+              bgWarn ? { warn: true, warnReason: bgWarn } : undefined);
           } else {
             setActivity('Stopped', s.message || 'run ended', false);
             fin.style.color = '#f87171';
