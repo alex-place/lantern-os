@@ -136,6 +136,14 @@ because actions compound error.*
   self-triggered-control framing (Heemels–Tabuada) applies. **[confidence: Medium — the schedule
   is proven on synthetic maps + one reservoir, not on an agent trajectory · source: cert §3.1]**
 - **GAP.** No trained tool-use / agentic-RL of our own; agency rides on rented base models.
+  **MEASURED (2026-07-21):** the autowork pipeline has not yet resolved a real issue
+  end-to-end — live run `autowork-2762-1784669597545` failed at apply after three patch
+  regenerations with hallucinated context (its context lines weren't in the real file), and
+  SWE-bench Lite single-shot sits at 0/5 ([#2762]). The diagnosed failure is a freshness
+  failure at the Act seam: the retry regenerates from the same stale context, so the
+  Grounding Ledger's own law (only fresh truth informs) prescribes the fix — re-slice the
+  real file into each retry. The loop's Verify discipline diagnosing its weakest stage is
+  the design cohering, and closing [#2762] is the highest-leverage open item.
 
 ## VERIFY — grounding, collapse detection, honesty  ·  **the Certificate's home**
 

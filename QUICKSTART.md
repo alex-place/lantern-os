@@ -113,7 +113,7 @@ Once it's running on `http://127.0.0.1:4177`:
 | Page | Address | What it is |
 |---|---|---|
 | **Home** | `/` | The landing page with links to everything |
-| **Chat** | `/dream-chat.html` | Talk to unisona.ai — your main way in |
+| **Chat** | `/chat.html` | Talk to unisona.ai — your main way in (legacy `/dream-chat.html` redirects) |
 | **Help** | `/knowledgecenter.html` | Guides, docs, and your saved PDFs |
 | **Trader** | `/trader-dashboard.html` | Markets & prediction-market terminal *(needs an account)* |
 | **Create** | `/create.html` | Image and content tools *(needs an account)* |

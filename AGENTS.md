@@ -605,7 +605,7 @@ python src/convergence_io_engine.py inspect
 | Server entry | [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) (~764 lines: `routes[]` wiring + child-process supervisor) |
 | All dream routes | [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) |
 | SSE streaming | [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) |
-| Dream chat UI | [`apps/lantern-garage/public/dream-chat.html`](apps/lantern-garage/public/dream-chat.html) |
+| Chat UI | [`apps/lantern-garage/public/chat.html`](apps/lantern-garage/public/chat.html) (legacy `dream-chat.html` is a redirect stub) |
 | Landing page | [`apps/lantern-garage/public/index.html`](apps/lantern-garage/public/index.html) |
 | Provider settings | `POST /api/settings/providers` in [`routes/dream.js`](apps/lantern-garage/routes/dream.js) |
 | Orchestrator | [`src/convergence_io_engine.py`](src/convergence_io_engine.py) |
