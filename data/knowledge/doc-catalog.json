@@ -1860,7 +1860,7 @@
   "reason": "Still-usable release-gate checklist; procedural rubric, evergreen; minor COMET-LEAP artifacts dated"
  },
  {
-  "path": "docs/V10-TRAINING-QUICKSTART.md",
+  "path": "docs/archive/creator-v10/V10-TRAINING-QUICKSTART.md",
   "title": "Σ₀ V10 Training Pipeline — Quickstart",
   "category": "training",
   "description": "Runbook to train the XGBoost V10 video scorer from YouTube Shorts; runs on mock data, real-API integration into the scorer still a to-do.",
@@ -1884,7 +1884,7 @@
   "reason": "Live scheduled-task + env/runbook still accurate; flag that Kaggle bf16 issue (see diagnosis) makes some provider claims stale"
  },
  {
-  "path": "docs/YOUTUBE-API-SETUP.md",
+  "path": "docs/archive/creator-v10/YOUTUBE-API-SETUP.md",
   "title": "YouTube Data API v3 Setup Guide",
   "category": "setup",
   "description": "Step-by-step guide to enable the YouTube Data API v3, create/restrict a key, manage quota, and wire the Shorts collector for the creator training pipeline.",
