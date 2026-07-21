@@ -525,7 +525,9 @@ function awUpdateLoop(row, phase, status) {
     const st = state[stageKey] || (state[stageKey] = { active: false, error: false, done: false });
     if (cls === 'active' || cls === 'retry') st.active = true;
     else if (cls === 'error') st.error = true;
-    else if (cls === 'done' || cls === 'skipped') st.done = true;
+    // 'skipped' deliberately does NOT count as done: a skipped Verify stage lit the
+    // strip green on a zero-tests run. Skipped stages stay unlit — honest.
+    else if (cls === 'done') st.done = true;
   };
   row.querySelectorAll('.aw-step').forEach((el) => {
     const cls = el.classList.contains('is-active') ? 'active'
@@ -547,12 +549,13 @@ function awUpdateLoop(row, phase, status) {
 }
 
 // On success light the whole loop; on failure freeze it where it stopped so the
-// strip itself answers "how far did the run get".
+// strip itself answers "how far did the run get" — a stage still marked active at
+// the stop is where it died, so it flips to the error state rather than pulsing on.
 function awFinishLoop(row, ok) {
   if (!row) return;
   row.querySelectorAll('.aw-loop-node').forEach((node) => {
     if (ok) { node.classList.remove('is-active', 'is-error'); node.classList.add('is-done'); }
-    else node.classList.remove('is-active');
+    else if (node.classList.contains('is-active')) { node.classList.remove('is-active'); node.classList.add('is-error'); }
   });
 }
 
@@ -898,7 +901,7 @@ async function runAutowork(target, btn, base) {
       if (evName === 'run') { awRunId = d.runId; AW_LOCAL_RUNS.add(d.runId); return; }
       if (evName === 'step') {
         let extra = '';
-        if (d.phase === 'tests' && d.status === 'done') extra = d.passed ? 'passed' : (d.ran ? 'failed' : 'none');
+        if (d.phase === 'tests' && d.status === 'done') extra = d.ran ? (d.passed ? 'passed' : 'failed') : 'none';
         else if (d.phase === 'research' && d.status === 'done') extra = `${d.filesFound || 0} files · ${d.webSourcesFound || 0} web`;
         else if (d.phase === 'create_issue' && d.status === 'done') extra = `#${d.issue}`;
         else if (d.phase === 'pr' && d.status === 'done') extra = 'PR opened';
@@ -961,6 +964,7 @@ async function runAutowork(target, btn, base) {
       if (actImg) actImg.src = '/mandala.svg'; // steady (no spin)
     } else {
       if (btn) { btn.textContent = '✗ Failed'; btn.style.color = '#f87171'; }
+      awFinishLoop(row, false);
       if (!fin.textContent) {
         fin.style.color = '#f87171';
         fin.textContent = `✗ ${esc((finalDone && finalDone.message) || 'Auto-work failed')}`;
@@ -1103,7 +1107,7 @@ function attachBackgroundAutoworkPanel(run, base) {
   const applySteps = (steps) => {
     for (const s of steps || []) {
       let extra = '';
-      if (s.phase === 'tests' && s.status === 'done') extra = s.passed ? 'passed' : (s.ran ? 'failed' : 'none');
+      if (s.phase === 'tests' && s.status === 'done') extra = s.ran ? (s.passed ? 'passed' : 'failed') : 'none';
       else if (s.phase === 'research' && s.status === 'done') extra = `${s.filesFound || 0} files · ${s.webSourcesFound || 0} web`;
       else if (s.phase === 'pr' && s.status === 'done') extra = 'PR opened';
       else if (s.status === 'retry') extra = `retry ${s.attempt || ''}`.trim();

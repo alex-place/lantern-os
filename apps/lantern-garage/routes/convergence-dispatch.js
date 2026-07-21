@@ -1078,17 +1078,24 @@ module.exports = async (req, res, url, deps) => {
             continue;
           }
 
-          // Failed — roll the tree back clean and carry the errors into the next try,
-          // now WITH the real line-numbered content of the targeted files so the model
-          // copies exact context instead of re-hallucinating it.
+          // Failed — roll the tree back clean and carry the errors into the next try
+          // with the REAL content of the targeted files. Deliberately WITHOUT the
+          // prior diff: run autowork-2762@23:0x proved the model anchors on its own
+          // failed diff when it is re-shown (attempts 2 and 3 reproduced the identical
+          // wrong 15-line context even alongside the real file content). The prior
+          // diff's hunks ARE the contamination on a context mismatch — withhold the
+          // ratchet, keep the fresh truth (the certificate's de-ratchet law, applied).
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           const applyDetail = humanizeApplyFailure(stats);
           feedback = {
-            priorDiff: diffText,
             errors: ((stats.errors && stats.errors.length)
               ? stats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
               : "the diff changed no files (paths/hunks did not match the repo)")
+              + "\nYour previous diff is deliberately NOT shown: its context lines were wrong, and "
+              + "reproducing them fails every time. Rebuild EVERY hunk from scratch by copying 3+ "
+              + "consecutive lines EXACTLY from the REAL content below — do not reuse lines you "
+              + "remember writing before."
               + targetedFileContext(workRoot, stats, diffText),
           };
           step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
@@ -1128,9 +1135,13 @@ module.exports = async (req, res, url, deps) => {
         const testsPassed = testResults.every((r) => r.ok !== false);  // inconclusive (timeout) ≠ failure
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         const _failedTest = testResults.find((r) => r.ok === false) || {};
-        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length, floor: testsFromFloor,
+        // Zero tests = SKIPPED, never "done/passed": [].every() is vacuously true, and
+        // that truthy `passed` lit the panel's verify row green on runs that verified
+        // nothing (caught live on the 2026-07-21 html-only run).
+        step("tests", tests.length === 0 ? "skipped" : "done",
+          { testResults, ...(tests.length === 0 ? {} : { passed: testsPassed }), ran: tests.length, floor: testsFromFloor,
           detail: tests.length === 0
-            ? "no tests were specified for this change"
+            ? "no tests were specified for this change — Verify stage NOT exercised"
             : (testsPassed
                 ? `${tests.length} test command(s) passed${testsFromFloor ? " (deterministic verify floor — the plan specified none)" : ""}`
                 : `failed: ${_failedTest.command || tests[0]} — ${String(_failedTest.output || "").split("\n").filter(Boolean).slice(-1)[0] || "see output"}`.slice(0, 240)) });
