@@ -344,4 +344,4 @@ echo "Latest model: $latest"
 - **Continuous loop:** `scripts/v10_training_loop.py` (Phase 4)
 - **V10 Scorer:** `lib/sigma0-v10-scoring.js` (uses trained weights)
 
-**Theory:** [docs/SIGMA0-V10-THEORY-GROUNDING.md](SIGMA0-V10-THEORY-GROUNDING.md)
+**Theory:** [docs/SIGMA0-V10-THEORY-GROUNDING.md](../../SIGMA0-V10-THEORY-GROUNDING.md)
