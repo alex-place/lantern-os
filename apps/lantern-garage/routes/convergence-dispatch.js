@@ -55,18 +55,70 @@ function humanizeApplyFailure(stats) {
 // Line-numbered current content of the files a failed diff TARGETED, appended to the
 // retry feedback so the model anchors on real lines instead of re-hallucinating
 // context — the concrete fix for the repeating "hunk_not_located" apply failures.
-function targetedFileContext(workRoot, stats) {
+function targetedFileContext(workRoot, stats, priorDiff) {
+  // #2762: two failure mechanisms killed the retry loop's self-correction.
+  // (1) The old version emitted LINE-NUMBERED content with "copy context lines
+  //     VERBATIM from here" — a model that obeys produces hunk context prefixed
+  //     "NN: ", which exists in no file, so every retry fails identically.
+  // (2) The failed hunk's @@ position is the hallucination's own coordinate; the
+  //     model needs the TRUE location of the region it targeted, found by matching
+  //     the failed hunk's lines against the real file (freshness law at the Act
+  //     seam: feed fresh truth into the retry, not another sample of stale context).
   const fs = require("fs"); const path = require("path");
   const files = [...new Set([...(stats.changed || []), ...(stats.created || []),
     ...((stats.errors || []).map((e) => e.file))].filter(Boolean))];
+
+  // Per-file context/removal lines of the prior diff's hunks (what the model
+  // BELIEVED the file contains) — used only to locate the true region.
+  const hunkLines = {};
+  if (priorDiff) {
+    let cur = null;
+    for (const raw of String(priorDiff).split("\n")) {
+      const m = raw.match(/^\+\+\+ b\/(.+)$/);
+      if (m) { cur = m[1].trim(); hunkLines[cur] = hunkLines[cur] || []; continue; }
+      if (!cur) continue;
+      if (raw.startsWith(" ") || raw.startsWith("-")) {
+        const t = raw.slice(1).trim();
+        if (t.length >= 8) hunkLines[cur].push(t);   // short/blank lines match everywhere
+      }
+    }
+  }
+
   let out = "";
   for (const fp of files.slice(0, 3)) {
     try {
       const full = path.join(workRoot, fp);
-      if (!fs.existsSync(full)) { out += `\n--- ${fp} (this file does NOT exist — do not patch it) ---\n`; continue; }
-      const numbered = fs.readFileSync(full, "utf8").split("\n").slice(0, 400)
-        .map((l, i) => `${i + 1}: ${l}`).join("\n");
-      out += `\n--- ${fp} (CURRENT content, line-numbered — copy context lines VERBATIM from here) ---\n${numbered}\n`;
+      if (!fs.existsSync(full)) { out += `\n--- ${fp}: this file does NOT exist — do not patch it ---\n`; continue; }
+      const lines = fs.readFileSync(full, "utf8").split("\n");
+      const n = lines.length;
+
+      // Locate the believed lines in the real file → true coordinates, stated in
+      // prose (never as content prefixes).
+      let anchorNote = "";
+      const believed = (hunkLines[fp] || []).slice(0, 12);
+      if (believed.length) {
+        const trimmed = lines.map((l) => l.trim());
+        let hits = 0;
+        const locs = [];
+        for (const b of believed) {
+          const at = trimmed.indexOf(b);
+          if (at >= 0) { hits++; if (locs.length < 4) locs.push(at + 1); }
+        }
+        anchorNote = hits
+          ? `Of the ${believed.length} context/removed lines your failed diff claimed for this file, ${hits} exist — near line(s) ${[...new Set(locs)].join(", ")}. Anchor your hunks there.`
+          : `NONE of the context/removed lines your failed diff used exist in this file — that content was invented. Rebuild the hunks from the real content below only.`;
+      }
+
+      // Raw content, NO line-number prefixes (they poison verbatim copying). Whole
+      // file when small; head+tail windows (with true line ranges in the headers,
+      // outside the copyable content) when large.
+      let body;
+      if (n <= 520) body = lines.join("\n");
+      else body = `«lines 1-260 of ${n}»\n` + lines.slice(0, 260).join("\n")
+        + `\n«lines ${n - 159}-${n} of ${n}»\n` + lines.slice(n - 160).join("\n");
+      out += `\n--- ${fp} — REAL current content (${n} lines). ${anchorNote} `
+        + `Context lines in your new diff must match this content character-for-character; `
+        + `do NOT include line numbers in diff lines. ---\n${body}\n`;
     } catch { /* skip unreadable */ }
   }
   return out;
@@ -1032,7 +1084,7 @@ module.exports = async (req, res, url, deps) => {
             errors: ((stats.errors && stats.errors.length)
               ? stats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
               : "the diff changed no files (paths/hunks did not match the repo)")
-              + targetedFileContext(workRoot, stats),
+              + targetedFileContext(workRoot, stats, diffText),
           };
           step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
             { stats, attempt,

@@ -30,6 +30,19 @@
 
 ### Fixed
 
+- autowork(#2762): the apply-retry's self-correction mechanism was poisoning itself. The
+  retry feedback DID include the targeted file's real content — but line-numbered
+  (`102: <line>`) with the instruction "copy context lines VERBATIM from here", so an obedient
+  model produced hunk context prefixed `NN: ` that exists in no file, failing identically every
+  attempt; the failed hunk's own @@ coordinate (a hallucination) was the only position signal;
+  and content was capped at the file's first 400 lines. `targetedFileContext` now emits RAW
+  un-numbered content (whole file when ≤520 lines, head+tail windows with true ranges
+  otherwise), locates the failed hunks' believed lines in the real file and states the true
+  anchor line numbers in prose ("your claimed context exists near line N" / "NONE of your
+  context lines exist — that content was invented"), and instructs explicitly that diff lines
+  must carry no line numbers. The freshness law applied to the Act seam: fresh truth into the
+  retry, not another sample of the stale prompt.
+
 - chat(autowork): the loop strip derived stage state by forward-marking ("everything before the
   current stage is done"), but the pipeline is not in loop order — `branch` (an Act phase) runs
   before `research` (Remember) — so Reason lit as done before the plan step ever ran. Stage state
