@@ -1,0 +1,48 @@
+{
+  "grounding-calibration": {
+    "exists": true,
+    "n_rows": 371,
+    "n_malformed": 0,
+    "fields_used": {
+      "key": "key",
+      "outcome": "outcome",
+      "ts": "ts"
+    },
+    "n_keys_with_usable_fields": 6,
+    "n_rho_fittable_keys (>=2 spaced obs, both classes)": 1
+  },
+  "trading-trades": {
+    "exists": false
+  },
+  "trading-signals": {
+    "exists": false
+  },
+  "kalshi-cio-accuracy": {
+    "exists": false
+  },
+  "council-reviews": {
+    "exists": true,
+    "n_rows": 415,
+    "n_malformed": 0,
+    "fields_used": {
+      "key": "id",
+      "outcome": "verdict",
+      "ts": "ts"
+    },
+    "n_keys_with_usable_fields": 63,
+    "n_rho_fittable_keys (>=2 spaced obs, both classes)": 0
+  },
+  "canary-events": {
+    "exists": true,
+    "n_rows": 1,
+    "n_malformed": 0,
+    "fields_used": {
+      "key": null,
+      "outcome": null,
+      "ts": null
+    },
+    "n_keys_with_usable_fields": 0,
+    "n_rho_fittable_keys (>=2 spaced obs, both classes)": 0
+  },
+  "_verdict": "Best available stream: grounding-calibration with 1 fittable keys. NO stream is rich enough \u2014 the spaced-probe instrumentation (#2787) is confirmed as the only path to M2's cadence law."
+}

@@ -23,7 +23,7 @@ const { resolveCodingRoute } = require("./route-contract");
 const { unifiedAgentStreamSSE } = require("./unified-agent");
 const sse = require("./stream-chat/sse");
 const { parseStreamChatRequest } = require("./stream-chat/request");
-const { runCanaries } = require("./canary");
+const { runCanaries, createCanaryTrace } = require("./canary");
 const { providedSourceGrounding } = require("./groundedness-canary");
 const streamSurprise = require("./stream-surprise");
 const surpriseIntervene = require("./surprise-intervene"); // ADR-0017 — flag-gated, default OFF
@@ -1375,6 +1375,10 @@ async function handleStreamChat(req, url, res) {
   // dispatch loop runs. A `let` declared later left those calls in the temporal
   // dead zone ("Cannot access 'fullReply' before initialization").
   let fullReply = "";
+  // #2791 (M6): per-generation canary signal trajectory — no-op unless CANARY_TRACE=1.
+  // Sampled where the mid-stream collapse guard already scores; emitted (both classes)
+  // by runCanaries at done. Reset alongside fullReply on provider retries.
+  const canaryTrace = createCanaryTrace();
   // #1678 Verify valve: per-token logprob accumulator. Logprob-exposing providers feed it
   // during streaming; sendDone() reads it once as tokenSurprise for the groundedness canary.
   // No-op when SURPRISE_CANARY is off or the provider has no logprobs (value() → null →
@@ -1470,6 +1474,7 @@ async function handleStreamChat(req, url, res) {
           groundingContext: canaryGroundingContext,
           tokenSurprise: surprise.value(), // #1678: model-internal uncertainty (null when none captured)
           surpriseModel: signature.model,  // #1681: calibrate the uncertainty magnitude to this model
+          trace: canaryTrace,              // #2791: mid-stream signal trajectory (no-op unless CANARY_TRACE=1)
           context: { source, provider: signature.provider, agent: agent.id || agent.name, surface: "dream-chat" },
         });
         Object.assign(signature, signaturePatch);
@@ -2110,6 +2115,7 @@ async function handleStreamChat(req, url, res) {
               if (!_collapseTripped && fullReply.length >= 400 && fullReply.length - _lastCanaryLen >= 240) {
                 _lastCanaryLen = fullReply.length;
                 const sc = scoreReplyCollapse(fullReply, { threshold: COLLAPSE_BLOCK });
+                canaryTrace.push(fullReply.length, sc); // #2791: trajectory sample (flag-gated no-op)
                 if (sc.collapsed) {
                   _collapseTripped = true;
                   console.warn(`[canary_collapse_block] proximity=${sc.proximity} provider=ollama signals=${JSON.stringify(sc.signals)}`);
@@ -2281,6 +2287,7 @@ async function handleStreamChat(req, url, res) {
     // otherwise it falls through to the backstop. Gates every per-provider guard.
     const _hardPin = requestedProvider && _isLastProvider;
     fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
+    canaryTrace.reset(); // #2791: trajectory restarts with the fresh attempt
     surprise.reset(); // #1678: nor a failed attempt's captured logprobs
 
   // Provider: Gemini (streaming)
@@ -2453,7 +2460,7 @@ async function handleStreamChat(req, url, res) {
         msg.includes("quota") ||
         /gemini_status_5\d\d/.test(msg) || // 500/502/503/504 high-demand
         msg.includes("gemini_timeout");
-      if (isTransient) { fullReply = ""; surprise.reset(); continue; } // retry with next model silently
+      if (isTransient) { fullReply = ""; surprise.reset(); canaryTrace.reset(); continue; } // retry with next model silently
       // Terminal gemini failure (chain exhausted / non-transient): record to the
       // leaderboard so PCSF learns provider reliability. Not reached on a
       // transient retry that later succeeds (that path `continue`d above). (#1236)
