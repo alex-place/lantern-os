@@ -38,11 +38,14 @@ never re-argued), or **[design — falsifiable]** (proposed here with a kill cri
 > harness). The field now has **three independent live incarnations**; the remaining
 > applications are extensions of those, not new machinery.
 >
-> An addendum (§5) answers the follow-up ask — *qutrit ↔ binary compression* — with a
-> web-verified brief and a graded brainstorm: trit-packing is a solved 99% craft whose one
-> real home here is the **ADR-0026 ternary serving artifact** (llama.cpp TQ1_0, 1.6875 bpw);
-> ternary's honest wins are hardware/serving economics (GDDR7 PAM-3, BitNet kernels), never
-> codecs. One build candidate, four honest closures.
+> An addendum (§5) answers the follow-up asks — *qutrit ↔ binary compression* and the
+> *higher-dimensional binary compression* landscape — with a web-verified brief and a graded
+> brainstorm. Trit-packing is a solved 99% craft whose one real home here is the **ADR-0026
+> ternary serving artifact** (llama.cpp TQ1_0, 1.6875 bpw); ternary's honest wins are
+> hardware/serving economics (GDDR7 PAM-3, BitNet kernels), never codecs. The 2026
+> higher-dimensional literature adds two more: a **RaBitQ 1-bit/dim embedding cache** for the
+> memory reranker, and **neutral grading of CSF-Omni on the AITDCC-2026 benchmark**. Three
+> build/bench candidates, four honest closures.
 
 ---
 
@@ -315,14 +318,17 @@ are tasks, not claims, and carry parity gates instead of kill rows.
 | **A8** | Measured surprise beats regex dilation | A/B `chatDilation` regex vs surprise-augmented on the same eval set | no reduction in unsupported-claim rate at equal latency budget |
 | **A9** | Send-on-delta beats the fixed 6 s clock | `KALSHI_ADAPTIVE_POLL=1` for one measured week vs baseline week | delta-detection latency **or** 429 rate worsens |
 | **A11** | An uncertainty bonus improves feed discovery | Offline replay on `interactions.jsonl`, then 2-week A/B | no lift in discovered-winners (items reaching top-CTR after first exposure) at ≤noise overall-CTR cost |
-| **Q1** | TQ1_0 packing is the right serving-artifact format (§5) | Bench TQ1_0 vs TQ2_0 on the 8 GB target when the ADR-0026 artifact exists | TQ1_0 tokens/s < 0.85× TQ2_0 and the ~0.33 GB RAM saving unlocks nothing (context/model size) |
+| **Q1** | TQ1_0 packing is the right serving-artifact format (§5) | Bench TQ1_0 vs TQ2_0 (+ DBF/BiSCo watch arms, B9) on the 8 GB target when the ADR-0026 artifact exists | TQ1_0 tokens/s < 0.85× TQ2_0 and the ~0.33 GB RAM saving unlocks nothing (context/model size) |
+| **A12** | A 1-bit/dim RaBitQ embedding cache preserves rerank quality (§5, B7) | Cache + bitwise prefilter vs the live float rerank on the LongMemEval harness | recall@5 or MRR drops > 1 pt, **or** no measured latency/RAM win |
+| **Q2** | CSF-Omni's "ties-brotli envelope" survives neutral grading (§5, B8) | Run CSF-Omni over the AITDCC-2026 public corpus; compare leaderboard references (ratio + Weissman) | CSF-Omni lands below the **zstd-19 reference** on ratio → the spec's envelope claim gets a corpus-scope caveat |
 
 ---
 
-## 5. Addendum (2026-07-21) — qutrit ↔ binary compression: research brief + brainstorm
+## 5. Addendum (2026-07-21) — qutrit ↔ binary & higher-dimensional compression: research brief + brainstorm
 
-Requested mid-review: *"research qutrit binary compression and brainstorm."* The brief below is
-web-verified; the brainstorm is graded against the kill doc's floor so nothing dead is revived.
+Requested mid-review: *"research qutrit binary compression and brainstorm"*, then *"higher
+dimensional binary file compression."* The brief below is web-verified; the brainstorm is
+graded against the kill doc's floor so nothing dead is revived.
 
 ### 5.1 The settled floor (not relitigated)
 
@@ -364,7 +370,51 @@ and intermediate-qutrit circuit compression is a real research line
 ([ACM ToQC](https://dl.acm.org/doi/10.1145/3406309)). All of it requires quantum hardware; the
 repo's "qutrit" is a classical 6-bit slot (§5.1). Door closed, with citations rather than vibes.
 
-### 5.3 Brainstorm — graded
+### 5.3 The "higher-dimensional binary compression" landscape (verified 2026-07-21)
+
+In the 2025–2026 literature the phrase resolves to **four live programs** — none of which is
+the killed geometric-arrangement claim, and two of which directly serve this project's surfaces:
+
+**(a) Binary / extreme-low-bit weight compression.** **DBF** — *Addition is almost all you
+need* ([arXiv:2505.11076](https://arxiv.org/abs/2505.11076), ICML 2025): factor a dense weight
+matrix into **two binary sign matrices + scaling vectors**; best-in-class at 1 bpw, competitive
+with QuIP#/QTIP at 2 bpw, with a continuous ratio dial (the intermediate dimension).
+**BiSCo-LLM** ([arXiv:2607.08643](https://arxiv.org/pdf/2607.08643), 2026-07): codebook-free
+**binary spherical coding** — weight chunks mapped to a unit hypersphere and stored as a
+bit-packed sign stream + residual BSQ stage, no lookup tables. Lattice VQ is also active
+(Leech-lattice quantization, [arXiv:2603.11021](https://arxiv.org/pdf/2603.11021)). *Relevance:
+these are the 1–2 bpw alternatives sitting right next to ternary TQ packing for the ADR-0026
+serving artifact — watch items for Q1's bench, not separate builds (B9).*
+
+**(b) High-dimensional vector quantization with guarantees.** **RaBitQ**
+([arXiv:2405.12497](https://arxiv.org/abs/2405.12497), SIGMOD 2024): quantize a D-dim vector to
+**D bits** with an **unbiased distance estimator and a sharp theoretical error bound**;
+**Extended-RaBitQ** generalizes to B bits/dim with an asymptotically optimal space–accuracy
+trade-off ([library](https://vectordb-ntu.github.io/RaBitQ-Library/)). This is what
+"higher-dimensional binary compression" means when it works: compress the *embedding*, keep the
+*distance*. *Relevance: the memory reranker's embedding side (A12).*
+
+**(c) Neutral lossless benchmarking.** The **2026 AIT Data Compression Challenge**
+([arXiv:2606.17712](https://arxiv.org/abs/2606.17712)): 16 heterogeneous files, public-train /
+hidden-test split, **117 submitted compressors** graded on ratio, time, Weissman score, and
+Pareto frontier, under ≤8 GB RAM + ≤1 MB decompressor rules; open leaderboard
+([aitdcc.github.io](https://aitdcc.github.io)). *Relevance: exactly the External-Reality-Rule
+instrument for CSF-Omni's "ties-brotli upper envelope" claim — grade it on someone else's
+corpus (Q2).*
+
+**(d) Compression as measurement.** **CID** — computable information density as an
+information-theoretic collective variable ([arXiv:2602.22440](https://arxiv.org/abs/2602.22440)):
+a compression-based per-configuration entropy estimate that needs **no hand-chosen order
+parameters**, validated across molecular systems. An independent field arriving at K1's
+conclusion — *a compressor is an instrument, not (only) a store* — which is precisely the
+surviving reading of the lapse field (E3). Corroboration, not a build.
+
+Boundary notes: tensor decomposition (Tucker/TT) remains the occupied academic meaning of
+"higher-dimensional compression" (kill doc §2.5), and compression-for-clustering of discrete
+data ([arXiv:2606.10593](https://arxiv.org/abs/2606.10593)) is lossy analytics — neither
+touches the lossless archive path, and neither rescues geometry-as-compression.
+
+### 5.4 Brainstorm — graded
 
 | # | Idea | Grade | Why |
 |---|---|---|---|
@@ -374,9 +424,14 @@ repo's "qutrit" is a classical 6-bit slot (§5.1). Door closed, with citations r
 | **B4** | Trit-pack the convergance-record verdict stream (verified/refuted/unknown is a literal trit) | **Reject** | A second binary memory format = the forbidden second memory system; JSONL + zstd already at the floor. Anti-sprawl fence applies |
 | **B5** | Quantum-qutrit compression transfer | **Closed** | §5.2(c) — requires quantum hardware; nothing transfers to a classical store |
 | **B6** | Ternary-aware column coding inside CSF-Col (#1593) | **Free — already implied** | A 3-symbol enum column hits H ≤ 1.585 bits/symbol automatically via zstd's FSE entropy stage; no ternary-specific code needed. Lesson: hand-rolled trit packing only matters where an entropy coder is absent (weights, wire formats, RAM layouts) — inside a compressor it is redundant |
+| **B7** | **RaBitQ-packed embedding cache for the memory reranker**: persist candidate embeddings once (768-dim nomic ≈ 3 KB fp32 → **96 B at 1 bit/dim, ~32×**), bitwise-estimator prefilter before the exact rerank | **Build candidate** → **A12** in §4 | The one high-dimensional-binary technique with a guarantee (unbiased estimator + error bound) meeting a real cost on the Remember path (per-query re-embedding today). Graceful float fallback preserved |
+| **B8** | **Grade CSF-Omni on the AITDCC-2026 corpus** — someone else's 16 files, someone else's leaderboard | **Adopt (bench)** → **Q2** in §4 + a 📋 Planned row in [`../BENCHMARKS.md`](../BENCHMARKS.md) | The spec's "ties brotli as upper envelope" claim has only ever been measured on our own corpora; this is the neutral instrument for it |
+| **B9** | DBF / BiSCo-LLM as 1–2 bpw alternatives for the ADR-0026 serving artifact | **Watch — folds into Q1** | Same bench matrix as TQ1_0/TQ2_0 when the artifact exists; no separate build. Keeps "models are interchangeable" honest at the packing layer too |
 
-The brainstorm's net: **one build candidate (B1/Q1), one docs adoption (B3), and four honest
-closures.** Ternary's future in this project is the serving artifact, not the archive.
+The brainstorm's net: **three build/bench candidates (B1/Q1, B7/A12, B8/Q2), one docs adoption
+(B3), one watch item (B9), and four honest closures.** Ternary's future in this project is the
+serving artifact, not the archive — and the binary-side wins are the embedding cache and the
+neutral benchmark, not a new codec.
 
 ---
 
@@ -434,4 +489,12 @@ encoding ([arXiv:2507.03836](https://arxiv.org/abs/2507.03836)); TesserAct 4D wo
 [Rambus](https://www.rambus.com/blogs/all-you-need-to-know-about-gddr7/) ·
 [Keysight 2026](https://www.keysight.com/us/en/about/newsroom/news-releases/2026/0217-pr-26-025-keysight-introduces-pam3-signaling-with-new-gddr7-transmitter-compliance-solution-for-next-generation-graphics-memory.html));
 qutrit/quantum source coding ([quant-ph/0207069](https://arxiv.org/pdf/quant-ph/0207069) ·
-[Intermediate qutrits, ACM ToQC](https://dl.acm.org/doi/10.1145/3406309)).
+[Intermediate qutrits, ACM ToQC](https://dl.acm.org/doi/10.1145/3406309)); DBF
+([arXiv:2505.11076](https://arxiv.org/abs/2505.11076)); BiSCo-LLM
+([arXiv:2607.08643](https://arxiv.org/pdf/2607.08643)); Leech-lattice LLM VQ
+([arXiv:2603.11021](https://arxiv.org/pdf/2603.11021)); RaBitQ
+([arXiv:2405.12497](https://arxiv.org/abs/2405.12497) ·
+[library](https://vectordb-ntu.github.io/RaBitQ-Library/)); AITDCC-2026
+([arXiv:2606.17712](https://arxiv.org/abs/2606.17712) · [aitdcc.github.io](https://aitdcc.github.io));
+CID collective variable ([arXiv:2602.22440](https://arxiv.org/abs/2602.22440));
+compression-for-clustering ([arXiv:2606.10593](https://arxiv.org/abs/2606.10593)).
