@@ -1,0 +1,7 @@
+{
+  "trials": 200,
+  "arithmetic": "exact rational (fractions.Fraction), no tolerances",
+  "violations_minkowski_det(M+Q)>=det(M)": 0,
+  "violations_chain_det(ASA'+Q)>=detA^2 detS": 0,
+  "verdict": "EXACT PASS"
+}

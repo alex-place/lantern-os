@@ -1,0 +1,44 @@
+{
+  "n_keys": 6,
+  "per_key_flips_exposure_h": {
+    "gemini": [
+      0,
+      0.0
+    ],
+    "ollama": [
+      0,
+      0.0
+    ],
+    "agent:keystone": [
+      0,
+      407.5
+    ],
+    "agent:Keystone": [
+      0,
+      34.6
+    ],
+    "autowork:patch": [
+      1,
+      26.8
+    ],
+    "agent:unisona.ai": [
+      0,
+      17.4
+    ]
+  },
+  "bootstrap_B": 2000,
+  "undefined_resamples (0 flips)": 658,
+  "undefined_fraction": 0.329,
+  "halflife_hours": {
+    "p2.5": 21.6,
+    "median": 183.9,
+    "p97.5": 866.0
+  },
+  "Tstar_minutes (p_v/p_e=0.1)": {
+    "p2.5": 2.5,
+    "median": 7.3,
+    "p97.5": 15.8
+  },
+  "kill_criterion": "T* unstable across resamples",
+  "verdict": "UNSTABLE on today's data \u2014 the estimator is fine but the 6-key bursty ledger cannot support a cadence decision; instrumentation (spaced probes, many keys) must land before per-topic T* ships. Kill criterion FIRES for the data, not the law."
+}

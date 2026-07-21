@@ -45,15 +45,25 @@ function dilation(uncertainty, costPressure = 0, confidence = 0.5, collapseProxi
   return clamp(d, D_MIN, D_MAX);
 }
 
+// #2790 (M5): breadth ramp above D=1. KKT water-filling derives a LOG ramp
+// (budget ~ log uncertainty above a hard water level); the offline sim measured
+// a median 6.1% residual-error win for log over the linear ramp, robust to model
+// misspecification (5.2%). Default stays "linear" until the live A/B (map A8)
+// decides — GROUNDING_RAMP=log opts in; tests may pass { ramp } explicitly.
+function rampScale(D, ramp) {
+  const mode = ramp || process.env.GROUNDING_RAMP || "linear";
+  return mode === "log" ? 1 + Math.log(D) : D;
+}
+
 // Mirror of grounding_policy(): D → external-grounding budget.
-function groundingPolicy(D, { baseMaxResults = 5, baseMinSources = 2 } = {}) {
+function groundingPolicy(D, { baseMaxResults = 5, baseMinSources = 2, ramp } = {}) {
   D = clamp(D, D_MIN, D_MAX);
   if (D <= 1.0) {
     return { fetchExternal: D > 0.5, maxResults: baseMaxResults, minSources: baseMinSources, deepMode: false };
   }
   return {
     fetchExternal: true,
-    maxResults: Math.round(baseMaxResults * D),
+    maxResults: Math.round(baseMaxResults * rampScale(D, ramp)),
     minSources: baseMinSources + (D >= 3.0 ? 1 : 0),
     deepMode: D >= 3.0,
   };

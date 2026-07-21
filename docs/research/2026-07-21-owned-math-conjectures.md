@@ -235,7 +235,126 @@ to couple to. Killed by no lead-time.
 
 ---
 
-## 8. Honest scope
+## 8. Progress log — 2026-07-21, second pass (issues worked)
+
+All six issues advanced the same day the slate landed. New artifacts:
+[`owned_math_m1_precision_check.py`](../../experiments/owned_math_m1_precision_check.py) ·
+[`owned_math_m2_bootstrap.py`](../../experiments/owned_math_m2_bootstrap.py) ·
+[`owned_math_m3_indistinguishability.py`](../../experiments/owned_math_m3_indistinguishability.py) ·
+[`owned_math_m4_ensemble.py`](../../experiments/owned_math_m4_ensemble.py) ·
+[`owned_math_m5_allocation_sim.py`](../../experiments/owned_math_m5_allocation_sim.py) ·
+[`owned_math_m6_canary_census.py`](../../experiments/owned_math_m6_canary_census.py) (+ JSON reports).
+
+**M1 — lemma machine-checked + ledger clean [measured].** The exact decomposition
+`ΔJ = evidence_term + dynamics_term` with `evidence_term ≥ 0` and
+`dynamics_term ≤ 2·log(1/|det A|)` held with **0 violations over 9,000 information-filter
+steps across 300 random systems** (evidence-precision monotonicity also 0 violations;
+decomposition exact to 1e-9). Positive no-evidence growth occurred **only** through the
+contraction channel (1,890 of 8,940 contracting steps) — the collapse-suspect mode, never a
+third source. **Ledger longitudinal test:** among 24 repeated hypotheses (50 consecutive
+same-hypothesis pairs, generic chat heartbeats excluded), **0 paid-growth violations** —
+today's ledger satisfies No-Free-Confidence. Remaining for proof-grade: write §M1 as a lemma
+with the Minkowski-determinant step spelled out, machine-check symbolically (L2 pattern).
+
+**M2 — kill criterion executed: fires for the data, not the law [measured].** Cluster
+bootstrap over keys (B=2000): **32.9% of resamples cannot define ρ at all** (zero flips);
+half-life CI **[21.6 h, 866 h]** (40×); T\* CI [2.5, 15.8] min at p_v/p_e=0.1. Recorded
+verdict: the estimator is sound, the 6-key bursty ledger is not — **per-topic cadences are
+blocked on instrumentation** (spaced probes over many keys), which
+[#2787](https://github.com/alex-place/lantern-os/issues/2787) now specifies.
+
+**M3 — lemma's computational half done [measured].** Equal-law construction (perfect tracker
+of an external AR world vs the self-driven loop): passive battery of five internal
+functionals — mean prequential NIS, anisotropy, lag-1 autocorrelation, step norm, state norm —
+**non-separating across 200 runs each** (KS D 0.06–0.125, p 0.08–0.85). The interventional
+probe **separates perfectly**: grounded recovery median **1 step** (the next observation of
+the untouched world snaps the tracker back) vs ungrounded **22 steps** (pure dynamical decay,
+consistent with ρ=0.9 theory), KS D = 1.0, p ≈ 0. Passivity cannot separate grounded from
+ungrounded; one intervention against the external channel does — the cadence-necessity
+corollary, now demonstrated end to end. Remaining: the two-paragraph measure-theoretic
+write-up (equal pushforward ⇒ equal functional distributions) for the certificate corpus.
+
+**M4 — ensemble upgrade: bound universal, one honest trade surfaced [measured].** Beyond the
+hand-picked Jordan family: 150 random stable matrices (n 2–4, spectral radius 0.9, Henrici
+non-normality up to **0.935**): envelope `M ≤ e·n·K(A)` — **0 violations**, margin never
+below 2.2× (non-vacuous, never breached; no grid refinement even triggered). Detection on a
+40-system subset with nominal-model thresholds: healthy false-alarm **naive 44% vs L3 0%**;
+unstable-twin detection **naive 100% vs L3 93%**. The 7-point detection gap concentrates in
+the highest-K systems where the inflated threshold is slow inside the 150-step horizon —
+i.e., **L3 trades false alarms for detection latency on extreme non-normality**, which is
+exactly the band-limited refinement path the issue's kill criterion anticipates. Real-loop
+Jacobians (the GPU step) remain the open item on
+[#2789](https://github.com/alex-place/lantern-os/issues/2789).
+
+**M5 — hypothesized gain quantified offline [measured].** Across three node populations ×
+three budgets: KKT water-filling beats the faithful shipped linear-ramp allocator by
+**1.5–14.5% (median 6.1%)** total residual error under the derivation's own model — and,
+the robustness check, **still wins under a misspecified power-law returns model
+(0.5–8.2%, median 5.2%)**. Robust-positive but modest → the live A/B (application map A8)
+decides; no policy change from simulation alone. IP gate unchanged.
+
+**M6 — blocked on instrumentation, now precisely specified [measured].** Census of
+`canary-events.jsonl`: 61 events (7 collapse-tripped, 54 grounded-pass), all signals are
+**terminal scalars** — `events_with_time_series_signals = 0`. Lead-time analysis is
+impossible on today's log. Instrumentation ask (in
+[#2791](https://github.com/alex-place/lantern-os/issues/2791)): flag-gated per-token signal
+trajectories for both fired and non-fired generations, sampled; then estimate per-mode
+gain/leak and measure crossing→fire lead time.
+
+### 8.1 Third pass (same day) — proofs, product instrumentation, refinements
+
+**M1 — proven + exact-checked.** Formal statement and proof written
+([`2026-07-21-owned-math-proofs.md`](2026-07-21-owned-math-proofs.md) Lemma 1), and the two
+load-bearing inequalities re-checked in **exact rational arithmetic** (no tolerances):
+0 violations / 200 random rational systems
+([`owned_math_m1_exact_check.py`](../../experiments/owned_math_m1_exact_check.py)).
+
+**M3 — proven via the innovations representation, generalized beyond the corner.** Proof note
+(Lemma 2 + both corollaries) rides Kailath's innovations representation: **every**
+steady-state Kalman tracker has an ungrounded doppelgänger of identical law — passive
+indistinguishability holds at every observation-noise level, not just perfect observation.
+Machine check per r ∈ {0.01, 0.25, 1.0, 4.0}
+([`owned_math_m3_innovations.py`](../../experiments/owned_math_m3_innovations.py)): passive
+battery non-separating (honest wrinkle: at r=4.0, 2 of 16 tests show nominal p<0.05 —
+marginal after multiple-comparison correction; flagged for a higher-power recheck rather than
+hidden). The gain-separability corollary measured: tracker probe-recovery 3→6 steps as gain
+falls (spec radius A(I−K) 0.651) vs the mimic's constant 22 — **grounding quality is probe
+separability**, quantified.
+
+**M4 — the L3′ envelope threshold closes the gap completely [measured].** Time-indexed
+threshold `τ_t = 1.05·c·‖A_nom^t‖` (zero FA by construction): across the extreme-K family +
+the 6 highest-K random systems — healthy FA **0.0 everywhere**, unstable detection **1.00
+everywhere** (flat threshold's minimum was 0.95), median detection time **3–7 steps vs the
+flat threshold's 14–79** ([`owned_math_m4_envelope.py`](../../experiments/owned_math_m4_envelope.py)).
+L3′ is the shippable form; the flat e·n·K bound remains the proof device.
+
+**M5 — the log ramp is now product code, default-off.**
+[`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) gained
+`GROUNDING_RAMP=log` / `{ ramp: "log" }` (breadth = base·(1+ln D) above the water level), with
+Python parity in [`dilation.py`](../../src/convergence_io/dilation.py) and 7 unit tests
+([`grounding-policy-ramp.test.js`](../../apps/lantern-garage/test/grounding-policy-ramp.test.js));
+24 existing dilation tests still green. The live A/B (map A8) can now run by flipping one env
+var.
+
+**M6 — the instrumentation exists, default-off.** `CANARY_TRACE=1` records the per-generation
+signal **trajectory** (sampled where the mid-stream collapse guard already scores; bounded at
+48 points; reset on provider retries) and emits events for healthy generations too — the
+both-class data the lead-time analysis needs
+([`canary.js`](../../apps/lantern-garage/lib/canary.js) `createCanaryTrace`,
+[`stream-chat.js`](../../apps/lantern-garage/lib/stream-chat.js) wiring, 4 unit tests). Local
+(ollama) path first — where collapse events actually occur; cloud paths need a token-cadence
+sampler, noted in [#2791](https://github.com/alex-place/lantern-os/issues/2791).
+
+**M2 — the survey closed the "maybe another ledger" question [measured].** Every longitudinal
+outcome stream the repo writes was graded for ρ-fittability
+([`owned_math_m2_ledger_survey.py`](../../experiments/owned_math_m2_ledger_survey.py)):
+best is grounding-calibration with **1** fittable key; council-reviews has 63 keyed entities,
+**0** fittable. **No existing stream can power the staleness law** — the spaced-probe
+instrumentation is confirmed as the only path, not merely the preferred one.
+
+---
+
+## 9. Honest scope
 
 - Nothing here is proven yet. M4 is *supported synthetically*; M3's lemma is *conjectured
   after refutation of its predecessor*; M1/M2 have *measured terms*, not theorems; M5 is a

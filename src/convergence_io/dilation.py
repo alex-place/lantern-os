@@ -88,7 +88,7 @@ class GroundingPolicy:
 
 
 def grounding_policy(D: float, base_max_results: int = 5,
-                     base_min_sources: int = 2) -> GroundingPolicy:
+                     base_min_sources: int = 2, ramp: str = "linear") -> GroundingPolicy:
     """Map a dilation value D to an external-grounding budget (route-by-difficulty).
 
     D ≤ 1 (confident / fast): minimal fetch, base corroboration, no deep loop.
@@ -96,6 +96,10 @@ def grounding_policy(D: float, base_max_results: int = 5,
     and escalate to DEEP mode once D is high. Realizes "dilation affects grounding
     from without"; pairs with the G12-corrected `dilation()` so a *frozen* node (low D)
     does not over-fetch and a *productively uncertain* node (high D) grounds harder.
+
+    ramp (#2790 / M5): "linear" (default, shipped behavior) or "log" — the KKT
+    water-filling derivation says breadth should grow ~log(D) above the water level;
+    kept optional until the live A/B decides. Mirror of grounding-policy.js rampScale.
     """
     D = max(D_MIN, min(D_MAX, D))
     if D <= 1.0:
@@ -105,9 +109,10 @@ def grounding_policy(D: float, base_max_results: int = 5,
             min_sources=base_min_sources,
             deep_mode=False,
         )
+    scale = (1.0 + math.log(D)) if ramp == "log" else D
     return GroundingPolicy(
         fetch_external=True,
-        max_results=int(round(base_max_results * D)),
+        max_results=int(round(base_max_results * scale)),
         min_sources=base_min_sources + (1 if D >= 3.0 else 0),
         deep_mode=D >= 3.0,
     )
