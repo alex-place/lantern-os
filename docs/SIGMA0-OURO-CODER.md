@@ -167,12 +167,21 @@ owned verified data.
   cheap tier **saturates easy open problems locally** and the cascade catches the miss — it is
   **not** a hard-task (full-MBPP / SWE-bench) claim; stressing the escalation economics on a harder
   open set is the next run.
-- **Phase 1 — VTD-specialize the cheap tier (own weights).** Base = the verified Qwen2.5-Coder-7B;
-  data = the **exec-verified** subset of {SWE-HERO 13.5k, KodCode, TACO} **+ our own escalation
-  corpus**; method = Verified-Trace Distillation (receipt-gated, both-class, process-level; nearest
-  prior art rStar-Math 2501.04519). Gated on Phase-0 evidence; GPU dispatch is real spend (see §9)
-  and stays behind an explicit, funded run. Relates to [ADR-0015](adr/0015-qwen-teacher-verified-distillation.md)
-  / [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
+- **Phase 1 — VTD-specialize the cheap tier (own weights). Confirmed NECESSARY (2026-07-22).** We
+  first tested the *cheap* form of self-improvement — retrieval, no weight change (CLAUDE.md
+  "improve via retrieval, not retraining"). On-box it **HURT** the tiny model:
+  [`experiments/tiny_model_selfimprove.js`](../experiments/tiny_model_selfimprove.js) measured
+  `qwen2.5-coder:0.5b` at baseline **6/6** on held-out DP problems → **2/6** when its own verified
+  solutions were injected as few-shot (regressed 4, rescued 0). The raw generations show *template
+  contamination*: shown `min_distance`, the 0.5B wrote an edit-distance-shaped answer to
+  `longest_common_subsequence`. A model this tiny has weak in-context learning, so capability can't
+  ride in the context — it must be baked into the **weights**. So VTD is the path, not a nice-to-have.
+  Base = the verified Qwen2.5-Coder-7B; data = the **exec-verified** subset of {SWE-HERO 13.5k,
+  KodCode, TACO} **+ our own escalation corpus** (the frontier rescues = exactly the hard-tail the
+  tiny model needs); method = Verified-Trace Distillation (receipt-gated, both-class, process-level;
+  nearest prior art rStar-Math 2501.04519). GPU dispatch is real spend (see §9) and stays behind an
+  explicit, funded run. Relates to [ADR-0015](adr/0015-qwen-teacher-verified-distillation.md) /
+  [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - **Phase 2 — the tiny recursive core (research option).** TRM/HRM substrate + rotational
   anti-collapse (coRNN) as trainable modules. **Gated behind Phase-1 evidence** and held at low
   confidence: proven on puzzles/tabular only, not code/language (the make-or-break risk).
