@@ -1,0 +1,30 @@
+# unisona.ai — crawl policy
+User-agent: *
+Allow: /
+
+# Keep crawlers out of auth, personal, and operator/diagnostic surfaces
+# (these are also excluded from sitemap.xml).
+Disallow: /auth.html
+Disallow: /reset-password.html
+Disallow: /entry.html
+Disallow: /accounts.html
+Disallow: /profile.html
+Disallow: /settings.html
+Disallow: /orchestration.html
+Disallow: /work.html
+Disallow: /admin-flags.html
+Disallow: /agent-status.html
+Disallow: /agent-leaderboard.html
+Disallow: /metrics.html
+Disallow: /systems.html
+Disallow: /drift.html
+Disallow: /calibration.html
+Disallow: /grounding-diff.html
+Disallow: /replay.html
+Disallow: /factcheck.html
+Disallow: /wide-search.html
+Disallow: /ibkr-connect.html
+Disallow: /kalshi-screener.html
+Disallow: /api/
+
+Sitemap: https://www.unisona.ai/sitemap.xml
