@@ -34,7 +34,7 @@ def test_package_splits_local_and_cloud_runtime_scripts() -> None:
 
 
 def test_runtime_cicd_docs_cover_local_cloud_and_render_validation() -> None:
-    text = (ROOT / "docs" / "LANTERN-RUNTIME-CICD.md").read_text(encoding="utf-8")
+    text = (ROOT / "docs" / "archive" / "LANTERN-RUNTIME-CICD.md").read_text(encoding="utf-8")
     required = [
         "npm run start:local",
         "npm run start:cloud",
