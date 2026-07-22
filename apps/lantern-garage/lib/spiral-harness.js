@@ -1,0 +1,253 @@
+"use strict";
+
+/**
+ * Spiral harness — Phase 0 of ADR-0029 (the verified-cascade spiral).
+ *
+ * This is the CLAUDE.md convergence loop (Observe → Remember → Reason → Act →
+ * Verify → Converge) run on ONE problem for as long as it keeps advancing. It is a
+ * HARNESS, not a model: no new weights. It reassembles parts we already shipped —
+ * the live verified cascade (experiments/verified_cascade_live.py, #2800), the
+ * constraint-aware cheap-tier picker (lib/local-model-registry.js selectCheapStandin,
+ * #2814), and the Fix-Rate verifier metric (lib/spiral-fix-rate.js) — into a loop.
+ *
+ * Each turn is a VERIFIED CASCADE (the cascade research applied per step, cf.
+ * Policy-Guided Stepwise Routing arXiv 2605.06116; Cluster-Route-Escalate 2606.27457;
+ * escalation decision-theory 2605.06350):
+ *
+ *     1. the CHEAP owned tier proposes the next step
+ *     2. the verifier (M4 Fix Rate) gates it — did it advance?
+ *     3. only on a stall do we ESCALATE that step to the frontier tier,
+ *        inheriting the full accumulated memory (progress preserved, not restarted)
+ *     4. a verified step commits to growing memory (M1); an unverified one de-ratchets
+ *
+ * Why the cascade matters here (ADR-0029 §4.5): most steps are easy, the cheap tier
+ * clears them (sufficiency regime → the long horizon stays affordable), and every
+ * ESCALATED step is a frontier demonstration on a problem the cheap tier could not
+ * advance — i.e. a perfect distillation target. The harness emits those as the
+ * escalation corpus; VTD later trains the cheap tier on them so the one governing
+ * number, the escalation rate, only falls.
+ *
+ * The four core objects map cleanly: Memory = the growing verified memory; Task = the
+ * problem; Tool = the tier calls; Convergence Record = each committed verified step.
+ * Nothing here is a separate engine — it is the loop, focused.
+ *
+ * Everything crossing the I/O boundary is INJECTED (tiers, verifier, corpus sink,
+ * clock) so the loop is pure and unit-testable without a server or a GPU. Prod wires
+ * real model tiers + the exec-verify sandbox; tests wire stubs.
+ */
+
+const fs = require("fs");
+const path = require("path");
+const { fixRate } = require("./spiral-fix-rate");
+
+let _repoRoot;
+try {
+  _repoRoot = require("./app-paths").repoRoot;
+} catch {
+  _repoRoot = path.resolve(__dirname, "..", "..", "..");
+}
+
+// M3 focus rotation — a cheap hint that makes each turn attend a *different aspect*
+// so the cheap tier does not propose the same failing patch every turn (the design's
+// rotational anti-collapse, reduced to a scheduler; the coRNN dynamics are Phase 2).
+const DEFAULT_FOCI = ["outline", "edge-cases", "fix-failing", "simplify", "regressions"];
+
+/** Default escalation-corpus sink: append JSONL under data/eval/spiral/. */
+function _defaultCorpus(runId) {
+  const dir = path.join(_repoRoot, "data", "eval", "spiral");
+  const file = path.join(dir, `spiral-${runId}.jsonl`);
+  return {
+    file,
+    append(row) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+        fs.appendFileSync(file, JSON.stringify(row) + "\n");
+      } catch {
+        /* best-effort telemetry — never fail the loop on a log write */
+      }
+    },
+  };
+}
+
+const noop = () => {};
+
+/**
+ * Run the spiral on one problem.
+ *
+ * @param {object} args
+ *   problem   {object}   REQUIRED. { id, prompt, tests? } — the one problem.
+ *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>.
+ *                        `ctx` = { problem, memory, focus, y, turn }. `escalate` is
+ *                        optional; if absent, a cheap stall simply de-ratchets.
+ *   verify    {function} REQUIRED. async (candidateText, { problem, memory, before }) =>
+ *                        either a Fix-Rate result ({ advanced, solved, ... }) OR a raw
+ *                        test-result set (array/counts) which we score with fixRate().
+ *   memory    {Array}    optional seed of verified steps (default []).
+ *   maxTurns  {number}   safety cap on the unbounded loop (default 12).
+ *   answerability {function} optional async (ctx) => number ∈ [0,1]; halt "honest can't"
+ *                        when it declines below `answerabilityFloor` (M5).
+ *   answerabilityFloor {number} default 0.15.
+ *   rotate    {function} optional (turn, memory) => focus hint (M3). Default: cycle DEFAULT_FOCI.
+ *   onStep    {function} optional (event) => void — the dream-chat progress hook.
+ *   corpus    {object}   optional { append(row) } sink. Default: JSONL under data/eval/spiral/.
+ *   runId     {string}   optional id for the corpus file/run.
+ *   now       {function} optional () => ms clock (injectable for deterministic tests).
+ *
+ * @returns {Promise<{
+ *   solved:boolean, haltReason:string, turns:number, escalations:number,
+ *   cost:number, y:(string|null), memory:Array, corpusRows:Array,
+ *   escalationRate:number, corpusFile:(string|null)
+ * }>}
+ */
+async function runSpiral(args) {
+  const {
+    problem,
+    tiers,
+    verify,
+    memory: seed = [],
+    maxTurns = 12,
+    answerability = null,
+    answerabilityFloor = 0.15,
+    rotate = null,
+    onStep = noop,
+    corpus: corpusArg = null,
+    runId: runIdArg = null,
+    now = () => Date.now(),
+  } = args || {};
+
+  if (!problem || typeof problem !== "object") throw new Error("runSpiral: problem is required");
+  if (!tiers || typeof tiers.cheap !== "function") throw new Error("runSpiral: tiers.cheap is required");
+  if (typeof verify !== "function") throw new Error("runSpiral: verify is required");
+
+  const runId = runIdArg || `${problem.id || "problem"}-${now()}`;
+  const corpus = corpusArg || _defaultCorpus(runId);
+  const rotateFn = rotate || ((t) => DEFAULT_FOCI[t % DEFAULT_FOCI.length]);
+
+  const memory = Array.isArray(seed) ? seed.slice() : [];
+  const corpusRows = [];
+  let best = memory.length ? memory[memory.length - 1].results || null : null; // best-so-far results (ratchet baseline)
+  let y = memory.length ? memory[memory.length - 1].text || null : null;
+  let cost = 0;
+  let escalations = 0;
+  let solved = false;
+  let haltReason = "maxTurns";
+
+  // Coerce a verify() return into a Fix-Rate result. If verify already returned a
+  // scored result (has `advanced`), trust it; else treat it as a raw test-result set
+  // and score it against the best-so-far baseline. We stash the raw set on `_results`
+  // so that COMMITTING an advancing step advances the ratchet baseline to it — without
+  // that, every turn would be graded against turn 0 and regressions couldn't be seen.
+  const score = (raw, before) => {
+    if (raw && typeof raw === "object" && typeof raw.advanced === "boolean") return raw;
+    const r = fixRate(before, raw);
+    r._results = raw;
+    return r;
+  };
+
+  for (let turn = 0; turn < maxTurns; turn++) {
+    const focus = rotateFn(turn, memory);
+    onStep({ type: "turn_start", turn, focus, memorySize: memory.length });
+
+    // M5 (pre-step): honest-can't halt — if the model can no longer justify an
+    // answer, stop rather than bluff. Checked before spending a tier call.
+    if (answerability) {
+      const a = await answerability({ problem, memory, y, turn, focus });
+      if (Number.isFinite(a) && a < answerabilityFloor) {
+        haltReason = "answerability";
+        onStep({ type: "halt", reason: haltReason, turns: turn, solved, answerability: a });
+        break;
+      }
+    }
+
+    // ── M2: the per-turn verified cascade ──────────────────────────────────
+    let tier = "cheap";
+    let cand = await tiers.cheap({ problem, memory, focus, y, turn });
+    cost += Number(cand && cand.cost) || 0;
+    onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
+    let v = score(await verify(cand.text, { problem, memory, before: best }), best);
+    onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+
+    if (!v.advanced && typeof tiers.escalate === "function") {
+      // Cheap stalled → escalate THIS step to the frontier, inheriting the full
+      // accumulated memory (progress preserved). This is the only time we spend big.
+      onStep({ type: "escalate", turn, from: cand && cand.model, reason: "cheap stalled the verifier" });
+      tier = "escalated";
+      escalations += 1;
+      cand = await tiers.escalate({ problem, memory, focus, y, turn });
+      cost += Number(cand && cand.cost) || 0;
+      v = score(await verify(cand.text, { problem, memory, before: best }), best);
+      onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+    }
+    // ────────────────────────────────────────────────────────────────────────
+
+    const row = {
+      runId,
+      problemId: problem.id || null,
+      turn,
+      tier,
+      focus,
+      advanced: v.advanced,
+      solved: !!v.solved,
+      fixRate: v.fixRate,
+      penalizedFixRate: v.penalizedFixRate,
+      cost: Number(cand && cand.cost) || 0,
+      // The escalated + advancing steps are the VTD distillation targets: a frontier
+      // demonstration on a step the cheap tier could not do. Flagged for the trainer.
+      distillTarget: tier === "escalated" && v.advanced,
+      ts: new Date(now()).toISOString(),
+    };
+    corpus.append(row);
+    corpusRows.push(row);
+
+    if (v.advanced) {
+      // Commit the verified, (in Phase 2) decorrelated step → grow the radius (M1).
+      const step = { turn, tier, text: cand.text, focus, results: v._results || v.results || null, fixRate: v.fixRate, solved: !!v.solved };
+      // Preserve the raw results so the next turn's ratchet baseline is this best.
+      if (!step.results && Array.isArray(v.fixedTests)) step.results = null;
+      memory.push(step);
+      best = _bestResults(best, v, cand);
+      y = cand.text;
+      onStep({ type: "commit", turn, tier, fixRate: v.fixRate, solved: !!v.solved, memorySize: memory.length });
+      if (v.solved) {
+        solved = true;
+        haltReason = "solved";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved: true, cost, escalations });
+        break;
+      }
+    } else {
+      // Neither tier advanced — de-ratchet (rotate focus / ground externally next
+      // turn), never freeze. Nothing commits to memory (the ratchet holds).
+      onStep({ type: "stall", turn, tier });
+    }
+  }
+
+  if (haltReason === "maxTurns") onStep({ type: "halt", reason: haltReason, turns: maxTurns, solved, cost, escalations });
+
+  const turns = corpusRows.length;
+  return {
+    solved,
+    haltReason,
+    turns,
+    escalations,
+    escalationRate: turns ? escalations / turns : 0,
+    cost,
+    y,
+    memory,
+    corpusRows,
+    corpusFile: corpus.file || null,
+  };
+}
+
+/**
+ * Best-so-far test results after an advancing step. If verify() surfaced a raw result
+ * set we ratchet against it; otherwise we keep the prior best (the score was
+ * pre-computed and we can't reconstruct per-test identity). Kept tiny + explicit.
+ */
+function _bestResults(prevBest, v, cand) {
+  if (v && Array.isArray(v.results)) return v.results;
+  if (v && Array.isArray(v._results)) return v._results;
+  if (cand && Array.isArray(cand.results)) return cand.results;
+  return prevBest;
+}
+
+module.exports = { runSpiral, DEFAULT_FOCI };

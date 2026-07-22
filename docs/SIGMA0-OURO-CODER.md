@@ -1,377 +1,301 @@
 ---
 author: Alex Place
 created: 2026-06-19
-updated: 2026-06-25
+updated: 2026-07-22
 ---
 
-# Σ₀ Ouro Coder — the local coding agent (single source of truth)
+# Σ₀ Ouro Coder → the Spiral — the owned local coding model (single source of truth)
 
-> ## ⚠️ Role update (2026-07-01): Ouro is now the KERNEL, not the coding lead
+> ## ⭐ Current state (2026-07-22): the model IS the Spiral, a verified cascade
 >
-> When this doc was written, Ouro was *the* local coder. That changed. The current split in
-> [`local-model-registry.js`](../apps/lantern-garage/lib/local-model-registry.js) is:
-> - **Coding / reasoning / default lead → `keystone-sigma0-plt`** — the owned Parallel Loop
->   Transformer we bootstrap from LoopCoder-V2 ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md);
->   serves on its own shim at `:11435`). It is the **sole local coder** by operator decision, but
->   still **`verified:false`** — it leads because there's no verified peer to displace, not because
->   it won an eval. Faithful parity + a head-to-head win vs a frontier coder are the open gates.
-> - **Kernel (the Σ₀ Convergence Core path) → Ouro / `keystone-ft`** — *this doc*. Ouro stays the
->   recurrent-depth kernel/research front (Q-exit self-convergence) on `:11434`; it is no longer
->   the universal coding default.
+> This page is the **one doc for the owned local coder and its whole legacy** — what it was,
+> what it is, and where it's going. The headline, decided in **[ADR-0030](adr/0030-spiral-verified-cascade-harness.md)**
+> (Accepted): the "model" is no longer a single fine-tune. It is the **Spiral** — the CLAUDE.md
+> convergence loop run on ONE problem, whose per-turn engine is a **verified cascade** (a cheap
+> owned tier proposes → a real exec-test verifier gates by **Fix Rate** → escalate to a frontier
+> tier only on a stall, inheriting the progress). **The moat is the system, not a home-grown
+> frontier model, and generalization comes from the verifier, not scale.**
 >
-> So: two looped families, distinct roles, one Convergence Core — **not** parallel product coders.
-> Everything below still accurately describes the Ouro kernel path and the loop mechanism. For the
-> owned-PLT coder, see [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) and
-> [`models/keystone-sigma0-plt/README.md`](../models/keystone-sigma0-plt/README.md).
-
-> **This is the one doc for the local Σ₀ coder — then and now.** It supersedes and folds
-> in two older pages:
-> - **`LANTERN-SIGMA0-CODER.md`** — *what we had then*: the Qwen2.5-Coder-3B QLoRA model
->   served via the Ollama binary (tombstone removed 2026-07-16; in git history).
-> - **`OURO-LOOPLM.md`** — the **loop mechanism** (Q-exit math + the two loop
->   implementations), now described in [§The loop mechanism](#the-loop-mechanism) below
->   (tombstone removed 2026-07-16; in git history).
->
-> If you landed on one of those, you're in the right place now.
+> The lineage that led here — Qwen-3B QLoRA → Ouro-1.4B looped → the owned PLT coder → the
+> verified Qwen-7B default → the Spiral — is the rest of this page. Everything about the **Ouro
+> recurrent-depth kernel** below is still accurate: Ouro is the looped-reasoning research front
+> and the Convergence-Core kernel; the Spiral is the outer verified loop that wraps whatever cheap
+> tier leads. Design of record: [docs/research/2026-07-22-spiral-verified-cascade-design.md](research/2026-07-22-spiral-verified-cascade-design.md).
 
 > ## 📖 In plain English (start here)
 >
-> **What this is:** a coding assistant that runs entirely **on your own computer** — no
-> cloud, no internet needed. Its "brain" is a small AI model called **Ouro**.
+> **What this is:** a coding assistant that runs on **your own computer** (CPU or an 8GB GPU) —
+> no cloud needed for the common case. It's built to **punch above its size** by being careful,
+> not big.
 >
-> **The trick — it thinks in loops.** Most AI models get smarter by being *bigger*. Ouro
-> gets smarter by going *around again*: it reuses the same small set of layers several
-> times on one problem — like re-reading a hard sentence until it clicks. That's why it's
-> named "Ouro," after the *ouroboros*, the snake that eats its own tail. A loop.
+> **The trick — it spirals, and it checks its work against reality.** Instead of answering once,
+> it works one problem in a loop: it proposes a step, then **actually runs the tests**. It keeps
+> only steps that genuinely make more tests pass. If its small local brain gets stuck, it calls a
+> big frontier model **for that one step**, hands it everything it's figured out so far, and keeps
+> going. Most steps are easy and stay local (cheap); only the hard ones "phone a friend."
 >
-> **It decides how hard to think.** Easy question? It loops a couple of times and answers
-> fast. Hard question? It keeps looping to think it through. A built-in "good enough yet?"
-> check (the *Q-exit gate*) decides when to stop — so a tiny model can punch above its size
-> on the hard parts without being slow on the easy ones.
+> **Why that's the whole point.** Because a real test — not the model's opinion — decides every
+> step, a small model can't bluff its way to a wrong answer, and it keeps improving on the exact
+> steps it used to fail. Every time it has to call the big model, that's a free lesson it saves to
+> get better next time. The one number that matters — how often it has to escalate — is designed
+> to only go **down**.
 >
-> **It learned this project.** It was fine-tuned on this repo's own past coding sessions,
-> so it already knows the house style and conventions.
+> **Its brains, past and present.** The current cheap "brain" is **Qwen2.5-Coder-7B** (the one
+> local coder we've actually verified on our own hardware). An earlier brain, **Ouro**, is a
+> looping model we keep as the research kernel — it "re-reads the hard sentence until it clicks."
+> The whole thing is one swappable brain plugged into the bigger Lantern loop — *Observe →
+> Remember → Reason → Act → Verify → Converge*.
 >
-> **Two speeds:** a **Fast** mode (the default — quick, reuses cached work) and a **Deep**
-> "think-harder" mode you switch on for tough problems (slower, ~1 second per word).
+> **Honest about limits:** its home is **verifiable work** — code and math, where a test can
+> decide. Away from that (open-ended chat), it can't ratchet, so it's just a normal small model.
+> It is not a frontier model; the edge is the *system* around it.
 >
-> **Where it fits:** it's just one swappable "brain" plugged into the bigger Lantern loop —
-> *Observe → Remember → Reason → Act → Verify → Converge*. Unplug it, drop in a different
-> model, and the rest of the system doesn't change.
->
-> **What came before:** an earlier version used a different brain (Qwen) and needed a
-> separate "Ollama" program to run it. We retired that — the new one is smaller, loops, and
-> runs itself. See *[What we had then → what we have now](#what-we-had-then--what-we-have-now)*.
->
-> **Honest about limits:** it's small (1.4 billion parameters), it's a real but modest
-> fine-tune (not a production-grade model), and its Deep mode is genuinely slow. A capable
-> local helper — not a frontier model.
->
-> *🎙️ Want it read aloud? Press the **Listen** bar at the bottom of this page.*
->
-> The rest of this page is the precise, technical version. ↓
+> The rest of this page is the precise version. ↓
 
-The **Σ₀ Ouro Coder** is the Σ₀ coding agent running on **Ouro** (the *Ouroboros* looped
-language model, [arXiv:2510.25741](https://arxiv.org/abs/2510.25741)) instead of a plain
-transformer. It is the same Convergence-Core coder path — `Reason → Act` for code — but its
-local brain is **Ouro-1.4B with weight-tied recurrent depth + a learned Q-exit gate**, plus
-our own Σ₀ fine-tune. It runs **fully local**, served as a drop-in Ollama-API model.
+---
 
-## What we had then → what we have now
+## 1. What this is now — the Spiral
 
-There used to be **two** local coders documented separately; there is now **one**. This is
-the arc:
+The **owned local coder** is the **Spiral** ([ADR-0030](adr/0030-spiral-verified-cascade-harness.md)):
+the convergence loop run on one problem, where **each turn is a verified cascade**.
 
-| | **Then** (`lantern-sigma0-coder`, 2026-06-18) | **Now** (Σ₀ Ouro Coder, since 2026-06-20) |
-|---|---|---|
-| **Base model** | `Qwen/Qwen2.5-Coder-3B-Instruct` (plain transformer) | `ByteDance/Ouro-1.4B-Thinking` (weight-tied **looped** transformer) |
-| **Σ₀ tune** | QLoRA on 365 pairs / 51 sessions; 3 epochs / 135 steps; loss 2.87 → 1.78 | QLoRA on the Σ₀ Claude-session set; 3 epochs, **bf16** base (4-bit arch-gated), r=16/α=32 over `all-linear` |
-| **Serving** | **Ollama binary** (`lantern-sigma0-coder-v2`) | [`scripts/ouro_serve.py`](../scripts/ouro_serve.py) — **drop-in Ollama HTTP API**, no Ollama binary |
-| **Adaptive depth** | none (single forward pass) | `Sigma0LoopLM` **Q-exit** — loop until `CDF(t) ≥ q` |
-| **Routing** | leaderboard-preferred (`model-leaderboard.js`) | drop-in on `:11434`; leaderboard integration is a follow-up |
-| **Status** | **deprecated & removed** | **active local coder** |
+```
+loop on ONE problem:
+  cheap owned tier proposes the next step        (Qwen2.5-Coder-7B today; a VTD-specialized tier later)
+  → Fix-Rate verifier gates it                   (real exec tests: failing→passing minus a regression penalty)
+  → if it stalled, escalate THIS step            (rented frontier — inherits the accumulated memory)
+  → commit only if reality ratchets it           (the anti-memorization gate)
+  halt on solved | honest-can't | turn cap; emit the escalation corpus (the Phase-1 VTD fuel)
+```
 
-**Why the switch (issue #811 / PR #823 — "Ollama sunset"):** we retired the external Ollama
-binary as a hard dependency and moved to a Python server that *speaks* the Ollama API. That
-made it natural to swap the brain for Ouro, whose looped recurrent depth lets a 1.4B model
-spend extra computation on hard turns and exit early on easy ones — a better trade for a
-small local model than a larger single-pass one.
+Five modules (design doc §2): **M1** growing verified memory · **M2** the per-turn cascade ·
+**M3** rotational anti-collapse (coRNN-grounded; Phase 2) · **M4** the Fix-Rate verifier
+(the load-bearing piece) · **M5** answerability halt ("honest can't"). Generalization comes from
+**M4**, not the parameters — ARC-Prize showed tiny-recursive puzzle wins are largely memorization,
+so an *external* verifier is what makes it generalize.
 
-**Verified on disk (2026-06-20):** the Qwen training outputs
-(`D:\lantern-train\sigma0-adapters`, `sigma0-merged`) were **removed** and
-`lantern-sigma0-coder-v2` is **no longer registered in Ollama** (only the base
-`qwen2.5-coder` blob remained). The active local coder is the Ouro Σ₀ adapter at
-`D:\lantern-train\ouro-sigma0-adapters\final\` (base `ByteDance/Ouro-1.4B`, LoRA r=16/α=32,
-trained locally). The Qwen continual-training track was **deleted as bloat — do not
-rebuild it**; the live retrain pipeline is [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md).
-
-## What it is
-| | |
+**Implementation (Phase 0, shipped):**
+| Piece | File |
 |---|---|
-| **Base model** | `ByteDance/Ouro-1.4B-Thinking` (weight-tied recurrent transformer) |
-| **Σ₀ tune** | QLoRA on the Σ₀ Claude-session set ([`scripts/train-qlora-ouro.py`](../scripts/train-qlora-ouro.py); 3 epochs, **bf16** base, LoRA r=16/α=32 over `all-linear`, lr 2e-4, **seq 1536**) |
-| **Adaptive depth** | `Sigma0LoopLM` ([`src/sigma0/loop_lm.py`](../src/sigma0/loop_lm.py)) — three exit policies (`OURO_MODE`): `qexit` (trained gate, default), `converge` (first-order fixed point), `accel` (spiral-robust, certificate-consistent) |
-| **Collapse guard** | DecodeCanary per-token `sigma0_proximity` monitor (observe-only by default; `OURO_ADAPT=1` lets it deepen the loop to fight its own incipient collapse) — the [collapse certificate](SIGMA0-COLLAPSE-CERTIFICATE.md) is the safety foundation |
-| **Serving** | [`scripts/ouro_serve.py`](../scripts/ouro_serve.py) — drop-in **Ollama HTTP API** (`ouro:latest` on `:11434`); fast cached default + opt-in native deep mode |
-| **8GB / long-context** | `OURO_4BIT=1` (NF4 base, ~7.7→1.85 GB) + `OURO_KV_INT8=1` (int8 KV cache) + `OURO_UT_STEPS=2` (halves the recurrent KV) — reaches CC-scale (15–20k) prompts on an 8 GB card |
-| **Integration** | transparent: the coder/agent path POSTs to `OLLAMA_BASE_URL` (default `:11434`) — point it at ouro_serve and the whole path uses Ouro |
-| **Claude Code** | protocol bridge solved ([`scripts/ouro_anthropic_bridge.py`](../scripts/ouro_anthropic_bridge.py)); the 1.4B adapter is not yet reliable enough to *drive* CC — see `integration status` |
+| the loop + per-turn cascade + corpus emit | [`lib/spiral-harness.js`](../apps/lantern-garage/lib/spiral-harness.js) |
+| the M4 Fix-Rate ratchet metric (pure) | [`lib/spiral-fix-rate.js`](../apps/lantern-garage/lib/spiral-fix-rate.js) |
+| real exec verifier + injectable model tiers | [`lib/spiral-tiers.js`](../apps/lantern-garage/lib/spiral-tiers.js) |
+| non-blocking bounded exec sandbox | [`lib/exec-verify.js`](../apps/lantern-garage/lib/exec-verify.js) (`verifyExecAsync`) |
+| **the chat surface** — `spiral_solve` operator tool | [`lib/tool-runner.js`](../apps/lantern-garage/lib/tool-runner.js) |
+| Phase-0 runner over real executable tasks | [`experiments/spiral_phase0.js`](../experiments/spiral_phase0.js) |
 
-## Why Ouro for the coder
-Ouro builds reasoning into **computation depth** — reusing weight-tied layers R times in
-latent space — rather than into token length (the paper's "third scaling axis": loop depth).
-For a small local model that's a good trade: spend extra recurrent steps on hard
-coding/reasoning turns and exit early on easy ones. The Σ₀ QLoRA tune adapts it to *this*
-codebase from past Claude-Code sessions, so it learns the repo's idioms while staying 1.4B
-and local.
+**Chat is the surface.** A user drives a spiral on a tested coding task from
+[`dream-chat.html`](../apps/lantern-garage/public/dream-chat.html) via the `spiral_solve` tool and
+watches it converge; it returns the verified solution + transcript + escalation rate, and says so
+honestly when it can't verify. This is the *Coder = Kernel + Memory + Tools* task type of
+[06] LANTERN-CODER, now realized as a verified loop rather than a single model call.
 
-## The loop mechanism
-*(absorbed from the former `OURO-LOOPLM.md`.)*
+## 2. The legacy — the full lineage
+
+There have been several "local coders"; this is the arc, oldest to newest. **Each superseded step
+is kept for history; the Spiral is what unifies them.**
+
+| Era | Model | Role then | Status now |
+|---|---|---|---|
+| 2026-06-18 | **`lantern-sigma0-coder`** — Qwen2.5-Coder-3B QLoRA, served via the **Ollama binary** | the first local coder | **removed** (git history); Ollama-binary dependency retired (#811/#823) |
+| 2026-06-20 | **Σ₀ Ouro Coder** — Ouro-1.4B weight-tied **looped** transformer + Q-exit, our QLoRA | *the* local coder | **recurrent-depth KERNEL / research front** (see §7); no longer the coding lead |
+| 2026-07-01 | **`keystone-sigma0-plt`** — owned Parallel Loop Transformer bootstrapped from LoopCoder-V2 ([ADR-0011](adr/0011-proprietary-sigma0-base-model.md)) | the sole local coder by operator decision | registered but **`verified:false`** — leads only for lack of a verified peer; serves on its `:11435` shim |
+| 2026-07-06 | **`qwen2.5-coder:latest`** — supported Apache-2.0 Qwen2.5-Coder-7B (OSS-baseline #2171) | the **verified** local coder | **reproduced on-box** (#2173: coding-golden exec pass@1 0.96) — the current cheap-tier base |
+| **2026-07-22** | **the Spiral** — a verified cascade over the above, with a growing verified memory ([ADR-0030](adr/0030-spiral-verified-cascade-harness.md)) | — | **the current architecture** — the model is now the *system*, not any single checkpoint |
+
+**Why the arc bent this way.** We chased "own a small model that codes." Two facts settled the
+strategy: (1) open Qwen3-Coder-32B already ≈ Claude 3.5 on SWE-bench, so **we can't out-parameter
+the frontier and don't need to**; (2) tiny-recursive puzzle wins are largely memorization, so
+**the verifier, not scale, is the source of generalization**. Both point away from "a bigger
+home-grown checkpoint" and toward "a verified *system* around a small, honest, improving cheap
+tier." That system is the Spiral.
+
+## 3. The moat — the system, not the model
+
+- **Not** a home-grown frontier model (scale isn't our edge).
+- **Is:** a verified harness (the exec Fix-Rate ratchet) + **owned verified-trace data** (the
+  escalation corpus the Spiral generates) + the **smallest hardware** (CPU / 8GB) + local/private.
+- **The flywheel:** every escalation is a frontier demonstration on a step the cheap tier
+  couldn't do — a perfect **Verified-Trace-Distillation** target. Train the cheap tier on those and
+  it does cheaply next time what it escalated for last time. The governing number — the
+  **escalation rate** — is designed to only fall. Live cascade economics already measured: a strong
+  cheap tier escalates ≈0% and is **8.3× cheaper** (#2800).
+
+## 4. Borrowed weights & training sets (validated as convergence records)
+
+"Nothing is accepted without evidence." Each open **weight** or **training set** we might borrow
+for incremental gains is validated as one honest ConvergenceRecord — reproducible via
+[`scripts/spiral_borrow_records.js`](../scripts/spiral_borrow_records.js) (records land in the
+gitignored canonical ledger `data/convergence/records.jsonl`). The **External Reality Rule** holds:
+a borrow is a **candidate** (`verified:false`) until reproduced on our hardware, and synthesized
+trajectory sets are gated behind our own exec-verification before any become a VTD target
+(Gekhman 2405.05904: SFT on unverified data raises hallucination). The insight, per the survey:
+**open training sets are the likelier win** — we already have a good cheap tier; what we lack is
+owned verified data.
+
+| Borrow | Phase | Conf | Verified? | Why / gain | Source |
+|---|---|---|---|---|---|
+| **Qwen2.5-Coder-7B** (Apache-2.0) | P1 base | 0.82 | ✅ on-box (#2173) | known-good verified base VTD improves, not replaces | best-for-8GB guides; registry |
+| **SWE-HERO** exec-verified 13.5k | P1 | 0.75 | candidate | reference patches verified *by execution* → honest VTD subset | [2604.01496](https://arxiv.org/pdf/2604.01496) |
+| **KodCode** (verifiable, ≥5 tests/problem) | P1 / M4 | 0.72 | candidate | test-rich → the *rich* per-test Fix Rate our metric rewards | [2503.02951](https://arxiv.org/html/2503.02951v1) · [HF](https://huggingface.co/KodCode) |
+| **SWE-Gym** (2.4K exec + 234 Lite) | P0 / P1 | 0.70 | candidate | executable → native Fix-Rate source; Lite = the cheap first run | [Modal](https://modal.com/resources/best-open-source-models-swe-bench-coding-agents) |
+| **TACO** (25K, Apache-2.0, verified) | P1 / M4 | 0.68 | candidate | cleanest license — safe for a commercial moat | [2501.01054](https://arxiv.org/pdf/2501.01054) |
+| **SWE-rebench V2** (32k+ containerized, decontaminated, 20 langs) | P1 | 0.68 | candidate | scale + decontamination (avoids eval leakage) | [Nebius](https://nebius.com/blog/posts/meet-swe-rebench-v2) · [2505.20411](https://arxiv.org/pdf/2505.20411) |
+| **Pass-rate reward** (+ dynamic unit-test scaling) | M4 | 0.65 | candidate | confirms Fix Rate ~ pass-rate; a learned PRM as a cheap pre-filter | [2605.02944](https://arxiv.org/pdf/2605.02944) |
+| **OpenCoder-8B** (weights + **data** + recipe) | P1 | 0.60 | candidate | the open *data/recipe* is the borrow — a path to an owned base | [kilo.ai](https://kilo.ai/open-source-models) |
+| **DeepCoder-14B** (open RL recipe, verl) | P1 (24GB) | 0.58 | candidate | recipe transfers down to 7B; escalation-tier option on a big box | [Together](https://www.together.ai/blog/deepcoder) |
+| **Open-SWE-Traces** (207k synthesized) | P1 | 0.50 | candidate ⚠ gated | volume — but **exec-verify before use** (synthesized, not executed) | [2606.16038](https://arxiv.org/html/2606.16038v1) |
+| **TRM (~7M) / HRM (27M)** substrates | P2 | 0.35 | candidate ⚠ risk | the tiny recursive core *if* it generalizes to code — puzzle-proven only | [2510.04871](https://arxiv.org/abs/2510.04871) · [2506.21734](https://arxiv.org/abs/2506.21734) |
+
+## 5. The three phases (de-risked, most value first)
+
+- **Phase 0 — the verified-cascade harness (NO new weights). ✅ shipped + run live on-box.**
+  Reassembles the parts we already had (live cascade #2800, cheap-tier picker #2814, verified
+  ledger #2797) into the loop. [`experiments/spiral_phase0.js`](../experiments/spiral_phase0.js)
+  runs the spiral over real executable tasks, emits the escalation corpus, and self-emits a
+  ConvergenceRecord. **Verified live, fully local, zero spend (2026-07-22):** a real cascade with
+  `cheap=qwen2.5-coder:0.5b → escalate=qwen2.5-coder:7b` on the local Ollama daemon solved **5/6**
+  real tasks at **33% escalation** (4/6 cheap-tier sufficiency); the 6th (`rle`) was honestly
+  reported **unsolved** after both tiers plateaued — nothing fabricated — and the escalated rescue
+  (`two_sum`) was captured as a `distillTarget` corpus row. That is the affordable-long-horizon +
+  honest-halt behavior, on-box, with two real models. With a **cloud** escalate tier
+  (`SPIRAL_FRONTIER_PROVIDER=openai`) `rle` also solves → **6/6**: the cheap tier sets the cost
+  floor, the escalate tier the ceiling. On the **borrowed open MBPP-basic** set
+  (`node experiments/spiral_phase0.js --dataset mbpp --live`, 18 problems, per-check Fix Rate) the
+  same fully-local cascade solved **18/18 at 6% escalation** (17/18 cheap-tier sufficiency — only
+  `mbpp-8` needed the 7B). **Honest scope:** MBPP-basic is a *basic curated* set, so this shows the
+  cheap tier **saturates easy open problems locally** and the cascade catches the miss — it is
+  **not** a hard-task (full-MBPP / SWE-bench) claim; stressing the escalation economics on a harder
+  open set is the next run.
+- **Phase 1 — VTD-specialize the cheap tier (own weights). Confirmed NECESSARY (2026-07-22).** We
+  first tested the *cheap* form of self-improvement — retrieval, no weight change (CLAUDE.md
+  "improve via retrieval, not retraining"). On-box it **HURT** the tiny model:
+  [`experiments/tiny_model_selfimprove.js`](../experiments/tiny_model_selfimprove.js) measured
+  `qwen2.5-coder:0.5b` at baseline **6/6** on held-out DP problems → **2/6** when its own verified
+  solutions were injected as few-shot (regressed 4, rescued 0). The raw generations show *template
+  contamination*: shown `min_distance`, the 0.5B wrote an edit-distance-shaped answer to
+  `longest_common_subsequence`. A model this tiny has weak in-context learning, so capability can't
+  ride in the context — it must be baked into the **weights**. So VTD is the path, not a nice-to-have.
+  Base = the verified Qwen2.5-Coder-7B; data = the **exec-verified** subset of {SWE-HERO 13.5k,
+  KodCode, TACO} **+ our own escalation corpus** (the frontier rescues = exactly the hard-tail the
+  tiny model needs); method = Verified-Trace Distillation (receipt-gated, both-class, process-level;
+  nearest prior art rStar-Math 2501.04519). GPU dispatch is real spend (see §9) and stays behind an
+  explicit, funded run. Relates to [ADR-0015](adr/0015-qwen-teacher-verified-distillation.md) /
+  [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
+- **Phase 2 — the tiny recursive core (research option).** TRM/HRM substrate + rotational
+  anti-collapse (coRNN) as trainable modules. **Gated behind Phase-1 evidence** and held at low
+  confidence: proven on puzzles/tabular only, not code/language (the make-or-break risk).
+
+## 6. Serving & running it
+
+```bash
+# Phase-0 spiral over real executable tasks (free, deterministic mechanics run)
+node experiments/spiral_phase0.js
+# real LOCAL cascade, zero spend: cheap qwen2.5-coder:0.5b → escalate 7b on the Ollama daemon
+node experiments/spiral_phase0.js --live
+# stronger rescue via a cloud escalate tier (keys present): OpenAI / Gemini
+SPIRAL_FRONTIER_PROVIDER=openai node experiments/spiral_phase0.js --live
+
+# emit / refresh the borrow convergence records
+node scripts/spiral_borrow_records.js
+
+# in dream-chat: the assistant calls the `spiral_solve` tool on a tested coding task.
+```
+
+**Local-model resolution (the "fix the local Ollama" seam).** The spiral's local cheap tier
+resolves its model from the constraint-aware registry (`selectCheapStandin` → `qwen2.5-coder`),
+**not** the raw `OLLAMA_MODEL` env — which on this box pins `ouro:latest`, a model served only by
+the separate `ouro_serve.py` shim, so a plain-daemon call to it returns *"model not found"*. So
+`spiral_solve` and the Phase-0 runner work against whatever coder is actually pulled in Ollama,
+independent of the Ouro serving state. Override with `SPIRAL_LOCAL_MODEL`.
+
+The Ouro **kernel** is still served exactly as before — `ouro_serve.py` speaks the Ollama HTTP
+API on `:11434`, and the cheap-tier / re-prompt loop points at `OLLAMA_BASE_URL`. See §8 for the
+full knob reference.
+
+## 7. The loop mechanism — the Ouro recurrent-depth kernel
+
+*(The Spiral is the outer, verifier-gated loop. Ouro is the inner recurrent-depth kernel and the
+looped-reasoning research front — both are real, and they compose: a looped model can be the cheap
+tier of the Spiral.)*
 
 **Source:** *Scaling Latent Reasoning via Looped Language Models* (Ouro,
-[arXiv:2510.25741](https://arxiv.org/abs/2510.25741)). PDF in repo:
-``docs/research-papers/ouro-looped-llm-2510.25741.pdf``.
+[arXiv:2510.25741](https://arxiv.org/abs/2510.25741); PDF `docs/research-papers/ouro-looped-llm-2510.25741.pdf`).
+LoopLM builds reasoning into computation by **reusing weight-tied layers R times** in latent space
+(the paper's "third scaling axis": loop depth), with a learned **Q-exit** early-exit gate.
 
-### The idea (paper)
-LoopLM builds reasoning into computation by **reusing weight-tied layers R times** in latent
-space (a "third scaling axis": loop depth). Key mechanisms we borrow:
-- **Adaptive depth + learned early-exit (Q-exit):** a gate emits per-step exit probabilities;
-  exit at the first step where the cumulative `CDF(t) ≥ q`. `q` trades compute for accuracy.
-- **Entropy-regularized depth** (uniform prior) prevents collapse to always-shallow/deep.
-- **Deeper-is-better, with diminishing returns** — most inputs converge by mid-depth.
+### 7.1 Native latent loop on real Ouro weights
+[`src/sigma0/loop_lm.py`](../src/sigma0/loop_lm.py) — `Sigma0LoopLM` runs the paper's **Q-exit
+adaptive-depth policy** (λ→survival→CDF→first-step-≥q) on Ouro's pretrained weight-tied block + exit
+gate (we do **not** pretrain a LoopLM — that needs 7.7T tokens). The stock checkpoint runs fixed
+full depth; our module activates the adaptive inference and reports realized per-token depth
+(`mean_depth`). Three exit policies (`OURO_MODE`):
+- **`qexit`** (default) — the trained gate; exit at the first step with `CDF(t) ≥ q`.
+- **`converge`** — first-order latent fixed point `‖hₜ−hₜ₋₁‖/‖hₜ₋₁‖ < ε`.
+- **`accel`** — spiral-robust second-order acceleration criterion (Two-Scale, arXiv:2509.23314);
+  the **certificate-consistent** upgrade where first-order `converge` false-exits on spiral dynamics
+  (see [collapse certificate](SIGMA0-COLLAPSE-CERTIFICATE.md) §1.1).
 
-### 1. Native latent loop on real Ouro weights (the real thing)
-[`src/sigma0/loop_lm.py`](../src/sigma0/loop_lm.py) — `Sigma0LoopLM` is our implementation of
-the paper's **Q-exit adaptive-depth policy** (λ→survival→CDF→first-step-≥q), run on **Ouro's
-pretrained weight-tied block + exit gate** (we do **not** pretrain a LoopLM — that needs
-7.7T tokens). This activates the adaptive inference the **stock Ouro checkpoint leaves off**:
-its `generate()` threads no per-call exit threshold, so it runs **fixed full depth**. Our
-module reads the per-step gates, applies Q-exit, and **reports the realized per-token loop
-depth** (`mean_depth`); `generate()` returns `exit_reason: "adaptive_qexit"`. Defaults:
-`q=0.5`, `max_new_tokens=200`, repetition penalty `1.3`.
+**DecodeCanary + depth coupling (intrinsic anti-collapse):** in native mode the per-token
+DecodeCanary (#766/#793) folds self-repeat / n-gram echo / argmax-margin / entropy-collapse
+z-alarms into one `sigma0_proximity`. `OURO_CANARY=1` runs it observe-only; `OURO_ADAPT=1` arms the
+actuator — as proximity rises, the loop deepens and the repetition penalty rises (#1014,
+divergence→depth coupling). This is the *inner* anti-collapse; the Spiral's M3 (coRNN rotational
+recurrence) is the *outer* one.
 
-- **Probe it:** `python -m sigma0.loop_lm` prints the realized mean depth — adaptive and
-  **below** the recurrent step count (`total_ut_steps`), i.e. not fixed-depth. (This probe
-  output is **not yet persisted** to an eval artifact, so treat the number as a live
-  observation, not a benchmark.)
-- **Trained on our data:** QLoRA fine-tune of Ouro-1.4B on the Σ₀ Claude-session set
-  ([`scripts/train-qlora-ouro.py`](../scripts/train-qlora-ouro.py)). Adapter loads via
-  `Sigma0LoopLM.load(base, adapter=…)`.
-- **Three exit policies (`OURO_MODE`, now wired into serving):** `Sigma0LoopLM.generate()` takes
-  `mode=`:
-  - **`qexit`** (default, `exit_reason: "adaptive_qexit"`) — the trained entropy/confidence
-    gate; exit at the first step with `CDF(t) ≥ q`. This is what Ouro was *trained* for.
-  - **`converge`** (`exit_reason: "convergence_exit"`, returns `mean_contraction`) — exit on a
-    **first-order latent fixed point** `‖hₜ − hₜ₋₁‖/‖hₜ₋₁‖ < ε`. The falsifiable "spiral"
-    experiment (E2).
-  - **`accel`** — exit on the **spiral-robust second-order acceleration** criterion
-    `‖Δᵏ − Δᵏ⁻¹‖/‖·‖ < ε` held for `patience` steps (Two-Scale, arXiv:2509.23314). First-order
-    `converge` false-exits on SPIRAL dynamics — the case the [collapse certificate](SIGMA0-COLLAPSE-CERTIFICATE.md)
-    §1.1 flags as hard (where the energy proof fails); `accel` is the **certificate-consistent**
-    upgrade.
+### 7.2 API-level re-prompt loop (provider-agnostic)
+[`lib/loop-reasoner.js`](../apps/lantern-garage/lib/loop-reasoner.js) — `loopedReason()` approximates
+the loop for any plain local model by re-prompting up to `MAX_LOOPS` (4 = Ouro R4), feeding each
+prior answer back as a Coconut-style prefix, exiting via `cdfExit()` (`threshold_met` /
+`converged` / `max_loops`). Confidence is heuristic. Wired into
+[`lib/stream-chat.js`](../apps/lantern-garage/lib/stream-chat.js) for reasoning/coding intents; the
+**"Loop Depth (Σ₀)"** panel in dream-chat renders `⟳ N loop(s) · X% conf · <exit_reason>`.
 
-  All three are selectable on the served deep path (`ouro_serve.py`, `OURO_NATIVE=1`,
-  `OURO_MODE=…`); `qexit` remains the default. See
-  [research/2026-06-19-convergence-tesseract-spiral.md](research/2026-06-19-convergence-tesseract-spiral.md)
-  and the [collapse explainer](SIGMA0-COLLAPSE-EXPLAINER.md).
-- **DecodeCanary + depth coupling (the intrinsic anti-collapse mechanism):** in native mode the
-  per-token **DecodeCanary** (#766/#793) folds self-repeat / n-gram echo / argmax-margin /
-  entropy-collapse z-alarms into one `sigma0_proximity` score. `OURO_CANARY=1` (default in
-  native) runs it **observe-only** — telemetry only (`canary_max_proximity` / `spooks` /
-  `signal`). `OURO_ADAPT=1` arms the **actuator**: as proximity rises, `knobs()` deepens the
-  recurrent loop and raises the repetition penalty — the model stepping deeper to resolve its
-  own incipient degeneration (#1014, divergence→depth coupling). Native loop only; the fast
-  cached path is plain HF decode and never sees the canary.
-
-### 2. API-level re-prompt loop (provider-agnostic approximation)
-For any plain (non-looped) local model, we also approximate the loop by re-prompting:
-
-- **[`lib/loop-reasoner.js`](../apps/lantern-garage/lib/loop-reasoner.js)** — `loopedReason()`
-  runs the model up to `MAX_LOOPS` (4, = Ouro R4), feeding each prior answer back as a
-  Coconut-style context prefix, and **exits via `cdfExit()`**:
-  - `threshold_met` — confidence `≥ CDF_THRESHOLD` (0.85)
-  - `converged` — `|Δconfidence| < CONVERGENCE_EPS` (0.04), the entropy-plateau analog
-    (requires ≥ 2 loops)
-  - `max_loops` — compute budget hit
-
-  Confidence is **heuristic** — `extractConfidence()` parses a `Confidence:` field or
-  estimates from structure. The module also exports a one-shot `singleReason()`
-  (`exit_reason: "single_pass"`) and the three constants; callers may override
-  `maxLoops`/`cdfThreshold` per call.
-- **Wired into [`lib/stream-chat.js`](../apps/lantern-garage/lib/stream-chat.js)** — for
-  `reasoning`/`coding` intents (and only when **not** unisona.ai-debug, **not** roleplay, and
-  no explicit provider was picked), a looped pass runs on the local model and the `done`
-  event carries **`loop_n` / `confidence` / `exit_reason`**. The **"Loop Depth (Σ₀)"** panel
-  in [`dream-chat.html`](../apps/lantern-garage/public/dream-chat.html) renders them as
-  `⟳ N loop(s) · X% conf · <exit_reason>`; the provider dropdown's **"Local Σ₀ Loop (Ouro)"**
-  option is the user-facing entry. On error the pass falls through to normal streaming
-  (non-fatal).
-
-### Where it maps in the codebase
 | Paper concept | Lantern |
 |---|---|
-| Recurrent steps R | Ouro `total_ut_steps` (native) · `MAX_LOOPS` (re-prompt) |
-| Q-exit `CDF(t) ≥ q` | `qexit_step()` in `loop_lm.py` (native) · `cdfExit()` (re-prompt) |
-| Realized adaptive depth | `mean_depth` (native) · "Loop Depth (Σ₀)" panel (`loop_n`/`confidence`/`exit_reason`) |
-| Deeper-is-better, diminishing | early-exit at the first step with `CDF ≥ q` |
-| Knowledge manipulation > capacity | small local model + KB grounding ([CSF spec §2.9](CSF-FORMAT-SPECIFICATION.md)) |
+| Recurrent steps R | Ouro `total_ut_steps` (native) · `MAX_LOOPS` (re-prompt) · **Spiral turns** (outer) |
+| Q-exit `CDF(t) ≥ q` | `qexit_step()` (native) · `cdfExit()` (re-prompt) · **M5 answerability halt** (outer) |
+| Realized adaptive depth | `mean_depth` (native) · "Loop Depth (Σ₀)" panel (re-prompt) |
+| The **verifier** deciding progress | — (Ouro has none) · **the Spiral's M4 Fix Rate** (this is the new part) |
 
-> **Grounding note:** this doc is markdown, indexed by
-> [`scripts/build_knowledge_index.py`](../scripts/build_knowledge_index.py) into
-> `data/knowledge/index.jsonl`, so the Knowledge Center can ground / near-route on it. A doc
-> becomes grounded by being linked from `knowledgecenter.html` (the indexer scrapes
-> `/repo/*.md` hrefs). **Re-run the indexer after editing** so the snapshot matches the live
-> text.
-
-## How the agent uses it (no code change)
-`ouro_serve.py` **speaks the Ollama HTTP API** (`/api/chat`, `/api/generate`, `/api/tags`)
-and defaults to port **11434**, advertising the model as `ouro:latest`. The Σ₀ coder/agent
-path already calls a local model over exactly that API:
-- streaming chat is **Ollama-first** (`OLLAMA_BASE_URL`, default `http://127.0.0.1:11434`);
-- the looped re-prompt pass ([`lib/loop-reasoner.js`](../apps/lantern-garage/lib/loop-reasoner.js))
-  and the MCP Kernel worker (`task_run` → `/api/dream/chat`) hit the same local endpoint.
-
-So **run `ouro_serve.py` on 11434** and the entire coder/agent path transparently runs on
-Ouro — `Observe → Remember → Reason → Act → Verify → Converge` with a looped brain, no code
-change. `OURO_MODEL` defaults to `ByteDance/Ouro-1.4B-Thinking`; set `OURO_ADAPTER` for the
-Σ₀ tune. (Ouro is a *drop-in*; unlike the old Qwen coder it is **not** yet registered in the
-model-broker leaderboard — that's a follow-up.)
-
-## Two inference modes
-- **Default — fast cached.** Uses Ouro's `UniversalTransformerCache`; this is the chat/coder
-  default (the product gate is speed). Plain HF decode — no canary, no adaptive depth.
-- **Deep — native adaptive loop.** `OURO_NATIVE=1` activates `Sigma0LoopLM`: per-token exit by
-  `OURO_MODE` (`qexit` default, `q` = `OURO_Q`, default 0.5; or `converge`/`accel`, `eps` =
-  `OURO_EPS`, default 0.05), realized depth reported as `mean_depth`. It is no-cache (~1 s/token),
-  so it's an opt-in "think-harder" mode. Tunable via `OURO_NATIVE_MAX` (80). The canary
-  (`OURO_CANARY`, on) and actuator (`OURO_ADAPT`) live here.
-
-### Knob reference (`ouro_serve.py`)
+## 8. Knob reference (`ouro_serve.py`)
 | Knob | Default | What it does |
 |---|---|---|
 | `OURO_NATIVE` | `0` | `1` = deep adaptive loop; `0` = fast cached |
 | `OURO_MODE` | `qexit` | exit policy: `qexit` / `converge` / `accel` (native only) |
 | `OURO_Q` / `OURO_EPS` | `0.5` / `0.05` | Q-exit threshold · convergence/accel ε |
 | `OURO_CANARY` / `OURO_ADAPT` | `1` / `0` | collapse monitor (observe) · depth-coupling actuator |
-| `OURO_UT_STEPS` | model default | recurrent-step count — **the proven decode-speed lever** (3 ≈ 1.28×) and the long-context KV lever (2 halves the recurrent cache) |
+| `OURO_UT_STEPS` | model default | recurrent-step count — decode-speed lever (3 ≈ 1.28×) + long-context KV lever (2 halves the recurrent cache) |
 | `OURO_4BIT` | `0` | NF4 base (~7.7→1.85 GB; forces LoRA unmerged) |
 | `OURO_KV_INT8` | `0` | int8 KV cache (~halves it, near-lossless; cached path) |
 | `OURO_MERGE` / `OURO_ATTN` | `1` / `sdpa` | merge LoRA into base · attention kernel — together ~2.8× faster (#775) |
-| `OURO_REP_PENALTY` / `OURO_NO_REPEAT_NGRAM` | `1.3` / `3` | small-model degeneration guards (both paths) |
-| `OURO_SAMPLE` / `OURO_TEMPERATURE` / `OURO_TOP_P` | `0`(greedy) / `0.7` / `0.9` | sampling for chat-natural output |
+| `OURO_REP_PENALTY` / `OURO_NO_REPEAT_NGRAM` | `1.3` / `3` | small-model degeneration guards |
 | `OURO_ADAPTER` / `OURO_MODEL` | — / `…/Ouro-1.4B-Thinking` | Σ₀ adapter dir · base model id |
 
-The API re-prompt loop (§2 above) is gated separately by `LOOP_REASONER=1`.
+**8GB / CC-scale prompts:** `OURO_4BIT=1 OURO_KV_INT8=1 OURO_UT_STEPS=2` reaches 15–20k-token
+prompts on an 8GB card. **Transformers ≥ 4.54** required (Ouro's `configuration_ouro.py` needs
+`layer_type_validation`); local `.venv-train` + the Kaggle/Lightning dispatch wrappers pin **4.57**;
+`OuroConfig.pad_token_id` is `None` and is patched to `bos_token_id` before load.
 
-**Transformers version:** Ouro's custom modeling code requires **transformers ≥ 4.54** (its
-`configuration_ouro.py` imports `layer_type_validation`, added in 4.54); the local `.venv-train`
-runs **4.57** and the Kaggle/Lightning dispatch wrappers are now pinned to **4.57** (the old
-`>=4.40,<4.53` cap broke the model load — fixed in `b5c62465`). `OuroConfig.pad_token_id` is
-`None` and must be patched to `bos_token_id` before `from_pretrained`; the train/serve scripts do
-this. No `transformers` entry in `requirements.txt` (training env only).
+## 9. Honest scope & status
+- **Home is verifiable domains** (code, math). The Fix-Rate ratchet needs a real test; in
+  open-domain chat there is no hard M4, so the Spiral degrades to plain cascade quality — we do not
+  claim the ratchet there.
+- **Phase 0 is mechanics-verified, not a model result.** [`spiral_phase0.js`](../experiments/spiral_phase0.js)
+  proves the loop + exec verifier + corpus on real tasks with stub tiers; a `--live` run is what
+  produces a model-capability number.
+- **Phase 1 GPU training is real spend** ([memory: dispatch = paid job](adr/0025-rlvr-dreaming-continual-updates-double-gated.md)),
+  and Ampere-only (bf16; Kaggle's pre-Ampere free fleet can't be a trustworthy target — the correct
+  target is a Lightning/Modal A10/L4). It stays behind an explicit, funded run.
+- **Borrows are candidates until reproduced** (§4). Synthesized trajectory sets are exec-verified
+  before any become VTD targets.
+- **The Ouro kernel (§7)** is real adaptive depth but inference-time only (we don't pretrain), and
+  the 1.4B adapter can't yet *drive* Claude Code (under-triggers tools under CC's ~20k-token system
+  prompt). Reliable surfaces: in-app chat + the standalone agent loop + now `spiral_solve`.
 
-## Run it
-```bash
-# 1. (optional) train the Σ₀ adapter — needs transformers>=4.40 + a CUDA GPU (local: 4.57.6 works)
-python scripts/train-qlora-ouro.py --epochs 3
-
-# 2. serve Ouro as a drop-in Ollama model on :11434
-#    set OURO_ADAPTER to the adapter dir produced by step 1
-OURO_ADAPTER=<adapter_dir> python scripts/ouro_serve.py
-
-# 3. (optional) deep adaptive-depth mode — qexit (default), or converge/accel
-OURO_NATIVE=1 OURO_ADAPTER=<adapter_dir> python scripts/ouro_serve.py
-OURO_NATIVE=1 OURO_MODE=accel OURO_ADAPT=1 OURO_ADAPTER=<adapter_dir> python scripts/ouro_serve.py
-
-# 3b. 8GB / CC-scale (15-20k-token) prompts: 4-bit base + int8 KV + shallow loop
-OURO_4BIT=1 OURO_KV_INT8=1 OURO_UT_STEPS=2 OURO_ADAPTER=<adapter_dir> python scripts/ouro_serve.py
-
-# 4. probe the realized loop depth directly
-python -m sigma0.loop_lm
-```
-The garage chat path (4177/4178) and the MCP `task_run` worker then use Ouro with no further
-config — they already point at `:11434`.
-
-## Continual training
-The local adapter improves offline via the **Σ₀ continual-training loop**
-([SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md)): harvest → execution-verify →
-train → eval → eval-gated promote. Two ground-truth gates (only green subprocesses train;
-only a measured pass@1 win promotes), kept offline by design. This replaces the old
-`scripts/continual-train.ps1` Qwen flow.
-
-## Where it fits the loop
-This is **[06] LANTERN-CODER** realized on a looped model: *Coder = Kernel + Memory + Tools +
-"improve the codebase" task type* — a task type, not a separate system. Ouro plugs into
-**[02] LANTERN-MODEL-BROKER** as one interchangeable local model; its adaptive depth serves
-the **Reason/Act** stages; every turn still emits a PCSF receipt + Convergence Record
-(**Verify/Converge**). It is fully in-house and offline — see the
-[Σ₀ Briefing](CONVERGANCE-SIGMA0-BRIEFING.md) and the
-[Superfleet design](SUPERFLEET-SWARM-DESIGN.md) (workers run this loop on Tasks).
-
-## Honest scope
-- **1.4B, single-pass QLoRA** — a genuine fine-tune, not production-grade; quality ratchets
-  via continual training.
-- **Native loop (§1)** is real adaptive depth on Ouro's weight-tied checkpoint — but
-  **inference-time only** (we don't pretrain), and the no-cache Q-exit path is slow
-  (~1 s/token), so it's opt-in deep mode; the **default** served path is the fast cached one.
-- **Re-prompt loop (§2)** is an **API-level approximation** — it refines by re-prompting a
-  standard model, not shared-weight latent loops. Confidence and exit are heuristic.
-- **Drop-in, not yet leaderboard-routed** — you select Ouro by serving it on 11434, not via
-  the model-broker leaderboard (that integration is a follow-up).
-- **Can't yet *drive* Claude Code** — the protocol bridge round-trips cleanly, but the 1.4B
-  adapter under-triggers tools and is overwhelmed by CC's ~20k-token system prompt. The reliable
-  surfaces are the in-app chat and the standalone agent loop. See
-  the former SIGMA0-CODER-CLAUDE-CODE-STATUS note (removed; in git history).
-- **Deep-mode depth is now logged; bench-grade numbers still aren't** — the served native path
-  appends realized `mean_depth` + contraction to the eval leaderboard (`_persist_loop_meta`,
-  #777), but the `python -m sigma0.loop_lm` probe output remains a live observation, not a
-  persisted benchmark.
-
-## Training status (2026-06-25)
-
-Cloud GPU dispatch (`orchestration.html` → `routes/gpu-training.js` → `lib/training-dispatcher.js`)
-is wired; dispatch + poll + convergence-logging all work, and the weekly scheduled task
-(`KeystoneWeeklyTraining`, Mondays 00:00 UTC) is live. Providers are configured via
-`data/pcsf/gpu-training.pcsf.json`; credentials live in Windows User-scope env vars and sync into
-`process.env` at first call. Dispatching a real run this week drove out a chain of five bugs and a
-**strategic finding** — full write-up:
-[research/gpu-training-pipeline-diagnosis-2026-06-25.md](research/gpu-training-pipeline-diagnosis-2026-06-25.md).
-
-**The strategic finding — Kaggle is the wrong GPU class.** The recipe deliberately prefers
-**bf16** (fp16 QLoRA on this reasoning LM overflows gradients to NaN, which clipping bakes into a
-garbage adapter), and **bf16 is Ampere-only (cc ≥ 8.0)**. Kaggle's free fleet is exclusively
-pre-Ampere (P100 cc 6.0, T4 cc 7.5), so it can't be a *trustworthy* target. The arch-aware fixes
-stop the crashes (Kaggle now degrades to plain fp16 LoRA instead of dying), but the correct
-automatable target is **Lightning AI's A10 (cc 8.6)** — the same Ampere class as the local 8 GB
-RTX where the good adapters trained.
-
-| Provider | Class | Status |
-|---|---|---|
-| **Local RTX (8 GB)** | Ampere (bf16 ✓) | ✓ primary — where the live Σ₀ adapter trained |
-| **Lightning AI (A10)** | Ampere (bf16 ✓) | **recommended cloud target**; wired, but dispatch currently fails on a Lightning-SDK teamspace/owner-inference bug (`error_count: 3` in the PCSF) — restore is the open follow-up |
-| **Kaggle (P100/T4, 30 h/wk free)** | pre-Ampere (no bf16) | crash-free fallback only; reaches the training loop but fp16 adapter quality is not dependable |
-| **HuggingFace Hub** (`lanternfounder/ouro-checkpoints`) | — | ✓ upload + download roundtrip passes |
-| **Paperspace / Colab / SageMaker** | — | credentials present; full dispatch untested/blocked |
-
-**The five bugs fixed this week (each advanced the run one stage):**
-
-| Stage reached | Root cause | Fix |
-|---|---|---|
-| deploy gate | `api-tools-log.js` exported an Express `Router()` not the `(req,res,url,deps)⇒bool` convention; threw `fn.apply` and 500'd `/api/convergence/health` — the deploy health-check endpoint — silently rolling back *every* stable deploy for ~2 days | `0e98dbfe` |
-| dataset mount | kernel looked for `.json`; the Kaggle Dataset ships `.jsonl` | `225880ee` (probe both) |
-| model load | `transformers>=4.40,<4.53` pin too old — Ouro needs `layer_type_validation` (4.54+) | `b5c62465` (pin → 4.57) |
-| CUDA init (4-bit) | hardcoded NF4; bitsandbytes kernels need cc ≥ 7.5; Kaggle gave a P100 (6.0) | `5e7e9e87` (arch-aware: skip 4-bit on cc < 7.5) |
-| CUDA init (bf16) | `torch.cuda.is_bf16_supported()` false-positives on P100; first bf16 op crashes | `8b1475a0` (gate bf16 on cc ≥ 8.0) |
-
-Seq-length note: corpus p99 audited at 1219 tokens; bumped to **seq=1536** so the tail of
-function-call outputs is no longer truncated — fits an A10/local-RTX without swapping to CPU.
-
-## Related
-- [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel that improves this adapter
-- [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) · [SIGMA0-COLLAPSE-EXPLAINER.md](SIGMA0-COLLAPSE-EXPLAINER.md) — the safety foundation; why `accel` exit is the certificate-consistent policy
-- former SIGMA0-CODER-CLAUDE-CODE-STATUS (removed; in git history) — can it drive Claude Code? (bridge solved, model-reliability blocked)
-- [research/gpu-training-pipeline-diagnosis-2026-06-25.md](research/gpu-training-pipeline-diagnosis-2026-06-25.md) — the 5-bug chain + Kaggle-is-pre-Ampere finding
-- [SUPERFLEET-SWARM-DESIGN.md](SUPERFLEET-SWARM-DESIGN.md) — the worker swarm that runs this loop on Tasks
-- [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the architecture North Star
-- [CSF-FORMAT-SPECIFICATION.md](CSF-FORMAT-SPECIFICATION.md) — §2.9 KB grounding index + near routing
+## 10. Related
+- **[ADR-0030](adr/0030-spiral-verified-cascade-harness.md)** — the Spiral decision · [design of record](research/2026-07-22-spiral-verified-cascade-design.md)
+- [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) (owned PLT coder) · [ADR-0021](adr/0021-serving-substrate-retain-ouro-custom-loop.md) (retain the Ouro loop) · [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md) / [ADR-0026](adr/0026-ternary-serving-artifact-distillation-target.md) (training + serving-artifact)
+- [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel · [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) — the safety foundation
+- [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star · [models/keystone-sigma0-plt/README.md](../models/keystone-sigma0-plt/README.md) — the PLT coder
 - `LANTERN-SIGMA0-CODER.md` · `OURO-LOOPLM.md` — the two superseded pages this consolidates (removed 2026-07-16; in git history)

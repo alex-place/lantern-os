@@ -93,5 +93,6 @@ against the *merged* master, not your branch's base.
 | [0027](0027-one-click-broker-oauth2.md) | One-click broker connect — per-user OAuth2 (Alpaca now, IBKR when they ship it); replaces the five-step IBKR key-upload wizard with provider login → Approve | Accepted (Alex Place, 2026-07-15) |
 | [0028](0028-managed-strategy-sharpe-gate-tax-aware.md) | Managed-strategy mode — Sharpe-mandate acceptance gate, tax-aware management, contained execution | Accepted (operator approval given in-session, 2026-07-15) |
 | [0029](0029-ibkr-streaming-challenger-duel.md) | IBKR streaming Challenger — Champion's core + send-on-delta cadence + real IBKR funding/cash-sweep frictions + minute-accurate history, in a pre-registered backtest + live-paper duel vs the Champion; fold path adopts the friction fixes on a loss; ADR-0028 gate unchanged | Proposed (awaiting Alex's approval) |
+| [0030](0030-spiral-verified-cascade-harness.md) | The Spiral — a verified-cascade convergence loop as the owned local reasoning core; per-turn cheap→Fix-Rate-verify→escalate-inheriting-progress over a growing verified memory; Phase-0 harness (no new weights) accepted, Phases 1–2 (own weights) evidence-gated; generalization from the verifier not scale | Accepted (Alex Place, in-session, 2026-07-22) |
 
 <!-- Add new ADRs to this table on merge. -->

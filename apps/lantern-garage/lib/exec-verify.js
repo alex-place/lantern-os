@@ -12,7 +12,7 @@
 // temp-dir isolation. It runs the MODEL's proposed code (not untrusted operator input); the
 // caller decides whether execution is appropriate for the surface, and the timeout bounds it.
 
-const { execFileSync } = require("child_process");
+const { execFileSync, execFile } = require("child_process");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -84,4 +84,52 @@ function verifyExec(opts = {}) {
   }
 }
 
-module.exports = { verifyExec, RUNNERS };
+/**
+ * Async twin of verifyExec — same contract, same isolation, but non-blocking so a
+ * caller on the server's request path (e.g. the spiral harness, ADR-0030) does NOT
+ * freeze the event loop while the subprocess runs (the execSync-freezes-server
+ * lesson). Returns a Promise<{ran, passed, output}> with identical semantics.
+ */
+function verifyExecAsync(opts = {}) {
+  const { language = "js", code = "", test = "", timeoutMs = 10000 } = opts;
+  const runner = RUNNERS[language];
+  if (!runner) return Promise.resolve({ ran: false, passed: false, output: `unsupported language: ${language}` });
+
+  let dir;
+  try {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "sigma0-exec-"));
+  } catch (e) {
+    return Promise.resolve({ ran: false, passed: false, output: `tempdir failed: ${e.message}` });
+  }
+  const file = path.join(dir, "case" + runner.ext);
+  const cleanup = () => { try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* best-effort */ } };
+  try {
+    fs.writeFileSync(file, `${code}\n${test}\n`, "utf8");
+  } catch (e) {
+    cleanup();
+    return Promise.resolve({ ran: false, passed: false, output: `write failed: ${e.message}` });
+  }
+  return new Promise((resolve) => {
+    execFile(
+      runner.cmd, [file],
+      {
+        timeout: timeoutMs, encoding: "utf8", windowsHide: true, cwd: dir,
+        maxBuffer: 512 * 1024,
+        // SECURITY: minimal env — model-proposed code must never see the server's API keys.
+        env: { PATH: process.env.PATH || "", SystemRoot: process.env.SystemRoot || "", TMP: dir, TEMP: dir },
+      },
+      (err, stdout, stderr) => {
+        cleanup();
+        if (!err) return resolve({ ran: true, passed: true, output: String(stdout).slice(0, MAX_OUTPUT) });
+        if (err.code === "ENOENT") return resolve({ ran: false, passed: false, output: `runner not found: ${runner.cmd}` });
+        const overflow = err.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER";
+        const timedOut = !overflow && (err.killed || err.signal === "SIGTERM" || /ETIMEDOUT/.test(String(err.code)));
+        const text = String(stderr || "") + String(stdout || "") || err.message || "";
+        const prefix = overflow ? "output-limit-exceeded\n" : timedOut ? "timeout\n" : "";
+        resolve({ ran: true, passed: false, output: prefix + text.slice(0, MAX_OUTPUT) });
+      },
+    );
+  });
+}
+
+module.exports = { verifyExec, verifyExecAsync, RUNNERS };
