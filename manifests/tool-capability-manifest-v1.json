@@ -250,6 +250,35 @@
       "result_receipt_schema_version": 1
     },
     {
+      "name": "patent_search",
+      "description": "Search the local worldwide-patent corpus for prior art / relevant patents. Returns top patents with publication number, title, office, date, assignee, CPC, and a citable URL. Grounds on title + abstract worldwide (plus full text where free: EP/WO/US). Use for prior-art, freedom-to-operate, patent-landscape, and 'who holds the patent on X' questions. Each result is cited per the Σ₀ External Reality Rule.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The patent / prior-art query — the technology, problem, or invention described in plain language"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Max patents to return (1–10, default 5)"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
       "name": "convergence_inspect",
       "description": "Inspect the convergence orchestrator's live state — registered cells, active agent/dream-journal slots, tripped circuits, pending CSF specs, and per-layer target latencies. Read-only; grounds Observe with real engine state instead of guessing.",
       "input_schema": {
@@ -975,6 +1004,71 @@
         },
         "required": [
           "cash"
+        ]
+      },
+      "policy": "read",
+      "operator_required": false,
+      "surface_availability": {
+        "dream_chat": true,
+        "mcp": true
+      },
+      "execution_enabled": false,
+      "execution_disabled_reason": "chat_tool_exec_disabled",
+      "result_receipt_schema_version": 1
+    },
+    {
+      "name": "spiral_solve",
+      "description": "Solve ONE self-contained, VERIFIABLE coding problem with the verified Spiral (ADR-0030): a growing verified memory refined turn-by-turn by a per-turn cascade — the cheap/owned tier proposes a step, a REAL bounded exec-test verifier (Fix Rate) gates it, and ONLY on a stall does it escalate to a frontier tier inheriting the accumulated progress. It commits a step only when reality (the tests) ratchets it, then halts on solved / honest-can't / a turn cap. Use it when the user gives a function-level coding task that COMES WITH tests (the Fix-Rate verifier needs at least one test that throws / exits non-zero on failure — the HumanEval check() contract). Returns the verified solution, the spiral transcript, and the escalation rate. Honest scope: home is verifiable code/math on the smallest hardware; if no interpreter or no tests are available it says so rather than guessing. It never places orders or touches money.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "the coding problem — a function signature + docstring / spec the model should implement"
+          },
+          "tests": {
+            "type": "array",
+            "description": "one or more test snippets; EACH must throw / exit non-zero on failure (HumanEval check() contract). More named tests → a richer per-test Fix Rate; one test → coarse pass/fail.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "test": {
+                  "type": "string",
+                  "description": "code appended after the candidate that raises/exits non-zero on failure"
+                }
+              },
+              "required": [
+                "test"
+              ]
+            }
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "js",
+              "python"
+            ],
+            "description": "js (default) or python"
+          },
+          "max_turns": {
+            "type": "number",
+            "description": "spiral turn cap (1–16, default 8)"
+          },
+          "cheap_provider": {
+            "type": "string",
+            "description": "cheap/owned tier provider (default 'ollama' — the local standin)"
+          },
+          "frontier_provider": {
+            "type": "string",
+            "description": "escalation provider (default 'anthropic')"
+          }
+        },
+        "required": [
+          "prompt",
+          "tests"
         ]
       },
       "policy": "read",

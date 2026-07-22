@@ -1773,11 +1773,15 @@ ceiling and its break, in one line.
 `tests/test_oracle_active_loop.py` (7 passed); run: `experiments/oracle_active_loop.py` →
 `data/oracle/active-loop-runs.jsonl`. Honest scope: this proves the loop *works and records
 corpus-absent facts in the grounding discipline* — it does **not** prove the loop beats a strong
-predictor, because the passive baseline here is a frozen heuristic, not a frontier model. The next
-rung — the model-in-the-loop run on questions where inference plausibly fails, and
-value-of-information experiment selection — is GAP (Oracle design §5). This is still the
-least-proven Part of the document — read it with §3.1's authority, never §1's — but the fifth move
-is no longer only a design: its mechanism is built and measured.]**
+predictor, because the passive baseline here is a frozen heuristic, not a frontier model.
+**Directed exploration (VoI steering) is now SEED-BUILT too** (`experiments/oracle_voi_select.py`,
+unit-tested) — budgeted greedy value-of-information selection that runs the highest-value
+experiments first and excludes pins — the bandit's *steering* on top of the anti-collapse
+*no-regret* floor. The next rung — the model-in-the-loop run on questions where inference plausibly
+fails, and a real Bayesian VoI estimate (the current one is a heuristic prior-entropy proxy) — is
+GAP (Oracle design §5). This is still the least-proven Part of the document — read it with §3.1's
+authority, never §1's — but the fifth move is no longer only a design: its mechanism *and its
+steering* are built and measured.]**
 
 ---
 

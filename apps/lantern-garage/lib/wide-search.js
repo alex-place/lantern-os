@@ -69,6 +69,41 @@ function localArxivSources(query) {
   }
 }
 
+// Local worldwide-patent corpus — the same pattern as arXiv above, a second BM25
+// grounding source from drive F: (harvested via EPO OPS). Optional + fail-safe:
+// queryPatents() self-gates to patent / prior-art / IP questions, so it contributes
+// nothing on non-patent topics and a missing corpus never blocks web research.
+let queryPatents = null;
+try { ({ queryPatents } = require("./patent-index")); } catch (_e) { /* corpus lib absent — web only */ }
+
+const PATENT_K = parseInt(process.env.WIDE_SEARCH_PATENTS_K || "4", 10);
+const PATENT_ENABLED = process.env.WIDE_SEARCH_PATENTS !== "0" && PATENT_K > 0;
+
+/**
+ * Pull local patents relevant to the query and shape them like web pool items so the
+ * rest of the loop treats them as ordinary sources. `via: "patent:<publicationNumber>"`
+ * keeps them auditable as local-corpus grounding; the patent's canonical URL becomes its
+ * unique, citable evidence id.
+ */
+function localPatentSources(query) {
+  if (!PATENT_ENABLED || typeof queryPatents !== "function") return [];
+  try {
+    const hits = queryPatents(query, PATENT_K) || [];
+    return hits.map((p) => {
+      const tag = [p.country, p.published].filter(Boolean).join(" ");
+      const assignee = p.assignee ? `, ${p.assignee}` : "";
+      return {
+        title: p.title || p.id,
+        url: p.url || `https://patents.google.com/patent/${p.id}/en`,
+        snippet: `${p.snippet || ""} (patent ${p.id}${tag ? `, ${tag}` : ""}${assignee})`,
+        via: [`patent:${p.id}`],
+      };
+    });
+  } catch (_e) {
+    return [];
+  }
+}
+
 // Default fidelity ladder: cheap/local first, stronger model for synthesis only.
 // "auto" cascades Vertex → Claude → Gemini → … (whatever has funded quota).
 const LOW = process.env.WIDE_SEARCH_LOW_PROVIDER || "ollama";
@@ -299,6 +334,18 @@ async function wideSearch(o) {
       if (p.url && !seen.has(p.url)) { pool.push(p); seen.add(p.url); added += 1; }
     }
     emit("observe", "local_arxiv", { found: localPapers.length, added });
+  }
+
+  // Fold in local worldwide-patent grounding (prior art / IP), deduped by URL against
+  // the pool built so far (web + arXiv) — same treatment as arXiv above.
+  const localPatents = localPatentSources(q);
+  if (localPatents.length) {
+    const seen = new Set(pool.map((s) => s.url));
+    let added = 0;
+    for (const p of localPatents) {
+      if (p.url && !seen.has(p.url)) { pool.push(p); seen.add(p.url); added += 1; }
+    }
+    emit("observe", "local_patents", { found: localPatents.length, added });
   }
   emit("observe", "pool", { totalSources: pool.length });
 
