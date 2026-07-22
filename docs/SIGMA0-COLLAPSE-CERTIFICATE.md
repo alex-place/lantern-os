@@ -41,15 +41,24 @@ building it.
 outside expert has endorsed it. External review so far consists of the adversarial model passes
 and the operator review recorded in §8.7 and Appendix M — useful, but not peer review.
 
-**Novelty: none is claimed.** A three-way prior-art search (2026-07-07, recorded in §8.7–§8.8 and
-[ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md)) concluded the components are
-standard (TRPO, Gao, Dwork — ~97% confidence not novel), the framing has close prior art (ADOWIP,
-EvalStop, sealed-audit gating — ~90%), and what remains is a system-specific integration. The one
-open research question — §8.6 item 5 (incremental validity) — was **measured on 2026-07-07** (two
-pre-registered experiments, PR #2240): the internal signal adds detection power **only for gross
-degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2, decaying to +0.019 at
-n=5), and it **cannot substitute for fresh verified data at all** in the selection role (§8.4.1).
-The still-open cell is *subtle, training-induced* badness, which needs the real A/B/C artifacts.
+**Novelty: graded per item, never blanket** *(policy updated 2026-07-22; the former head-line
+"Novelty: none is claimed" was scoped only to Part II's components and read as more)*. The ladder:
+`NOT-NOVEL` — imported/standard, no claim (this correctly covers **Part II's components**: the
+three-way prior-art search of 2026-07-07, recorded in §8.7–§8.8 and
+[ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md), found TRPO/Gao/Dwork standard
+at ~97% confidence, framing close-prior-arted at ~90%). `CANDIDATE ★` — possibly novel, a bounded
+prior-art search is owed or incomplete; claimable only as a candidate. `AUDITED-CANDIDATE ✓` —
+survived a *recorded, bounded* search (the strongest status this document ever self-assigns;
+"proven novel" requires external review and is never self-declared). The 2026-07-17 overlooked-
+novelty audit ([#2690](https://github.com/alex-place/lantern-os/issues/2690)–[#2692](https://github.com/alex-place/lantern-os/issues/2692))
+is the precedent in *both* directions: it found claims to retire **and** unclaimed corners worth
+promoting. Per-item statuses live in the [formula registry](#the-mathematics--formula-registry).
+The one open research question — §8.6 item 5 (incremental validity) — was **measured on
+2026-07-07** (two pre-registered experiments, PR #2240): the internal signal adds detection power
+**only for gross degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2,
+decaying to +0.019 at n=5), and it **cannot substitute for fresh verified data at all** in the
+selection role (§8.4.1). The still-open cell is *subtle, training-induced* badness, which needs
+the real A/B/C artifacts.
 
 **"Machine-checked" here means:** closed-form algebra + numerical sweeps + `pytest` — **not** a
 Lean/Mathlib formal proof. Every use of the phrase in this document carries that meaning and no
@@ -110,7 +119,7 @@ Internal names are project identifiers, not claimed technical contributions:
 | | Section | Status |
 |---|---|---|
 | — | [Plain-language summary](#plain-language-summary) | the honest gist |
-| — | [**The mathematics — novel-math registry**](#the-mathematics--novel-math-registry) | formulas, status, provenance |
+| — | [**The mathematics — formula registry**](#the-mathematics--formula-registry) | formulas: epistemic + novelty status |
 | **I** | [Fast state `x`: the Collapse Certificate](#part-i--fast-state-x-the-collapse-certificate--proven-where-marked--machine-checked) — [§1 collapse-guarantee theorem](#1-the-collapse-guarantee-theorem) · [§2 trigger Σ₀](#2-the-collapse-trigger-σ₀) · [§3 anti-collapse Σ₀⁻¹](#3-the-anti-collapse-operator-σ₀¹) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 attractor graph](#5-global-structure-the-attractor-graph-g) · [§6 router demo](#6-demonstration-on-router-data) · [§7 ASI warning](#7-why-this-is-a-warning-against-asi) | **PROVEN** where marked |
 | **II** | [Slow weights `θ`: the Model-Update Acceptance Gate Σ_θ](#part-ii--slow-weights-θ-the-model-update-acceptance-gate-σ_θ--heuristic--imported-no-machine-checked-theorem) ([§8](#8-the-model-update-acceptance-gate-σ_θ)) | HEURISTIC + measured |
 | **III** | [Two-timescale composition](#part-iii--two-timescale-composition--target) ([§9](#9-composing-part-i-and-part-ii)) | TARGET |
@@ -190,14 +199,18 @@ flowchart LR
 
 ---
 
-## The mathematics — novel-math registry
+## The mathematics — formula registry
 
-Every formula this program runs on, with its **honest provenance**: `PROVEN` (machine-checked
-here), `MEASURED` (live numbers), `CONJECTURE` (stated + falsifiable, ledger test owed),
-`IMPORTED` (classical result; only the *application* is ours). Most entries are **novel
-applications of classical mathematics** — the candidate-novel items are marked ★. Issues
+Every formula this program runs on, with two independent labels. **Epistemic status:** `PROVEN`
+(machine-checked here) · `MEASURED` (live numbers) · `CONJECTURE` (stated + falsifiable, ledger
+test owed) · `IMPORTED` (classical result applied in-repo). **Novelty status** (graded ladder from
+the head-note — claims are made *when earned, per item*): `NOT-NOVEL` for anything imported;
+**`CANDIDATE ★`** = possibly novel, bounded prior-art search owed or incomplete;
+**`AUDITED-CANDIDATE ✓`** = survived a recorded bounded search. Today every starred item below is
+`CANDIDATE ★` — none has yet earned ✓; promotions happen only by a recorded search (the §8.7 /
+2026-07-17-audit precedent), and demotions are logged in Appendix C. Issues
 [#2786](https://github.com/alex-place/lantern-os/issues/2786)–[#2791](https://github.com/alex-place/lantern-os/issues/2791)
-carry the falsification plans; the registry is the single place to see what is actually claimed.
+carry the falsification plans.
 
 ### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
 ![collapse guarantee](assets/cert/rho-gate.svg)
@@ -2017,16 +2030,20 @@ for produced results and Appendix A for the original design sketch.*
 
 ## Appendix M — Provenance: maintenance log & closed-gap history
 
-> **2026-07-22 — white-paper restructure + novel-math registry.** Added the linked Contents
-> table, the loop diagram, and **"The mathematics — novel-math registry"** (R1–R11): every
-> formula rendered as an image (`docs/assets/cert/*.svg`, generator
-> `scripts/render_cert_formulas.py`) with honest provenance labels — PROVEN / MEASURED /
-> CONJECTURE / IMPORTED, ★ marking candidate-novel items. Three new entries from this date's
-> work: the anytime-valid e-process stop certificate (R8, imported via SEA 2607.00871), basin
-> determinism (R9, conjecture, measured by #2859), and the oracle objective (R10, definition).
-> Added **Appendix C — corrections register** consolidating every correction into one auditable
-> table (in-situ markers retained at point of claim). No theorem, status line, or measured
-> number was altered by this pass — structure and rendering only.
+> **2026-07-22 — white-paper restructure + formula registry + novelty-policy calibration.**
+> Added the linked Contents table, the loop diagram, and **"The mathematics — formula registry"**
+> (R1–R11): every formula rendered as an image (`docs/assets/cert/*.svg`, generator
+> `scripts/render_cert_formulas.py`) with **two independent labels** — epistemic status
+> (PROVEN / MEASURED / CONJECTURE / IMPORTED) and novelty status (NOT-NOVEL / CANDIDATE ★ /
+> AUDITED-CANDIDATE ✓). Same day, operator-directed: the 2026-07-07 head-line **"Novelty: none is
+> claimed" was replaced by the graded per-item ladder** — it was scoped to Part II's components
+> but read as a whole-document surrender; novelty is now claimed *when earned, per item*
+> (all current ★ items are unaudited candidates; promotions only via recorded bounded search).
+> Three new registry entries from this date's work: the anytime-valid e-process stop certificate
+> (R8, imported via SEA 2607.00871), basin determinism (R9, conjecture, #2859), and the oracle
+> objective (R10, definition). Added **Appendix C — corrections register** consolidating every
+> correction into one auditable table (in-situ markers retained at point of claim). No theorem,
+> status line, or measured number was altered by this pass.
 
 > Moved here from the document head on 2026-07-07 for readability. Unedited, chronological.
 > This is the anti-drift record: each entry is an external-reality reconcile pass (fresh test
