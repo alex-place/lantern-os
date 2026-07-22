@@ -2,14 +2,14 @@
 
 Two convergence records from grounding the "serve our own transformer" design against mid-2026
 SOTA and against our own measurement. Format: [hypothesis → evidence → result → confidence →
-source]. Backs [ADR-0021](../adr/0021-serving-substrate-retain-ouro-custom-loop.md).
+source]. Backs [ADR-0021](../../adr/0021-serving-substrate-retain-ouro-custom-loop.md).
 
 ## Record 1 — serving substrate
 
 - **Hypothesis:** moving Ouro to a production serving engine (vLLM/SGLang/llama.cpp) is the way
   to fix DEEP mode's ~1 s/token and harden serving.
 - **Evidence:** web sweep, 4 lenses, adversarial re-fetch of 10 load-bearing claims, 0 refuted
-  ([memo](2026-07-04-serving-design-sota.md)). vLLM's `ouro.py` runs a **fixed** 4-loop and never
+  ([memo](../../research/2026-07-04-serving-design-sota.md)). vLLM's `ouro.py` runs a **fixed** 4-loop and never
   calls its `early_exit_gate` (source-verified twice); Ouro card confirms vLLM always runs all
   steps; vLLM #37668 (open, Mar 2026) confirms adaptive exit unimplemented; TGI archived;
   TensorRT-LLM dropped Windows; llama.cpp/ExLlamaV3 have no Ouro arch; no engine exposes mid-layer

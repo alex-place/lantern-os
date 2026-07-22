@@ -3,18 +3,18 @@
 **Date:** 2026-07-01
 **Status:** research result (measured) — negative/inconclusive, with a clear methodological cause identified.
 **Loop stages:** Verify (the leak).
-**Harness:** [`experiments/surprise_leak_layer2_canary.js`](../../experiments/surprise_leak_layer2_canary.js)
+**Harness:** [`experiments/surprise_leak_layer2_canary.js`](../../../experiments/surprise_leak_layer2_canary.js)
 
 ## What was tested
 
 #1679's exact question: does feeding `modelUncertainty` into
-[`groundedness-canary.js`](../../apps/lantern-garage/lib/groundedness-canary.js)'s risk score
+[`groundedness-canary.js`](../../../apps/lantern-garage/lib/groundedness-canary.js)'s risk score
 improve hallucination **detection** (recall/FPR through the real, shipped canary) vs the
 text-only baseline it runs today with `SURPRISE_CANARY` off?
 
 No new model generation was needed. The Layer-1 result files
 (`experiments/results/surprise_leak_{qwen15b,mistral7b}.jsonl`, from
-[the Layer-1 result](2026-06-30-surprise-leak-layer1-result.md)) already carry, per example: the
+[the Layer-1 result](../../research/2026-06-30-surprise-leak-layer1-result.md)) already carry, per example: the
 generated reply text (`prediction`), the hallucination label, and the exact `surpriseField`
 shape (`{nTokens, meanBits, p90Bits, maxBits, tailMass}`) the canary's `toUncertainty()` consumes.
 The harness calls the real `scoreReplyGroundedness()` twice per row — once with
@@ -29,7 +29,7 @@ calibration (#1681) — at the canary's own default threshold (0.5, no tuning).
 | mistral:7b | 199 | 187 (94.0%) | 12 | 1.0000 / 1.0000 | 1.0000 / 1.0000 | +0.0000 / +0.0000 |
 
 Zero measurable change from the surprise signal, on both datasets. Full confusion-matrix
-counts + report: [`experiments/results/surprise_leak_layer2_canary_report.json`](../../experiments/results/surprise_leak_layer2_canary_report.json).
+counts + report: [`experiments/results/surprise_leak_layer2_canary_report.json`](../../../experiments/results/surprise_leak_layer2_canary_report.json).
 
 ## Why — two independent, both fatal for this dataset
 
