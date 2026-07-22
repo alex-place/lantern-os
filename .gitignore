@@ -543,3 +543,4 @@ apps/lantern-garage/data/profiles/
 apps/lantern-garage/data/lantern-garage/trading/trader-state.json
 data/lantern-garage/trading/trader-state.json
 experiments/deep_history.json
+experiments/v1_10_toy/linked-records.sample.jsonl
