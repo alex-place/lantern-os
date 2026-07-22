@@ -193,6 +193,25 @@ phase emits ConvergenceRecords either way — honest nulls included.
 Toy harness: `experiments/v1_10_toy/` (PR #2849). Full design tracked as epic
 [#2841](https://github.com/alex-place/lantern-os/issues/2841).
 
+## 6a. Design principle — deterministic from the outside (operator directive, 2026-07-22)
+
+**Variance is for the inside; determinism is for the outside.** Σ₀ behaves like a bandit that has
+converged: exploration (sampling, best-of-N, tier/route search) happens *inside* the loop and is
+consumed by the verifier; the user always sees the greedy arm. The invariant (M1 in product form):
+
+> **The answer is a function of (question, verified knowledge) — never of the sampling path.**
+> An answer may change only when evidence changes (or on a logged version bump), and the change
+> carries its receipt. Re-asking is not re-rolling.
+
+Mechanisms (each maps to an existing component): serve converged answers **from the ledger, not
+the dice** (the convergence-record serving path — the one missing piece); greedy decoding as the
+assistant default; sample-inside/select-by-verifier (spiral + probe-gate argmax); bandit-converged
+routing pinned until a regret signal (generalize `convergence-router`); an **answer-stability
+canary** (re-ask K canonical questions daily; instability without an evidence-delta = drift alarm —
+a new M3 axis). Scope honesty: product-level determinism (same visible answer), not bitwise GPU
+determinism. A deterministically-wrong answer is a *feature*: it is a mineable, fixable record —
+RNG-wrong is unfixable fog.
+
 ## 6b. Citation grounding (full-text verified)
 All external claims in this doc were verified against full source text on 2026-07-22 — see the
 **[grounding ledger + patent landscape](research/2026-07-22-grounding-ledger-and-patent-landscape.md)**
