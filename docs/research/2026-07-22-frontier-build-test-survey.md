@@ -150,11 +150,16 @@ stack** — de-glossed SFT → DPO on honesty preferences → **RLVR with the du
 mix (G3), dedup/filtering (G4), and the eval-power gate (G5) as hard preconditions. The wheel is
 already round; our contribution is the verifier bolted to it, not a new wheel.
 
-## 5. Review asks (founder decisions)
-1. **G1:** permit on-policy logit distillation *for the student tier only*, exec-gate retained? (Qwen3 + DeepSeek-V4 evidence vs. our ban)
-2. **G10:** formally demote ADR-0024 Phase-3 from-scratch to research-option? (Post-training = 15–25% of frontier compute is the participatable stage.)
-3. Approve reshaping v1.10 §6 to the standard-stack topology (§4 above), with the DeepSeek-V4 expert→consolidate shape as the reference: domain-expert honesty tune → consolidate by on-policy distillation → dual-verifier audit?
-4. **G11:** add a gates-off eval arm to every promotion run?
+## 5. Review asks — RULED (Alex, 2026-07-22)
+1. **G1: ✅ APPROVED (compromise).** Exec-verification stays the non-negotiable gate on every
+   training target; on-policy logit distillation permitted as the *transport* for the
+   student/serving tier only. Recorded in the ADR-0024 amendment.
+2. **G10: ✅ APPROVED.** ADR-0024 Phase-3 (from-scratch frontier) **retired** to research-option.
+3. **✅ APPROVED via "map out new phases":** v1.10 §6 replaced with the phase map **V0–V4**
+   (foundations → honest teacher → verifier-rewarded RL with dose-response → consolidate/distill →
+   research option). See [AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md §6](../AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md).
+4. **G11:** folded into Phase V0 (gates-off arm in the eval harness) — implicitly approved with
+   the phase map; flag at V0 review if that reading is wrong.
 
 *Logged for review; no design docs modified pending answers. Sources: primary reports
 [2412.19437](https://arxiv.org/pdf/2412.19437) · [2505.09388](https://arxiv.org/pdf/2505.09388) ·

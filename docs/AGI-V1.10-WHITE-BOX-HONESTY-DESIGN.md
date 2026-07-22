@@ -115,20 +115,61 @@ legal opinion.)
    never agreement alone. Gekhman ([2405.05904], cited in the Spiral) shows SFT on unverified data
    raises hallucination.
 
-## 6. Proof before scale (the founder gate)
+## 6. The phase map (operator-approved 2026-07-22; replaces the old proof-gate list)
 
-No from-scratch spend (ADR-0024) until the mechanism is shown on **open weights**, cheaply:
+**Rulings recorded** (see [survey §5](research/2026-07-22-frontier-build-test-survey.md) and the
+ADR-0024 amendment): **G1 compromise approved** — exec-verification is the non-negotiable *gate* on
+every training target; on-policy logit distillation is permitted as the *transport* for the
+student/serving tier only. **ADR-0024 Phase-3 (from-scratch frontier) retired** to research-option.
+The program is now a **post-training program on open weights**, shaped like the 2026 standard stack
+(survey §1/§1b), with our dual verifier bolted on where the labs put their reward oracle.
 
-1. **Dual-verifier ablation** (issue [#2847](https://github.com/alex-place/lantern-os/issues/2847)):
-   Arm A imitation-distilled vs Arm B self-generated-then-verified, on a contamination-free held-out
-   verifier set. Decisive signal = **dose-response** (does Arm B's lead grow with verified data?).
-2. **Probe re-validation** (issue [#2845](https://github.com/alex-place/lantern-os/issues/2845)):
-   de-glossed AUROC ≥ 0.75 at some available open scale (1.4B → 7B ladder), and **survives the
-   ternary artifact**. The toy already shows 0.5B fails this — consistent with
-   [2510.09033](https://arxiv.org/pdf/2510.09033); the open question is the crossover scale.
-3. **Approve** the pilot only on a positive, growing dose-response curve **and** a probe that clears
-   0.75 de-glossed post-ternary. Otherwise down-scope or kill — for the price of L4-hours, not a
-   cluster.
+### Phase V0 — Foundations (no training; the hard preconditions)
+*Everything here is cheap, parallel, and blocks everything below.*
+- **Eval power** (survey G5): build the honesty eval to **≥140 held-out de-glossed negatives**
+  (±5pp resolution; ~203 for ±3pp per SIGMA0-MODEL-DESIGN), pre-registered protocol, 13-gram
+  decontamination extended to honesty sets. Add the **gates-off arm** (G11) to the harness.
+- **Corpus** (issues [#2842](https://github.com/alex-place/lantern-os/issues/2842)/[#2843](https://github.com/alex-place/lantern-os/issues/2843),
+  survey G3/G4): mine all 243 sessions + full PR history (incl. reverts) into both-class records;
+  de-gloss lint; MinHash dedup + perplexity filter; **anchor mix ≥60% general data in every future
+  train**; LOSO splits.
+- **Probe re-validation** (issue [#2845](https://github.com/alex-place/lantern-os/issues/2845)):
+  scale ladder 1.4B → 7B, de-glossed, *including* an associated-hallucination set per
+  [2510.09033](https://arxiv.org/pdf/2510.09033).
+- **Kill-gate V0:** if the de-glossed probe never clears **AUROC ≥ 0.75** at any affordable open
+  scale, the white-box audit is demoted from verifier to telemetry and §2 is redesigned.
+
+### Phase V1 — Honest teacher (first spend; open weights, 7B-class)
+- De-glossed SFT (anchored mix) → **DPO on honesty preferences** (assert/abstain pairs from the
+  both-class corpus). muP-style lr transfer (G6) — no hand-tuned lr.
+- **Kill-gate V1:** beats base on confabulation at equal golden accuracy on the powered eval, CI
+  excluding zero, gates-off arm reported. Fail → stop; the thesis is refuted cheaply.
+
+### Phase V2 — Verifier-rewarded RL (the owned stage; the dose-response proof)
+- GRPO/RLVR where the **reward oracle is the dual verifier**: exec/citation output check +
+  abstention-aware ternary reward (+1 correct / 0 abstain / −λ error,
+  [2511.11500](https://arxiv.org/abs/2511.11500)). The **probe stays off-gradient** — audit only,
+  re-trained per candidate (anti-Goodhart).
+- Run the **Arm A (imitation) vs Arm B (verified) dose-response** here
+  (issue [#2847](https://github.com/alex-place/lantern-os/issues/2847)).
+- **Kill-gate V2:** Arm B beats Arm A with a lead that *grows* with verified-data dose. Flat or
+  shrinking → the verified-data moat thesis is dead; say so and stop.
+
+### Phase V3 — Consolidate & distill to the serving tier (G1 compromise applied)
+- **On-policy distillation** (the approved transport; DeepSeek-V4/Qwen3 shape) from the V2 teacher
+  into the student (1.4B–4B class), anchored mix, every training target still exec/citation-gated.
+- Student passes the **probe audit** (internal honesty) and converts to the **ternary artifact**
+  (ADR-0026); named acceptance test: the probe must survive ternary quantization
+  ([2606.02628](https://arxiv.org/abs/2606.02628) only proves 4-bit).
+- Ships with a **model card** (G7): powered-eval results, gates-off results, known regressions
+  stated plainly.
+
+### Phase V4 — research option, unfunded (the retired from-scratch tier)
+- Reopened only on evidence from V1–V3 that a pretraining-level intervention is *necessary* (e.g.
+  the honesty property provably cannot be instilled post-hoc), per the ADR-0024 amendment.
+
+**Sequencing:** V0 now; V1 after V0's gates; V2 after V1; V3 after V2's curve is positive. Each
+phase emits ConvergenceRecords either way — honest nulls included.
 
 Toy harness: `experiments/v1_10_toy/` (PR #2849). Full design tracked as epic
 [#2841](https://github.com/alex-place/lantern-os/issues/2841).
