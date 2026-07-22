@@ -206,9 +206,12 @@ Every formula this program runs on, with two independent labels. **Epistemic sta
 test owed) · `IMPORTED` (classical result applied in-repo). **Novelty status** (graded ladder from
 the head-note — claims are made *when earned, per item*): `NOT-NOVEL` for anything imported;
 **`CANDIDATE ★`** = possibly novel, bounded prior-art search owed or incomplete;
-**`AUDITED-CANDIDATE ✓`** = survived a recorded bounded search. Today every starred item below is
-`CANDIDATE ★` — none has yet earned ✓; promotions happen only by a recorded search (the §8.7 /
-2026-07-17-audit precedent), and demotions are logged in Appendix C. Issues
+**`AUDITED-CANDIDATE ✓`** = survived a recorded bounded search. Promotions happen only by a
+recorded search (the §8.7 / 2026-07-17-audit precedent); demotions and scope-shrinks are logged in
+Appendix C. Current state: **R3 and R9 hold ✓** (audits [#2860](https://github.com/alex-place/lantern-os/issues/2860),
+[#2861](https://github.com/alex-place/lantern-os/issues/2861), 2026-07-22 — both promoted with
+*narrowed* scope, which is the ladder working as intended); all other starred items remain
+unaudited `CANDIDATE ★`. Issues
 [#2786](https://github.com/alex-place/lantern-os/issues/2786)–[#2791](https://github.com/alex-place/lantern-os/issues/2791)
 carry the falsification plans.
 
@@ -224,11 +227,15 @@ thresholds by 𝒦(A) closes the certificate's non-normal gap (§4, [#2789](http
 Fielded cross-domain precedent: Iterative Learning Control's contraction requirement (patent
 landscape, 2026-07-22).
 
-### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` ★
+### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE
 ![no-free-confidence](assets/cert/m1-nofreeconf.svg)
 Justified confidence rises only with external evidence; absent it, confidence is a
 **supermartingale** (can only drift down). The anti-runaway invariant ([#2786](https://github.com/alex-place/lantern-os/issues/2786));
-longitudinal ledger test owed.
+longitudinal ledger test owed. **Novelty scope (audit [#2860](https://github.com/alex-place/lantern-os/issues/2860),
+~70%):** the martingale *core* is classical (Doob/CEE) and the *diagnostic* use is taken
+(Martingale Score, 2512.02914); the audited candidate is strictly **M1-as-enforced-runtime-gate**
+wired to the convergence ledger — the nearest gate framework (2607.13070) was full-text checked
+and carries no such invariant.
 
 ### R4 · M2 — the EOQ re-grounding cadence `CONJECTURE · EOQ IMPORTED` ★application
 ![eoq cadence](assets/cert/m2-eoq.svg)
@@ -257,12 +264,17 @@ E-process monitoring stays valid under *optional stopping* — the statistical f
 monitors must take for an **indefinite** spiral (source: SEA, arXiv:2607.00871; Ramdas-school
 e-values). Without it, "check whenever you like" silently inflates false alarms.
 
-### R9 · Basin determinism `CONJECTURE` ★ — new 2026-07-22
+### R9 · Basin determinism `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE (low-confidence) — new 2026-07-22
 ![basin determinism](assets/cert/basin-determinism.svg)
 Same-intent paraphrases must contract into the **same fixed point** — the model-level form of
 "deterministic from the outside" (v1.10 §6a/6c; measured by the answer-stability canary,
 [#2859](https://github.com/alex-place/lantern-os/issues/2859)). Temperature-0 gives only *point*
-determinism; this is the *basin* upgrade.
+determinism; this is the *basin* upgrade. **Novelty scope (audit [#2861](https://github.com/alex-place/lantern-os/issues/2861),
+~55–60% — crowded neighborhood):** four adjacent lanes occupied (paraphrase-attractor analysis
+2502.15208; Lyapunov same-basin certification in DEQs 2304.12707; output-level consistency
+training 2510.14242; depth-consistency in looped LMs 2602.11451). The surviving sliver is
+**semantic-intent basin identity as a training objective + measured product contract**; a
+second-round audit may kill it.
 
 ### R10 · The oracle objective `DEFINITION` — new 2026-07-22
 ![oracle objective](assets/cert/oracle-objective.svg)
@@ -2025,6 +2037,8 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected-review-hit-1) |
 | 2026-07-17 | §8.6 "no prior art for internal-state checkpoint monitors" | **stale** — the detection lane is occupied (2601.16874, 2602.10144, 2604.19884); only the *incremental* ΔAUC design may remain unique | §8.6 item 5 |
 | 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | [grounding ledger](research/2026-07-22-grounding-ledger-and-patent-landscape.md) |
+| 2026-07-22 | R3 (M1) filed as if the *inequality itself* might be novel | **scope shrunk on audit** — martingale core classical (Doob/CEE), diagnostic use taken (2512.02914); only the *enforced-runtime-gate* form promoted ✓ at ~70% | [#2860](https://github.com/alex-place/lantern-os/issues/2860) |
+| 2026-07-22 | R9 (basin determinism) filed broad | **scope shrunk on audit** — four adjacent lanes occupied; only *semantic-intent basin identity as objective + product contract* promoted ✓ at ~55–60%, flagged killable on second round | [#2861](https://github.com/alex-place/lantern-os/issues/2861) |
 
 ---
 
