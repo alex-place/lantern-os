@@ -120,6 +120,7 @@ Internal names are project identifiers, not claimed technical contributions:
 |---|---|---|
 | — | [Plain-language summary](#plain-language-summary) | the honest gist |
 | — | [**The mathematics — formula registry**](#the-mathematics--formula-registry) | formulas: epistemic + novelty status |
+| — | [**The loop, stage by stage**](#the-loop-stage-by-stage--each-stages-certificate-objects-research-and-open-front) | Observe · Remember · Reason · Act · Verify · Converge — each stage's objects, research, open front |
 | **I** | [Fast state `x`: the Collapse Certificate](#part-i--fast-state-x-the-collapse-certificate--proven-where-marked--machine-checked) — [§1 collapse-guarantee theorem](#1-the-collapse-guarantee-theorem) · [§2 trigger Σ₀](#2-the-collapse-trigger-σ₀) · [§3 anti-collapse Σ₀⁻¹](#3-the-anti-collapse-operator-σ₀¹) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 attractor graph](#5-global-structure-the-attractor-graph-g) · [§6 router demo](#6-demonstration-on-router-data) · [§7 ASI warning](#7-why-this-is-a-warning-against-asi) | **PROVEN** where marked |
 | **II** | [Slow weights `θ`: the Model-Update Acceptance Gate Σ_θ](#part-ii--slow-weights-θ-the-model-update-acceptance-gate-σ_θ--heuristic--imported-no-machine-checked-theorem) ([§8](#8-the-model-update-acceptance-gate-σ_θ)) | HEURISTIC + measured |
 | **III** | [Two-timescale composition](#part-iii--two-timescale-composition--target) ([§9](#9-composing-part-i-and-part-ii)) | TARGET |
@@ -286,6 +287,77 @@ cost**. Coverage alone argmaxes to the confident bluffer — the honesty constra
 ![fix rate](assets/cert/fix-rate.svg)
 The Act-stage verifier metric: net tests fixed minus regression penalty. Live in the Spiral
 (ADR-0030); the escalation corpus it emits is the VTD training fuel.
+
+---
+
+## The loop, stage by stage — each stage's certificate objects, research, and open front
+
+*(The registry above is organized by formula; this section is the same content organized by the
+CLAUDE.md loop — every stage has a place here, its own research base, and its open question.)*
+
+### OBSERVE — contact with external reality
+**Certificate role:** the evidence input `u` in `ẋ = f(x,u,θ)` — every guarantee below is
+conditional on this stage delivering fresh truth; R8 (anytime-valid) governs when observation may
+*stop*. **Research base:** bounded-context externalized state for indefinite horizons (InfiAgent /
+Self-GC 2607.00692 / AgentFold — [conv-engine note](research/2026-07-22-sigma0-math-convergence-engine.md));
+the current frontier generation pretrains on *agentic execution traces* (DeepSeek-V4, [survey §1b](research/2026-07-22-frontier-build-test-survey.md)).
+**In-repo:** the verified-event miners (1,842 PR/ledger records; sessions pending Vertex);
+arXiv corpus + patent harvester. **Open:** [#2852](https://github.com/alex-place/lantern-os/issues/2852).
+
+### REMEMBER — knowledge in and outside the weights
+**Certificate objects:** R4/M2 (EOQ re-grounding clocks — *the* cost lever for indefinite
+operation). **Research base:** memory staleness is unsolved at the tooling level (2026 surveys);
+forgetting-curve replay (FOREVER); the memory-update gap (Supersede 2606.27472); the
+surrogate-leash discipline (US8131656B2: trust the cheap check only while re-fit against ground
+truth). **In-repo:** CSF memory + wired recall (+22pp@5 measured); the canonical ledger (M1-clean,
+first replay 2026-07-22: 0 free rises / 48 pairs); serve-from-ledger planned
+([#2859](https://github.com/alex-place/lantern-os/issues/2859)).
+**Open:** [#2853](https://github.com/alex-place/lantern-os/issues/2853) ·
+[#2787](https://github.com/alex-place/lantern-os/issues/2787) ledger test.
+
+### REASON — the kernel and its halting
+**Certificate objects:** R1 (ρ(J)<1, **PROVEN**) · R2 (Kreiss thresholds) · R9 (basin
+determinism ✓). **Research base:** looped/equilibrium models (Ouro 2510.25741; FPRM 2606.18206;
+Equilibrium Reasoners 2605.21488; STARS 2605.26733); four decades of Iterative Learning Control
+(patents US7345448B2/US8094405B1 — contraction or divergence, no third fate). **In-repo:** the
+Ouro kernel's `converge`/`accel` exits are equilibrium halting (v1.10 §6c); the probe ladder
+measured truth linearly decodable at 7B (factual 1.000 / assoc 0.924, on-box). **Open:**
+[#2854](https://github.com/alex-place/lantern-os/issues/2854) Kreiss-safe halting;
+paraphrase-contraction training (R9 second-round audit risk, [#2861](https://github.com/alex-place/lantern-os/issues/2861)).
+
+### ACT — tools, execution, the cascade
+**Certificate objects:** R6/M5 (water-filling budget) · R11 (Fix-Rate, **MEASURED live**).
+**Research base:** decision-theoretic cascades (2605.06350; UCCI 2605.18796; Shadow Price
+2606.03092 ≈ M5's water level); the escalation-contract patents (hierarchical assay US6013436A:
+cheapest-test-first, pass terminates; bidirectional tiering US7254641B2: *de*-escalate when easy);
+ILC re-parameterizing the cheap tier (US6686716B1 = the VTD flywheel's servo precedent).
+**In-repo:** the Spiral shipped (ADR-0030; 18/18 MBPP at 6% escalation; strong cheap tier 8.3×
+cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator;
+stop-on-stall + de-escalation quick wins ([backlog](research/2026-07-22-cross-domain-incremental-backlog.md)).
+
+### VERIFY — the certificate's home (Part I lives here)
+**Certificate objects:** R3/M1 (✓ audited; **first ledger replay 2026-07-22: M1-clean — 1
+evidence-backed rise, 0 free rises across 48 pairs**; instrument
+`experiments/v1_10_toy/m1_ledger_check.py`) · R7/M6 (lasing kill) · R5/M3 (canary axes; hard
+cadence necessary) · R8 (anytime-valid e-cert) · the white-box probe as verifier (0.92–1.00
+measured on-box, 4-bit). **Research base:** hidden-state probing (2606.02628, replicated here) with
+its honest scope limit (2510.09033); agent drift (2601.04170); gates-off snapshot testing as
+frontier practice (Opus 4.6 card). **In-repo:** exec-verify sandbox; the powered honesty eval
+(162 held-out negatives + gates-off arm); the M1 replay instrument. **Open:**
+[#2856](https://github.com/alex-place/lantern-os/issues/2856) · wire M1 as an *enforced* gate ·
+probe survival at 1.58-bit (V3 acceptance test).
+
+### CONVERGE — promotion, the ratchet, determinism
+**Certificate objects:** R10 (the oracle objective — coverage s.t. calibrated honesty at bounded
+cost) · the Σ_θ acceptance gate (Part II) · basin determinism as the product contract
+(serve-from-ledger, [#2859](https://github.com/alex-place/lantern-os/issues/2859)). **Research
+base:** assembly-by-distillation is the frontier norm (Qwen3 strong-to-weak; DeepSeek-V4
+expert→consolidate); merging is <1% (2511.21437); anytime-valid self-evolution (SEA 2607.00871).
+**In-repo:** the VTD dose-response (−6 → ±0, crossover pending scale); the V1 honest-teacher chain
+(running; verdict → [#2850](https://github.com/alex-place/lantern-os/issues/2850)); the
+escalation-rate-only-falls design. **Open:**
+[#2857](https://github.com/alex-place/lantern-os/issues/2857) unified control law ·
+[#2847](https://github.com/alex-place/lantern-os/issues/2847) V2 dose-response kill-gate.
 
 ---
 
