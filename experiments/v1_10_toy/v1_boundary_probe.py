@@ -30,8 +30,12 @@ def gold_answer(ans):
 
 
 def model_answer(text):
-    nums = re.findall(r"-?\d[\d,]*\.?\d*", text.replace(",", ""))
-    return nums[-1].strip() if nums else None
+    # Decimal part only when digits follow the dot — otherwise the sentence period of the
+    # mandated format "The answer is 72." is captured into the number ("72." != "72"),
+    # marking CORRECT answers wrong (measured: this artifact suppressed running-acc to ~0.24
+    # and would have mislabeled the Gekhman boundary; tests/test_v1_boundary_parse.py).
+    nums = re.findall(r"-?\d[\d,]*(?:\.\d+)?", text)
+    return nums[-1].replace(",", "").strip() if nums else None
 
 
 def main():
@@ -84,6 +88,7 @@ def main():
             "id": f"bnd-gsm8k-{i:04d}", "question": q, "gold": gold,
             "model_correct": bool(ok),
             "target": gen.strip() if ok else "I don't know.",
+            "gen": gen.strip(),  # raw generation kept ALWAYS — makes future re-labeling free
             "honesty_class": "assert" if ok else "abstain",
             "source": "gsm8k-boundary", "meta": {"verifier": "numeric-exact-match", "model": a.model},
         })
