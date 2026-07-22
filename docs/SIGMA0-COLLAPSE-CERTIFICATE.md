@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-21
+updated: 2026-07-22
 ---
 
 # Σ — The Convergence Certificate
@@ -107,11 +107,18 @@ Internal names are project identifiers, not claimed technical contributions:
 
 ## Contents
 
-**Part I** (§0–§7) — fast state `x`: the collapse certificate *(PROVEN where marked)* ·
-**Part II** (§8) — slow weights `θ`: the Model-Update Acceptance Gate *(HEURISTIC + imported;
-simulation-measured)* · **Part III** (§9) — two-timescale composition *(TARGET)* ·
-**Part IV** (§10) — the active face: grounding as capability *(DESIGN / TARGET — no theorem)* ·
-References · Appendix A (historical design sketch) · Appendix M (provenance: maintenance log).
+| | Section | Status |
+|---|---|---|
+| — | [Plain-language summary](#plain-language-summary) | the honest gist |
+| — | [**The mathematics — novel-math registry**](#the-mathematics--novel-math-registry) | formulas, status, provenance |
+| **I** | [Fast state `x`: the Collapse Certificate](#part-i--fast-state-x-the-collapse-certificate--proven-where-marked--machine-checked) — [§1 collapse-guarantee theorem](#1-the-collapse-guarantee-theorem) · [§2 trigger Σ₀](#2-the-collapse-trigger-σ₀) · [§3 anti-collapse Σ₀⁻¹](#3-the-anti-collapse-operator-σ₀¹) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 attractor graph](#5-global-structure-the-attractor-graph-g) · [§6 router demo](#6-demonstration-on-router-data) · [§7 ASI warning](#7-why-this-is-a-warning-against-asi) | **PROVEN** where marked |
+| **II** | [Slow weights `θ`: the Model-Update Acceptance Gate Σ_θ](#part-ii--slow-weights-θ-the-model-update-acceptance-gate-σ_θ--heuristic--imported-no-machine-checked-theorem) ([§8](#8-the-model-update-acceptance-gate-σ_θ)) | HEURISTIC + measured |
+| **III** | [Two-timescale composition](#part-iii--two-timescale-composition--target) ([§9](#9-composing-part-i-and-part-ii)) | TARGET |
+| **IV** | [The active face: grounding as capability](#part-iv--the-active-face-grounding-as-capability-not-only-safety--design--target--no-theorem) ([§10](#10-from-anti-collapse-to-ceiling-break)) | DESIGN |
+| — | [References](#references-lineage) | lineage |
+| A | [Appendix A — historical design sketch](#appendix-a-router-demonstration-design-original-sketch) | historical |
+| C | [Appendix C — corrections register (consolidated)](#appendix-c--corrections-register-consolidated) | the receipts |
+| M | [Appendix M — provenance & maintenance log](#appendix-m--provenance-maintenance-log--closed-gap-history) | provenance |
 
 ---
 
@@ -163,6 +170,97 @@ alarm for gross breakage exactly when outside tests are scarce (measured on one 
 
 > **For the precise version, read on.** Each section carries its own status line.
 > The summary above is the honest gist, not a substitute for the math.
+
+**Where each piece of math bites in the loop:**
+
+```mermaid
+flowchart LR
+    O[Observe] --> R[Remember]
+    R --> RS[Reason]
+    RS --> A[Act]
+    A --> V[Verify]
+    V --> C[Converge]
+    C --> O
+    R -.->|"M2: EOQ re-grounding clock"| V
+    RS -.->|"ρ(J)<1 + Kreiss halting"| RS
+    A -.->|"M5: water-filling budget"| A
+    V -.->|"M1 no-free-confidence · M6 lasing kill · M3 canary axes · anytime-valid e-cert"| C
+    C -.->|"basin determinism: serve the converged answer"| O
+```
+
+---
+
+## The mathematics — novel-math registry
+
+Every formula this program runs on, with its **honest provenance**: `PROVEN` (machine-checked
+here), `MEASURED` (live numbers), `CONJECTURE` (stated + falsifiable, ledger test owed),
+`IMPORTED` (classical result; only the *application* is ours). Most entries are **novel
+applications of classical mathematics** — the candidate-novel items are marked ★. Issues
+[#2786](https://github.com/alex-place/lantern-os/issues/2786)–[#2791](https://github.com/alex-place/lantern-os/issues/2791)
+carry the falsification plans; the registry is the single place to see what is actually claimed.
+
+### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
+![collapse guarantee](assets/cert/rho-gate.svg)
+Ungrounded self-update contracts to a frozen fixed point (or diverges) — no third fate. Classical
+Lyapunov/Banach machinery; the *certificate quantities and tests* (§1, 46/46 green) are ours.
+
+### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE · theorem IMPORTED` ★application
+![kreiss](assets/cert/kreiss.svg)
+The Kreiss matrix theorem bounds transient growth of non-normal systems; inflating canary
+thresholds by 𝒦(A) closes the certificate's non-normal gap (§4, [#2789](https://github.com/alex-place/lantern-os/issues/2789)).
+Fielded cross-domain precedent: Iterative Learning Control's contraction requirement (patent
+landscape, 2026-07-22).
+
+### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` ★
+![no-free-confidence](assets/cert/m1-nofreeconf.svg)
+Justified confidence rises only with external evidence; absent it, confidence is a
+**supermartingale** (can only drift down). The anti-runaway invariant ([#2786](https://github.com/alex-place/lantern-os/issues/2786));
+longitudinal ledger test owed.
+
+### R4 · M2 — the EOQ re-grounding cadence `CONJECTURE · EOQ IMPORTED` ★application
+![eoq cadence](assets/cert/m2-eoq.svg)
+Each fact re-verifies on its own optimal clock from its measured decay rate ρ — the cost lever
+that makes indefinite operation affordable (§3.1, [#2787](https://github.com/alex-place/lantern-os/issues/2787)).
+
+### R5 · M3 — the indistinguishability lemma `REFUTED-AS-DICHOTOMY → LEMMA`
+![indistinguishability](assets/cert/m3-indist.svg)
+The candidate completeness theorem was numerically refuted; what survives is stronger in practice:
+ungrounded traces exist that match grounded statistics on *every* passive monitor — therefore a
+**hard re-grounding cadence is necessary**, not optional ([#2788](https://github.com/alex-place/lantern-os/issues/2788)).
+
+### R6 · M5 — water-filling grounding allocation `CONJECTURE · KKT IMPORTED` ★application
+![water-filling](assets/cert/m5-waterfill.svg)
+Budget flows to sub-goals by marginal value-of-information; the water level μ is the shadow price.
+Novelty audit owed vs. the 2026 economic-allocation literature ([#2790](https://github.com/alex-place/lantern-os/issues/2790)).
+
+### R7 · M6 — the lasing threshold `CONJECTURE` ★
+![lasing threshold](assets/cert/m6-lasing.svg)
+A mode with gain over leak and **zero coupling to external innovation** grows without bound — the
+quantitative kill-condition for confident-but-unanchored runaway ([#2791](https://github.com/alex-place/lantern-os/issues/2791)).
+
+### R8 · Anytime-valid stopping certificate `IMPORTED (e-processes)` — new 2026-07-22
+![anytime e-value](assets/cert/anytime-evalue.svg)
+E-process monitoring stays valid under *optional stopping* — the statistical form the M1/M6
+monitors must take for an **indefinite** spiral (source: SEA, arXiv:2607.00871; Ramdas-school
+e-values). Without it, "check whenever you like" silently inflates false alarms.
+
+### R9 · Basin determinism `CONJECTURE` ★ — new 2026-07-22
+![basin determinism](assets/cert/basin-determinism.svg)
+Same-intent paraphrases must contract into the **same fixed point** — the model-level form of
+"deterministic from the outside" (v1.10 §6a/6c; measured by the answer-stability canary,
+[#2859](https://github.com/alex-place/lantern-os/issues/2859)). Temperature-0 gives only *point*
+determinism; this is the *basin* upgrade.
+
+### R10 · The oracle objective `DEFINITION` — new 2026-07-22
+![oracle objective](assets/cert/oracle-objective.svg)
+The asymptote the engine climbs: **maximize coverage subject to calibrated honesty at bounded
+cost**. Coverage alone argmaxes to the confident bluffer — the honesty constraint is constitutive
+(Kalai proper-scoring lineage; convergence-engine research note, 2026-07-22).
+
+### R11 · The Fix-Rate ratchet `MEASURED (live)` ★
+![fix rate](assets/cert/fix-rate.svg)
+The Act-stage verifier metric: net tests fixed minus regression penalty. Live in the Spiral
+(ADR-0030); the escalation corpus it emits is the VTD training fuel.
 
 ---
 
@@ -1896,7 +1994,39 @@ for produced results and Appendix A for the original design sketch.*
 
 ---
 
+## Appendix C — Corrections register (consolidated)
+
+> Every correction, retraction, and de-glossed overclaim in this document's history, in one
+> auditable table. In-situ markers remain at the point of claim (the record must live where the
+> claim lives); this register is the **single place to audit them all**. The discipline is the
+> point: *a pre-registered falsification found the overstatement, and the correction — not the
+> original claim — is what ships.*
+
+| Date | What was claimed | What survived (the correction) | Where |
+|---|---|---|---|
+| 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
+| 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
+| 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
+| 2026-06-26 | Theorem C3 needed the alignment hypothesis | hypothesis **removable** — freeze-prevention proven for all `A`, normal and non-normal (an upgrade logged like a correction) | §3 |
+| 2026-07-07 | §8's "a fixed holdout gives O(1) gates" | **n-graded, not O(1)** (measured 32 seeds); fresh-flow strictly dominates (22× at n=50); Thresholdout is the formal third road | [§8.4](#84-the-load-bearing-open-problem--holdout-theater-review-hit-3-the-sharpest) |
+| 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected-review-hit-1) |
+| 2026-07-17 | §8.6 "no prior art for internal-state checkpoint monitors" | **stale** — the detection lane is occupied (2601.16874, 2602.10144, 2604.19884); only the *incremental* ΔAUC design may remain unique | §8.6 item 5 |
+| 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | [grounding ledger](research/2026-07-22-grounding-ledger-and-patent-landscape.md) |
+
+---
+
 ## Appendix M — Provenance: maintenance log & closed-gap history
+
+> **2026-07-22 — white-paper restructure + novel-math registry.** Added the linked Contents
+> table, the loop diagram, and **"The mathematics — novel-math registry"** (R1–R11): every
+> formula rendered as an image (`docs/assets/cert/*.svg`, generator
+> `scripts/render_cert_formulas.py`) with honest provenance labels — PROVEN / MEASURED /
+> CONJECTURE / IMPORTED, ★ marking candidate-novel items. Three new entries from this date's
+> work: the anytime-valid e-process stop certificate (R8, imported via SEA 2607.00871), basin
+> determinism (R9, conjecture, measured by #2859), and the oracle objective (R10, definition).
+> Added **Appendix C — corrections register** consolidating every correction into one auditable
+> table (in-situ markers retained at point of claim). No theorem, status line, or measured
+> number was altered by this pass — structure and rendering only.
 
 > Moved here from the document head on 2026-07-07 for readability. Unedited, chronological.
 > This is the anti-drift record: each entry is an external-reality reconcile pass (fresh test
