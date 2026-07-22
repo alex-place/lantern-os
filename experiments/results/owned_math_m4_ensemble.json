@@ -1,0 +1,25 @@
+{
+  "n": 150,
+  "bound_violations": 0,
+  "refined": 0,
+  "henrici_nonnormality": {
+    "mean": 0.556,
+    "max": 0.935
+  },
+  "envelope_margin_e_n_K_over_M": {
+    "min": 2.23,
+    "median": 5.53
+  },
+  "detection_subset": {
+    "n_systems": 40,
+    "healthy_false_alarm_rate": {
+      "naive_mean": 0.44,
+      "L3_mean": 0.0
+    },
+    "unstable_detection_rate": {
+      "naive_mean": 1.0,
+      "L3_mean": 0.93
+    }
+  },
+  "reading": "0 envelope violations across the ensemble = the L3 inflation rule is sound beyond the hand-picked family; naive thresholds false-alarm on healthy non-normal decay while L3 stays quiet and still detects the unstable twin."
+}

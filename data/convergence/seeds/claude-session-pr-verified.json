@@ -1,0 +1,82 @@
+[
+  {
+    "claim": "The convergance ledger carried laundered records (verified=true on unverified, single-source claims); mining Claude-session history into both-class records and demoting the laundered ones restores an honest ledger.",
+    "evidence": "PR #2737 added scripts/session_to_convergence.py + scripts/repair_convergence_records.py; the repair demoted 60 laundered verified=true records to false and merged both-class session records.",
+    "verified": true, "verified_by": ["pr:2737", "commit:17801bda"],
+    "confidence": 0.9, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (convergance ledger honesty)", "loop_stage": "Verify",
+    "tags": ["convergance-ledger", "honesty", "self-improvement"]
+  },
+  {
+    "claim": "The Cloudflare-tunnel-to-local deployment path is deprecated in favor of the GCE origin (ADR-0018); the deploy docs now say so.",
+    "evidence": "PR #2743 marked docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md and docs/ARCHITECTURE.md DEPRECATED and pointed them at the GCE origin.",
+    "verified": true, "verified_by": ["pr:2743", "commit:eb6d9cda"],
+    "confidence": 0.88, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (deploy docs)", "loop_stage": "Verify",
+    "tags": ["deploy", "gce", "docs"]
+  },
+  {
+    "claim": "Two creator-V10 pipeline docs (V10-TRAINING-QUICKSTART, YOUTUBE-API-SETUP) were dead because their scripts were removed in #2734, and belong in docs/archive rather than the canonical set.",
+    "evidence": "PR #2772 git-moved both docs to docs/archive/creator-v10/, fixed their knowledgecenter + doc-catalog references, and added an archive policy README.",
+    "verified": true, "verified_by": ["pr:2772", "commit:85d364a3", "pr:2734"],
+    "confidence": 0.88, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (docs consolidation)", "loop_stage": "Verify",
+    "tags": ["docs", "archive", "creator-v10"]
+  },
+  {
+    "claim": "The IP register held 8 scattered, partly overlapping invention claims; consolidating to 7 honestly-graded entries (folding/downgrading prior-art-heavy ones) reflects the accurate novelty state.",
+    "evidence": "PR #2768 rewrote docs/KEYSTONE-IP-AND-BUILDOUT.md from 8 claims to 7, promoted the accountability layer to #1, and honestly graded novelty.",
+    "verified": true, "verified_by": ["pr:2768", "commit:f6778713"],
+    "confidence": 0.82, "allowed_max_confidence": 0.85,
+    "source": "claude-code session (IP register consolidation)", "loop_stage": "Verify",
+    "tags": ["ip", "novelty", "docs"]
+  },
+  {
+    "claim": "Autowork's research grounding was consumed only at the Verify stage, not threaded into the code-generation prompt; wiring it into codegen closes that gap (#2741).",
+    "evidence": "PR #2779 threads the research grounding into the codegen prompt path, not just Verify.",
+    "verified": true, "verified_by": ["pr:2779", "commit:9ac106e1"],
+    "confidence": 0.85, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (autowork grounding)", "loop_stage": "Verify",
+    "tags": ["autowork", "grounding", "codegen"]
+  },
+  {
+    "claim": "apps/bettersafe and the creator-V10 collection/training scripts were dead code with zero live wiring and were removed (resolving #2541).",
+    "evidence": "PR #2734 removed apps/bettersafe + the creator-V10 shorts/training scripts; CI green on removal.",
+    "verified": true, "verified_by": ["pr:2734", "commit:eb860ba4"],
+    "confidence": 0.9, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (repo slim / #2541)", "loop_stage": "Verify",
+    "tags": ["repo-slim", "dead-code", "2541"]
+  },
+  {
+    "claim": "Issue #2535's Colab cell referenced the nonexistent scripts/train_ouro.py and convergence-lora.js carried a dead training branch; both were fixed/removed.",
+    "evidence": "PR #2732 completed #2535 by removing the convergence-lora dead branch and fixing the stale training wiring.",
+    "verified": true, "verified_by": ["pr:2732", "commit:1355e241"],
+    "confidence": 0.88, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (fix #2535 stale training wiring)", "loop_stage": "Verify",
+    "tags": ["training", "dead-code", "2535"]
+  },
+  {
+    "claim": "Single-stock 12-1 momentum measured on a survivorship-biased universe is a mirage that ties SPY once survivorship is handled — it is NOT a real upgrade over the index.",
+    "evidence": "PR #2736 measured the single-stock-momentum survivorship mirage on real data and reported the tie-to-SPY result.",
+    "verified": true, "verified_by": ["pr:2736", "commit:2aea315d"],
+    "confidence": 0.8, "allowed_max_confidence": 0.85,
+    "source": "claude-code session (survivorship / momentum)", "loop_stage": "Verify",
+    "tags": ["trading", "survivorship", "momentum"]
+  },
+  {
+    "claim": "trader_positions reported a misleading endpoint error when the broker was simply not connected; it now reports an honest 'not connected' state.",
+    "evidence": "PR #2770 changed trader_positions to report an honest not-connected status instead of an endpoint error.",
+    "verified": true, "verified_by": ["pr:2770", "commit:0a5a8d41"],
+    "confidence": 0.85, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (trader honesty / #2725)", "loop_stage": "Verify",
+    "tags": ["trading", "honesty", "2725"]
+  },
+  {
+    "claim": "The chat coding path needed repo auto-detection plus env-tunable per-model token budgets (#2759); both were added.",
+    "evidence": "PR #2769 added repo auto-detection and env-tunable per-model token budgets to the chat path.",
+    "verified": true, "verified_by": ["pr:2769", "commit:df756cc8"],
+    "confidence": 0.85, "allowed_max_confidence": 0.9,
+    "source": "claude-code session (chat repo/token config / #2759)", "loop_stage": "Verify",
+    "tags": ["chat", "config", "2759"]
+  }
+]

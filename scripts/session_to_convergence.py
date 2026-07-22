@@ -73,6 +73,24 @@ def normalize(rec: dict, session_id: str) -> dict:
     # a claim cannot be both verified-true and refuted-true
     if verified and refuted:
         verified = False
+    # HARD verification artifacts (schema: ConvergenceRecord.verified_by). A checkable
+    # ref anyone can re-open: "pr:2737", "commit:<sha>", "test:<path::name>", "exec:<id>".
+    # Normalize bare PR numbers / "#2737" to the "pr:" form. verified=True is legitimate
+    # ONLY with such an artifact — this is the concrete External Reality Rule (the
+    # strongest artifact for a self-coding loop is a MERGED PR), matching objects.py.
+    verified_by = []
+    for a in (rec.get("verified_by") or []):
+        s = str(a).strip()
+        if not s:
+            continue
+        if s.isdigit():
+            s = f"pr:{s}"
+        elif s.startswith("#") and s[1:].isdigit():
+            s = f"pr:{s[1:]}"
+        verified_by.append(s)
+    if verified and not verified_by:
+        # no receipt → cannot claim reality confirmed it (foreclose laundering at the source)
+        verified = False
     return {
         "id": rec_id(session_id, claim),
         "timestamp": rec.get("timestamp") or _now_iso(),
@@ -91,6 +109,7 @@ def normalize(rec: dict, session_id: str) -> dict:
         "source": rec.get("source"),
         "sources": list(rec.get("sources") or []),
         "grounding_signals": list(rec.get("grounding_signals") or []),
+        "verified_by": verified_by,  # hard, checkable artifacts (pr:/commit:/test:/exec:)
         "applied_evidence": [],  # empty at emit; Verify stage fills it (#764 G9)
         "loop_stage": rec.get("loop_stage", "Verify"),
         "reasoner": "claude-code-session",

@@ -643,11 +643,14 @@ function renderConvergenceSummary(fin, d) {
   if (conf && typeof conf.overall === 'number') {
     const pct = Math.max(0, Math.min(100, Math.round(conf.overall * 100)));
     const fmt = v => (typeof v === 'number' ? v.toFixed(2) : '–');
-    // #2803: don't let the meter perform calibration the record doesn't have — when the
-    // server declares the basis, say which terms are formula priors vs measured.
-    const basisNote = (conv && conv.confidenceBasis)
-      ? ' · basis: formula priors (measured: calibratedTrust only)' : '';
-    chips.push(`<span class="aw-chip" title="research ${fmt(conf.research)} · grounded ${fmt(conf.grounded)} · tests ${fmt(conf.testsPassed)}${basisNote}">confidence <span class="aw-conf-bar"><span style="width:${pct}%"></span></span> ${pct}%</span>`);
+    // #2803: don't let the meter perform calibration the record doesn't have. Master's
+    // lib-backed impl (lib/confidence-basis.js) ships confidence.basisSummary as the label
+    // and confidence.calibratedTrust as the one outcome-calibrated number — prefer them.
+    const basisNote = (conf && conf.basisSummary) ? ` · basis: ${conf.basisSummary}`
+      : (conf && conf.basis) ? ' · basis: formula priors (measured: calibratedTrust only)' : '';
+    const calNote = (conf && typeof conf.calibratedTrust === 'number')
+      ? ` · calibrated trust ${Math.round(conf.calibratedTrust * 100)}%` : '';
+    chips.push(`<span class="aw-chip" title="research ${fmt(conf.research)} · grounded ${fmt(conf.grounded)} · tests ${fmt(conf.testsPassed)}${basisNote}${calNote}">confidence <span class="aw-conf-bar"><span style="width:${pct}%"></span></span> ${pct}%</span>`);
   }
   const card = document.createElement('div');
   card.className = 'aw-conv';
@@ -1642,6 +1645,45 @@ async function sendMessage(opts = {}) {
         sendMessage({ text: text + '\n\n[Your previous code failed this check:\n' + out + '\n]\nFix it so the test passes.' });
       });
       bubble.appendChild(retry);
+    }
+  }
+  // Plain-language trust chip for NON-operator users (#2805). #2332 correctly hid the raw
+  // Σ₀ jargon (seam-open/pin/refuted reads as an error) — but that left the product knowing
+  // more about its own reliability than it tells the person deciding whether to trust the
+  // answer. Translate the non-healthy verdicts to plain language; grounded (the healthy case)
+  // stays quiet. The operator view above is unchanged, so #2332 is respected — this is
+  // translation, not jargon exposure.
+  else if (bubble.dataset.councilVerdict) {
+    const TRANSLATE = {
+      seam_open: ['⚠ unverified — worth double-checking', '#f5a623'],
+      refuted:   ['✗ failed a live check (see output)',    '#f87171'],
+      pin:       ['? no verifiable answer exists',          '#9ca3af'],
+    };
+    const t = TRANSLATE[bubble.dataset.councilVerdict];  // grounded / unknown → nothing (quiet)
+    if (t) {
+      const chip = document.createElement('span');
+      chip.className = 'council-trust-chip';
+      chip.dataset.verdict = bubble.dataset.councilVerdict;
+      chip.textContent = t[0];
+      chip.style.cssText = 'display:inline-block;font-size:11px;margin-left:6px;vertical-align:middle;color:'
+        + t[1] + ';opacity:0.9';
+      bubble.appendChild(chip);
+
+      // "see output": refuted carries the failing check's output — proof the answer is wrong.
+      // Surface it plainly (no Σ₀ jargon) so the user can look, without exposing operator chrome.
+      if (bubble.dataset.councilVerdict === 'refuted' && bubble.dataset.councilExecOutput) {
+        const det = document.createElement('details');
+        det.style.cssText = 'margin:6px 0 0;font-size:11px';
+        const sum = document.createElement('summary');
+        sum.textContent = 'show what failed';
+        sum.style.cssText = 'cursor:pointer;color:#f87171;list-style:none;user-select:none';
+        det.appendChild(sum);
+        const pre = document.createElement('pre');
+        pre.textContent = bubble.dataset.councilExecOutput;
+        pre.style.cssText = 'margin:6px 0 0;padding:8px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:pre-wrap;overflow-x:auto;color:var(--text,#ddd)';
+        det.appendChild(pre);
+        bubble.appendChild(det);
+      }
     }
   }
 

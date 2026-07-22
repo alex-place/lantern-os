@@ -67,6 +67,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { execFileSync } = require("child_process");
 
 const DEFAULT_ENDPOINT = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434";
@@ -162,6 +163,38 @@ const DEFAULTS = [
     note: "Default local coder (OSS-BASELINE #2171). Supported Apache-2.0 Qwen2.5-Coder-7B via Ollama (:11434). VERIFIED on-box (#2173): coding-golden exec pass@1 0.96 (24/25). Leads coding/reasoning/default on the 8GB box; kernel stays Ouro. Ouro promotion to coding gated on the loop-value experiment (#2178).",
   },
   {
+    // ── CPU / GCP cheap stand-ins ──────────────────────────────────────────────
+    // The cheap tier picked when a box has NO GPU (a local CPU or a cheap GCP CPU
+    // instance). vramGB is kept for the GPU path, but `ramGB` + `cpuOk` are what the
+    // CPU-mode gate uses: the model must run acceptably on CPU and fit system RAM.
+    // Among the ones that FIT the user's constraints, our capability shaping (below)
+    // picks the strongest — so a 4GB GCP box gets 3B, a 2GB box gets 1.5B.
+    id: "qwen2.5-coder:3b",
+    endpoint: DEFAULT_ENDPOINT,
+    selfConverges: false,
+    toolCalling: true,
+    vramGB: 3, ramGB: 4, cpuOk: true,   // 3B @ Q4 ≈ 2GB on disk / ~3-4GB RAM; ~8-15 tok/s on a modern CPU
+    ctxTokens: 32768,
+    taskTypes: ["coding", "reasoning", "default"],
+    rank: 2,
+    capabilityScore: 0.84,              // Qwen2.5-Coder-3B HumanEval ~84% (vendor) — UNVERIFIED on-box
+    verified: false,
+    note: "CPU/GCP cheap stand-in (mid). Qwen2.5-Coder-3B @ Q4 — runs on a local CPU or a cheap GCP CPU instance (no GPU). Picked when a box has ~4GB+ RAM and no GPU. `ollama pull qwen2.5-coder:3b`. capabilityScore is the vendor HumanEval anchor; flip verified once reproduced on-box.",
+  },
+  {
+    id: "qwen2.5-coder:1.5b",
+    endpoint: DEFAULT_ENDPOINT,
+    selfConverges: false,
+    toolCalling: true,
+    vramGB: 2, ramGB: 2, cpuOk: true,   // 1.5B @ Q4 ≈ 1GB on disk / ~2GB RAM; ~15-25 tok/s on CPU
+    ctxTokens: 32768,
+    taskTypes: ["coding", "reasoning", "default"],
+    rank: 3,
+    capabilityScore: 0.70,              // Qwen2.5-Coder-1.5B HumanEval ~70% (vendor) — UNVERIFIED
+    verified: false,
+    note: "CPU/GCP cheap stand-in (low-RAM floor). Qwen2.5-Coder-1.5B @ Q4 — the smallest coder that still writes usable code; the floor tier for a ~2GB-RAM CPU box. `ollama pull qwen2.5-coder:1.5b`.",
+  },
+  {
     id: "lantern-csf-dream",
     endpoint: DEFAULT_ENDPOINT,
     selfConverges: false,
@@ -240,6 +273,33 @@ function _vramBudgetGB() {
     if (Number.isFinite(d) && d > 0) return d;
   }
   return 8; // safe fallback: the 8GB box
+}
+
+/**
+ * Is a GPU present? nvidia-smi finding VRAM ⇒ yes. A local CPU box or a cheap GCP CPU
+ * instance ⇒ no, which flips selectChain to the CPU/RAM gate (a small CPU-runnable
+ * coder), instead of the old bug where the 8GB VRAM fallback made a CPU box pick the
+ * 7B it can't serve → cloud. Override: opts.hasGpu, or LOCAL_FORCE_CPU=1.
+ */
+function _hasGpu(opts = {}) {
+  if (opts.hasGpu !== undefined) return !!opts.hasGpu;
+  if (process.env.LOCAL_FORCE_CPU === "1") return false;
+  const d = _detectVramGB(); // null when no NVIDIA GPU / nvidia-smi absent
+  return Number.isFinite(d) && d > 0;
+}
+
+/**
+ * System-RAM budget (GB) for CPU inference: total RAM minus ~2GB OS/node headroom, so a
+ * model's `ramGB` must fit what is actually free. This is the user-constraint the CPU
+ * cheap-tier is sized to. Override: opts.ramBudgetGB, or RAM_BUDGET_GB (e.g. to model a
+ * specific GCP instance from the server, or cap a shared host).
+ */
+function _ramBudgetGB(opts = {}) {
+  if (Number.isFinite(opts.ramBudgetGB) && opts.ramBudgetGB > 0) return opts.ramBudgetGB;
+  const v = parseFloat(process.env.RAM_BUDGET_GB || "");
+  if (Number.isFinite(v) && v > 0) return v;
+  const totalGB = os.totalmem() / 1024 ** 3;
+  return Math.max(1, Math.round((totalGB - 2) * 10) / 10);
 }
 
 /**
@@ -357,9 +417,20 @@ function selectChain(taskType = "default", opts = {}) {
   // kernel (the Σ₀ Convergence Core path) must stay strict: only models that
   // explicitly opt into "kernel" are eligible there. No general-fallback widening.
   const widenWithDefault = !STRICT_TASKS.has(taskType);
+  // Constraint gate — "picked by the user's hardware". GPU box → VRAM-gated (existing).
+  // No GPU (a local CPU box or a cheap GCP CPU instance) → CPU-gated: the model must be
+  // cpuOk AND fit system RAM, so a CPU box gets a small quantized coder that actually
+  // runs instead of the 7B it can't serve (the old VRAM-fallback-to-8GB bug → cloud).
+  const cpuMode = opts.cpuOnly === true || (opts.cpuOnly === undefined && !_hasGpu(opts));
+  const ramBudget = _ramBudgetGB(opts);
+  const fits = (e) => {
+    if (opts.includeAll) return true;
+    if (cpuMode) return e.cpuOk === true && (Number(e.ramGB) || Number(e.vramGB) || 99) <= ramBudget;
+    return (Number(e.vramGB) || 0) <= budget;
+  };
   const eligible = reg.filter(
     (e) =>
-      (opts.includeAll || (e.vramGB || 0) <= budget) &&
+      fits(e) &&
       Array.isArray(e.taskTypes) &&
       (e.taskTypes.includes(taskType) || (widenWithDefault && e.taskTypes.includes("default"))),
   );
@@ -384,6 +455,26 @@ function selectChain(taskType = "default", opts = {}) {
 /** The single best local model id to lead this task (or null if none fit). */
 function selectBest(taskType = "default", opts = {}) {
   return selectChain(taskType, opts)[0] || null;
+}
+
+/**
+ * The best local model to STAND IN for cloud chat as the cheap cascade tier, chosen from
+ * the user's hardware constraints × our capability shaping. GPU box → the VRAM-gated
+ * capability lead (e.g. Qwen2.5-Coder-7B). A local CPU box or a cheap GCP CPU instance →
+ * the strongest CPU-runnable coder that fits system RAM (3B, else 1.5B) — never a
+ * GPU-only research model like Ouro. Returns { id, endpoint, mode, ramBudgetGB } or null
+ * (→ the caller escalates straight to cloud; the cascade's verify gate still backs it).
+ *
+ * @param {object} [opts] hasGpu, vramBudgetGB, ramBudgetGB, cpuOnly, taskType (default "coding")
+ */
+function selectCheapStandin(opts = {}) {
+  const taskType = opts.taskType || "coding";
+  const id = selectChain(taskType, opts)[0] || null;
+  const cpuMode = opts.cpuOnly === true || (opts.cpuOnly === undefined && !_hasGpu(opts));
+  return id
+    ? { id, endpoint: endpointFor(id), mode: cpuMode ? "cpu" : "gpu",
+        ramBudgetGB: cpuMode ? _ramBudgetGB(opts) : null }
+    : null;
 }
 
 /**
@@ -462,9 +553,12 @@ module.exports = {
   isVerified,
   selectChain,
   selectBest,
+  selectCheapStandin,
   resolveLocalLead,
   _resetCache,
   _vramBudgetGB,
+  _ramBudgetGB,
+  _hasGpu,
   _detectVramGB,
   DEFAULTS,
   REGISTRY_JSON_PATH,

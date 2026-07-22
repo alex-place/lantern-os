@@ -989,7 +989,8 @@ module.exports = async (req, res, url, deps) => {
             researchBased: scopeFiles.length > 0 ? 0.8 : 0.5,
             observable: true,
             grounded: true
-          }
+          },
+          confidence_basis: { researchBased: "prior", observable: "prior", grounded: "prior" }, // #2803: all formula constants
         });
 
         // ── 4-5. patch → apply, with a feedback retry loop ────────────────
@@ -1302,6 +1303,7 @@ module.exports = async (req, res, url, deps) => {
         // no neural change. 0.5 prior until grounded.
         let calibratedTrust = 0.5;
         try { calibratedTrust = require("../lib/grounding-calibration").trust("autowork:patch"); } catch (_) {}
+        const { confidenceBasis, basisSummary } = require("../lib/confidence-basis"); // #2803
         const convergenceRecord = {
           timestamp: new Date().toISOString(),
           issue: issueNumber,
@@ -1337,13 +1339,13 @@ module.exports = async (req, res, url, deps) => {
             // consulted (not retrained) each run; 0.5 until grounded by real outcomes.
             calibratedTrust,
           },
-          // #2803: every confidence field declares its basis — "prior" = a formula
-          // constant chosen by hand (NOT a measurement), "measured" = calibrated from
-          // real recorded outcomes. Only calibratedTrust is measured today; the record
-          // must not perform calibration it doesn't have.
-          confidenceBasis: {
+          // #2803: label each confidence field's basis so the record stops PERFORMING
+          // measurement — 'measured' = outcome-calibrated (only calibratedTrust today),
+          // 'prior' = a formula constant. A reader can now tell the one honest term from
+          // the ritual constants instead of reading the weighted sum as a measurement.
+          confidence_basis: {
             codebaseResearch: "prior", webGrounded: "prior", testsPassed: "prior",
-            observable: "prior", grounded: "prior", overall: "prior-formula",
+            observable: "prior", grounded: "prior", overall: "prior",
             calibratedTrust: "measured",
           },
           sources: {
@@ -1359,7 +1361,7 @@ module.exports = async (req, res, url, deps) => {
             ? { verdict: council.verdict, delta: council.delta, groundedBy: council.groundedBy, recommend: council.recommend }
             : null,
         };
-        step("convergence", "done", { record: convergenceRecord });
+        step("convergence", "done", { record: convergenceRecord, confidenceBasis: basisSummary(convergenceRecord.confidence).label });
 
         // Append to convergence log
         const convergenceLog = path.join(REPO_ROOT, "data", "convergence-autonomous-work.jsonl");
@@ -1385,10 +1387,15 @@ module.exports = async (req, res, url, deps) => {
             verify: c.testsPassed,                                   // tests actually ran/passed
             converge: c.overall                                      // confidence record + PR
           },
-          // #2803: these dimension scores are heuristic formula constants, not
-          // measured capability — consumers must not read them as calibration.
-          basis: "prior-formula",
-          overall: c.overall
+          // #2803: none of these six dimensions are outcome-calibrated — each is a formula
+          // constant gated on a real event (issue fetched, plan made, patch applied, tests
+          // ran), so the row reports a prior profile, not a measurement.
+          dimensions_basis: {
+            observe: "prior", research: "prior", reason: "prior",
+            act: "prior", verify: "prior", converge: "prior",
+          },
+          overall: c.overall,
+          overall_basis: "prior"
         };
         const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
         fsSync.appendFileSync(agiBenchLog, JSON.stringify(agiRow) + "\n");
@@ -1414,15 +1421,38 @@ module.exports = async (req, res, url, deps) => {
           },
           evidence: convergenceRecord.evidence,
           sources: convergenceRecord.sources,
-          confidenceBasis: convergenceRecord.confidenceBasis,   // #2803: priors vs measured
+          // #2803 (merged with master's lib-backed impl): the record field is `confidence_basis`.
+          confidence_basis: convergenceRecord.confidence_basis,
+          calibratedTrust: convergenceRecord.confidence.calibratedTrust,
         };
         send("done", {
           ok: true,
           ...receipt,
           councilVerdict: council ? council.verdict : null,
           councilDelta: council ? council.delta : null,
-          convergence: convergenceSummary,
-          message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (confidence: ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%)`
+          convergence: {
+            hypothesis: convergenceRecord.hypothesis,
+            confidence: {
+              // #2795 fix: the record field is `codebaseResearch`; reading `.research`
+              // returned undefined (the finale's research number was blank).
+              research: convergenceRecord.confidence.codebaseResearch,
+              testsPassed: convergenceRecord.confidence.testsPassed,
+              observable: convergenceRecord.confidence.observable,
+              grounded: convergenceRecord.confidence.grounded,
+              overall: convergenceRecord.confidence.overall,
+              // #2803: overall is a prior (weighted sum of formula constants); calibratedTrust
+              // is the one outcome-calibrated number. Ship both, labeled, so the finale can
+              // show the split instead of passing a prior off as a measurement.
+              calibratedTrust: convergenceRecord.confidence.calibratedTrust,
+              basis: convergenceRecord.confidence_basis,
+              basisSummary: basisSummary(convergenceRecord.confidence).label,
+            },
+            evidence: convergenceRecord.evidence,
+            sources: convergenceRecord.sources,
+          },
+          // #2803: don't pass the weighted-sum prior off as a measurement. Lead with the
+          // one calibrated number and label the overall a prior estimate.
+          message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (prior estimate ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%; calibrated trust ${(convergenceRecord.confidence.calibratedTrust * 100).toFixed(0)}%)`
         });
         finishLog(true, {
           prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}`,

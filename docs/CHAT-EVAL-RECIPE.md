@@ -72,6 +72,34 @@ recipe when you want the *browser* path or a non-coding suite.
    so the turn is runnable, and note in the report that a real attachment would
    change the result.
 
+## Tool gating — measure the faculty, not the tool (#2777)
+
+Burnell et al. ([arXiv:2605.28405](https://arxiv.org/abs/2605.28405) §4.3, canon [07]):
+*"if the system can simply search the internet … we are no longer measuring the system's
+memory — only its ability to search."* So when an eval targets a specific faculty, **disable
+the tools that would let the model substitute a different capability** — otherwise the score
+is uninterpretable (this is the #2322 closed-context groundedness-noise class).
+
+**Faculty under test → tools to gate:**
+
+| Eval condition (loop stage) | Gate these tools | Why |
+|---|---|---|
+| **Memory / recall** (Remember) | `web_search`, `web_fetch` | else recall is replaced by live search |
+| **Reasoning, closed-context** (Reason) | `web_search`, `web_fetch`, and repo retrieval (`Read`/`Grep`/`workspace_read`) | the answer must come from the model, not lookup |
+| **Coding, no-lookup** (Act) | `web_search`, `web_fetch` | measures generation, not retrieval of a known solution |
+
+**How to gate a run.** Set `CHAT_EVAL_GATED_TOOLS` (comma/space-separated tool names) before
+the run — or pass `ctx.gatedTools` to `runTool`:
+
+```bash
+CHAT_EVAL_GATED_TOOLS="web_search,web_fetch" node scripts/eval_humaneval_chat.py   # example
+```
+
+`runTool` then denies each gated tool **before it executes**, returning
+`reason_code: "tool_gated"`, and the denial is written to the tool log — so the run record
+shows exactly which tools were gated and that no gated call slipped through. Names are
+case-insensitive. Leave the variable unset (or blank) for a normal, ungated run.
+
 ## Selectors & storage reference
 
 | Thing | Where |

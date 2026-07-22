@@ -1,0 +1,123 @@
+{
+  "config": {
+    "rho": 0.9,
+    "runs": 150,
+    "T": 2500,
+    "kick": 8.0
+  },
+  "noise_levels": [
+    {
+      "obs_noise_r": 0.01,
+      "gain_norm": 0.99,
+      "spec_radius_tracker_recovery A(I-K)": 0.016,
+      "spec_radius_mimic_recovery A": 0.9,
+      "passive_KS (expect non-separating)": {
+        "a_sigma": {
+          "KS_D": 0.0533,
+          "p": 0.9804
+        },
+        "lag1": {
+          "KS_D": 0.1333,
+          "p": 0.1279
+        },
+        "step": {
+          "KS_D": 0.0667,
+          "p": 0.882
+        },
+        "norm": {
+          "KS_D": 0.0867,
+          "p": 0.6069
+        }
+      },
+      "probe_recovery_median": {
+        "tracker": 1.0,
+        "mimic": 22.0
+      }
+    },
+    {
+      "obs_noise_r": 0.25,
+      "gain_norm": 0.822,
+      "spec_radius_tracker_recovery A(I-K)": 0.228,
+      "spec_radius_mimic_recovery A": 0.9,
+      "passive_KS (expect non-separating)": {
+        "a_sigma": {
+          "KS_D": 0.0733,
+          "p": 0.8
+        },
+        "lag1": {
+          "KS_D": 0.08,
+          "p": 0.7055
+        },
+        "step": {
+          "KS_D": 0.1333,
+          "p": 0.1279
+        },
+        "norm": {
+          "KS_D": 0.1267,
+          "p": 0.1672
+        }
+      },
+      "probe_recovery_median": {
+        "tracker": 2.0,
+        "mimic": 22.0
+      }
+    },
+    {
+      "obs_noise_r": 1.0,
+      "gain_norm": 0.585,
+      "spec_radius_tracker_recovery A(I-K)": 0.445,
+      "spec_radius_mimic_recovery A": 0.9,
+      "passive_KS (expect non-separating)": {
+        "a_sigma": {
+          "KS_D": 0.1133,
+          "p": 0.2737
+        },
+        "lag1": {
+          "KS_D": 0.0667,
+          "p": 0.882
+        },
+        "step": {
+          "KS_D": 0.0667,
+          "p": 0.882
+        },
+        "norm": {
+          "KS_D": 0.0533,
+          "p": 0.9804
+        }
+      },
+      "probe_recovery_median": {
+        "tracker": 3.0,
+        "mimic": 22.0
+      }
+    },
+    {
+      "obs_noise_r": 4.0,
+      "gain_norm": 0.321,
+      "spec_radius_tracker_recovery A(I-K)": 0.651,
+      "spec_radius_mimic_recovery A": 0.9,
+      "passive_KS (expect non-separating)": {
+        "a_sigma": {
+          "KS_D": 0.0867,
+          "p": 0.6069
+        },
+        "lag1": {
+          "KS_D": 0.0933,
+          "p": 0.5109
+        },
+        "step": {
+          "KS_D": 0.2,
+          "p": 0.0041
+        },
+        "norm": {
+          "KS_D": 0.16,
+          "p": 0.0382
+        }
+      },
+      "probe_recovery_median": {
+        "tracker": 6.0,
+        "mimic": 22.0
+      }
+    }
+  ],
+  "reading": "At every observation-noise level the mimic (innovations form) is passively indistinguishable from the grounded tracker \u2014 the lemma holds GENERALLY, not just at the perfect-observation corner. The probe's separating power shrinks as the gain does: a tracker that barely listens is barely distinguishable from a loop that never listens. Grounding quality = probe separability."
+}

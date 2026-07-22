@@ -1691,6 +1691,26 @@ function _validateArgs(schema, input) {
   return errs.length ? errs.join("; ") : null;
 }
 
+// Is `name` gated for this run? (#2777) The gate set is the union of the env
+// CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
+// case-insensitive. Used to enforce per-faculty measurement validity in capability
+// evals — e.g. gate web_search/web_fetch for a Remember-stage (memory) eval so the
+// model can't substitute search for recall (Burnell et al. arXiv:2605.28405 §4.3).
+function _gatedToolSet(ctx) {
+  const out = new Set();
+  const add = (v) => { const s = String(v || "").trim().toLowerCase(); if (s) out.add(s); };
+  String(process.env.CHAT_EVAL_GATED_TOOLS || "").split(/[,\s]+/).forEach(add);
+  const fromCtx = ctx && ctx.gatedTools;
+  if (Array.isArray(fromCtx)) fromCtx.forEach(add);
+  else if (fromCtx instanceof Set) fromCtx.forEach(add);
+  else if (typeof fromCtx === "string") fromCtx.split(/[,\s]+/).forEach(add);
+  return out;
+}
+function _isToolGated(name, ctx) {
+  const gated = _gatedToolSet(ctx);
+  return gated.size > 0 && gated.has(String(name || "").trim().toLowerCase());
+}
+
 /**
  * Execute a parsed tool call under the policy.
  * @param {string} name  canonical tool name the model emitted
@@ -1734,6 +1754,21 @@ async function runTool(name, input, ctx = {}) {
       error: `'${name}' (${entry.policy}) requires operator access`,
     });
     await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
+    return result;
+  }
+
+  // Per-faculty tool gating for capability evals (#2777). Burnell et al. §4.3: if a
+  // memory eval lets the model web_search, you measure search, not memory. An eval run
+  // sets CHAT_EVAL_GATED_TOOLS (comma-separated) — or passes ctx.gatedTools — to DENY
+  // the named tools for that run, so closed-context conditions are actually closed and
+  // the gating is recorded in the tool log (interpretable after the fact).
+  if (_isToolGated(name, ctx)) {
+    const result = _outcome("unavailable", name, {
+      reason_code: "tool_gated",
+      policy: entry.policy,
+      error: `'${name}' is gated for this eval run (measurement-validity gating, #2777)`,
+    });
+    await _logToolExecution(name, input, "unavailable", "tool_gated", startTime, ctx);
     return result;
   }
 

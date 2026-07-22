@@ -1,0 +1,19 @@
+{
+  "part_a_lemma_check": {
+    "n_systems": 300,
+    "n_steps_checked": 9000,
+    "violations_evidence_term_negative": 0,
+    "violations_precision_monotone": 0,
+    "violations_contraction_cap (dyn > 2log 1/|detA|)": 0,
+    "violations_exact_decomposition": 0,
+    "contracting_steps": 8940,
+    "contracting_steps_with_positive_dynamics_term": 1890,
+    "reading": "0 violations expected on the first four rows = the lemma's inequalities hold numerically; positive dynamics terms occur ONLY via contraction \u2014 the collapse-suspect channel, never a third source."
+  },
+  "part_b_ledger_longitudinal": {
+    "n_hypotheses_with_repeats": 24,
+    "n_consecutive_pairs": 50,
+    "n_paid_growth_violations (conf up, evidence not grown)": 0,
+    "examples": []
+  }
+}

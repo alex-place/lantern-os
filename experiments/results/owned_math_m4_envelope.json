@@ -1,0 +1,212 @@
+{
+  "horizon": 150,
+  "trials_per_cell": 100,
+  "rows": [
+    {
+      "system": "jordan",
+      "n": 2,
+      "K_est": 2.6,
+      "healthy_FA": {
+        "naive": 0.99,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 15.0,
+        "env": 5.0
+      }
+    },
+    {
+      "system": "jordan",
+      "n": 2,
+      "K_est": 12.5,
+      "healthy_FA": {
+        "naive": 1.0,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 15.0,
+        "env": 5.0
+      }
+    },
+    {
+      "system": "jordan",
+      "n": 2,
+      "K_est": 50.0,
+      "healthy_FA": {
+        "naive": 1.0,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 14.0,
+        "env": 5.0
+      }
+    },
+    {
+      "system": "jordan",
+      "n": 2,
+      "K_est": 125.0,
+      "healthy_FA": {
+        "naive": 1.0,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 14.0,
+        "env": 5.0
+      }
+    },
+    {
+      "system": "randomK2.8",
+      "n": 2,
+      "K_est": 2.8,
+      "healthy_FA": {
+        "naive": 0.86,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 0.95,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 53.0,
+        "env": 4.5
+      }
+    },
+    {
+      "system": "randomK1.4",
+      "n": 2,
+      "K_est": 1.4,
+      "healthy_FA": {
+        "naive": 0.95,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 38.0,
+        "env": 3.0
+      }
+    },
+    {
+      "system": "randomK1.4",
+      "n": 3,
+      "K_est": 1.4,
+      "healthy_FA": {
+        "naive": 0.83,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 0.99,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 66.0,
+        "env": 4.0
+      }
+    },
+    {
+      "system": "randomK1.3",
+      "n": 4,
+      "K_est": 1.3,
+      "healthy_FA": {
+        "naive": 0.72,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 0.96,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 79.0,
+        "env": 7.0
+      }
+    },
+    {
+      "system": "randomK1.3",
+      "n": 4,
+      "K_est": 1.3,
+      "healthy_FA": {
+        "naive": 0.91,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 0.99,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 71.0,
+        "env": 5.0
+      }
+    },
+    {
+      "system": "randomK1.3",
+      "n": 2,
+      "K_est": 1.3,
+      "healthy_FA": {
+        "naive": 0.95,
+        "flat": 0.0,
+        "env": 0.0
+      },
+      "unstable_detect": {
+        "naive": 1.0,
+        "flat": 1.0,
+        "env": 1.0
+      },
+      "unstable_median_detect_t": {
+        "naive": 1.0,
+        "flat": 47.0,
+        "env": 4.0
+      }
+    }
+  ],
+  "summary": {
+    "envelope_max_healthy_FA": 0.0,
+    "envelope_min_unstable_detection": 1.0,
+    "flat_min_unstable_detection": 0.95
+  },
+  "reading": "The time-indexed envelope threshold keeps FA at zero by construction and recovers the detections the flat Kreiss threshold missed on extreme-K systems, with earlier median detection times \u2014 L3' is the shippable form."
+}

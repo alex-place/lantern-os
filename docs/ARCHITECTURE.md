@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-23
-updated: 2026-06-26
+updated: 2026-07-21
 status: current
 supersedes: docs/ARCHITECTURE-AUDIT-2026-06-13.md
 ---
@@ -9,7 +9,15 @@ supersedes: docs/ARCHITECTURE-AUDIT-2026-06-13.md
 # unisona.ai — Architecture (Current State)
 
 **Canonical "what the system *is* today" snapshot.** This document records *what is true now*;
-the [ADRs](adr/README.md) record *why* it became that way. Every important claim below carries
+the [ADRs](adr/README.md) record *why* it became that way.
+
+> **Delta 2026-07-21 (targeted refresh, not a full re-ground):** the chat page is
+> **chat.html** (renamed from dream-chat.html in #2751; old path redirects). The deterministic
+> chat commands `!work #<issue>` / `!review #<PR>` / `!prs` are live server routes — this
+> document's earlier "autowork is chat-only via `!work`" claim was aspirational until
+> 2026-07-21, when the route landed (PR #2795); autowork run panels now render the
+> Observe→…→Converge loop strip with verify/converge evidence at the Approve moment. A full
+> section-by-section re-ground remains due. Every important claim below carries
 evidence (`file:line` / commit / PR) per the Σ₀ External Reality Rule. Where the code and the
 intent diverge, that is called out in [§9 Known divergences](#9-known-divergences--debt) rather
 than papered over.

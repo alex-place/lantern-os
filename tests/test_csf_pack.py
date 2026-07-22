@@ -324,3 +324,228 @@ def test_pack_files_with_annotations():
         csf_pack.pack([str(f)], out,
                       annotations={"script.py": {"description": "a script", "metadata": {"loop_stage": "Infra"}}})
         assert csf_pack.file_annotation(out, "script.py")["description"] == "a script"
+
+
+# ── solid mode (one compressed stream over all members; v0.9, 2026-07-21) ───────
+
+
+def test_solid_roundtrip_blobs_and_read_file():
+    blobs = {f"logs/day{i}.jsonl": (b'{"n":%d,"msg":"the same structural line"}\n' % i) * 40
+             for i in range(12)}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "solid.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True)
+        assert m.get("solid") and m["version"] == "0.9"
+        assert csf_pack.unpack_blobs(out) == blobs               # full inverse
+        one = "logs/day7.jsonl"
+        assert csf_pack.read_file(out, one) == blobs[one]        # single-member read
+        # per-file entries carry decompressed-space offsets, no csize
+        assert all("csize" not in fe for fe in m["files"])
+
+
+def test_solid_beats_or_ties_per_file_on_redundant_set():
+    blobs = {f"f{i}.md": b"# shared header\ncommon boilerplate paragraph\n" * 30 + str(i).encode()
+             for i in range(20)}
+    with tempfile.TemporaryDirectory() as d:
+        a = str(pathlib.Path(d) / "perfile.csf")
+        b = str(pathlib.Path(d) / "solid.csf")
+        csf_pack.pack_blobs(blobs, a)
+        csf_pack.pack_blobs(blobs, b, solid=True)
+        assert pathlib.Path(b).stat().st_size <= pathlib.Path(a).stat().st_size
+
+
+def test_solid_tamper_detected():
+    blobs = {"a.txt": b"hello " * 100, "b.txt": b"world " * 100}
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "s.csf"
+        csf_pack.pack_blobs(blobs, str(out), solid=True)
+        raw = bytearray(out.read_bytes())
+        raw[len(raw) // 2] ^= 0xFF                                # flip a body byte
+        out.write_bytes(bytes(raw))
+        try:
+            csf_pack.unpack_blobs(str(out))
+            assert False, "tamper must not pass"
+        except ValueError:
+            pass                                                  # footer or sha catches it
+
+
+def test_solid_ignored_for_store_and_dict_subsumed():
+    blobs = {"x": b"abc" * 50, "y": b"def" * 50}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "s.csf")
+        m = csf_pack.pack_blobs(blobs, out, compress=False, solid=True)
+        assert not m.get("solid") and m["version"] == "0.8"       # store: solid ignored
+        m2 = csf_pack.pack_blobs(blobs, out, solid=True, use_dict=True)
+        assert m2.get("solid") and not m2.get("shared_dict")      # dict subsumed
+
+
+def test_non_solid_archives_unchanged():
+    blobs = {"a": b"payload-a" * 20}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "n.csf")
+        m = csf_pack.pack_blobs(blobs, out)
+        assert m["version"] == "0.8" and "solid" not in m
+        assert csf_pack.unpack_blobs(out) == blobs
+
+
+# ── generative members (v0.9): recomputation-as-storage, registry-only ─────────
+
+
+def test_generative_members_roundtrip_and_ratio():
+    """A 16 MiB lawful stream stored as a ~hundred-byte description, materialized
+    on read and sha-verified — generator coding as a container primitive."""
+    size = 16 * 1024 * 1024
+    blobs = {
+        "streams/lawful.bin": {"generator": {"kind": "sha256-ctr", "seed": "universe-42", "size": size}},
+        "streams/zeros.bin": {"generator": {"kind": "zeros", "size": 4096}},
+        "streams/pattern.bin": {"generator": {"kind": "repeat", "pattern_hex": "deadbeef", "size": 1000}},
+        "notes/readme.md": b"# normal member alongside generative ones\n" * 20,
+    }
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "gen.csf"
+        m = csf_pack.pack_blobs(blobs, str(out))
+        assert m["version"] == "0.9"
+        archive_bytes = out.stat().st_size
+        assert archive_bytes < 4096  # 16 MiB member, tiny archive
+        got = csf_pack.unpack_blobs(str(out))
+        assert len(got["streams/lawful.bin"]) == size
+        assert got["streams/zeros.bin"] == b"\x00" * 4096
+        assert got["streams/pattern.bin"][:4] == bytes.fromhex("deadbeef")
+        assert got["notes/readme.md"] == blobs["notes/readme.md"]
+        # determinism: same spec -> same bytes -> sha passes on a fresh read
+        assert csf_pack.read_file(str(out), "streams/lawful.bin")[:32] == got["streams/lawful.bin"][:32]
+
+
+def test_generative_member_tamper_detected():
+    blobs = {"g.bin": {"generator": {"kind": "sha256-ctr", "seed": "s", "size": 4096}}}
+    with tempfile.TemporaryDirectory() as d:
+        out = pathlib.Path(d) / "g.csf"
+        csf_pack.pack_blobs(blobs, str(out))
+        raw = out.read_bytes()
+        # flip the seed inside the manifest: sha over materialized bytes must fail
+        tampered = raw.replace(b'"seed":"s"', b'"seed":"x"')
+        assert tampered != raw
+        out.write_bytes(tampered)
+        try:
+            csf_pack.unpack_blobs(str(out))
+            assert False, "tampered generator must not verify"
+        except ValueError:
+            pass  # footer digest or member sha catches it
+
+
+def test_generative_unknown_kind_and_guard():
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "x.csf")
+        try:
+            csf_pack.pack_blobs({"a": {"generator": {"kind": "evil-eval", "size": 10}}}, out)
+            assert False, "unknown generator kind must be rejected"
+        except ValueError:
+            pass
+        try:
+            csf_pack.pack_blobs({"a": {"generator": {"kind": "zeros", "size": 1 << 40}}}, out)
+            assert False, "materialization guard must reject huge sizes"
+        except ValueError:
+            pass
+
+
+def test_generative_plus_solid_combo():
+    blobs = {
+        "doc1.md": b"shared boilerplate\n" * 50,
+        "doc2.md": b"shared boilerplate\n" * 50 + b"tail",
+        "law.bin": {"generator": {"kind": "sha256-ctr", "seed": "k", "size": 8192}},
+    }
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "combo.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True)
+        assert m.get("solid") and m["version"] == "0.9"
+        got = csf_pack.unpack_blobs(out)
+        assert got["doc2.md"].endswith(b"tail") and len(got["law.bin"]) == 8192
+
+
+# ── F1b: read_slice (observer-slice reads) + framed solid ──────────────────────
+
+
+def _slice_matches_full(out, path, cases):
+    full = csf_pack.read_file(out, path)
+    for off, ln in cases:
+        assert csf_pack.read_slice(out, path, off, ln) == full[off:off + ln], (path, off, ln)
+
+
+def test_read_slice_all_layouts_match_full_read():
+    blobs = {
+        "gen/law.bin": {"generator": {"kind": "sha256-ctr", "seed": "u", "size": 100_000}},
+        "gen/zeros.bin": {"generator": {"kind": "zeros", "size": 5_000}},
+        "gen/pat.bin": {"generator": {"kind": "repeat", "pattern_hex": "0badf00d51", "size": 7_777}},
+        "doc/a.md": b"alpha beta gamma delta " * 400,
+        "doc/b.md": b"epsilon zeta eta theta " * 300,
+    }
+    cases = [(0, 100), (31, 65), (999, 4001), (4_990, 10), (0, 0)]
+    with tempfile.TemporaryDirectory() as d:
+        # per-file layout
+        out1 = str(pathlib.Path(d) / "perfile.csf")
+        csf_pack.pack_blobs(blobs, out1)
+        for p in blobs:
+            _slice_matches_full(out1, p, cases)
+        # store layout
+        out2 = str(pathlib.Path(d) / "store.csf")
+        csf_pack.pack_blobs(blobs, out2, compress=False)
+        for p in ("doc/a.md", "doc/b.md"):
+            _slice_matches_full(out2, p, cases)
+        # solid (single frame) and framed solid
+        out3 = str(pathlib.Path(d) / "solid.csf")
+        csf_pack.pack_blobs(blobs, out3, solid=True)
+        out4 = str(pathlib.Path(d) / "framed.csf")
+        m4 = csf_pack.pack_blobs(blobs, out4, solid=True, solid_frame_mb=0.005)
+        assert len(m4["solid"]["frames"]) > 1  # framing actually happened
+        for p in blobs:
+            _slice_matches_full(out3, p, cases)
+            _slice_matches_full(out4, p, cases)
+        # tail slice of the big generative member
+        tail = csf_pack.read_slice(out1, "gen/law.bin", 100_000 - 7, 7)
+        assert tail == csf_pack.read_file(out1, "gen/law.bin")[-7:]
+
+
+def test_read_slice_bounds_and_missing():
+    blobs = {"x.bin": b"0123456789"}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "x.csf")
+        csf_pack.pack_blobs(blobs, out)
+        try:
+            csf_pack.read_slice(out, "x.bin", 8, 5)
+            assert False, "out-of-range slice must fail"
+        except ValueError:
+            pass
+        try:
+            csf_pack.read_slice(out, "nope", 0, 1)
+            assert False
+        except KeyError:
+            pass
+
+
+def test_framed_solid_roundtrip_and_frame_locality():
+    """Frames cut at member boundaries: every member lies in exactly one frame,
+    full unpack still byte-exact, and read_file on a framed archive works."""
+    blobs = {f"m{i:02d}.txt": (f"member {i} ".encode() * 500) for i in range(20)}
+    with tempfile.TemporaryDirectory() as d:
+        out = str(pathlib.Path(d) / "framed.csf")
+        m = csf_pack.pack_blobs(blobs, out, solid=True, solid_frame_mb=0.01)
+        frames = m["solid"]["frames"]
+        assert len(frames) > 1
+        assert sum(fr["raw_size"] for fr in frames) == m["solid"]["raw_size"]
+        # member->frame locality (boundaries respected)
+        for fe in m["files"]:
+            covering = [fr for fr in frames
+                        if not (fr["raw_offset"] + fr["raw_size"] <= fe["offset"]
+                                or fr["raw_offset"] >= fe["offset"] + fe["size"])]
+            assert len(covering) == 1, fe["path"]
+        assert csf_pack.unpack_blobs(out) == blobs
+        assert csf_pack.read_file(out, "m07.txt") == blobs["m07.txt"]
+
+
+def test_gen_slice_block_math_sha256_ctr():
+    """The sha256-ctr slicer computes only covering blocks — verify exact block
+    alignment across boundaries."""
+    gen = {"kind": "sha256-ctr", "seed": "blocks", "size": 320}
+    full = csf_pack.materialize_generator(gen)
+    for off, ln in [(0, 32), (31, 2), (32, 32), (33, 63), (300, 20), (0, 320)]:
+        assert csf_pack._gen_slice(gen, off, ln) == full[off:off + ln], (off, ln)
