@@ -184,9 +184,14 @@ owned verified data.
   rows the model memorized the corpus (train loss 0.003) and the update damaged the instruct
   behavior more than it taught. Together with the retrieval negative this shows the 0.5B's
   capability is **fragile under both context injection and aggressive small-corpus updates**.
-  **Evidence-driven next:** scale the corpus (remaining MBPP + the borrowed exec-verified sets)
-  and retrain **gentler** (lr ~5e-5, ≤3 epochs, r=8, retention mix) — the rStar-Math-lineage
-  result appears at trace *scale*, not at 63.
+  **Run 2 (same day, dose-response confirmed):** scaled to **204 traces** (remaining MBPP 120–400)
+  and retrained gentle (lr 5e-5, 3 epochs, r=8): held-out delta went **−6 → ±0** (21/50 both arms;
+  fixed 3, regressed 3; ledger `cr-mrvxt1li`). Training dynamics flipped from memorized (loss
+  0.003) to healthy (loss 0.38, best checkpoint = last). The direction confirms the scale
+  hypothesis: **more data + gentler update = less damage, with real fixes appearing** — but the
+  crossover to a net lift needs an order of magnitude more traces. MBPP is nearly exhausted
+  (400/450 used); the next corpus source is the borrowed verifiable sets (§4: KodCode ≥5
+  tests/problem, TACO Apache-2.0), plus a retention mix to eliminate the residual regressions.
   Longer-term data = the **exec-verified** subset of {SWE-HERO 13.5k, KodCode, TACO} **+ our own
   escalation corpus**; method = Verified-Trace Distillation (receipt-gated, both-class,
   process-level; nearest prior art rStar-Math 2501.04519). Cloud GPU dispatch is real spend (see
