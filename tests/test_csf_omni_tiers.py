@@ -131,3 +131,35 @@ def test_shuffle_helps_a_numeric_array_via_omni():
     # and it must beat plain max-without-transforms (approximate: beat zstd-19 alone)
     import zstandard as zstd
     assert len(blob) < len(zstd.ZstdCompressor(level=19).compress(data))
+
+
+# ── SPDP shuffle+delta composites (research-borrowed, exhaustive-only) ──────────
+
+
+def test_spdp_composites_registered_and_roundtrip():
+    import os
+    for tid in (6, 7, 8):
+        name, fwd, inv = omni.TRANSFORMS[tid]
+        assert name.endswith("+delta")
+        for data in (b"", b"z", b"abcdefgh" * 500, os.urandom(4099), bytes(16)):
+            assert inv(fwd(data)) == data, (tid, len(data))
+    assert all(0 <= t <= 15 for t in omni.TRANSFORMS)   # nibble invariant holds
+
+
+def test_spdp_only_in_exhaustive():
+    for eff in ("fast", "balanced", "max"):
+        tids = {t for t, _c in omni._candidates(eff, portable=False)}
+        assert not (tids & {6, 7, 8}), eff        # SPDP composites absent
+    ex = {t for t, _c in omni._candidates("exhaustive", portable=False)}
+    assert {6, 7, 8} & ex                          # present in exhaustive
+
+
+def test_spdp_helps_16bit_image_like_data():
+    """16-bit sample array with a slow ramp: shuffle+delta must let exhaustive beat
+    plain lzma (the x-ray class)."""
+    import struct
+    data = b"".join(struct.pack("<H", (i // 3) & 0xFFFF) for i in range(60000))
+    b_ex = omni.compress_best(data, effort="exhaustive")
+    assert omni.decompress(b_ex) == data
+    import lzma
+    assert len(b_ex) <= len(lzma.compress(data, preset=9))

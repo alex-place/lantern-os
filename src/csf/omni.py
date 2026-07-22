@@ -128,6 +128,20 @@ def _shuffle_inv(buf: bytes, s: int) -> bytes:
     return bytes(out) + buf[full:]
 
 
+# SPDP-style shuffle→delta chain (Claggett & Burtscher, SPDP; a byte-regroup then a
+# byte-granularity subtraction before LZ). Measured (omni_bitshuffle_probe.py) to beat
+# bz2 on 16-bit image data: Silesia x-ray +0.85%. Exhaustive-tier only (marginal, and
+# the pure-Python delta pass is costly). Bit-level bitshuffle (Masui 2015) was tested in
+# the same probe and DROPPED — 0 wins here: it needs smooth/correlated arrays (radio
+# telescope), not this corpus's byte-aligned or high-entropy-float data.
+def _shufdelta_fwd(b, s):
+    return _delta_fwd(_shuffle_fwd(b, s))
+
+
+def _shufdelta_inv(b, s):
+    return _shuffle_inv(_delta_inv(b), s)
+
+
 TRANSFORMS: dict[int, tuple[str, Callable[[bytes], bytes], Callable[[bytes], bytes]]] = {
     0: ("none", lambda b: b, lambda b: b),
     1: ("delta", _delta_fwd, _delta_inv),
@@ -135,6 +149,9 @@ TRANSFORMS: dict[int, tuple[str, Callable[[bytes], bytes], Callable[[bytes], byt
     3: ("shuf2", lambda b: _shuffle_fwd(b, 2), lambda b: _shuffle_inv(b, 2)),
     4: ("shuf4", lambda b: _shuffle_fwd(b, 4), lambda b: _shuffle_inv(b, 4)),
     5: ("shuf8", lambda b: _shuffle_fwd(b, 8), lambda b: _shuffle_inv(b, 8)),
+    6: ("shuf2+delta", lambda b: _shufdelta_fwd(b, 2), lambda b: _shufdelta_inv(b, 2)),
+    7: ("shuf4+delta", lambda b: _shufdelta_fwd(b, 4), lambda b: _shufdelta_inv(b, 4)),
+    8: ("shuf8+delta", lambda b: _shufdelta_fwd(b, 8), lambda b: _shufdelta_inv(b, 8)),
 }
 
 
@@ -238,6 +255,14 @@ _DOMAIN_ORDER: list[tuple[int, int]] = (
     + [(t, 8) for t in (3, 4, 5)]                          # shuf{2,4,8}+lzma-9
 )
 
+# SPDP shuffle+delta composites — exhaustive-only (marginal +0.85% on 16-bit image
+# data, costly pure-Python delta). Tried after _DOMAIN_ORDER so a tie prefers the
+# plainer transform.
+_SPDP_ORDER: list[tuple[int, int]] = (
+    [(t, 5) for t in (6, 7, 8) if 5 in CODECS]             # shuf{2,4,8}+delta then zstd
+    + [(t, 8) for t in (6, 7, 8)]                          # shuf{2,4,8}+delta then lzma-9
+)
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -268,7 +293,7 @@ def _candidates(effort: str, portable: bool) -> list[tuple[int, int]]:
     if effort == "fast":
         order = [(0, c) for c in (0, 1, 5) if c in CODECS]
     elif effort == "exhaustive":
-        order = list(_SEARCH_ORDER) + _COL_ORDER + _DOMAIN_ORDER   # + domain transforms
+        order = list(_SEARCH_ORDER) + _COL_ORDER + _DOMAIN_ORDER + _SPDP_ORDER
     elif effort == "max":
         order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0] + _COL_ORDER + _DOMAIN_ORDER
     else:  # "balanced" (default) — full panel minus brotli (plain AND col+brotli)
