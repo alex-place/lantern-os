@@ -130,7 +130,11 @@ function _stdioWrapper(code, stdin, expected) {
     "sys.stdin = io.StringIO(_IN)",
     "_buf = io.StringIO(); _old = sys.stdout; sys.stdout = _buf",
     "try:",
-    "    runpy.run_path('cand.py', run_name='__main__')",
+    "    _g = runpy.run_path('cand.py', run_name='__main__')",
+    "    # affordance (alias-shim analog): a program that only DEFINES main() without the",
+    "    # call guard produced no output — invoke it rather than fail on a style convention.",
+    "    if not _buf.getvalue().strip() and callable(_g.get('main')):",
+    "        _g['main']()",
     "except SystemExit:",
     "    pass",
     "finally:",
@@ -214,7 +218,10 @@ function _failingHint(ctx) {
 function _prompt(ctx, tier, language) {
   const failing = _failingHint(ctx);
   return [
-    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Define the function with EXACTLY the name and signature given in the problem; do NOT rename it (keep snake_case as written — do not camelCase it).`,
+    // I/O-contract specifics (exact function name vs complete stdin→stdout program) come from
+    // the problem prompt itself — hardcoding "define the function named..." here broke stdio
+    // tasks (models wrote uncalled functions that print nothing → guaranteed stdout mismatch).
+    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Follow the problem's I/O contract exactly: if it names a function, define EXACTLY that name (do not rename or camelCase it); if it asks for a program, write a complete program that actually runs.`,
     ctx.problem.prompt,
     ctx.y ? `\nCurrent best attempt (improve it; KEEP whatever already passes):\n${ctx.y}` : "",
     failing ? `\nFocus "${ctx.focus}". Still-failing tests:\n${failing}` : `\nFocus: ${ctx.focus}.`,
