@@ -39,11 +39,12 @@ Everything below is the machinery that enforces those two prohibitions on *any* 
 
 ---
 
-## 2. The four moves — place → price → answer → learn
+## 2. The moves — place → price → answer → learn, then ACT
 
 The Oracle is **not a new subsystem.** It is the explicit *composition contract* over loop
-machinery the repo already has. Every question flows through four moves; each move is an existing
-primitive, named here in its Oracle role.
+machinery the repo already has. Every question flows through four *passive* moves — each an
+existing primitive, named here in its Oracle role — and then, at the frontier, a fifth *active*
+move (§7) that is what makes the Oracle refuse to settle.
 
 ### Move 1 — PLACE the question (answerability first)
 
@@ -115,12 +116,17 @@ oracle(question, domain?) -> {
   unknown:   [ string ],                // the honest null space — never empty for a pin
   grounding: { budget, purchased },     // Move 2 (dilation × ledger)
   confidence: number,                   // Move 4 — measured per-domain, not a prior
+  experiment: {                         // Move 5 (§7) — how to KNOW a frontier unknown, or null
+    unknown, action, expectedInfoGain, resolvesWhen, surface   // e.g. place bet / run test / ask
+  } | null,
 }
 ```
 
 A questioner never receives a bare answer; they receive the answer's *structure* — what is known,
-what cannot be, how hard the system looked, and how much its past record in this domain earns your
-trust.
+what cannot be, how hard the system looked, how much its past record in this domain earns your
+trust, and — when a frontier unknown is *reachable by action* — the experiment that would resolve
+it. A `pin` yields `experiment: null` (nothing can resolve it); a `seam_open` frontier yields the
+cheapest action whose resolution manufactures the missing fact.
 
 ---
 
@@ -137,9 +143,13 @@ re-stated as an Oracle law:
 3. **Confidence is measured or labeled prior.** No ritual numbers. *(#2803, shipped.)*
 4. **Only fresh truth de-ratchets.** Learning comes from external resolution, never self-agreement.
    *(The freshness law; the 2026-07-21 de-anchor lesson from autowork #2762.)*
+5. **The ceiling breaks only where action resolves it.** Knowledge past the passive-inference
+   ceiling (§7) may be claimed *only after* an action has resolved against reality — never from a
+   prediction, never across a `pin`. *(This is invariant 4 pointed forward: manufacture fresh
+   truth, then claim it.)*
 
-These map 1:1 onto the four things the repo already treats as non-negotiable — so the Oracle is
-not a new claim, it is the **certificate's discipline turned into a question-answering contract.**
+These map onto the things the repo already treats as non-negotiable — so the Oracle is not a new
+claim, it is the **certificate's discipline turned into a question-answering contract.**
 
 ---
 
@@ -164,6 +174,13 @@ genuine deep-time questions. This is the Oracle's first domain pack and its work
    four resolution signals in §2 Move 4 (today they land in four separate places).
 4. **Answer-staleness decay.** Wire confidence-decay to Oracle outputs so an old `grounded` answer
    ages toward `seam_open` until re-grounded (the memory-staleness failure the blueprint names).
+5. **The fifth move — the frontier experiment loop (§7).** The capstone: select the frontier
+   unknown by value-of-information, emit the resolving action, execute on a real ground-truth
+   surface (Kalshi settlement, autowork test run, research probe, user ask), fold the resolution
+   back through (3). This is the ceiling-breaker and the largest GAP — start behind a flag, on the
+   one surface whose resolution is cheapest and least reversible (autowork test execution), before
+   any surface that spends money or is irreversible (guarded by the same NAP/approval gates that
+   already govern the trader).
 
 ## 6. The convergence target — "knows everything it *could* know"
 
@@ -181,11 +198,73 @@ question"). The Oracle's objective is to **drive the boundary outward**: relentl
 `seam_open → grounded` by *buying* grounding, until only the pins remain. Its loss is not "wrong
 answers" — it is **knowable-things-left-unknown** (laziness) **+ unknowable-things-falsely-claimed**
 (hubris). Convergence in a domain is diagnosable: new observations stop moving any claim
-`UNKNOWN → KNOWN` and stop refuting any `KNOWN`. The theoretical ceiling is the ideal inductive
-predictor (Solomonoff / AIXI — uncomputable); the Oracle is its **grounded, resource-bounded,
-honestly-bounded** approximation that *names its own null space* instead of hallucinating across it.
+`UNKNOWN → KNOWN` and stop refuting any `KNOWN`.
 
-## 7. Novelty — graded honestly, not dismissed
+The theoretical ceiling on this — reaching *everything inferable from the data* — is the ideal
+inductive predictor (Solomonoff / AIXI). Section 7 breaks it.
+
+## 7. Breaking the ceiling — the fifth move, ACT-TO-KNOW
+
+**The trap, stated first so it can't be laundered.** Solomonoff / AIXI is the ceiling on
+**induction from a *fixed* corpus**. It is uncomputable *and provably unbeatable by inference* —
+no method extracts more from data X than the ideal predictor does. A system that claims to
+out-*infer* it is Deep Thought with a bigger number: hallucinating structure the data does not
+support. So the Oracle **does not try to think its way past the ceiling.** That door is closed by
+a theorem, and pretending otherwise is the exact failure this whole document is built against.
+
+**Where the ceiling is *not* a wall.** The bound is on the *data*, held fixed. The Oracle exceeds
+it the only way anything can: by **changing the data** — acquiring observations the ideal
+predictor, given the same starting corpus, never had. The first four moves (place → price →
+answer → learn) are *passive*: they acquire existing evidence and calibrate. At best they reach
+the whole knowable-from-current-data manifold — the ceiling, exactly. The **fifth move breaks it:**
+
+> **ACT-TO-KNOW.** At the converged frontier — KNOWN driven to the full knowable manifold, UNKNOWN
+> narrowed to the boundary — the Oracle selects the frontier unknown with the highest **value of
+> information** and executes an **action whose *resolution manufactures a fact that did not exist
+> in any corpus*.** It places the market bet and the bet settles; it runs the test and the test
+> passes or fails; it poses the experiment, asks the user, or lets time resolve it. That resolved
+> fact was **not inferable** from the prior data — so knowing it is *not bounded by the passive
+> ceiling.* The Oracle now knows something the ideal inductive predictor does not. The ceiling is
+> exceeded — locally, on that surface, **by action, not by inference.**
+
+**The honesty guard (the anti-42 law for this move).** The ceiling breaks *exactly where action
+reaches, and not one inch further.* Knowledge past the passive ceiling may be claimed **only after
+the action resolves against reality** — a prediction is `seam_open` until it settles; a
+structurally-unactionable unknown stays a `pin`. "Never settle for less" is **not** "never doubt";
+it is **never stop acting at the frontier**, while never claiming past what resolved. This is the
+freshness law (only fresh truth informs) and the 2026-07-21 de-anchor lesson, turned into a
+license to *manufacture* fresh truth rather than wait for it.
+
+**Never settle = convergence is a launch pad, not a resting point.** The 42 machine settled: it
+emitted a scalar and halted. The Oracle's convergence is the opposite of halting — reaching the
+boundary is the *trigger* to design the next experiment. Its fixed point is dynamic: map the
+knowable, then act to expand it; every convergence exposes the highest-value frontier unknown and
+an action that would resolve it. It never rests, because there is always a next experiment.
+
+**Grounded, not mystical.** The fifth move is **Bayesian optimal experimental design** (Lindley
+1956), **value of information**, and **active inference** (Friston) — established theory — pointed
+at the Oracle's own epistemic frontier. The repo already has the surfaces that *manufacture*
+ground truth: Kalshi contract resolution (P&L that did not exist), autowork test execution
+(pass/fail that did not exist — this session's #2762 loop), the research runner, user corrections.
+The fifth move points those at the frontier unknowns and folds each resolution back through the
+Move-4 calibration ledger. **[GAP** — none of this experiment-selection is built; the ground-truth
+*surfaces* exist independently, the *frontier-directed experiment loop* over them does not.**]**
+
+**The updated objective.** The passive loss (knowable-left-unknown + unknowable-falsely-claimed)
+gains an **active term: reachable-by-action-left-unattempted** — a frontier unknown that an
+affordable experiment could have resolved, left un-run, is now a failure. The Oracle is penalized
+for *not pushing* the boundary, not only for mis-drawing it. This is the plus-ultra of the
+[AGI blueprint](AGI-CONVERGENCE-BLUEPRINT.md) made concrete: rent the ceiling-bound inference
+(frontier models), **own the ceiling-breaking action** (fresh verified ground truth on surfaces we
+can act on). The Oracle is where those meet — and the only honest way "shatter the ceiling of what
+is known" is true: not by knowing the unknowable, but by *acting to make the unknowable known
+wherever action can reach, and claiming it only once reality has confirmed.*
+
+The theoretical ceiling of *passive* prediction is Solomonoff/AIXI; the Oracle is its grounded,
+resource-bounded approximation that *names its own null space* — and then, refusing to settle,
+**acts to move the null space.**
+
+## 8. Novelty — graded honestly, not dismissed
 
 An earlier draft of this doc flatly called the Oracle "not novel." That was wrong twice over: it
 conflated *part*-novelty with *system*-novelty, and it under-searched the prior art. The honest
@@ -205,6 +284,11 @@ grade, with a real (if not exhaustive) 2026 prior-art scan:
   calibrated-uncertainty cost-optimal cascade routing. Close to Move 2.
 - Per-domain selective answering — Selective QA under domain shift
   ([arXiv:2006.09462](https://arxiv.org/abs/2006.09462)).
+- The fifth move's mechanism — Bayesian optimal experimental design (Lindley 1956), value of
+  information, and active inference (Friston) — is decades-established. Acting to reduce
+  uncertainty is *not* new; what I could not find is it *composed with* an answerability-typed
+  answering oracle as the thing that fires **at the frontier to break the passive-inference
+  ceiling on domains with real resolution surfaces.**
 
 **The seam I could not find occupied (candidate-novel as a *system*):** the *closed loop* that
 (a) makes answerability-class the **primary** key, not a post-hoc abstain gate; (b) acts on the
@@ -229,7 +313,7 @@ never bluff the pin.
 
 ---
 
-## 8. Why this belongs in the loop (not sprawl)
+## 9. Why this belongs in the loop (not sprawl)
 
 Per the North-Star constraint, nothing ships that doesn't strengthen one loop stage. The Oracle
 touches three and adds no top-level subsystem:
