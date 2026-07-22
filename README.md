@@ -148,7 +148,7 @@ unisona.ai is built on **Σ₀ (Sigma-Zero)** — a framework for verifying that
 - The five Σ₀ routing/feedback paradoxes identified in 2026-06 (agent-selection hard loop, unbounded provider retries, stale route cache, silent memory truncation, ignored escalation gates) are all fixed with measurement loops and feedback gates, verified under stress testing.
 - Verification surfaces are user-facing: fact-check button, grounding-diff viewer, drift canaries, and confidence-scored convergence records.
 
-Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[AGI convergence blueprint](docs/AGI-CONVERGENCE-BLUEPRINT.md)** · **[collapse certificate](docs/SIGMA0-COLLAPSE-CERTIFICATE.md)** · **[grounding ledger](docs/SIGMA0-GROUNDING-LEDGER.md)** · **[anti-collapse hardening](docs/ANTI-COLLAPSE-HARDENING.md)** · **[research canon](docs/RESEARCH-CANON.md)**.
+Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[AGI convergence blueprint](docs/AGI-CONVERGENCE-BLUEPRINT.md)** · **[collapse certificate](docs/SIGMA0-COLLAPSE-CERTIFICATE.md)** · **[Oracle design](docs/CONVERGENCE-ORACLE-DESIGN.md)** · **[grounding ledger](docs/SIGMA0-GROUNDING-LEDGER.md)** · **[anti-collapse hardening](docs/ANTI-COLLAPSE-HARDENING.md)** · **[research canon](docs/RESEARCH-CANON.md)**.
 
 ## Privacy & security
 
