@@ -1,0 +1,33 @@
+{
+  "note": "RKD = retrieval-anchored structural delta (global nearest-prior by token overlap) + entropy floor, vs shipped zstd-19 / brotli-11 / solid+omni. Kill criterion C2: RKD must beat solid+omni on the real ledgers.",
+  "rows": [
+    {
+      "corpus": "convergence/records.jsonl",
+      "raw": 975383,
+      "n_lines": 1215,
+      "roundtrip": true,
+      "zstd19": 136236,
+      "brotli11": 126122,
+      "solid_omni": 120964,
+      "rkd+zstd19": 138351,
+      "rkd+brotli11": 128055,
+      "rkd_vs_zstd_pct": -1.5,
+      "rkd_vs_solid_omni_pct": -12.6,
+      "best_rkd_vs_best_baseline_pct": -5.5
+    },
+    {
+      "corpus": "csf_memory/raw.jsonl",
+      "raw": 2083668,
+      "n_lines": 1590,
+      "roundtrip": true,
+      "zstd19": 175313,
+      "brotli11": 165246,
+      "solid_omni": 156646,
+      "rkd+zstd19": 180783,
+      "rkd+brotli11": 168854,
+      "rkd_vs_zstd_pct": -3.0,
+      "rkd_vs_solid_omni_pct": -13.4,
+      "best_rkd_vs_best_baseline_pct": -7.2
+    }
+  ]
+}
