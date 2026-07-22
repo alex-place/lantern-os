@@ -9,10 +9,40 @@ A CapabilityGate checks claims before allowing actions to proceed.
 
 from __future__ import annotations
 
+import re
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set
+
+
+# ── Shared authz helpers (also imported by nap.py so both gates agree) ──────────
+
+def canon(token: str) -> str:
+    """Canonicalize an authorization token before any allow/deny decision.
+
+    Lowercase, strip, and unify whitespace/hyphens to '_' — so a denial keyed on
+    'financial_trade' cannot be bypassed by 'Financial_Trade', 'financial-trade',
+    'financial trade', or trailing space (CWE-178 / CWE-289 canonicalization).
+    Dots are preserved (hierarchical labels like 'pii.ssn' keep their structure).
+    """
+    return re.sub(r"[\s\-]+", "_", str(token).strip().lower())
+
+
+def canon_set(tokens) -> Set[str]:
+    return {canon(t) for t in (tokens or [])}
+
+
+# The single tier ladder both gates rank against. Unknown tiers are handled
+# fail-closed by the callers (unknown *required* tier denies; unknown *claim* tier
+# ranks below everything). Keep NAP and CCF pointed at THIS map.
+TIER_ORDER: Dict[str, int] = {"wanderer": 0, "deep_dreamer": 1, "synthesasia_guild": 2}
+
+
+def tier_rank(tier: str) -> int:
+    """Rank a claim/subject tier; an unrecognized tier ranks below the floor (-1),
+    so it can never satisfy a real (>=0) requirement."""
+    return TIER_ORDER.get(canon(tier), -1)
 
 
 @dataclass
@@ -31,6 +61,11 @@ class CapabilityClaim:
     expires_at: Optional[str] = None
     # CCF tier enforcement
     tier: str = "wanderer"  # wanderer | deep_dreamer | synthesasia_guild
+
+    def __post_init__(self) -> None:
+        # Store capabilities canonicalized so matching is bypass-proof (F6).
+        self.capabilities = canon_set(self.capabilities)
+        self.tier = canon(self.tier) if self.tier else self.tier
 
     def verify(self) -> "CapabilityClaim":
         now = datetime.now(timezone.utc)
@@ -51,7 +86,7 @@ class CapabilityClaim:
             return False
 
     def has_capability(self, cap: str) -> bool:
-        return cap in self.capabilities
+        return canon(cap) in self.capabilities
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -77,7 +112,10 @@ class HonestyTracker:
         self._checks: Dict[str, List[Dict[str, Any]]] = {}
 
     def record_result(self, agent_id: str, expected_caps: Set[str], actual_caps: Set[str]) -> None:
-        matched = bool(expected_caps & actual_caps)
+        # Honest iff the agent actually held EVERYTHING it needed (F4). The old
+        # any-overlap test (`expected & actual`) rewarded partial over-claims, so an
+        # agent with one real cap could keep claiming caps it lacked at honesty 1.0.
+        matched = set(expected_caps).issubset(set(actual_caps))
         entry = {"expected": sorted(expected_caps), "actual": sorted(actual_caps), "matched": matched, "at": datetime.now(timezone.utc).isoformat()}
         self._checks.setdefault(agent_id, []).append(entry)
 
@@ -110,14 +148,14 @@ class CapabilityGate:
         # P8/PCSF: optional ProviderRegistry; when supplied, a claim whose provider is
         # not currently routable (circuit-open / quota-hit / no-key) is denied.
         self._pcsf = pcsf_registry
-        # CCF tier enforcement: action → required tier
-        self._tier_requirements: Dict[str, str] = {
+        # CCF tier enforcement: action → required tier (keys canonicalized).
+        self._tier_requirements: Dict[str, str] = {canon(k): v for k, v in {
             "art_generation_unlimited": "synthesasia_guild",
             "art_generation": "deep_dreamer",
             "3door_full": "deep_dreamer",
             "advanced_symbolic_tools": "deep_dreamer",
             "guild_override": "synthesasia_guild",
-        }
+        }.items()}
 
     def register_claim(self, claim: CapabilityClaim) -> None:
         if not claim.verified_at:
@@ -146,18 +184,21 @@ class CapabilityGate:
             return GateResult(allowed=False,
                               reason=f"honesty {score} < floor {self._honesty_floor}",
                               honesty_score=score)
-        # Tier enforcement
+        # Tier enforcement (F5: an unknown REQUIRED tier fails CLOSED — XACML
+        # "indeterminate → deny" — instead of the old fail-open where an
+        # unrecognized required tier acted as no requirement at all).
         if tier and claim.tier:
-            tier_order = {"wanderer": 0, "deep_dreamer": 1, "synthesasia_guild": 2}
-            claim_rank = tier_order.get(claim.tier, 0)
-            request_rank = tier_order.get(tier, 0)
-            if claim_rank < request_rank:
+            if canon(tier) not in TIER_ORDER:
+                return GateResult(allowed=False,
+                                  reason=f"unknown required tier '{tier}' (fail-closed)")
+            if tier_rank(claim.tier) < tier_rank(tier):
                 return GateResult(allowed=False, reason=f"tier mismatch: claim tier '{claim.tier}' < required '{tier}'")
+        required = canon_set(required)                      # F6: canonical match
         missing = required - claim.capabilities
         if missing:
             self._honesty.record_result(agent_id, required, claim.capabilities)
             return GateResult(allowed=False, reason=f"missing capabilities: {sorted(missing)}", honesty_score=self._honesty.score(agent_id))
-        if boundary and claim.boundary != boundary and claim.boundary != "hybrid":
+        if boundary and canon(claim.boundary) != canon(boundary) and canon(claim.boundary) != "hybrid":
             return GateResult(allowed=False, reason=f"boundary mismatch: need {boundary}, have {claim.boundary}")
         self._honesty.record_result(agent_id, required, claim.capabilities)
         return GateResult(allowed=True, claim=claim, honesty_score=self._honesty.score(agent_id))

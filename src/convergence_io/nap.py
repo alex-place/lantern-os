@@ -16,6 +16,10 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
+# Shared authz helpers — one canonicalizer and one tier ladder for BOTH gates, so a
+# denial and a capability claim can never disagree on what a token/tier means.
+from .ccf import canon, canon_set, tier_rank
+
 
 @dataclass
 class NegativeAuthorityProfile:
@@ -28,20 +32,32 @@ class NegativeAuthorityProfile:
     source: str = "static"  # static | external_list | operator | temporal
     expires_at: Optional[str] = None
     last_refreshed: Optional[str] = None
-    # N7 — tier override: minimum tier required to bypass this NAP
+    # N7 — tier override: minimum tier required to bypass this NAP (SOFT denials only)
     tier_override: Optional[str] = None  # synthesasia_guild | deep_dreamer | None (no override)
+    # HARD denial: an enforcement boundary that NO tier can lift. Makes the documented
+    # "hard denials cannot be overridden by a capability claim" invariant structural,
+    # not conventional — a hard NAP ignores tier_override entirely (IP register §4.4).
+    hard: bool = False
+
+    def __post_init__(self) -> None:
+        # Store all denial tokens canonicalized so a re-cased/re-spaced action, provider,
+        # boundary, or data-class string cannot slip past the boundary (F1, CWE-178/289).
+        self.denied_actions = canon_set(self.denied_actions)
+        self.denied_providers = canon_set(self.denied_providers)
+        self.denied_boundaries = canon_set(self.denied_boundaries)
+        self.denied_data_classes = canon_set(self.denied_data_classes)
 
     def denies_action(self, action_type: str) -> bool:
-        return action_type in self.denied_actions
+        return canon(action_type) in self.denied_actions
 
     def denies_provider(self, provider_id: str) -> bool:
-        return provider_id in self.denied_providers
+        return canon(provider_id) in self.denied_providers
 
     def denies_boundary(self, boundary: str) -> bool:
-        return boundary in self.denied_boundaries
+        return canon(boundary) in self.denied_boundaries
 
     def denies_data_class(self, label: str) -> bool:
-        return label in self.denied_data_classes
+        return canon(label) in self.denied_data_classes
 
     def is_expired(self) -> bool:
         if not self.expires_at:
@@ -54,10 +70,11 @@ class NegativeAuthorityProfile:
             return False
 
     def can_override(self, tier: str) -> bool:
-        if not self.tier_override:
+        # A hard denial can never be lifted by a tier, regardless of tier_override.
+        if self.hard or not self.tier_override:
             return False
-        tier_order = {"wanderer": 0, "deep_dreamer": 1, "synthesasia_guild": 2}
-        return tier_order.get(tier, 0) >= tier_order.get(self.tier_override, 0)
+        # Shared tier ladder; an unknown tier ranks below the floor so it can't override.
+        return tier_rank(tier) >= tier_rank(self.tier_override)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -71,6 +88,7 @@ class NegativeAuthorityProfile:
             "expires_at": self.expires_at,
             "last_refreshed": self.last_refreshed,
             "tier_override": self.tier_override,
+            "hard": self.hard,
         }
 
 
@@ -139,6 +157,7 @@ def dreamer_safety_nap() -> NegativeAuthorityProfile:
         denied_data_classes={"pii.ssn", "pii.financial", "phi.diagnosis", "coppa.under_13"},
         reason="Dreamer safety boundary — no financial, medical, or child-identity actions",
         source="static",
+        hard=True,  # safety is an enforcement boundary — no tier lifts it
     )
 
 
