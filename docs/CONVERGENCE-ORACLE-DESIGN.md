@@ -179,12 +179,21 @@ genuine deep-time questions. This is the Oracle's first domain pack and its work
    `tests/test_oracle_active_loop.py` 7 passed) runs the ACT-TO-KNOW loop on the cheapest surface —
    local code execution — and its first run manufactured **5 corpus-absent facts by action**, each
    provably outside any fixed corpus (current git SHA, live file counts, a hash, current doc state),
-   plus one `pin` named-not-bluffed (`data/oracle/active-loop-runs.jsonl`; certificate §10.2). What
-   remains **GAP:** the passive baseline is a frozen heuristic, not a frontier model — so this proves
-   the *mechanism*, not that the loop beats a strong predictor; and value-of-information experiment
-   *selection* is not built. The strong rungs — a model-in-the-loop run on questions where inference
-   plausibly fails, then money/irreversible surfaces (Kalshi settlement) behind the same NAP/approval
-   gates that already govern the trader — are next, deliberately staged by irreversibility.
+   plus one `pin` named-not-bluffed (`data/oracle/active-loop-runs.jsonl`; certificate §10.2).
+   **VoI steering now SEED-BUILT too (2026-07-22):** `experiments/oracle_voi_select.py`
+   (unit-tested, `tests/test_oracle_voi_select.py` 7 passed) adds the *directed*-exploration leg —
+   budgeted greedy value-of-information selection (Howard 1966; Krause–Guestrin submodular greedy,
+   (1−1/e) under submodularity, not verified here) — turning the loop from "run every candidate"
+   into "spend the budget on the highest-VoI experiments." Its run ranks corpus-absent facts
+   (VoI 1.0, only knowable by acting) above obvious facts inference already knows (`2+2==4`,
+   VoI ~0.01) and excludes pins (VoI 0). This is the bandit's *steering* on top of the anti-collapse
+   *no-regret* floor (see certificate §10). What remains **GAP:** the passive baseline is a frozen
+   heuristic, not a frontier model, and the VoI is a heuristic prior-entropy proxy, not a computed
+   Bayesian posterior-entropy reduction — so this proves the *mechanism + steering structure*, not
+   that the loop beats a strong predictor or that the selection is optimal. The strong rungs — a
+   model-in-the-loop run on questions where inference plausibly fails, a real Bayesian VoI estimate,
+   then money/irreversible surfaces (Kalshi settlement) behind the same NAP/approval gates that
+   already govern the trader — are next, deliberately staged by irreversibility.
 
 ## 6. The convergence target — "knows everything it *could* know"
 
