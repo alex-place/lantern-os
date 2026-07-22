@@ -65,14 +65,22 @@ def _read_varint(buf, pos):
         shift += 7
 
 
+_POST_CAP = 24   # keep only the N most-recent postings per token (bounds retrieval)
+
+
 def rkd_forward(lines: list[bytes]) -> bytes:
-    """Retrieval-anchored structural delta. Global nearest-prior by token overlap."""
+    """Retrieval-anchored structural delta. Global nearest-prior by token overlap.
+
+    Retrieval is bounded: each token keeps only its _POST_CAP most-recent postings, so
+    the candidate scan is O(tokens * _POST_CAP) per line — near-linear overall, the way
+    a real capped/top-k inverted index behaves (an unbounded scan is quadratic on
+    common-token corpora like a chemical DB)."""
     index: dict[bytes, list[int]] = {}
     out = bytearray()
     out += _varint(len(lines))
     for i, line in enumerate(lines):
         toks = set(_TOK.findall(line))
-        # retrieve: prior line sharing the most tokens
+        # retrieve: prior line sharing the most tokens (bounded posting scan)
         counts: dict[int, int] = {}
         for t in toks:
             for j in index.get(t, ()):
@@ -99,7 +107,10 @@ def rkd_forward(lines: list[bytes]) -> bytes:
             out += _varint(len(line))
             out += line
         for t in toks:
-            index.setdefault(t, []).append(i)
+            lst = index.setdefault(t, [])
+            lst.append(i)
+            if len(lst) > _POST_CAP:
+                del lst[0]                       # keep only recent postings (bounded)
     return bytes(out)
 
 
