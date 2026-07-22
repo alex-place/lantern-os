@@ -67,6 +67,8 @@ HEADER_LEN = 7  # magic(2) + method(1) + crc32(4)
 # LZMA raw filter with pb=0 — position bits 0 helps line-structured text/JSONL.
 # The exact same filter spec is required to decode (FORMAT_RAW has no header).
 _LZMA_PB0 = [{"id": lzma.FILTER_LZMA2, "preset": 9 | lzma.PRESET_EXTREME, "pb": 0}]
+# x86 BCJ branch filter + LZMA2 (codec 9). Exact spec required to decode (FORMAT_RAW).
+_BCJ_X86 = [{"id": lzma.FILTER_X86}, {"id": lzma.FILTER_LZMA2, "preset": 9}]
 
 
 # ---------------------------------------------------------------------------
@@ -106,10 +108,33 @@ def _col_fwd(b: bytes) -> bytes:
     return _col.forward(b)   # raises NotApplicable -> candidate skipped by _encode_all
 
 
+# Byte-shuffle / SoA planes (scientific-array domain, HDF5/Blosc "shuffle"): split
+# fixed-width records into byte planes so each plane is low-entropy and the LZ/entropy
+# stage sees smooth structure instead of interleaved noise. Stride derives from the
+# transform id; length is recovered from the buffer at decode (extended slicing is
+# C-level, so no numpy dependency). Measured wins over the panel best (2026-07-21,
+# experiments/omni_crossdomain_probe.py): AITDCC E +7.7% (stride 4), G +2.4% (8), F
+# +1.0% (2) — 32/64/16-bit numeric arrays that brotli/bz2 could not decorrelate.
+def _shuffle_fwd(data: bytes, s: int) -> bytes:
+    n = len(data); full = n - (n % s)
+    return b"".join(data[p:full:s] for p in range(s)) + data[full:]
+
+
+def _shuffle_inv(buf: bytes, s: int) -> bytes:
+    n = len(buf); full = n - (n % s); per = full // s
+    out = bytearray(full)
+    for p in range(s):
+        out[p:full:s] = buf[p * per:(p + 1) * per]
+    return bytes(out) + buf[full:]
+
+
 TRANSFORMS: dict[int, tuple[str, Callable[[bytes], bytes], Callable[[bytes], bytes]]] = {
     0: ("none", lambda b: b, lambda b: b),
     1: ("delta", _delta_fwd, _delta_inv),
     2: ("col", _col_fwd, _col.inverse),
+    3: ("shuf2", lambda b: _shuffle_fwd(b, 2), lambda b: _shuffle_inv(b, 2)),
+    4: ("shuf4", lambda b: _shuffle_fwd(b, 4), lambda b: _shuffle_inv(b, 4)),
+    5: ("shuf8", lambda b: _shuffle_fwd(b, 8), lambda b: _shuffle_inv(b, 8)),
 }
 
 
@@ -138,6 +163,15 @@ def _build_codecs() -> dict[int, tuple[str, bool, Callable, Callable]]:
         8: ("lzma-9", True,
             lambda b: lzma.compress(b, preset=9),
             lzma.decompress),
+        # 9 = LZMA with the x86 BCJ branch filter (executable-compression domain —
+        # xz/UPX). Rewrites x86 call/jump *relative* targets to absolute so the LZ
+        # matcher sees the repetition it otherwise can't. Measured wins over the
+        # panel best (omni_crossdomain_probe.py): Silesia ooffice +16.45%, AITDCC
+        # H (ELF) +3.42% — genuine x86 binaries. Same FORMAT_RAW decode contract as
+        # lzma-pb0 (the exact filter spec is required to decode).
+        9: ("lzma-bcjx86", True,
+            lambda b: lzma.compress(b, format=lzma.FORMAT_RAW, filters=_BCJ_X86),
+            lambda b: lzma.decompress(b, format=lzma.FORMAT_RAW, filters=_BCJ_X86)),
     }
     if _zstd is not None:
         codecs[5] = ("zstd-19", True,
@@ -165,7 +199,7 @@ assert all(0 <= cid <= 0x0F for cid in CODECS), "CSF-Omni codec id must fit a ni
 assert all(0 <= tid <= 0x0F for tid in TRANSFORMS), "CSF-Omni transform id must fit a nibble (0-15)"
 
 # Codecs that ship with Python — safe for portable mode and present at decode.
-_STDLIB_CODEC_IDS = {0, 1, 2, 3, 4, 8}
+_STDLIB_CODEC_IDS = {0, 1, 2, 3, 4, 8, 9}
 
 # Candidate search order (transform id, codec id). Lower order wins ties, so the
 # cheapest-to-decode / most-standard option is preferred on a tie. `store` first
@@ -190,6 +224,19 @@ _BALANCED_CODECS = (0, 1, 5, 2, 3, 4, 8)   # store zlib zstd bz2 lzma lzma-pb0 l
 # (forward() fast-skips everything else). Listed after the t∈{0,1} panel so a tie
 # prefers the simpler/no-transform encoding; omni still keeps the strict min size.
 _COL_ORDER: list[tuple[int, int]] = [(2, c) for c in (5, 6, 3) if c in CODECS]
+
+# Domain-specific candidates (executable + scientific-array), measured to beat the
+# general panel on binary/numeric files (experiments/omni_crossdomain_probe.py):
+#   bcj-x86 (codec 9) — x86 executables (ooffice +16.45%, ELF H +3.42%)
+#   shuf{2,4,8} (transforms 3/4/5) × zstd/lzma-9 — numeric arrays (E +7.7% / G +2.4% / F +1.0%)
+# They cost a pass on non-matching data, so they live in `max`/`exhaustive` only —
+# NOT in the fast default. Listed last: a tie prefers the plainer encoding, and omni
+# still keeps the strict minimum, so adding them can never enlarge any output.
+_DOMAIN_ORDER: list[tuple[int, int]] = (
+    ([(0, 9)] if 9 in CODECS else [])                      # bcj-x86
+    + [(t, 5) for t in (3, 4, 5) if 5 in CODECS]           # shuf{2,4,8}+zstd (cheap)
+    + [(t, 8) for t in (3, 4, 5)]                          # shuf{2,4,8}+lzma-9
+)
 
 
 # ---------------------------------------------------------------------------
@@ -221,9 +268,9 @@ def _candidates(effort: str, portable: bool) -> list[tuple[int, int]]:
     if effort == "fast":
         order = [(0, c) for c in (0, 1, 5) if c in CODECS]
     elif effort == "exhaustive":
-        order = list(_SEARCH_ORDER) + _COL_ORDER            # codecs x {none, delta} + col
+        order = list(_SEARCH_ORDER) + _COL_ORDER + _DOMAIN_ORDER   # + domain transforms
     elif effort == "max":
-        order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0] + _COL_ORDER
+        order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0] + _COL_ORDER + _DOMAIN_ORDER
     else:  # "balanced" (default) — full panel minus brotli (plain AND col+brotli)
         balanced_col = [(t, c) for (t, c) in _COL_ORDER if c not in (6, 7)]
         order = [(0, c) for c in _BALANCED_CODECS if c in CODECS] + balanced_col

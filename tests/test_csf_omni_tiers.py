@@ -79,3 +79,55 @@ def test_balanced_close_to_max_on_realistic_text():
     b_max = omni.compress_best(data, effort="max")
     assert omni.decompress(b_bal) == data and omni.decompress(b_max) == data
     assert len(b_bal) <= len(b_max) * 1.02
+
+
+# ── cross-domain transforms: BCJ-x86 codec + byte-shuffle (2026-07-21) ──────────
+
+
+def test_bcj_and_shuffle_registered():
+    assert omni.CODECS[9][0] == "lzma-bcjx86"
+    assert omni.TRANSFORMS[3][0] == "shuf2"
+    assert omni.TRANSFORMS[4][0] == "shuf4"
+    assert omni.TRANSFORMS[5][0] == "shuf8"
+    # all ids still fit a nibble
+    assert all(0 <= c <= 15 for c in omni.CODECS)
+    assert all(0 <= t <= 15 for t in omni.TRANSFORMS)
+
+
+def test_shuffle_transforms_roundtrip_exact():
+    import os
+    for s, (fwd, inv) in ((2, omni.TRANSFORMS[3][1:]), (4, omni.TRANSFORMS[4][1:]),
+                          (8, omni.TRANSFORMS[5][1:])):
+        for data in (b"", b"x", b"abcdefgh" * 1000, os.urandom(4097), bytes(9)):
+            assert inv(fwd(data)) == data, (s, len(data))
+
+
+def test_bcj_codec_roundtrips():
+    enc, dec = omni.CODECS[9][2], omni.CODECS[9][3]
+    data = bytes(range(256)) * 500
+    assert dec(enc(data)) == data
+
+
+def test_domain_transforms_only_in_max_and_exhaustive():
+    for eff in ("fast", "balanced"):
+        ids = {(t, c) for t, c in omni._candidates(eff, portable=False)}
+        assert not any(c == 9 for _t, c in ids)        # no bcj-x86
+        assert not any(t in (3, 4, 5) for t, _c in ids)  # no shuffle
+    for eff in ("max", "exhaustive"):
+        ids = {(t, c) for t, c in omni._candidates(eff, portable=False)}
+        assert (0, 9) in ids                            # bcj-x86 present
+        assert any(t in (3, 4, 5) for t, _c in ids)     # shuffle present
+
+
+def test_shuffle_helps_a_numeric_array_via_omni():
+    """A 4-byte record array where the high bytes are near-constant: shuffle must
+    let omni-max beat every no-transform codec (the E/F/G class)."""
+    import struct
+    data = b"".join(struct.pack("<I", 0x0400_0000 + (i % 997)) for i in range(50000))
+    blob = omni.compress_best(data, effort="max")
+    assert omni.decompress(blob) == data
+    # a shuffle method should win here
+    assert "shuf" in omni.describe(blob)
+    # and it must beat plain max-without-transforms (approximate: beat zstd-19 alone)
+    import zstandard as zstd
+    assert len(blob) < len(zstd.ZstdCompressor(level=19).compress(data))
