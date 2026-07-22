@@ -1,0 +1,39 @@
+# #2833 prompt set — spread across decay regimes so the prediction is falsifiable:
+# easy-factual (fast converge, grounded), math, multi-step reason, open-ended (spiral),
+# ambiguous/unanswerable (barrier, should not converge), and fictional/nonsense (ungrounded).
+# One prompt per line; blank lines and #-comments ignored.
+
+# --- easy factual (expect fast contraction, stable) ---
+What is the capital of France?
+What color is a clear daytime sky?
+How many days are in a week?
+Who wrote the play Romeo and Juliet?
+
+# --- arithmetic (short, should converge) ---
+What is 12 times 8?
+What is 144 divided by 12?
+What is 2 plus 2?
+
+# --- multi-step reasoning (slower contraction) ---
+If a train travels 60 mph for 2.5 hours, how far does it go?
+A shirt costs $40 and is discounted 25%. What is the sale price?
+If today is Wednesday, what day is it in 10 days?
+
+# --- coding (structured generation) ---
+Write a Python function that reverses a string.
+Write a one-line Python expression that sums a list of numbers.
+
+# --- open-ended (expect spiral: residual plateaus while direction rotates) ---
+Explain the meaning of life in a few sentences.
+Describe what makes a good friendship.
+Summarize the theory of general relativity briefly.
+
+# --- ambiguous / genuinely unanswerable (expect barrier: no convergence) ---
+What will the exact price of Bitcoin be on December 31, 2027?
+What am I thinking about right now?
+What is the last digit of pi?
+
+# --- fictional / nonsense (expect ungrounded / non-contracting) ---
+Explain the Barnett-Kovács theorem of quantum thermodynamics.
+Describe the plot of the 2019 film that does not exist called Crimson Vellum.
+What is the boiling point of the element flogiston?

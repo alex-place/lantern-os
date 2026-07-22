@@ -141,10 +141,63 @@ law. Then test the one claim the whole graft rests on:
 
 ## Honest limits
 
-- This is a **design amendment (Proposed)**, not a result. The load-bearing claim (decay
-  predicts the door) is **unmeasured** until #2029 runs on the real loop.
+- This is a **design amendment (Proposed)**. The load-bearing claim (decay predicts the
+  door) has now been **measured** (see *Measured result*, #2833): on Ouro-1.4B it is **not**
+  predictive — the loop plateaus (`ρ(J)>1` in 21/21), so there is no Converge-door crossing
+  to forecast. The amendment degrades to fixed-cadence routing, pending a deeper-R re-run
+  before the graft is finally kept or dropped.
 - The barrier `B(h)` over a raw high-dimensional hidden state needs a **defined state
   abstraction** before any formal reach-avoid guarantee — per the reading pack, "global
   convergence" stays an aspiration until the abstraction + bounded region exist.
 - It consumes only already-trained/analytic parts (Q-exit gate, certificate, canaries) — no
   retraining — honoring the Persistent-Learning rule.
+
+## Measured result — the load-bearing claim, run (2026-07-22, #2833)
+
+The falsifiable first experiment is now **run**, not proposed. Harness:
+`experiments/oracle_spiral/measure_decay_predicts_door.py` on the real Ouro native loop
+(`ByteDance/Ouro-1.4B`, `loop_lm._truncated_forward` at `q=1.0` → the full per-UT-step
+trajectory), 21 prompts across six regimes (easy-factual, arithmetic, multi-step,
+open-ended, unanswerable, fictional). Per step it logs `r_t=‖Δh‖/‖h‖`, `λ̂=r_t/r_{t-1}`,
+`ρ(J)`/`‖J‖₂` (the STARS JSRR certificate on the empirical loop Jacobian), the trained
+Q-exit step, the convergence step, and the stability verdict. Raw data +
+prediction table: `data/oracle/decay-predicts-door.jsonl`.
+
+**Verdict: NOT predictive** — and the reason is sharper than "λ̂ mispredicts the door":
+on Ouro-1.4B there **is no converge-door crossing to predict.**
+
+| Measurement (21/21 prompts) | Value |
+|---|---|
+| UT loop depth | **4 steps** (Ouro-1.4B is R4 — only 3 residual ratios per unit) |
+| early decay `λ̂` | 0.448–0.560 (mean 0.485) — contracts *early* … |
+| residual floor (best any step) | **0.236** — … then **plateaus**, never near `ε=0.05` |
+| convergence door | **max_depth in 21/21** — the loop never reaches a fixed point |
+| `ρ(J)` | 1.19–2.31 (mean 1.75) — **> 1 in 21/21** (non-normal / spiral) |
+| JSRR-stable (`ρ(A)<1`) | **0/21** |
+| trained Q-exit | `threshold_met` at step 4 (= max depth) in 21/21 — no early exit either |
+
+The naive geometric extrapolation from `λ̂` predicts convergence at step 5–6, but the loop
+plateaus at `‖Δh‖/‖h‖ ≈ 0.24–0.5` and rides to full depth every time. So the **premise** of
+the self-triggered *convergence* predictor — a contracting loop whose decay forecasts a
+Converge crossing — **does not hold** for this model. Per the decision rule, the
+`(ρ(J), λ̂) → n_converge → next_check` schedule is **not earned** on Ouro-1.4B; the amendment
+**degrades to fixed-cadence routing**, as designed. What *is* consistently present is the
+**barrier** signal (`ρ(J)>1` / non-normal in 21/21) — but on this set it fires for
+*everything*, so as estimated it does not yet **discriminate** healthy from unhealthy units.
+
+**Honest confounds (why this is a first answer, not the last word):**
+1. **R4 is too shallow to power the test.** Four UT steps give only three residual ratios —
+   almost no horizon for a decay forecast. The claim deserves a re-run on a deeper-loop
+   variant (Ouro-2.6B / higher-R) where a real trajectory exists, *before the graft is
+   permanently dropped.*
+2. `ε=0.05` sits far below the model's residual plateau (~0.24–0.5); no `ε` near the plateau
+   would reveal geometric decay, because the residual genuinely stops falling.
+3. `ρ(J)` here is the mean-outer-product empirical Jacobian (loop_lm's estimator); a
+   JVP/VJP power iteration on the true per-step map is a stronger `ρ(J)` — a follow-up.
+4. n=21, one model, one forward per prompt (not full generation). Per "measure before
+   building," that is the point: a MEASURED answer where there was a design claim.
+
+**Net for the amendment:** ship fixed-cadence routing (no self-triggered *convergence*
+schedule) on Ouro-1.4B; keep the barrier/non-normal instrument but treat it as
+not-yet-discriminating; re-run #2833 on a deeper-R Ouro before either adopting or finally
+dropping the self-triggered graft. Either way, the load-bearing claim is now **measured**.
