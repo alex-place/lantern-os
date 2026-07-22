@@ -18,3 +18,9 @@
   escalates to a cloud tier instead. The Phase-0 ConvergenceRecord is now `verified:true` in both
   modes (the "harness runs end-to-end + emits a corpus" claim is confirmed by the run; the
   capability number is carried as a measurement, not an eval-leaderboard benchmark).
+- **spiral: Phase-0 runner takes a borrowed open benchmark (`--dataset mbpp`).** Normalizes
+  `data/eval/mbpp-basic.jsonl` (`checks` → per-test Python `assert`s) into the spiral task schema.
+  Fully-local run (0.5B → 7B) solved **18/18 at 6% escalation** (17/18 cheap-tier sufficiency);
+  MBPP-basic is a *basic* curated set, so this is honestly a sufficiency demonstration on easy open
+  problems, not a hard-task claim. Also fixed a misleading tier label (a cloud escalate no longer
+  prints a qwen model name).

@@ -158,7 +158,15 @@ owned verified data.
   real tasks at **33% escalation** (4/6 cheap-tier sufficiency); the 6th (`rle`) was honestly
   reported **unsolved** after both tiers plateaued — nothing fabricated — and the escalated rescue
   (`two_sum`) was captured as a `distillTarget` corpus row. That is the affordable-long-horizon +
-  honest-halt behavior, on-box, with two real models.
+  honest-halt behavior, on-box, with two real models. With a **cloud** escalate tier
+  (`SPIRAL_FRONTIER_PROVIDER=openai`) `rle` also solves → **6/6**: the cheap tier sets the cost
+  floor, the escalate tier the ceiling. On the **borrowed open MBPP-basic** set
+  (`node experiments/spiral_phase0.js --dataset mbpp --live`, 18 problems, per-check Fix Rate) the
+  same fully-local cascade solved **18/18 at 6% escalation** (17/18 cheap-tier sufficiency — only
+  `mbpp-8` needed the 7B). **Honest scope:** MBPP-basic is a *basic curated* set, so this shows the
+  cheap tier **saturates easy open problems locally** and the cascade catches the miss — it is
+  **not** a hard-task (full-MBPP / SWE-bench) claim; stressing the escalation economics on a harder
+  open set is the next run.
 - **Phase 1 — VTD-specialize the cheap tier (own weights).** Base = the verified Qwen2.5-Coder-7B;
   data = the **exec-verified** subset of {SWE-HERO 13.5k, KodCode, TACO} **+ our own escalation
   corpus**; method = Verified-Trace Distillation (receipt-gated, both-class, process-level; nearest

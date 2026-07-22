@@ -7,19 +7,24 @@
  *   default  deterministic STUB tiers — free, reproducible; proves the harness mechanics
  *            end-to-end on real executable tasks (real exec verifier, real Fix-Rate ratchet,
  *            real corpus emission). This is a MECHANICS milestone, NOT a model result.
- *   --live   real model tiers via lib/spiral-tiers (cheap=ollama, escalate=anthropic) —
- *            SPEND-GATED (needs providers/keys); this is the run that produces a real
- *            model escalation corpus for Phase-1 VTD. Left to an explicit, funded run.
+ *   --live   real model tiers via lib/spiral-tiers — fully LOCAL + zero spend by default
+ *            (cheap=qwen2.5-coder:0.5b → escalate=qwen2.5-coder:7b on the Ollama daemon).
+ *            SPIRAL_FRONTIER_PROVIDER=openai|gemini escalates to a cloud frontier tier.
+ *            Produces the real model escalation corpus (the Phase-1 VTD fuel).
  *
  * The task set is hand-authored self-contained JS (no third-party license) with per-test
  * assertions so Fix Rate has granularity. To run Phase 0 on a BORROWED open set (SWE-Gym
  * Lite / KodCode / TACO — see docs/SIGMA0-OURO-CODER.md), normalize it to {id, prompt,
  * tests:[{name,test}]} and pass it here; the harness is dataset-agnostic.
  *
- * Run:  node experiments/spiral_phase0.js            (stub, free)
- *       node experiments/spiral_phase0.js --live      (real tiers, spend-gated)
+ * Run:  node experiments/spiral_phase0.js                       (built-in JS tasks, stub, free)
+ *       node experiments/spiral_phase0.js --live                (built-in JS tasks, real local cascade)
+ *       node experiments/spiral_phase0.js --dataset mbpp --live (BORROWED open MBPP-basic, Python)
+ *       SPIRAL_FRONTIER_PROVIDER=openai node ... --dataset mbpp --live   (cloud escalate tier)
  */
 
+const fs = require("fs");
+const path = require("path");
 const { runSpiral } = require("../apps/lantern-garage/lib/spiral-harness");
 const { makeVerifier, makeTiers } = require("../apps/lantern-garage/lib/spiral-tiers");
 const { emitConvergenceRecord } = require("../apps/lantern-garage/lib/convergence-records");
@@ -66,34 +71,69 @@ function stubTiers() {
   };
 }
 
+// ── BORROWED open benchmark: MBPP-basic (data/eval/mbpp-basic.jsonl) ──────────────
+// A JS value → a Python literal, so a `[expr, expected]` check becomes a real assert.
+function toPyLiteral(v) {
+  if (v === null) return "None";
+  if (v === true) return "True";
+  if (v === false) return "False";
+  if (typeof v === "number" || typeof v === "string") return JSON.stringify(v); // valid Python too
+  if (Array.isArray(v)) return "[" + v.map(toPyLiteral).join(", ") + "]";
+  return JSON.stringify(v);
+}
+function loadMbpp(limit) {
+  const file = path.join(__dirname, "..", "data", "eval", "mbpp-basic.jsonl");
+  const tasks = fs.readFileSync(file, "utf8").trim().split(/\r?\n/).filter(Boolean).map((l) => {
+    const j = JSON.parse(l);
+    return {
+      id: "mbpp-" + j.id,
+      prompt: `${j.prompt}\nDefine the function \`${j.fn}\`. Reply with ONLY a Python code block.`,
+      tests: (j.checks || []).map((c, i) => ({ name: "c" + i, test: `assert (${c[0]}) == (${toPyLiteral(c[1])}), ${JSON.stringify(String(c[0]))}` })),
+    };
+  });
+  return limit > 0 ? tasks.slice(0, limit) : tasks;
+}
+
 async function main() {
   const live = process.argv.includes("--live");
+  const dataset = process.argv.includes("--dataset") ? process.argv[process.argv.indexOf("--dataset") + 1] : null;
+  const limit = Number(process.env.SPIRAL_LIMIT || 0) || 0;
+  if (dataset && dataset !== "mbpp") { console.error(`unknown --dataset '${dataset}' (only 'mbpp' is wired)`); process.exit(2); }
+  if (dataset && !live) { console.error("--dataset requires --live — a real model must solve real open problems (stub only knows the built-in JS tasks)."); process.exit(2); }
+  const language = dataset === "mbpp" ? "python" : "js";
+  const tasks = dataset === "mbpp" ? loadMbpp(limit) : TASKS;
+
   // Fully-LOCAL real cascade by default (zero spend): a weak cheap tier (0.5B) that stalls on
-  // hard tasks, escalating to a strong local tier (7B). Override the frontier to a cloud
-  // provider with SPIRAL_FRONTIER_PROVIDER=openai|gemini (keys present) for a stronger rescue.
+  // hard tasks, escalating to a strong local tier (7B). SPIRAL_FRONTIER_PROVIDER=openai|gemini
+  // (keys present) escalates to a cloud frontier tier instead.
   const cheapModel = process.env.SPIRAL_CHEAP_MODEL || "qwen2.5-coder:0.5b";
   const frontierProvider = process.env.SPIRAL_FRONTIER_PROVIDER || "ollama";
-  const frontierModel = process.env.SPIRAL_FRONTIER_MODEL || "qwen2.5-coder:latest";
+  // A model pin only applies to the local (ollama) tier; a cloud provider's leg picks its own
+  // model, so we must NOT label a cloud escalate with a qwen model name (that would be a lie).
+  const frontierModel = frontierProvider === "ollama"
+    ? (process.env.SPIRAL_FRONTIER_MODEL || "qwen2.5-coder:latest")
+    : (process.env.SPIRAL_FRONTIER_MODEL || null);
   const tiers = live
-    ? makeTiers({ language: "js", cheapProvider: "ollama", cheapModel, frontierProvider, frontierModel })
+    ? makeTiers({ language, cheapProvider: "ollama", cheapModel, frontierProvider, frontierModel })
     : stubTiers();
-  console.log(`Spiral Phase-0 — ${live ? `LIVE local cascade: cheap=${cheapModel} → escalate=${frontierProvider}:${frontierModel}` : "deterministic STUB tiers (free mechanics run)"}`);
-  console.log(`${TASKS.length} real executable tasks · exec-verified Fix-Rate ratchet · emitting escalation corpus\n`);
-  console.log(`${"task".padEnd(16)} ${"result".padEnd(10)} tier`);
+  const escLabel = `${frontierProvider}${frontierModel ? ":" + frontierModel : ""}`;
+  console.log(`Spiral Phase-0 — ${dataset ? `dataset=${dataset} · ` : ""}${live ? `LIVE cascade: cheap=${cheapModel} → escalate=${escLabel}` : "deterministic STUB tiers (free mechanics run)"}`);
+  console.log(`${tasks.length} real executable ${language} tasks · exec-verified Fix-Rate ratchet · emitting escalation corpus\n`);
+  console.log(`${"task".padEnd(18)} ${"result".padEnd(10)} tier`);
 
   const rows = [];
   let corpusFile = null;
-  for (const t of TASKS) {
+  for (const t of tasks) {
     const r = await runSpiral({
       problem: { id: t.id, prompt: t.prompt },
       tiers,
-      verify: makeVerifier({ language: "js", tests: t.tests }),
-      maxTurns: 4,
+      verify: makeVerifier({ language, tests: t.tests }),
+      maxTurns: dataset ? 3 : 4,
     });
     corpusFile = r.corpusFile || corpusFile;
     const finalTier = r.escalations > 0 ? "escalated" : "cheap";
     rows.push({ id: t.id, solved: r.solved, escalations: r.escalations, turns: r.turns, tier: finalTier });
-    console.log(`${t.id.padEnd(16)} ${(r.solved ? "SOLVED" : "unsolved").padEnd(10)} ${finalTier}${r.escalations ? "  (cheap stalled → frontier)" : ""}`);
+    console.log(`${String(t.id).padEnd(18)} ${(r.solved ? "SOLVED" : "unsolved").padEnd(10)} ${finalTier}${r.escalations ? "  (cheap stalled → frontier)" : ""}`);
   }
 
   const n = rows.length;
