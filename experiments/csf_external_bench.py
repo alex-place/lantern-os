@@ -78,6 +78,8 @@ CODECS = {
                                lambda b: __import__("csf").decompress(b)),
     "CSF-Omni (best-fit, max)": (lambda b: omni.compress_best(b, effort="max"),
                                  lambda b: omni.decompress(b)),
+    "CSF-Omni (balanced, default)": (lambda b: omni.compress_best(b, effort="balanced"),
+                                     lambda b: omni.decompress(b)),
 }
 
 

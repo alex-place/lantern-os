@@ -1,0 +1,19 @@
+{
+  "corpus": "Silesia + AITDCC-2026 public (combined)",
+  "raw_bytes": 225074888,
+  "measured": "2026-07-21, real omni.compress_best, parallel panel, every round-trip verified",
+  "tiers": {
+    "max": {
+      "total_bytes": 54483817, "ratio": 4.1310, "wall_s": 882, "MBps": 0.26,
+      "selected_methods": {"bz2-9": 6, "lzma-9": 3, "lzma-pb0": 5, "brotli-11": 4, "store": 1, "brotli-11-tx": 1}
+    },
+    "balanced (new default)": {
+      "total_bytes": 54551710, "ratio": 4.1259, "wall_s": 257, "MBps": 0.87,
+      "selected_methods": {"bz2-9": 7, "lzma-9": 4, "lzma-pb0": 7, "zstd-19": 1, "store": 1}
+    }
+  },
+  "speedup_x": 3.43,
+  "size_cost_pct": 0.125,
+  "new_codec_lzma9_selected_files": "3 at max, 4 at balanced (mozilla/ooffice/sao class — where PRESET_EXTREME overfits)",
+  "conclusion": "balanced default = 3.43x faster at +0.125% size by dropping brotli (the 4x-slowest codec, <0.2% unique contribution); lzma-9 (plain preset-9) earns its panel slot on both tiers. max remains the strict all-codec envelope."
+}

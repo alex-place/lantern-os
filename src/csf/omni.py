@@ -6,13 +6,15 @@ The honest answer to "beat every competitor" is not to invent a new entropy code
 candidates over the input, keeps every candidate that round-trips losslessly, and
 emits the smallest one behind a 7-byte self-describing, integrity-checked header.
 
-By construction the output is `<=` the best codec in the panel on **any** input
-(the *upper envelope*): CSF-Omni equals the best codec on every input and strictly
-beats every *non-winning* codec, at the cost of a small self-describing header vs
-the per-corpus champion. When different corpora are won by different codecs, no
-single fixed codec can match CSF-Omni on all of them; when one codec (e.g. brotli)
-happens to win every corpus in a workload, CSF-Omni *ties* it within the header —
-it does not beat the frontier coder's raw bytes, it guarantees you always get them.
+By construction the output is `<=` the best codec **of the selected effort tier** on
+**any** input (the *upper envelope of that tier*): CSF-Omni equals the best tier codec
+on every input and strictly beats every *non-winning* one, at the cost of a small
+self-describing header. When different corpora are won by different codecs, no single
+fixed codec can match CSF-Omni on all of them. The default ``balanced`` tier is the
+full panel minus brotli — measured within ~0.13% of the strict ``max`` envelope at
+~4x the encode speed, because brotli is the 4x-slowest codec and its *unique* ratio
+contribution on real heterogeneous corpora is <0.2% (`experiments/omni_panel_probe.py`,
+Silesia+AITDCC-2026). Pass ``effort="max"`` for the strict all-codec envelope.
 
 Blob layout (self-describing, integrity-checked, deterministic)
 ---------------------------------------------------------------
@@ -126,6 +128,16 @@ def _build_codecs() -> dict[int, tuple[str, bool, Callable, Callable]]:
         4: ("lzma-pb0", True,
             lambda b: lzma.compress(b, format=lzma.FORMAT_RAW, filters=_LZMA_PB0),
             lambda b: lzma.decompress(b, format=lzma.FORMAT_RAW, filters=_LZMA_PB0)),
+        # 8 = lzma preset 9 WITHOUT extreme. Measured (Silesia+AITDCC panel probe,
+        # 2026-07-21): PRESET_EXTREME's extra optimizer passes *overfit* some binary/
+        # float distributions and emit marginally LARGER output — plain preset-9 is the
+        # strict winner on mozilla, ooffice, and sao (star-catalog floats, +0.24%). Same
+        # decode path as id 3 (default XZ container). The one new codec the exhaustive
+        # search found worth adding; delta-filters / zstd-22 / brotli-q10 / zopfli were
+        # all dominated (0 unique wins) and are NOT added.
+        8: ("lzma-9", True,
+            lambda b: lzma.compress(b, preset=9),
+            lzma.decompress),
     }
     if _zstd is not None:
         codecs[5] = ("zstd-19", True,
@@ -153,7 +165,7 @@ assert all(0 <= cid <= 0x0F for cid in CODECS), "CSF-Omni codec id must fit a ni
 assert all(0 <= tid <= 0x0F for tid in TRANSFORMS), "CSF-Omni transform id must fit a nibble (0-15)"
 
 # Codecs that ship with Python — safe for portable mode and present at decode.
-_STDLIB_CODEC_IDS = {0, 1, 2, 3, 4}
+_STDLIB_CODEC_IDS = {0, 1, 2, 3, 4, 8}
 
 # Candidate search order (transform id, codec id). Lower order wins ties, so the
 # cheapest-to-decode / most-standard option is preferred on a tie. `store` first
@@ -161,10 +173,18 @@ _STDLIB_CODEC_IDS = {0, 1, 2, 3, 4}
 # brotli-text (7) so a tie keeps the stock encoding.
 _SEARCH_ORDER: list[tuple[int, int]] = [
     (t, c)
-    for c in (0, 1, 5, 3, 4, 2, 6, 7)   # store zlib zstd lzma lzma-pb0 bz2 brotli brotli-tx
+    # store zlib zstd lzma lzma-pb0 lzma-9 bz2 brotli brotli-tx
+    for c in (0, 1, 5, 3, 4, 8, 2, 6, 7)
     for t in (0, 1)                     # none, delta
     if c in CODECS
 ]
+
+# Codecs that do the actual selecting on real heterogeneous corpora, WITHOUT the
+# two brotli variants — measured (panel probe, 2026-07-21) as the 4x-slowest codecs
+# (brotli-11 1115s / brotli-tx 1302s vs lzma 315s over 225 MB) whose UNIQUE ratio
+# contribution is <0.2%. Dropping them is the speed fix; `max` keeps them for the
+# strict full-panel envelope on line-structured text (xml, some AITDCC files).
+_BALANCED_CODECS = (0, 1, 5, 2, 3, 4, 8)   # store zlib zstd bz2 lzma lzma-pb0 lzma-9
 
 # CSF-Col (transform 2) only pays paired with a strong backend, and only on JSONL
 # (forward() fast-skips everything else). Listed after the t∈{0,1} panel so a tie
@@ -179,20 +199,34 @@ _COL_ORDER: list[tuple[int, int]] = [(2, c) for c in (5, 6, 3) if c in CODECS]
 def _candidates(effort: str, portable: bool) -> list[tuple[int, int]]:
     """Candidate (transform_id, codec_id) list for an effort tier.
 
-    - ``fast``       : store / zlib / zstd only, no transforms — near-zlib speed,
-                       zstd-class ratio. For hot write paths.
-    - ``max`` (def.) : every codec, transform=none. The ratio-optimal codec choice
-                       without the transform sweep (which never won on real text/
-                       JSONL/log corpora) — so identical ratio at ~half the encode.
-    - ``exhaustive`` : every codec x every transform (adds the delta pre-pass that
-                       can help raw numeric/binary streams). Slowest.
+    - ``fast``        : store / zlib / zstd only, no transforms — near-zlib speed,
+                        zstd-class ratio. For hot write paths.
+    - ``balanced`` (default): every SELECTING codec (bz2 + full lzma family + zstd)
+                        + col, but NOT the two brotli variants. Measured on
+                        Silesia+AITDCC: within **~0.13%** of the full-panel ratio at
+                        roughly **4x** the encode speed (brotli is the 4x-slowest
+                        codec and its unique ratio contribution is <0.2%). The
+                        speed-fix default.
+    - ``max``         : the STRICT full-panel envelope — adds both brotli variants
+                        (they lead only on some line-structured text: xml, a few
+                        AITDCC files). Use when you want the last ~0.15% and can pay
+                        ~4x the time (cold, archival).
+    - ``exhaustive``  : max + the delta byte transform (helps raw numeric/binary
+                        streams). Slowest.
+
+    All tiers are lossless, deterministic, and self-describing; the ONLY difference
+    is which candidate set the strict-minimum is taken over. Existing blobs — incl.
+    brotli-encoded ones — always decode regardless of the tier that made them.
     """
     if effort == "fast":
         order = [(0, c) for c in (0, 1, 5) if c in CODECS]
     elif effort == "exhaustive":
         order = list(_SEARCH_ORDER) + _COL_ORDER            # codecs x {none, delta} + col
-    else:  # "max"
+    elif effort == "max":
         order = [(t, c) for (t, c) in _SEARCH_ORDER if t == 0] + _COL_ORDER
+    else:  # "balanced" (default) — full panel minus brotli (plain AND col+brotli)
+        balanced_col = [(t, c) for (t, c) in _COL_ORDER if c not in (6, 7)]
+        order = [(0, c) for c in _BALANCED_CODECS if c in CODECS] + balanced_col
     if portable:
         order = [(t, c) for (t, c) in order if c in _STDLIB_CODEC_IDS]
     return order
@@ -246,7 +280,7 @@ def _encode_all(data: bytes, effort: str, portable: bool) -> list[tuple[int, int
     return [(sz, tid, cid, pl) for sz, _order, tid, cid, pl in results]
 
 
-def rank(data: bytes, effort: str = "max", portable: bool = False) -> list[tuple[str, int]]:
+def rank(data: bytes, effort: str = "balanced", portable: bool = False) -> list[tuple[str, int]]:
     """Diagnostic: every candidate's total blob size (incl. header), smallest first.
 
     Returns [(method_name, blob_size)] so callers/benchmarks can show *which* codec
@@ -261,16 +295,19 @@ def rank(data: bytes, effort: str = "max", portable: bool = False) -> list[tuple
     return rows
 
 
-def compress_best(data: bytes, effort: str = "max", portable: bool = False) -> bytes:
+def compress_best(data: bytes, effort: str = "balanced", portable: bool = False) -> bytes:
     """Compress `data` with the deterministically smallest verified candidate → a
     self-describing, CRC-checked blob (decode with `decompress`).
 
     The panel is encoded in parallel for large inputs (the C codecs release the GIL),
     so this is ~as fast as the slowest single codec while remaining the EXACT best-fit
-    — `len(result) <= min(codec(data)) + 7` (the 7-byte header).
+    over its tier — `len(result) <= min(tier_codec(data)) + 7` (the 7-byte header).
 
-    effort: ``max`` (default, full panel) · ``fast`` (store/zlib/zstd, hot paths) ·
-    ``exhaustive`` (adds the byte transforms). Lossless + deterministic in every mode.
+    effort: ``balanced`` (default — full panel minus brotli; ~4x faster than max at
+    ~0.13% larger, the measured speed default) · ``max`` (strict full-panel envelope,
+    adds brotli; cold/archival) · ``fast`` (store/zlib/zstd, hot paths) ·
+    ``exhaustive`` (max + byte transforms). Lossless + deterministic in every mode;
+    blobs made by any tier (incl. older brotli-encoded ones) always decode.
     """
     if not isinstance(data, (bytes, bytearray)):
         raise TypeError("compress_best expects bytes")
