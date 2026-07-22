@@ -107,6 +107,17 @@ test("resolveLocalModel picks a real coder, NEVER the unserved ouro:latest pin",
   }
 });
 
+test("stdio verifier: TACO-style stdin/stdout tests pass correct programs, reject wrong ones", async (t) => {
+  // Needs a python interpreter (the stdio wrapper is Python) — skip gracefully if absent.
+  const { spawnSync } = require("child_process");
+  if (spawnSync("python", ["--version"], { timeout: 5000 }).status !== 0) return t.skip("no python");
+  const v = makeVerifier({ language: "python", tests: [{ name: "c0", stdin: "3\n1 2 3\n", expected: "6" }] });
+  const good = await v("n = int(input())\nprint(sum(map(int, input().split())))");
+  assert.equal(good[0].passed, true, "correct stdio program passes");
+  const bad = await v("n = int(input())\nprint(max(map(int, input().split())))");
+  assert.equal(bad[0].passed, false, "wrong output rejected");
+});
+
 test("extractCode prefers a fenced block, tolerates bare code", () => {
   assert.match(extractCode("here:\n```js\nconst x=1;\n```\ndone", "js"), /^const x=1;$/);
   assert.equal(extractCode("const y=2;", "js"), "const y=2;", "no fence → whole text");
