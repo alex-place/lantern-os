@@ -148,6 +148,14 @@ jobs:
           node-version: 24
       - name: Check relative markdown links
         run: node scripts/check-md-links.mjs --strict
+      # Mirror of the sprawl tripwire for REMOVED/RENAMED surfaces (#2811): the four
+      # canonical entry docs must not cite a public page that no longer exists or is
+      # only a redirect stub. The chat.html rename (#2751) left eleven stale
+      # dream-chat.html references for a week — this makes that class blocking.
+      - name: Check docs surface drift
+        run: node scripts/check-docs-drift.mjs
+      - name: Validate docs-drift gate logic
+        run: node apps/lantern-garage/test/docs-drift-gate.test.js
 
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
