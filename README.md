@@ -94,11 +94,13 @@ Capabilities, organized by the loop stage they strengthen:
 | **Observe** | [Explore feed](docs/EXPLORE-FEED.md) — single PCSF-ranked content stream · market-data collectors (Kalshi, stocks) · in-app issue reporter with auto-capture |
 | **Remember** | [CSF](docs/CSF-FORMAT-SPECIFICATION.md) memory archive + append-only JSONL logs · confidence-decay memory (facts fade unless reinforced) · per-user conversation storage · in-chat memory recall |
 | **Reason** | unisona.ai chat — fast-cached default + deep Σ₀ opt-in (`OURO_NATIVE=1`) · personal cockpits (financial reasoning, preference model, tutor) · deterministic convergence router (120+ intent routes, >70% cache hit) over the 10-provider chain |
-| **Act** | ~35 native chat tools ([`tool-runner.js`](apps/lantern-garage/lib/tool-runner.js)) · autowork draft PRs with in-chat Approve / Rework / Discard · trading terminal (60+ [REST endpoints](docs/trading-api-reference.md)) · document generation (.docx/.xlsx/.pptx) |
+| **Act** | ~35 native chat tools ([`tool-runner.js`](apps/lantern-garage/lib/tool-runner.js)) · autowork draft PRs with in-chat Approve / Rework / Discard (the *flow*; end-to-end issue resolution is the tracked frontier — [#2762](https://github.com/alex-place/lantern-os/issues/2762) — and the pipeline stops honestly when verification fails) · trading terminal (60+ [REST endpoints](docs/trading-api-reference.md)) · document generation (.docx/.xlsx/.pptx) |
 | **Verify** | Σ₀ verification + convergence records · fact-check button + grounding-diff viewer · drift canaries · council exec-verify · WCAG 2.1 AA on all surfaces · autonomous Playwright test fleet |
 | **Converge** | Decision journal + calibration scoring · [external benchmarks registry](docs/BENCHMARKS.md) · PCSF provider leaderboard · CI convergence gates |
 
-**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `dream-chat.html` (the chat — primary UI) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
+**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `chat.html` (the chat — primary UI; legacy `dream-chat.html` redirects) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
+
+**Chat commands** (deterministic, server-routed — no model in the loop): `!work #<issue>` runs the observable autowork pipeline on a GitHub issue (research → plan → patch → tests → draft PR, rendered live as a walk of the loop) · `!review #<PR>` reviews a pull request's diff in-chat with Approve / Discard · `!prs` lists open pull requests.
 
 **Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](apps/lantern-garage/public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)). Historical milestone writeup: [Unisona 1.8 — "one front door"](docs/UNISONA-1.8.md).
 
