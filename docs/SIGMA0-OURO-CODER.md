@@ -149,11 +149,16 @@ owned verified data.
 
 ## 5. The three phases (de-risked, most value first)
 
-- **Phase 0 — the verified-cascade harness (NO new weights). ✅ shipped.** Reassembles the parts we
-  already had (live cascade #2800, cheap-tier picker #2814, verified ledger #2797) into the loop.
-  [`experiments/spiral_phase0.js`](../experiments/spiral_phase0.js) runs the spiral over real
-  executable tasks, emits the escalation corpus, and self-emits a ConvergenceRecord. *Mechanics
-  verified* (real exec + ratchet + corpus); model capability is the `--live` run.
+- **Phase 0 — the verified-cascade harness (NO new weights). ✅ shipped + run live on-box.**
+  Reassembles the parts we already had (live cascade #2800, cheap-tier picker #2814, verified
+  ledger #2797) into the loop. [`experiments/spiral_phase0.js`](../experiments/spiral_phase0.js)
+  runs the spiral over real executable tasks, emits the escalation corpus, and self-emits a
+  ConvergenceRecord. **Verified live, fully local, zero spend (2026-07-22):** a real cascade with
+  `cheap=qwen2.5-coder:0.5b → escalate=qwen2.5-coder:7b` on the local Ollama daemon solved **5/6**
+  real tasks at **33% escalation** (4/6 cheap-tier sufficiency); the 6th (`rle`) was honestly
+  reported **unsolved** after both tiers plateaued — nothing fabricated — and the escalated rescue
+  (`two_sum`) was captured as a `distillTarget` corpus row. That is the affordable-long-horizon +
+  honest-halt behavior, on-box, with two real models.
 - **Phase 1 — VTD-specialize the cheap tier (own weights).** Base = the verified Qwen2.5-Coder-7B;
   data = the **exec-verified** subset of {SWE-HERO 13.5k, KodCode, TACO} **+ our own escalation
   corpus**; method = Verified-Trace Distillation (receipt-gated, both-class, process-level; nearest
@@ -169,13 +174,23 @@ owned verified data.
 ```bash
 # Phase-0 spiral over real executable tasks (free, deterministic mechanics run)
 node experiments/spiral_phase0.js
-node experiments/spiral_phase0.js --live       # real model tiers (spend-gated)
+# real LOCAL cascade, zero spend: cheap qwen2.5-coder:0.5b → escalate 7b on the Ollama daemon
+node experiments/spiral_phase0.js --live
+# stronger rescue via a cloud escalate tier (keys present): OpenAI / Gemini
+SPIRAL_FRONTIER_PROVIDER=openai node experiments/spiral_phase0.js --live
 
 # emit / refresh the borrow convergence records
 node scripts/spiral_borrow_records.js
 
 # in dream-chat: the assistant calls the `spiral_solve` tool on a tested coding task.
 ```
+
+**Local-model resolution (the "fix the local Ollama" seam).** The spiral's local cheap tier
+resolves its model from the constraint-aware registry (`selectCheapStandin` → `qwen2.5-coder`),
+**not** the raw `OLLAMA_MODEL` env — which on this box pins `ouro:latest`, a model served only by
+the separate `ouro_serve.py` shim, so a plain-daemon call to it returns *"model not found"*. So
+`spiral_solve` and the Phase-0 runner work against whatever coder is actually pulled in Ollama,
+independent of the Ouro serving state. Override with `SPIRAL_LOCAL_MODEL`.
 
 The Ouro **kernel** is still served exactly as before — `ouro_serve.py` speaks the Ollama HTTP
 API on `:11434`, and the cheap-tier / re-prompt loop points at `OLLAMA_BASE_URL`. See §8 for the

@@ -20,8 +20,52 @@
  * unit-testable with a stub transport + real (tiny) JS exec, no server or GPU.
  */
 
+const http = require("http");
 const { verifyExecAsync } = require("./exec-verify");
 const verifyLLM = require("./verify-llm");
+
+// Direct Ollama /api/generate for a SPECIFIC model. The spiral's local tier resolves its
+// model from the constraint-aware registry (selectCheapStandin), NOT the raw OLLAMA_MODEL
+// env — which on this box pins `ouro:latest`, a model served only by the separate
+// ouro_serve.py shim, so a plain-daemon call to it 404s. This is the "fix the local
+// Ollama" seam: "ollama" means the registry's real local coder, whatever is pulled.
+function ollamaComplete(model, { baseUrl = process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434", timeoutMs = 120000 } = {}) {
+  return (prompt, maxTokens = 700) =>
+    new Promise((resolve, reject) => {
+      const body = JSON.stringify({ model, prompt, stream: false, options: { temperature: 0, num_predict: maxTokens } });
+      let u;
+      try { u = new URL(baseUrl); } catch { return reject(new Error("bad OLLAMA_BASE_URL")); }
+      const req = http.request(
+        { hostname: u.hostname, port: u.port || 11434, path: "/api/generate", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) }, timeout: timeoutMs },
+        (res) => {
+          let d = "";
+          res.on("data", (c) => (d += c));
+          res.on("end", () => {
+            try {
+              const j = JSON.parse(d);
+              if (j.error) return reject(new Error(`ollama: ${j.error}`));
+              resolve(String(j.response || ""));
+            } catch { reject(new Error("ollama parse: " + d.slice(0, 120))); }
+          });
+        },
+      );
+      req.on("error", reject);
+      req.on("timeout", () => req.destroy(new Error("ollama timeout")));
+      req.write(body);
+      req.end();
+    });
+}
+
+// The local coder the spiral cheap tier should use, resolved by our hardware constraints
+// via the registry — never the ouro:latest OLLAMA_MODEL pin. Env override SPIRAL_LOCAL_MODEL.
+function resolveLocalModel(opts = {}) {
+  if (process.env.SPIRAL_LOCAL_MODEL) return process.env.SPIRAL_LOCAL_MODEL;
+  try {
+    const stand = require("./local-model-registry").selectCheapStandin({ taskType: "coding", ...opts });
+    if (stand && stand.id && !/^ouro/i.test(stand.id)) return stand.id;
+  } catch { /* registry unavailable → sane default below */ }
+  return "qwen2.5-coder:latest"; // the verified on-box coder (#2173), always pulled
+}
 
 /**
  * Extract the implementation from a model reply: prefer a fenced code block, else
@@ -72,7 +116,15 @@ function _legFor(provider) {
  * configured, fall back to the first reachable leg (callVerifyModel) so a missing
  * cheap/frontier key DEGRADES (still answers) rather than breaks.
  */
-async function _defaultComplete(provider, prompt, maxTokens = 700) {
+async function _defaultComplete(provider, prompt, maxTokens = 700, model = null) {
+  if (provider === "ollama") {
+    // The local cheap tier — a real pulled coder via the registry, NOT the ouro:latest pin.
+    const m = model || resolveLocalModel();
+    try {
+      const t = await ollamaComplete(m)(prompt, maxTokens);
+      if (t && t.trim()) return t.trim();
+    } catch { /* daemon down / model missing → fall through to a cloud leg */ }
+  }
   const leg = _legFor(provider);
   if (leg) {
     try {
@@ -117,17 +169,18 @@ function _prompt(ctx, tier, language) {
  *   language          "js" | "python"
  *   maxTokens         per-call cap (default 700)
  */
-function makeTiers({ complete = _defaultComplete, cheapProvider = "ollama", frontierProvider = "anthropic", language = "js", maxTokens = 700 } = {}) {
+function makeTiers({ complete = _defaultComplete, cheapProvider = "ollama", frontierProvider = "anthropic", cheapModel = null, frontierModel = null, language = "js", maxTokens = 700 } = {}) {
+  const label = (p, m) => `${p}${m ? ":" + m : ""}`;
   return {
     async cheap(ctx) {
-      const text = await complete(cheapProvider, _prompt(ctx, "cheap", language), maxTokens);
-      return { text: extractCode(text, language), model: `cheap:${cheapProvider}`, cost: 0 };
+      const text = await complete(cheapProvider, _prompt(ctx, "cheap", language), maxTokens, cheapModel);
+      return { text: extractCode(text, language), model: `cheap:${label(cheapProvider, cheapModel)}`, cost: 0 };
     },
     async escalate(ctx) {
-      const text = await complete(frontierProvider, _prompt(ctx, "frontier", language), maxTokens);
-      return { text: extractCode(text, language), model: `frontier:${frontierProvider}`, cost: 0 };
+      const text = await complete(frontierProvider, _prompt(ctx, "frontier", language), maxTokens, frontierModel);
+      return { text: extractCode(text, language), model: `frontier:${label(frontierProvider, frontierModel)}`, cost: 0 };
     },
   };
 }
 
-module.exports = { extractCode, makeVerifier, makeTiers, _legFor, _defaultComplete };
+module.exports = { extractCode, makeVerifier, makeTiers, ollamaComplete, resolveLocalModel, _legFor, _defaultComplete };

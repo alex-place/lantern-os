@@ -16,7 +16,7 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 
 const { runSpiral } = require("../lib/spiral-harness");
-const { makeTiers, makeVerifier, extractCode } = require("../lib/spiral-tiers");
+const { makeTiers, makeVerifier, extractCode, resolveLocalModel } = require("../lib/spiral-tiers");
 
 const TWO_SUM = {
   id: "two_sum",
@@ -73,6 +73,24 @@ test("honest failure: neither tier can pass the tests → not solved, nothing fa
   assert.equal(r.solved, false);
   assert.equal(r.haltReason, "maxTurns");
   assert.equal(r.memory.length, 0, "no unverified code was ever committed");
+});
+
+test("resolveLocalModel picks a real coder, NEVER the unserved ouro:latest pin", () => {
+  // The "fix the local Ollama" contract: the local cheap tier resolves the registry coder,
+  // not the OLLAMA_MODEL=ouro:latest env (ouro is served only by ouro_serve.py, not the daemon).
+  const prev = process.env.SPIRAL_LOCAL_MODEL;
+  delete process.env.SPIRAL_LOCAL_MODEL;
+  try {
+    const m = resolveLocalModel();
+    assert.ok(m && !/^ouro/i.test(m), `resolved '${m}' must not be an ouro model`);
+    assert.match(m, /coder/i, "resolves a coder model");
+    // explicit override is honored
+    process.env.SPIRAL_LOCAL_MODEL = "qwen2.5-coder:3b";
+    assert.equal(resolveLocalModel(), "qwen2.5-coder:3b", "SPIRAL_LOCAL_MODEL override wins");
+  } finally {
+    if (prev === undefined) delete process.env.SPIRAL_LOCAL_MODEL;
+    else process.env.SPIRAL_LOCAL_MODEL = prev;
+  }
 });
 
 test("extractCode prefers a fenced block, tolerates bare code", () => {
