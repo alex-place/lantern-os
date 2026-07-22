@@ -545,3 +545,4 @@ data/lantern-garage/trading/trader-state.json
 experiments/deep_history.json
 experiments/v1_10_toy/linked-records.sample.jsonl
 data/eval/v1_10/corpus-v0.jsonl
+data/eval/v1_10/honesty-eval-v1.jsonl
