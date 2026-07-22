@@ -29,6 +29,10 @@ const https = require("https");
 const { tokenizeCommand, safeExec } = require("./safe-exec");
 const { resolveCommand } = require("./command-allowlist");
 const { webSearch } = require("./web-search-client");
+// Local worldwide-patent corpus (BM25 over the F: index). Guarded + fail-safe: if the
+// lib or corpus is absent, queryPatents stays null and patent_search reports "unavailable".
+let queryPatents = null;
+try { ({ queryPatents } = require("./patent-index")); } catch (_e) { /* corpus lib absent */ }
 const { render: renderDocument, listTemplates: listDocTemplates } = require("./document-templates");
 const toolLogger = require("./tool-logger");
 const entryStore = require("./entry-store");
@@ -406,6 +410,46 @@ const REGISTRY = {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);
         if (r.snippet) lines.push(`    snippet: ${r.snippet}`);
+      });
+      return lines.join("\n");
+    },
+  },
+
+  // ── Worldwide patents (observe/remember) ────────────────────────────────────
+  // Local BM25 corpus harvested from EPO Open Patent Services (worldwide bibliographic
+  // + abstract; EP/WO/US full text where free). A sibling of the arXiv grounding source
+  // — same fail-safe, gated retrieval — surfaced here as a first-class tool because users
+  // ask for prior art directly. See docs/PATENT-CORPUS.md.
+  patent_search: {
+    policy: "read",
+    guest_safe: true, // local public-patent corpus: no secrets, fixed query surface — safe for non-operators
+    desc: "Search the local worldwide-patent corpus for prior art / relevant patents. Returns top patents with publication number, title, office, date, assignee, CPC, and a citable URL. Grounds on title + abstract worldwide (plus full text where free: EP/WO/US). Use for prior-art, freedom-to-operate, patent-landscape, and 'who holds the patent on X' questions. Each result is cited per the Σ₀ External Reality Rule.",
+    schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "The patent / prior-art query — the technology, problem, or invention described in plain language" },
+        max_results: { type: "integer", description: "Max patents to return (1–10, default 5)" },
+      },
+      required: ["query"],
+    },
+    run(i) {
+      const query = String(i.query || "").trim();
+      if (!query) return "[error: query is required]";
+      if (typeof queryPatents !== "function") {
+        return "[patent_search unavailable: patent corpus not installed — run scripts/patent_harvest.py then scripts/patent_build_index.py (see docs/PATENT-CORPUS.md)]";
+      }
+      const maxResults = Math.max(1, Math.min(10, parseInt(i.max_results, 10) || 5));
+      const hits = queryPatents(query, maxResults) || [];
+      if (!hits.length) {
+        return `[no patents in the local corpus for: ${query} — the corpus may be empty or the query off-topic; say so rather than answering from memory]`;
+      }
+      const lines = [`patent_search("${query}") — ${hits.length} patent(s):\n`];
+      hits.forEach((p, idx) => {
+        const meta = [p.country, p.published, p.assignee].filter(Boolean).join(" · ");
+        lines.push(`[${idx + 1}] ${p.title || p.id}`);
+        lines.push(`    id: ${p.id}${meta ? `  (${meta})` : ""}${p.cpc ? `  CPC ${p.cpc}` : ""}`);
+        lines.push(`    url: ${p.url || ""}`);
+        if (p.snippet) lines.push(`    abstract: ${p.snippet}`);
       });
       return lines.join("\n");
     },
