@@ -54,6 +54,7 @@ def main():
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
+    ap.add_argument("--val-size", type=int, default=100, help="held-out val records for best-checkpoint selection (#2729)")
     a = ap.parse_args()
 
     # datasets must be imported before torch on Windows to avoid pyarrow/CUDA DLL conflict
@@ -138,7 +139,7 @@ def main():
     # all-linear is robust for a custom (trust_remote_code) architecture whose
     # exact projection names we don't want to hardcode.
     model = get_peft_model(model, LoraConfig(
-        r=a.lora_r, lora_alpha=2 * a.lora_r, lora_dropout=0.05, bias="none",
+        r=a.lora_r, lora_alpha=2 * a.lora_r, lora_dropout=0.0, bias="none",  # dropout 0 at 2k scale (#2729 recipe)
         task_type="CAUSAL_LM", target_modules="all-linear"))
     model.print_trainable_parameters()
 
@@ -188,20 +189,51 @@ def main():
         return enc
     ds = ds.map(tok_fn, batched=True, remove_columns=["text"])
 
+    # ── Selection loop (#2729) — the real bug this fixes ────────────────────────────────
+    # Without a val split + best-checkpoint selection the trainer is SELECTION-BLIND: it
+    # keeps the LAST step, not the BEST, which violates the freshness law (Σ_G §1 —
+    # internal signals must select on held-out truth, not the training set). 2026 LoRA
+    # consensus (Thinking Machines `lora_without_regret`; Unsloth): a small held-out val
+    # split, eval every 50 steps, `load_best_model_at_end` on eval_loss.
+    val_size = min(a.val_size, max(1, len(ds) // 5))
+    split = ds.train_test_split(test_size=val_size, seed=42, shuffle=True)
+    train_ds, eval_ds = split["train"], split["test"]
+    print(f"train rows: {len(train_ds)}  val rows: {len(eval_ds)} (held-out for best-checkpoint selection)")
+
+    # Overfit tripwire (#2729): if train loss collapses below 0.2 before the model has seen
+    # the corpus twice (epoch 2), we are memorizing noise, not learning signal — abort and
+    # keep the best checkpoint found so far rather than shipping a memorized adapter.
+    from transformers import TrainerCallback
+
+    class OverfitTripwire(TrainerCallback):
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            if (logs and "loss" in logs and state.epoch is not None
+                    and state.epoch < 2.0 and logs["loss"] < 0.2):
+                print(f"OVERFIT TRIPWIRE: train loss {logs['loss']:.3f} < 0.2 at epoch "
+                      f"{state.epoch:.2f} (< 2) — aborting to avoid a memorized adapter.")
+                control.should_training_stop = True
+            return control
+
     os.makedirs(a.out, exist_ok=True)
     trainer = Trainer(
-        model=model, train_dataset=ds,
+        model=model, train_dataset=train_ds, eval_dataset=eval_ds,
         data_collator=default_data_collator,  # tok_fn already padded + built masked labels; don't let the LM collator overwrite them
+        callbacks=[OverfitTripwire()],
         args=TrainingArguments(
             output_dir=a.out, num_train_epochs=a.epochs, max_steps=a.max_steps,
             per_device_train_batch_size=1,
-            gradient_accumulation_steps=8, learning_rate=a.lr,
-            bf16=use_bf16, fp16=not use_bf16, max_grad_norm=1.0, warmup_ratio=0.03,
-            logging_steps=10, save_strategy="steps", save_steps=150, save_total_limit=12,
+            # effective batch 16 → ~3 epochs of 2k records ≈ 375 steps (NOT the old fixed 600)
+            gradient_accumulation_steps=16, learning_rate=a.lr,
+            bf16=use_bf16, fp16=not use_bf16, max_grad_norm=1.0,
+            warmup_ratio=0.05, weight_decay=0.01, lr_scheduler_type="cosine",  # #2729 recipe
+            eval_strategy="steps", eval_steps=50,                              # selection loop
+            load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
+            logging_steps=10, save_strategy="steps", save_steps=50, save_total_limit=12,
             optim="paged_adamw_8bit",
             gradient_checkpointing=True, report_to="none"))
     resume_arg = True if a.resume == "auto" else (a.resume or None)
     trainer.train(resume_from_checkpoint=resume_arg)
+    print(f"best checkpoint selected on held-out eval_loss: {trainer.state.best_model_checkpoint}")
 
     final = os.path.join(a.out, "final")
     model.save_pretrained(final); tok.save_pretrained(final)

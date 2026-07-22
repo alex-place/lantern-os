@@ -55,18 +55,70 @@ function humanizeApplyFailure(stats) {
 // Line-numbered current content of the files a failed diff TARGETED, appended to the
 // retry feedback so the model anchors on real lines instead of re-hallucinating
 // context — the concrete fix for the repeating "hunk_not_located" apply failures.
-function targetedFileContext(workRoot, stats) {
+function targetedFileContext(workRoot, stats, priorDiff) {
+  // #2762: two failure mechanisms killed the retry loop's self-correction.
+  // (1) The old version emitted LINE-NUMBERED content with "copy context lines
+  //     VERBATIM from here" — a model that obeys produces hunk context prefixed
+  //     "NN: ", which exists in no file, so every retry fails identically.
+  // (2) The failed hunk's @@ position is the hallucination's own coordinate; the
+  //     model needs the TRUE location of the region it targeted, found by matching
+  //     the failed hunk's lines against the real file (freshness law at the Act
+  //     seam: feed fresh truth into the retry, not another sample of stale context).
   const fs = require("fs"); const path = require("path");
   const files = [...new Set([...(stats.changed || []), ...(stats.created || []),
     ...((stats.errors || []).map((e) => e.file))].filter(Boolean))];
+
+  // Per-file context/removal lines of the prior diff's hunks (what the model
+  // BELIEVED the file contains) — used only to locate the true region.
+  const hunkLines = {};
+  if (priorDiff) {
+    let cur = null;
+    for (const raw of String(priorDiff).split("\n")) {
+      const m = raw.match(/^\+\+\+ b\/(.+)$/);
+      if (m) { cur = m[1].trim(); hunkLines[cur] = hunkLines[cur] || []; continue; }
+      if (!cur) continue;
+      if (raw.startsWith(" ") || raw.startsWith("-")) {
+        const t = raw.slice(1).trim();
+        if (t.length >= 8) hunkLines[cur].push(t);   // short/blank lines match everywhere
+      }
+    }
+  }
+
   let out = "";
   for (const fp of files.slice(0, 3)) {
     try {
       const full = path.join(workRoot, fp);
-      if (!fs.existsSync(full)) { out += `\n--- ${fp} (this file does NOT exist — do not patch it) ---\n`; continue; }
-      const numbered = fs.readFileSync(full, "utf8").split("\n").slice(0, 400)
-        .map((l, i) => `${i + 1}: ${l}`).join("\n");
-      out += `\n--- ${fp} (CURRENT content, line-numbered — copy context lines VERBATIM from here) ---\n${numbered}\n`;
+      if (!fs.existsSync(full)) { out += `\n--- ${fp}: this file does NOT exist — do not patch it ---\n`; continue; }
+      const lines = fs.readFileSync(full, "utf8").split("\n");
+      const n = lines.length;
+
+      // Locate the believed lines in the real file → true coordinates, stated in
+      // prose (never as content prefixes).
+      let anchorNote = "";
+      const believed = (hunkLines[fp] || []).slice(0, 12);
+      if (believed.length) {
+        const trimmed = lines.map((l) => l.trim());
+        let hits = 0;
+        const locs = [];
+        for (const b of believed) {
+          const at = trimmed.indexOf(b);
+          if (at >= 0) { hits++; if (locs.length < 4) locs.push(at + 1); }
+        }
+        anchorNote = hits
+          ? `Of the ${believed.length} context/removed lines your failed diff claimed for this file, ${hits} exist — near line(s) ${[...new Set(locs)].join(", ")}. Anchor your hunks there.`
+          : `NONE of the context/removed lines your failed diff used exist in this file — that content was invented. Rebuild the hunks from the real content below only.`;
+      }
+
+      // Raw content, NO line-number prefixes (they poison verbatim copying). Whole
+      // file when small; head+tail windows (with true line ranges in the headers,
+      // outside the copyable content) when large.
+      let body;
+      if (n <= 520) body = lines.join("\n");
+      else body = `«lines 1-260 of ${n}»\n` + lines.slice(0, 260).join("\n")
+        + `\n«lines ${n - 159}-${n} of ${n}»\n` + lines.slice(n - 160).join("\n");
+      out += `\n--- ${fp} — REAL current content (${n} lines). ${anchorNote} `
+        + `Context lines in your new diff must match this content character-for-character; `
+        + `do NOT include line numbers in diff lines. ---\n${body}\n`;
     } catch { /* skip unreadable */ }
   }
   return out;
@@ -480,7 +532,12 @@ module.exports = async (req, res, url, deps) => {
         }
 
         // Step 4: Run tests from the plan. Empty test set = UNVERIFIED, not "passed".
-        const plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        // #2762 verify floor: same fallback as the stream path — never zero for a code change.
+        let plannedTests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        if (plannedTests.length === 0 && changedFiles.length > 0) {
+          const { deriveVerifyFloor } = require("../lib/self-edit-engine");
+          plannedTests = deriveVerifyFloor(workRoot, changedFiles);
+        }
         step("test", "start", { count: plannedTests.length });
         const testResults = runTests(workRoot, plannedTests, { env: worktreeTestEnv(REPO_ROOT) });
         const testsRan = plannedTests.length;
@@ -636,6 +693,13 @@ module.exports = async (req, res, url, deps) => {
         succeeded: result ? result.status === "ok" : null,
         prUrl: (result && result.prUrl) || null,
         message: (result && result.message) || null,
+        // Verify/Converge evidence from the result record (persisted by finishLog),
+        // so re-attached clients render the same convergence summary + warn-aware
+        // Approve as a live SSE client. Absent on runs logged before this shipped.
+        councilVerdict: (result && result.councilVerdict) || null,
+        councilDelta: (result && result.councilDelta != null) ? result.councilDelta : null,
+        testsPassed: (result && typeof result.testsPassed === "boolean") ? result.testsPassed : null,
+        convergence: (result && result.convergence) || null,
         // Full step history so a client attaching to a run it didn't start (the
         // background-run watcher) can replay the panel, not just show the tail.
         steps: records.map((r) => ({
@@ -925,7 +989,8 @@ module.exports = async (req, res, url, deps) => {
             researchBased: scopeFiles.length > 0 ? 0.8 : 0.5,
             observable: true,
             grounded: true
-          }
+          },
+          confidence_basis: { researchBased: "prior", observable: "prior", grounded: "prior" }, // #2803: all formula constants
         });
 
         // ── 4-5. patch → apply, with a feedback retry loop ────────────────
@@ -1014,18 +1079,25 @@ module.exports = async (req, res, url, deps) => {
             continue;
           }
 
-          // Failed — roll the tree back clean and carry the errors into the next try,
-          // now WITH the real line-numbered content of the targeted files so the model
-          // copies exact context instead of re-hallucinating it.
+          // Failed — roll the tree back clean and carry the errors into the next try
+          // with the REAL content of the targeted files. Deliberately WITHOUT the
+          // prior diff: run autowork-2762@23:0x proved the model anchors on its own
+          // failed diff when it is re-shown (attempts 2 and 3 reproduced the identical
+          // wrong 15-line context even alongside the real file content). The prior
+          // diff's hunks ARE the contamination on a context mismatch — withhold the
+          // ratchet, keep the fresh truth (the certificate's de-ratchet law, applied).
           await new Promise((resolve) =>
             execFile("git", ["checkout", "--", "."], { cwd: workRoot, timeout: 10000, windowsHide: true }, () => resolve()));
           const applyDetail = humanizeApplyFailure(stats);
           feedback = {
-            priorDiff: diffText,
             errors: ((stats.errors && stats.errors.length)
               ? stats.errors.map((e) => `${e.file}: ${e.error}`).join("\n")
               : "the diff changed no files (paths/hunks did not match the repo)")
-              + targetedFileContext(workRoot, stats),
+              + "\nYour previous diff is deliberately NOT shown: its context lines were wrong, and "
+              + "reproducing them fails every time. Rebuild EVERY hunk from scratch by copying 3+ "
+              + "consecutive lines EXACTLY from the REAL content below — do not reuse lines you "
+              + "remember writing before."
+              + targetedFileContext(workRoot, stats, diffText),
           };
           step("apply", attempt < MAX_PATCH_ATTEMPTS ? "retry" : "error",
             { stats, attempt,
@@ -1046,18 +1118,33 @@ module.exports = async (req, res, url, deps) => {
         step("apply", "done", { stats, changedFiles });
 
         // ── 6. tests (verification gate for commit/push) ─────────────────
-        const tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
-        step("tests", "start", { commands: tests });
+        // #2762 verify floor: a plan with zero tests left the Verify stage empty and
+        // shipped `verified: false` on the first end-to-end run. When the plan names
+        // no tests but code changed, derive the deterministic floor (syntax checks +
+        // the repo's real unit tests for the changed files) so verification is never
+        // zero for a code change.
+        let tests = Array.isArray(plan.testsToRun) ? plan.testsToRun : [];
+        let testsFromFloor = false;
+        if (tests.length === 0 && changedFiles.length > 0) {
+          const { deriveVerifyFloor } = require("../lib/self-edit-engine");
+          const floor = deriveVerifyFloor(workRoot, changedFiles);
+          if (floor.length) { tests = floor; testsFromFloor = true; }
+        }
+        step("tests", "start", { commands: tests, ...(testsFromFloor ? { floor: true } : {}) });
         const testResults = runTests(workRoot, tests, { env: worktreeTestEnv(REPO_ROOT) });
         const ranTests = tests.length > 0; // #933: zero tests is NOT a pass
         const testsPassed = testResults.every((r) => r.ok !== false);  // inconclusive (timeout) ≠ failure
         receipt.testsPassed = tests.length === 0 ? null : testsPassed;
         const _failedTest = testResults.find((r) => r.ok === false) || {};
-        step("tests", "done", { testResults, passed: testsPassed, ran: tests.length,
+        // Zero tests = SKIPPED, never "done/passed": [].every() is vacuously true, and
+        // that truthy `passed` lit the panel's verify row green on runs that verified
+        // nothing (caught live on the 2026-07-21 html-only run).
+        step("tests", tests.length === 0 ? "skipped" : "done",
+          { testResults, ...(tests.length === 0 ? {} : { passed: testsPassed }), ran: tests.length, floor: testsFromFloor,
           detail: tests.length === 0
-            ? "no tests were specified for this change"
+            ? "no tests were specified for this change — Verify stage NOT exercised"
             : (testsPassed
-                ? `${tests.length} test command(s) passed`
+                ? `${tests.length} test command(s) passed${testsFromFloor ? " (deterministic verify floor — the plan specified none)" : ""}`
                 : `failed: ${_failedTest.command || tests[0]} — ${String(_failedTest.output || "").split("\n").filter(Boolean).slice(-1)[0] || "see output"}`.slice(0, 240)) });
 
         // Σ₀ fast-layer plasticity (#1011): record this run's test gate as an external
@@ -1216,6 +1303,7 @@ module.exports = async (req, res, url, deps) => {
         // no neural change. 0.5 prior until grounded.
         let calibratedTrust = 0.5;
         try { calibratedTrust = require("../lib/grounding-calibration").trust("autowork:patch"); } catch (_) {}
+        const { confidenceBasis, basisSummary } = require("../lib/confidence-basis"); // #2803
         const convergenceRecord = {
           timestamp: new Date().toISOString(),
           issue: issueNumber,
@@ -1251,6 +1339,15 @@ module.exports = async (req, res, url, deps) => {
             // consulted (not retrained) each run; 0.5 until grounded by real outcomes.
             calibratedTrust,
           },
+          // #2803: label each confidence field's basis so the record stops PERFORMING
+          // measurement — 'measured' = outcome-calibrated (only calibratedTrust today),
+          // 'prior' = a formula constant. A reader can now tell the one honest term from
+          // the ritual constants instead of reading the weighted sum as a measurement.
+          confidence_basis: {
+            codebaseResearch: "prior", webGrounded: "prior", testsPassed: "prior",
+            observable: "prior", grounded: "prior", overall: "prior",
+            calibratedTrust: "measured",
+          },
           sources: {
             issue: `github.com/alex-place/lantern-os/issues/${issueNumber}`,
             pr: prUrl,
@@ -1264,7 +1361,7 @@ module.exports = async (req, res, url, deps) => {
             ? { verdict: council.verdict, delta: council.delta, groundedBy: council.groundedBy, recommend: council.recommend }
             : null,
         };
-        step("convergence", "done", { record: convergenceRecord });
+        step("convergence", "done", { record: convergenceRecord, confidenceBasis: basisSummary(convergenceRecord.confidence).label });
 
         // Append to convergence log
         const convergenceLog = path.join(REPO_ROOT, "data", "convergence-autonomous-work.jsonl");
@@ -1290,7 +1387,15 @@ module.exports = async (req, res, url, deps) => {
             verify: c.testsPassed,                                   // tests actually ran/passed
             converge: c.overall                                      // confidence record + PR
           },
-          overall: c.overall
+          // #2803: none of these six dimensions are outcome-calibrated — each is a formula
+          // constant gated on a real event (issue fetched, plan made, patch applied, tests
+          // ran), so the row reports a prior profile, not a measurement.
+          dimensions_basis: {
+            observe: "prior", research: "prior", reason: "prior",
+            act: "prior", verify: "prior", converge: "prior",
+          },
+          overall: c.overall,
+          overall_basis: "prior"
         };
         const agiBenchLog = path.join(REPO_ROOT, "data", "agi-benchmark.jsonl");
         fsSync.appendFileSync(agiBenchLog, JSON.stringify(agiRow) + "\n");
@@ -1300,6 +1405,26 @@ module.exports = async (req, res, url, deps) => {
         // assigned-issue merge gate (lib/pr-watcher.js) can land it. Fire-and-forget.
         try { require("../lib/autowork-research").markPrConverged(prUrl).catch(() => {}); } catch (_e) { /* best-effort */ }
 
+        // One summary object, sent on the live SSE `done` AND persisted in the run
+        // log's result record — a client that reconnects (or the background-run
+        // watcher) must render the same verify/converge evidence as a live one.
+        // `research` maps from confidence.codebaseResearch (the record's field name);
+        // it was previously read from a nonexistent `.research` and always undefined.
+        const convergenceSummary = {
+          hypothesis: convergenceRecord.hypothesis,
+          confidence: {
+            research: convergenceRecord.confidence.codebaseResearch,
+            testsPassed: convergenceRecord.confidence.testsPassed,
+            observable: convergenceRecord.confidence.observable,
+            grounded: convergenceRecord.confidence.grounded,
+            overall: convergenceRecord.confidence.overall
+          },
+          evidence: convergenceRecord.evidence,
+          sources: convergenceRecord.sources,
+          // #2803 (merged with master's lib-backed impl): the record field is `confidence_basis`.
+          confidence_basis: convergenceRecord.confidence_basis,
+          calibratedTrust: convergenceRecord.confidence.calibratedTrust,
+        };
         send("done", {
           ok: true,
           ...receipt,
@@ -1308,18 +1433,34 @@ module.exports = async (req, res, url, deps) => {
           convergence: {
             hypothesis: convergenceRecord.hypothesis,
             confidence: {
-              research: convergenceRecord.confidence.research,
+              // #2795 fix: the record field is `codebaseResearch`; reading `.research`
+              // returned undefined (the finale's research number was blank).
+              research: convergenceRecord.confidence.codebaseResearch,
               testsPassed: convergenceRecord.confidence.testsPassed,
               observable: convergenceRecord.confidence.observable,
               grounded: convergenceRecord.confidence.grounded,
-              overall: convergenceRecord.confidence.overall
+              overall: convergenceRecord.confidence.overall,
+              // #2803: overall is a prior (weighted sum of formula constants); calibratedTrust
+              // is the one outcome-calibrated number. Ship both, labeled, so the finale can
+              // show the split instead of passing a prior off as a measurement.
+              calibratedTrust: convergenceRecord.confidence.calibratedTrust,
+              basis: convergenceRecord.confidence_basis,
+              basisSummary: basisSummary(convergenceRecord.confidence).label,
             },
             evidence: convergenceRecord.evidence,
             sources: convergenceRecord.sources,
           },
-          message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (confidence: ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%)`
+          // #2803: don't pass the weighted-sum prior off as a measurement. Lead with the
+          // one calibrated number and label the overall a prior estimate.
+          message: `✓ Σ₀ autonomous work complete. Issue #${issueNumber} → ${prUrl} (prior estimate ${(convergenceRecord.confidence.overall * 100).toFixed(0)}%; calibrated trust ${(convergenceRecord.confidence.calibratedTrust * 100).toFixed(0)}%)`
         });
-        finishLog(true, { prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}` });
+        finishLog(true, {
+          prUrl, issue: issueNumber, message: `Auto-worked #${issueNumber} → ${prUrl}`,
+          councilVerdict: council ? council.verdict : null,
+          councilDelta: council ? council.delta : null,
+          testsPassed: receipt.testsPassed,
+          convergence: convergenceSummary,
+        });
         res.end();
       } catch (err) {
         const stage = receipt.stoppedAt || (receipt.steps && receipt.steps[receipt.steps.length - 1]) || null;

@@ -68,29 +68,53 @@ const BANDS = {
   },
 };
 
+// Third strike of the bare-keyword disease (#1268 defaulted everything to NOW;
+// #1275 grounded "fix this bug now" in dark energy; this pass caught "transparent"
+// → CMB on CSS questions, "beginner" → Planck epoch, "inflation" → cosmic inflation
+// on economics, "final state" → heat death on reducer questions — all measured in
+// test/convergence-oracle.test.js). Split: STRONG phrases are unambiguous and match
+// alone; WEAK words are real cosmology anchors that also live in everyday language,
+// so they additionally require the question to read as cosmology (CONTEXT).
+const CONTEXT = /universe|cosmic|cosmolog|big bang|entropy|galax|stellar|interstellar|cosmos|astrophys|space-?time|expansion of space/i;
+
 const KEYMAP = [
-  [["before the big bang", "singularity", "planck", "quantum gravity", "begin", "t=0",
-    "start of time", "first instant"], "Planck epoch"],
-  [["inflation", "flatness", "horizon problem"], "Inflation"],
-  [["nucleosynthesis", "helium", "abundance", "antimatter", "baryogenesis"], "Nucleosynthesis (BBN)"],
-  [["cmb", "microwave background", "recombination", "transparent"], "Recombination / CMB"],
-  [["first star", "reionization", "population iii", "first galax"], "First stars → reionization"],
-  // NOW band: real cosmology anchors only. The bare words "now"/"today"/"current"
-  // were removed (#1275) — they are not cosmology keywords and matched everyday
-  // requests ("fix this bug now", "my schedule today"), grounding them in dark
-  // energy. The no-match case already returns no grounding (#1268, sliceFor→null).
-  [["how old", "age of the universe", "dark energy", "dark matter"], NOW],
-  [["proton decay", "white dwarf", "remnant", "stars stop", "star formation end"], "Degenerate era"],
-  [["black hole", "hawking", "evaporat"], "Black hole era"],
-  [["heat death", "end of the universe", "ultimate fate", "fate of the universe", "fate of everything",
-    "big rip", "vacuum decay", "final state", "how does it end", "how will the universe end",
-    "end of time"], "Dark era / heat death"],
+  { band: "Planck epoch",
+    strong: ["before the big bang", "quantum gravity", "planck epoch", "planck time", "start of time", "first instant"],
+    weak: ["begin", "t=0", "singularity", "planck"] },
+  { band: "Inflation",
+    strong: ["cosmic inflation", "horizon problem", "inflaton"],
+    weak: ["inflation", "flatness"] },
+  { band: "Nucleosynthesis (BBN)",
+    strong: ["nucleosynthesis", "baryogenesis", "antimatter"],
+    weak: ["helium", "abundance"] },
+  { band: "Recombination / CMB",
+    strong: ["cmb", "microwave background"],
+    weak: ["recombination", "transparent"] },
+  { band: "First stars → reionization",
+    strong: ["first stars", "reionization", "population iii", "first galax"],
+    weak: ["first star"] },
+  { band: NOW,
+    strong: ["age of the universe", "dark energy", "dark matter"],
+    weak: ["how old"] },
+  { band: "Degenerate era",
+    strong: ["proton decay", "white dwarf", "star formation end", "stars stop"],
+    weak: ["remnant"] },
+  { band: "Black hole era",
+    strong: ["black hole", "hawking"],
+    weak: ["evaporat"] },
+  { band: "Dark era / heat death",
+    strong: ["heat death", "end of the universe", "ultimate fate", "fate of the universe", "fate of everything",
+             "big rip", "vacuum decay", "how does it end", "how will the universe end", "end of time"],
+    weak: ["final state"] },
 ];
 
 function sliceFor(question) {
   const q = String(question || "").toLowerCase();
-  for (const [keys, band] of KEYMAP) {
-    if (keys.some((k) => q.includes(k))) return Object.assign({ band }, BANDS[band]);
+  const hasContext = CONTEXT.test(q);
+  for (const { band, strong, weak } of KEYMAP) {
+    if (strong.some((k) => q.includes(k)) || (hasContext && weak.some((k) => q.includes(k)))) {
+      return Object.assign({ band }, BANDS[band]);
+    }
   }
   return null;   // not a cosmology/deep-time question — no slice, no forced grounding
 }

@@ -166,10 +166,30 @@ class ConvergenceRecord:
     grounding_signals: List[str] = field(default_factory=list)  # ExternalGroundingSensor IDs
     # Confidence capped by grounding signal quality (VerificationHardener)
     allowed_max_confidence: Optional[float] = None
+    # HARD, CHECKABLE verification artifacts — the External Reality Rule made concrete.
+    # Typed refs anyone can independently re-check: "pr:2737" (merged pull request),
+    # "commit:a9800440", "test:tests/test_x.py::name", "exec:humaneval/0". Distinct from
+    # grounding_signals, which are SOFT corroboration (web/arxiv). The frontier lesson
+    # (verified-outcome routing/cascades — RouteLLM, FrugalGPT, ETH cascade-routing) is
+    # that a decision is only trustworthy when its label is a checkable outcome; here the
+    # strongest such artifact for a self-coding loop is a MERGED PR. So `verified=True` is
+    # legitimate ONLY when verified_by carries ≥1 checkable artifact — this structurally
+    # forecloses the confidence laundering the §2/#767 audits kept finding.
+    verified_by: List[str] = field(default_factory=list)
 
     def is_grounded(self) -> bool:
         """Does this record cite external evidence?"""
         return bool(self.grounding_signals)
+
+    def verification_ok(self) -> bool:
+        """`verified=True` is legitimate only when backed by a checkable artifact.
+
+        Returns True for any un-verified record; for a verified one, requires at least
+        one entry in ``verified_by`` (a PR / commit / test / exec ref). A record that
+        claims ``verified=True`` with an empty ``verified_by`` is laundered — the exact
+        failure the honest-ledger repair (#2737) and the §2 trigger audit fight.
+        """
+        return (not self.verified) or bool(self.verified_by)
 
     def confidence_valid(self) -> bool:
         """Is the claimed confidence consistent with grounding?
@@ -196,6 +216,7 @@ class ConvergenceRecord:
             "applied_evidence": self.applied_evidence,
             "grounding_signals": self.grounding_signals,
             "allowed_max_confidence": self.allowed_max_confidence,
+            "verified_by": self.verified_by,
         })
 
 

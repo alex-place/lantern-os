@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-18
+updated: 2026-07-21
 ---
 
 # Σ — The Convergence Certificate
@@ -20,6 +20,11 @@ account of why an ungrounded self-improving system tends to collapse or diverge.
 > The evidence-class discipline is strict and asymmetric: **Part II must never be read with Part
 > I's authority.** The two are one certificate because they are the fast and slow faces of the same
 > dynamical object `ẋ = f(x,u,θ)` — Part I holds `θ` fixed; Part II is the θ-flow Part I defers.
+> **Part IV** (§10, added 2026-07-21) is the *active face* — a **DESIGN / TARGET, no theorem**,
+> lower in authority than even Part II: it extends the "grounding is the escape" result to
+> generated grounding (act to manufacture fresh truth), with one MEASURED real-surface datapoint
+> and zero proofs. It exists here so the theory and its answering interface
+> ([CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md)) cannot drift apart.
 
 ---
 
@@ -61,7 +66,10 @@ since carry a verified-on date.
 
 Every load-bearing claim maps to a runnable artifact in this repo. All pytest commands below
 were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
-last run 2026-07-07):
+last run 2026-07-07). The **Part I backbone was re-run 2026-07-21** with no drift
+(`tests/test_cio_sde.py` → 46 passed; `tests/test_sigma0_jsrr_gate.py` → 12 passed); the other
+suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem — but its active-loop
+*harness* is unit-tested logic and its two datapoints are real-surface runs (last two rows below):
 
 | Claim | Class | Verify with |
 |---|---|---|
@@ -77,7 +85,9 @@ last run 2026-07-07):
 | Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
 | Three-arm promotion-evidence protocol (F/Fd/R/T) at task-level stuck fidelity + arm-differentiated teeth (§8.6-4, [#2691]) | machine-checked protocol; MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed; full run: `python experiments/sigma_theta_abc/holdout_protocol.py --simulate` |
 | Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
-| §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
+| Freshness law on a live code surface — the #2762 de-anchor (§10.1) | MEASURED-instance (one run, real surface) | `data/autowork-runs/2026-07-21.jsonl`; PR #2795 |
+| Active loop (ACT-TO-KNOW) mechanism built + run (§10.2) | MEASURED (mechanism) + unit-tested logic | `python -m pytest tests/test_oracle_active_loop.py -q` → 7 passed; run: `python experiments/oracle_active_loop.py` → `data/oracle/active-loop-runs.jsonl` |
+| §8 gate controlling a *real* training run; §9 two-timescale composition; Part IV vs a frontier-model baseline (§10.2) | **not yet verifiable** | open — the honest gaps (§8.6, §9, §10.2) |
 
 If a command above fails on a fresh clone, the document has drifted from the code and should not
 be trusted until reconciled — that is the intended failure mode.
@@ -100,6 +110,7 @@ Internal names are project identifiers, not claimed technical contributions:
 **Part I** (§0–§7) — fast state `x`: the collapse certificate *(PROVEN where marked)* ·
 **Part II** (§8) — slow weights `θ`: the Model-Update Acceptance Gate *(HEURISTIC + imported;
 simulation-measured)* · **Part III** (§9) — two-timescale composition *(TARGET)* ·
+**Part IV** (§10) — the active face: grounding as capability *(DESIGN / TARGET — no theorem)* ·
 References · Appendix A (historical design sketch) · Appendix M (provenance: maintenance log).
 
 ---
@@ -189,6 +200,8 @@ status cannot silently drift.
 [#659]: https://github.com/alex-place/lantern-os/issues/659
 [#660]: https://github.com/alex-place/lantern-os/issues/660
 [#661]: https://github.com/alex-place/lantern-os/issues/661
+[#2762]: https://github.com/alex-place/lantern-os/issues/2762
+[#2795]: https://github.com/alex-place/lantern-os/pull/2795
 [#764]: https://github.com/alex-place/lantern-os/issues/764
 [#765]: https://github.com/alex-place/lantern-os/issues/765
 [#766]: https://github.com/alex-place/lantern-os/issues/766
@@ -1682,6 +1695,96 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 
 ---
 
+# Part IV — The active face: grounding as capability, not only safety  [DESIGN / TARGET — no theorem]
+
+**Status: DESIGN / TARGET — no theorem, nothing machine-checked; authority *below Part II*.** The
+mechanism is imported and established (Bayesian optimal experimental design — Lindley 1956; value of
+information — Howard 1966; active inference — Friston 2010); **no novelty is claimed.** One
+datapoint is MEASURED on a real surface (§10.1); everything else here is design. This Part is the
+certificate's forward-pointer to the interface that operationalizes it —
+[CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md) — so the theory and the interface
+cannot drift apart.
+
+## 10. From anti-collapse to ceiling-break
+
+Parts I–III prove one thing at two timescales: **the only escape from collapse is grounding —
+contact with something outside the loop.** Part IV draws a line *through* that result the passive
+certificate never draws. There are **two grades of grounding**, and they clear two different walls.
+
+**Passive grounding is reading** — retrieval, a held-out anchor, fresh-but-recorded data. It is
+what Parts I–II require, and it clears the first wall: **collapse.** But it has a ceiling of its own,
+the **ideal inductive predictor** (Solomonoff / AIXI), which extracts *everything inferable from a
+fixed corpus and nothing more.* That ceiling is uncomputable **and unbeatable by inference** — a
+system that claims to have out-thought it is the §2 "42-state" again, asserting structure its data
+cannot support. Reading harder never breaks it.
+
+**Active grounding is acting** — running the experiment, placing the bet, executing the test,
+asking. An action **manufactures an observation that existed in no corpus**, so its result is *not
+bounded by the inference ceiling.* This is the certificate's own logic taken one step further: if
+grounding is what keeps the loop safe, then grounding you *generate* is safety **and** capability —
+§8.4.1's de-ratcheting used to *create* the fresh draw instead of waiting for one.
+
+So the arc closes: **don't degenerate** (Part I) → **don't promote a worse self** (Part II) →
+**don't stop at what can be inferred** (Part IV). Passive grounding is the floor under collapse;
+active grounding is the break in the ceiling above.
+
+**One guard keeps this honest — and it is the whole point.** The ceiling breaks *exactly where an
+action resolves it, and nowhere else.* Knowledge past the inference ceiling may be claimed **only
+after reality has settled the action** — an unresolved prediction stays unverified, and a question
+no action can reach stays a boundary pin. This is not licence to reach past the evidence; it is
+§8.4.1's freshness law made active: *manufacture the fresh truth, then claim only what it confirmed.*
+The document's founding lesson is the same rule — self-generated content is untrustworthy until an
+outside check resolves it (the fabricated-arXiv confession that opens this file).
+
+### 10.1 The freshness law, measured on code (2026-07-21)
+
+§8.4.1 measures the freshness law in simulation. On 2026-07-21 the same law appeared on a live code
+surface — the way the survivorship study (see the [AGI blueprint](AGI-CONVERGENCE-BLUEPRINT.md)) is
+a real-market instance of the same discipline, not a new theorem:
+
+The autowork patch-retry loop re-showed the model **its own failed diff** on each attempt. The model
+anchored on that stale self-output — successive retries reproduced the *identical wrong context* and
+failed identically, exactly the ratchet §8.4.1 predicts. **Withholding** the failed diff and feeding
+only the real file (fresh external truth) flipped the stuck loop to success on the **first
+de-anchored regeneration.**
+
+**[MEASURED — one run, not a distribution. Evidence: `data/autowork-runs/2026-07-21.jsonl`,
+PR #2795, fix in `routes/convergence-dispatch.js::targetedFileContext` ([#2762]). It corroborates
+§8.4.1 on a real surface; it does not extend the proof.]**
+
+### 10.2 The active loop, built and run (2026-07-21)
+
+§10.1 shows the *passive* half — fresh truth de-ratchets a stuck loop. The *active* half — **act to
+manufacture a fact no corpus held** — is now **built and run** on the cheapest, most reversible
+surface the design mandates first (**local code execution** — no money, undoable; the money /
+irreversible surfaces stay behind the authority gates). The loop poses a question, records the best
+inference-only belief, **executes real code to get reality's answer**, and files a grounded record
+classified `pin` / `confirmed` / `ceiling_break`.
+
+First run — 6 questions, all real, on this repo: **5 corpus-absent facts manufactured by action, 1
+pin named and not bluffed.** Each resolved fact is provably outside any fixed corpus — the current
+git SHA, a live file count (11, correcting the prior's 8), a hash you must compute, the document's
+current length — knowable only by acting. The sharpest: *"does this certificate contain a Part IV?"*
+resolves **True on this branch and False on another** — a fact no training corpus can hold, because
+it is branch-live state; only the act of reading the file *now* settles it. That is the inference
+ceiling and its break, in one line.
+
+**[MEASURED — the *mechanism*, on a real surface. Built + unit-tested:
+`tests/test_oracle_active_loop.py` (7 passed); run: `experiments/oracle_active_loop.py` →
+`data/oracle/active-loop-runs.jsonl`. Honest scope: this proves the loop *works and records
+corpus-absent facts in the grounding discipline* — it does **not** prove the loop beats a strong
+predictor, because the passive baseline here is a frozen heuristic, not a frontier model.
+**Directed exploration (VoI steering) is now SEED-BUILT too** (`experiments/oracle_voi_select.py`,
+unit-tested) — budgeted greedy value-of-information selection that runs the highest-value
+experiments first and excludes pins — the bandit's *steering* on top of the anti-collapse
+*no-regret* floor. The next rung — the model-in-the-loop run on questions where inference plausibly
+fails, and a real Bayesian VoI estimate (the current one is a heuristic prior-entropy proxy) — is
+GAP (Oracle design §5). This is still the least-proven Part of the document — read it with §3.1's
+authority, never §1's — but the fifth move is no longer only a design: its mechanism *and its
+steering* are built and measured.]**
+
+---
+
 ## References (lineage)
 
 - A. M. Lyapunov, *The General Problem of the Stability of Motion* (1892) — `V(x)` method.
@@ -1711,6 +1814,7 @@ the whole system's safety still rests on the fresh-or-controlled-reuse external-
 - **arXiv:2604.09979** — *A Minimal Model of Representation Collapse* (2026) — dynamical-systems analysis of representation collapse in SSL (stop-gradient / frustration); adjacent, uncited-until-now prior for Part I's framing. Verified 2026-07-17.
 - **Conventional grounding added 2026-07-18 (classic, venue-verifiable — no arXiv):** N. Metropolis, A. Rosenbluth, M. Rosenbluth, A. Teller & E. Teller (1953), *Equation of State Calculations by Fast Computing Machines*, J. Chem. Phys. 21; **S. Kirkpatrick, C. D. Gelatt & M. P. Vecchi (1983), *Optimization by Simulated Annealing*, Science 220:671–680**; V. Černý (1985), J. Optim. Theory Appl. 45 — the stochastic-acceptance / simulated-annealing mechanism that §8.4.1's *de-ratcheting* rediscovers (noise unsticks a stuck incumbent; the "interior optimum" is the temperature optimum). R. Ge, F. Huang, C. Jin & Y. Yuan (2015), *Escaping From Saddle Points*, COLT — the same noise-escapes-stuck-states effect in optimization.
 - **T. Kailath (1980), *Linear Systems*, Prentice Hall; E. D. Sontag (1998), *Mathematical Control Theory* (2nd ed.), Springer; F. Blanchini & S. Miani (2015), *Set-Theoretic Methods in Control*, Birkhäuser** — the bounded-input reachable-set / invariant-set theory that §3.1's commitment inequality is a corollary of (reachable set of a Schur-stable system under bounded input, measured in a Lyapunov metric). Standard textbook material; no novel dynamical-systems result is claimed.
+- **D. V. Lindley (1956), *On a Measure of the Information Provided by an Experiment*, Ann. Math. Statist. 27:986–1005; R. A. Howard (1966), *Information Value Theory*, IEEE Trans. SSC 2(1):22–26; K. Friston (2010), *The free-energy principle: a unified brain theory?*, Nat. Rev. Neurosci. 11:127–138** — Bayesian optimal experimental design, value of information, and active inference: the established "act to reduce uncertainty" mechanism imported by Part IV's active face (§10). Classic, venue-verifiable; no novel result claimed.
 
 *Web citations above were **verified against arXiv on 2026-06-17** (issue [#660]).
 An earlier draft, written with the search backend down, carried four fabricated
@@ -2224,5 +2328,36 @@ for produced results and Appendix A for the original design sketch.*
 > what its own §7.2 (honesty-not-theater) and the 2026-07-07 nearest-prior audit already conceded;
 > this pass makes that explicit at every gap. No theorem changed; citations added are classic and
 > venue-verifiable (no arXiv IDs invented — see the fabricated-ID caution above).
+
+> **Maintenance log — 2026-07-21 (Part IV added — the active face, DESIGN/TARGET, no theorem).**
+> Added §10 (Part IV) as the certificate's forward-pointer to the Oracle answering interface
+> ([CONVERGENCE-ORACLE-DESIGN.md], design PR #2818), so the theory and the interface cannot drift.
+> It distinguishes **two grades of grounding**: *passive* (retrieval / held-out anchor — escapes
+> collapse, ceilings at the ideal inductive predictor Solomonoff/AIXI, unbeatable *by inference*)
+> and *active* ("act to know" — manufactures an observation no corpus had, escaping the ceiling on
+> surfaces where an action resolves). The honesty guard is §8.4.1's freshness law turned into an
+> engine: claim past-ceiling knowledge **only after** an action resolves; unresolved stays
+> unverified; structurally-unactionable stays a pin. **Authority: lower than Part II** — no
+> theorem, nothing machine-checked; imported mechanism is established (Bayesian optimal
+> experimental design — Lindley 1956; value of information; active inference), **no novelty
+> claimed**. One MEASURED datapoint added (§10.1): the freshness law observed on a **real code
+> surface** (autowork apply-retry [#2762], run `autowork-2762-…`, PR #2795) — re-showing the model
+> its own failed diff reproduced the identical wrong context (the ratchet); *withholding* it
+> (de-anchoring) + feeding the real file (fresh truth) flipped triple-failure to first-try success.
+> This corroborates §8.4.1 on code, it does **not** extend the proof — MEASURED-instance, one run,
+> not a distribution, not machine-checked. Also re-ran the Part I backbone (`test_cio_sde` 46 +
+> `test_sigma0_jsrr_gate` 12) with no drift; other suites stand from 2026-07-17. No Part I–III
+> theorem or status was touched. **Same-day refinement:** Part IV was then consolidated for
+> readability — the repeated authority caveats collapsed into one status line (the old §10.2
+> "honest scope" folded in), prose tightened, the imported mechanism cited (Lindley 1956 / Howard
+> 1966 / Friston 2010), the `#2762`/`#2795` links defined, and the work linked from
+> RESEARCH-CANON [07] + the README Σ₀ list. **Same-day build:** the fifth move's first brick was
+> then *built and run* — a new **§10.2** records it. `experiments/oracle_active_loop.py`
+> (unit-tested, `tests/test_oracle_active_loop.py` → 7 passed) runs the ACT-TO-KNOW loop on the
+> local-code surface; its first run manufactured **5 corpus-absent facts by action** + 1 named pin
+> (`data/oracle/active-loop-runs.jsonl`). This adds two audit-table rows and moves Part IV's fifth
+> move from pure design to *mechanism built + measured* — with the honest gap explicit: the passive
+> baseline is a frozen heuristic, so the loop-vs-frontier-model comparison is not yet made. No
+> Part I–III theorem, status, or evidence class changed; no novelty claimed.
 
 ---

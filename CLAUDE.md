@@ -89,7 +89,7 @@ Reject architectural sprawl. Prefer extension over addition. Maintain a single C
 
 ## Project Overview
 
-unisona.ai is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **dream-chat.html** — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
+unisona.ai is a **persistent local-first reasoning system** led by Alex Place and built by a **team of concurrent human + AI-agent lanes** (see the Per-Lane Workstream Rule below — `claude/`, `gemini/`, `codex/`, and per-human lanes all run in parallel; paying power users contribute too). The primary user interface is **chat.html** (renamed from dream-chat.html in #2751; the old path redirects) — a freeform chat backed by a Convergence Core that remembers, reasons, acts, and verifies.
 
 ## Quickstart (Read QUICKSTART.md First)
 
@@ -278,11 +278,11 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 | Scenario | Purpose | Target |
 |---|---|---|
 | home-load | Verify home page renders + no console errors | `/` |
-| dream-chat-init | Verify dream-chat loads + textarea ready | `/dream-chat.html` |
-| dream-chat-first-message | Send test message + verify response stream | `/dream-chat.html` |
+| dream-chat-init | Verify the chat loads + textarea ready | `/chat.html` |
+| dream-chat-first-message | Send test message + verify response stream | `/chat.html` |
 | theme-toggle | Light ↔ dark mode works bidirectionally | All pages |
-| dream-chat-agent-select | Switch agent personas + verify prompt changes | `/dream-chat.html` |
-| dream-chat-error-handling | Send malformed input + verify error state | `/dream-chat.html` |
+| chat-provider-select | Switch the provider dropdown + verify the route label changes | `/chat.html` |
+| dream-chat-error-handling | Send malformed input + verify error state | `/chat.html` |
 | home-nav-links | Click all nav links + verify page loads | `/` → all targets |
 | trader-dashboard-load | Verify Kalshi deck renders | `/kalshi-terminal.html` |
 | responsive-mobile | Test 375x812 (iPhone) viewport | All pages |
@@ -300,7 +300,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
 | <0.2 (Trivial) | Discard (console.warn, CSS whitespace, etc.) |
 
 ### Triggering Autonomous Tests
-**In dream-chat.html:**
+**In chat.html:**
 - Type: `"test the app"` or `"scan for issues"` or `"audit the system"`
 - unisona.ai agent will autonomously:
   1. **Observe**: Fetch list of issues needing validation
@@ -311,7 +311,7 @@ Copy `.env.example` to `.env` at repo root. Key variables: `ANTHROPIC_API_KEY`, 
   6. **Converge**: File issues with evidence + confidence records
 
 ### Reviewing Results
-1. **Live stream**: Watch real-time test execution in dream-chat.html test panel
+1. **Live stream**: Watch real-time test execution in the chat.html test panel
 2. **Convergence log**: `data/keystone-test-runs.jsonl` — append-only record of each run
 3. **Issue tracker**: `#566-588` — full test fleet issues for ongoing improvements
 4. **GitHub issues**: Auto-filed with [keystone-autonomous] + [sigma0-grounded] labels
@@ -342,7 +342,7 @@ Each test run logs:
 
 ### Running a chat capability / benchmark test manually
 
-To drive `dream-chat.html` through a prompt suite (golden benchmark or freeform
+To drive `chat.html` through a prompt suite (golden benchmark or freeform
 capability list) by hand and score it, follow **[docs/CHAT-EVAL-RECIPE.md](docs/CHAT-EVAL-RECIPE.md)**.
 It captures the fast path (warm the provider, plain turns, pace off the disk log,
 grade with the real HumanEval sandbox) and the gotchas that otherwise cost a

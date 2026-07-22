@@ -1,0 +1,39 @@
+{
+  "config": {
+    "rho": 0.9,
+    "theta": 0.7,
+    "runs": 200,
+    "T": 3000,
+    "kick": 8.0
+  },
+  "passive_functionals_KS (expect NO separation \u2014 identical laws)": {
+    "mean_NIS": {
+      "KS_D": 0.08,
+      "p": 0.5272
+    },
+    "a_sigma": {
+      "KS_D": 0.06,
+      "p": 0.8537
+    },
+    "lag1_autocorr": {
+      "KS_D": 0.115,
+      "p": 0.1324
+    },
+    "mean_step": {
+      "KS_D": 0.125,
+      "p": 0.0809
+    },
+    "mean_norm": {
+      "KS_D": 0.105,
+      "p": 0.2078
+    }
+  },
+  "interventional_probe": {
+    "recovery_steps_ungrounded_median": 22.0,
+    "recovery_steps_grounded_median": 1.0,
+    "theory_ungrounded_halflife_steps": 6.6,
+    "KS_D": 1.0,
+    "p": 0.0
+  },
+  "reading": "Passive battery: all p large / D small \u2014 the grounded tracker and the ungrounded loop are the same law, so NO internal functional separates them (lemma). Probe: distributions disjoint (p~0) \u2014 separation requires intervening against the external channel: the #1012 hard cadence is the necessary instrument, not an heuristic."
+}

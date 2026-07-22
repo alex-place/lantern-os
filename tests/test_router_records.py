@@ -12,6 +12,7 @@ RECORD_KEYS = {
     "source",
     "applied_evidence",  # #764 G9
     "grounding_signals", "allowed_max_confidence",  # Σ₀ grounding fields
+    "verified_by",  # #2797 — checkable artifacts gating the honest ledger
 }
 
 

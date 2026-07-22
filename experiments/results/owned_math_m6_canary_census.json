@@ -1,0 +1,32 @@
+{
+  "path": "C:\\dev\\lantern-os\\data\\convergence\\canary-events.jsonl",
+  "n_events": 61,
+  "n_malformed": 0,
+  "fields": {
+    "ts": 61,
+    "type": 61,
+    "tripped": 61,
+    "text_length": 61,
+    "collapse": 54,
+    "grounded": 54,
+    "source": 54,
+    "provider": 54,
+    "agent": 54,
+    "surface": 54
+  },
+  "tripped_distribution": {
+    "collapse": 7,
+    "grounded": 54
+  },
+  "signal_keys_seen": {
+    "tokens": 54,
+    "selfRepeatRatio": 54,
+    "ngramEchoRatio": 54,
+    "typeTokenRatio": 54,
+    "longestRunRatio": 54,
+    "maxUnpunctuatedRun": 12,
+    "longestSegmentTokens": 42
+  },
+  "events_with_time_series_signals": 0,
+  "verdict": "LEAD-TIME ANALYSIS NOT YET POSSIBLE: events are terminal per-generation snapshots (scalar signals at fire/pass time); the lasing-threshold test needs per-token signal trajectories. Instrumentation ask: behind a flag, log the per-token signal vector (selfRepeat, ngramEcho, entropy-z, exit depth) for BOTH fired and non-fired generations, sampled; then estimate per-mode gain/leak and measure crossing\u2192fire lead time."
+}

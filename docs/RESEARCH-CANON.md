@@ -278,7 +278,8 @@ blueprint companion view tracked in #2775.
     drift canaries, convergence records, the honesty probe.
   - **§4.3 — tools contaminate faculty measurement** ("if the system can simply search the internet …
     we are no longer measuring the system's memory — only its ability to search"); baselines must get
-    the same tools. This is the #2322 groundedness-noise class, now named.
+    the same tools. This is the #2322 groundedness-noise class, now named — prescription: tool-gated
+    per-faculty eval conditions, tracked in #2777.
 - **A Definition of AGI** (Hendrycks et al., [arXiv:2510.18212](https://arxiv.org/abs/2510.18212),
   Oct 2025 — *abstract-level web-verified 2026-07-21*)
   - Companion **ten-domain** framework grounded in Cattell–Horn–Carroll (the most empirically
@@ -289,8 +290,24 @@ blueprint companion view tracked in #2775.
   the same evidence discipline as the Verify loop — and both name **metacognition** as the frontier
   gap. DeepMind states it is building held-out metacognition evals with academic partners, so the
   frontier is instrumenting the exact gap this loop occupies; validation should parallelize (E-B
-  #2691 + external metacognition evals), not serialize. Status: **theory adopted as the measurement
-  yardstick**; held-out eval integration is roadmap.
+  #2691 + external metacognition evals, tracked in #2776), not serialize. Status: **theory adopted
+  as the measurement yardstick**; held-out eval integration is roadmap.
+
+### The Oracle — answerability-first grounding + the active face (added 2026-07-21)
+- **[CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md)** — the Verify discipline expressed
+  as an answering interface: place a question by answerability (the council's
+  grounded/seam_open/**pin**/refuted verdict, where `pin` *names* the unknown), price grounding by
+  uncertainty, answer in the KNOWN+UNKNOWN envelope, learn per-domain from real resolution, then
+  **act** to manufacture fresh truth at the frontier. Status: cosmology domain pack **ships**
+  (SEED); the contract + other packs are **GAP**. Novelty honestly graded **candidate (unproven)** —
+  the parts are occupied (answerability detection, structured-ignorance certificates, uncertainty-
+  priced routing), the closed loop is the seam.
+- **[SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) §10 (Part IV — the active face)**
+  — the theory backbone for the above: *passive* grounding escapes collapse but ceilings at the
+  ideal inductive predictor (Solomonoff/AIXI, unbeatable by inference); *active* grounding
+  (act-to-know) breaks that ceiling where an action resolves. **DESIGN/TARGET, no theorem**; one
+  MEASURED real-surface datapoint (the #2762 de-anchor). Cross-linked to the Oracle doc so theory and
+  interface stay in sync.
 
 ### Integration
 - Unit tests → memory update

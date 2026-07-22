@@ -126,7 +126,7 @@ def _train_body(steps: int, hf_repo: str, checkpoint_file: str, repo_ref: str = 
     if checkpoint_file:
         local_csf = hf_hub_download(repo_id=hf_repo, filename=checkpoint_file, repo_type="model")
         csf.unpack(local_csf, "/root/checkpoint")
-        resume_arg = ["--resume_from", "/root/checkpoint"]
+        resume_arg = ["--resume", "/root/checkpoint"]  # trainer arg is --resume (not --resume_from; #2535 class)
 
     # Ensure real SFT data exists — the old models/lantern-sigma0-coder/training-data.jsonl
     # path was never in the repo. Prep it from open datasets (the worker has egress) if absent.
@@ -140,7 +140,8 @@ def _train_body(steps: int, hf_repo: str, checkpoint_file: str, repo_ref: str = 
          "--base", "ByteDance/Ouro-1.4B",
          "--data", data_path,
          "--out", "/root/output",
-         "--max-steps", str(steps),
+         "--epochs", "3",            # #2729: 3 epochs WITH best-checkpoint selection, not a fixed 600
+         "--max-steps", str(steps),  # -1 (default) => use epochs; pass >0 only for a smoke test
          "--seq", "1536",
          *resume_arg],
         "train", env=train_env,
@@ -248,7 +249,9 @@ def main():
     sub = parser.add_subparsers(dest="command")
 
     p_dispatch = sub.add_parser("dispatch")
-    p_dispatch.add_argument("--steps", type=int, default=600)
+    p_dispatch.add_argument("--steps", type=int, default=-1,
+                            help="-1 (default) => train 3 epochs w/ best-checkpoint selection (#2729); "
+                                 ">0 forces a fixed max-steps (smoke tests only)")
     p_dispatch.add_argument("--checkpoint-uri", default="")
     p_dispatch.add_argument("--hf-repo", default="")
     p_dispatch.add_argument("--repo-ref", default=os.environ.get("MODAL_REPO_REF", "master"),

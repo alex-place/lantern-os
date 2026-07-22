@@ -43,6 +43,40 @@ function groundednessBand(grounded) {
   return grounded.risk >= GROUND_HIGH ? "red" : "amber";
 }
 
+// ── Per-generation signal trajectories (#2791 / M6) ────────────────────────────
+// The lasing-threshold claim needs the RUN-UP to a canary firing, not just the
+// terminal snapshot — and healthy trajectories too (both-class, like the record
+// ledger). Opt-in via CANARY_TRACE=1 because it (a) samples the collapse scorer
+// mid-stream where a scorer already runs, and (b) emits an event for HEALTHY
+// replies as well (tripped: []), which grows the event stream. Bounded points,
+// never throws, exact no-op when the flag is off.
+const TRACE_MAX_POINTS = 48;
+
+function traceEnabled() {
+  return process.env.CANARY_TRACE === "1"; // read at call time — testable, toggleable
+}
+
+function createCanaryTrace() {
+  if (!traceEnabled()) return { enabled: false, points: null, push() {}, reset() {} };
+  const points = [];
+  return {
+    enabled: true,
+    points,
+    push(len, sc) {
+      if (points.length >= TRACE_MAX_POINTS || !sc) return;
+      const s = sc.signals || {};
+      points.push({
+        len,
+        prox: sc.proximity,
+        rep: s.selfRepeatRatio,
+        echo: s.ngramEchoRatio,
+        ttr: s.typeTokenRatio,
+      });
+    },
+    reset() { points.length = 0; },
+  };
+}
+
 /**
  * Run both canary axes over a completed reply.
  *
@@ -98,12 +132,18 @@ function runCanaries(reply, opts = {}) {
     signaturePatch.ungroundedSignal = ungroundedSignal(grounded);
   }
 
-  if (tripped.length && opts.emit !== false) {
+  // #2791: with CANARY_TRACE=1, emit for healthy replies too (tripped: []) so the
+  // event stream carries BOTH classes of trajectory — the lead-time analysis needs
+  // non-fired baselines. Without the flag, behavior is exactly as before.
+  const trace = opts.trace && opts.trace.enabled && opts.trace.points && opts.trace.points.length
+    ? opts.trace.points.slice() : null;
+  if ((tripped.length || trace) && opts.emit !== false) {
     recordCanaryEvent({
       tripped,
       collapse: { proximity: collapse.proximity, signals: collapse.signals },
       grounded: { risk: grounded.risk, anchored: grounded.anchored, signals: grounded.signals },
       text_length: text.length,
+      ...(trace ? { trace } : {}),
       ...(opts.context || {}),
     });
   }
@@ -123,4 +163,4 @@ function recordCanaryEvent(evt) {
   }
 }
 
-module.exports = { runCanaries, recordCanaryEvent, CANARY_EVENTS };
+module.exports = { runCanaries, recordCanaryEvent, createCanaryTrace, CANARY_EVENTS };
