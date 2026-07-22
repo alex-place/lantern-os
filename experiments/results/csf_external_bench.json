@@ -1,0 +1,181 @@
+{
+  "note": "External corpora only. CSF-Omni is the panel envelope by construction (= best panel codec + 3-byte header); container rows include full integrity metadata. Omni encode uses its internal thread pool.",
+  "corpora": [
+    {
+      "corpus": "Silesia",
+      "n_files": 12,
+      "raw_bytes": 211938580,
+      "results": {
+        "zlib-9 (gzip-class)": {
+          "bytes": 67643273,
+          "ratio": 3.133,
+          "c_MBps": 7.52,
+          "d_MBps": 221.37,
+          "lossless": true
+        },
+        "bzip2-9": {
+          "bytes": 54506769,
+          "ratio": 3.888,
+          "c_MBps": 9.37,
+          "d_MBps": 26.74,
+          "lossless": true
+        },
+        "xz/lzma-9e": {
+          "bytes": 48456004,
+          "ratio": 4.374,
+          "c_MBps": 1.32,
+          "d_MBps": 57.72,
+          "lossless": true
+        },
+        "zstd-19+LDM": {
+          "bytes": 52885611,
+          "ratio": 4.007,
+          "c_MBps": 1.38,
+          "d_MBps": 278.68,
+          "lossless": true
+        },
+        "brotli-11": {
+          "bytes": 50332587,
+          "ratio": 4.211,
+          "c_MBps": 0.35,
+          "d_MBps": 214.86,
+          "lossless": true
+        },
+        "CSF compress (default)": {
+          "bytes": 52885623,
+          "ratio": 4.007,
+          "c_MBps": 1.86,
+          "d_MBps": 430.66,
+          "lossless": true
+        },
+        "CSF-Omni (best-fit, max)": {
+          "bytes": 47522882,
+          "ratio": 4.46,
+          "c_MBps": 0.23,
+          "d_MBps": 41.07,
+          "lossless": true
+        },
+        "CSF-Pack per-file zstd": {
+          "bytes": 52887889,
+          "ratio": 4.007,
+          "c_MBps": 1.32,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid zstd": {
+          "bytes": 52841017,
+          "ratio": 4.011,
+          "c_MBps": 1.54,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid framed 4MB": {
+          "bytes": 52888687,
+          "ratio": 4.007,
+          "c_MBps": 1.65,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid omni": {
+          "bytes": 48410591,
+          "ratio": 4.378,
+          "c_MBps": 0.25,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        }
+      }
+    },
+    {
+      "corpus": "AITDCC-2026 public",
+      "n_files": 8,
+      "raw_bytes": 13136308,
+      "results": {
+        "zlib-9 (gzip-class)": {
+          "bytes": 7786253,
+          "ratio": 1.687,
+          "c_MBps": 6.0,
+          "d_MBps": 211.63,
+          "lossless": true
+        },
+        "bzip2-9": {
+          "bytes": 7209293,
+          "ratio": 1.822,
+          "c_MBps": 9.92,
+          "d_MBps": 19.83,
+          "lossless": true
+        },
+        "xz/lzma-9e": {
+          "bytes": 7107072,
+          "ratio": 1.848,
+          "c_MBps": 2.55,
+          "d_MBps": 35.76,
+          "lossless": true
+        },
+        "zstd-19+LDM": {
+          "bytes": 7351902,
+          "ratio": 1.787,
+          "c_MBps": 3.22,
+          "d_MBps": 345.96,
+          "lossless": true
+        },
+        "brotli-11": {
+          "bytes": 7040486,
+          "ratio": 1.866,
+          "c_MBps": 0.45,
+          "d_MBps": 139.91,
+          "lossless": true
+        },
+        "CSF compress (default)": {
+          "bytes": 7351910,
+          "ratio": 1.787,
+          "c_MBps": 3.44,
+          "d_MBps": 508.95,
+          "lossless": true
+        },
+        "CSF-Omni (best-fit, max)": {
+          "bytes": 6974015,
+          "ratio": 1.884,
+          "c_MBps": 0.37,
+          "d_MBps": 62.08,
+          "lossless": true
+        },
+        "CSF-Pack per-file zstd": {
+          "bytes": 7353427,
+          "ratio": 1.786,
+          "c_MBps": 3.22,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid zstd": {
+          "bytes": 7381334,
+          "ratio": 1.78,
+          "c_MBps": 3.09,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid framed 4MB": {
+          "bytes": 7355676,
+          "ratio": 1.786,
+          "c_MBps": 3.13,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        },
+        "CSF-Pack solid omni": {
+          "bytes": 7057666,
+          "ratio": 1.861,
+          "c_MBps": 0.38,
+          "d_MBps": null,
+          "lossless": true,
+          "note": "container incl. manifest + per-file sha256 + footer"
+        }
+      }
+    }
+  ]
+}
