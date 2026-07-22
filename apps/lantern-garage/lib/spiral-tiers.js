@@ -114,7 +114,13 @@ function makeVerifier({ language = "js", tests, entryPoint = null, timeoutMs = 1
 // exact-name test resolves even when the model renamed the function. JS only (the observed
 // case); Python convention already matches snake_case so no shim is needed there.
 function _aliasShim(language, entryPoint) {
-  if (language !== "js" || !entryPoint || !/_/.test(entryPoint)) return "";
+  if (!entryPoint) return "";
+  if (language === "python") {
+    // If the exact name isn't defined but exactly one top-level function is, alias it — a
+    // correct solution named slightly differently still counts (MBPP names are arbitrary).
+    return `\ntry:\n    ${entryPoint}\nexcept NameError:\n    import types as _t\n    _fns=[v for k,v in list(globals().items()) if isinstance(v,_t.FunctionType) and not k.startswith('_')]\n    if len(_fns)==1:\n        globals()['${entryPoint}']=_fns[0]\n`;
+  }
+  if (language !== "js" || !/_/.test(entryPoint)) return "";
   const camel = entryPoint.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
   if (camel === entryPoint) return "";
   return `\n;try{ if (typeof ${entryPoint} === 'undefined' && typeof ${camel} !== 'undefined') globalThis.${entryPoint} = ${camel}; }catch(e){}\n`;
