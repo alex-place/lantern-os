@@ -205,6 +205,12 @@ inductive predictor (Solomonoff / AIXI). Section 7 breaks it.
 
 ## 7. Breaking the ceiling — the fifth move, ACT-TO-KNOW
 
+> Formalized as **Part IV (§10)** of the [Collapse Certificate](SIGMA0-COLLAPSE-CERTIFICATE.md) —
+> the theory backbone: *passive* grounding escapes collapse and ceilings at the ideal inductive
+> predictor; *active* grounding manufactures fresh truth and breaks that ceiling. Both docs carry
+> the same DESIGN/TARGET status and the same freshness-law honesty guard, cross-linked so they
+> cannot drift.
+
 **The trap, stated first so it can't be laundered.** Solomonoff / AIXI is the ceiling on
 **induction from a *fixed* corpus**. It is uncomputable *and provably unbeatable by inference* —
 no method extracts more from data X than the ideal predictor does. A system that claims to
