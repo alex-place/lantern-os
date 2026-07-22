@@ -44,7 +44,21 @@ C:/dev/lantern-os/.venv-train/Scripts/python.exe experiments/v1_10_toy/build_lin
 
 Writes a **sample** (`linked-records.sample.jsonl`), never the canonical ledger.
 
-## What the smoke run already showed (honest, measured)
+## V0 probe ladder — MEASURED (2026-07-22)
+`build_probe_sets.py` → `probe_ladder.py` on the frozen de-glossed set (294 rows), 5-fold CV AUROC:
+
+| family | 0.5B | 1.5B | 7B (4-bit) |
+|---|---|---|---|
+| factual (recall-truth) | 0.837 | 0.980 | **1.000** |
+| assoc (2510.09033 hard case) | 0.703 | 0.774 | **0.924** |
+| arith (control) | 0.747 | 0.869 | 0.901 |
+
+**V0 kill-gate PASSED.** Reproduces 2606.02628 (factual 1.000 on 4-bit 7B) and shows the
+associated-hallucination signal is **scale-dependent, not absent** (0.70→0.92). The white-box audit
+is a viable verifier at 7B; the dual verifier stays because `assoc` is weak at ≤1.5B. Ternary
+(1.58-bit) survival is still an open V3 acceptance test — this is 4-bit.
+
+## What the earlier toy smoke run showed (honest, measured)
 - The miner works, but a healthy repo's recent PRs are ~94% clean merges (negative fraction
   ≈ 0.06). **Confirms the E1 data problem persists even in PR mining** → the real honest-negatives
   must come from *session corrections* (`scripts/session_to_convergence.py`) and *full-history

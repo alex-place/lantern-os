@@ -139,6 +139,25 @@ The program is now a **post-training program on open weights**, shaped like the 
 - **Kill-gate V0:** if the de-glossed probe never clears **AUROC ≥ 0.75** at any affordable open
   scale, the white-box audit is demoted from verifier to telemetry and §2 is redesigned.
 
+  **RESULT (2026-07-22, MEASURED — GATE PASSED).** `probe_ladder.py` over the frozen de-glossed
+  set (`data/eval/v1_10/probe-sets-v1.jsonl`, 294 rows), 5-fold CV AUROC, best over
+  layer×{mean,last}:
+
+  | family | 0.5B | 1.5B | 7B (4-bit NF4) |
+  |---|---|---|---|
+  | **factual** (recall-truth) | 0.837 | 0.980 | **1.000** |
+  | **assoc** (associated misconception — [2510.09033] hard case) | 0.703 | 0.774 | **0.924** |
+  | arith (control) | 0.747 | 0.869 | 0.901 |
+
+  Findings: (1) **reproduces [2606.02628] on our hardware** — factual truth linearly decodable at
+  1.000 on a 4-bit 7B, peak in the mid-to-late band (L17–23), last-token pooling ≥ mean. (2) **The
+  associated-hallucination pessimism is scale-dependent, not fundamental:** the split [2510.09033]
+  said was internally invisible climbs 0.70→0.77→**0.92** — at 7B the probe reads associated-claim
+  truth strongly. **The white-box audit is a viable verifier at the 7B teacher scale.** (3) Dual
+  verifier still stands: at ≤1.5B `assoc` is weak, so the output-side check remains load-bearing
+  for the small serving tier. **Open acceptance test unchanged:** confirmed at **4-bit**, not yet
+  at **1.58-bit ternary** (V3).
+
 ### Phase V1 — Honest teacher (first spend; open weights, 7B-class)
 - De-glossed SFT (anchored mix) → **DPO on honesty preferences** (assert/abstain pairs from the
   both-class corpus). muP-style lr transfer (G6) — no hand-tuned lr.
