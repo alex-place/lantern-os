@@ -32,12 +32,16 @@ That single constraint drives every choice below.
 
 ## Merged models — reviewed, and mostly declined for now
 Techniques: **Task Arithmetic** (average deltas), **TIES** (keep top-magnitude, sign-agree),
-**DARE** (drop 90–99% of deltas, rescale), **SLERP** (spherical interpolation) — surveys
-[2511.21437](https://arxiv.org/html/2511.21437v1) · [NVIDIA](https://developer.nvidia.com/blog/an-introduction-to-model-merging-for-llms/) ·
-DARE [2311.03099](https://arxiv.org/pdf/2311.03099).
+**DARE** (drop 90–99% of deltas, rescale — [2311.03099](https://arxiv.org/pdf/2311.03099)),
+**SLERP** (spherical interpolation), and newer subspace methods (Model Stock, TSV-Merge, Iso-C,
+Subspace Boosting — [2511.21437](https://arxiv.org/html/2511.21437v1)). *(Full-text-verified
+2026-07-22: the [2511.21437] survey studies the latter six — **not** DARE; DARE's own paper is
+[2311.03099].)*
 
-- **Measured reality:** merging gains are **modest — generally <1% averaged over tasks**
-  ([2511.21437]). It is a *consolidation convenience*, not a capability driver.
+- **Measured reality:** merging gains are **modest — generally <1% averaged over tasks**, and only
+  **Task Arithmetic** is reliably net-positive (peak **+1.02% at n=12** merged models); the newer
+  subspace methods often *degrade* (to −5.36%) ([2511.21437]). It is a *consolidation convenience*,
+  not a capability driver.
 - **Contrast with distillation:** the frontier assembly step is **on-policy distillation**
   (DeepSeek-V4 expert→consolidate, Qwen3 strong-to-weak; survey G1) — that is where real gains are,
   and it is the transport we already approved for the student tier.
@@ -63,4 +67,7 @@ eval with **both arms** (gated + gates-off). RLVR/Abstain-R1 with the dual verif
 - Boundary slice needs a base-model inference pass over gsm8k/TACO (compute; one job at a time).
 - KodCode is CC-BY-NC → only for research weights, never commercial-lineage (founder licensing policy).
 - Session-mined honesty negatives (Vertex) still pending — would enrich the honesty core.
-- DPO drops OOD in some reports ([2407.18418]); CPO/ORPO are calibration-friendlier fallbacks if DPO regresses the eval.
+- Abstention-aware *instruction-tuning* can fail to generalize OOD ([2407.18418] attributes this to
+  Feng et al., across domains/LLMs — **not** specifically to DPO; the survey names no CPO/ORPO
+  remedy). Full-text-verified 2026-07-22 (grounding ledger). If DPO regresses the powered eval,
+  treat multi-task training (Zhang et al.) as the survey's actual counter-measure, not CPO/ORPO.

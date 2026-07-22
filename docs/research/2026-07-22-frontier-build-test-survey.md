@@ -38,8 +38,9 @@ Every current frontier model is assembled the same way. The stages, with per-lab
 
 ### Stage B — Architecture (a commodity; nobody differentiates here)
 - All sparse MoE: DeepSeek-V3 **671B/37B active** (aux-loss-free load balancing, MTP objective)
-  [P] · Kimi K2 **1.04T/32B** [P] · Gemini 2.5 sparse MoE on TPUv5p [P:
-  [2507.06261](https://arxiv.org/pdf/2507.06261)] · Llama 4 MoE [S].
+  [P] · Kimi K2 **1.04T/32B** [P] · Gemini 2.5 sparse MoE on TPUv5p, thinking-budget
+  **128–32768 (Pro) / 0–24576 (Flash)** tokens [P:
+  [2507.06261](https://arxiv.org/pdf/2507.06261); ranges full-text-verified 2026-07-22] · Llama 4 MoE [S].
 - This confirms the blueprint's "architecture is rented" stance — no lab wins on topology.
 
 ### Stage C — Training systems (the engineering moat)

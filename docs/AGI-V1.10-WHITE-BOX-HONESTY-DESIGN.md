@@ -193,6 +193,14 @@ phase emits ConvergenceRecords either way — honest nulls included.
 Toy harness: `experiments/v1_10_toy/` (PR #2849). Full design tracked as epic
 [#2841](https://github.com/alex-place/lantern-os/issues/2841).
 
+## 6b. Citation grounding (full-text verified)
+All external claims in this doc were verified against full source text on 2026-07-22 — see the
+**[grounding ledger + patent landscape](research/2026-07-22-grounding-ledger-and-patent-landscape.md)**
+(33/40 citations held exactly, 7 overstatements corrected, 0 fabricated). The two load-bearing ones
+held: **2606.02628** (probe 0.904–1.000 on 4-bit 7–8B) and **2510.09033** (associated-hallucination
+detection near-random) — with the scope note that their "AH" (Wikidata associations) differs from our
+probe-ladder `assoc` set (misconceptions), so the two are complementary, not contradictory.
+
 ## 7. Related
 - **[SIGMA0-OURO-CODER.md](SIGMA0-OURO-CODER.md)** — the coding-axis twin (the Spiral; verifier-gated
   cascade + VTD). This doc is its honesty-axis counterpart; both share the "verifier > scale" moat.
