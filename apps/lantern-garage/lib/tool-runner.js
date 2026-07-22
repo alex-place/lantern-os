@@ -1467,6 +1467,60 @@ const REGISTRY = {
     },
   },
 
+  spiral_solve: {
+    policy: "read", // runs the model tiers + a BOUNDED, sandboxed exec verifier; authors + verifies code, places nothing
+    desc: "Solve ONE self-contained, VERIFIABLE coding problem with the verified Spiral (ADR-0030): a growing verified memory refined turn-by-turn by a per-turn cascade — the cheap/owned tier proposes a step, a REAL bounded exec-test verifier (Fix Rate) gates it, and ONLY on a stall does it escalate to a frontier tier inheriting the accumulated progress. It commits a step only when reality (the tests) ratchets it, then halts on solved / honest-can't / a turn cap. Use it when the user gives a function-level coding task that COMES WITH tests (the Fix-Rate verifier needs at least one test that throws / exits non-zero on failure — the HumanEval check() contract). Returns the verified solution, the spiral transcript, and the escalation rate. Honest scope: home is verifiable code/math on the smallest hardware; if no interpreter or no tests are available it says so rather than guessing. It never places orders or touches money.",
+    schema: {
+      type: "object",
+      properties: {
+        prompt: { type: "string", description: "the coding problem — a function signature + docstring / spec the model should implement" },
+        tests: {
+          type: "array",
+          description: "one or more test snippets; EACH must throw / exit non-zero on failure (HumanEval check() contract). More named tests → a richer per-test Fix Rate; one test → coarse pass/fail.",
+          items: { type: "object", properties: { name: { type: "string" }, test: { type: "string", description: "code appended after the candidate that raises/exits non-zero on failure" } }, required: ["test"] },
+        },
+        language: { type: "string", enum: ["js", "python"], description: "js (default) or python" },
+        max_turns: { type: "number", description: "spiral turn cap (1–16, default 8)" },
+        cheap_provider: { type: "string", description: "cheap/owned tier provider (default 'ollama' — the local standin)" },
+        frontier_provider: { type: "string", description: "escalation provider (default 'anthropic')" },
+      },
+      required: ["prompt", "tests"],
+    },
+    async run(i, _ctx) {
+      try {
+        const { runSpiral } = require("./spiral-harness");
+        const { makeTiers, makeVerifier } = require("./spiral-tiers");
+        const language = i.language === "python" ? "python" : "js";
+        const tests = Array.isArray(i.tests) ? i.tests.filter((t) => t && t.test) : [];
+        if (!tests.length) {
+          return "[spiral_solve: no tests provided. The spiral's Fix-Rate verifier needs at least one test that throws / exits non-zero on failure — ask the user for tests, or say plainly that you can't verify this task.]";
+        }
+        const verify = makeVerifier({ language, tests });
+        const tiers = makeTiers({ language, cheapProvider: i.cheap_provider || "ollama", frontierProvider: i.frontier_provider || "anthropic" });
+        const maxTurns = Math.min(Math.max(Number(i.max_turns) || 8, 1), 16);
+        const transcript = [];
+        const line = (e) => {
+          if (e.type === "commit") transcript.push(`  turn ${e.turn} [${e.tier}] ✓ committed (fixRate ${Number(e.fixRate).toFixed(2)}${e.solved ? ", SOLVED" : ""})`);
+          else if (e.type === "escalate") transcript.push(`  turn ${e.turn} — cheap stalled → escalate (inheriting progress)`);
+          else if (e.type === "stall") transcript.push(`  turn ${e.turn} [${e.tier}] · no verified advance → de-ratchet`);
+          else if (e.type === "halt") transcript.push(`  halt: ${e.reason}`);
+        };
+        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify, maxTurns, onStep: line });
+        const head = r.solved
+          ? `Spiral SOLVED in ${r.turns} turn(s)`
+          : `Spiral did not solve (${r.haltReason}) after ${r.turns} turn(s)`;
+        return [
+          `${head} · escalations ${r.escalations}/${r.turns} (${Math.round(r.escalationRate * 100)}%).`,
+          ...transcript,
+          r.y ? `\nVerified solution:\n\`\`\`${language}\n${r.y}\n\`\`\`` : "\n(No candidate ever passed the verifier — reported honestly, nothing fabricated.)",
+          "\nVerified by real bounded exec tests (Fix-Rate ratchet, ADR-0030); the escalation corpus was appended for later Verified-Trace Distillation.",
+        ].join("\n");
+      } catch (e) {
+        return `[spiral_solve error: ${e.message}]`;
+      }
+    },
+  },
+
   brake_status: {
     policy: "read", // streams the ADR-0028 overlay's live brake state — PAPER ONLY, places NOTHING (Act is gated by trading-guard/ADR-0020)
     desc: "Read the live ADR-0028 leverage-overlay brake monitor: the current gross-exposure target (0–2×, from vol targeting × 6-month trend gate × drawdown taper — the brake-to-cash spec), each signal's state (ok/braking), the virtual $25k paper book's equity, and the recent gross-target changes. PAPER MODE: this is the overlay's live practice record — nothing is or can be placed; the Sharpe-mandate gate (meets_ci vs the Buffett bar) decides if/when a strategy ever touches real money. Use when the user asks about the brake, current leverage posture, or how the overlay is doing live.",
