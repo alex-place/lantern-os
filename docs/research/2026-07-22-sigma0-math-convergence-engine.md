@@ -73,6 +73,32 @@ introspection. This is the same verification-over-imitation thesis as the Spiral
   Surrogate-fitness re-fit against ground truth (US8131656B2) → **M2** cadence. **No patent gates an
   LLM with a ground-truth verifier** — the composition is the owned contribution.
 
+## The asymptote — what "real-life omniscience" actually is (pinned 2026-07-22)
+
+"A machine that answers any question as well as or better than a human" is the right *telos* for
+this engine — but it must be stated honestly or it becomes the confident-bluffer objective.
+Literal omniscience has four hard walls no architecture crosses: **formal limits** (Gödel),
+**computational irreducibility** (some answers cost the full simulation), **chaos** (finite
+prediction horizons), and the **light cone / private data** (evidence you cannot have). So real
+omniscience is not a state of knowing everything — it is **an asymptote the loop climbs**:
+
+> For every question, do the best epistemically-possible thing: **serve** it if converged (from the
+> ledger, deterministically), **compute** it if computable (tools/exec), **measure** it if
+> measurable (fetch/ground), and if unanswerable, **price it** — name exactly what evidence would
+> settle it and what that evidence costs. Then learn, so the next question is cheaper.
+
+This is precisely the [Convergence Oracle](../CONVERGENCE-ORACLE-DESIGN.md)'s answerability-first
+discipline (place → price → answer → learn) given its end-state name. The objective is well-posed
+only as a pair: **maximize coverage subject to calibrated honesty at bounded cost** — coverage
+alone argmaxes to "always answer confidently" (the bluffer), which is why the proper-scoring/
+abstention machinery (M1, the ternary reward) is constitutive, not decorative. "Better than a
+human" then decomposes into four measurable superiorities: better *recall* (the ledger never
+forgets a verified answer), better *calculation* (exec beats mental arithmetic), better
+*calibration* (the probe + M1 beat human overconfidence), and equal-or-better *humility* on the
+unanswerable (a priced frontier instead of a shrug). Omniscience-as-asymptote = the convergence
+engine run indefinitely: coverage grows monotonically with verified evidence influx (M1's only
+unbounded term), cost stays bounded (M2/M5), runaway stays killed (M6).
+
 ## Honest gaps
 - M1/M2/M5 have closed forms but only M4/ROA is machine-checked (#1991); M1/M2/M5/M6 need the
   longitudinal ledger tests their issues specify before we claim the guarantees.

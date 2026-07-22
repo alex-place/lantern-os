@@ -212,6 +212,44 @@ a new M3 axis). Scope honesty: product-level determinism (same visible answer), 
 determinism. A deterministically-wrong answer is a *feature*: it is a mineable, fixable record —
 RNG-wrong is unfixable fog.
 
+## 6c. The Reason-stage counterpart — answers as fixed points, not samples (pinned 2026-07-22)
+
+§6a demands determinism from the outside; this section names the model class that delivers it
+*natively*. Today's LLMs are samplers because they are trained as **distribution estimators** —
+the randomness is the output interface, not the intelligence (the theoretical ideal agent, AIXI,
+is an **argmax**, not a sampler). Four real non-sampler classes exist: energy/optimization models
+(JEPA lineage — inference = descend to a minimum), **equilibrium/attractor models** (DEQ; Hopfield
+ancestry; Fixed-Point Reasoners [2606.18206](https://arxiv.org/abs/2606.18206) — the fixed point
+`h*=f(h*)` *is* the answer; Equilibrium Reasoners [2605.21488](https://arxiv.org/pdf/2605.21488)),
+neurosymbolic provers (answer = artifact that checkably satisfies a spec), and deterministic-ODE
+flows. None is scaled alone; the scaled shape is **stochastic proposer inside a deterministic
+objective**.
+
+**The load-bearing distinction:** temperature-0 gives *point* determinism (identical string →
+identical answer, but a paraphrase takes a different trajectory — deterministic yet chaotic).
+Attractor dynamics give **basin determinism**: every phrasing of the same question falls into the
+same basin → same answer. §6a's user contract requires basin determinism.
+
+**Σ₀ already implements this at the system level** — named here so it's designed *on purpose*:
+- **The Ouro kernel is the attractor substrate.** `src/sigma0/loop_lm.py` runs weight-tied
+  recurrence with fixed-point exits — `OURO_MODE=converge` (first-order `‖hₜ−hₜ₋₁‖<ε`) and `accel`
+  (second-order, spiral-robust) are *literally* equilibrium halting
+  ([SIGMA0-OURO-CODER §7](SIGMA0-OURO-CODER.md)); STARS ([2605.26733](https://arxiv.org/abs/2605.26733),
+  full-text verified) is the training-side stabilizer (ρ(J)<1) that makes deep recurrence converge
+  instead of collapse. ADR-0021's retained custom loop is what makes this ownable.
+- **The verifier is the energy function.** Exec tests + the probe define the minimum; the spiral is
+  optimization-based inference (propose → verify → converge), with sampling demoted to interior
+  search consumed by the verifier's argmax.
+- **The ledger is crystallized attractors** — a converged verified answer becomes a basin future
+  queries fall into (the serve-from-ledger path, [#2859](https://github.com/alex-place/lantern-os/issues/2859),
+  with question-canonicalization as the basin boundary).
+
+**Research bet (Reason-stage, canary-gated):** push basin determinism from the system level into
+the kernel — train the looped model so paraphrase-perturbations *contract into the same fixed
+point* (STARS-style JSRR + paraphrase-consistency objective), measured by the #2859
+answer-stability canary. This is the Reason-stage twin of the white-box honesty thesis: honesty
+verified in the activations; **answers defined by attractors, not dice.**
+
 ## 6b. Citation grounding (full-text verified)
 All external claims in this doc were verified against full source text on 2026-07-22 — see the
 **[grounding ledger + patent landscape](research/2026-07-22-grounding-ledger-and-patent-landscape.md)**

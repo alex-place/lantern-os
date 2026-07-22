@@ -240,6 +240,15 @@ full knob reference.
 looped-reasoning research front — both are real, and they compose: a looped model can be the cheap
 tier of the Spiral.)*
 
+> **Why the kernel matters beyond speed (pinned 2026-07-22):** the Ouro loop is the **attractor
+> substrate** of the non-sampler design in
+> [AGI-V1.10-WHITE-BOX-HONESTY-DESIGN §6c](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md) — `converge`/
+> `accel` exits are equilibrium halting (the fixed point *is* the answer), which is what upgrades
+> temperature-0 *point* determinism into **basin determinism** (paraphrases fall into the same
+> attractor → same answer). STARS (arXiv:2605.26733) is the training-side stabilizer; the
+> answer-stability canary (#2859) is the measurement. This is the Reason-stage counterpart of the
+> white-box honesty thesis.
+
 **Source:** *Scaling Latent Reasoning via Looped Language Models* (Ouro,
 [arXiv:2510.25741](https://arxiv.org/abs/2510.25741); PDF `docs/research-papers/ouro-looped-llm-2510.25741.pdf`).
 LoopLM builds reasoning into computation by **reusing weight-tied layers R times** in latent space
