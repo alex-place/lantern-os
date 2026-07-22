@@ -282,6 +282,14 @@ substrates are published; the repo's own falsification retired the sparsity-equi
 and the reproducible benchmark — not a compression algorithm.** Defensive publication + the CSF
 trademark are the right (and only sensible) vehicles.
 
+**Prior-art record (2026-07-22).** A live patent search confirms this grade with named prior
+art for *every* CSF technique (best-fit selection US8111704/US6804238/US5953503; seed/regeneration
+US20040267773/US11967975; byte-shuffle = HDF5/Blosc open standard; BCJ = xz standard; framed
+random-access US20120109909/US9503123 + the zstd seekable format) — and finds **freedom-to-operate
+is clean** (the blocking-looking patents are packet-header-specific or term-expired). Full review +
+citations: [`research/2026-07-22-csf-patent-prior-art.md`](research/2026-07-22-csf-patent-prior-art.md).
+It supplies the §7 prior-art record CSF needs before any (defensive) publication.
+
 ---
 
 ## 5. How each spec maps to the loop
