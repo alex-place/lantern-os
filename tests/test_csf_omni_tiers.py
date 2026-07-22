@@ -128,8 +128,10 @@ def test_shuffle_helps_a_numeric_array_via_omni():
     assert omni.decompress(blob) == data
     # a shuffle method should win here
     assert "shuf" in omni.describe(blob)
-    # and it must beat plain max-without-transforms (approximate: beat zstd-19 alone)
-    import zstandard as zstd
+    # and it must beat plain max-without-transforms (approximate: beat zstd-19 alone).
+    # zstandard is optional in the CI env — skip the comparison there, like
+    # test_csf_default_codec.py's _HAS_ZSTD guard (the roundtrip above still ran).
+    zstd = pytest.importorskip("zstandard")
     assert len(blob) < len(zstd.ZstdCompressor(level=19).compress(data))
 
 
