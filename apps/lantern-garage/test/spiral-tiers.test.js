@@ -75,6 +75,20 @@ test("honest failure: neither tier can pass the tests → not solved, nothing fa
   assert.equal(r.memory.length, 0, "no unverified code was ever committed");
 });
 
+test("name-tolerance: a camelCase-renamed function still passes a snake_case entry-point test", async () => {
+  // Models often rename `word_break` → `wordBreak`; the exact-name test would ReferenceError
+  // even on a correct algorithm. makeVerifier({entryPoint}) aliases the variant back.
+  const verify = makeVerifier({
+    language: "js", entryPoint: "add_two",
+    tests: [{ name: "t", test: "if(add_two(2,3)!==5) throw new Error('x')" }],
+  });
+  const camel = await verify("function addTwo(a,b){return a+b}");
+  assert.equal(camel[0].passed, true, "camelCase addTwo aliased to add_two → PASS");
+  // and it does not mask a genuinely wrong algorithm
+  const wrong = await verify("function addTwo(a,b){return a-b}");
+  assert.equal(wrong[0].passed, false, "wrong logic still fails even after aliasing");
+});
+
 test("resolveLocalModel picks a real coder, NEVER the unserved ouro:latest pin", () => {
   // The "fix the local Ollama" contract: the local cheap tier resolves the registry coder,
   // not the OLLAMA_MODEL=ouro:latest env (ouro is served only by ouro_serve.py, not the daemon).

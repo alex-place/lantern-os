@@ -91,18 +91,33 @@ function extractCode(text, language = "js") {
  * @returns {function(code):Promise<Array<{name,passed,ran,output}>>}
  *   a results array the harness scores with fixRate(before, results).
  */
-function makeVerifier({ language = "js", tests, timeoutMs = 10000 } = {}) {
+function makeVerifier({ language = "js", tests, entryPoint = null, timeoutMs = 10000 } = {}) {
   const list = Array.isArray(tests) ? tests : tests ? [{ name: "check", test: tests }] : [];
+  // Name-tolerance shim: models frequently rename a snake_case entry point to camelCase
+  // (e.g. `word_break` → `wordBreak`), which makes an exact-name test throw ReferenceError
+  // even when the algorithm is correct — a real defect `spiral_solve` hits too, not just eval
+  // noise. If an entryPoint is given, alias a camelCase variant back to it so the test resolves.
+  const alias = _aliasShim(language, entryPoint);
   return async function verify(code) {
     // Run tests concurrently (each is its own isolated subprocess) — bounded by the
     // small suite size; keeps a multi-test turn from serializing 10s timeouts.
     return Promise.all(
       list.map(async (t, i) => {
-        const r = await verifyExecAsync({ language, code, test: t.test, timeoutMs });
+        const r = await verifyExecAsync({ language, code: code + alias, test: t.test, timeoutMs });
         return { name: t.name || `t${i}`, passed: !!(r.ran && r.passed), ran: !!r.ran, output: r.passed ? "" : String(r.output || "") };
       }),
     );
   };
+}
+
+// Bind a camelCase variant of a snake_case entry point back to the exact name so an
+// exact-name test resolves even when the model renamed the function. JS only (the observed
+// case); Python convention already matches snake_case so no shim is needed there.
+function _aliasShim(language, entryPoint) {
+  if (language !== "js" || !entryPoint || !/_/.test(entryPoint)) return "";
+  const camel = entryPoint.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+  if (camel === entryPoint) return "";
+  return `\n;try{ if (typeof ${entryPoint} === 'undefined' && typeof ${camel} !== 'undefined') globalThis.${entryPoint} = ${camel}; }catch(e){}\n`;
 }
 
 /** A single provider leg (by name) from verify-llm's implemented set, or null. */
@@ -150,7 +165,7 @@ function _failingHint(ctx) {
 function _prompt(ctx, tier, language) {
   const failing = _failingHint(ctx);
   return [
-    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose.`,
+    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Define the function with EXACTLY the name and signature given in the problem; do NOT rename it (keep snake_case as written — do not camelCase it).`,
     ctx.problem.prompt,
     ctx.y ? `\nCurrent best attempt (improve it; KEEP whatever already passes):\n${ctx.y}` : "",
     failing ? `\nFocus "${ctx.focus}". Still-failing tests:\n${failing}` : `\nFocus: ${ctx.focus}.`,
