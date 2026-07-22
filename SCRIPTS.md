@@ -127,6 +127,9 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/train-qlora-ouro.py` | `apps/lantern-garage/lib/model-registry.js` | `python scripts/train-qlora-ouro.py` |
 | `scripts/train-qlora-peft.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/merge-lora.py` | `scripts/continual-train.ps1` | via launcher |
+| `scripts/fetch_mbpp.py` | registered here — VTD Phase-1 data prep (ADR-0030); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_mbpp.py` |
+| `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
+| `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` | via launcher |
 | `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` | via launcher |
