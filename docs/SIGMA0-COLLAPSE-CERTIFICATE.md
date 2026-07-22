@@ -68,8 +68,8 @@ Every load-bearing claim maps to a runnable artifact in this repo. All pytest co
 were run against this revision on 2026-07-17 (91 tests, all passing; the gate self-test was
 last run 2026-07-07). The **Part I backbone was re-run 2026-07-21** with no drift
 (`tests/test_cio_sde.py` → 46 passed; `tests/test_sigma0_jsrr_gate.py` → 12 passed); the other
-suites stand from 2026-07-17. Part IV (§10) adds no machine-checked artifact — its one MEASURED
-datapoint is a real-surface run, pointed to inline, not a pytest:
+suites stand from 2026-07-17. Part IV (§10) is DESIGN/TARGET — no theorem — but its active-loop
+*harness* is unit-tested logic and its two datapoints are real-surface runs (last two rows below):
 
 | Claim | Class | Verify with |
 |---|---|---|
@@ -85,7 +85,9 @@ datapoint is a real-surface run, pointed to inline, not a pytest:
 | Freshness law RE-STATED: kill test fired — re-drawn noise de-ratchets (dither-equivalent); fresh truth still dominates (§8.4.1, [#2692]) | MEASURED (simulation) | `python -m pytest tests/test_sigma_update_stochastic_signal.py -q` → 6 passed; full run: `python experiments/sigma_update_stochastic_signal.py` |
 | Three-arm promotion-evidence protocol (F/Fd/R/T) at task-level stuck fidelity + arm-differentiated teeth (§8.6-4, [#2691]) | machine-checked protocol; MEASURED (simulation) | `python -m pytest tests/test_sigma_theta_holdout_protocol.py -q` → 6 passed; full run: `python experiments/sigma_theta_abc/holdout_protocol.py --simulate` |
 | Incremental validity on a real model: gross-only, scarcity-gated (§8.6 item 5) | MEASURED (one model) | `experiments/sigma_incremental_validity_ouro.py` (requires local GPU + cached Ouro-1.4B, ~25 min; run log reproduced in PR #2240) |
-| §8 gate controlling a *real* training run; §9 two-timescale composition | **not yet verifiable** | open — the honest gap (§8.6, §9) |
+| Freshness law on a live code surface — the #2762 de-anchor (§10.1) | MEASURED-instance (one run, real surface) | `data/autowork-runs/2026-07-21.jsonl`; PR #2795 |
+| Active loop (ACT-TO-KNOW) mechanism built + run (§10.2) | MEASURED (mechanism) + unit-tested logic | `python -m pytest tests/test_oracle_active_loop.py -q` → 7 passed; run: `python experiments/oracle_active_loop.py` → `data/oracle/active-loop-runs.jsonl` |
+| §8 gate controlling a *real* training run; §9 two-timescale composition; Part IV vs a frontier-model baseline (§10.2) | **not yet verifiable** | open — the honest gaps (§8.6, §9, §10.2) |
 
 If a command above fails on a fresh clone, the document has drifted from the code and should not
 be trusted until reconciled — that is the intended failure mode.
@@ -1748,8 +1750,34 @@ de-anchored regeneration.**
 
 **[MEASURED — one run, not a distribution. Evidence: `data/autowork-runs/2026-07-21.jsonl`,
 PR #2795, fix in `routes/convergence-dispatch.js::targetedFileContext` ([#2762]). It corroborates
-§8.4.1 on a real surface; it does not extend the proof. This is the least-proven Part of the
-document — read it with §3.1's authority, never §1's.]**
+§8.4.1 on a real surface; it does not extend the proof.]**
+
+### 10.2 The active loop, built and run (2026-07-21)
+
+§10.1 shows the *passive* half — fresh truth de-ratchets a stuck loop. The *active* half — **act to
+manufacture a fact no corpus held** — is now **built and run** on the cheapest, most reversible
+surface the design mandates first (**local code execution** — no money, undoable; the money /
+irreversible surfaces stay behind the authority gates). The loop poses a question, records the best
+inference-only belief, **executes real code to get reality's answer**, and files a grounded record
+classified `pin` / `confirmed` / `ceiling_break`.
+
+First run — 6 questions, all real, on this repo: **5 corpus-absent facts manufactured by action, 1
+pin named and not bluffed.** Each resolved fact is provably outside any fixed corpus — the current
+git SHA, a live file count (11, correcting the prior's 8), a hash you must compute, the document's
+current length — knowable only by acting. The sharpest: *"does this certificate contain a Part IV?"*
+resolves **True on this branch and False on another** — a fact no training corpus can hold, because
+it is branch-live state; only the act of reading the file *now* settles it. That is the inference
+ceiling and its break, in one line.
+
+**[MEASURED — the *mechanism*, on a real surface. Built + unit-tested:
+`tests/test_oracle_active_loop.py` (7 passed); run: `experiments/oracle_active_loop.py` →
+`data/oracle/active-loop-runs.jsonl`. Honest scope: this proves the loop *works and records
+corpus-absent facts in the grounding discipline* — it does **not** prove the loop beats a strong
+predictor, because the passive baseline here is a frozen heuristic, not a frontier model. The next
+rung — the model-in-the-loop run on questions where inference plausibly fails, and
+value-of-information experiment selection — is GAP (Oracle design §5). This is still the
+least-proven Part of the document — read it with §3.1's authority, never §1's — but the fifth move
+is no longer only a design: its mechanism is built and measured.]**
 
 ---
 
@@ -2316,9 +2344,16 @@ for produced results and Appendix A for the original design sketch.*
 > not a distribution, not machine-checked. Also re-ran the Part I backbone (`test_cio_sde` 46 +
 > `test_sigma0_jsrr_gate` 12) with no drift; other suites stand from 2026-07-17. No Part I–III
 > theorem or status was touched. **Same-day refinement:** Part IV was then consolidated for
-> readability — the repeated authority caveats collapsed into one status line (§10.2 folded in),
-> prose tightened, the imported mechanism cited (Lindley 1956 / Howard 1966 / Friston 2010), the
-> `#2762`/`#2795` links defined, and the work linked from RESEARCH-CANON [07] + the README Σ₀ list.
-> Substance and evidence class unchanged.
+> readability — the repeated authority caveats collapsed into one status line (the old §10.2
+> "honest scope" folded in), prose tightened, the imported mechanism cited (Lindley 1956 / Howard
+> 1966 / Friston 2010), the `#2762`/`#2795` links defined, and the work linked from
+> RESEARCH-CANON [07] + the README Σ₀ list. **Same-day build:** the fifth move's first brick was
+> then *built and run* — a new **§10.2** records it. `experiments/oracle_active_loop.py`
+> (unit-tested, `tests/test_oracle_active_loop.py` → 7 passed) runs the ACT-TO-KNOW loop on the
+> local-code surface; its first run manufactured **5 corpus-absent facts by action** + 1 named pin
+> (`data/oracle/active-loop-runs.jsonl`). This adds two audit-table rows and moves Part IV's fifth
+> move from pure design to *mechanism built + measured* — with the honest gap explicit: the passive
+> baseline is a frozen heuristic, so the loop-vs-frontier-model comparison is not yet made. No
+> Part I–III theorem, status, or evidence class changed; no novelty claimed.
 
 ---

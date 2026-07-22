@@ -174,13 +174,17 @@ genuine deep-time questions. This is the Oracle's first domain pack and its work
    four resolution signals in §2 Move 4 (today they land in four separate places).
 4. **Answer-staleness decay.** Wire confidence-decay to Oracle outputs so an old `grounded` answer
    ages toward `seam_open` until re-grounded (the memory-staleness failure the blueprint names).
-5. **The fifth move — the frontier experiment loop (§7).** The capstone: select the frontier
-   unknown by value-of-information, emit the resolving action, execute on a real ground-truth
-   surface (Kalshi settlement, autowork test run, research probe, user ask), fold the resolution
-   back through (3). This is the ceiling-breaker and the largest GAP — start behind a flag, on the
-   one surface whose resolution is cheapest and least reversible (autowork test execution), before
-   any surface that spends money or is irreversible (guarded by the same NAP/approval gates that
-   already govern the trader).
+5. **The fifth move — the frontier experiment loop (§7).** The capstone and ceiling-breaker.
+   **SEED BUILT + measured (2026-07-21):** `experiments/oracle_active_loop.py` (unit-tested,
+   `tests/test_oracle_active_loop.py` 7 passed) runs the ACT-TO-KNOW loop on the cheapest surface —
+   local code execution — and its first run manufactured **5 corpus-absent facts by action**, each
+   provably outside any fixed corpus (current git SHA, live file counts, a hash, current doc state),
+   plus one `pin` named-not-bluffed (`data/oracle/active-loop-runs.jsonl`; certificate §10.2). What
+   remains **GAP:** the passive baseline is a frozen heuristic, not a frontier model — so this proves
+   the *mechanism*, not that the loop beats a strong predictor; and value-of-information experiment
+   *selection* is not built. The strong rungs — a model-in-the-loop run on questions where inference
+   plausibly fails, then money/irreversible surfaces (Kalshi settlement) behind the same NAP/approval
+   gates that already govern the trader — are next, deliberately staged by irreversibility.
 
 ## 6. The convergence target — "knows everything it *could* know"
 
