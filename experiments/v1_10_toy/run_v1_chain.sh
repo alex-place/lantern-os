@@ -20,7 +20,8 @@ echo "=== [1/5] boundary probe ==="
 if [ "$(wc -l < data/eval/v1_10/boundary-gsm8k.jsonl 2>/dev/null || echo 0)" -ge 100 ]; then
   echo "boundary output already present (>=100 rows) — skipping (re-runnable chain)"
 else
-  step 1800 "$PY" experiments/v1_10_toy/v1_boundary_probe.py --model "$BASE" --n 150 --max-new 256 \
+  # 5400s: ~23s/item x 150 = ~58min; the old 1800s guard was killing a HEALTHY run at item ~75
+  step 5400 "$PY" experiments/v1_10_toy/v1_boundary_probe.py --model "$BASE" --n 150 --max-new 256 \
     --out data/eval/v1_10/boundary-gsm8k.jsonl || fail "V1-A boundary probe"
 fi
 [ -s data/eval/v1_10/boundary-gsm8k.jsonl ] || fail "V1-A boundary (no output)"
