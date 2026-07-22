@@ -1496,6 +1496,25 @@ async function handleStreamChat(req, url, res) {
             const runnable = _extractRunnable(fullReply);
             if (runnable) {
               execVerdict = verifyExec({ ...runnable, timeoutMs: COUNCIL_EXEC_TIMEOUT_MS });
+              // Router corpus (#2798): the gate just RAN, so record its real verified label
+              // — the [intent, tier, exec pass/fail, latency] a cascade-router trains on and
+              // that neither the convergance records nor pcsf receipts carry. Pure logging of
+              // an outcome that already happened; never mutates or breaks the reply.
+              if (execVerdict && execVerdict.ran) {
+                try {
+                  require("./coding-outcome-log").logCodingOutcome({
+                    intent: converganceIntent,
+                    taskType: leaderboardTaskType,
+                    provider: signature.provider,
+                    source,
+                    model: (extra && extra.model) || null,
+                    tier: (extra && extra.provider && _EXECUTABLE_CLOUD.has(extra.provider)) ? "cloud" : "local",
+                    exec_ran: true,
+                    exec_passed: !!execVerdict.passed,
+                    latencyMs: Date.now() - _turnStart,
+                  });
+                } catch { /* router-corpus logging must never break a reply */ }
+              }
             }
           }
           const c = councilReview(fullReply, {
