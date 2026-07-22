@@ -30,6 +30,7 @@ knowns + the honest unknowns for that band.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -156,29 +157,38 @@ class ConvergenceOracle:
 
     def slice_for(self, question: str) -> ObserverSlice:
         """Locate a question in cosmic time by topic and return its slice. Falls back to NOW —
-        the best-grounded slice — when the question isn't cosmologically anchored."""
+        the best-grounded slice — when the question isn't cosmologically anchored.
+
+        Two-tier match (kept identical to the Node twin, lib/convergence-oracle.js): STRONG
+        phrases are unambiguous and match alone; WEAK words are real cosmology anchors that
+        also live in everyday/technical language ("transparent", "begin", "inflation",
+        "final state"), so they only fire when the question carries cosmology CONTEXT.
+        Third strike of the bare-word disease (#1268, #1275, 2026-07-21 audit)."""
         q = (question or "").lower()
+        context = re.search(
+            r"universe|cosmic|cosmolog|big bang|entropy|galax|stellar|interstellar|cosmos|"
+            r"astrophys|space-?time|expansion of space", q) is not None
+        # (band, strong_phrases, weak_words)
         keymap = [
-            (("before the big bang", "singularity", "planck", "quantum gravity", "begin", "t=0",
-              "start of time", "first instant"), "Planck epoch"),
-            (("inflation", "flatness", "horizon problem"), "Inflation"),
-            (("nucleosynthesis", "helium", "abundance", "antimatter", "baryogenesis"), "Nucleosynthesis (BBN)"),
-            (("cmb", "microwave background", "recombination", "transparent"), "Recombination / CMB"),
-            (("first star", "reionization", "population iii", "first galax"), "First stars → reionization"),
-            # NOW band: real cosmology anchors only. The bare words "now"/"today"/"current"
-            # were dropped to stay in sync with the Node oracle (#1275); un-anchored
-            # questions still fall through to the NOW fallback below, so slice_for's
-            # output is unchanged — this only keeps the keyword lists identical.
-            (("how old", "age of the universe", "dark energy", "dark matter"), "Stelliferous era (NOW)"),
-            (("proton decay", "white dwarf", "remnant", "stars stop", "star formation end"),
-             "Degenerate era"),
-            (("black hole", "hawking", "evaporat"), "Black hole era"),
-            (("heat death", "end of the universe", "ultimate fate", "fate of the universe",
-              "fate of everything", "big rip", "vacuum decay", "final state", "how does it end",
-              "how will the universe end", "end of time"), "Dark era / heat death"),
+            ("Planck epoch",
+             ("before the big bang", "quantum gravity", "planck epoch", "planck time",
+              "start of time", "first instant"),
+             ("begin", "t=0", "singularity", "planck")),
+            ("Inflation", ("cosmic inflation", "horizon problem", "inflaton"), ("inflation", "flatness")),
+            ("Nucleosynthesis (BBN)", ("nucleosynthesis", "baryogenesis", "antimatter"), ("helium", "abundance")),
+            ("Recombination / CMB", ("cmb", "microwave background"), ("recombination", "transparent")),
+            ("First stars → reionization", ("first stars", "reionization", "population iii", "first galax"), ("first star",)),
+            ("Stelliferous era (NOW)", ("age of the universe", "dark energy", "dark matter"), ("how old",)),
+            ("Degenerate era", ("proton decay", "white dwarf", "star formation end", "stars stop"), ("remnant",)),
+            ("Black hole era", ("black hole", "hawking"), ("evaporat",)),
+            ("Dark era / heat death",
+             ("heat death", "end of the universe", "ultimate fate", "fate of the universe",
+              "fate of everything", "big rip", "vacuum decay", "how does it end",
+              "how will the universe end", "end of time"),
+             ("final state",)),
         ]
-        for keys, band in keymap:
-            if any(k in q for k in keys):
+        for band, strong, weak in keymap:
+            if any(k in q for k in strong) or (context and any(k in q for k in weak)):
                 return next(b for b in self.bands if b.band == band)
         return self.now()
 

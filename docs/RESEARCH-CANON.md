@@ -293,6 +293,22 @@ blueprint companion view tracked in #2775.
   #2691 + external metacognition evals, tracked in #2776), not serialize. Status: **theory adopted
   as the measurement yardstick**; held-out eval integration is roadmap.
 
+### The Oracle — answerability-first grounding + the active face (added 2026-07-21)
+- **[CONVERGENCE-ORACLE-DESIGN.md](CONVERGENCE-ORACLE-DESIGN.md)** — the Verify discipline expressed
+  as an answering interface: place a question by answerability (the council's
+  grounded/seam_open/**pin**/refuted verdict, where `pin` *names* the unknown), price grounding by
+  uncertainty, answer in the KNOWN+UNKNOWN envelope, learn per-domain from real resolution, then
+  **act** to manufacture fresh truth at the frontier. Status: cosmology domain pack **ships**
+  (SEED); the contract + other packs are **GAP**. Novelty honestly graded **candidate (unproven)** —
+  the parts are occupied (answerability detection, structured-ignorance certificates, uncertainty-
+  priced routing), the closed loop is the seam.
+- **[SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) §10 (Part IV — the active face)**
+  — the theory backbone for the above: *passive* grounding escapes collapse but ceilings at the
+  ideal inductive predictor (Solomonoff/AIXI, unbeatable by inference); *active* grounding
+  (act-to-know) breaks that ceiling where an action resolves. **DESIGN/TARGET, no theorem**; one
+  MEASURED real-surface datapoint (the #2762 de-anchor). Cross-linked to the Oracle doc so theory and
+  interface stay in sync.
+
 ### Integration
 - Unit tests → memory update
 - Integration tests → pattern extraction

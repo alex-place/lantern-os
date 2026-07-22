@@ -75,3 +75,33 @@ test("bare 'now'/'today'/'current' no longer false-trigger NOW-band grounding (#
   // …but a real anchor sitting next to those words still grounds.
   assert.ok(formatGrounding("how old is the universe right now?").length > 0);
 });
+
+// Third strike of the bare-word disease (2026-07-21 audit): cosmology terms that
+// ALSO live in everyday/technical language matched alone. The matcher now splits
+// STRONG phrases (unambiguous — match alone) from WEAK words (real anchors that
+// need cosmology CONTEXT in the same question).
+const WEAK_WORD_FALSE_POSITIVES = [
+  "make this div transparent on hover",   // transparent → CMB
+  "beginner guide to react hooks",        // begin → Planck epoch
+  "where do I begin with the terminal?",  // begin
+  "why is inflation at 3 percent",        // inflation → cosmic inflation
+  "what is the final state of this reducer", // final state → heat death
+  "my water bottle evaporated overnight", // evaporate → Hawking
+  "an abundance mindset for founders",    // abundance → BBN
+  "when will the AI singularity happen",  // singularity → Planck epoch
+  "how old is this repository",           // how old → NOW
+];
+
+test("weak cosmology words don't fire without cosmology context (2026-07-21)", () => {
+  for (const q of WEAK_WORD_FALSE_POSITIVES) {
+    assert.equal(sliceFor(q), null, `"${q}" must not ground on a weak word alone`);
+  }
+});
+
+test("weak words DO fire with cosmology context, strong phrases fire alone", () => {
+  assert.equal(sliceFor("how did the universe begin")?.band, "Planck epoch");
+  assert.equal(sliceFor("explain inflation in the early universe")?.band, "Inflation");
+  assert.equal(sliceFor("when did the universe become transparent")?.band, "Recombination / CMB");
+  assert.equal(sliceFor("what happens inside a black hole")?.band, "Black hole era"); // strong, no context word
+  assert.equal(sliceFor("tell me about the heat death")?.band, "Dark era / heat death");
+});
