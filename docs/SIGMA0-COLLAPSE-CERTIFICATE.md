@@ -274,8 +274,20 @@ determinism; this is the *basin* upgrade. **Novelty scope (audit [#2861](https:/
 ~55–60% — crowded neighborhood):** four adjacent lanes occupied (paraphrase-attractor analysis
 2502.15208; Lyapunov same-basin certification in DEQs 2304.12707; output-level consistency
 training 2510.14242; depth-consistency in looped LMs 2602.11451). The surviving sliver is
-**semantic-intent basin identity as a training objective + measured product contract**; a
-second-round audit may kill it.
+**semantic-intent basin identity as a training objective + measured product contract**.
+**Round-2 kill-or-confirm ([#2874](https://github.com/alex-place/lantern-os/issues/2874),
+2026-07-23): CONFIRMED — held, boundary sharpened.** Both pre-registered kill lanes
+searched (8 queries, 3 full-text fetches): (a) objective half CLEAN — the two candidate
+killers train *input-specific* equilibria (HRM contraction-mapping training 2603.22871:
+stability-to-unique-fixed-point per input, no intent-class identity; DEQ neural collapse
+2410.23391: descriptive vision-classifier geometry, no objective); confidence up ~65%.
+(b) product half NARROWED by two new named neighbors: **verified semantic caching**
+(2602.13165 — LLM-judge-verified paraphrase answer-reuse in tiered serving; no evidence
+receipts, no stability contract) and **TAR@N-style stability metrics** (2408.04667,
+ReasonBENCH 2512.07795 — measurement without a contract). What remains ours: exact-key +
+evidence-receipted serving with the **no-free-movement alarm invariant** (answers change
+only with a receipt, ~50%). Net R9: AUDITED-CANDIDATE stands; neither promoted to high
+confidence nor killed.
 
 ### R10 · The oracle objective `DEFINITION` — new 2026-07-22
 ![oracle objective](assets/cert/oracle-objective.svg)
@@ -2115,6 +2127,7 @@ for produced results and Appendix A for the original design sketch.*
 | 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | [grounding ledger](research/2026-07-22-grounding-ledger-and-patent-landscape.md) |
 | 2026-07-22 | R3 (M1) filed as if the *inequality itself* might be novel | **scope shrunk on audit** — martingale core classical (Doob/CEE), diagnostic use taken (2512.02914); only the *enforced-runtime-gate* form promoted ✓ at ~70% | [#2860](https://github.com/alex-place/lantern-os/issues/2860) |
 | 2026-07-22 | R9 (basin determinism) filed broad | **scope shrunk on audit** — four adjacent lanes occupied; only *semantic-intent basin identity as objective + product contract* promoted ✓ at ~55–60%, flagged killable on second round | [#2861](https://github.com/alex-place/lantern-os/issues/2861) |
+| 2026-07-23 | R9 round-2 kill-or-confirm | **CONFIRMED, boundary sharpened** — objective half clean (2603.22871 input-specific contraction, 2410.23391 descriptive-only; ~65%); product half narrowed by verified semantic caching 2602.13165 + TAR@N metrics 2408.04667/2512.07795 — the surviving contract is exact-key evidence-receipted serving with the no-free-movement alarm (~50%) | [#2874](https://github.com/alex-place/lantern-os/issues/2874) |
 
 ---
 
