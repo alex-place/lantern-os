@@ -1,0 +1,3 @@
+### Changed
+
+- Settings polish (follow-up to the rework): headings + section labels now use the index.html brand display face (`--head-font`, Century Gothic stack) so Settings matches the home page. **API keys and connectors are folded into the Connections panel** — no separate page: Connections now shows **Brokerage** (IBKR / Alpaca), **Your AI keys (bring-your-own)** for Claude / ChatGPT / Gemini (add/remove via the per-user `#2505` `/api/providers/set-key` store, encrypted server-side), **Connectors** (Indeed OAuth via `/api/job/indeed/*`), and your **referral link** — one scrollable panel. General gains a **"What best describes your work?"** selector (persisted to `preferences.work`). All wired to existing endpoints; no new backend, no new surface.
