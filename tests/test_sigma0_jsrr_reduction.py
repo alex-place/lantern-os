@@ -7,7 +7,8 @@ eigvals, no 2GB broadcast). Zero-dep, no model. Run:
 """
 import time
 import numpy as np
-import torch
+import pytest
+torch = pytest.importorskip("torch")   # CI has no GPU deps — skip this suite there (runs locally)
 from cio_sde.collapse import jsrr_certificate
 from sigma0.loop_lm import _stability_gates, _CONT_GATE_MAX_DIM
 
