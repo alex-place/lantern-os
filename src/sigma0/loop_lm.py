@@ -46,16 +46,32 @@ def _finite(x):
     return round(float(x), 4) if (x == x and abs(x) != float("inf")) else None
 
 
-def _stability_gates(A_tensor):
+# P0 serve-path budgets (env-tunable). The empirical Jacobian is (d,d) with d = hidden size
+# (2048 for Ouro-1.4B), but it is rank ≤ T-1 (a mean of T token-transitions), so ρ — the JSRR
+# acceptance object — is computed EXACTLY from a (T-1,T-1) reduced Gram (see generate()). We
+# additionally window T so the reduced eigenproblem stays cheap on very long generations, and cap
+# the geometry-dependent continuous diagnostics (which need the full (d,d) and cost ~7s at d=2048)
+# to a small dimension — they are diagnostic + acceptance-fallback only, never the primary gate.
+_JAC_TOKEN_WINDOW = int(os.environ.get("SIGMA0_JAC_TOKEN_WINDOW", "256") or 256)
+_CONT_GATE_MAX_DIM = int(os.environ.get("SIGMA0_CONT_GATE_MAX_DIM", "512") or 512)
+
+
+def _stability_gates(A_tensor, jsrr_matrix=None):
     """Stability certificate on the empirical loop Jacobian A. Returns a dict, or None on
     total failure (never raises). Two independently-computed layers:
 
       • JSRR (acceptance gate) — the DISCRETE spectral-radius criterion ρ(A)<1 (STARS,
         arXiv:2605.26733), numpy-only, computed FIRST so it survives even in the minimal
-        inference venv where scipy (needed by the continuous gates below) is absent.
+        inference venv where scipy (needed by the continuous gates below) is absent. When
+        `jsrr_matrix` is supplied it is the exact low-rank reduction of `A_tensor` (same
+        nonzero spectrum, hence identical ρ and accept verdict) — used so the serve path
+        never eigvals a (2048,2048) matrix; ρ/regime/stable are exact, σ_max/‖Av‖ telemetry
+        reflect the reduced matrix.
       • #768 continuous region-wideners + non-normal dichotomy — best-effort telemetry
         (scipy-dependent Lyapunov/Kreiss legs); a stricter, over-rejecting sufficient
-        contraction test kept for diagnostics and as an acceptance FALLBACK.
+        contraction test kept for diagnostics and as an acceptance FALLBACK. Skipped when
+        `A_tensor` is larger than `_CONT_GATE_MAX_DIM` (they need the full geometry and are
+        O(d³) — the reduction does not apply to them, and they are not the primary gate).
     """
     try:
         _src = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -74,7 +90,7 @@ def _stability_gates(A_tensor):
     except Exception:
         _margin = 0.0
     try:
-        j = jsrr_certificate(A_tensor, margin=_margin)
+        j = jsrr_certificate(jsrr_matrix if jsrr_matrix is not None else A_tensor, margin=_margin)
         out["jsrr"] = {
             "spectral_radius": _finite(j.spectral_radius),
             "radius_estimate": _finite(j.radius_estimate),
@@ -91,6 +107,14 @@ def _stability_gates(A_tensor):
     # — scipy-dependent; best-effort. Certify contraction of the FULL Jacobian and
     # over-reject non-normal A, so they are diagnostic + acceptance fallback, not primary.
     try:
+        # geometry-dependent continuous gates need the full (d,d) and are O(d³); skip them above
+        # the cap (they are diagnostic + fallback, and JSRR above already gave the exact verdict).
+        try:
+            _d = int(A_tensor.shape[0])
+        except Exception:
+            _d = 0
+        if _d > _CONT_GATE_MAX_DIM:
+            return out or None
         from cio_sde.collapse import stability_gates, dichotomy_certificate  # noqa: PLC0415
         g = stability_gates(A_tensor, margin=0.0)
         out.update({
@@ -585,12 +609,32 @@ class Sigma0LoopLM:
             try:
                 torch, *_ = _lazy()
                 H = torch.stack(exit_hiddens)          # (T, d)
+                # INTENTIONAL BEHAVIOR: for generations longer than the window we measure stability
+                # over the MOST RECENT transitions, not the whole history. This is (a) a cost bound —
+                # the reduced eigenproblem is (T-1,T-1), O(T³), so an unwindowed 2000-token generation
+                # would re-approach the 7s cost the (d,d) path had — and (b) arguably the more relevant
+                # signal ("is the loop stable *now*"). NOTE: this is NOT verdict-preserving vs pre-patch
+                # for T>window; only the low-rank *reduction* (below) is exact. The reduction preserves
+                # ρ to machine precision; the window is a deliberate recency change (SIGMA0_JAC_TOKEN_WINDOW).
+                if H.shape[0] > _JAC_TOKEN_WINDOW + 1:
+                    H = H[-(_JAC_TOKEN_WINDOW + 1):]
                 dH = H[1:] - H[:-1]                   # (T-1, d) deltas
                 norms = H[:-1].norm(dim=-1, keepdim=True).clamp(min=1e-9)
                 dH_norm = dH / norms                   # normalized transitions
-                # Jacobian proxy: mean outer product of consecutive hidden pairs → (d, d)
-                A_emp = (dH_norm.unsqueeze(-1) * H[:-1].unsqueeze(-2)).mean(0)
-                stability_cert = _stability_gates(A_emp)
+                Hprev = H[:-1]                          # (T-1, d)
+                # A_emp = (1/(T-1)) Σ_t dH_norm[t] ⊗ Hprev[t] = (1/(T-1)) dH_normᵀ Hprev — a (d,d)
+                # matrix of rank ≤ T-1. Its NONZERO spectrum (hence ρ, the JSRR acceptance object)
+                # equals that of the (T-1,T-1) Gram G = (1/(T-1)) Hprev dH_normᵀ (UVᵀ↔VᵀU identity),
+                # so ρ is computed EXACTLY from the tiny matrix — ~570× cheaper at d=2048, machine-
+                # precision match (experiments/p0_gate_measure.py M5). eigvals(d=2048)≈7s/gen → sub-
+                # ms. σ_max/‖Av‖ telemetry is NOT preserved by the reduction, so the diagnostic
+                # continuous gates still see the full A_emp (capped by dim so they never cost 7s).
+                Tm1 = Hprev.shape[0]
+                jsrr_mat = (Hprev @ dH_norm.transpose(-1, -2)) / max(Tm1, 1)   # (T-1, T-1), exact ρ
+                # (d,d) via matmul — mathematically the same mean-outer-product, but WITHOUT the
+                # (T-1,d,d) broadcast intermediate (≈2GB at d=2048); only the diagnostics use it.
+                A_emp = (dH_norm.transpose(-1, -2) @ Hprev) / max(Tm1, 1)       # (d, d)
+                stability_cert = _stability_gates(A_emp, jsrr_matrix=jsrr_mat)
             except Exception:
                 pass
 
