@@ -103,11 +103,45 @@ function makeVerifier({ language = "js", tests, entryPoint = null, timeoutMs = 1
     // small suite size; keeps a multi-test turn from serializing 10s timeouts.
     return Promise.all(
       list.map(async (t, i) => {
-        const r = await verifyExecAsync({ language, code: code + alias, test: t.test, timeoutMs });
+        // stdio test ({stdin, expected} — TACO/competitive style): wrap the candidate so it
+        // runs under a patched stdin with stdout captured and compared (normalized). The
+        // wrapper embeds everything base64 so quotes/newlines in program text can't break it.
+        const r = t && t.stdin !== undefined
+          ? await verifyExecAsync({ language: "python", code: _stdioWrapper(code, t.stdin, t.expected), test: "", timeoutMs })
+          : await verifyExecAsync({ language, code: code + alias, test: t.test, timeoutMs });
         return { name: t.name || `t${i}`, passed: !!(r.ran && r.passed), ran: !!r.ran, output: r.passed ? "" : String(r.output || "") };
       }),
     );
   };
+}
+
+// Build the self-contained Python runner for one stdio test case. The candidate program is
+// written to its own file inside the sandbox temp dir and run via runpy with __main__
+// semantics (also tolerating a candidate's sys.exit()); stdout is captured and compared.
+function _stdioWrapper(code, stdin, expected) {
+  const b64 = (s) => Buffer.from(String(s == null ? "" : s), "utf8").toString("base64");
+  return [
+    "import base64, sys, io, runpy",
+    `_SRC = base64.b64decode("${b64(code)}").decode("utf-8")`,
+    `_IN = base64.b64decode("${b64(stdin)}").decode("utf-8")`,
+    `_EXP = base64.b64decode("${b64(expected)}").decode("utf-8")`,
+    "with open('cand.py', 'w', encoding='utf-8') as _f:",
+    "    _f.write(_SRC)",
+    "sys.stdin = io.StringIO(_IN)",
+    "_buf = io.StringIO(); _old = sys.stdout; sys.stdout = _buf",
+    "try:",
+    "    _g = runpy.run_path('cand.py', run_name='__main__')",
+    "    # affordance (alias-shim analog): a program that only DEFINES main() without the",
+    "    # call guard produced no output — invoke it rather than fail on a style convention.",
+    "    if not _buf.getvalue().strip() and callable(_g.get('main')):",
+    "        _g['main']()",
+    "except SystemExit:",
+    "    pass",
+    "finally:",
+    "    sys.stdout = _old",
+    "_norm = lambda s: '\\n'.join(l.rstrip() for l in s.rstrip().splitlines())",
+    "assert _norm(_buf.getvalue()) == _norm(_EXP), 'stdout mismatch: ' + repr(_buf.getvalue()[:200])",
+  ].join("\n");
 }
 
 // Bind a camelCase variant of a snake_case entry point back to the exact name so an
@@ -145,16 +179,29 @@ async function _defaultComplete(provider, prompt, maxTokens = 700, model = null)
       const t = await ollamaComplete(m)(prompt, maxTokens);
       if (t && t.trim()) return t.trim();
     } catch { /* daemon down / model missing → fall through to a cloud leg */ }
+    const r = await verifyLLM.callVerifyModel(prompt, { maxTokens });
+    return r ? r.text : "";
   }
-  const leg = _legFor(provider);
-  if (leg) {
-    try {
-      const t = await leg(prompt, maxTokens);
-      if (t && t.trim()) return t.trim();
-    } catch { /* provider down → fall through to any reachable one */ }
+  // CLOUD tier (the escalate role). The VTD batch-2 rescue collapse (36 → 9 rescues) is
+  // consistent with a rate-limited cloud leg silently degrading through callVerifyModel to
+  // the SAME local model — a fake escalation. So: retry the requested leg with backoff,
+  // then the OTHER cloud legs, and if no cloud tier answers, FAIL HONESTLY ("") — an
+  // escalate must never masquerade as the cheap tier it was called to rescue.
+  const cloud = [provider, ...verifyLLM.buildLegs().map((l) => l.provider).filter((p) => p !== provider && p !== "ollama")];
+  for (const p of cloud) {
+    const leg = _legFor(p);
+    if (!leg) continue;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const t = await leg(prompt, maxTokens);
+        if (t && t.trim()) return t.trim();
+        break; // empty (non-error) answer → try the next provider, don't hammer this one
+      } catch {
+        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1))); // backoff then retry once
+      }
+    }
   }
-  const r = await verifyLLM.callVerifyModel(prompt, { maxTokens });
-  return r ? r.text : "";
+  return "";
 }
 
 /** The still-failing signal from the last committed step, fed back to the next turn. */
@@ -171,7 +218,10 @@ function _failingHint(ctx) {
 function _prompt(ctx, tier, language) {
   const failing = _failingHint(ctx);
   return [
-    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Define the function with EXACTLY the name and signature given in the problem; do NOT rename it (keep snake_case as written — do not camelCase it).`,
+    // I/O-contract specifics (exact function name vs complete stdin→stdout program) come from
+    // the problem prompt itself — hardcoding "define the function named..." here broke stdio
+    // tasks (models wrote uncalled functions that print nothing → guaranteed stdout mismatch).
+    `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Follow the problem's I/O contract exactly: if it names a function, define EXACTLY that name (do not rename or camelCase it); if it asks for a program, write a complete program that actually runs.`,
     ctx.problem.prompt,
     ctx.y ? `\nCurrent best attempt (improve it; KEEP whatever already passes):\n${ctx.y}` : "",
     failing ? `\nFocus "${ctx.focus}". Still-failing tests:\n${failing}` : `\nFocus: ${ctx.focus}.`,

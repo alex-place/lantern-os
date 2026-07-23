@@ -113,6 +113,21 @@ async function main() {
   const frontierModel = frontierProvider === "ollama"
     ? (process.env.SPIRAL_FRONTIER_MODEL || "qwen2.5-coder:latest")
     : (process.env.SPIRAL_FRONTIER_MODEL || null);
+  // Honest-labeling preflight (#2835): with no configured leg for a requested CLOUD
+  // frontier, _defaultComplete would silently answer from the first reachable leg (the
+  // LOCAL model) while every corpus row is labeled frontier:<provider> — a mislabeled
+  // distillation corpus. Refuse up front instead of poisoning the VTD fuel.
+  if (live && frontierProvider !== "ollama") {
+    const { _legFor } = require("../apps/lantern-garage/lib/spiral-tiers");
+    if (!_legFor(frontierProvider)) {
+      console.error(
+        `SPIRAL_FRONTIER_PROVIDER=${frontierProvider} requested but no ${frontierProvider} leg is configured on this box (no key). ` +
+        `Refusing to run: the escalate leg would silently fall back to a local model while the corpus labels it frontier:${frontierProvider}. ` +
+        `Set the provider key, or unset SPIRAL_FRONTIER_PROVIDER for the local escalate tier.`,
+      );
+      process.exit(2);
+    }
+  }
   const tiers = live
     ? makeTiers({ language, cheapProvider: "ollama", cheapModel, frontierProvider, frontierModel })
     : stubTiers();

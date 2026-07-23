@@ -176,11 +176,26 @@ owned verified data.
   contamination*: shown `min_distance`, the 0.5B wrote an edit-distance-shaped answer to
   `longest_common_subsequence`. A model this tiny has weak in-context learning, so capability can't
   ride in the context — it must be baked into the **weights**. So VTD is the path, not a nice-to-have.
-  Base = the verified Qwen2.5-Coder-7B; data = the **exec-verified** subset of {SWE-HERO 13.5k,
-  KodCode, TACO} **+ our own escalation corpus** (the frontier rescues = exactly the hard-tail the
-  tiny model needs); method = Verified-Trace Distillation (receipt-gated, both-class, process-level;
-  nearest prior art rStar-Math 2501.04519). GPU dispatch is real spend (see §9) and stays behind an
-  explicit, funded run. Relates to [ADR-0015](adr/0015-qwen-teacher-verified-distillation.md) /
+  **Run 1 (2026-07-22, MEASURED NEGATIVE — dose, not mechanism):** the full pipeline ran end-to-end
+  on-box — 120 MBPP problems → **63 exec-verified traces** (36 frontier rescues) via the cascade
+  (0.5B local → OpenAI escalate), QLoRA on the RTX 3070 (6 epochs, 292s, r=16, lr 2e-4,
+  best-checkpoint on held-out eval_loss), then held-out MBPP [400–450): **base 21/50 (42%) →
+  +VTD 15/50 (30%), delta −6** (fixed 2, regressed 8; ledger record `cr-mrvvxsuc`). At 55 train
+  rows the model memorized the corpus (train loss 0.003) and the update damaged the instruct
+  behavior more than it taught. Together with the retrieval negative this shows the 0.5B's
+  capability is **fragile under both context injection and aggressive small-corpus updates**.
+  **Run 2 (same day, dose-response confirmed):** scaled to **204 traces** (remaining MBPP 120–400)
+  and retrained gentle (lr 5e-5, 3 epochs, r=8): held-out delta went **−6 → ±0** (21/50 both arms;
+  fixed 3, regressed 3; ledger `cr-mrvxt1li`). Training dynamics flipped from memorized (loss
+  0.003) to healthy (loss 0.38, best checkpoint = last). The direction confirms the scale
+  hypothesis: **more data + gentler update = less damage, with real fixes appearing** — but the
+  crossover to a net lift needs an order of magnitude more traces. MBPP is nearly exhausted
+  (400/450 used); the next corpus source is the borrowed verifiable sets (§4: KodCode ≥5
+  tests/problem, TACO Apache-2.0), plus a retention mix to eliminate the residual regressions.
+  Longer-term data = the **exec-verified** subset of {SWE-HERO 13.5k, KodCode, TACO} **+ our own
+  escalation corpus**; method = Verified-Trace Distillation (receipt-gated, both-class,
+  process-level; nearest prior art rStar-Math 2501.04519). Cloud GPU dispatch is real spend (see
+  §9); the local 3070 handles the 0.5B tier. Relates to [ADR-0015](adr/0015-qwen-teacher-verified-distillation.md) /
   [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md).
 - **Phase 2 — the tiny recursive core (research option).** TRM/HRM substrate + rotational
   anti-collapse (coRNN) as trainable modules. **Gated behind Phase-1 evidence** and held at low

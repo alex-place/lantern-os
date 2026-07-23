@@ -16,3 +16,12 @@
     (never in training), exec-verified, same template + name tolerance.
   - `lib/spiral-tiers.js`: the name-tolerance shim now also covers Python (single-defined-function
     fallback), so MBPP's arbitrary function names don't undercount correct solutions.
+  - **Run 1 result (measured, honest negative):** 63 traces → QLoRA (6 epochs, r=16, lr 2e-4) →
+    held-out MBPP [400–450): base **21/50 (42%)** → +VTD **15/50 (30%)**, delta **−6** (ledger
+    `cr-mrvvxsuc`). At 55 train rows the corpus is memorized and the update damages instruct
+    behavior — dose, not mechanism. Next iteration: corpus scale (remaining MBPP generating) +
+    gentler update (lr ~5e-5, ≤3 epochs, r=8).
+  - **Run 2 (dose-response confirmed):** 204 traces + gentle config (lr 5e-5, 3 epochs, r=8) →
+    held-out delta **−6 → ±0** (21/50 both arms; 3 genuine fixes, 3 regressions; ledger
+    `cr-mrvxt1li`). Damage eliminated; the crossover to a net lift needs order-of-magnitude more
+    traces — next corpus source is the borrowed verifiable sets (KodCode/TACO) + a retention mix.
