@@ -4,6 +4,30 @@ Curated references organized by component. Not a bookmark dump. Living document 
 
 ---
 
+## Canonical naming rule (operator decision, 2026-07-23)
+
+**There is ONE machine: the Convergence Core** (its behavior is the loop —
+Observe → Remember → Reason → Act → Verify → Converge). The 2026-07 research review found the
+corpus had sprawled *by renaming*: the same loop re-badged as five separately-named "central
+machines," each with its own doc family and unification story. Those names are hereby demoted to
+**stages or contracts of the one Core** and may not be presented as machines:
+
+| Name in the corpus | What it actually is |
+|---|---|
+| the Spiral | the Act/Verify escalation runtime (verified cascade, ADR-0030) |
+| the Convergence Oracle / Question Machine | the answerability discipline of Observe/Converge |
+| the Collapse-Certificate "engine" | the stability contract on Reason (JSRR gate + Σ₀⁻¹) |
+| the owned-math "convergence engine" | the proof obligations (M1–M6) on the Core's dynamics |
+| CSF-Converge | the Remember substrate's compression/retrieval contract |
+
+**Tripwire (doc review):** a new proper-noun "machine," "engine," or "oracle" in any doc is
+rejected the same way the sprawl tripwire rejects a new public surface — extend the Core or name
+a stage of it. Shared measurement anchors (8.3× cascade, 88.4% rescue, probe ladder, 0.829
+HumanEval-7B, …) are cited from **[BENCHMARKS.md](BENCHMARKS.md)** / the eval leaderboard — never
+re-stated in a cluster's own voice as if it were independent evidence.
+
+---
+
 ## [01] LANTERN-KERNEL — Core Orchestration Loop
 
 ### Academic Foundation

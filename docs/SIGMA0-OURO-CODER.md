@@ -2,13 +2,26 @@
 author: Alex Place, with the unisona.ai agent lanes
 created: 2026-06-19
 updated: 2026-07-23
-status: Public whitepaper — the Σ₀ from-scratch model program (operator direction 2026-07-23).
+status: Public whitepaper — SUPERSEDED IN PART (operator decision, 2026-07-23, later same day):
+  the model is a DISTILLED ≤3B looped student, not a from-scratch pretrain. §5's from-scratch
+  costing is retained as reference/contingency only. Everything verifier-, serving-, stability-,
+  and honesty-shaped in this paper carries over to the distilled program unchanged.
   Prior revisions of this page (the retrofit-era lineage SSOT) are preserved in git history;
   internal engineering twins: research/2026-07-23-sigma0-llm-design.md (design of record),
   research/2026-07-23-sigma0-rc1-model-spec.md (baseline harness), SIGMA0-COLLAPSE-CERTIFICATE.md.
 ---
 
 # Σ₀ — A Verified Looped Language Model, Built From Scratch
+
+> **Supersession note (2026-07-23).** The operator resolved the build-vs-distill tension the
+> same day this revision was published: **Σ₀ is a distilled ≤3B looped student** (teacher-
+> verified, exec-gated — ADR-0015/ADR-0024 lineage), consistent with ADR-0024's Phase-3
+> retirement and the frontier build/test survey (G10: "nobody trains a small frontier model
+> from scratch — even Meta codistills"). The from-scratch program below is preserved as the
+> costed contingency it always was (§5, §9 kill-criteria), not the live plan. The paper's
+> core claims — external verifier as ground truth, the Spiral runtime, loop-stability
+> contract, ternary serving target, honesty-by-contract — are architecture-of-the-*student*
+> claims and are unchanged by the supersession.
 
 **A whitepaper on a small language model designed to be owned, not rented: trained from
 scratch for verifiable work, stable by construction, honest by contract, and small enough to
