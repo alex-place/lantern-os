@@ -98,7 +98,7 @@ async function main() {
   }
 
   // 3. Measure the TINY model on HELD-OUT: baseline vs retrieval-augmented.
-  console.log(`\n[2/3] Measuring TINY (${TINY}) on ${HELDOUT.length} HELD-OUT problems: baseline vs +retrieval(k=${K})\n`);
+  console.log(`\n[2/3] Measuring TINY (${TINY}) on ${HELDOUT.length} HELD-OUT problems: baseline vs +retrieval k=${K}\n`);
   const rows = [];
   for (const p of HELDOUT) {
     const base = `Solve this. Reply with ONLY a JS code block. Define the function with EXACTLY the name given (snake_case; do NOT camelCase it).\n${p.prompt}`;
