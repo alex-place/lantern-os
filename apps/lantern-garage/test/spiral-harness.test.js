@@ -140,7 +140,10 @@ test("maxTurns caps the unbounded loop; nothing spurious commits", async () => {
     problem: { id: "p6", prompt: "never solved" },
     tiers: { cheap: async () => ({ text: "pass:", cost: 0.001, model: "cheap" }) }, // always stalls
     verify: async (text) => parseVerify(text),
-    corpus, now: clock, maxTurns: 3,
+    // stallLimit 0: this test pins the OUTER safety cap; stop-on-stall (which would
+    // halt this all-stall run earlier, honestly) has its own tests in
+    // spiral-stall-tiering.test.js.
+    corpus, now: clock, maxTurns: 3, stallLimit: 0,
   });
   assert.equal(r.haltReason, "maxTurns");
   assert.equal(r.solved, false);

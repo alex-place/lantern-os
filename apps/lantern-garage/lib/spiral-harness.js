@@ -27,6 +27,18 @@
  * escalation corpus; VTD later trains the cheap tier on them so the one governing
  * number, the escalation rate, only falls.
  *
+ * Cascade policy (cross-domain prior art, fielded for decades outside LLMs):
+ *   - STOP-ON-STALL (ECC iterative decoders, US6518892B2/US8301987B2): halt after
+ *     `stallLimit` consecutive non-advancing turns, and a state-hash spots a generator
+ *     that is cycling (halt "loop") — instead of grinding to the fixed turn cap.
+ *   - PASS-TERMINATES / cheapest-check-first (hierarchical assay, US6013436A): a
+ *     candidate identical to one that already stalled (or to the current best) is
+ *     never re-verified — the zero-cost hash check runs before the paid one, and a
+ *     pass at any rung ends the turn's spend.
+ *   - BIDIRECTIONAL TIERING (call-routing, US7254641B2): after a fully-stalled turn
+ *     the next turn starts at the frontier rung (skip the doomed cheap try); any
+ *     commit drops back to cheap — de-escalate when the hard part is over.
+ *
  * The four core objects map cleanly: Memory = the growing verified memory; Task = the
  * problem; Tool = the tier calls; Convergence Record = each committed verified step.
  * Nothing here is a separate engine — it is the loop, focused.
@@ -36,9 +48,10 @@
  * real model tiers + the exec-verify sandbox; tests wire stubs.
  */
 
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { fixRate } = require("./spiral-fix-rate");
+const { fixRate, summarize } = require("./spiral-fix-rate");
 
 let _repoRoot;
 try {
@@ -84,6 +97,12 @@ const noop = () => {};
  *                        test-result set (array/counts) which we score with fixRate().
  *   memory    {Array}    optional seed of verified steps (default []).
  *   maxTurns  {number}   safety cap on the unbounded loop (default 12).
+ *   stallLimit {number}  consecutive non-advancing turns before halting "stalled"
+ *                        (default 3). 0 disables stop-on-stall AND the loop-halt
+ *                        (duplicate proposals still skip the paid verify).
+ *   stickyTiers {boolean} bidirectional rung movement (default true): a fully-stalled
+ *                        turn starts the NEXT turn at the frontier rung; any commit
+ *                        returns to cheap.
  *   answerability {function} optional async (ctx) => number ∈ [0,1]; halt "honest can't"
  *                        when it declines below `answerabilityFloor` (M5).
  *   answerabilityFloor {number} default 0.15.
@@ -96,8 +115,11 @@ const noop = () => {};
  * @returns {Promise<{
  *   solved:boolean, haltReason:string, turns:number, escalations:number,
  *   cost:number, y:(string|null), memory:Array, corpusRows:Array,
- *   escalationRate:number, corpusFile:(string|null)
+ *   escalationRate:number, corpusFile:(string|null), confidence:number
  * }>}
+ *   haltReason ∈ "solved" | "stalled" | "loop" | "answerability" | "maxTurns".
+ *   confidence is the whole-answer score (see _wholeAnswerConfidence), decoupled
+ *   from where the loop stopped.
  */
 async function runSpiral(args) {
   const {
@@ -106,6 +128,8 @@ async function runSpiral(args) {
     verify,
     memory: seed = [],
     maxTurns = 12,
+    stallLimit = 3,
+    stickyTiers = true,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -131,6 +155,14 @@ async function runSpiral(args) {
   let escalations = 0;
   let solved = false;
   let haltReason = "maxTurns";
+
+  // Stop-on-stall + loop detection + the sticky cascade rung. `seenStalled` holds
+  // state-hashes of candidates that failed to advance — re-proposing one is loop
+  // evidence, and never worth paying the verifier for again.
+  let consecutiveStalls = 0;
+  let consecutiveDupTurns = 0;
+  let rung = "cheap";
+  const seenStalled = new Set();
 
   // Coerce a verify() return into a Fix-Rate result. If verify already returned a
   // scored result (has `advanced`), trust it; else treat it as a raw test-result set
@@ -159,24 +191,58 @@ async function runSpiral(args) {
       }
     }
 
-    // ── M2: the per-turn verified cascade ──────────────────────────────────
-    let tier = "cheap";
-    let cand = await tiers.cheap({ problem, memory, focus, y, turn });
-    cost += Number(cand && cand.cost) || 0;
-    onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
-    let v = score(await verify(cand.text, { problem, memory, before: best }), best);
-    onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+    // ── M2: the per-turn verified cascade, entered at the current rung ─────
+    // Pass-terminates / cheapest-check-first: the zero-cost identity check runs
+    // before the paid verifier — a candidate identical to the current best, or to
+    // one that already stalled, cannot advance the ratchet, so it is scored as the
+    // stall it is without spending an exec run.
+    let dupsThisTurn = 0;
+    const evaluate = async (c) => {
+      const h = _stateHash(c && c.text);
+      if (seenStalled.has(h) || (y != null && String(c && c.text) === String(y))) {
+        dupsThisTurn += 1;
+        onStep({ type: "verify_skipped", turn, reason: "duplicate-candidate" });
+        return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _dup: true };
+      }
+      return score(await verify(c.text, { problem, memory, before: best }), best);
+    };
 
-    if (!v.advanced && typeof tiers.escalate === "function") {
-      // Cheap stalled → escalate THIS step to the frontier, inheriting the full
-      // accumulated memory (progress preserved). This is the only time we spend big.
-      onStep({ type: "escalate", turn, from: cand && cand.model, reason: "cheap stalled the verifier" });
+    const canEscalate = typeof tiers.escalate === "function";
+    let tier = "cheap";
+    let cand;
+    let v;
+    let triedTiers = 1;
+    if (stickyTiers && canEscalate && rung === "escalated") {
+      // Bidirectional tiering, the rise direction: the last turn stalled at BOTH
+      // rungs, so the cheap try is proven futile right now — start this turn at the
+      // frontier, inheriting the accumulated memory. Any commit drops back to cheap.
       tier = "escalated";
       escalations += 1;
+      onStep({ type: "escalate", turn, reason: "sticky rung: cheap stalled last turn" });
       cand = await tiers.escalate({ problem, memory, focus, y, turn });
       cost += Number(cand && cand.cost) || 0;
-      v = score(await verify(cand.text, { problem, memory, before: best }), best);
+      v = await evaluate(cand);
       onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+    } else {
+      cand = await tiers.cheap({ problem, memory, focus, y, turn });
+      cost += Number(cand && cand.cost) || 0;
+      onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
+      v = await evaluate(cand);
+      onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+
+      if (!v.advanced && canEscalate) {
+        // Cheap stalled → escalate THIS step to the frontier, inheriting the full
+        // accumulated memory (progress preserved). This is the only time we spend big.
+        if (!v._dup) seenStalled.add(_stateHash(cand && cand.text));
+        onStep({ type: "escalate", turn, from: cand && cand.model, reason: "cheap stalled the verifier" });
+        tier = "escalated";
+        escalations += 1;
+        triedTiers = 2;
+        cand = await tiers.escalate({ problem, memory, focus, y, turn });
+        cost += Number(cand && cand.cost) || 0;
+        v = await evaluate(cand);
+        onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
+      }
     }
     // ────────────────────────────────────────────────────────────────────────
 
@@ -194,6 +260,7 @@ async function runSpiral(args) {
       // The escalated + advancing steps are the VTD distillation targets: a frontier
       // demonstration on a step the cheap tier could not do. Flagged for the trainer.
       distillTarget: tier === "escalated" && v.advanced,
+      verifySkipped: !!v._dup,
       ts: new Date(now()).toISOString(),
     };
     corpus.append(row);
@@ -207,6 +274,11 @@ async function runSpiral(args) {
       memory.push(step);
       best = _bestResults(best, v, cand);
       y = cand.text;
+      // De-escalation (the fall direction): the hard step cleared, so the next turn
+      // probes the cheap rung again — a long session drifts back to the cheap tier.
+      rung = "cheap";
+      consecutiveStalls = 0;
+      consecutiveDupTurns = 0;
       onStep({ type: "commit", turn, tier, fixRate: v.fixRate, solved: !!v.solved, memorySize: memory.length });
       if (v.solved) {
         solved = true;
@@ -215,9 +287,27 @@ async function runSpiral(args) {
         break;
       }
     } else {
-      // Neither tier advanced — de-ratchet (rotate focus / ground externally next
-      // turn), never freeze. Nothing commits to memory (the ratchet holds).
+      // Neither tried rung advanced — de-ratchet (rotate focus / ground externally
+      // next turn), never freeze. Nothing commits to memory (the ratchet holds).
+      if (!v._dup) seenStalled.add(_stateHash(cand && cand.text));
+      consecutiveStalls += 1;
+      consecutiveDupTurns = dupsThisTurn >= triedTiers ? consecutiveDupTurns + 1 : 0;
+      // Rise: the frontier was tried this turn and still no advance — starting the
+      // next turn at the cheap rung would repeat a proven-futile call.
+      if (stickyTiers && tier === "escalated") rung = "escalated";
       onStep({ type: "stall", turn, tier });
+      // Stop-on-stall: a run of turns with zero real progress will not be saved by
+      // more of the same — halt honestly instead of grinding out the turn cap.
+      if (stallLimit > 0 && consecutiveDupTurns >= 2) {
+        haltReason = "loop";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved, cost, escalations });
+        break;
+      }
+      if (stallLimit > 0 && consecutiveStalls >= stallLimit) {
+        haltReason = "stalled";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved, cost, escalations });
+        break;
+      }
     }
   }
 
@@ -235,7 +325,28 @@ async function runSpiral(args) {
     memory,
     corpusRows,
     corpusFile: corpus.file || null,
+    confidence: _wholeAnswerConfidence(best, solved),
   };
+}
+
+// Cheap content hash for the stop-on-stall loop detector: two proposals with the
+// same text are the same state. Not security — just identity.
+function _stateHash(text) {
+  return crypto.createHash("sha1").update(String(text == null ? "" : text)).digest("hex");
+}
+
+/**
+ * Whole-answer confidence: computed from the FULL final verified state — the
+ * fraction of tests the best committed candidate passes — never inferred from where
+ * the loop happened to stop (a "stalled" halt with 3/4 tests passing is 0.75, not
+ * zero; a lucky early exit is not 1.0 unless every test passes). Solved ⇒ 1;
+ * nothing ever committed ⇒ 0.
+ */
+function _wholeAnswerConfidence(best, solved) {
+  if (solved) return 1;
+  if (best == null) return 0;
+  const s = summarize(best);
+  return s.total > 0 ? s.passed / s.total : 0;
 }
 
 /**
