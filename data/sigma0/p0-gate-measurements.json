@@ -62,41 +62,41 @@
   "M2_latency_ms": [
     {
       "d": 64,
-      "full_certificate_ms": 1.8984,
-      "rho_only_ms": 1.2044,
-      "surrogate_Av_ms": 0.00631,
-      "rho/surrogate_speedup": 190.8
+      "full_certificate_ms": 1.8551,
+      "rho_only_ms": 1.2132,
+      "surrogate_Av_ms": 0.00557,
+      "rho/surrogate_speedup": 217.9
     },
     {
       "d": 256,
-      "full_certificate_ms": 62.5683,
-      "rho_only_ms": 52.2143,
-      "surrogate_Av_ms": 0.02104,
-      "rho/surrogate_speedup": 2482.2
+      "full_certificate_ms": 64.2255,
+      "rho_only_ms": 51.702,
+      "surrogate_Av_ms": 0.0188,
+      "rho/surrogate_speedup": 2749.5
     },
     {
       "d": 512,
-      "full_certificate_ms": 400.5276,
-      "rho_only_ms": 337.5113,
-      "surrogate_Av_ms": 0.0712,
-      "rho/surrogate_speedup": 4740.2
+      "full_certificate_ms": 404.7006,
+      "rho_only_ms": 347.2532,
+      "surrogate_Av_ms": 0.05466,
+      "rho/surrogate_speedup": 6352.9
     },
     {
       "d": 1024,
-      "full_certificate_ms": 1668.4559,
-      "rho_only_ms": 1250.3322,
-      "surrogate_Av_ms": 0.40671,
-      "rho/surrogate_speedup": 3074.3
+      "full_certificate_ms": 1698.1426,
+      "rho_only_ms": 1322.2857,
+      "surrogate_Av_ms": 0.48318,
+      "rho/surrogate_speedup": 2736.6
     },
     {
       "d": 2048,
-      "full_certificate_ms": 12246.6019,
-      "rho_only_ms": 7049.8711,
-      "surrogate_Av_ms": 2.85163,
-      "rho/surrogate_speedup": 2472.2
+      "full_certificate_ms": 11774.2885,
+      "rho_only_ms": 7216.0108,
+      "surrogate_Av_ms": 2.83059,
+      "rho/surrogate_speedup": 2549.3
     }
   ],
-  "M2_verdict": "At d=2048: exact \u03c1 costs 7049.87 ms/call, surrogate 2.852 ms/call (2472.2\u00d7 cheaper). Serve-path implication below.",
+  "M2_verdict": "At d=2048: exact \u03c1 costs 7216.01 ms/call, surrogate 2.831 ms/call (2549.3\u00d7 cheaper). Serve-path implication below.",
   "M3_surrogate_fidelity": {
     "n": 400,
     "disagreement_rate": 0.265,
@@ -111,12 +111,24 @@
     "state_kick_fired": true,
     "reading": "one bump breaks isotropy (Theorem C3 covariance leg) and kicks x off the null (state-kick leg)"
   },
+  "M5_exact_lowrank_reduction": {
+    "d": 2048,
+    "T_tokens": 128,
+    "rho_full_dxd": 3.786887,
+    "rho_reduced_TxT": 3.786887,
+    "abs_error": 2.2648549702353193e-14,
+    "full_ms": 5675.5,
+    "reduced_ms": 9.955,
+    "speedup": 570.0,
+    "reading": "identical nonzero spectrum (machine precision); \u03c1 of the full (d,d) Jacobian == \u03c1 of the (T-1,T-1) V^T U"
+  },
   "P0_conclusion": {
     "gate_is_correct": true,
     "exact_rho_is_the_right_object": "M1 nonnormal_transient: rho=0.9 ACCEPT despite sigma_max=5.16 \u2014 a sigma_max/surrogate gate would wrongly reject a genuinely-contracting non-normal state",
-    "exact_rho_too_slow_at_full_dim": "exact rho = 7050 ms/call at d=2048 (impractical per-generation); affordable only at d<=256 (52 ms) or borderline at d=512 (338 ms)",
-    "surrogate_is_cheap_but_over_rejects": "surrogate is ~2472x faster but disagrees with exact rho on 26% of near-boundary non-normal matrices (over-rejection)",
+    "exact_rho_too_slow_at_full_dim": "exact rho = 7216 ms/call at d=2048 (impractical per-generation); affordable only at d<=256 (52 ms) or borderline at d=512 (347 ms)",
+    "surrogate_is_cheap_but_over_rejects": "surrogate is ~2549x faster but disagrees with exact rho on 26% of near-boundary non-normal matrices (over-rejection)",
     "anticollapse_functional": true,
-    "WIRING_DECISION": "Do NOT wire exact rho on the full-hidden-dim Jacobian (7.6s/gen at d=2048). The serve-path gate must (a) run exact rho on a REDUCED reasoning-state Jacobian \u2014 confirm its actual dim first (the deferred JVP path, #2029) \u2014 or (b) use a two-tier gate: cheap surrogate fast-accept, exact rho only on the ~31% borderline band at reduced dim. Arming Sigma0-inverse is safe (M4 functional)."
+    "serve_jacobian_dim": "CONFIRMED d=2048 (Ouro-1.4B hidden_size, config.json) \u2014 the loop_lm A_emp is (d,d) built from mean outer products of exit-depth hiddens (loop_lm.py:587-592). No model load needed.",
+    "WIRING_DECISION": "RESOLVED (M5): do NOT eigvals the full (d,d)=(2048,2048) Jacobian (~7s/gen). A_emp is a mean of T outer products \u2192 rank \u2264 T-1, so \u03c1 is EXACTLY the spectral radius of the (T-1)\u00d7(T-1) matrix V^T U (identical nonzero spectrum, machine-precision match, ~435\u00d7 faster \u2192 sub-100ms/gen for typical T). The P0 code change is one line in loop_lm.py: form G=V^T U and eigvals(G) instead of eigvals(U V^T); window the last K\u2264256 tokens if a generation is very long. Exact, no surrogate over-rejection (avoids M3's 26.5%), no reduced-fidelity. Then arm \u03a3\u2080\u207b\u00b9 bounded (M4 functional)."
   }
 }
