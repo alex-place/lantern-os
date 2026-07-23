@@ -53,6 +53,12 @@
     .plan-card { border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; background: var(--surface); }
     .plan-card .pc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .plan-card ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    table.inv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    table.inv th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    table.inv td { padding: 10px; border-bottom: 1px solid var(--border); }
+    table.inv td.num, table.inv th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.inv tr:last-child td { border-bottom: none; }
+    table.inv a { color: var(--accent-strong); }
     .banner { padding: 10px 14px; border-radius: 9px; font-size: 13px; margin-bottom: 16px; background: color-mix(in srgb, var(--amber) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--border)); color: var(--text); }
     .banner a { color: var(--accent-strong); }
     .muted-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; line-height: 1.6; }
@@ -272,7 +278,7 @@
   }
 
   // ── BILLING ──────────────────────────────────────────────────────────────
-  function renderBilling() {
+  async function renderBilling() {
     const el = $("p-billing");
     if (!profile) return needSignIn(el, "Billing");
     const plan = planName(profile.role);
@@ -295,8 +301,13 @@
       </div>
       ${upsell ? `<div class="group-label">${plan === "Free" ? "Upgrade" : "Go further"}</div>${upsell}
         <div class="row"><div class="rl"><div class="k">Compare all plans</div><div class="v">See everything each plan includes, side by side.</div></div><div class="rc"><a class="btn" href="/pricing.html">Pricing →</a></div></div>` : ""}
-      ${paid ? `<div class="group-label">Subscription</div>
-        <div class="row"><div class="rl"><div class="k">Manage subscription</div><div class="v">Update your card, download invoices, or cancel — via Stripe.</div></div><div class="rc"><button class="btn" id="b-portal">Open portal</button></div></div>` : ""}
+      ${paid ? `
+        <div class="group-label">Payment</div>
+        <div class="row"><div class="rl"><div class="k">Payment method</div><div class="v" id="b-card">Loading…</div></div><div class="rc"><button class="btn" id="b-update">Update</button></div></div>
+        <div class="group-label">Invoices</div>
+        <div id="b-invoices" class="muted-note" style="margin-top:0">Loading…</div>
+        <div class="group-label" style="color:var(--red)">Cancellation</div>
+        <div class="row"><div class="rl"><div class="k">Cancel plan</div><div class="v">You keep access until the end of the current billing period.</div></div><div class="rc"><button class="btn danger" id="b-cancel">Cancel</button></div></div>` : ""}
       <p class="muted-note">Payments are handled securely by Stripe — card details go straight to Stripe, we never see or store them. The Free plan needs no billing.</p>`;
     // Inline checkout: buy right here. On any snag (billing not configured, tier has
     // no live price, etc.) fall through to the full pricing page which handles those
@@ -311,7 +322,28 @@
       }
       location.href = "/pricing.html";
     });
-    const bp = $("b-portal"); if (bp) bp.onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/portal", { method: "POST" }); if (o.ok && o.body && o.body.url) location.href = o.body.url; else { alert((o.body && o.body.message) || "No active subscription to manage yet."); e.target.disabled = false; } };
+    if (paid) {
+      // Editing the card stays in the Stripe portal (PCI — we never collect card fields).
+      const upd = $("b-update"); if (upd) upd.onclick = async () => { const o = await api("/api/billing/portal", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else alert("Updating your card opens the Stripe portal — no active subscription was found."); };
+      const cancel = $("b-cancel"); if (cancel) cancel.onclick = async () => {
+        if (!confirm("Cancel your subscription? You keep access until the end of the current billing period, then drop to Free.")) return;
+        cancel.disabled = true;
+        const o = await api("/api/billing/cancel", { method: "POST" });
+        if (o.ok) { alert("Done — your plan ends at the close of the current period. You keep access until then."); load(); }
+        else { alert((o.body && (o.body.error || o.body.detail)) || "Could not cancel here — try Update → Stripe portal."); cancel.disabled = false; }
+      };
+      // Fill card + invoices (async; both gracefully handle billing-not-configured).
+      const [pm, inv] = await Promise.all([api("/api/billing/payment-method"), api("/api/billing/invoices")]);
+      const cardEl = $("b-card");
+      if (cardEl) { const c = pm.body && pm.body.card; cardEl.innerHTML = c ? `${esc(String(c.brand || "card").toUpperCase())} •••• ${esc(c.last4 || "")}${c.exp_month ? ` · exp ${c.exp_month}/${String(c.exp_year).slice(-2)}` : ""}` : (pm.status === 503 ? "Billing not configured" : "No card on file"); }
+      const invEl = $("b-invoices");
+      if (invEl) {
+        const rows = (inv.body && inv.body.invoices) || [];
+        invEl.innerHTML = rows.length
+          ? `<table class="inv"><thead><tr><th>Date</th><th class="num">Total</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((i) => `<tr><td>${i.date ? new Date(i.date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—"}</td><td class="num">$${Number(i.total || 0).toFixed(2)}</td><td>${esc(i.status || "")}</td><td>${i.url ? `<a href="${esc(i.url)}" target="_blank" rel="noopener">View</a>` : ""}</td></tr>`).join("")}</tbody></table>`
+          : (inv.status === 503 ? "Billing not configured." : "No invoices yet.");
+      }
+    }
   }
 
   // ── CONNECTIONS (brokers + AI keys + connectors + invite) ─────────────────
