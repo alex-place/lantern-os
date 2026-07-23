@@ -367,7 +367,15 @@ module.exports = async function dreamRoutes(req, res, url, deps) {
         const modelMessage = responseSchema ? `${message}\n\n${schemaHint(responseSchema)}` : message;
         // body.mode: allowlisted one-shot mode (#2577, e.g. "review" from pr-watcher) —
         // no tools narrative, no context injection; unknown values are ignored.
-        result = await dreamChatReply(modelMessage, recentDreams, body.agent || "", body.provider || "", body.mode || "");
+        // Standing user instructions (Settings → General → preferences.instructions):
+        // resolved from the SESSION user (never the body) so they apply to every chat.
+        let _userInstr = "";
+        try {
+          const _uid = require("../lib/session-identity").getEffectiveUserId(req);
+          const _pr = _uid ? require("../lib/user-profiles").getProfile(_uid) : null;
+          _userInstr = (_pr && _pr.preferences && _pr.preferences.instructions) || "";
+        } catch (_) { /* best-effort */ }
+        result = await dreamChatReply(modelMessage, recentDreams, body.agent || "", body.provider || "", body.mode || "", _userInstr);
         if (responseSchema && result.reply) {
           let parsed = parseObject(result.reply, responseSchema);
           if (!parsed.ok) {

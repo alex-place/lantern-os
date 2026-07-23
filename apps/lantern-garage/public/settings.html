@@ -138,6 +138,8 @@
       <div class="row"><div class="rl"><div class="k">Full name</div></div><div class="rc"><input class="fld" id="g-name" value="${esc(profile.name || "")}" maxlength="80"><button class="btn primary" id="g-name-save">Save</button></div></div>
       <div class="row"><div class="rl"><div class="k">What should we call you?</div><div class="v">Used to greet you in chat and the trader.</div></div><div class="rc"><input class="fld" id="g-callme" value="${esc(prefs.displayName || "")}" maxlength="40" placeholder="${esc(profile.name || "Your name")}"><button class="btn primary" id="g-callme-save">Save</button></div></div>
       <div class="row"><div class="rl"><div class="k">What best describes your work?</div><div class="v">Helps tailor examples and defaults.</div></div><div class="rc"><select class="fld" id="g-work">${["", "Trader / investor", "Software developer", "Founder / operator", "Researcher", "Creator", "Student", "Other"].map((o) => `<option ${((prefs.work || "") === o) ? "selected" : ""} value="${esc(o)}">${o || "Select…"}</option>`).join("")}</select></div></div>
+      <div class="group-label">Instructions for Unisona</div>
+      <div class="row" style="align-items:flex-start"><div class="rl"><div class="k">Custom instructions</div><div class="v">Unisona keeps these in mind across all your chats — tone, format, what you're working on.</div></div><div class="rc" style="flex-direction:column;align-items:stretch;gap:6px;min-width:300px"><textarea class="fld" id="g-instr" rows="4" maxlength="2000" style="min-width:300px;resize:vertical;font-family:inherit;line-height:1.5" placeholder="e.g. I'm a day trader — be concise, lead with the number, and always flag uncertainty.">${esc(prefs.instructions || "")}</textarea><button class="btn primary" id="g-instr-save" style="align-self:flex-end">Save</button></div></div>
       <div class="group-label">Preferences</div>
       <div class="row"><div class="rl"><div class="k">Appearance</div><div class="v">System follows your device setting.</div></div><div class="rc">
         <div class="seg" id="g-theme">
@@ -154,6 +156,13 @@
     $("g-callme-save").onclick = async (e) => {
       e.target.disabled = true;
       const merged = Object.assign({}, profile.preferences || {}, { displayName: $("g-callme").value.trim() });
+      const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences: merged }) });
+      e.target.textContent = out.ok ? "Saved ✓" : "Retry"; e.target.disabled = false;
+      if (out.ok) profile.preferences = merged;
+    };
+    $("g-instr-save").onclick = async (e) => {
+      e.target.disabled = true;
+      const merged = Object.assign({}, profile.preferences || {}, { instructions: $("g-instr").value.slice(0, 2000) });
       const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences: merged }) });
       e.target.textContent = out.ok ? "Saved ✓" : "Retry"; e.target.disabled = false;
       if (out.ok) profile.preferences = merged;

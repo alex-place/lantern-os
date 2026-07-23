@@ -564,7 +564,7 @@ function parseUpstreamProviderError(provider, statusCode, rawBody) {
   return { provider, status: statusCode, code, type: String(type), message: String(message).slice(0, 300) };
 }
 
-async function dreamChatReply(message, recentDreams, requestedAgent = "", requestedProvider = "", oneshotMode = "") {
+async function dreamChatReply(message, recentDreams, requestedAgent = "", requestedProvider = "", oneshotMode = "", userInstructions = "") {
   console.log("[dreamChatReply] Called with agent:", requestedAgent, "provider:", requestedProvider);
   const text = String(message || "").trim();
   // #2577: allowlisted one-shot mode (unknown values ignored). Swaps the persona
@@ -610,6 +610,18 @@ async function dreamChatReply(message, recentDreams, requestedAgent = "", reques
   // One-shot callers get the truthful no-tools prompt — the persona prompt's
   // tool claims are what made single-shot reviews narrate instead of conclude.
   if (oneshot) agent = { ...agent, systemPrompt: oneshot.systemPrompt };
+
+  // Standing user instructions (Settings → General): the user set these to apply to
+  // EVERY chat, so append them to the system prompt for real end-user turns. Skipped
+  // for one-shot/internal modes (reviews etc.), and clipped so a huge paste can't
+  // crowd out the base prompt. Safety and the identity floor still take precedence.
+  if (userInstructions && !oneshot && agent && typeof agent.systemPrompt === "string") {
+    const instr = String(userInstructions).slice(0, 2000).trim();
+    if (instr) {
+      agent = { ...agent, systemPrompt: agent.systemPrompt +
+        "\n\n# The user's standing instructions\nThe user set these in Settings to apply across all their chats. Follow them unless they conflict with safety, honesty, or your core identity:\n" + instr };
+    }
+  }
 
   // For unisona.ai (technical agent), skip dream door suggestions
   const suggestions = agent.id === "keystone" ? [] : Object.values(DREAM_DOORS)
