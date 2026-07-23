@@ -71,7 +71,9 @@ test("honest failure: neither tier can pass the tests → not solved, nothing fa
     corpus: { file: "(test)", append() {} }, maxTurns: 3,
   });
   assert.equal(r.solved, false);
-  assert.equal(r.haltReason, "maxTurns");
+  // Both tiers propose the SAME wrong code every turn, so the loop detector calls
+  // the cycle honestly (and stops paying the verifier for it) before the turn cap.
+  assert.equal(r.haltReason, "loop");
   assert.equal(r.memory.length, 0, "no unverified code was ever committed");
 });
 
