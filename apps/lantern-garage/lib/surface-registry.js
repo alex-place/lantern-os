@@ -72,7 +72,7 @@ const EXTENSION = {
   "auth.html":                     ["account", null],
   "terms.html":                    ["account", null],
   "entry.html":                    ["account", null],
-  "profile.html":                  ["account", null],
+  // profile.html retired → 302s to /settings.html (profile merged into settings; see routes/pages.js REDIRECTS); no file, so no registry entry.
   "accounts.html":                 ["account", null], // staff account-support console (admin/tech_support): multi-auth + password fixes
   "reset-password.html":           ["account", null],
   "pricing.html":                  ["account", null],

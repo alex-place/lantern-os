@@ -81,7 +81,6 @@ const PUBLIC_PAGES = {
 // implicitly). Trade pages use the "trade" entitlement so a paid tier such as
 // Pro (deep_dreamer) does NOT get trading access unless explicitly granted.
 const PROTECTED_PAGES = {
-  "/profile.html":        { file: "profile.html",           role: "guest" },
   "/create.html":         { file: "create.html",            role: "deep_dreamer" },
   // /trading.html retired → 302s to /stock-trader.html (see REDIRECTS, #2488).
   "/kalshi-terminal.html":{ file: "kalshi-terminal.html",   entitlement: "trade" },
@@ -105,6 +104,7 @@ const REDIRECTS = {
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
   "/api-keys-settings.html": "/orchestration.html", // API keys now live on the operator page (settings.html reworked to user General/Account/Billing/Connections)
+  "/profile.html": "/settings.html",     // profile merged into settings — one account/profile page (nav profile button → settings)
 };
 
 function renderDisabledPage(pathname) {
