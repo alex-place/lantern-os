@@ -21,12 +21,28 @@ def test_grounded_true_requires_stable_AND_external():
     assert v["grounded"] is True and v["klass"] == "externally_verified"
 
 
-def test_stable_but_unverified_is_None_not_True():
-    """The load-bearing honesty case: a stable loop with no external check is NOT grounded."""
-    v = V(_out("contract"), external_grounded=None)
-    assert v["grounded"] is None            # honestly undetermined — never a fabricated pass
+def test_stable_but_unverified_directs_an_experiment_not_a_refusal():
+    """The active face: a stable-but-unverified answer is NEVER grounded=True, but it does NOT
+    rest at 'I can't' — it PENDS (grounded=None) with a directive to experiment."""
+    v = V(_out("contract"), external_grounded=None)   # means available, not exhausted
+    assert v["grounded"] is None            # never a fabricated pass
     assert v["loop_certified"] is True      # the loop half IS certified
-    assert v["klass"] in ("unverified", "stability_certified_only")
+    assert v["klass"] == "experiment_required" and v["next_action"] == "experiment"
+
+
+def test_unverifiable_after_exhaustion_is_effectively_false():
+    """The last leg exhausted: stable but no means left to verify → grounded=False (effectively
+    false until true), NOT a permanent None/refusal."""
+    v = V(_out("contract"), external_grounded=None, experiments_exhausted=True)
+    assert v["grounded"] is False and v["klass"] == "unverifiable_exhausted"
+    assert v["next_action"] == "halt"
+
+
+def test_no_means_task_is_effectively_false():
+    """A task that admits no experiment at all (verifiable=False) settles false immediately —
+    there is nothing to experiment on, so it is effectively false until an oracle appears."""
+    v = V(_out("contract"), external_grounded=None, verifiable=False)
+    assert v["grounded"] is False and v["klass"] == "unverifiable_exhausted"
 
 
 def test_stable_but_verifier_rejected_is_False():
@@ -42,20 +58,18 @@ def test_unstable_loop_is_never_grounded():
             assert v["loop_certified"] is False
 
 
-def test_non_verifiable_task_is_certified_only_not_grounded():
-    v = V(_out("contract"), external_grounded=None, verifiable=False)
-    assert v["grounded"] is None and v["klass"] == "stability_certified_only"
-
-
 def test_exhaustive_invariant():
-    """grounded is True  ⟺  (stable == 'contract'  AND  external_grounded is True) — for ALL inputs."""
-    for stable, ext, verif in itertools.product(
-            ("contract", "spiral", "diverge", None), (True, False, None), (True, False, None)):
-        v = V(_out(stable), external_grounded=ext, verifiable=verif)
+    """grounded is True  ⟺  (stable == 'contract'  AND  external_grounded is True) — for ALL inputs.
+    The active-face change never weakens this: it only moves undetermined cases toward not-grounded."""
+    for stable, ext, verif, exh in itertools.product(
+            ("contract", "spiral", "diverge", None), (True, False, None), (True, False, None), (True, False)):
+        v = V(_out(stable), external_grounded=ext, verifiable=verif, experiments_exhausted=exh)
         expect_true = (stable == "contract" and ext is True)
-        assert (v["grounded"] is True) == expect_true, (stable, ext, verif, v["grounded"])
-        # and grounded is never fabricated: it is exactly one of {True, False, None}
+        assert (v["grounded"] is True) == expect_true, (stable, ext, verif, exh, v["grounded"])
         assert v["grounded"] in (True, False, None)
+        # never a resting refusal: an undetermined (None) verdict ALWAYS carries an experiment directive
+        if v["grounded"] is None:
+            assert v["next_action"] == "experiment"
 
 
 def test_reads_full_generate_out_via_assemble():

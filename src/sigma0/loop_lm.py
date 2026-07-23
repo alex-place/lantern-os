@@ -250,64 +250,75 @@ def assemble_reason_verdict(out):
     }
 
 
-def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None):
-    """The Σ₀-grounding verdict for ONE generated answer — an honest, two-factor certificate.
+def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None, experiments_exhausted=False):
+    """The Σ₀-grounding verdict for ONE generated answer — an honest, two-factor certificate with
+    an ACTIVE last leg.
 
     An answer is Σ₀-GROUNDED iff BOTH hold:
       1. the reasoning loop was STABLE — it contracted (JSRR ρ<1), i.e. it did not collapse
-         onto a frozen self-agreeing state nor diverge. This is the PROVEN-in-regime gate
-         (Collapse Certificate §1/§1.2.3). A stable loop is NECESSARY but NOT SUFFICIENT for a
-         correct answer.
-      2. an EXTERNAL verifier confirmed the answer — execution/held-out tests (code/math), or
-         a groundedness signal (facts). Stability is a property of the *dynamics*; correctness
-         is a property of *reality*, and the certificate is explicit that a loop-stability
-         signal only becomes a factuality signal once external grounding is supplied
-         (SIGMA0-COLLAPSE-CERTIFICATE.md #2236; the Freshness Law: internal signals are alarms,
-         never the selector).
+         onto a frozen self-agreeing state nor diverge (PROVEN-in-regime; §1/§1.2.3). Necessary,
+         NOT sufficient.
+      2. an EXTERNAL verifier confirmed the answer — execution/held-out tests, or a groundedness
+         signal. A loop-stability signal only becomes a factuality signal once external grounding
+         is supplied (#2236; Freshness Law).
 
-    THE LOAD-BEARING INVARIANT (verified in tests): ``grounded=True`` is returned ONLY when the
-    loop is stable AND ``external_grounded is True``. It is NEVER True on stability alone — a
-    false "grounded" is the one dangerous failure this function exists to prevent.
+    THE ACTIVE FACE (Certificate Part IV §10, ACT-TO-KNOW): a stable-but-unverified answer is NOT
+    left to rest as "I don't know". The system takes the last leg — it EXPERIMENTS to manufacture
+    the missing verification (run the test, execute, retrieve, escalate). The verdict signals this
+    with ``next_action="experiment"`` and ``grounded=None`` (a PENDING state that DIRECTS action,
+    not a refusal). Only when **all available means are exhausted** does the answer settle to
+    ``grounded=False`` — treated as **EFFECTIVELY FALSE until an experiment proves it true**
+    (a falsificationist stance; NOT a claim of real-world falsity). Refusal/abstention is not a
+    resting place: verify it, or hold it false.
+
+    THE LOAD-BEARING INVARIANT (verified in tests, UNCHANGED): ``grounded=True`` is returned ONLY
+    when the loop is stable AND ``external_grounded is True`` — never on stability alone, and the
+    active-face change only ever moves the undetermined case toward the SAFE (not-grounded) side.
 
     Args:
       out: the dict from ``Sigma0LoopLM.generate()`` (or any dict with the verdict fields).
-      external_grounded: True/False from an external verifier upstream; None = no check ran
-        (the model server itself has no verifier — that signal is supplied by the Spiral /
-        exec-verifier / groundedness-canary at the serving or tool layer).
-      verifiable: True if the task admits an external check (code/math with tests); None=unknown.
+      external_grounded: True/False from an external verifier upstream; None = not yet checked.
+      verifiable: True if the task admits an external check; False = no experiment can help;
+        None = unknown (default: assume a means exists and experiment).
+      experiments_exhausted: True once the active loop has tried every available means and still
+        could not verify — flips the undetermined case to grounded=False (effectively false).
 
-    Returns ``{ grounded, stable, loop_certified, external_grounded, klass, why }`` where
-    ``grounded ∈ {True, False, None}`` (None = honestly-undetermined, never a fabricated pass).
+    Returns ``{ grounded, stable, loop_certified, external_grounded, klass, next_action, why }``.
+    ``next_action ∈ {accept, experiment, escalate, halt}`` — the machine directive for the loop.
     """
     rv = assemble_reason_verdict(out) if "stable" not in out else out
     stable = rv.get("stable")
     loop_certified = (stable == "contract")   # PROVEN-in-regime contraction gate
 
     if not loop_certified:
-        # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded, escalate/reject
+        # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded; escalate & retry
         klass = {"diverge": "diverged", "spiral": "collapsed"}.get(stable, "uncertified")
         return {"grounded": False, "stable": stable, "loop_certified": False,
-                "external_grounded": external_grounded, "klass": klass,
+                "external_grounded": external_grounded, "klass": klass, "next_action": "escalate",
                 "why": "reasoning loop did not contract (ρ≥1 / collapse / uncertifiable) — not grounded"}
 
     # loop is stable; grounding now hinges ENTIRELY on the external check
     if external_grounded is True:
         return {"grounded": True, "stable": stable, "loop_certified": True,
-                "external_grounded": True, "klass": "externally_verified",
+                "external_grounded": True, "klass": "externally_verified", "next_action": "accept",
                 "why": "stable loop AND external verifier confirmed the answer — Σ₀-grounded"}
     if external_grounded is False:
         return {"grounded": False, "stable": stable, "loop_certified": True,
-                "external_grounded": False, "klass": "verification_failed",
+                "external_grounded": False, "klass": "verification_failed", "next_action": "escalate",
                 "why": "stable loop but the external verifier rejected the answer — keep spiraling / escalate"}
-    # external_grounded is None — no check ran. Stable, but grounding is HONESTLY undetermined.
-    if verifiable is False:
-        klass, why = "stability_certified_only", ("loop stable; task is not externally verifiable, so Σ₀ "
-                     "cannot certify factual grounding — surfaced as unverified, never claimed grounded")
-    else:
-        klass, why = "unverified", ("loop stable but no external verifier ran yet — the Spiral should "
-                     "verify before this is claimed grounded (grounded stays None, not True)")
-    return {"grounded": None, "stable": stable, "loop_certified": True,
-            "external_grounded": external_grounded, "klass": klass, "why": why}
+
+    # external_grounded is None — not yet verified. THE ACTIVE FACE: do not refuse; take the last leg.
+    means_left = (verifiable is not False) and (not experiments_exhausted)
+    if means_left:
+        return {"grounded": None, "stable": stable, "loop_certified": True,
+                "external_grounded": None, "klass": "experiment_required", "next_action": "experiment",
+                "why": "stable but unverified — ACT to verify (run the test / exec-verify / retrieve / "
+                       "escalate); this is a PENDING directive, not a resting refusal (Certificate Part IV)"}
+    # every available means exhausted (or the task admits no experiment) → effectively FALSE until true
+    return {"grounded": False, "stable": stable, "loop_certified": True,
+            "external_grounded": None, "klass": "unverifiable_exhausted", "next_action": "halt",
+            "why": "stable but unverifiable after exhausting all means — treated as EFFECTIVELY FALSE "
+                   "until an experiment proves it true (falsificationist; NOT a claim of real-world falsity)"}
 
 
 # ADR-0012 step 2 kill-switch: the door-2 inner break is OPT-IN and per-step revertible.
