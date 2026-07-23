@@ -163,9 +163,9 @@
       // guest render repurposed it into a sign-in link (SPA-style re-check).
       if (profileBtn) {
         profileBtn.style.display = '';
-        profileBtn.href = '/profile.html';
-        profileBtn.title = 'Your profile';
-        profileBtn.setAttribute('aria-label', 'View your profile');
+        profileBtn.href = '/settings.html';
+        profileBtn.title = 'Account & settings';
+        profileBtn.setAttribute('aria-label', 'Account and settings');
         profileBtn.classList.remove('nav-signin');
       }
       if (logoutBtn) logoutBtn.style.display = '';
