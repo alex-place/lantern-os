@@ -1,0 +1,122 @@
+{
+  "margin": 0.05,
+  "note": "gate measured in isolation; no model served (P0 pre-wiring)",
+  "M1_verdict_battery": [
+    {
+      "case": "contract_0.9",
+      "rho_true": 0.9,
+      "rho_measured": 0.9,
+      "sigma_max": 0.9,
+      "surrogate_Av": 0.9,
+      "regime": "contraction",
+      "accept": true,
+      "expected_accept": true,
+      "correct": true
+    },
+    {
+      "case": "divergent_1.2",
+      "rho_true": 1.2,
+      "rho_measured": 1.2,
+      "sigma_max": 1.2,
+      "surrogate_Av": 1.2,
+      "regime": "divergent",
+      "accept": false,
+      "expected_accept": false,
+      "correct": true
+    },
+    {
+      "case": "rotation_1.3",
+      "rho_true": 1.3,
+      "rho_measured": 1.3,
+      "sigma_max": 1.3,
+      "surrogate_Av": 1.3,
+      "regime": "divergent",
+      "accept": false,
+      "expected_accept": false,
+      "correct": true
+    },
+    {
+      "case": "critical_1.0",
+      "rho_true": 1.0,
+      "rho_measured": 1.0,
+      "sigma_max": 1.0,
+      "surrogate_Av": 1.0,
+      "regime": "critical",
+      "accept": false,
+      "expected_accept": false,
+      "correct": true
+    },
+    {
+      "case": "nonnormal_transient",
+      "rho_true": 0.9,
+      "rho_measured": 0.9,
+      "sigma_max": 5.157,
+      "surrogate_Av": 1.994,
+      "regime": "contraction",
+      "accept": true,
+      "expected_accept": true,
+      "correct": true
+    }
+  ],
+  "M1_all_correct": true,
+  "M2_latency_ms": [
+    {
+      "d": 64,
+      "full_certificate_ms": 1.8984,
+      "rho_only_ms": 1.2044,
+      "surrogate_Av_ms": 0.00631,
+      "rho/surrogate_speedup": 190.8
+    },
+    {
+      "d": 256,
+      "full_certificate_ms": 62.5683,
+      "rho_only_ms": 52.2143,
+      "surrogate_Av_ms": 0.02104,
+      "rho/surrogate_speedup": 2482.2
+    },
+    {
+      "d": 512,
+      "full_certificate_ms": 400.5276,
+      "rho_only_ms": 337.5113,
+      "surrogate_Av_ms": 0.0712,
+      "rho/surrogate_speedup": 4740.2
+    },
+    {
+      "d": 1024,
+      "full_certificate_ms": 1668.4559,
+      "rho_only_ms": 1250.3322,
+      "surrogate_Av_ms": 0.40671,
+      "rho/surrogate_speedup": 3074.3
+    },
+    {
+      "d": 2048,
+      "full_certificate_ms": 12246.6019,
+      "rho_only_ms": 7049.8711,
+      "surrogate_Av_ms": 2.85163,
+      "rho/surrogate_speedup": 2472.2
+    }
+  ],
+  "M2_verdict": "At d=2048: exact \u03c1 costs 7049.87 ms/call, surrogate 2.852 ms/call (2472.2\u00d7 cheaper). Serve-path implication below.",
+  "M3_surrogate_fidelity": {
+    "n": 400,
+    "disagreement_rate": 0.265,
+    "near_boundary_frac": 0.31,
+    "reading": "\u2016Av\u2016 over-rejects (\u03c3_max \u2265 \u03c1); disagreements are the price of the cheap gate on non-normal A"
+  },
+  "M4_anticollapse_excite": {
+    "anisotropy_before": 1.0,
+    "anisotropy_after": 1.45,
+    "anisotropy_lifted": true,
+    "state_kick_norm": 0.7179,
+    "state_kick_fired": true,
+    "reading": "one bump breaks isotropy (Theorem C3 covariance leg) and kicks x off the null (state-kick leg)"
+  },
+  "P0_conclusion": {
+    "gate_is_correct": true,
+    "exact_rho_is_the_right_object": "M1 nonnormal_transient: rho=0.9 ACCEPT despite sigma_max=5.16 \u2014 a sigma_max/surrogate gate would wrongly reject a genuinely-contracting non-normal state",
+    "exact_rho_too_slow_at_full_dim": "exact rho = 7050 ms/call at d=2048 (impractical per-generation); affordable only at d<=256 (52 ms) or borderline at d=512 (338 ms)",
+    "surrogate_is_cheap_but_over_rejects": "surrogate is ~2472x faster but disagrees with exact rho on 26% of near-boundary non-normal matrices (over-rejection)",
+    "anticollapse_functional": true,
+    "WIRING_DECISION": "Do NOT wire exact rho on the full-hidden-dim Jacobian (7.6s/gen at d=2048). The serve-path gate must (a) run exact rho on a REDUCED reasoning-state Jacobian \u2014 confirm its actual dim first (the deferred JVP path, #2029) \u2014 or (b) use a two-tier gate: cheap surrogate fast-accept, exact rho only on the ~31% borderline band at reduced dim. Arming Sigma0-inverse is safe (M4 functional)."
+  }
+}
