@@ -156,9 +156,8 @@
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pro" hidden>Upgrade to Pro</button>
-          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
         </div>
-        <p class="tier-note">Billed securely by Stripe or Patreon. Cancel anytime.</p>
+        <p class="tier-note">Billed securely by Stripe. Cancel anytime.</p>
       </article>
 
       <article class="tier-card">
@@ -174,9 +173,8 @@
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pilot" hidden>Upgrade to Pilot</button>
-          <a class="btn-ghost" href="https://www.patreon.com/c/UnisonaAI/membership" target="_blank" rel="noopener noreferrer">Subscribe on Patreon</a>
         </div>
-        <p class="tier-note">Billed monthly by Stripe or Patreon. Invoice available.</p>
+        <p class="tier-note">Billed monthly by Stripe. Invoice available.</p>
       </article>
     </section>
 
@@ -185,7 +183,7 @@
       <div class="faq-grid">
         <div class="faq-card"><h3>Is this equity or an investment?</h3><p>No. These are service subscriptions. No equity, tokens, or profit share.</p></div>
         <div class="faq-card"><h3>Can I cancel?</h3><p>Yes. Cancel anytime. Your local data stays yours.</p></div>
-        <div class="faq-card"><h3>What payment methods?</h3><p>Pay by card directly (Stripe — cards, Apple Pay, Google Pay) or via Patreon. Card details go straight to Stripe; we never see or store them. Invoice available for Pilot tier.</p></div>
+        <div class="faq-card"><h3>What payment methods?</h3><p>Pay by card directly (Stripe — cards, Apple Pay, Google Pay). Card details go straight to Stripe; we never see or store them. Invoice available for Pilot tier.</p></div>
         <div class="faq-card"><h3>Where does the money go?</h3><p>Recorded in the Unisona wallet ledger. Used for infrastructure, development, and operator time.</p></div>
         <div class="faq-card"><h3>Is my data private?</h3><p>Yes. Local-first by default. Private notes are stored on your machine by design.</p></div>
       </div>
@@ -194,7 +192,7 @@
 <script>
   /* Native Stripe subscription checkout (#2568). Buttons stay hidden until the
      server confirms billing is live AND that tier has a configured Price, so a
-     deploy without Stripe keys shows only the Patreon CTA — no broken button. */
+     deploy without Stripe keys simply shows no upgrade button (never a broken one). */
   (function () {
     var banner = document.getElementById('billing-banner');
     function show(kind, msg) {
@@ -231,7 +229,7 @@
     fetch('/api/billing/config', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (cfg) {
-        if (!cfg || !cfg.configured) return; // Stripe off → Patreon-only, buttons stay hidden
+        if (!cfg || !cfg.configured) return; // Stripe off → buttons stay hidden (no upgrade path shown)
         if (cfg.subscribed) {
           // Already subscribed → don't offer a second checkout (double-billing); show Manage.
           var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
@@ -245,7 +243,7 @@
           if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
         });
       })
-      .catch(function () { /* config probe failed → leave Patreon-only */ });
+      .catch(function () { /* config probe failed → leave upgrade buttons hidden */ });
 
     // "Link my subscription" — claim an existing card sub by verified email.
     var linkBtn = document.getElementById('link-btn');
@@ -296,7 +294,7 @@
           show('info', 'You already have an active subscription — opening the portal to change your plan.');
           openPortal(); return;
         }
-        show('error', res.data && res.data.detail ? ('Could not start checkout: ' + res.data.detail) : 'Could not start checkout. Please try Patreon or try again.');
+        show('error', res.data && res.data.detail ? ('Could not start checkout: ' + res.data.detail) : 'Could not start checkout. Please try again.');
       }).catch(function () {
         reset();
         show('error', 'Network error starting checkout. Please try again.');
