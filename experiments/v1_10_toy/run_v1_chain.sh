@@ -39,7 +39,10 @@ echo "=== [3/5] baseline honesty eval ==="
 step 900 "$PY" experiments/v1_10_toy/eval_honesty.py --base "$BASE" --tag base --out "$RES" || fail "baseline eval"
 
 echo "=== [4/5] QLoRA SFT (honest teacher) ==="
-step 5400 "$PY" scripts/train_qlora_qwen_coder.py --base "$BASE" --data data/eval/v1_10/v1-sft.jsonl \
+# 28800s: measured 33s/step x 708 steps ~= 6.5h on the 2848-row corpus — the old 5400s
+# guard (sized for the 63-trace run) was killing a HEALTHY run at step 405/708. The
+# trainer resumes from its newest checkpoint, so a guard kill never loses progress.
+step 28800 "$PY" scripts/train_qlora_qwen_coder.py --base "$BASE" --data data/eval/v1_10/v1-sft.jsonl \
   --out "$OUTDIR/qwen15-honest" --epochs 2 --lr 1e-4 --lora-r 16 --seq 768 --val-size 16 || fail "V1-C train"
 [ -d "$ADAPTER" ] || fail "V1-C train (no adapter)"
 
