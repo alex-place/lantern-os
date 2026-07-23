@@ -474,6 +474,65 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     return true;
   }
 
+  // ── In-app billing surface (Settings → Billing): card-on-file, invoices, cancel ──
+  // Read-only reads (card masked to brand+last4; invoices to date/total/status/hosted
+  // URL) plus a cancel-at-period-end. Editing the card stays in the Stripe portal (PCI
+  // — we never collect card fields). All scoped to the caller's OWN Stripe customer.
+  if (url.pathname === "/api/billing/invoices" && req.method === "GET") {
+    const userId = getEffectiveUserId(req);
+    if (!userId) { sendJson(res, { error: "auth_required" }, 401); return true; }
+    const profile = getProfile(userId);
+    if (!profile || !profile.stripeCustomerId) { sendJson(res, { invoices: [] }); return true; }
+    try {
+      const list = await stripe().invoices.list({ customer: profile.stripeCustomerId, limit: 12 });
+      const invoices = (list.data || []).map((inv) => ({
+        id: inv.id,
+        date: inv.created ? inv.created * 1000 : null,
+        total: (inv.total != null ? inv.total : inv.amount_due || 0) / 100,
+        currency: (inv.currency || "usd").toUpperCase(),
+        status: inv.status,
+        url: inv.hosted_invoice_url || inv.invoice_pdf || null,
+      }));
+      sendJson(res, { invoices });
+    } catch (e) { console.error("[BILLING] invoices list failed", e.message); sendJson(res, { error: "invoices_failed", detail: e.message }, 502); }
+    return true;
+  }
+
+  if (url.pathname === "/api/billing/payment-method" && req.method === "GET") {
+    const userId = getEffectiveUserId(req);
+    if (!userId) { sendJson(res, { error: "auth_required" }, 401); return true; }
+    const profile = getProfile(userId);
+    if (!profile || !profile.stripeCustomerId) { sendJson(res, { card: null }); return true; }
+    try {
+      const cust = await stripe().customers.retrieve(profile.stripeCustomerId, { expand: ["invoice_settings.default_payment_method"] });
+      let pm = cust && cust.invoice_settings && cust.invoice_settings.default_payment_method;
+      if (!pm || !pm.card) {
+        const pms = await stripe().paymentMethods.list({ customer: profile.stripeCustomerId, type: "card", limit: 1 });
+        pm = (pms.data || [])[0] || null;
+      }
+      const card = pm && pm.card ? { brand: pm.card.brand, last4: pm.card.last4, exp_month: pm.card.exp_month, exp_year: pm.card.exp_year } : null;
+      sendJson(res, { card });
+    } catch (e) { console.error("[BILLING] payment-method failed", e.message); sendJson(res, { error: "payment_method_failed", detail: e.message }, 502); }
+    return true;
+  }
+
+  if (url.pathname === "/api/billing/cancel" && req.method === "POST") {
+    const userId = getEffectiveUserId(req);
+    if (!userId) { sendJson(res, { error: "auth_required" }, 401); return true; }
+    const profile = getProfile(userId);
+    if (!profile || !profile.stripeCustomerId) { sendJson(res, { error: "no_subscription" }, 409); return true; }
+    try {
+      const subs = await stripe().subscriptions.list({ customer: profile.stripeCustomerId, status: "active", limit: 1 });
+      const sub = (subs.data || [])[0];
+      if (!sub) { sendJson(res, { error: "no_subscription" }, 409); return true; }
+      // Cancel at period end so the user keeps access they already paid for; the
+      // subscription.updated webhook re-syncs the role when it actually lapses.
+      const updated = await stripe().subscriptions.update(sub.id, { cancel_at_period_end: true });
+      sendJson(res, { ok: true, cancel_at_period_end: true, current_period_end: updated.current_period_end ? updated.current_period_end * 1000 : null });
+    } catch (e) { console.error("[BILLING] cancel failed", e.message); sendJson(res, { error: "cancel_failed", detail: e.message }, 502); }
+    return true;
+  }
+
   // ── Post-checkout eager-sync (authenticated same-origin POST) ────────────────
   // Moved off the GET /billing/success redirect so no state change rides a cross-site
   // navigation (#2648). Applies the caller's own just-completed checkout immediately
