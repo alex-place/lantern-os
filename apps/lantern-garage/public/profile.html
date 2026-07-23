@@ -370,7 +370,7 @@
 
 <script src="/js/theme-toggle.js"></script>
 <script>
-// Patreon tiers by pledge amount: supporter $5 Member, deep_dreamer $20 Pro,
+// Tier by plan: supporter = Free floor, deep_dreamer = $20 Pro,
 // pilot $200 Pilot. `founder` kept as a legacy alias for deep_dreamer (#698).
 const ROLE_LEVEL = { guest: 0, supporter: 1, deep_dreamer: 2, founder: 2, pilot: 3, tech_support: 4, admin: 5 };
 
@@ -408,15 +408,13 @@ const FEATURES = [
 // (ADR-0005) — every provider is one identity among many on a single account.
 const SOURCE_LABELS = {
   local:   { label: 'Email + password', emoji: '🔑' },
-  patreon: { label: 'Patreon',          emoji: '♥' },
-  discord: { label: 'Discord',          emoji: '🎮' },
   google:  { label: 'Google',           emoji: 'ᴳ' },
   oauth:   { label: 'OAuth',            emoji: '🔗' },
   dev:     { label: 'Local dev bypass', emoji: '🛠️' },
 };
 
 // The OAuth providers a user can connect/disconnect from this page.
-const LINKABLE_PROVIDERS = ['discord', 'google', 'patreon'];
+const LINKABLE_PROVIDERS = ['google'];
 
 let currentProfile = null;
 let currentSession = null;
@@ -460,8 +458,6 @@ function currentSignInMethod() {
 // legacy fallback to the denormalized *Id mirrors + metadata.source).
 function connectedProviders(profile) {
   const set = new Set((profile.identities || []).map((i) => i.provider));
-  if (profile.discordId) set.add('discord');
-  if (profile.patreonId) set.add('patreon');
   if (!set.size && profile.metadata?.source) set.add(profile.metadata.source);
   return set;
 }
@@ -564,7 +560,7 @@ function renderProfile(profile) {
       </div>
       <div class="info-cell">
         <div class="info-label">Account ID</div>
-        <div class="info-value"><code>${escapeHtml(profile.id || profile.patreonId || '—')}</code></div>
+        <div class="info-value"><code>${escapeHtml(profile.id || '—')}</code></div>
       </div>
     </div>
 
@@ -597,7 +593,7 @@ function renderProfile(profile) {
           <span class="link-state" id="stripe-state"></span>
         </div>
       </div>
-      <p class="link-note">Subscribed by card before creating this account? Link it to unlock your tier here — we match the subscription by your verified email. Patreon tiers apply when you connect Patreon above.</p>
+      <p class="link-note">Subscribed by card before creating this account? Link it to unlock your tier here — we match the subscription by your verified email.</p>
     </div>
 
     <div>
