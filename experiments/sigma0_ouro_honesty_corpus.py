@@ -52,7 +52,12 @@ REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from experiments.sigma0_seed_facts import SEED  # noqa: E402
+from experiments.sigma0_seed_facts import (  # noqa: E402
+    SEED,
+    degloss_statement,  # #2843: strip trailing status clauses so the model can't
+    REWORD_V2,          # read the class off the surface text (E1 gloss-leak fix)
+    _leaks,
+)
 
 TRAIN_OUT = REPO / "data" / "sigma0" / "ouro_honesty_train.jsonl"
 BALANCED_OUT = REPO / "data" / "sigma0" / "ouro_honesty_train_balanced.jsonl"
@@ -183,15 +188,22 @@ def heldout_entity_hits(text: str, heldout_ids) -> set:
 
 def golden_row_to_record(row) -> dict:
     fid, hyp, cls, verified, conf, status, cite, domain = row
+    # #2843: de-gloss the STATEMENT text — status lives ONLY in the answer key, never
+    # in the statement, so the model must judge truth, not read a leaked "-- OPEN"
+    # stamp (E1: the leak spiked Ouro confab 10%->55%). A hand-reworded few use
+    # REWORD_V2; the rest strip their trailing status clause via degloss_statement
+    # (idempotent — bare statements pass through unchanged).
+    stmt = REWORD_V2.get(fid) or degloss_statement(hyp)
     out = f"CLASS: {cls}\nVERIFIED: {'yes' if verified else 'no'}"
-    return {"instruction": INSTR % hyp, "output": out,
+    return {"instruction": INSTR % stmt, "output": out,
             "meta": {"source": f"golden:{fid}", "class": cls, "verified": verified,
                      "negative": not verified}}
 
 
 def augment_to_record(seed_id: str, statement: str) -> dict:
     """An assertive open-conjecture phrasing -> a declination training row."""
-    return {"instruction": INSTR % statement,
+    stmt = degloss_statement(statement)  # #2843: bare claim only, no status gloss
+    return {"instruction": INSTR % stmt,
             "output": "CLASS: HEURISTIC\nVERIFIED: no",
             "meta": {"source": f"augment:{seed_id}", "class": "HEURISTIC",
                      "verified": False, "negative": True}}
@@ -261,7 +273,9 @@ def main():
     _write_jsonl(TRAIN_OUT, train_records)
     _write_jsonl(BALANCED_OUT, balanced_records)
     HELDOUT_OUT.write_text(json.dumps(
-        {"heldout_golden_ids": heldout_ids,
+        # sorted → the frozen holdout serializes deterministically (#2843), so a
+        # rebuild never churns the manifest when the id SET is unchanged.
+        {"heldout_golden_ids": sorted(heldout_ids),
          "note": ("these golden facts were NEVER emitted as training rows; score the "
                   "updated Ouro on THESE to measure honesty without memorization")},
         indent=2), encoding="utf-8")
