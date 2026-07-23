@@ -43,10 +43,21 @@ ollama serve &&  ollama pull qwen2.5-coder:1.5b qwen2.5-coder:3b
 # CPU-mode runs: same models, OLLAMA num_gpu=0 (record tok/s separately)
 ```
 
-Pinned decode params, all arms: `temperature 0.7 / top_p 0.9` for the N-sample ladder,
+Pinned decode params, all arms: **`temperature 1.0 / min_p 0.1`** for the N-sample ladder
+(min-p replaces top-p — training-free quality+diversity win validated 1B–123B, OpenReview
+FBkpCyujtS; higher temp is exactly what min-p makes safe, buying Best-of-N diversity),
 `temperature 0` for the single-shot baseline row; `repetition_penalty 1.3, no_repeat_ngram 3`
 (RC1-L small-model guards); seed ladder `1337 + i` for sample i (deterministic reruns).
 Context budget: 8k task window (Ouro's comfort zone; Qwen native 32k unused in RC1).
+
+**Sampling order is SEQUENTIAL with early stop** (pinned harness behavior): generate sample
+i+1 only if sample i failed verification — easy tasks cost 1 sample, not N; N is a *cap*, not
+a batch size (adaptive-TTC allocation, arXiv:2602.01070). Queued next-wins, adopt-and-measure
+(B5/A-B rows, no claims until measured): prompt-lookup decoding on repair steps (repair output
+largely copies the failing candidate — draft-free speculation); llama.cpp speculative decoding
+for CPU rows with `qwen2.5-coder:0.5b` as draft (CPU 3B measured 1.72–2.03× upstream);
+EAGER-style entropy-gated branching for the anytime mode (arXiv:2510.11170: +12% pass@k at
+64% fewer tokens, test-time); INT4 KV (InnerQ 2602.23200) after INT8 headroom is measured.
 
 **Gate receipts (required output, every RC1-L generation):** one JSONL row —
 `{ρ, jsrr_verdict, mean_depth, canary_proximity, exit_reason}` → `data/sigma0/rc1-receipts.jsonl`.
