@@ -74,6 +74,16 @@ NATIVE_MAX = int(os.environ.get("OURO_NATIVE_MAX", "80"))
 # is plain HF decode and never sees the canary).
 NATIVE_CANARY = os.environ.get("OURO_CANARY", "1") == "1"
 NATIVE_ADAPT = os.environ.get("OURO_ADAPT", "0") == "1"
+# Σ₀-GROUNDED serving (default ON — the operator's "best answer, cost no object" directive): route
+# through the native gated loop so EVERY answer carries a Σ₀-grounding verdict (the loop-stability
+# certificate + the external-verification slot), and ARM the bounded anti-collapse actuator. This is
+# slower (~1 s/token, native, no KV cache) — set SIGMA0_GROUNDED=0 to fall back to the fast cached
+# path, which cannot attach a loop-stability certificate to the answer. Honest scope: the model
+# server certifies STABILITY (ρ<1); factual grounding requires the external verifier supplied by the
+# Spiral / exec-verifier upstream, which fills the verdict's `external_grounded`.
+SIGMA0_GROUNDED = os.environ.get("SIGMA0_GROUNDED", "1") == "1"
+if SIGMA0_GROUNDED:
+    NATIVE, NATIVE_ADAPT = True, True
 # Recurrent-loop exit policy (the per-token depth controller). 'qexit' = the trained
 # entropy/confidence gate (Ouro paper §3 — the calibrated native exit, default). 'converge' =
 # first-order latent fixed point ‖Δh‖<eps (E2 research). 'accel' = the spiral-robust second-
@@ -298,6 +308,15 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
                   f"adapt={out.get('adapt')} stability_accepted={out.get('stability_accepted')} "
                   f"tokens={out.get('tokens')}", flush=True)
         _persist_loop_meta(out)  # #777: persist depth/contraction to leaderboard
+        # Σ₀-grounding verdict for this answer. external_grounded=None here: the model server
+        # certifies the STABILITY half (ρ<1 contraction); the external-verification half is filled
+        # upstream (Spiral / exec-verifier / groundedness-canary). So at this layer the verdict is
+        # "stability_certified_only"/"unverified" — never a fabricated "grounded=True".
+        try:
+            from sigma0.loop_lm import sigma0_grounding_verdict  # noqa: PLC0415
+            out["sigma0_grounding"] = sigma0_grounding_verdict(out)
+        except Exception:
+            pass
         if stream_cb is not None and text:
             stream_cb(text)
         return text, out  # also return meta for x-ouro-depth header
@@ -392,15 +411,22 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/x-ndjson")
             self.end_headers()
             try:
-                _generate(prompt, max_tok, stream_cb=lambda p: (self.wfile.write(pack(p, False)), self.wfile.flush()))
-                self.wfile.write(pack("", True)); self.wfile.flush()
+                _txt, _meta = _generate(prompt, max_tok, stream_cb=lambda p: (self.wfile.write(pack(p, False)), self.wfile.flush()))
+                _final = json.loads(pack("", True).decode())
+                if _meta and _meta.get("sigma0_grounding"):
+                    _final["sigma0_grounding"] = _meta["sigma0_grounding"]  # Σ₀ verdict on the final frame
+                self.wfile.write((json.dumps(_final) + "\n").encode()); self.wfile.flush()
             except Exception as e:
                 try: self.wfile.write(pack(f"[ouro error: {e}]", True))
                 except Exception: pass
         else:
             try:
                 text, loop_meta = _generate(prompt, max_tok)
-                b = json.dumps(json.loads(pack(text, True).decode())).encode()
+                _resp = json.loads(pack(text, True).decode())
+                _grounding = loop_meta.get("sigma0_grounding") if loop_meta else None
+                if _grounding:
+                    _resp["sigma0_grounding"] = _grounding   # Σ₀ verdict in the response body
+                b = json.dumps(_resp).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(b)))
@@ -410,6 +436,9 @@ class H(BaseHTTPRequestHandler):
                                             ("mean_depth", "exit_reason", "mean_contraction")
                                             if loop_meta.get(k) is not None})
                     self.send_header("x-ouro-depth", depth_str)
+                if _grounding:
+                    self.send_header("x-sigma0-grounding", json.dumps(
+                        {k: _grounding.get(k) for k in ("grounded", "stable", "klass")}))
                 self.end_headers()
                 self.wfile.write(b)
             except Exception as e:

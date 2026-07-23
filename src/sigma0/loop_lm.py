@@ -204,15 +204,25 @@ def assemble_reason_verdict(out):
     regime = str(jsrr.get("regime") or "").lower()   # JSRR discrete verdict (primary gate)
     signal = out.get("canary_signal", "none")
 
-    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. JSRR's discrete regime
-    # is the primary read (it is the acceptance gate); the #768 continuous proven_contracting
-    # and the dichotomy fate corroborate. Absent JSRR (older cert), this reduces exactly to
-    # the prior proven_contracting/fate logic — so the reason_verdict contract is unchanged.
-    if regime == "contraction" or gates.get("proven_contracting"):
+    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. The JSRR DISCRETE acceptance
+    # (ρ<1−margin) is AUTHORITATIVE for an iterated loop; the #768 continuous proven_contracting gate
+    # certifies e^{tA} (max Re λ<0) — a DIFFERENT criterion that must NEVER override a discrete
+    # 'divergent' (ρ≥1) verdict (a λ=−2 loop is continuous-stable yet ρ=2 DIVERGES). So JSRR decides
+    # when present; proven_contracting/fate are the FALLBACK only when JSRR is absent (older cert),
+    # preserving the prior reason_verdict contract. Keying on jsrr.stable (not regime=='contraction')
+    # also respects the margin — the near-critical band ρ∈[1−margin,1) is 'spiral', not 'contract'.
+    # (Fix 2026-07-23, math-check: OR-ing the continuous gate mislabelled a discrete-divergent loop
+    # 'contract' → a false 'grounded' when external_grounded=True.)
+    jsrr_accept = jsrr.get("stable")   # True ⟺ ρ<1−margin (margin-respecting); None when no JSRR ran
+    if jsrr_accept is True:
         stable = "contract"
-    elif regime == "divergent" or fate == "DIVERGE":
+    elif jsrr_accept is False:
+        stable = "diverge" if regime == "divergent" else "spiral"   # rejected: diverging vs near-critical
+    elif gates.get("proven_contracting"):
+        stable = "contract"          # FALLBACK: continuous gate, only when the discrete JSRR is absent
+    elif fate == "DIVERGE":
         stable = "diverge"
-    elif regime == "critical" or fate in ("COLLAPSE", "MARGINAL"):
+    elif fate in ("COLLAPSE", "MARGINAL"):
         stable = "spiral"
     else:
         stable = None  # too few tokens / no certificate — honest unknown, not a guess
@@ -238,6 +248,66 @@ def assemble_reason_verdict(out):
         "stable": stable,
         "reason": reason,
     }
+
+
+def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None):
+    """The Σ₀-grounding verdict for ONE generated answer — an honest, two-factor certificate.
+
+    An answer is Σ₀-GROUNDED iff BOTH hold:
+      1. the reasoning loop was STABLE — it contracted (JSRR ρ<1), i.e. it did not collapse
+         onto a frozen self-agreeing state nor diverge. This is the PROVEN-in-regime gate
+         (Collapse Certificate §1/§1.2.3). A stable loop is NECESSARY but NOT SUFFICIENT for a
+         correct answer.
+      2. an EXTERNAL verifier confirmed the answer — execution/held-out tests (code/math), or
+         a groundedness signal (facts). Stability is a property of the *dynamics*; correctness
+         is a property of *reality*, and the certificate is explicit that a loop-stability
+         signal only becomes a factuality signal once external grounding is supplied
+         (SIGMA0-COLLAPSE-CERTIFICATE.md #2236; the Freshness Law: internal signals are alarms,
+         never the selector).
+
+    THE LOAD-BEARING INVARIANT (verified in tests): ``grounded=True`` is returned ONLY when the
+    loop is stable AND ``external_grounded is True``. It is NEVER True on stability alone — a
+    false "grounded" is the one dangerous failure this function exists to prevent.
+
+    Args:
+      out: the dict from ``Sigma0LoopLM.generate()`` (or any dict with the verdict fields).
+      external_grounded: True/False from an external verifier upstream; None = no check ran
+        (the model server itself has no verifier — that signal is supplied by the Spiral /
+        exec-verifier / groundedness-canary at the serving or tool layer).
+      verifiable: True if the task admits an external check (code/math with tests); None=unknown.
+
+    Returns ``{ grounded, stable, loop_certified, external_grounded, klass, why }`` where
+    ``grounded ∈ {True, False, None}`` (None = honestly-undetermined, never a fabricated pass).
+    """
+    rv = assemble_reason_verdict(out) if "stable" not in out else out
+    stable = rv.get("stable")
+    loop_certified = (stable == "contract")   # PROVEN-in-regime contraction gate
+
+    if not loop_certified:
+        # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded, escalate/reject
+        klass = {"diverge": "diverged", "spiral": "collapsed"}.get(stable, "uncertified")
+        return {"grounded": False, "stable": stable, "loop_certified": False,
+                "external_grounded": external_grounded, "klass": klass,
+                "why": "reasoning loop did not contract (ρ≥1 / collapse / uncertifiable) — not grounded"}
+
+    # loop is stable; grounding now hinges ENTIRELY on the external check
+    if external_grounded is True:
+        return {"grounded": True, "stable": stable, "loop_certified": True,
+                "external_grounded": True, "klass": "externally_verified",
+                "why": "stable loop AND external verifier confirmed the answer — Σ₀-grounded"}
+    if external_grounded is False:
+        return {"grounded": False, "stable": stable, "loop_certified": True,
+                "external_grounded": False, "klass": "verification_failed",
+                "why": "stable loop but the external verifier rejected the answer — keep spiraling / escalate"}
+    # external_grounded is None — no check ran. Stable, but grounding is HONESTLY undetermined.
+    if verifiable is False:
+        klass, why = "stability_certified_only", ("loop stable; task is not externally verifiable, so Σ₀ "
+                     "cannot certify factual grounding — surfaced as unverified, never claimed grounded")
+    else:
+        klass, why = "unverified", ("loop stable but no external verifier ran yet — the Spiral should "
+                     "verify before this is claimed grounded (grounded stays None, not True)")
+    return {"grounded": None, "stable": stable, "loop_certified": True,
+            "external_grounded": external_grounded, "klass": klass, "why": why}
 
 
 # ADR-0012 step 2 kill-switch: the door-2 inner break is OPT-IN and per-step revertible.
