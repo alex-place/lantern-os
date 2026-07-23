@@ -21,6 +21,7 @@
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
+    { href: "/contest.html", label: "Contest" },
     { href: "/orchestration.html", label: "Settings" },
     { href: "/work.html", label: "Work" },
     { href: "/explore.html", label: "Explore" },

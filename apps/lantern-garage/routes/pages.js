@@ -49,6 +49,9 @@ const PUBLIC_PAGES = {
   "/":                    "index.html",
   "/index.html":          "index.html",
   "/explore.html":        "explore.html",
+  // Paper-trading contest leaderboard (#2552) — public READ (anyone can watch the
+  // board); joining/start/stop are auth-gated server-side in routes/trading/champion.js.
+  "/contest.html":        "contest.html",
   "/knowledgecenter.html":"knowledgecenter.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
   "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
