@@ -228,24 +228,42 @@
     const el = $("p-billing");
     if (!profile) return needSignIn(el, "Billing");
     const plan = planName(profile.role);
+    const paid = plan === "Pro" || plan === "Pilot";
     const FEATURES = {
       Free: ["Memory-backed chat", "Personalized charts + watchlist", "Paper-trading contest", "Live demo account"],
       Pro: ["Everything in Free", "Real-money trading (your broker)", "Creator Suite (video → shorts)", "Wide multi-model research + persistent memory"],
       Pilot: ["Everything in Pro", "Autonomous AI trader", "1:1 operator review", "Priority support"],
     };
+    const PRICE = { Pro: "$20/mo", Pilot: "$200/mo" };
+    const BLURB = { Pro: "Real-money trading, the creator suite, and wide multi-model research.", Pilot: "Everything in Pro plus the hands-free autonomous AI trader." };
+    const UPGRADES = ({ Free: ["Pro", "Pilot"], Pro: ["Pilot"], Pilot: [] })[plan] || [];
+    const upsell = UPGRADES.map((t) =>
+      `<div class="row"><div class="rl"><div class="k">Upgrade to ${t} · <span style="color:var(--muted);font-weight:600">${PRICE[t]}</span></div><div class="v">${BLURB[t]}</div></div><div class="rc"><button class="btn primary" data-buy="${t.toLowerCase()}">Upgrade to ${t}</button></div></div>`).join("");
     el.innerHTML = `
-      <h2>Billing</h2><p class="sub">Your plan and subscription.</p>
+      <h2>Billing</h2><p class="sub">${paid ? "Your plan and subscription." : "You're on the Free plan — upgrade any time."}</p>
       <div class="plan-card">
         <div class="pc-head"><div><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Current plan</div><div style="font-size:22px;font-weight:800;margin-top:2px">${plan}</div></div><span class="tier-badge2">${esc(plan)}</span></div>
         <ul>${(FEATURES[plan] || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
       </div>
-      <div class="group-label">Manage</div>
-      ${plan !== "Pilot" ? `<div class="row"><div class="rl"><div class="k">Upgrade</div><div class="v">${plan === "Free" ? "Unlock real-money trading + the creator suite." : "Add the autonomous AI trader."}</div></div><div class="rc"><a class="btn primary" href="/pricing.html">See plans</a></div></div>` : ""}
-      <div class="row"><div class="rl"><div class="k">Manage subscription</div><div class="v">Update card, invoices, or cancel — via Stripe.</div></div><div class="rc"><button class="btn" id="b-portal">Open portal</button></div></div>
-      <div class="row"><div class="rl"><div class="k">Already subscribed?</div><div class="v">Link an existing Stripe subscription to this account.</div></div><div class="rc"><button class="btn" id="b-link">Link subscription</button></div></div>
-      <p class="muted-note">Payments are handled securely by Stripe — we never see or store your card. The Free plan needs no billing.</p>`;
-    $("b-portal").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/portal", { method: "POST" }); if (o.ok && o.body && o.body.url) location.href = o.body.url; else { alert((o.body && o.body.message) || "No active subscription to manage — upgrade first."); e.target.disabled = false; } };
-    $("b-link").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/link", { method: "POST" }); alert(o.ok ? (o.body && o.body.already ? "Already linked." : "Subscription linked — your plan will update shortly.") : (o.body && o.body.message) || "No subscription found for your email."); e.target.disabled = false; if (o.ok) load(); };
+      ${upsell ? `<div class="group-label">${plan === "Free" ? "Upgrade" : "Go further"}</div>${upsell}
+        <div class="row"><div class="rl"><div class="k">Compare all plans</div><div class="v">See everything each plan includes, side by side.</div></div><div class="rc"><a class="btn" href="/pricing.html">Pricing →</a></div></div>` : ""}
+      ${paid ? `<div class="group-label">Subscription</div>
+        <div class="row"><div class="rl"><div class="k">Manage subscription</div><div class="v">Update your card, download invoices, or cancel — via Stripe.</div></div><div class="rc"><button class="btn" id="b-portal">Open portal</button></div></div>` : ""}
+      <p class="muted-note">Payments are handled securely by Stripe — card details go straight to Stripe, we never see or store them. The Free plan needs no billing.</p>`;
+    // Inline checkout: buy right here. On any snag (billing not configured, tier has
+    // no live price, etc.) fall through to the full pricing page which handles those
+    // states; an existing subscription opens the Stripe portal to change plan.
+    el.querySelectorAll("[data-buy]").forEach((b) => b.onclick = async () => {
+      b.disabled = true; b.textContent = "Redirecting…";
+      const o = await api("/api/billing/checkout", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tier: b.dataset.buy }) });
+      if (o.status === 200 && o.body && o.body.url) { location.href = o.body.url; return; }
+      if (o.status === 409 && o.body && o.body.error === "already_subscribed") {
+        const p = await api("/api/billing/portal", { method: "POST" });
+        if (p.body && p.body.url) { location.href = p.body.url; return; }
+      }
+      location.href = "/pricing.html";
+    });
+    const bp = $("b-portal"); if (bp) bp.onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/portal", { method: "POST" }); if (o.ok && o.body && o.body.url) location.href = o.body.url; else { alert((o.body && o.body.message) || "No active subscription to manage yet."); e.target.disabled = false; } };
   }
 
   // ── CONNECTIONS (brokers + AI keys + connectors + invite) ─────────────────
