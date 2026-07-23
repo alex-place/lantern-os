@@ -71,7 +71,9 @@ test("honest failure: neither tier can pass the tests → not solved, nothing fa
     corpus: { file: "(test)", append() {} }, maxTurns: 3,
   });
   assert.equal(r.solved, false);
-  assert.equal(r.haltReason, "maxTurns");
+  // Both tiers propose the SAME wrong code every turn, so the loop detector calls
+  // the cycle honestly (and stops paying the verifier for it) before the turn cap.
+  assert.equal(r.haltReason, "loop");
   assert.equal(r.memory.length, 0, "no unverified code was ever committed");
 });
 
@@ -105,6 +107,17 @@ test("resolveLocalModel picks a real coder, NEVER the unserved ouro:latest pin",
     if (prev === undefined) delete process.env.SPIRAL_LOCAL_MODEL;
     else process.env.SPIRAL_LOCAL_MODEL = prev;
   }
+});
+
+test("stdio verifier: TACO-style stdin/stdout tests pass correct programs, reject wrong ones", async (t) => {
+  // Needs a python interpreter (the stdio wrapper is Python) — skip gracefully if absent.
+  const { spawnSync } = require("child_process");
+  if (spawnSync("python", ["--version"], { timeout: 5000 }).status !== 0) return t.skip("no python");
+  const v = makeVerifier({ language: "python", tests: [{ name: "c0", stdin: "3\n1 2 3\n", expected: "6" }] });
+  const good = await v("n = int(input())\nprint(sum(map(int, input().split())))");
+  assert.equal(good[0].passed, true, "correct stdio program passes");
+  const bad = await v("n = int(input())\nprint(max(map(int, input().split())))");
+  assert.equal(bad[0].passed, false, "wrong output rejected");
 });
 
 test("extractCode prefers a fenced block, tolerates bare code", () => {

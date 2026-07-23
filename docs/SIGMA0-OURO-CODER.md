@@ -244,6 +244,12 @@ verified-cascade harness (now the teacher/examiner). The full engineering histor
 era is preserved in this file's git history and the internal design docs. An ADR formalizing
 the from-scratch program (G0–G3, budget gates) follows operator approval.
 
+**Honesty-axis twin.** Where this whitepaper owns the *coding/math* axis (an exec-test verifier
+gates each step), its counterpart on the *truthfulness* axis is
+[AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md) — a hidden-state
+honesty probe used as a held-out verifier over self-minted convergence data. Same thesis: the
+verifier, not scale, is the source of generalization.
+
 ---
 
 *unisona.ai / Lantern OS — 2026-07-23. Corrections welcome: every number above is either

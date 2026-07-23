@@ -101,11 +101,28 @@ contract **train frontier → distill to the ≤8GB local serving artifact**:
   external marks (AbstentionBench, SimpleQA-Verified, HaluEval). *Gate: honesty property
   survives distillation (retention threshold set in D7) and the watched-vs-unwatched gap
   is measured and bounded.*
-- **Phase 3 — FRONTIER tier.** Scale per D1, only through the prior gates.
+- **Phase 3 — FRONTIER tier.** ~~Scale per D1, only through the prior gates.~~
+  **RETIRED to research-option by operator decision (Alex, 2026-07-22).** Grounding: the
+  [frontier build+test survey](../research/2026-07-22-frontier-build-test-survey.md) (G10) —
+  no lab at any budget trains small frontier models from scratch (even Meta codistills;
+  DeepSeek-V4 consolidates its flagship via on-policy distillation), recipe/data beat ~15×
+  parameters within one generation (Qwen3.6-27B dense > 397B flagship on coding), and
+  post-training is now 15–25% of frontier compute — the stage a mid-size player can contend
+  in. From-scratch pretraining may only be revisited if the post-training program (the v1.10
+  phase map in [AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](../AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md))
+  produces evidence that a pretraining-level intervention is *necessary* — not merely
+  desirable — and the honesty objective is proven trainable at small scale first.
 
 Program invariants: evidence-classed claims with artifacts; GPU-hour anchors only (no
 invented prices); every phase has a kill-gate; honesty bound to external checks the model
 does not control; one loop, no sprawl; operator authority over every gate.
+
+**Operator amendment (2026-07-22, Alex):** (a) Phase 3 retired as above. (b) **G1 compromise
+approved:** exec-verification remains the non-negotiable *gate* on every training target, and
+**on-policy logit distillation is permitted as the *transport* for the student/serving tier
+only** — never as a substitute for verification, and never claimed as a path to exceeding the
+teacher. Evidence: Qwen3 strong-to-weak beats RL for ≤14B; DeepSeek-V4 expert→consolidate.
+The active program shape moves to the v1.10 phase map (survey §4).
 
 ## Consequences
 

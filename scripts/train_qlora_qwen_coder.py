@@ -139,7 +139,11 @@ def main():
             logging_steps=2, save_strategy="steps", save_steps=max(5, len(train_ds) // a.grad_accum),
             save_total_limit=4, optim="paged_adamw_8bit",
             gradient_checkpointing=True, report_to="none"))
-    trainer.train()
+    # Resume from the newest checkpoint when the output dir already has one — a killed
+    # run (timeout guard, session death) continues instead of retraining from step 0.
+    import glob as _glob
+    _ckpts = _glob.glob(os.path.join(a.out, "checkpoint-*"))
+    trainer.train(resume_from_checkpoint=True if _ckpts else None)
     print(f"best checkpoint (held-out eval_loss): {trainer.state.best_model_checkpoint}")
     final = os.path.join(a.out, "final")
     model.save_pretrained(final); tok.save_pretrained(final)

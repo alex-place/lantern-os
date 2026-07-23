@@ -43,10 +43,12 @@ async function main() {
   let cheap = 0, rescued = 0, unsolved = 0, kept = 0;
   for (let k = 0; k < problems.length; k++) {
     const p = problems[k];
-    const problem = { id: p.id, prompt: `${p.prompt}\n(The function must be named EXACTLY \`${p.entry_point}\`.)` };
+    // Function-based problems (MBPP) name the entry point; stdio problems (TACO) already
+    // carry the read-stdin/print-stdout instruction from the fetcher.
+    const problem = { id: p.id, prompt: p.entry_point ? `${p.prompt}\n(The function must be named EXACTLY \`${p.entry_point}\`.)` : p.prompt };
     let r;
     try {
-      r = await runSpiral({ problem, tiers, verify: makeVerifier({ language: "python", tests: p.tests, entryPoint: p.entry_point }), maxTurns: 3 });
+      r = await runSpiral({ problem, tiers, verify: makeVerifier({ language: "python", tests: p.tests, entryPoint: p.entry_point || null }), maxTurns: 3 });
     } catch (e) { console.log(`  ${p.id} ERROR ${e.message}`); unsolved++; continue; }
 
     if (r.solved && r.y) {

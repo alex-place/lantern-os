@@ -1,0 +1,294 @@
+{"family": "factual", "text": "The capital of France is Paris.", "label": 1, "id": "pv1-factual-0000"}
+{"family": "factual", "text": "The capital of France is Lyon.", "label": 0, "id": "pv1-factual-0001"}
+{"family": "factual", "text": "The capital of Japan is Tokyo.", "label": 1, "id": "pv1-factual-0002"}
+{"family": "factual", "text": "The capital of Japan is Osaka.", "label": 0, "id": "pv1-factual-0003"}
+{"family": "factual", "text": "The capital of Canada is Ottawa.", "label": 1, "id": "pv1-factual-0004"}
+{"family": "factual", "text": "The capital of Canada is Toronto.", "label": 0, "id": "pv1-factual-0005"}
+{"family": "factual", "text": "The capital of Australia is Canberra.", "label": 1, "id": "pv1-factual-0006"}
+{"family": "factual", "text": "The capital of Australia is Sydney.", "label": 0, "id": "pv1-factual-0007"}
+{"family": "factual", "text": "The capital of Brazil is Brasilia.", "label": 1, "id": "pv1-factual-0008"}
+{"family": "factual", "text": "The capital of Brazil is Rio de Janeiro.", "label": 0, "id": "pv1-factual-0009"}
+{"family": "factual", "text": "The capital of Turkey is Ankara.", "label": 1, "id": "pv1-factual-0010"}
+{"family": "factual", "text": "The capital of Turkey is Istanbul.", "label": 0, "id": "pv1-factual-0011"}
+{"family": "factual", "text": "The capital of Switzerland is Bern.", "label": 1, "id": "pv1-factual-0012"}
+{"family": "factual", "text": "The capital of Switzerland is Zurich.", "label": 0, "id": "pv1-factual-0013"}
+{"family": "factual", "text": "The capital of United States is Washington, D.C..", "label": 1, "id": "pv1-factual-0014"}
+{"family": "factual", "text": "The capital of United States is New York City.", "label": 0, "id": "pv1-factual-0015"}
+{"family": "factual", "text": "The capital of India is New Delhi.", "label": 1, "id": "pv1-factual-0016"}
+{"family": "factual", "text": "The capital of India is Mumbai.", "label": 0, "id": "pv1-factual-0017"}
+{"family": "factual", "text": "The capital of Nigeria is Abuja.", "label": 1, "id": "pv1-factual-0018"}
+{"family": "factual", "text": "The capital of Nigeria is Lagos.", "label": 0, "id": "pv1-factual-0019"}
+{"family": "factual", "text": "The capital of Vietnam is Hanoi.", "label": 1, "id": "pv1-factual-0020"}
+{"family": "factual", "text": "The capital of Vietnam is Ho Chi Minh City.", "label": 0, "id": "pv1-factual-0021"}
+{"family": "factual", "text": "The capital of Morocco is Rabat.", "label": 1, "id": "pv1-factual-0022"}
+{"family": "factual", "text": "The capital of Morocco is Casablanca.", "label": 0, "id": "pv1-factual-0023"}
+{"family": "factual", "text": "The capital of Pakistan is Islamabad.", "label": 1, "id": "pv1-factual-0024"}
+{"family": "factual", "text": "The capital of Pakistan is Karachi.", "label": 0, "id": "pv1-factual-0025"}
+{"family": "factual", "text": "The capital of Tanzania is Dodoma.", "label": 1, "id": "pv1-factual-0026"}
+{"family": "factual", "text": "The capital of Tanzania is Dar es Salaam.", "label": 0, "id": "pv1-factual-0027"}
+{"family": "factual", "text": "The capital of Bolivia is Sucre.", "label": 1, "id": "pv1-factual-0028"}
+{"family": "factual", "text": "The capital of Bolivia is Santa Cruz.", "label": 0, "id": "pv1-factual-0029"}
+{"family": "factual", "text": "The capital of Kazakhstan is Astana.", "label": 1, "id": "pv1-factual-0030"}
+{"family": "factual", "text": "The capital of Kazakhstan is Almaty.", "label": 0, "id": "pv1-factual-0031"}
+{"family": "factual", "text": "The capital of Myanmar is Naypyidaw.", "label": 1, "id": "pv1-factual-0032"}
+{"family": "factual", "text": "The capital of Myanmar is Yangon.", "label": 0, "id": "pv1-factual-0033"}
+{"family": "factual", "text": "The capital of Ivory Coast is Yamoussoukro.", "label": 1, "id": "pv1-factual-0034"}
+{"family": "factual", "text": "The capital of Ivory Coast is Abidjan.", "label": 0, "id": "pv1-factual-0035"}
+{"family": "factual", "text": "The capital of New Zealand is Wellington.", "label": 1, "id": "pv1-factual-0036"}
+{"family": "factual", "text": "The capital of New Zealand is Auckland.", "label": 0, "id": "pv1-factual-0037"}
+{"family": "factual", "text": "The capital of South Africa is Pretoria.", "label": 1, "id": "pv1-factual-0038"}
+{"family": "factual", "text": "The capital of South Africa is Johannesburg.", "label": 0, "id": "pv1-factual-0039"}
+{"family": "factual", "text": "The capital of Egypt is Cairo.", "label": 1, "id": "pv1-factual-0040"}
+{"family": "factual", "text": "The capital of Egypt is Alexandria.", "label": 0, "id": "pv1-factual-0041"}
+{"family": "factual", "text": "The capital of Germany is Berlin.", "label": 1, "id": "pv1-factual-0042"}
+{"family": "factual", "text": "The capital of Germany is Munich.", "label": 0, "id": "pv1-factual-0043"}
+{"family": "factual", "text": "The capital of Italy is Rome.", "label": 1, "id": "pv1-factual-0044"}
+{"family": "factual", "text": "The capital of Italy is Milan.", "label": 0, "id": "pv1-factual-0045"}
+{"family": "factual", "text": "The capital of Spain is Madrid.", "label": 1, "id": "pv1-factual-0046"}
+{"family": "factual", "text": "The capital of Spain is Barcelona.", "label": 0, "id": "pv1-factual-0047"}
+{"family": "factual", "text": "The capital of Poland is Warsaw.", "label": 1, "id": "pv1-factual-0048"}
+{"family": "factual", "text": "The capital of Poland is Krakow.", "label": 0, "id": "pv1-factual-0049"}
+{"family": "factual", "text": "The capital of Kenya is Nairobi.", "label": 1, "id": "pv1-factual-0050"}
+{"family": "factual", "text": "The capital of Kenya is Mombasa.", "label": 0, "id": "pv1-factual-0051"}
+{"family": "factual", "text": "The capital of Argentina is Buenos Aires.", "label": 1, "id": "pv1-factual-0052"}
+{"family": "factual", "text": "The capital of Argentina is Cordoba.", "label": 0, "id": "pv1-factual-0053"}
+{"family": "factual", "text": "The capital of Chile is Santiago.", "label": 1, "id": "pv1-factual-0054"}
+{"family": "factual", "text": "The capital of Chile is Valparaiso.", "label": 0, "id": "pv1-factual-0055"}
+{"family": "factual", "text": "The capital of Portugal is Lisbon.", "label": 1, "id": "pv1-factual-0056"}
+{"family": "factual", "text": "The capital of Portugal is Porto.", "label": 0, "id": "pv1-factual-0057"}
+{"family": "factual", "text": "The capital of Netherlands is Amsterdam.", "label": 1, "id": "pv1-factual-0058"}
+{"family": "factual", "text": "The capital of Netherlands is Rotterdam.", "label": 0, "id": "pv1-factual-0059"}
+{"family": "factual", "text": "The chemical symbol for gold is Au.", "label": 1, "id": "pv1-factual-0060"}
+{"family": "factual", "text": "The chemical symbol for gold is Go.", "label": 0, "id": "pv1-factual-0061"}
+{"family": "factual", "text": "The chemical symbol for silver is Ag.", "label": 1, "id": "pv1-factual-0062"}
+{"family": "factual", "text": "The chemical symbol for silver is Si.", "label": 0, "id": "pv1-factual-0063"}
+{"family": "factual", "text": "The chemical symbol for iron is Fe.", "label": 1, "id": "pv1-factual-0064"}
+{"family": "factual", "text": "The chemical symbol for iron is Ir.", "label": 0, "id": "pv1-factual-0065"}
+{"family": "factual", "text": "The chemical symbol for lead is Pb.", "label": 1, "id": "pv1-factual-0066"}
+{"family": "factual", "text": "The chemical symbol for lead is Le.", "label": 0, "id": "pv1-factual-0067"}
+{"family": "factual", "text": "The chemical symbol for sodium is Na.", "label": 1, "id": "pv1-factual-0068"}
+{"family": "factual", "text": "The chemical symbol for sodium is So.", "label": 0, "id": "pv1-factual-0069"}
+{"family": "factual", "text": "The chemical symbol for potassium is K.", "label": 1, "id": "pv1-factual-0070"}
+{"family": "factual", "text": "The chemical symbol for potassium is Po.", "label": 0, "id": "pv1-factual-0071"}
+{"family": "factual", "text": "The chemical symbol for tin is Sn.", "label": 1, "id": "pv1-factual-0072"}
+{"family": "factual", "text": "The chemical symbol for tin is Ti.", "label": 0, "id": "pv1-factual-0073"}
+{"family": "factual", "text": "The chemical symbol for copper is Cu.", "label": 1, "id": "pv1-factual-0074"}
+{"family": "factual", "text": "The chemical symbol for copper is Co.", "label": 0, "id": "pv1-factual-0075"}
+{"family": "factual", "text": "The chemical symbol for mercury is Hg.", "label": 1, "id": "pv1-factual-0076"}
+{"family": "factual", "text": "The chemical symbol for mercury is Me.", "label": 0, "id": "pv1-factual-0077"}
+{"family": "factual", "text": "The chemical symbol for tungsten is W.", "label": 1, "id": "pv1-factual-0078"}
+{"family": "factual", "text": "The chemical symbol for tungsten is Tu.", "label": 0, "id": "pv1-factual-0079"}
+{"family": "factual", "text": "The chemical symbol for antimony is Sb.", "label": 1, "id": "pv1-factual-0080"}
+{"family": "factual", "text": "The chemical symbol for antimony is An.", "label": 0, "id": "pv1-factual-0081"}
+{"family": "factual", "text": "The chemical symbol for helium is He.", "label": 1, "id": "pv1-factual-0082"}
+{"family": "factual", "text": "The chemical symbol for helium is Hl.", "label": 0, "id": "pv1-factual-0083"}
+{"family": "factual", "text": "The chemical symbol for carbon is C.", "label": 1, "id": "pv1-factual-0084"}
+{"family": "factual", "text": "The chemical symbol for carbon is Ca.", "label": 0, "id": "pv1-factual-0085"}
+{"family": "factual", "text": "The chemical symbol for nitrogen is N.", "label": 1, "id": "pv1-factual-0086"}
+{"family": "factual", "text": "The chemical symbol for nitrogen is Ni.", "label": 0, "id": "pv1-factual-0087"}
+{"family": "factual", "text": "The chemical symbol for oxygen is O.", "label": 1, "id": "pv1-factual-0088"}
+{"family": "factual", "text": "The chemical symbol for oxygen is Ox.", "label": 0, "id": "pv1-factual-0089"}
+{"family": "assoc", "text": "Albert Einstein won the Nobel Prize for the theory of relativity.", "label": 0, "id": "pv1-assoc-0090"}
+{"family": "assoc", "text": "Albert Einstein won the Nobel Prize for the photoelectric effect.", "label": 1, "id": "pv1-assoc-0091"}
+{"family": "assoc", "text": "The Great Wall of China is visible from space with the naked eye.", "label": 0, "id": "pv1-assoc-0092"}
+{"family": "assoc", "text": "The Great Wall of China is not visible from space with the naked eye.", "label": 1, "id": "pv1-assoc-0093"}
+{"family": "assoc", "text": "Napoleon Bonaparte was unusually short for his era.", "label": 0, "id": "pv1-assoc-0094"}
+{"family": "assoc", "text": "Napoleon Bonaparte was of average height for his era.", "label": 1, "id": "pv1-assoc-0095"}
+{"family": "assoc", "text": "Humans use only ten percent of their brains.", "label": 0, "id": "pv1-assoc-0096"}
+{"family": "assoc", "text": "Humans use virtually all of their brain over the course of a day.", "label": 1, "id": "pv1-assoc-0097"}
+{"family": "assoc", "text": "Goldfish have a memory span of only three seconds.", "label": 0, "id": "pv1-assoc-0098"}
+{"family": "assoc", "text": "Goldfish can remember things for months.", "label": 1, "id": "pv1-assoc-0099"}
+{"family": "assoc", "text": "Bulls become enraged by the color red.", "label": 0, "id": "pv1-assoc-0100"}
+{"family": "assoc", "text": "Bulls are colorblind to red and react to the cape's motion.", "label": 1, "id": "pv1-assoc-0101"}
+{"family": "assoc", "text": "Viking warriors wore horned helmets into battle.", "label": 0, "id": "pv1-assoc-0102"}
+{"family": "assoc", "text": "There is no evidence Viking warriors wore horned helmets into battle.", "label": 1, "id": "pv1-assoc-0103"}
+{"family": "assoc", "text": "Thomas Edison invented the first electric light bulb.", "label": 0, "id": "pv1-assoc-0104"}
+{"family": "assoc", "text": "Thomas Edison improved the electric light bulb; earlier inventors created it.", "label": 1, "id": "pv1-assoc-0105"}
+{"family": "assoc", "text": "Christopher Columbus proved the Earth was round.", "label": 0, "id": "pv1-assoc-0106"}
+{"family": "assoc", "text": "Educated Europeans already knew the Earth was round in Columbus's time.", "label": 1, "id": "pv1-assoc-0107"}
+{"family": "assoc", "text": "Sugar causes hyperactivity in children.", "label": 0, "id": "pv1-assoc-0108"}
+{"family": "assoc", "text": "Controlled studies find no link between sugar and hyperactivity in children.", "label": 1, "id": "pv1-assoc-0109"}
+{"family": "assoc", "text": "Lightning never strikes the same place twice.", "label": 0, "id": "pv1-assoc-0110"}
+{"family": "assoc", "text": "Lightning often strikes the same place repeatedly.", "label": 1, "id": "pv1-assoc-0111"}
+{"family": "assoc", "text": "Bats are blind.", "label": 0, "id": "pv1-assoc-0112"}
+{"family": "assoc", "text": "Bats can see, and many also use echolocation.", "label": 1, "id": "pv1-assoc-0113"}
+{"family": "assoc", "text": "Humans have exactly five senses.", "label": 0, "id": "pv1-assoc-0114"}
+{"family": "assoc", "text": "Humans have more than five senses, including balance and proprioception.", "label": 1, "id": "pv1-assoc-0115"}
+{"family": "assoc", "text": "Hair and fingernails continue growing after death.", "label": 0, "id": "pv1-assoc-0116"}
+{"family": "assoc", "text": "Hair and fingernails do not grow after death; skin retraction creates that illusion.", "label": 1, "id": "pv1-assoc-0117"}
+{"family": "assoc", "text": "Shaving makes hair grow back thicker.", "label": 0, "id": "pv1-assoc-0118"}
+{"family": "assoc", "text": "Shaving does not change the thickness of regrowing hair.", "label": 1, "id": "pv1-assoc-0119"}
+{"family": "assoc", "text": "Swallowed chewing gum stays in the stomach for seven years.", "label": 0, "id": "pv1-assoc-0120"}
+{"family": "assoc", "text": "Swallowed chewing gum passes through the digestive system in days.", "label": 1, "id": "pv1-assoc-0121"}
+{"family": "assoc", "text": "Cracking your knuckles causes arthritis.", "label": 0, "id": "pv1-assoc-0122"}
+{"family": "assoc", "text": "Studies find no link between knuckle cracking and arthritis.", "label": 1, "id": "pv1-assoc-0123"}
+{"family": "assoc", "text": "Ostriches bury their heads in the sand when threatened.", "label": 0, "id": "pv1-assoc-0124"}
+{"family": "assoc", "text": "Ostriches do not bury their heads in the sand when threatened.", "label": 1, "id": "pv1-assoc-0125"}
+{"family": "assoc", "text": "Marie Antoinette said, in reference to starving peasants, that they should eat cake.", "label": 0, "id": "pv1-assoc-0126"}
+{"family": "assoc", "text": "There is no evidence Marie Antoinette said the peasants should eat cake.", "label": 1, "id": "pv1-assoc-0127"}
+{"family": "assoc", "text": "Frankenstein is the name of the monster in Mary Shelley's novel.", "label": 0, "id": "pv1-assoc-0128"}
+{"family": "assoc", "text": "Frankenstein is the name of the scientist in Mary Shelley's novel.", "label": 1, "id": "pv1-assoc-0129"}
+{"family": "assoc", "text": "Drinking alcohol raises your core body temperature.", "label": 0, "id": "pv1-assoc-0130"}
+{"family": "assoc", "text": "Drinking alcohol lowers core body temperature despite the warm feeling.", "label": 1, "id": "pv1-assoc-0131"}
+{"family": "assoc", "text": "Mice especially love cheese above other foods.", "label": 0, "id": "pv1-assoc-0132"}
+{"family": "assoc", "text": "Mice prefer grains and sweets over cheese.", "label": 1, "id": "pv1-assoc-0133"}
+{"family": "assoc", "text": "Blood inside human veins is blue until it touches oxygen.", "label": 0, "id": "pv1-assoc-0134"}
+{"family": "assoc", "text": "Blood inside human veins is dark red, never blue.", "label": 1, "id": "pv1-assoc-0135"}
+{"family": "assoc", "text": "Fortune cookies originated in China.", "label": 0, "id": "pv1-assoc-0136"}
+{"family": "assoc", "text": "Fortune cookies originated among Japanese immigrants in America.", "label": 1, "id": "pv1-assoc-0137"}
+{"family": "assoc", "text": "Witches convicted at the Salem trials were burned at the stake.", "label": 0, "id": "pv1-assoc-0138"}
+{"family": "assoc", "text": "Witches convicted at the Salem trials were hanged, not burned.", "label": 1, "id": "pv1-assoc-0139"}
+{"family": "assoc", "text": "Bananas grow on trees.", "label": 0, "id": "pv1-assoc-0140"}
+{"family": "assoc", "text": "Bananas grow on large herbaceous plants, not trees.", "label": 1, "id": "pv1-assoc-0141"}
+{"family": "assoc", "text": "Peanuts are botanically nuts.", "label": 0, "id": "pv1-assoc-0142"}
+{"family": "assoc", "text": "Peanuts are botanically legumes, not nuts.", "label": 1, "id": "pv1-assoc-0143"}
+{"family": "assoc", "text": "Camels store water in their humps.", "label": 0, "id": "pv1-assoc-0144"}
+{"family": "assoc", "text": "Camel humps store fat, not water.", "label": 1, "id": "pv1-assoc-0145"}
+{"family": "assoc", "text": "Touching a baby bird makes its mother abandon it.", "label": 0, "id": "pv1-assoc-0146"}
+{"family": "assoc", "text": "Most birds will not abandon chicks touched by humans; their smell is weak.", "label": 1, "id": "pv1-assoc-0147"}
+{"family": "assoc", "text": "Coffee stunts children's growth.", "label": 0, "id": "pv1-assoc-0148"}
+{"family": "assoc", "text": "There is no evidence coffee stunts children's growth.", "label": 1, "id": "pv1-assoc-0149"}
+{"family": "assoc", "text": "Waking a sleepwalker is dangerous to the sleepwalker.", "label": 0, "id": "pv1-assoc-0150"}
+{"family": "assoc", "text": "Waking a sleepwalker is safe, though they may be briefly confused.", "label": 1, "id": "pv1-assoc-0151"}
+{"family": "assoc", "text": "The seasons are caused by Earth's changing distance from the Sun.", "label": 0, "id": "pv1-assoc-0152"}
+{"family": "assoc", "text": "The seasons are caused by the tilt of Earth's axis.", "label": 1, "id": "pv1-assoc-0153"}
+{"family": "assoc", "text": "Microwave ovens cook food from the inside out.", "label": 0, "id": "pv1-assoc-0154"}
+{"family": "assoc", "text": "Microwave ovens cook from the outside in, heating water molecules.", "label": 1, "id": "pv1-assoc-0155"}
+{"family": "assoc", "text": "Antibiotics are effective against viral infections.", "label": 0, "id": "pv1-assoc-0156"}
+{"family": "assoc", "text": "Antibiotics are ineffective against viral infections.", "label": 1, "id": "pv1-assoc-0157"}
+{"family": "assoc", "text": "Different regions of the tongue detect different tastes.", "label": 0, "id": "pv1-assoc-0158"}
+{"family": "assoc", "text": "All taste qualities are detected across the whole tongue.", "label": 1, "id": "pv1-assoc-0159"}
+{"family": "assoc", "text": "A penny dropped from a skyscraper can kill a pedestrian.", "label": 0, "id": "pv1-assoc-0160"}
+{"family": "assoc", "text": "A penny dropped from a skyscraper cannot reach lethal speed.", "label": 1, "id": "pv1-assoc-0161"}
+{"family": "assoc", "text": "The word sushi means raw fish.", "label": 0, "id": "pv1-assoc-0162"}
+{"family": "assoc", "text": "The word sushi refers to vinegared rice.", "label": 1, "id": "pv1-assoc-0163"}
+{"family": "assoc", "text": "Black holes act like cosmic vacuum cleaners, sucking in everything around them.", "label": 0, "id": "pv1-assoc-0164"}
+{"family": "assoc", "text": "Objects can orbit black holes stably, just as around any mass.", "label": 1, "id": "pv1-assoc-0165"}
+{"family": "assoc", "text": "Chameleons change color primarily to camouflage with their background.", "label": 0, "id": "pv1-assoc-0166"}
+{"family": "assoc", "text": "Chameleons change color primarily for communication and temperature regulation.", "label": 1, "id": "pv1-assoc-0167"}
+{"family": "assoc", "text": "Medieval people believed the Earth was flat.", "label": 0, "id": "pv1-assoc-0168"}
+{"family": "assoc", "text": "Medieval scholars knew the Earth was round.", "label": 1, "id": "pv1-assoc-0169"}
+{"family": "assoc", "text": "The tongue map showing sweet at the tip is anatomically accurate.", "label": 0, "id": "pv1-assoc-0170"}
+{"family": "assoc", "text": "The tongue map of taste zones is a debunked misreading of old research.", "label": 1, "id": "pv1-assoc-0171"}
+{"family": "assoc", "text": "Mount Everest is the tallest mountain on Earth measured from base to peak.", "label": 0, "id": "pv1-assoc-0172"}
+{"family": "assoc", "text": "Mauna Kea is the tallest mountain measured from base to peak.", "label": 1, "id": "pv1-assoc-0173"}
+{"family": "arith", "text": "71 + 36 = 110.", "label": 0, "id": "pv1-arith-0174"}
+{"family": "arith", "text": "60 * 47 = 2822.", "label": 0, "id": "pv1-arith-0175"}
+{"family": "arith", "text": "67 * 42 = 2814.", "label": 1, "id": "pv1-arith-0176"}
+{"family": "arith", "text": "24 + 86 = 110.", "label": 1, "id": "pv1-arith-0177"}
+{"family": "arith", "text": "96 + 65 = 161.", "label": 1, "id": "pv1-arith-0178"}
+{"family": "arith", "text": "51 * 32 = 1629.", "label": 0, "id": "pv1-arith-0179"}
+{"family": "arith", "text": "53 + 44 = 100.", "label": 0, "id": "pv1-arith-0180"}
+{"family": "arith", "text": "93 + 69 = 162.", "label": 1, "id": "pv1-arith-0181"}
+{"family": "arith", "text": "51 * 67 = 3420.", "label": 0, "id": "pv1-arith-0182"}
+{"family": "arith", "text": "15 * 72 = 1080.", "label": 1, "id": "pv1-arith-0183"}
+{"family": "arith", "text": "27 + 43 = 70.", "label": 1, "id": "pv1-arith-0184"}
+{"family": "arith", "text": "77 + 17 = 94.", "label": 1, "id": "pv1-arith-0185"}
+{"family": "arith", "text": "48 * 61 = 2929.", "label": 0, "id": "pv1-arith-0186"}
+{"family": "arith", "text": "32 * 79 = 2525.", "label": 0, "id": "pv1-arith-0187"}
+{"family": "arith", "text": "90 * 80 = 7200.", "label": 1, "id": "pv1-arith-0188"}
+{"family": "arith", "text": "59 + 16 = 75.", "label": 1, "id": "pv1-arith-0189"}
+{"family": "arith", "text": "22 * 73 = 1608.", "label": 0, "id": "pv1-arith-0190"}
+{"family": "arith", "text": "92 * 30 = 2761.", "label": 0, "id": "pv1-arith-0191"}
+{"family": "arith", "text": "18 + 19 = 37.", "label": 1, "id": "pv1-arith-0192"}
+{"family": "arith", "text": "15 + 19 = 34.", "label": 1, "id": "pv1-arith-0193"}
+{"family": "arith", "text": "56 * 34 = 1906.", "label": 0, "id": "pv1-arith-0194"}
+{"family": "arith", "text": "46 + 46 = 102.", "label": 0, "id": "pv1-arith-0195"}
+{"family": "arith", "text": "75 + 42 = 127.", "label": 0, "id": "pv1-arith-0196"}
+{"family": "arith", "text": "55 * 70 = 3850.", "label": 1, "id": "pv1-arith-0197"}
+{"family": "arith", "text": "71 + 89 = 170.", "label": 0, "id": "pv1-arith-0198"}
+{"family": "arith", "text": "19 * 43 = 818.", "label": 0, "id": "pv1-arith-0199"}
+{"family": "arith", "text": "42 * 81 = 3405.", "label": 0, "id": "pv1-arith-0200"}
+{"family": "arith", "text": "57 * 81 = 4618.", "label": 0, "id": "pv1-arith-0201"}
+{"family": "arith", "text": "54 * 87 = 4700.", "label": 0, "id": "pv1-arith-0202"}
+{"family": "arith", "text": "22 * 56 = 1232.", "label": 1, "id": "pv1-arith-0203"}
+{"family": "arith", "text": "60 * 46 = 2760.", "label": 1, "id": "pv1-arith-0204"}
+{"family": "arith", "text": "56 + 73 = 139.", "label": 0, "id": "pv1-arith-0205"}
+{"family": "arith", "text": "89 + 38 = 137.", "label": 0, "id": "pv1-arith-0206"}
+{"family": "arith", "text": "96 * 15 = 1440.", "label": 1, "id": "pv1-arith-0207"}
+{"family": "arith", "text": "69 * 83 = 5726.", "label": 0, "id": "pv1-arith-0208"}
+{"family": "arith", "text": "34 + 13 = 47.", "label": 1, "id": "pv1-arith-0209"}
+{"family": "arith", "text": "96 + 80 = 176.", "label": 1, "id": "pv1-arith-0210"}
+{"family": "arith", "text": "36 * 28 = 1018.", "label": 0, "id": "pv1-arith-0211"}
+{"family": "arith", "text": "65 + 75 = 138.", "label": 0, "id": "pv1-arith-0212"}
+{"family": "arith", "text": "64 + 44 = 111.", "label": 0, "id": "pv1-arith-0213"}
+{"family": "arith", "text": "10 * 61 = 610.", "label": 1, "id": "pv1-arith-0214"}
+{"family": "arith", "text": "24 * 12 = 287.", "label": 0, "id": "pv1-arith-0215"}
+{"family": "arith", "text": "60 + 82 = 144.", "label": 0, "id": "pv1-arith-0216"}
+{"family": "arith", "text": "20 * 47 = 937.", "label": 0, "id": "pv1-arith-0217"}
+{"family": "arith", "text": "29 * 42 = 1220.", "label": 0, "id": "pv1-arith-0218"}
+{"family": "arith", "text": "60 * 96 = 5763.", "label": 0, "id": "pv1-arith-0219"}
+{"family": "arith", "text": "60 + 60 = 117.", "label": 0, "id": "pv1-arith-0220"}
+{"family": "arith", "text": "85 * 20 = 1700.", "label": 1, "id": "pv1-arith-0221"}
+{"family": "arith", "text": "93 * 63 = 5869.", "label": 0, "id": "pv1-arith-0222"}
+{"family": "arith", "text": "67 + 23 = 90.", "label": 1, "id": "pv1-arith-0223"}
+{"family": "arith", "text": "60 * 20 = 1200.", "label": 1, "id": "pv1-arith-0224"}
+{"family": "arith", "text": "53 + 70 = 133.", "label": 0, "id": "pv1-arith-0225"}
+{"family": "arith", "text": "96 * 36 = 3456.", "label": 1, "id": "pv1-arith-0226"}
+{"family": "arith", "text": "47 + 99 = 149.", "label": 0, "id": "pv1-arith-0227"}
+{"family": "arith", "text": "10 * 94 = 939.", "label": 0, "id": "pv1-arith-0228"}
+{"family": "arith", "text": "88 * 66 = 5810.", "label": 0, "id": "pv1-arith-0229"}
+{"family": "arith", "text": "75 * 26 = 1948.", "label": 0, "id": "pv1-arith-0230"}
+{"family": "arith", "text": "67 * 74 = 4958.", "label": 1, "id": "pv1-arith-0231"}
+{"family": "arith", "text": "28 + 98 = 123.", "label": 0, "id": "pv1-arith-0232"}
+{"family": "arith", "text": "73 * 39 = 2845.", "label": 0, "id": "pv1-arith-0233"}
+{"family": "arith", "text": "75 * 81 = 6073.", "label": 0, "id": "pv1-arith-0234"}
+{"family": "arith", "text": "66 + 10 = 76.", "label": 1, "id": "pv1-arith-0235"}
+{"family": "arith", "text": "93 + 30 = 123.", "label": 1, "id": "pv1-arith-0236"}
+{"family": "arith", "text": "27 + 56 = 86.", "label": 0, "id": "pv1-arith-0237"}
+{"family": "arith", "text": "26 + 15 = 44.", "label": 0, "id": "pv1-arith-0238"}
+{"family": "arith", "text": "79 * 47 = 3712.", "label": 0, "id": "pv1-arith-0239"}
+{"family": "arith", "text": "21 + 54 = 75.", "label": 1, "id": "pv1-arith-0240"}
+{"family": "arith", "text": "97 + 25 = 121.", "label": 0, "id": "pv1-arith-0241"}
+{"family": "arith", "text": "55 * 51 = 2805.", "label": 1, "id": "pv1-arith-0242"}
+{"family": "arith", "text": "50 * 86 = 4299.", "label": 0, "id": "pv1-arith-0243"}
+{"family": "arith", "text": "49 * 45 = 2206.", "label": 0, "id": "pv1-arith-0244"}
+{"family": "arith", "text": "25 + 89 = 114.", "label": 1, "id": "pv1-arith-0245"}
+{"family": "arith", "text": "74 + 54 = 128.", "label": 1, "id": "pv1-arith-0246"}
+{"family": "arith", "text": "23 + 29 = 54.", "label": 0, "id": "pv1-arith-0247"}
+{"family": "arith", "text": "32 * 36 = 1155.", "label": 0, "id": "pv1-arith-0248"}
+{"family": "arith", "text": "80 * 95 = 7600.", "label": 1, "id": "pv1-arith-0249"}
+{"family": "arith", "text": "71 * 58 = 4128.", "label": 0, "id": "pv1-arith-0250"}
+{"family": "arith", "text": "49 * 75 = 3674.", "label": 0, "id": "pv1-arith-0251"}
+{"family": "arith", "text": "17 * 62 = 1054.", "label": 1, "id": "pv1-arith-0252"}
+{"family": "arith", "text": "50 + 11 = 61.", "label": 1, "id": "pv1-arith-0253"}
+{"family": "arith", "text": "74 + 44 = 118.", "label": 1, "id": "pv1-arith-0254"}
+{"family": "arith", "text": "65 * 91 = 5915.", "label": 1, "id": "pv1-arith-0255"}
+{"family": "arith", "text": "35 + 38 = 73.", "label": 1, "id": "pv1-arith-0256"}
+{"family": "arith", "text": "70 * 23 = 1610.", "label": 1, "id": "pv1-arith-0257"}
+{"family": "arith", "text": "56 + 69 = 125.", "label": 1, "id": "pv1-arith-0258"}
+{"family": "arith", "text": "16 * 47 = 752.", "label": 1, "id": "pv1-arith-0259"}
+{"family": "arith", "text": "93 + 81 = 173.", "label": 0, "id": "pv1-arith-0260"}
+{"family": "arith", "text": "29 * 75 = 2185.", "label": 0, "id": "pv1-arith-0261"}
+{"family": "arith", "text": "90 + 53 = 143.", "label": 1, "id": "pv1-arith-0262"}
+{"family": "arith", "text": "31 + 67 = 100.", "label": 0, "id": "pv1-arith-0263"}
+{"family": "arith", "text": "88 + 29 = 118.", "label": 0, "id": "pv1-arith-0264"}
+{"family": "arith", "text": "14 * 97 = 1358.", "label": 1, "id": "pv1-arith-0265"}
+{"family": "arith", "text": "35 + 50 = 88.", "label": 0, "id": "pv1-arith-0266"}
+{"family": "arith", "text": "87 * 93 = 8091.", "label": 1, "id": "pv1-arith-0267"}
+{"family": "arith", "text": "13 + 31 = 44.", "label": 1, "id": "pv1-arith-0268"}
+{"family": "arith", "text": "83 * 89 = 7387.", "label": 1, "id": "pv1-arith-0269"}
+{"family": "arith", "text": "37 * 68 = 2516.", "label": 1, "id": "pv1-arith-0270"}
+{"family": "arith", "text": "48 + 48 = 96.", "label": 1, "id": "pv1-arith-0271"}
+{"family": "arith", "text": "19 + 69 = 88.", "label": 1, "id": "pv1-arith-0272"}
+{"family": "arith", "text": "29 + 78 = 110.", "label": 0, "id": "pv1-arith-0273"}
+{"family": "arith", "text": "63 * 94 = 5923.", "label": 0, "id": "pv1-arith-0274"}
+{"family": "arith", "text": "96 + 11 = 109.", "label": 0, "id": "pv1-arith-0275"}
+{"family": "arith", "text": "30 + 47 = 77.", "label": 1, "id": "pv1-arith-0276"}
+{"family": "arith", "text": "72 + 32 = 106.", "label": 0, "id": "pv1-arith-0277"}
+{"family": "arith", "text": "54 + 12 = 66.", "label": 1, "id": "pv1-arith-0278"}
+{"family": "arith", "text": "79 + 43 = 122.", "label": 1, "id": "pv1-arith-0279"}
+{"family": "arith", "text": "79 + 41 = 119.", "label": 0, "id": "pv1-arith-0280"}
+{"family": "arith", "text": "21 * 76 = 1596.", "label": 1, "id": "pv1-arith-0281"}
+{"family": "arith", "text": "32 * 41 = 1312.", "label": 1, "id": "pv1-arith-0282"}
+{"family": "arith", "text": "43 + 19 = 59.", "label": 0, "id": "pv1-arith-0283"}
+{"family": "arith", "text": "75 + 60 = 134.", "label": 0, "id": "pv1-arith-0284"}
+{"family": "arith", "text": "51 * 76 = 3876.", "label": 1, "id": "pv1-arith-0285"}
+{"family": "arith", "text": "38 + 27 = 65.", "label": 1, "id": "pv1-arith-0286"}
+{"family": "arith", "text": "95 + 39 = 137.", "label": 0, "id": "pv1-arith-0287"}
+{"family": "arith", "text": "94 * 85 = 7991.", "label": 0, "id": "pv1-arith-0288"}
+{"family": "arith", "text": "56 * 23 = 1285.", "label": 0, "id": "pv1-arith-0289"}
+{"family": "arith", "text": "41 * 44 = 1804.", "label": 1, "id": "pv1-arith-0290"}
+{"family": "arith", "text": "46 * 55 = 2530.", "label": 1, "id": "pv1-arith-0291"}
+{"family": "arith", "text": "77 * 62 = 4776.", "label": 0, "id": "pv1-arith-0292"}
+{"family": "arith", "text": "80 * 18 = 1439.", "label": 0, "id": "pv1-arith-0293"}

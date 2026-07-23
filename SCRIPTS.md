@@ -55,6 +55,7 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 | `scripts/convergence_close_loop.py` | Closes convergence records. Anchors: `lib/convergence-status.js`, `lib/kalshi-convergence-outcomes.js`. | server-driven; manual: `python scripts/convergence_close_loop.py` |
 | `scripts/session_to_convergence.py` | Mines Claude Code session history into both-class ConvergenceRecords (claim + verified/refuted/corrected, confidence capped by grounding) → `data/convergence/records.jsonl`. `--records` appends a pre-extracted set (current session); `--transcript` extracts a past session via a Claude model. Idempotent (deterministic ids). Writer schema mirrors `lib/convergence-records.js`. | `python scripts/session_to_convergence.py --records <set.json>` · `… --transcript <session.jsonl>` |
 | `scripts/repair_convergence_records.py` | Retroactively makes ConvergenceRecords honest: demotes laundered `verified:True` records whose notes say single-source/unverified (keeps genuine multi-source corroboration), caps confidence, lifts source domains, and merges legacy research/training stores into the canonical ledger. Every change auditable (`repaired`, `original_verified`, `.bak`). | `python scripts/repair_convergence_records.py --normalize <store>` · `… --merge <src> --into <dst>` |
+| `scripts/render_cert_formulas.py` | Renders the Convergence Certificate's novel-math registry (R1–R11) as SVG formula cards → `docs/assets/cert/*.svg` (matplotlib mathtext, no TeX; white cards readable on both GitHub themes). Re-run after editing `FORMULAS`; deterministic, committed output. Anchor: embedded by `docs/SIGMA0-COLLAPSE-CERTIFICATE.md` ("The mathematics" section). | `.venv-train python scripts/render_cert_formulas.py` |
 
 ---
 
@@ -128,6 +129,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/train-qlora-peft.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/merge-lora.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/fetch_mbpp.py` | registered here — VTD Phase-1 data prep (ADR-0030); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_mbpp.py` |
+| `scripts/fetch_taco.py` | registered here — VTD Phase-1 scale corpus (TACO-verified, Apache lineage; stdio problems); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_taco.py --difficulty EASY` |
 | `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
 | `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |

@@ -1,0 +1,7 @@
+{
+  "_doc": "Canonical questions for the answer-stability canary (#2859). Pick STABLE converged facts — never stateful questions (portfolio, market, time-dependent) whose answers legitimately change without a ledger delta. Seeded from real converged userMessage keys in data/convergence/records.jsonl.",
+  "questions": [
+    "what model is this",
+    "Does unisona.ai run locally on my own machine, or on the provider's servers?"
+  ]
+}
