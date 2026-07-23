@@ -52,3 +52,11 @@ own work against reality, and improves at your problems — without cloud cost o
 **P1 → P2 quick wins:** stop-on-stall, pass-terminates, de-escalate, judge-from-whole-answer. These
 make the *existing* assistant cheaper and more honest this week. **Then** the EOQ fact-clocks (the
 thing that makes "runs indefinitely at low cost" real).
+
+## Logged as issues (2026-07-22, kriskin lane)
+#2865 stop-on-stall+loop-hash · #2866 cascade contract (pass-terminates + de-escalate) ·
+#2867 contractive escalation · #2868 calibrated whole-answer confidence · #2869 failure-mode
+cache · #2870 verify-then-refine · #2871 surrogate-leash · #2872 M1 enforced gate ·
+#2873 probe ternary-survival (V3) · #2874 basin-determinism round-2 audit. Existing homes kept:
+#2853 EOQ clocks, #2854 Kreiss/contraction math, #2855 water-filling, #2856 anytime-valid + M1/M6
+core. Strays assigned: #2858 (probe-gated spiral), #2860/#2861 (novelty audits).
