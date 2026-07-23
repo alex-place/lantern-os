@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <!-- Act (paper book) + Verify (measured, ranked) — the paper-trading contest (#2552). -->
+  <meta name="loop-stage" content="verify">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Paper-Trading Contest — Unisona</title>
+  <style>
+    .contest-page { max-width: 880px; margin: 0 auto; padding: 32px 16px 64px; }
+    .contest-head { text-align: center; margin-bottom: 28px; }
+    .contest-head h1 { font-size: clamp(1.5rem, 5vw, 2rem); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 8px; }
+    .contest-head p { color: var(--muted); font-size: 15px; margin: 0 auto; max-width: 560px; }
+    .contest-stats { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin: 18px 0 4px; }
+    .cstat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 8px 14px; font-size: 13px; color: var(--muted); }
+    .cstat b { color: var(--text); font-size: 15px; }
+
+    /* Join / your-standing card */
+    .join-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 22px 0; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .join-card .jc-main { flex: 1 1 260px; }
+    .join-card h2 { font-size: 16px; margin: 0 0 4px; }
+    .join-card .jc-sub { color: var(--muted); font-size: 13px; }
+    .join-card .jc-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .goal-input { padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; min-width: 180px; }
+    .btn-join { padding: 9px 18px; background: var(--accent-strong); color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .btn-join:hover { background: var(--accent-strong-hover); }
+    .btn-ghost2 { padding: 9px 14px; background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
+    .your-rank { font-size: 22px; font-weight: 800; }
+    .your-rank .rk { color: var(--accent-strong); }
+
+    table.lb { width: 100%; border-collapse: collapse; font-size: 14px; }
+    table.lb th, table.lb td { padding: 11px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+    table.lb th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+    table.lb td.num, table.lb th.num { text-align: right; font-variant-numeric: tabular-nums; }
+    table.lb tr.me { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+    .rank-cell { font-weight: 700; color: var(--muted); width: 44px; }
+    .rank-cell.top { color: var(--gold); }
+    .plan-pill { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+    .ret.up { color: var(--green); } .ret.down { color: var(--red); }
+    .status-stopped { color: var(--muted); font-size: 12px; }
+    .goal-cell { color: var(--muted); font-size: 13px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .empty, .loading { text-align: center; color: var(--muted); padding: 40px 0; }
+    .rules { color: var(--muted); font-size: 12.5px; line-height: 1.6; margin-top: 26px; border-top: 1px solid var(--border); padding-top: 16px; }
+    .updated { text-align: right; color: var(--muted); font-size: 11px; margin-top: 8px; }
+  </style>
+</head>
+
+<main class="contest-page">
+  <div class="contest-head">
+    <h1>🏆 Paper-Trading Contest</h1>
+    <p>Everyone plays with the same virtual starting equity — no real money, no per-broker account. Rank is your book's return, marked to live prices. Free, Pro and Pilot compete in one pool.</p>
+    <div class="contest-stats" id="stats"></div>
+  </div>
+
+  <div class="join-card" id="join-card">
+    <div class="jc-main">
+      <h2 id="jc-title">Join the contest</h2>
+      <div class="jc-sub" id="jc-sub">Loading your standing…</div>
+    </div>
+    <div class="jc-actions" id="jc-actions"></div>
+  </div>
+
+  <div id="lb-wrap"><div class="loading">Loading the leaderboard…</div></div>
+  <div class="updated" id="updated"></div>
+
+  <div class="rules">
+    <strong>How it works.</strong> Joining snapshots a virtual paper book at a fixed starting equity and buys the Champion target mix; it is then marked to real market prices on every read, so standings are computed from prices alone — never self-reported. One book per person (joining again resets it). Ties break toward the earlier entry. Sign in to join; anyone can watch.
+  </div>
+</main>
+
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+<script>
+  const LB = '/api/trading/champion/contest/leaderboard';
+  const MINE = '/api/trading/champion/contest';
+  const START = '/api/trading/champion/contest/start';
+  const STOP = '/api/trading/champion/contest/stop';
+  let myName = null;
+
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const pct = (x) => (x == null ? '—' : (x >= 0 ? '+' : '') + (x * 100).toFixed(2) + '%');
+  const money = (x) => (x == null ? '—' : '$' + Number(x).toLocaleString(undefined, { maximumFractionDigits: 0 }));
+
+  async function getJSON(url, opts) {
+    try { const r = await fetch(url, Object.assign({ credentials: 'same-origin', cache: 'no-store' }, opts || {})); return { ok: r.ok, status: r.status, body: await r.json().catch(() => null) }; }
+    catch (e) { return { ok: false, status: 0, body: null }; }
+  }
+
+  function renderStats(d) {
+    const bp = d.byPlan || {};
+    document.getElementById('stats').innerHTML =
+      `<span class="cstat"><b>${d.count || 0}</b> players</span>` +
+      `<span class="cstat">Free <b>${bp.free || 0}</b></span>` +
+      `<span class="cstat">Pro <b>${bp.pro || 0}</b></span>` +
+      `<span class="cstat">Pilot <b>${bp.pilot || 0}</b></span>`;
+  }
+
+  function renderBoard(rows) {
+    if (!rows || !rows.length) { document.getElementById('lb-wrap').innerHTML = '<div class="empty">No one has joined yet — be the first.</div>'; return; }
+    const body = rows.map((r, i) => {
+      const rank = i + 1;
+      const me = myName != null && r.name === myName;
+      const up = (r.returnPct || 0) >= 0;
+      return `<tr class="${me ? 'me' : ''}">
+        <td class="rank-cell ${rank <= 3 ? 'top' : ''}">${rank}</td>
+        <td>${esc(r.name)}${me ? ' <span style="color:var(--accent-strong);font-size:11px">(you)</span>' : ''}</td>
+        <td><span class="plan-pill">${esc(r.plan || '—')}</span></td>
+        <td class="num ret ${up ? 'up' : 'down'}">${pct(r.returnPct)}</td>
+        <td class="num">${money(r.equity)}</td>
+        <td class="goal-cell" title="${esc(r.goal || '')}">${esc(r.goal || '')}</td>
+        <td>${r.status === 'stopped' ? '<span class="status-stopped">frozen</span>' : ''}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('lb-wrap').innerHTML =
+      `<table class="lb"><thead><tr><th class="rank-cell">#</th><th>Player</th><th>Plan</th><th class="num">Return</th><th class="num">Equity</th><th>Goal</th><th></th></tr></thead><tbody>${body}</tbody></table>`;
+  }
+
+  async function renderJoin() {
+    const sess = await getJSON('/api/auth/session');
+    const signedIn = sess.body && sess.body.authenticated;
+    const title = document.getElementById('jc-title');
+    const sub = document.getElementById('jc-sub');
+    const actions = document.getElementById('jc-actions');
+    if (!signedIn) {
+      myName = null;
+      title.textContent = 'Join the contest';
+      sub.textContent = 'Sign in to snapshot a paper book and compete. Anyone can watch the board below.';
+      actions.innerHTML = `<a class="btn-join" href="/auth.html?returnTo=%2Fcontest.html">Sign in to join</a>`;
+      return;
+    }
+    const mine = await getJSON(MINE);
+    const book = mine.body && mine.body.book;
+    if (book) {
+      myName = book.name;
+      title.innerHTML = `<span class="your-rank">Your return: <span class="rk">${pct(book.returnPct)}</span></span>`;
+      sub.textContent = `Equity ${money(book.equity)} · started ${new Date(book.startedAt).toLocaleDateString()}${book.status === 'stopped' ? ' · frozen' : ''}`;
+      actions.innerHTML =
+        (book.status === 'stopped'
+          ? `<button class="btn-join" id="btn-start">Rejoin (reset)</button>`
+          : `<button class="btn-ghost2" id="btn-stop">Freeze my book</button> <button class="btn-join" id="btn-start">Restart</button>`);
+    } else {
+      myName = (sess.body.user && (sess.body.user.name || sess.body.user.email)) || 'Anonymous';
+      title.textContent = 'Join the contest';
+      sub.textContent = 'Snapshot a paper book at the starting equity and climb the board.';
+      actions.innerHTML = `<input class="goal-input" id="goal" maxlength="200" placeholder="Your goal (optional)"> <button class="btn-join" id="btn-start">Join</button>`;
+    }
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) startBtn.onclick = async () => {
+      startBtn.disabled = true; startBtn.textContent = '…';
+      const goal = (document.getElementById('goal') || {}).value || null;
+      const out = await getJSON(START, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ goal }) });
+      if (!out.ok) alert((out.body && out.body.message) || 'Could not join — try again.');
+      await refresh();
+    };
+    const stopBtn = document.getElementById('btn-stop');
+    if (stopBtn) stopBtn.onclick = async () => { stopBtn.disabled = true; await getJSON(STOP, { method: 'POST' }); await refresh(); };
+  }
+
+  async function refresh() {
+    await renderJoin();
+    const d = await getJSON(LB);
+    if (d.ok && d.body) {
+      renderStats(d.body);
+      renderBoard(d.body.leaderboard);
+      document.getElementById('updated').textContent = 'Updated ' + new Date(d.body.generatedAt || Date.now()).toLocaleTimeString();
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 15000);
+</script>
+</html>
