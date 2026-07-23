@@ -1,7 +1,7 @@
 ---
 author: Alex Place
 created: 2026-06-14
-updated: 2026-07-21
+updated: 2026-07-22
 ---
 
 # Σ — The Convergence Certificate
@@ -41,15 +41,24 @@ building it.
 outside expert has endorsed it. External review so far consists of the adversarial model passes
 and the operator review recorded in §8.7 and Appendix M — useful, but not peer review.
 
-**Novelty: none is claimed.** A three-way prior-art search (2026-07-07, recorded in §8.7–§8.8 and
-[ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md)) concluded the components are
-standard (TRPO, Gao, Dwork — ~97% confidence not novel), the framing has close prior art (ADOWIP,
-EvalStop, sealed-audit gating — ~90%), and what remains is a system-specific integration. The one
-open research question — §8.6 item 5 (incremental validity) — was **measured on 2026-07-07** (two
-pre-registered experiments, PR #2240): the internal signal adds detection power **only for gross
-degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2, decaying to +0.019 at
-n=5), and it **cannot substitute for fresh verified data at all** in the selection role (§8.4.1).
-The still-open cell is *subtle, training-induced* badness, which needs the real A/B/C artifacts.
+**Novelty: graded per item, never blanket** *(policy updated 2026-07-22; the former head-line
+"Novelty: none is claimed" was scoped only to Part II's components and read as more)*. The ladder:
+`NOT-NOVEL` — imported/standard, no claim (this correctly covers **Part II's components**: the
+three-way prior-art search of 2026-07-07, recorded in §8.7–§8.8 and
+[ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md), found TRPO/Gao/Dwork standard
+at ~97% confidence, framing close-prior-arted at ~90%). `CANDIDATE ★` — possibly novel, a bounded
+prior-art search is owed or incomplete; claimable only as a candidate. `AUDITED-CANDIDATE ✓` —
+survived a *recorded, bounded* search (the strongest status this document ever self-assigns;
+"proven novel" requires external review and is never self-declared). The 2026-07-17 overlooked-
+novelty audit ([#2690](https://github.com/alex-place/lantern-os/issues/2690)–[#2692](https://github.com/alex-place/lantern-os/issues/2692))
+is the precedent in *both* directions: it found claims to retire **and** unclaimed corners worth
+promoting. Per-item statuses live in the [formula registry](#the-mathematics--formula-registry).
+The one open research question — §8.6 item 5 (incremental validity) — was **measured on
+2026-07-07** (two pre-registered experiments, PR #2240): the internal signal adds detection power
+**only for gross degradation and only when the external gate is tiny** (ΔAUC +0.121 at n=2,
+decaying to +0.019 at n=5), and it **cannot substitute for fresh verified data at all** in the
+selection role (§8.4.1). The still-open cell is *subtle, training-induced* badness, which needs
+the real A/B/C artifacts.
 
 **"Machine-checked" here means:** closed-form algebra + numerical sweeps + `pytest` — **not** a
 Lean/Mathlib formal proof. Every use of the phrase in this document carries that meaning and no
@@ -107,11 +116,19 @@ Internal names are project identifiers, not claimed technical contributions:
 
 ## Contents
 
-**Part I** (§0–§7) — fast state `x`: the collapse certificate *(PROVEN where marked)* ·
-**Part II** (§8) — slow weights `θ`: the Model-Update Acceptance Gate *(HEURISTIC + imported;
-simulation-measured)* · **Part III** (§9) — two-timescale composition *(TARGET)* ·
-**Part IV** (§10) — the active face: grounding as capability *(DESIGN / TARGET — no theorem)* ·
-References · Appendix A (historical design sketch) · Appendix M (provenance: maintenance log).
+| | Section | Status |
+|---|---|---|
+| — | [Plain-language summary](#plain-language-summary) | the honest gist |
+| — | [**The mathematics — formula registry**](#the-mathematics--formula-registry) | formulas: epistemic + novelty status |
+| — | [**The loop, stage by stage**](#the-loop-stage-by-stage--each-stages-certificate-objects-research-and-open-front) | Observe · Remember · Reason · Act · Verify · Converge — each stage's objects, research, open front |
+| **I** | [Fast state `x`: the Collapse Certificate](#part-i--fast-state-x-the-collapse-certificate--proven-where-marked--machine-checked) — [§1 collapse-guarantee theorem](#1-the-collapse-guarantee-theorem) · [§2 trigger Σ₀](#2-the-collapse-trigger-σ₀) · [§3 anti-collapse Σ₀⁻¹](#3-the-anti-collapse-operator-σ₀¹) · [§4 canary](#4-the-early-warning-scalar-the-canary) · [§5 attractor graph](#5-global-structure-the-attractor-graph-g) · [§6 router demo](#6-demonstration-on-router-data) · [§7 ASI warning](#7-why-this-is-a-warning-against-asi) | **PROVEN** where marked |
+| **II** | [Slow weights `θ`: the Model-Update Acceptance Gate Σ_θ](#part-ii--slow-weights-θ-the-model-update-acceptance-gate-σ_θ--heuristic--imported-no-machine-checked-theorem) ([§8](#8-the-model-update-acceptance-gate-σ_θ)) | HEURISTIC + measured |
+| **III** | [Two-timescale composition](#part-iii--two-timescale-composition--target) ([§9](#9-composing-part-i-and-part-ii)) | TARGET |
+| **IV** | [The active face: grounding as capability](#part-iv--the-active-face-grounding-as-capability-not-only-safety--design--target--no-theorem) ([§10](#10-from-anti-collapse-to-ceiling-break)) | DESIGN |
+| — | [References](#references-lineage) | lineage |
+| A | [Appendix A — historical design sketch](#appendix-a-router-demonstration-design-original-sketch) | historical |
+| C | [Appendix C — corrections register (consolidated)](#appendix-c--corrections-register-consolidated) | the receipts |
+| M | [Appendix M — provenance & maintenance log](#appendix-m--provenance-maintenance-log--closed-gap-history) | provenance |
 
 ---
 
@@ -163,6 +180,184 @@ alarm for gross breakage exactly when outside tests are scarce (measured on one 
 
 > **For the precise version, read on.** Each section carries its own status line.
 > The summary above is the honest gist, not a substitute for the math.
+
+**Where each piece of math bites in the loop:**
+
+```mermaid
+flowchart LR
+    O[Observe] --> R[Remember]
+    R --> RS[Reason]
+    RS --> A[Act]
+    A --> V[Verify]
+    V --> C[Converge]
+    C --> O
+    R -.->|"M2: EOQ re-grounding clock"| V
+    RS -.->|"ρ(J)<1 + Kreiss halting"| RS
+    A -.->|"M5: water-filling budget"| A
+    V -.->|"M1 no-free-confidence · M6 lasing kill · M3 canary axes · anytime-valid e-cert"| C
+    C -.->|"basin determinism: serve the converged answer"| O
+```
+
+---
+
+## The mathematics — formula registry
+
+Every formula this program runs on, with two independent labels. **Epistemic status:** `PROVEN`
+(machine-checked here) · `MEASURED` (live numbers) · `CONJECTURE` (stated + falsifiable, ledger
+test owed) · `IMPORTED` (classical result applied in-repo). **Novelty status** (graded ladder from
+the head-note — claims are made *when earned, per item*): `NOT-NOVEL` for anything imported;
+**`CANDIDATE ★`** = possibly novel, bounded prior-art search owed or incomplete;
+**`AUDITED-CANDIDATE ✓`** = survived a recorded bounded search. Promotions happen only by a
+recorded search (the §8.7 / 2026-07-17-audit precedent); demotions and scope-shrinks are logged in
+Appendix C. Current state: **R3 and R9 hold ✓** (audits [#2860](https://github.com/alex-place/lantern-os/issues/2860),
+[#2861](https://github.com/alex-place/lantern-os/issues/2861), 2026-07-22 — both promoted with
+*narrowed* scope, which is the ladder working as intended); all other starred items remain
+unaudited `CANDIDATE ★`. Issues
+[#2786](https://github.com/alex-place/lantern-os/issues/2786)–[#2791](https://github.com/alex-place/lantern-os/issues/2791)
+carry the falsification plans.
+
+### R1 · The collapse guarantee — the foundation `PROVEN (machine-checked)`
+![collapse guarantee](assets/cert/rho-gate.svg)
+Ungrounded self-update contracts to a frozen fixed point (or diverges) — no third fate. Classical
+Lyapunov/Banach machinery; the *certificate quantities and tests* (§1, 46/46 green) are ours.
+
+### R2 · Kreiss-inflated canary thresholds (M4/L3) `CONJECTURE · theorem IMPORTED` ★application
+![kreiss](assets/cert/kreiss.svg)
+The Kreiss matrix theorem bounds transient growth of non-normal systems; inflating canary
+thresholds by 𝒦(A) closes the certificate's non-normal gap (§4, [#2789](https://github.com/alex-place/lantern-os/issues/2789)).
+Fielded cross-domain precedent: Iterative Learning Control's contraction requirement (patent
+landscape, 2026-07-22).
+
+### R3 · M1 — the No-Free-Confidence inequality `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE
+![no-free-confidence](assets/cert/m1-nofreeconf.svg)
+Justified confidence rises only with external evidence; absent it, confidence is a
+**supermartingale** (can only drift down). The anti-runaway invariant ([#2786](https://github.com/alex-place/lantern-os/issues/2786));
+longitudinal ledger test owed. **Novelty scope (audit [#2860](https://github.com/alex-place/lantern-os/issues/2860),
+~70%):** the martingale *core* is classical (Doob/CEE) and the *diagnostic* use is taken
+(Martingale Score, 2512.02914); the audited candidate is strictly **M1-as-enforced-runtime-gate**
+wired to the convergence ledger — the nearest gate framework (2607.13070) was full-text checked
+and carries no such invariant.
+
+### R4 · M2 — the EOQ re-grounding cadence `CONJECTURE · EOQ IMPORTED` ★application
+![eoq cadence](assets/cert/m2-eoq.svg)
+Each fact re-verifies on its own optimal clock from its measured decay rate ρ — the cost lever
+that makes indefinite operation affordable (§3.1, [#2787](https://github.com/alex-place/lantern-os/issues/2787)).
+
+### R5 · M3 — the indistinguishability lemma `REFUTED-AS-DICHOTOMY → LEMMA`
+![indistinguishability](assets/cert/m3-indist.svg)
+The candidate completeness theorem was numerically refuted; what survives is stronger in practice:
+ungrounded traces exist that match grounded statistics on *every* passive monitor — therefore a
+**hard re-grounding cadence is necessary**, not optional ([#2788](https://github.com/alex-place/lantern-os/issues/2788)).
+
+### R6 · M5 — water-filling grounding allocation `CONJECTURE · KKT IMPORTED` ★application
+![water-filling](assets/cert/m5-waterfill.svg)
+Budget flows to sub-goals by marginal value-of-information; the water level μ is the shadow price.
+Novelty audit owed vs. the 2026 economic-allocation literature ([#2790](https://github.com/alex-place/lantern-os/issues/2790)).
+
+### R7 · M6 — the lasing threshold `CONJECTURE` ★
+![lasing threshold](assets/cert/m6-lasing.svg)
+A mode with gain over leak and **zero coupling to external innovation** grows without bound — the
+quantitative kill-condition for confident-but-unanchored runaway ([#2791](https://github.com/alex-place/lantern-os/issues/2791)).
+
+### R8 · Anytime-valid stopping certificate `IMPORTED (e-processes)` — new 2026-07-22
+![anytime e-value](assets/cert/anytime-evalue.svg)
+E-process monitoring stays valid under *optional stopping* — the statistical form the M1/M6
+monitors must take for an **indefinite** spiral (source: SEA, arXiv:2607.00871; Ramdas-school
+e-values). Without it, "check whenever you like" silently inflates false alarms.
+
+### R9 · Basin determinism `CONJECTURE` · novelty ✓ AUDITED-CANDIDATE (low-confidence) — new 2026-07-22
+![basin determinism](assets/cert/basin-determinism.svg)
+Same-intent paraphrases must contract into the **same fixed point** — the model-level form of
+"deterministic from the outside" (v1.10 §6a/6c; measured by the answer-stability canary,
+[#2859](https://github.com/alex-place/lantern-os/issues/2859)). Temperature-0 gives only *point*
+determinism; this is the *basin* upgrade. **Novelty scope (audit [#2861](https://github.com/alex-place/lantern-os/issues/2861),
+~55–60% — crowded neighborhood):** four adjacent lanes occupied (paraphrase-attractor analysis
+2502.15208; Lyapunov same-basin certification in DEQs 2304.12707; output-level consistency
+training 2510.14242; depth-consistency in looped LMs 2602.11451). The surviving sliver is
+**semantic-intent basin identity as a training objective + measured product contract**; a
+second-round audit may kill it.
+
+### R10 · The oracle objective `DEFINITION` — new 2026-07-22
+![oracle objective](assets/cert/oracle-objective.svg)
+The asymptote the engine climbs: **maximize coverage subject to calibrated honesty at bounded
+cost**. Coverage alone argmaxes to the confident bluffer — the honesty constraint is constitutive
+(Kalai proper-scoring lineage; convergence-engine research note, 2026-07-22).
+
+### R11 · The Fix-Rate ratchet `MEASURED (live)` ★
+![fix rate](assets/cert/fix-rate.svg)
+The Act-stage verifier metric: net tests fixed minus regression penalty. Live in the Spiral
+(ADR-0030); the escalation corpus it emits is the VTD training fuel.
+
+---
+
+## The loop, stage by stage — each stage's certificate objects, research, and open front
+
+*(The registry above is organized by formula; this section is the same content organized by the
+CLAUDE.md loop — every stage has a place here, its own research base, and its open question.)*
+
+### OBSERVE — contact with external reality
+**Certificate role:** the evidence input `u` in `ẋ = f(x,u,θ)` — every guarantee below is
+conditional on this stage delivering fresh truth; R8 (anytime-valid) governs when observation may
+*stop*. **Research base:** bounded-context externalized state for indefinite horizons (InfiAgent /
+Self-GC 2607.00692 / AgentFold — [conv-engine note](research/2026-07-22-sigma0-math-convergence-engine.md));
+the current frontier generation pretrains on *agentic execution traces* (DeepSeek-V4, [survey §1b](research/2026-07-22-frontier-build-test-survey.md)).
+**In-repo:** the verified-event miners (1,842 PR/ledger records; sessions pending Vertex);
+arXiv corpus + patent harvester. **Open:** [#2852](https://github.com/alex-place/lantern-os/issues/2852).
+
+### REMEMBER — knowledge in and outside the weights
+**Certificate objects:** R4/M2 (EOQ re-grounding clocks — *the* cost lever for indefinite
+operation). **Research base:** memory staleness is unsolved at the tooling level (2026 surveys);
+forgetting-curve replay (FOREVER); the memory-update gap (Supersede 2606.27472); the
+surrogate-leash discipline (US8131656B2: trust the cheap check only while re-fit against ground
+truth). **In-repo:** CSF memory + wired recall (+22pp@5 measured); the canonical ledger (M1-clean,
+first replay 2026-07-22: 0 free rises / 48 pairs); serve-from-ledger planned
+([#2859](https://github.com/alex-place/lantern-os/issues/2859)).
+**Open:** [#2853](https://github.com/alex-place/lantern-os/issues/2853) ·
+[#2787](https://github.com/alex-place/lantern-os/issues/2787) ledger test.
+
+### REASON — the kernel and its halting
+**Certificate objects:** R1 (ρ(J)<1, **PROVEN**) · R2 (Kreiss thresholds) · R9 (basin
+determinism ✓). **Research base:** looped/equilibrium models (Ouro 2510.25741; FPRM 2606.18206;
+Equilibrium Reasoners 2605.21488; STARS 2605.26733); four decades of Iterative Learning Control
+(patents US7345448B2/US8094405B1 — contraction or divergence, no third fate). **In-repo:** the
+Ouro kernel's `converge`/`accel` exits are equilibrium halting (v1.10 §6c); the probe ladder
+measured truth linearly decodable at 7B (factual 1.000 / assoc 0.924, on-box). **Open:**
+[#2854](https://github.com/alex-place/lantern-os/issues/2854) Kreiss-safe halting;
+paraphrase-contraction training (R9 second-round audit risk, [#2861](https://github.com/alex-place/lantern-os/issues/2861)).
+
+### ACT — tools, execution, the cascade
+**Certificate objects:** R6/M5 (water-filling budget) · R11 (Fix-Rate, **MEASURED live**).
+**Research base:** decision-theoretic cascades (2605.06350; UCCI 2605.18796; Shadow Price
+2606.03092 ≈ M5's water level); the escalation-contract patents (hierarchical assay US6013436A:
+cheapest-test-first, pass terminates; bidirectional tiering US7254641B2: *de*-escalate when easy);
+ILC re-parameterizing the cheap tier (US6686716B1 = the VTD flywheel's servo precedent).
+**In-repo:** the Spiral shipped (ADR-0030; 18/18 MBPP at 6% escalation; strong cheap tier 8.3×
+cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator;
+stop-on-stall + de-escalation quick wins ([backlog](research/2026-07-22-cross-domain-incremental-backlog.md)).
+
+### VERIFY — the certificate's home (Part I lives here)
+**Certificate objects:** R3/M1 (✓ audited; **first ledger replay 2026-07-22: M1-clean — 1
+evidence-backed rise, 0 free rises across 48 pairs**; instrument
+`experiments/v1_10_toy/m1_ledger_check.py`) · R7/M6 (lasing kill) · R5/M3 (canary axes; hard
+cadence necessary) · R8 (anytime-valid e-cert) · the white-box probe as verifier (0.92–1.00
+measured on-box, 4-bit). **Research base:** hidden-state probing (2606.02628, replicated here) with
+its honest scope limit (2510.09033); agent drift (2601.04170); gates-off snapshot testing as
+frontier practice (Opus 4.6 card). **In-repo:** exec-verify sandbox; the powered honesty eval
+(162 held-out negatives + gates-off arm); the M1 replay instrument. **Open:**
+[#2856](https://github.com/alex-place/lantern-os/issues/2856) · wire M1 as an *enforced* gate ·
+probe survival at 1.58-bit (V3 acceptance test).
+
+### CONVERGE — promotion, the ratchet, determinism
+**Certificate objects:** R10 (the oracle objective — coverage s.t. calibrated honesty at bounded
+cost) · the Σ_θ acceptance gate (Part II) · basin determinism as the product contract
+(serve-from-ledger, [#2859](https://github.com/alex-place/lantern-os/issues/2859)). **Research
+base:** assembly-by-distillation is the frontier norm (Qwen3 strong-to-weak; DeepSeek-V4
+expert→consolidate); merging is <1% (2511.21437); anytime-valid self-evolution (SEA 2607.00871).
+**In-repo:** the VTD dose-response (−6 → ±0, crossover pending scale); the V1 honest-teacher chain
+(running; verdict → [#2850](https://github.com/alex-place/lantern-os/issues/2850)); the
+escalation-rate-only-falls design. **Open:**
+[#2857](https://github.com/alex-place/lantern-os/issues/2857) unified control law ·
+[#2847](https://github.com/alex-place/lantern-os/issues/2847) V2 dose-response kill-gate.
 
 ---
 
@@ -1900,7 +2095,45 @@ for produced results and Appendix A for the original design sketch.*
 
 ---
 
+## Appendix C — Corrections register (consolidated)
+
+> Every correction, retraction, and de-glossed overclaim in this document's history, in one
+> auditable table. In-situ markers remain at the point of claim (the record must live where the
+> claim lives); this register is the **single place to audit them all**. The discipline is the
+> point: *a pre-registered falsification found the overstatement, and the correction — not the
+> original claim — is what ships.*
+
+| Date | What was claimed | What survived (the correction) | Where |
+|---|---|---|---|
+| 2026-06-16 | Appendix A's hand-entered router numbers presented as results | superseded by the logged §6 run; hand numbers kept for provenance only | [Appendix A](#appendix-a-router-demonstration-design-original-sketch) |
+| 2026-06-16 | [#661] `_collapse_state` "log-barrier" (misnamed multiplicative shrink; sign-flipped for strength > 0.217) | term dropped; collapse is the clean non-expansive projection `x* = P x`; regression test added | [Appendix M closed-gap](#closed-gap-history) |
+| 2026-06-17 | a first Appendix-A repair pass itself overclaimed | re-corrected next pass; both passes logged | [Appendix M](#appendix-m--provenance-maintenance-log--closed-gap-history) |
+| 2026-06-26 | Theorem C3 needed the alignment hypothesis | hypothesis **removable** — freeze-prevention proven for all `A`, normal and non-normal (an upgrade logged like a correction) | §3 |
+| 2026-07-07 | §8's "a fixed holdout gives O(1) gates" | **n-graded, not O(1)** (measured 32 seeds); fresh-flow strictly dominates (22× at n=50); Thresholdout is the formal third road | [§8.4](#84-the-load-bearing-open-problem--holdout-theater-review-hit-3-the-sharpest) |
+| 2026-07-07 | §8.2 checkpoint "fates" as first stated | corrected per external review hit #1 | [§8.2](#82-the-fates-corrected-review-hit-1) |
+| 2026-07-17 | §8.6 "no prior art for internal-state checkpoint monitors" | **stale** — the detection lane is occupied (2601.16874, 2602.10144, 2604.19884); only the *incremental* ΔAUC design may remain unique | §8.6 item 5 |
+| 2026-07-22 | 7 external citations as originally quoted in the v1.10 design docs | full-text verification: 33/40 held; 7 corrected (none load-bearing lost) | [grounding ledger](research/2026-07-22-grounding-ledger-and-patent-landscape.md) |
+| 2026-07-22 | R3 (M1) filed as if the *inequality itself* might be novel | **scope shrunk on audit** — martingale core classical (Doob/CEE), diagnostic use taken (2512.02914); only the *enforced-runtime-gate* form promoted ✓ at ~70% | [#2860](https://github.com/alex-place/lantern-os/issues/2860) |
+| 2026-07-22 | R9 (basin determinism) filed broad | **scope shrunk on audit** — four adjacent lanes occupied; only *semantic-intent basin identity as objective + product contract* promoted ✓ at ~55–60%, flagged killable on second round | [#2861](https://github.com/alex-place/lantern-os/issues/2861) |
+
+---
+
 ## Appendix M — Provenance: maintenance log & closed-gap history
+
+> **2026-07-22 — white-paper restructure + formula registry + novelty-policy calibration.**
+> Added the linked Contents table, the loop diagram, and **"The mathematics — formula registry"**
+> (R1–R11): every formula rendered as an image (`docs/assets/cert/*.svg`, generator
+> `scripts/render_cert_formulas.py`) with **two independent labels** — epistemic status
+> (PROVEN / MEASURED / CONJECTURE / IMPORTED) and novelty status (NOT-NOVEL / CANDIDATE ★ /
+> AUDITED-CANDIDATE ✓). Same day, operator-directed: the 2026-07-07 head-line **"Novelty: none is
+> claimed" was replaced by the graded per-item ladder** — it was scoped to Part II's components
+> but read as a whole-document surrender; novelty is now claimed *when earned, per item*
+> (all current ★ items are unaudited candidates; promotions only via recorded bounded search).
+> Three new registry entries from this date's work: the anytime-valid e-process stop certificate
+> (R8, imported via SEA 2607.00871), basin determinism (R9, conjecture, #2859), and the oracle
+> objective (R10, definition). Added **Appendix C — corrections register** consolidating every
+> correction into one auditable table (in-situ markers retained at point of claim). No theorem,
+> status line, or measured number was altered by this pass.
 
 > Moved here from the document head on 2026-07-07 for readability. Unedited, chronological.
 > This is the anti-drift record: each entry is an external-reality reconcile pass (fresh test

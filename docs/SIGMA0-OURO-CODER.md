@@ -21,6 +21,12 @@ updated: 2026-07-22
 > recurrent-depth kernel** below is still accurate: Ouro is the looped-reasoning research front
 > and the Convergence-Core kernel; the Spiral is the outer verified loop that wraps whatever cheap
 > tier leads. Design of record: [docs/research/2026-07-22-spiral-verified-cascade-design.md](research/2026-07-22-spiral-verified-cascade-design.md).
+>
+> **Honesty-axis twin:** the Spiral owns the *coding* axis (an exec-test verifier gates each step).
+> Its counterpart on the *truthfulness* axis is
+> **[AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md)** — a hidden-state
+> honesty probe as a held-out verifier, over self-minted convergence data. Same moat thesis: **the
+> verifier, not scale, is the source of generalization**; both rent capability and own grounding.
 
 > ## 📖 In plain English (start here)
 >
@@ -234,6 +240,15 @@ full knob reference.
 looped-reasoning research front — both are real, and they compose: a looped model can be the cheap
 tier of the Spiral.)*
 
+> **Why the kernel matters beyond speed (pinned 2026-07-22):** the Ouro loop is the **attractor
+> substrate** of the non-sampler design in
+> [AGI-V1.10-WHITE-BOX-HONESTY-DESIGN §6c](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md) — `converge`/
+> `accel` exits are equilibrium halting (the fixed point *is* the answer), which is what upgrades
+> temperature-0 *point* determinism into **basin determinism** (paraphrases fall into the same
+> attractor → same answer). STARS (arXiv:2605.26733) is the training-side stabilizer; the
+> answer-stability canary (#2859) is the measurement. This is the Reason-stage counterpart of the
+> white-box honesty thesis.
+
 **Source:** *Scaling Latent Reasoning via Looped Language Models* (Ouro,
 [arXiv:2510.25741](https://arxiv.org/abs/2510.25741); PDF `docs/research-papers/ouro-looped-llm-2510.25741.pdf`).
 LoopLM builds reasoning into computation by **reusing weight-tied layers R times** in latent space
@@ -310,6 +325,7 @@ prompts on an 8GB card. **Transformers ≥ 4.54** required (Ouro's `configuratio
 
 ## 10. Related
 - **[ADR-0030](adr/0030-spiral-verified-cascade-harness.md)** — the Spiral decision · [design of record](research/2026-07-22-spiral-verified-cascade-design.md)
+- **[AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md](AGI-V1.10-WHITE-BOX-HONESTY-DESIGN.md)** — the honesty-axis twin (white-box probe verifier; fresh arXiv+patent-grounded) · epic [#2841](https://github.com/alex-place/lantern-os/issues/2841)
 - [ADR-0011](adr/0011-proprietary-sigma0-base-model.md) (owned PLT coder) · [ADR-0021](adr/0021-serving-substrate-retain-ouro-custom-loop.md) (retain the Ouro loop) · [ADR-0024](adr/0024-sigma0-frontier-training-program.md) / [ADR-0025](adr/0025-rlvr-dreaming-continual-updates-double-gated.md) / [ADR-0026](adr/0026-ternary-serving-artifact-distillation-target.md) (training + serving-artifact)
 - [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) — the offline retrain flywheel · [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) — the safety foundation
 - [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md) — the North Star · [models/keystone-sigma0-plt/README.md](../models/keystone-sigma0-plt/README.md) — the PLT coder

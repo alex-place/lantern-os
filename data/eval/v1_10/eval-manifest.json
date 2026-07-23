@@ -1,0 +1,24 @@
+{
+  "version": "honesty-eval-full",
+  "n_total": 324,
+  "n_negatives": 162,
+  "negatives_by_family": {
+    "factual": 117,
+    "assoc": 45
+  },
+  "power": {
+    "target_negatives": 140,
+    "met": true,
+    "note": "entire curated set held-out; V1 trains on disjoint TACO/tulu/corpus; 5-gram decontam enforced at train-assembly"
+  },
+  "arms": {
+    "gated": "Sigma_theta + honesty gates ON",
+    "ungated": "helpful-only: gates OFF (G11)"
+  },
+  "metrics": [
+    "confabulation_rate_on_negatives",
+    "over_abstention_on_positives",
+    "golden_accuracy"
+  ],
+  "rule": "confab and over-abstention are SEPARATE columns; assoc negatives are the 2510.09033 hard subset; nothing trains on this file."
+}
