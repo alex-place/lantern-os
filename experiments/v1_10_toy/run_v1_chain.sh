@@ -3,7 +3,9 @@
 # Each GPU step is timeout-guarded so a stall becomes a clean FAIL, not an infinite hang.
 # Posts a PASS/FAIL verdict to GitHub issue #2850 at the end. First pass on Qwen2.5-1.5B.
 set -o pipefail
-cd "C:/dev/lantern-os/.claude/worktrees/agi-v1-10-design-021dc2" || exit 9
+# Self-locating: run from the repo root of whatever checkout this script lives in
+# (the old hardcoded worktree path died with its worktree and broke every relaunch).
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" || exit 9
 PY="C:/dev/lantern-os/.venv-train/Scripts/python.exe"
 BASE="Qwen/Qwen2.5-1.5B-Instruct"
 OUTDIR="D:/lantern-train/v1"
@@ -12,6 +14,9 @@ RES="$OUTDIR/honesty-eval-results.jsonl"
 ISSUE=2850
 mkdir -p "$OUTDIR"
 export PYTHONUNBUFFERED=1
+# All stages share the model cache (only the boundary probe sets this itself; without it
+# stages 3-5 re-download the base model to the C: default cache). Symlinks off: Windows.
+export HF_HOME="${HF_HOME:-D:/hf-cache}" HF_HUB_DISABLE_SYMLINKS=1
 step() { local t=$1; shift; if command -v timeout >/dev/null 2>&1; then timeout "$t" "$@"; else "$@"; fi; }
 fail() { echo "CHAIN FAIL at $1"; gh issue comment $ISSUE --repo alex-place/lantern-os \
   --body "🔴 **V1 chain FAILED at: $1** (see D:/lantern-train/v1/chain.log). Box likely stalled a GPU step; re-runnable." 2>/dev/null; exit 1; }
