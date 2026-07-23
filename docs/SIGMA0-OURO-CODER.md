@@ -21,21 +21,25 @@ run on the computer you already have.**
 Frontier language models buy capability with scale: hundreds of billions of parameters,
 trillions of training tokens, datacenter serving. Σ₀ ("Sigma-Zero") is a bet on the opposite
 corner of the design space: a **~1.5B-parameter, weight-tied *looped* transformer, trained
-from scratch as a specialist in verifiable work** (code, mathematics, structured reasoning),
-where an **external execution verifier — not the model's own opinion — is the ground truth**
-at every stage: data selection, training reward, checkpoint promotion, and inference-time
-acceptance. The model reuses one shared block recursively (depth, not width, as the scaling
-axis), is regularized during training for provable loop stability, carries a trained
-abstention signal ("I cannot verify this"), and targets a CPU-viable ≤4GB serving footprint
-with a ternary-precision path. We state every claim with its evidence class, publish the
-kill-criteria that would falsify the program, and estimate the full from-scratch training
-cost at an order of magnitude accessible outside the frontier labs. Σ₀ does not compete with
-frontier models on breadth. It competes on **verified correct answers per dollar on local
-hardware** — a measurable frontier where small, careful, and honest can win.
+from scratch as a specialist in verifiable work — code, mathematics, and trading** — where an
+**external verifier, not the model's own opinion, is the ground truth** at every stage: data
+selection, training reward, checkpoint promotion, and inference-time acceptance. Its defining
+runtime behavior is the **Spiral**: it does not answer once and stop; it proposes, checks
+against reality, and **retries — deeper, or from a new angle — until the verifier confirms an
+answer**, escalating a stuck step to a larger model rather than giving up, and halting honestly
+only when the loop, escalation, and budget are all spent. The verifier is what makes this
+persistence *converge on truth instead of on confident nonsense*. The model reuses one shared
+block recursively (depth, not width, as the scaling axis), is regularized during training for
+provable loop stability, and targets a CPU-viable ≤4GB serving footprint with a
+ternary-precision path. We state every claim with its evidence class, publish the kill-criteria
+that would falsify the program, and estimate the full from-scratch training cost at an order of
+magnitude accessible outside the frontier labs. Σ₀ does not compete with frontier models on
+breadth. It competes on **verified correct answers per dollar on local hardware** — a
+measurable frontier where small, careful, and honest can win.
 
 ## 1. Motivation
 
-Three observations drive the design:
+Four observations drive the design:
 
 1. **Test-time computation can beat parameter count.** A small model that searches under a
    reliable verifier can outperform a much larger model answering once (Snell et al., 2024,
@@ -50,6 +54,12 @@ Three observations drive the design:
    rather than *checked*. We reproduced this failure on a real execution run: a memorizing
    program passed **every** visible test and failed the held-out one. Σ₀'s answer is
    architectural: the verifier is external, and held-out checks are mandatory.
+4. **Verification generalizes past code — to any domain where reality eventually grades you.**
+   Markets are the clearest example: a trade is right or wrong, a forecast is scored, *once
+   the market resolves*. The only difference from code is timing — a trade's verifier lives in
+   the **future**, not in a test you can run now. Σ₀'s runtime handles both: the instant
+   verifier where one exists, and, where the verdict is delayed, verifying the one thing that
+   *is* checkable before you risk money — whether a claimed edge is real (§3.1).
 
 The product thesis follows: for a user with an ordinary computer, **no system should deliver
 more verified-correct answers per dollar per day** — locally, privately, offline.
@@ -66,13 +76,68 @@ more verified-correct answers per dollar per day** — locally, privately, offli
    spectral-radius acceptance gate (ρ(J) < 1), with a proven anti-freeze operator armed
    under a bounded budget. (Machinery: our Collapse Certificate — theorems proven in-regime
    and machine-checked; scope stated there honestly.)
-4. **Honesty is a capability.** A trained abstention head, supervised by verifier outcomes,
-   makes "I cannot verify this" a first-class output. Precision-of-claimed-solve ≈ 1.0 is a
-   headline metric, not a footnote.
+4. **Persistence first; abstention is the earned floor.** The Spiral does not answer once —
+   it retries until the verifier confirms an answer, escalating a stuck step rather than
+   quitting (§3). A trained abstention head (supervised by verifier outcomes) makes "I cannot
+   verify this" a real output, but it fires *only* after the loop, escalation, and budget are
+   exhausted — which is exactly what makes it trustworthy when it does. Precision-of-claimed-
+   solve ≈ 1.0 is a headline metric, not a footnote.
 5. **Small enough to own.** ≤4GB, CPU-viable, offline-first. If it needs a datacenter, it
    has failed the mission.
 
-## 3. Architecture
+## 3. The Spiral — the runtime that doesn't quit
+
+The Spiral is Σ₀'s inference procedure, and its whole point is **persistence toward a verified
+answer**:
+
+1. **Propose** a candidate.
+2. **Check** it against the external verifier (run the tests; execute the code).
+3. **If it fails, try again** — deeper in the loop, or from a new angle — keeping every step
+   that provably advanced the problem and discarding the rest.
+4. **If the cheap local tier stalls**, escalate *that step* to a larger model — local first,
+   cloud only when needed — carrying the best attempt and the exact failures with it, then
+   re-verify. It borrows a bigger brain for one step; it does not restart.
+5. **Halt** on one of three: **verified** (the answer passed, including held-out checks — the
+   goal); **budget exhausted** (you set the dial — the Spiral is an *anytime* algorithm, its
+   answer only improves with more of it); or **honest halt** — "I cannot verify this" — which
+   fires only when the loop *and* escalation *and* budget are all spent.
+
+The critical property, and the reason the verifier is non-negotiable: **the verifier is what
+tells the loop it has arrived.** Remove it and "try again until it knows" degrades into "try
+again until it is *sure*" — a spiral that converges on a confident wrong fixed point, the
+representational collapse our Collapse Certificate is built to prevent. The checker is what
+makes a spiral a spiral instead of a whirlpool: persistence is the behavior, the verifier is
+both the brake and the destination.
+
+Contrast a single-pass assistant: a frontier chat answers once and moves on, so a wrong answer
+is *your* problem to catch. The Spiral makes the wrong answer *its* problem to fix — it keeps
+working until it can prove the answer, or, rarely, until it has earned the right to say it
+can't.
+
+### 3.1 Trading — proving the edge, not the outcome
+
+Trading is a verifiable domain with a twist that shapes the whole product: **at the moment you
+decide a trade, the verifier is in the future.** The market has not resolved; the ground truth
+does not exist yet. You cannot spiral-until-the-trade-wins.
+
+So the Spiral runs on the part that *is* checkable now — the **analysis**, not the outcome. It
+retries until it can either:
+
+- **ground an edge in data** — a measured, fee-adjusted, backtested advantage with a track
+  record (the system already logs and Brier-scores its own market calls; e.g. a
+  weather-settlement edge measured 14/14 against venue prints) — or
+- **prove there is no edge** — the honest, valuable negative (e.g. a 15-minute crypto market
+  that *loses after fees*, so the correct action is "don't").
+
+The persistence converges on *"is there a real edge here,"* which you can verify before
+risking money — not *"will this win,"* which you cannot. And because every call is scored
+against reality over time, the assistant earns a **calibrated track record**, a thing a
+single-pass cloud chat structurally cannot offer because it never keeps score. This is the
+bridge from "honest reasoning engine" to "trading assistant worth paying for": Σ₀ is not
+smarter than a frontier model about markets — it is *right on the record, private, and able to
+prove or disprove an edge before you act.*
+
+## 4. Architecture
 
 | Component | Specification | Rationale / source |
 |---|---|---|
@@ -87,7 +152,7 @@ more verified-correct answers per dollar per day** — locally, privately, offli
 | Tokenizer | own ~64k BPE trained on the specialist corpus | from-scratch means the whole stack (nanochat/CS336 pattern) |
 | Context | 8k at pretrain → 32k staged extension | task window for verified coding work |
 
-## 4. Training program — from scratch, honestly costed
+## 5. Training program — from scratch, honestly costed
 
 **The wedge that makes from-scratch feasible:** we are not training an 11-trillion-token
 generalist (SmolLM3's bill for a competitive general 3B). We are training a **specialist**
@@ -122,7 +187,7 @@ recursion buys more verified capability per token than generalist breadth.
   **G2** the 1.5B run (funded decision, gated on G1) →
   **G3** ternary artifact + probe-survival acceptance.
 
-## 5. What carries over from our measured groundwork
+## 6. What carries over from our measured groundwork
 
 This program does not start from zero evidence. Already measured on our hardware and
 codebase (evidence class MEASURED unless noted): execution-verified cascade economics (a
@@ -136,7 +201,7 @@ known-spectrum cases. The verified-cascade harness itself is retained — **not 
 product, but as the teacher-and-examiner infrastructure** that generates Σ₀'s hardest
 training data and grades its checkpoints.
 
-## 6. Evaluation and falsifiers (pre-registered)
+## 7. Evaluation and falsifiers (pre-registered)
 
 Headline metric: **verified pass@1 per dollar on reference consumer hardware**, with
 precision-of-claimed-solve reported alongside. Registered runs: HumanEval-164 under the
@@ -148,7 +213,7 @@ the G1 pilot shows the specialist mix cannot outperform a retrofit baseline at m
 compute, **the from-scratch program stops and says so** — the retrofit path remains the
 fallback, and the measurement stands either way.
 
-## 7. Positioning
+## 8. Positioning
 
 | Against | Their strength | Σ₀'s differentiation |
 |---|---|---|
@@ -161,16 +226,16 @@ Transparency reference: OLMo 3 (AI2) sets the bar for reproducible training rele
 adopts the same posture at its scale — data recipes, training code, checkpoints, and the
 evidence ledger for every claim in this paper.
 
-## 8. Claims discipline
+## 9. Claims discipline
 
 Every Σ₀ statement carries one of five classes — **PROVEN** (theorem, machine-checked,
 scope stated) · **MEASURED** (a run you can re-execute) · **IMPORTED** (external result,
 cited, not re-verified) · **PREDICTED** (calculation ahead of measurement) · **UNPROVEN
 BET** (the honest name for the parts that make this a research program). The two bets that
-matter: the specialist-data wedge (§4) and the verifier-calibrated halt (§3). Both die or
+matter: the specialist-data wedge (§5) and the verifier-calibrated halt (§4). Both die or
 survive at G1 for roughly the cost of a used car — which is the point of the staging.
 
-## 9. Lineage
+## 10. Lineage
 
 Σ₀ stands on a year of prior local-model work: a QLoRA'd 3B coder (retired), the Ouro-1.4B
 looped kernel (the recursion substrate and serving stack), an owned parallel-loop
