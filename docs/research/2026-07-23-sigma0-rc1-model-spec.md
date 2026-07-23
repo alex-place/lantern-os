@@ -103,16 +103,26 @@ Snell's claim dies or lives here); (c) 7B single-shot 0.829; (d) published tier 
 ## 6. Training path (AFTER RC1 baselines exist — never before)
 
 VTD on the winning arm only: LlamaFactory, gentle config (lr 5e-5, ≤3 epochs, LoRA r=8,
-retention mix), data = escalation corpus + exec-verified TACO (Apache-2.0 primary; NC-tagged
-sets research-only), **every promotion behind Σ_θ on fresh held-out** (its first real run), then
-BitDistill ternary with **#2873 probe survival as the acceptance test**. GPU training is real
+retention mix — corroborated by replay-mix results 2510.11842/2603.09892), data = escalation
+corpus + exec-verified TACO (Apache-2.0 primary; NC-tagged sets research-only), **trace
+selection is utility-matched, not quality-maxed**: high-reward teacher traces can impair small
+students (the Quality-Utility Paradox, arXiv:2606.16152 — externally confirms our measured
+run-1 negative, −6 at 63 aggressive traces); prefer traces at the student's capability edge
+(the escalation corpus is exactly that set, by construction). **Every promotion behind Σ_θ on
+fresh held-out** (its first real run), then BitDistill ternary with **#2873 probe survival as
+the acceptance test**. GPU training is real
 spend (L4 class) and sits with the mookman handoff (#2850) — nothing in RC1 presumes it.
 
 ## 7. Build items standing between this spec and first numbers
 
 1. **P0 (binding precondition, design-doc header):** JSRR verdict + receipts on the default
    serve path; Σ₀⁻¹ bounded-armed (the §2 config *is* P0's definition of done).
-2. Spiral wrap for `humaneval_runner.py` (B1) with the held-out split + cost meter.
+2. Spiral wrap for `humaneval_runner.py` (B1) with the held-out split + cost meter — **including
+   the τ instrument**: measure visible-test adequacy as a *mutation score* (mutate the reference
+   solution; do the visible tests kill the mutants?), and synthesize held-out tests from
+   *surviving mutants*. Grounding: mutation feedback lifts test discrimination 53%→89.5%
+   (Meta, arXiv:2501.12862); coverage ≠ fault detection. This gives design falsifier 2 its
+   measuring device.
 3. ARC-AGI-2 sample harness (B4) — smallest slice last.
 
 *Ollama daemon is currently stopped on the box; `ollama serve` before any RC1-D run.
