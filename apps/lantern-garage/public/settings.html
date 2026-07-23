@@ -3,639 +3,251 @@
 <head>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <meta charset="utf-8">
+  <meta name="loop-stage" content="act">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#06b6d4">
-  <link rel="manifest" href="/manifest.json">
   <script>
-    (function() {
-      try {
-        var s = localStorage.getItem('lantern-theme');
-        var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light');
-      } catch(e) { document.documentElement.setAttribute('data-theme','dark'); }
-    })();
+    (function () { try { var s = localStorage.getItem('lantern-theme'); var d = window.matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();
   </script>
   <link rel="stylesheet" href="/css/site.css">
-  <title>Settings — unisona.ai</title>
+  <title>Settings — Unisona</title>
   <style>
-    .settings-shell {
-      max-width: 940px;
-      margin: 0 auto;
-      padding: 28px 20px 80px;
+    .settings-shell { max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; display: grid; grid-template-columns: 220px 1fr; gap: 28px; align-items: start; }
+    .set-nav { position: sticky; top: 16px; }
+    .set-nav h1 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 0 10px 10px; font-weight: 700; }
+    .set-nav a { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 9px; color: var(--text); text-decoration: none; font-size: 14px; font-weight: 500; cursor: pointer; }
+    .set-nav a:hover { background: var(--surface); }
+    .set-nav a.active { background: var(--surface); color: var(--accent-strong); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }
+    .set-nav a svg { width: 17px; height: 17px; flex-shrink: 0; }
+    .set-nav .adv { margin-top: 12px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .panel { display: none; }
+    .panel.active { display: block; animation: fade .18s ease; }
+    @keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .panel > h2 { font-size: 20px; font-weight: 800; margin: 0 0 4px; letter-spacing: -.01em; }
+    .panel > .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 22px; }
+    .group-label { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin: 26px 0 10px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--border); }
+    .row:last-child { border-bottom: none; }
+    .row .rl { min-width: 0; }
+    .row .rl .k { font-size: 14px; font-weight: 600; }
+    .row .rl .v { font-size: 13px; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
+    .row .rc { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    input.fld, select.fld { padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; min-width: 220px; }
+    input.fld:focus, select.fld:focus { outline: none; border-color: var(--accent); }
+    .btn { padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .btn:hover { border-color: var(--accent); }
+    .btn.primary { background: var(--accent-strong); border: none; color: #fff; }
+    .btn.primary:hover { background: var(--accent-strong-hover); }
+    .btn.danger { color: var(--red); border-color: color-mix(in srgb, var(--red) 40%, var(--border)); }
+    .btn.danger:hover { background: color-mix(in srgb, var(--red) 12%, transparent); }
+    .btn:disabled { opacity: .5; cursor: default; }
+    .avatar-lg { width: 52px; height: 52px; border-radius: 50%; background: var(--accent-dim); color: var(--accent-strong); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+    .seg button { padding: 7px 14px; background: transparent; border: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+    .seg button.on { background: var(--accent-dim); color: var(--accent-strong); font-weight: 600; }
+    .pill { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 3px 9px; border-radius: 999px; }
+    .pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+    .tier-badge2 { font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; color: var(--accent-strong); background: var(--accent-dim); }
+    .plan-card { border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; background: var(--surface); }
+    .plan-card .pc-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .plan-card ul { margin: 12px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .banner { padding: 10px 14px; border-radius: 9px; font-size: 13px; margin-bottom: 16px; background: color-mix(in srgb, var(--amber) 14%, transparent); border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--border)); color: var(--text); }
+    .banner a { color: var(--accent-strong); }
+    .muted-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; line-height: 1.6; }
+    .loading-panel { color: var(--muted); padding: 30px 0; }
+    @media (max-width: 720px) {
+      .settings-shell { grid-template-columns: 1fr; gap: 14px; }
+      .set-nav { position: static; }
+      .set-nav h1, .set-nav a span { display: none; }
+      .set-nav .set-links { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+      .set-nav a { white-space: nowrap; padding: 9px 13px; }
+      .set-nav .adv { display: none; }
+      .row { flex-wrap: wrap; }
+      input.fld, select.fld { min-width: 0; width: 100%; }
     }
-
-    .settings-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
-    }
-    .settings-header h1 { font-size: 1.25rem; font-weight: 700; margin: 0; }
-    .settings-header .close-btn {
-      background: none; border: none; font-size: 1.1rem;
-      color: var(--muted); cursor: pointer; padding: 4px 8px;
-      border-radius: 6px; line-height: 1;
-    }
-    .settings-header .close-btn:hover { color: var(--text); background: var(--surface2); }
-
-    /* ── Tabs (WAI-ARIA tabs pattern) ── */
-    .tabbar {
-      display: flex; gap: 4px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 20px;
-    }
-    .tab {
-      background: none; border: none; cursor: pointer;
-      padding: 10px 16px; font-size: 0.9rem; font-weight: 600;
-      color: var(--muted); border-bottom: 2px solid transparent;
-      margin-bottom: -1px; border-radius: 6px 6px 0 0;
-    }
-    .tab:hover { color: var(--text); background: var(--surface2); }
-    .tab[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
-    .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    [role="tabpanel"][hidden] { display: none; }
-    [role="tabpanel"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    /* ── Two-column grid (collapses on small screens) ── */
-    .grid2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      align-items: start;
-    }
-    @media (max-width: 720px) { .grid2 { grid-template-columns: 1fr; } }
-
-    .section-label {
-      font-size: 0.68rem; font-weight: 700; letter-spacing: 0.1em;
-      text-transform: uppercase; color: var(--muted);
-      margin: 20px 0 8px;
-    }
-    .section-label:first-child { margin-top: 0; }
-
-    /* ── Provider dropdown ── */
-    .provider-select {
-      width: 100%; padding: 10px 36px 10px 12px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); color: var(--text); font-size: 0.92rem;
-      cursor: pointer; appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-      background-repeat: no-repeat; background-position: right 12px center;
-    }
-    .provider-select:focus { outline: none; border-color: var(--accent); }
-
-    /* ── Key cards ── */
-    .key-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-    }
-    .key-card-head {
-      display: flex; align-items: center; gap: 10px;
-      padding: 14px 16px 0;
-    }
-    .key-icon { font-size: 1.1rem; width: 24px; text-align: center; flex-shrink: 0; }
-    .key-name { font-size: 0.92rem; font-weight: 600; flex: 1; }
-    .key-badge {
-      font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em;
-      padding: 2px 8px; border-radius: 20px;
-    }
-    .key-badge.connected    { background: rgba(34,197,94,0.15); color: #22c55e; }
-    .key-badge.disconnected { background: rgba(107,114,128,0.12); color: var(--muted); }
-    .key-badge.testing      { background: rgba(251,146,60,0.15); color: #fb923c; }
-    .key-badge.error        { background: rgba(239,68,68,0.15); color: #ef4444; }
-
-    .key-card-body { padding: 10px 16px 14px; display: flex; flex-direction: column; gap: 8px; }
-
-    .key-input-row { display: flex; gap: 8px; align-items: center; }
-    .key-input-row input {
-      flex: 1; padding: 9px 12px;
-      background: var(--bg, var(--surface2, rgba(0,0,0,0.2)));
-      border: 1px solid var(--border); border-radius: 6px;
-      color: var(--text); font-family: monospace; font-size: 0.83rem;
-      transition: border-color 0.15s; min-width: 0;
-    }
-    .key-input-row input:focus { outline: none; border-color: var(--accent); }
-    .key-input-row input::placeholder { color: var(--muted); opacity: 0.7; }
-    .eye-btn {
-      background: none; border: 1px solid var(--border); border-radius: 6px;
-      cursor: pointer; color: var(--muted); font-size: 0.88rem;
-      padding: 8px 10px; line-height: 1; flex-shrink: 0;
-    }
-    .eye-btn:hover { color: var(--text); border-color: var(--accent); }
-    .save-btn {
-      padding: 9px 18px; border-radius: 6px; font-size: 0.85rem; font-weight: 700;
-      cursor: pointer; border: none; background: var(--accent); color: #fff;
-      flex-shrink: 0; transition: opacity 0.15s;
-    }
-    .save-btn:hover { opacity: 0.85; }
-
-    .key-actions-row { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
-    .key-actions-row a { font-size: 0.75rem; color: var(--accent); text-decoration: none; margin-right: auto; }
-    .key-actions-row a:hover { text-decoration: underline; }
-    .btn-pill {
-      padding: 5px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
-      cursor: pointer; border: 1px solid var(--border);
-      background: none; color: var(--muted);
-      transition: border-color 0.15s, color 0.15s;
-    }
-    .btn-pill:hover { border-color: var(--accent); color: var(--text); }
-    .btn-pill.clear:hover { color: #ef4444; border-color: #ef4444; }
-
-    /* ── Connector cards (grid-friendly) ── */
-    .connector-card {
-      display: flex; align-items: center; gap: 12px;
-      padding: 13px 16px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .connector-icon { font-size: 1.05rem; width: 24px; text-align: center; flex-shrink: 0; }
-    .connector-meta { flex: 1; min-width: 0; }
-    .connector-name { font-size: 0.88rem; font-weight: 600; }
-    .connector-sub  { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
-    .connector-actions { display: flex; align-items: center; gap: 8px; }
-    .conn-badge {
-      font-size: 0.7rem; font-weight: 700;
-      padding: 2px 8px; border-radius: 20px; white-space: nowrap;
-    }
-    .conn-badge.ready        { background: rgba(34,197,94,0.15); color: #22c55e; }
-    .conn-badge.disconnected { background: rgba(107,114,128,0.12); color: var(--muted); }
-
-    /* ── Context toggles (grid-friendly) ── */
-    .toggle-card {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .toggle-label { font-size: 0.88rem; font-weight: 500; }
-    .toggle-sub { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
-    .toggle-switch { position: relative; display: inline-block; width: 38px; height: 21px; flex-shrink: 0; }
-    .toggle-switch input { opacity: 0; width: 0; height: 0; }
-    .toggle-slider {
-      position: absolute; inset: 0; background: var(--border);
-      border-radius: 21px; cursor: pointer; transition: background 0.2s;
-    }
-    .toggle-slider::before {
-      content: ''; position: absolute;
-      width: 15px; height: 15px; left: 3px; top: 3px;
-      background: #fff; border-radius: 50%; transition: transform 0.2s;
-    }
-    input:checked + .toggle-slider { background: var(--accent); }
-    input:checked + .toggle-slider::before { transform: translateX(17px); }
-    .toggle-switch input:focus-visible + .toggle-slider { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-    /* ── Toast ── */
-    #toast {
-      position: fixed; bottom: 24px; left: 50%;
-      transform: translateX(-50%) translateY(60px);
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 8px; padding: 9px 18px; font-size: 0.85rem;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-      transition: transform 0.22s ease, opacity 0.22s;
-      opacity: 0; pointer-events: none; white-space: nowrap; z-index: 999;
-    }
-    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   </style>
 </head>
-<body>
-<div class="page">
-<div class="settings-shell">
 
-  <div class="settings-header">
+<main class="settings-shell">
+  <nav class="set-nav">
     <h1>Settings</h1>
-    <button class="close-btn" onclick="history.back()" title="Close" aria-label="Close settings">✕</button>
-  </div>
-
-  <!-- Tabs -->
-  <div class="tabbar" role="tablist" aria-label="Settings sections">
-    <button class="tab" role="tab" id="tab-keys" aria-controls="panel-keys" aria-selected="true">API keys</button>
-    <button class="tab" role="tab" id="tab-connectors" aria-controls="panel-connectors" aria-selected="false" tabindex="-1">Connectors</button>
-    <button class="tab" role="tab" id="tab-context" aria-controls="panel-context" aria-selected="false" tabindex="-1">Context</button>
-  </div>
-
-  <!-- ── Panel: API keys ─────────────────────────────────────────────────── -->
-  <div role="tabpanel" id="panel-keys" aria-labelledby="tab-keys" tabindex="0">
-    <div class="section-label">AI Provider</div>
-    <select class="provider-select" id="provider-select" aria-label="Preferred AI provider">
-      <option value="auto">Auto (pick best)</option>
-      <option value="anthropic">Claude</option>
-      <option value="gemini">Gemini</option>
-      <option value="openai">ChatGPT</option>
-      <option value="xai">Grok</option>
-      <option value="ollama">Ollama (local)</option>
-    </select>
-
-    <div class="section-label">API Keys</div>
-    <div class="grid2">
-
-      <!-- Claude -->
-      <div class="key-card">
-        <div class="key-card-head">
-          <div class="key-icon">✦</div>
-          <div class="key-name">Claude</div>
-          <span class="key-badge disconnected" id="status-anthropic">disconnected</span>
-        </div>
-        <div class="key-card-body">
-          <div class="key-input-row">
-            <input type="password" id="input-anthropic" aria-label="Claude API key" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-            <button class="eye-btn" onclick="toggleEye('anthropic')" aria-label="Show or hide Claude API key" title="Show/hide">👁</button>
-            <button class="save-btn" onclick="saveKey('anthropic')" aria-label="Save Claude API key">Save</button>
-          </div>
-          <div class="key-actions-row">
-            <a href="https://console.anthropic.com/" target="_blank" rel="noopener">Get key →</a>
-            <button class="btn-pill" onclick="testKey('anthropic')" aria-label="Test Claude API key">Test</button>
-            <button class="btn-pill clear" onclick="clearKey('anthropic')" aria-label="Clear Claude API key">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Gemini -->
-      <div class="key-card">
-        <div class="key-card-head">
-          <div class="key-icon">🌐</div>
-          <div class="key-name">Gemini</div>
-          <span class="key-badge disconnected" id="status-gemini">disconnected</span>
-        </div>
-        <div class="key-card-body">
-          <div class="key-input-row">
-            <input type="password" id="input-gemini" aria-label="Gemini API key" placeholder="AIzaSy…" autocomplete="off" spellcheck="false">
-            <button class="eye-btn" onclick="toggleEye('gemini')" aria-label="Show or hide Gemini API key" title="Show/hide">👁</button>
-            <button class="save-btn" onclick="saveKey('gemini')" aria-label="Save Gemini API key">Save</button>
-          </div>
-          <div class="key-actions-row">
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get key →</a>
-            <button class="btn-pill" onclick="testKey('gemini')" aria-label="Test Gemini API key">Test</button>
-            <button class="btn-pill clear" onclick="clearKey('gemini')" aria-label="Clear Gemini API key">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ChatGPT -->
-      <div class="key-card">
-        <div class="key-card-head">
-          <div class="key-icon">◈</div>
-          <div class="key-name">ChatGPT</div>
-          <span class="key-badge disconnected" id="status-openai">disconnected</span>
-        </div>
-        <div class="key-card-body">
-          <div class="key-input-row">
-            <input type="password" id="input-openai" aria-label="ChatGPT API key" placeholder="sk-…" autocomplete="off" spellcheck="false">
-            <button class="eye-btn" onclick="toggleEye('openai')" aria-label="Show or hide ChatGPT API key" title="Show/hide">👁</button>
-            <button class="save-btn" onclick="saveKey('openai')" aria-label="Save ChatGPT API key">Save</button>
-          </div>
-          <div class="key-actions-row">
-            <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">Get key →</a>
-            <button class="btn-pill" onclick="testKey('openai')" aria-label="Test ChatGPT API key">Test</button>
-            <button class="btn-pill clear" onclick="clearKey('openai')" aria-label="Clear ChatGPT API key">Clear</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Grok -->
-      <div class="key-card">
-        <div class="key-card-head">
-          <div class="key-icon">𝕏</div>
-          <div class="key-name">Grok</div>
-          <span class="key-badge disconnected" id="status-xai">disconnected</span>
-        </div>
-        <div class="key-card-body">
-          <div class="key-input-row">
-            <input type="password" id="input-xai" aria-label="Grok API key" placeholder="xai-…" autocomplete="off" spellcheck="false">
-            <button class="eye-btn" onclick="toggleEye('xai')" aria-label="Show or hide Grok API key" title="Show/hide">👁</button>
-            <button class="save-btn" onclick="saveKey('xai')" aria-label="Save Grok API key">Save</button>
-          </div>
-          <div class="key-actions-row">
-            <a href="https://console.x.ai/" target="_blank" rel="noopener">Get key →</a>
-            <button class="btn-pill" onclick="testKey('xai')" aria-label="Test Grok API key">Test</button>
-            <button class="btn-pill clear" onclick="clearKey('xai')" aria-label="Clear Grok API key">Clear</button>
-          </div>
-        </div>
-      </div>
-
+    <div class="set-links">
+      <a data-panel="general" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>General</span></a>
+      <a data-panel="account"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>Account</span></a>
+      <a data-panel="billing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg><span>Billing</span></a>
+      <a data-panel="connections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.6 13.4a2 2 0 0 0 2.8 0l3-3a2 2 0 0 0-2.8-2.8l-1 1"/><path d="M13.4 10.6a2 2 0 0 0-2.8 0l-3 3a2 2 0 0 0 2.8 2.8l1-1"/></svg><span>Connections</span></a>
     </div>
-  </div>
+    <a class="adv" href="/orchestration.html">API keys &amp; connectors →</a>
+  </nav>
 
-  <!-- ── Panel: Connectors ───────────────────────────────────────────────── -->
-  <div role="tabpanel" id="panel-connectors" aria-labelledby="tab-connectors" tabindex="0" hidden>
-    <div class="section-label">Connectors</div>
-    <div class="grid2">
-      <div class="connector-card">
-        <div class="connector-icon">🔌</div>
-        <div class="connector-meta">
-          <div class="connector-name">MCP Server</div>
-          <div class="connector-sub" id="mcp-sub">OAuth 2.0 · Port 8772</div>
-        </div>
-        <div class="connector-actions">
-          <span class="conn-badge disconnected" id="mcp-badge">Disconnected</span>
-          <button class="btn-pill" onclick="testMcp()" aria-label="Connect to MCP server">Connect</button>
-        </div>
-      </div>
-      <div class="connector-card">
-        <div class="connector-icon">🔍</div>
-        <div class="connector-meta">
-          <div class="connector-name">Web Search</div>
-          <div class="connector-sub">DuckDuckGo · No key needed</div>
-        </div>
-        <div class="connector-actions">
-          <span class="conn-badge ready" id="search-badge">Ready</span>
-          <button class="btn-pill" onclick="testWebSearch()" aria-label="Test web search">Test</button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <section class="set-content">
+    <div class="panel active" id="p-general"><div class="loading-panel">Loading…</div></div>
+    <div class="panel" id="p-account"><div class="loading-panel">Loading…</div></div>
+    <div class="panel" id="p-billing"><div class="loading-panel">Loading…</div></div>
+    <div class="panel" id="p-connections"><div class="loading-panel">Loading…</div></div>
+  </section>
+</main>
 
-  <!-- ── Panel: Context ──────────────────────────────────────────────────── -->
-  <div role="tabpanel" id="panel-context" aria-labelledby="tab-context" tabindex="0" hidden>
-    <div class="section-label">Context Modes</div>
-    <div class="grid2">
-      <div class="toggle-card">
-        <span class="toggle-label" id="lbl-ctx-web">Web Search (MCP)</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="ctx-web" aria-labelledby="lbl-ctx-web" onchange="saveCtx('web',this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="toggle-card">
-        <span class="toggle-label" id="lbl-ctx-csf">CSF Memory / Symbols</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="ctx-csf" aria-labelledby="lbl-ctx-csf" onchange="saveCtx('csf',this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-      <div class="toggle-card">
-        <span class="toggle-label" id="lbl-ctx-trading">Trading Context (IBKR)</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="ctx-trading" aria-labelledby="lbl-ctx-trading" onchange="saveCtx('trading',this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>
-  </div>
-
-</div>
-</div>
-
-<div id="toast"></div>
-
-<script>
-// Theme toggle is wired by the injected site-chrome nav's onclick + js/theme-toggle.js (#2254).
-
-// ── Tabs (WAI-ARIA tabs pattern: arrow keys move + select, Home/End jump) ──
-(function initTabs() {
-  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
-  const panels = { 'tab-keys':'panel-keys', 'tab-connectors':'panel-connectors', 'tab-context':'panel-context' };
-  const hashes = { '#keys':'tab-keys', '#connectors':'tab-connectors', '#context':'tab-context' };
-
-  function select(tab, focus) {
-    tabs.forEach(t => {
-      const on = t === tab;
-      t.setAttribute('aria-selected', on ? 'true' : 'false');
-      t.tabIndex = on ? 0 : -1;
-      document.getElementById(panels[t.id]).hidden = !on;
-    });
-    if (focus) tab.focus();
-    const hash = Object.keys(hashes).find(h => hashes[h] === tab.id);
-    if (hash) history.replaceState(null, '', hash);
-  }
-
-  tabs.forEach((tab, i) => {
-    tab.addEventListener('click', () => select(tab, false));
-    tab.addEventListener('keydown', (e) => {
-      let j = null;
-      if (e.key === 'ArrowRight') j = (i + 1) % tabs.length;
-      else if (e.key === 'ArrowLeft') j = (i - 1 + tabs.length) % tabs.length;
-      else if (e.key === 'Home') j = 0;
-      else if (e.key === 'End') j = tabs.length - 1;
-      if (j !== null) { e.preventDefault(); select(tabs[j], true); }
-    });
-  });
-
-  const fromHash = hashes[location.hash];
-  if (fromHash) select(document.getElementById(fromHash), false);
-})();
-
-// ── Toast ──────────────────────────────────────────────────────────────────
-let _tt;
-function toast(msg) {
-  const el = document.getElementById('toast');
-  el.textContent = msg; el.classList.add('show');
-  clearTimeout(_tt); _tt = setTimeout(() => el.classList.remove('show'), 2600);
-}
-
-// ── localStorage key map (old names → new) ────────────────────────────────
-// Old page used api_key_claude / api_key_gemini / api_key_openai / api_key_grok
-// New page uses  lantern_key_anthropic / lantern_key_gemini / lantern_key_openai / lantern_key_xai
-const OLD_KEY_MAP = { anthropic:'api_key_claude', gemini:'api_key_gemini', openai:'api_key_openai', xai:'api_key_grok' };
-const NEW_KEY     = id => 'lantern_key_' + id;
-
-function getStoredKey(id) {
-  return localStorage.getItem(NEW_KEY(id)) || localStorage.getItem(OLD_KEY_MAP[id]) || null;
-}
-function setStoredKey(id, val) {
-  localStorage.setItem(NEW_KEY(id), val);
-  // Also remove legacy key to avoid confusion
-  localStorage.removeItem(OLD_KEY_MAP[id]);
-}
-function removeStoredKey(id) {
-  localStorage.removeItem(NEW_KEY(id));
-  localStorage.removeItem(OLD_KEY_MAP[id]);
-}
-
-// ── UI helpers ─────────────────────────────────────────────────────────────
-function setStatus(id, state, label) {
-  const el = document.getElementById('status-' + id);
-  if (!el) return;
-  el.className = 'key-badge ' + state;
-  el.textContent = label || state;
-}
-
-function setInputPlaceholder(id, key) {
-  const inp = document.getElementById('input-' + id);
-  if (!inp) return;
-  inp.placeholder = key ? '•••••••• (set — enter new key to replace)' : { anthropic:'sk-ant-…', gemini:'AIzaSy…', openai:'sk-…', xai:'xai-…' }[id] || '…';
-  if (key) inp.value = ''; // clear input so placeholder shows
-}
-
-function toggleEye(id) {
-  const inp = document.getElementById('input-' + id);
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-
-// ── Key CRUD ───────────────────────────────────────────────────────────────
-async function saveKey(id) {
-  const inp = document.getElementById('input-' + id);
-  const val = inp.value.trim();
-  if (!val) { toast('Paste your key first'); inp.focus(); return; }
-
-  setStatus(id, 'testing', 'saving…');
-  // Persist to server .env.local first (so autowork can use it)
-  try {
-    const r = await fetch('/api/providers/set-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: id, key: val }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || 'server error');
-  } catch(e) {
-    // Server save failed — fall back to localStorage only
-    console.warn('server key save failed, using localStorage only:', e.message);
-  }
-
-  // Always save to localStorage as well
-  setStoredKey(id, val);
-  inp.value = '';
-  setInputPlaceholder(id, val);
-  setStatus(id, 'connected', 'connected');
-  toast('✓ ' + id + ' key saved');
-}
-
-async function clearKey(id) {
-  try {
-    await fetch('/api/providers/set-key', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: id }),
-    });
-  } catch(e) { /* best-effort */ }
-  removeStoredKey(id);
-  document.getElementById('input-' + id).value = '';
-  setInputPlaceholder(id, null);
-  setStatus(id, 'disconnected', 'disconnected');
-  toast(id + ' key cleared');
-}
-
-async function testKey(id) {
-  setStatus(id, 'testing', 'testing…');
-  // Send the current input value as key override if filled in
-  const inp = document.getElementById('input-' + id);
-  const keyOverride = inp.value.trim() || null;
-  try {
-    const r = await fetch('/api/providers/test/' + id, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(keyOverride ? { key: keyOverride } : {}),
-      signal: AbortSignal.timeout(12000),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (r.ok && d.ok) { setStatus(id, 'connected', 'connected'); toast('✓ ' + id + ' connected'); }
-    else {
-      setStatus(id, 'error', 'error');
-      toast('✗ ' + (d.error || d.message || 'check your key'));
-    }
-  } catch(e) {
-    setStatus(id, 'error', 'error');
-    toast('✗ ' + e.message);
-  }
-}
-
-// ── Connectors ─────────────────────────────────────────────────────────────
-async function testMcp() {
-  document.getElementById('mcp-badge').textContent = 'Checking…';
-  try {
-    const r = await fetch('http://127.0.0.1:8772/health', { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      document.getElementById('mcp-badge').className = 'conn-badge ready';
-      document.getElementById('mcp-badge').textContent = 'Connected';
-      document.getElementById('mcp-sub').textContent = 'OAuth 2.0 · Port 8772 · online';
-      toast('✓ MCP server reachable');
-    } else throw new Error('HTTP ' + r.status);
-  } catch(e) {
-    document.getElementById('mcp-badge').className = 'conn-badge disconnected';
-    document.getElementById('mcp-badge').textContent = 'Disconnected';
-    toast('MCP offline — start: python src/mcp_server/server.py');
-  }
-}
-
-async function testWebSearch() {
-  const badge = document.getElementById('search-badge');
-  badge.textContent = 'Testing…';
-  try {
-    const r = await fetch('/api/web-search?q=lantern', { signal: AbortSignal.timeout(6000) });
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    if (!data || !data.count) throw new Error('no results');
-    badge.className = 'conn-badge ready'; badge.textContent = 'Ready';
-    toast('✓ Web search OK (' + data.count + ' via ' + (data.source || 'web') + ')');
-  } catch(e) {
-    badge.className = 'conn-badge disconnected'; badge.textContent = 'Error';
-    toast('Web search error: ' + e.message);
-  }
-}
-
-// ── Context toggles ────────────────────────────────────────────────────────
-function saveCtx(k, v) {
-  localStorage.setItem('lantern_ctx_' + k, v ? '1' : '0');
-  toast((v ? '✓ ' : '— ') + { web:'Web Search', csf:'CSF Memory', trading:'Trading Context' }[k]);
-}
-['web','csf','trading'].forEach(k => {
-  const el = document.getElementById('ctx-' + k);
-  if (el) el.checked = localStorage.getItem('lantern_ctx_' + k) === '1';
-});
-
-// ── Provider preference ────────────────────────────────────────────────────
-const provSel = document.getElementById('provider-select');
-provSel.value = localStorage.getItem('lantern-provider') || 'auto';
-provSel.addEventListener('change', () => {
-  localStorage.setItem('lantern-provider', provSel.value);
-  toast('Provider set: ' + provSel.options[provSel.selectedIndex].text);
-});
-
-// ── Boot: load keys (localStorage first, then server .env overlay) ─────────
-const PROVIDERS = ['anthropic','gemini','openai','xai'];
-
-function initLocalKeys() {
-  PROVIDERS.forEach(id => {
-    const key = getStoredKey(id);
-    setInputPlaceholder(id, key);
-    if (key) setStatus(id, 'connected', 'connected');
-  });
-}
-
-async function overlayServerKeys() {
-  try {
-    const r = await fetch('/api/pcsf/routing', { cache:'no-store', signal: AbortSignal.timeout(4000) });
-    if (!r.ok) return;
-    const data = await r.json();
-    const map = { anthropic:'anthropic', gemini:'gemini', openai:'openai', xai:'xai' };
-    (data.providers || []).forEach(p => {
-      const id = map[p.id];
-      if (!id || !p.hasKey) return;
-      setStatus(id, 'connected', 'connected');
-      // Only update placeholder if not already set in localStorage
-      const inp = document.getElementById('input-' + id);
-      if (inp && !getStoredKey(id) && inp.placeholder.indexOf('set') === -1) {
-        inp.placeholder = '•••••••• (set in .env)';
-      }
-    });
-  } catch(e) { /* server offline — localStorage still shown */ }
-}
-
-async function overlayUserKeys() {
-  // Per-user server-stored keys (#2505) — lets a save made on another device
-  // show as connected here. 401 = signed out; localStorage view stands.
-  try {
-    const r = await fetch('/api/providers/set-key', { cache:'no-store', signal: AbortSignal.timeout(4000) });
-    if (!r.ok) return;
-    const data = await r.json();
-    (data.keys || []).forEach(k => {
-      if (!k.set || !PROVIDERS.includes(k.provider)) return;
-      setStatus(k.provider, 'connected', 'connected');
-      const inp = document.getElementById('input-' + k.provider);
-      if (inp && !getStoredKey(k.provider) && inp.placeholder.indexOf('set') === -1) {
-        inp.placeholder = '•••••••• (saved to your account)';
-      }
-    });
-  } catch(e) { /* server offline — localStorage still shown */ }
-}
-
-initLocalKeys();
-overlayServerKeys();
-overlayUserKeys();
-</script>
-<script src="/js/theme-toggle.js" defer></script>
+<script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
-</body>
+<script>
+(function () {
+  "use strict";
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const $ = (id) => document.getElementById(id);
+  let profile = null;
+
+  async function api(url, opts) {
+    try { const r = await fetch(url, Object.assign({ credentials: "same-origin", cache: "no-store" }, opts || {})); const body = await r.json().catch(() => null); return { ok: r.ok, status: r.status, body }; }
+    catch (e) { return { ok: false, status: 0, body: null }; }
+  }
+  const initials = (n) => (String(n || "").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "U").toUpperCase();
+  const ROLE_PLAN = { guest: "Free", supporter: "Free", deep_dreamer: "Pro", founder: "Pro", pilot: "Pilot", admin: "Pilot" };
+  const planName = (role) => ROLE_PLAN[role] || "Free";
+
+  const PANELS = ["general", "account", "billing", "connections"];
+  function show(name) {
+    if (!PANELS.includes(name)) name = "general";
+    document.querySelectorAll(".set-nav a[data-panel]").forEach((a) => a.classList.toggle("active", a.dataset.panel === name));
+    PANELS.forEach((p) => $("p-" + p).classList.toggle("active", p === name));
+    if (location.hash.slice(1) !== name) history.replaceState(null, "", "#" + name);
+  }
+  document.querySelectorAll(".set-nav a[data-panel]").forEach((a) => a.addEventListener("click", () => show(a.dataset.panel)));
+  window.addEventListener("hashchange", () => show(location.hash.slice(1)));
+
+  async function load() {
+    profile = (await api("/api/profiles/me")).body || null;
+    renderGeneral(); renderAccount(); renderBilling(); renderConnections();
+  }
+  function needSignIn(el, what) {
+    el.innerHTML = `<h2>${what}</h2><p class="sub">Sign in to manage your ${what.toLowerCase()}.</p><a class="btn primary" href="/auth.html?returnTo=%2Fsettings.html">Sign in</a>`;
+  }
+
+  // ── GENERAL ──────────────────────────────────────────────────────────────
+  function renderGeneral() {
+    const el = $("p-general");
+    if (!profile) return needSignIn(el, "General");
+    const prefs = profile.preferences || {};
+    const theme = localStorage.getItem("lantern-theme") || "system";
+    el.innerHTML = `
+      <h2>General</h2><p class="sub">Your profile and how the app looks.</p>
+      <div class="group-label">Profile</div>
+      <div class="row"><div class="rl"><div class="k">Avatar</div></div><div class="rc"><div class="avatar-lg">${esc(initials(profile.name))}</div></div></div>
+      <div class="row"><div class="rl"><div class="k">Full name</div></div><div class="rc"><input class="fld" id="g-name" value="${esc(profile.name || "")}" maxlength="80"><button class="btn primary" id="g-name-save">Save</button></div></div>
+      <div class="row"><div class="rl"><div class="k">What should we call you?</div><div class="v">Used to greet you in chat and the trader.</div></div><div class="rc"><input class="fld" id="g-callme" value="${esc(prefs.displayName || "")}" maxlength="40" placeholder="${esc(profile.name || "Your name")}"><button class="btn primary" id="g-callme-save">Save</button></div></div>
+      <div class="group-label">Preferences</div>
+      <div class="row"><div class="rl"><div class="k">Appearance</div><div class="v">System follows your device setting.</div></div><div class="rc">
+        <div class="seg" id="g-theme">
+          <button data-t="system" class="${theme === "system" ? "on" : ""}">🖥 System</button>
+          <button data-t="light" class="${theme === "light" ? "on" : ""}">☀ Light</button>
+          <button data-t="dark" class="${theme === "dark" ? "on" : ""}">🌙 Dark</button>
+        </div></div></div>`;
+    $("g-name-save").onclick = async (e) => {
+      e.target.disabled = true;
+      const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: $("g-name").value.trim() }) });
+      e.target.textContent = out.ok ? "Saved ✓" : "Retry"; e.target.disabled = false;
+      if (out.ok) { profile.name = $("g-name").value.trim(); renderAccount(); }
+    };
+    $("g-callme-save").onclick = async (e) => {
+      e.target.disabled = true;
+      const merged = Object.assign({}, profile.preferences || {}, { displayName: $("g-callme").value.trim() });
+      const out = await api("/api/profiles/me", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ preferences: merged }) });
+      e.target.textContent = out.ok ? "Saved ✓" : "Retry"; e.target.disabled = false;
+      if (out.ok) profile.preferences = merged;
+    };
+    $("g-theme").querySelectorAll("button").forEach((b) => b.onclick = () => {
+      const t = b.dataset.t;
+      if (t === "system") { localStorage.removeItem("lantern-theme"); const d = window.matchMedia("(prefers-color-scheme: dark)").matches; document.documentElement.setAttribute("data-theme", d ? "dark" : "light"); }
+      else { localStorage.setItem("lantern-theme", t); document.documentElement.setAttribute("data-theme", t); }
+      $("g-theme").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x.dataset.t === t));
+    });
+  }
+
+  // ── ACCOUNT ──────────────────────────────────────────────────────────────
+  const PROV = { google: { label: "Google", emoji: "🇬" }, local: { label: "Email + password", emoji: "🔑" }, discord: { label: "Discord", emoji: "💬" } };
+  function renderAccount() {
+    const el = $("p-account");
+    if (!profile) return needSignIn(el, "Account");
+    const verified = profile.emailVerified === true, hasPw = profile.hasPassword !== false;
+    const pending = profile.pendingEmail || null;
+    const ids = new Set((profile.identities || []).map((i) => i.provider));
+    if (profile.provider) ids.add(profile.provider);
+    const banner = (!verified && profile.email) || pending
+      ? `<div class="banner">${pending ? `Confirm <strong>${esc(pending)}</strong> to finish changing your email. ` : `Please confirm your email <strong>${esc(profile.email || "")}</strong>. `}<a href="#" id="a-resend">Resend link</a></div>` : "";
+    const provRows = Object.keys(PROV).map((p) => {
+      const on = ids.has(p);
+      return `<div class="row"><div class="rl"><div class="k">${PROV[p].emoji} ${PROV[p].label}</div></div><div class="rc">${on ? `<span class="pill ok">Connected</span>` : `<button class="btn" data-connect="${p}">Connect</button>`}</div></div>`;
+    }).join("");
+    el.innerHTML = `
+      <h2>Account</h2><p class="sub">Your sign-in, email and password.</p>${banner}
+      <div class="group-label">Identity</div>
+      <div class="row"><div class="rl"><div class="k">Email address</div><div class="v">${esc(profile.email || "—")} ${verified ? '<span class="pill ok">verified</span>' : ""}</div></div><div class="rc"><button class="btn" id="a-email">Change</button></div></div>
+      <div class="row"><div class="rl"><div class="k">Password</div><div class="v">${hasPw ? "••••••••" : "No password set"}</div></div><div class="rc"><button class="btn" id="a-pw">${hasPw ? "Change" : "Set password"}</button></div></div>
+      <div class="row"><div class="rl"><div class="k">Account ID</div><div class="v">${esc(profile.id || "—")}</div></div></div>
+      <div class="group-label">Sign-in methods</div>${provRows}
+      <div class="group-label">Session</div>
+      <div class="row"><div class="rl"><div class="k">Sign out</div><div class="v">End your session on this device.</div></div><div class="rc"><button class="btn" id="a-logout">Sign out</button></div></div>
+      <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>`;
+    const r = $("a-resend"); if (r) r.onclick = async (e) => { e.preventDefault(); await api("/api/profiles/me/resend-verification", { method: "POST" }); e.target.textContent = "Sent ✓"; };
+    $("a-email").onclick = () => { const v = prompt("New email address:"); if (v) api("/api/profiles/me/change-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: v.trim() }) }).then((o) => alert(o.ok ? "Check your inbox to confirm the change." : (o.body && (o.body.error || o.body.message)) || "Could not change email.")); };
+    $("a-pw").onclick = () => { const v = prompt("New password (min 8 chars):"); if (v) api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ newPassword: v }) }).then((o) => alert(o.ok ? "Password updated." : (o.body && (o.body.error || o.body.message)) || "Could not set password.")); };
+    el.querySelectorAll("[data-connect]").forEach((b) => b.onclick = () => { location.href = `/api/auth/${b.dataset.connect}/start?returnTo=${encodeURIComponent("/settings.html#account")}`; });
+    $("a-logout").onclick = async () => { await api("/api/auth/logout", { method: "POST" }); location.href = "/"; };
+    $("a-delete").onclick = () => { if (confirm("Delete your account permanently? This cannot be undone.")) alert("For your safety, account deletion is handled by support — email founder@lantern-os.net and we'll remove it right away."); };
+  }
+
+  // ── BILLING ──────────────────────────────────────────────────────────────
+  function renderBilling() {
+    const el = $("p-billing");
+    if (!profile) return needSignIn(el, "Billing");
+    const plan = planName(profile.role);
+    const FEATURES = {
+      Free: ["Memory-backed chat", "Personalized charts + watchlist", "Paper-trading contest", "Live demo account"],
+      Pro: ["Everything in Free", "Real-money trading (your broker)", "Creator Suite (video → shorts)", "Wide multi-model research + persistent memory"],
+      Pilot: ["Everything in Pro", "Autonomous AI trader", "1:1 operator review", "Priority support"],
+    };
+    el.innerHTML = `
+      <h2>Billing</h2><p class="sub">Your plan and subscription.</p>
+      <div class="plan-card">
+        <div class="pc-head"><div><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Current plan</div><div style="font-size:22px;font-weight:800;margin-top:2px">${plan}</div></div><span class="tier-badge2">${esc(plan)}</span></div>
+        <ul>${(FEATURES[plan] || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
+      </div>
+      <div class="group-label">Manage</div>
+      ${plan !== "Pilot" ? `<div class="row"><div class="rl"><div class="k">Upgrade</div><div class="v">${plan === "Free" ? "Unlock real-money trading + the creator suite." : "Add the autonomous AI trader."}</div></div><div class="rc"><a class="btn primary" href="/pricing.html">See plans</a></div></div>` : ""}
+      <div class="row"><div class="rl"><div class="k">Manage subscription</div><div class="v">Update card, invoices, or cancel — via Stripe.</div></div><div class="rc"><button class="btn" id="b-portal">Open portal</button></div></div>
+      <div class="row"><div class="rl"><div class="k">Already subscribed elsewhere?</div><div class="v">Link a Stripe or Patreon subscription to this account.</div></div><div class="rc"><button class="btn" id="b-link">Link subscription</button></div></div>
+      <p class="muted-note">Payments are handled by Stripe or Patreon — we never see or store your card. The Free plan needs no billing.</p>`;
+    $("b-portal").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/portal", { method: "POST" }); if (o.ok && o.body && o.body.url) location.href = o.body.url; else { alert((o.body && o.body.message) || "No active subscription to manage — upgrade first."); e.target.disabled = false; } };
+    $("b-link").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/link", { method: "POST" }); alert(o.ok ? (o.body && o.body.already ? "Already linked." : "Subscription linked — your plan will update shortly.") : (o.body && o.body.message) || "No subscription found for your email."); e.target.disabled = false; if (o.ok) load(); };
+  }
+
+  // ── CONNECTIONS ──────────────────────────────────────────────────────────
+  async function renderConnections() {
+    const el = $("p-connections");
+    if (!profile) return needSignIn(el, "Connections");
+    el.innerHTML = `<h2>Connections</h2><p class="sub">Link your brokerage and share your invite.</p><div class="loading-panel">Checking connections…</div>`;
+    const [ib, al, ref] = await Promise.all([
+      api("/api/trading/ibkr/connection"), api("/api/broker/alpaca/status"), api("/api/referral/link"),
+    ]);
+    const ibLive = ib.body && ib.body.live && ib.body.live.connected;
+    const ibCreds = ib.body && ib.body.hasCredentials;
+    const alConn = al.body && (al.body.connected || al.body.status === "connected");
+    const refUrl = ref.body && (ref.body.url || ref.body.link);
+    el.innerHTML = `
+      <h2>Connections</h2><p class="sub">Link your brokerage and share your invite.</p>
+      <div class="group-label">Brokerage</div>
+      <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
+      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? "Connected — paper trading" : "One-click paper-trading account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn" id="c-al-on">Connect</button>`}</div></div>
+      <div class="group-label">Invite</div>
+      <div class="row"><div class="rl"><div class="k">Your referral link</div><div class="v">${refUrl ? esc(refUrl) : "Generated once you can refer friends."}</div></div><div class="rc">${refUrl ? `<button class="btn" id="c-copy">Copy</button>` : ""}</div></div>
+      <p class="muted-note">Brokerage credentials are stored encrypted on the server and never leave it. Alpaca is paper-only; IBKR can be paper or live.</p>`;
+    const on = $("c-al-on"); if (on) on.onclick = async () => { const o = await api("/api/broker/alpaca/connect", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else renderConnections(); };
+    const off = $("c-al-off"); if (off) off.onclick = async () => { await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    const cp = $("c-copy"); if (cp) cp.onclick = () => { navigator.clipboard.writeText(refUrl).then(() => { cp.textContent = "Copied ✓"; }); };
+  }
+
+  load().then(() => show(location.hash.slice(1) || "general"));
+})();
+</script>
 </html>
