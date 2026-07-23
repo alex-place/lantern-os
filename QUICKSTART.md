@@ -115,7 +115,7 @@ Once it's running on `http://127.0.0.1:4177`:
 | **Home** | `/` | The landing page with links to everything |
 | **Chat** | `/chat.html` | Talk to unisona.ai — your main way in (legacy `/dream-chat.html` redirects) |
 | **Help** | `/knowledgecenter.html` | Guides, docs, and your saved PDFs |
-| **Trader** | `/trader-dashboard.html` | Markets & prediction-market terminal *(needs an account)* |
+| **Trader** | `/stock-trader.html` | Markets & prediction-market terminal *(needs an account)* |
 | **Create** | `/create.html` | Image and content tools *(needs an account)* |
 | **Explore** | `/explore.html` | Games, the flourishing dashboard, and more |
 

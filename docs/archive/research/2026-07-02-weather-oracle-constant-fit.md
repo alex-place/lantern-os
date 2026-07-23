@@ -120,6 +120,6 @@ Recommended: a short paper-observation window on real settled days before trusti
 Live 2026-07-02: [IEM MOS](https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py?station=KNYC&model=NBS&sts=2025-07-01T00:00Z&ets=2025-07-02T00:00Z&format=csv),
 [IEM ASOS](https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?help=),
 [IEM NWS CLI](https://mesonet.agron.iastate.edu/json/cli.py?station=KNYC&year=2024).
-Related: [`kalshi-weather-edge.js`](../../apps/lantern-garage/lib/kalshi-weather-edge.js),
-[`kalshi-nws.js`](../../apps/lantern-garage/lib/kalshi-nws.js),
-[distribution Verify #1895](2026-06-30-sigma0-weather-oracle-kalshi-edge.md), issue #1871.
+Related: [`kalshi-weather-edge.js`](../../../apps/lantern-garage/lib/kalshi-weather-edge.js),
+[`kalshi-nws.js`](../../../apps/lantern-garage/lib/kalshi-nws.js),
+[distribution Verify #1895](../../research/2026-06-30-sigma0-weather-oracle-kalshi-edge.md), issue #1871.

@@ -196,7 +196,7 @@ npm run test:auth
 | **Members / product** | [unisona.ai chat product definition](docs/KEYSTONE-PRODUCT.md) · [Dream Journal quickstart](docs/DREAM-JOURNAL-QUICKSTART.md) · [Explore feed](docs/EXPLORE-FEED.md) |
 | **Architects** | [Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md) (start here) · [ARCHITECTURE.md](docs/ARCHITECTURE.md) · [ADR index](docs/adr/README.md) · [CSF format spec](docs/CSF-FORMAT-SPECIFICATION.md) · [PCSF](docs/convergence-io/PCSF.md) · [convergence-core mapping](docs/convergence-core-mapping.md) |
 | **Traders / analysts** | [Trading API reference](docs/trading-api-reference.md) · [Kalshi API spec](docs/KALSHI-API-SPEC.md) · [Sharpe certificate](docs/UNISONA-SHARPE-CERTIFICATE.md) · [survivorship study](experiments/survivorship_momentum/FINDINGS.md) · [market-data vendors](docs/research/2026-07-18-market-data-vendors-survivorship.md) · [experiments/](experiments/) |
-| **Operators / deploy** | [PROVIDERS.md](PROVIDERS.md) · [Cloudflare tunnel deployment](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) · [repo contract](docs/REPO-CONTRACT.md) · [CHANGELOG.MD](CHANGELOG.MD) |
+| **Operators / deploy** | [PROVIDERS.md](PROVIDERS.md) · [Cloudflare tunnel deployment](docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md) · [repo contract](docs/archive/REPO-CONTRACT.md) · [CHANGELOG.MD](CHANGELOG.MD) |
 
 Something broken? Search or file a [GitHub issue](https://github.com/alex-place/lantern-os/issues) (labels: `bug`, `p0`, `p1`, `convergence`).
 

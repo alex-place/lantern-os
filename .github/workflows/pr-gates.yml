@@ -33,7 +33,7 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   MAX_NEW_FILES: 25
   MAX_NEW_MARKDOWN: 12
-  ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github,changelog.d
+  ALLOWED_TOP_LEVEL: src,apps,docs,tests,scripts,config,data,ops,integrations,skills,manifests,surfaces,archive,experiments,csf,lore,reports,research,assets,caad,.github,changelog.d,.claude
 
 jobs:
   # ── Anti-Sprawl Gate ────────────────────────────────────────────────────────
@@ -148,6 +148,14 @@ jobs:
           node-version: 24
       - name: Check relative markdown links
         run: node scripts/check-md-links.mjs --strict
+      # Mirror of the sprawl tripwire for REMOVED/RENAMED surfaces (#2811): the four
+      # canonical entry docs must not cite a public page that no longer exists or is
+      # only a redirect stub. The chat.html rename (#2751) left eleven stale
+      # dream-chat.html references for a week — this makes that class blocking.
+      - name: Check docs surface drift
+        run: node scripts/check-docs-drift.mjs
+      - name: Validate docs-drift gate logic
+        run: node apps/lantern-garage/test/docs-drift-gate.test.js
 
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
@@ -343,6 +351,9 @@ jobs:
             "__init__.py", "README.md", "README.rst", "setup.py",
             "conftest.py", "pytest.ini", "pyproject.toml", "setup.cfg",
             ".gitignore", ".gitkeep", "index.html", "index.js",
+            # One per skill directory by definition (like __init__.py per package) —
+            # .claude/skills/*/SKILL.md and skills/*/SKILL.md legitimately repeat.
+            "SKILL.md",
             # Node manifests are as legitimately-repeated as the Python ones above:
             # every sub-package / tool dir carries its own. Flagging them as duplicates
             # is a false positive (surfaced by #2744's leap-video report tooling).

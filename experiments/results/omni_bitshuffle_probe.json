@@ -1,0 +1,116 @@
+{
+  "tested": 8,
+  "improved": 1,
+  "winners": {
+    "silesia/x-ray": {
+      "method": "spdp2",
+      "gain_pct": 0.85
+    }
+  },
+  "per_file": {
+    "aitdcc/E": {
+      "raw": 1012112,
+      "omni_max_now": 796410,
+      "best_research": "spdp4",
+      "best_bytes": 806472,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp4": 806472,
+        "spdp8": 808656,
+        "bitshuf4+lzma": 820668
+      }
+    },
+    "aitdcc/F": {
+      "raw": 2097152,
+      "omni_max_now": 1644983,
+      "best_research": "spdp4",
+      "best_bytes": 1646960,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp4": 1646960,
+        "spdp2": 1647624,
+        "spdp8": 1653896
+      }
+    },
+    "aitdcc/G": {
+      "raw": 2526752,
+      "omni_max_now": 708079,
+      "best_research": "spdp2",
+      "best_bytes": 742344,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp2": 742344,
+        "spdp4": 749216,
+        "spdp8": 753916
+      }
+    },
+    "aitdcc/H": {
+      "raw": 1022760,
+      "omni_max_now": 354448,
+      "best_research": "spdp2",
+      "best_bytes": 583116,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp2": 583116,
+        "spdp4": 665972,
+        "spdp8": 736916
+      }
+    },
+    "silesia/mr": {
+      "raw": 9970564,
+      "omni_max_now": 2441287,
+      "best_research": "spdp2",
+      "best_bytes": 2496372,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp2": 2496372,
+        "bitshuf2+lzma": 2763700,
+        "bitshuf2+zstd": 2802154
+      }
+    },
+    "silesia/osdb": {
+      "raw": 10085684,
+      "omni_max_now": 2802799,
+      "best_research": "spdp2",
+      "best_bytes": 4248440,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp2": 4248440,
+        "spdp4": 5344008,
+        "spdp8": 7352604
+      }
+    },
+    "silesia/sao": {
+      "raw": 7251944,
+      "omni_max_now": 4415079,
+      "best_research": "spdp2",
+      "best_bytes": 6243908,
+      "improves": false,
+      "gain_pct": 0.0,
+      "top3": {
+        "spdp2": 6243908,
+        "bitshuf4+lzma": 6425588,
+        "bitshuf8+lzma": 6462356
+      }
+    },
+    "silesia/x-ray": {
+      "raw": 8474240,
+      "omni_max_now": 4051119,
+      "best_research": "spdp2",
+      "best_bytes": 4017140,
+      "improves": true,
+      "gain_pct": 0.85,
+      "top3": {
+        "spdp2": 4017140,
+        "spdp4": 4282088,
+        "bitshuf2+lzma": 4318828
+      }
+    }
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "files_tested": 13,
+  "files_improved": 5,
+  "tested_total_current": 38791882,
+  "tested_total_with_xd": 38341865,
+  "tested_gain_pct": 1.174,
+  "winners": {
+    "silesia/ooffice": {
+      "method": "bcj-x86+lzma9",
+      "gain_pct": 16.45,
+      "vs": "lzma-9 (plain)"
+    },
+    "aitdcc/E": {
+      "method": "shuf4+zstd",
+      "gain_pct": 7.7,
+      "vs": "brotli-11"
+    },
+    "aitdcc/F": {
+      "method": "shuf2+lzma",
+      "gain_pct": 1.01,
+      "vs": "brotli-11-tx"
+    },
+    "aitdcc/G": {
+      "method": "shuf8+lzma",
+      "gain_pct": 2.41,
+      "vs": "bz2-9"
+    },
+    "aitdcc/H": {
+      "method": "bcj-x86+lzma9",
+      "gain_pct": 3.42,
+      "vs": "lzma-pb0"
+    }
+  },
+  "per_file": {
+    "silesia/mozilla": {
+      "raw": 51220480,
+      "current_best": 13374160,
+      "current_method": "lzma-9 (plain)",
+      "best_xd": "bcj-arm+lzma9",
+      "best_xd_bytes": 13377721,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-arm+lzma9": 13377721,
+        "bcj-x86+lzma9": 13496164,
+        "shuf2+lzma": 15233232
+      }
+    },
+    "silesia/mr": {
+      "raw": 9970564,
+      "current_best": 2441280,
+      "current_method": "bz2-9",
+      "best_xd": "shuf2+lzma",
+      "best_xd_bytes": 2607124,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "shuf2+lzma": 2607124,
+        "pred2+lzma": 2610168,
+        "bcj-arm+lzma9": 2750211
+      }
+    },
+    "silesia/nci": {
+      "raw": 33553445,
+      "current_best": 1445376,
+      "current_method": "lzma-pb0",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 1738824,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-x86+lzma9": 1738824,
+        "bcj-arm+lzma9": 1738824,
+        "pred1+lzma": 1969436
+      }
+    },
+    "silesia/ooffice": {
+      "raw": 6152192,
+      "current_best": 2426816,
+      "current_method": "lzma-9 (plain)",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 2083933,
+      "improves": true,
+      "gain_pct": 16.45,
+      "all": {
+        "bcj-x86+lzma9": 2083933,
+        "bcj-arm+lzma9": 2447607,
+        "shuf2+lzma": 3008432
+      }
+    },
+    "silesia/osdb": {
+      "raw": 10085684,
+      "current_best": 2802792,
+      "current_method": "bz2-9",
+      "best_xd": "bcj-arm+lzma9",
+      "best_xd_bytes": 2851484,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-arm+lzma9": 2851484,
+        "bcj-x86+lzma9": 2852416,
+        "pred1+lzma": 3327304
+      }
+    },
+    "silesia/samba": {
+      "raw": 21606400,
+      "current_best": 3730295,
+      "current_method": "lzma-pb0",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 3764676,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-x86+lzma9": 3764676,
+        "bcj-arm+lzma9": 3764713,
+        "pred1+lzma": 4277016
+      }
+    },
+    "silesia/sao": {
+      "raw": 7251944,
+      "current_best": 4415072,
+      "current_method": "lzma-9 (plain)",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 4415352,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-x86+lzma9": 4415352,
+        "bcj-arm+lzma9": 4416780,
+        "pred1+lzma": 5179884
+      }
+    },
+    "silesia/x-ray": {
+      "raw": 8474240,
+      "current_best": 4051112,
+      "current_method": "bz2-9",
+      "best_xd": "shuf2+lzma",
+      "best_xd_bytes": 4082736,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "shuf2+lzma": 4082736,
+        "pred2+lzma": 4252052,
+        "shuf4+lzma": 4313472
+      }
+    },
+    "aitdcc/C": {
+      "raw": 2000000,
+      "current_best": 493953,
+      "current_method": "lzma-pb0",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 494357,
+      "improves": false,
+      "gain_pct": 0.0,
+      "all": {
+        "bcj-x86+lzma9": 494357,
+        "bcj-arm+lzma9": 494357,
+        "pred1+lzma": 617188
+      }
+    },
+    "aitdcc/E": {
+      "raw": 1012112,
+      "current_best": 857763,
+      "current_method": "brotli-11",
+      "best_xd": "shuf4+zstd",
+      "best_xd_bytes": 796403,
+      "improves": true,
+      "gain_pct": 7.7,
+      "all": {
+        "shuf4+zstd": 796403,
+        "shuf4+lzma": 796524,
+        "shuf8+zstd": 797511
+      }
+    },
+    "aitdcc/F": {
+      "raw": 2097152,
+      "current_best": 1661556,
+      "current_method": "brotli-11-tx",
+      "best_xd": "shuf2+lzma",
+      "best_xd_bytes": 1644976,
+      "improves": true,
+      "gain_pct": 1.01,
+      "all": {
+        "shuf2+lzma": 1644976,
+        "shuf4+lzma": 1646020,
+        "shuf8+lzma": 1648148
+      }
+    },
+    "aitdcc/G": {
+      "raw": 2526752,
+      "current_best": 725142,
+      "current_method": "bz2-9",
+      "best_xd": "shuf8+lzma",
+      "best_xd_bytes": 708072,
+      "improves": true,
+      "gain_pct": 2.41,
+      "all": {
+        "shuf8+lzma": 708072,
+        "shuf2+lzma": 727584,
+        "shuf4+lzma": 729636
+      }
+    },
+    "aitdcc/H": {
+      "raw": 1022760,
+      "current_best": 366565,
+      "current_method": "lzma-pb0",
+      "best_xd": "bcj-x86+lzma9",
+      "best_xd_bytes": 354441,
+      "improves": true,
+      "gain_pct": 3.42,
+      "all": {
+        "bcj-x86+lzma9": 354441,
+        "bcj-arm+lzma9": 368279,
+        "shuf2+lzma": 446700
+      }
+    }
+  }
+}

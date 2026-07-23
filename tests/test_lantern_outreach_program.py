@@ -13,5 +13,5 @@ def test_outreach_surface_stays_removed():
 
 def test_render_blueprint_is_retired_for_aws_pivot():
     assert not Path('render.yaml').exists()
-    text = Path('docs/LANTERN-RUNTIME-CICD.md').read_text(encoding='utf-8')
+    text = Path('docs/archive/LANTERN-RUNTIME-CICD.md').read_text(encoding='utf-8')
     assert 'Do not re-add `render.yaml`' in text
