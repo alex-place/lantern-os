@@ -56,6 +56,45 @@ Curated references organized by component. Not a bookmark dump. Living document 
   - Memory systems that work with any LLM
   - Informs Broker design
 
+### From-scratch training canon (reviewed 2026-07-23)
+
+The complete stack is four documents + one artifact; no single one is complete alone:
+
+- **The Smol Training Playbook** (HuggingFace, Oct 2025 — https://huggingfacetb-smol-training-playbook.hf.space/)
+  - **The most complete single written doc**: SmolLM3 3B / 11T tokens — our product tier, end-to-end
+  - Ablation discipline + data curation + post-training (SFT→DPO/GRPO, merging) **with the failures documented**
+  - Immediately actionable for us: the post-training + ablation chapters (VTD method), Eval Guidebook (B1–B5)
+- **Raschka, *Build a Large Language Model (From Scratch)*** (https://sebastianraschka.com/llms-from-scratch/)
+  - Pedagogy gold standard: embeddings→attention→GPT→pretrain→finetune, plain PyTorch; toy scale, thin RL
+- **Karpathy *nanochat*** (Oct 2025 — https://github.com/karpathy/nanochat)
+  - Smallest true end-to-end pipeline (tokenizer→pretrain→SFT→GRPO→eval→UI, ~$50–100); Phase-2 dry-run harness
+- **Stanford CS336 — Language Models From Scratch** (public lectures + assignments)
+  - The rigor path (build tokenizer/FlashAttention-in-Triton/distributed/scaling laws); training-lane curriculum (#2850)
+- **OLMo 3** (AI2, Nov 2025 — https://allenai.org/blog/olmo3)
+  - Not a doc — **the most complete reproducible artifact**: Dolma 3 (~9.3T), all code, every checkpoint,
+    reasoning traces traceable to data. The External Reality Rule industrialized; trust the code over any doc.
+- **The shared gap (our responsibility):** none covers looped/recurrent-depth cores, exec-verifier-in-the-loop
+  training, or ternary-native training — exactly where Σ₀ lives. SmolLM3's 11T-token cost is also the
+  standing argument for our retrofit-first decision.
+
+### Modern LLM design landscape (wide sweep, 2026-07-23)
+
+- **Frontier convergence** (Raschka's Architecture Gallery + Big Comparison; living table github.com/YichenZW/llm-arch-table)
+  - MoE is the flagship default (capability-per-FLOP case closed); **MLA gaining on GQA** (KV compression
+    that can *improve* quality); sliding-window mixes (Gemma 5:1, Cohere 3:1 RoPE+NoPE); QK-Norm; Pre+Post-Norm
+  - Verdict quoted from the field: the architecture war is maturing into an **engineering war** (training/data/post-train)
+- **Hybrid linear attention went mainstream** (Qwen3-Next 3:1 Gated-DeltaNet:full → promoted into Qwen3.5
+  flagship; Kimi KDA channel-wise gating; OLMo-Hybrid; Labonne "nobody agrees on attention anymore")
+  - **Σ₀ relevance — admissibility note:** the 3:1 layer pattern is *static*, not input-routed — unlike MoE
+    it is NOT a switched system, so certificate §1 machinery applies per-layer. Linear-hybrid is therefore a
+    *certifiable* long-context/CPU lever for a future RC arm, where MoE still waits on the admission gate.
+- **Diffusion LLMs are commercial** (Mercury Coder ~1109 tok/s on H100, ~10× speed at comparable quality;
+  open LLaDA/Dream/DiffuCoder; survey github.com/VILA-Lab/Awesome-DLMs)
+  - Parallel unmasking = many candidates per pass — a natural verifier-amplification feeder; GPU-centric
+    today, CPU story unproven → watch-list, not adopt
+- **Efficiency survey anchor:** *Speed Always Wins* (arXiv:2508.09834); attention-sink survey (2604.10098);
+  hybrid-sparse + learnable token eviction (2510.20787); speculative token sparsity (2605.15508)
+
 **Status:** Framework exists (needs formalization as Lantern component)
 
 ---

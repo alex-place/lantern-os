@@ -1,3 +1,0 @@
-### Changed
-
-- cert(#2874): **R9 basin-determinism round-2 kill-or-confirm ran: CONFIRMED, boundary sharpened.** Pre-registered 8-query/3-fetch audit: the training-objective half is clean (HRM contraction training 2603.22871 is input-specific stability, DEQ neural-collapse 2410.23391 is descriptive vision-only — ~65%); the product half narrowed by two new named neighbors (verified semantic caching 2602.13165; TAR@N stability metrics 2408.04667 + ReasonBENCH 2512.07795) — the surviving contract is exact-key, evidence-receipted serving with the no-free-movement alarm (~50%). R9 stands AUDITED-CANDIDATE; Appendix C row added.

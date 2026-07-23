@@ -46,16 +46,32 @@ def _finite(x):
     return round(float(x), 4) if (x == x and abs(x) != float("inf")) else None
 
 
-def _stability_gates(A_tensor):
+# P0 serve-path budgets (env-tunable). The empirical Jacobian is (d,d) with d = hidden size
+# (2048 for Ouro-1.4B), but it is rank ≤ T-1 (a mean of T token-transitions), so ρ — the JSRR
+# acceptance object — is computed EXACTLY from a (T-1,T-1) reduced Gram (see generate()). We
+# additionally window T so the reduced eigenproblem stays cheap on very long generations, and cap
+# the geometry-dependent continuous diagnostics (which need the full (d,d) and cost ~7s at d=2048)
+# to a small dimension — they are diagnostic + acceptance-fallback only, never the primary gate.
+_JAC_TOKEN_WINDOW = int(os.environ.get("SIGMA0_JAC_TOKEN_WINDOW", "256") or 256)
+_CONT_GATE_MAX_DIM = int(os.environ.get("SIGMA0_CONT_GATE_MAX_DIM", "512") or 512)
+
+
+def _stability_gates(A_tensor, jsrr_matrix=None):
     """Stability certificate on the empirical loop Jacobian A. Returns a dict, or None on
     total failure (never raises). Two independently-computed layers:
 
       • JSRR (acceptance gate) — the DISCRETE spectral-radius criterion ρ(A)<1 (STARS,
         arXiv:2605.26733), numpy-only, computed FIRST so it survives even in the minimal
-        inference venv where scipy (needed by the continuous gates below) is absent.
+        inference venv where scipy (needed by the continuous gates below) is absent. When
+        `jsrr_matrix` is supplied it is the exact low-rank reduction of `A_tensor` (same
+        nonzero spectrum, hence identical ρ and accept verdict) — used so the serve path
+        never eigvals a (2048,2048) matrix; ρ/regime/stable are exact, σ_max/‖Av‖ telemetry
+        reflect the reduced matrix.
       • #768 continuous region-wideners + non-normal dichotomy — best-effort telemetry
         (scipy-dependent Lyapunov/Kreiss legs); a stricter, over-rejecting sufficient
-        contraction test kept for diagnostics and as an acceptance FALLBACK.
+        contraction test kept for diagnostics and as an acceptance FALLBACK. Skipped when
+        `A_tensor` is larger than `_CONT_GATE_MAX_DIM` (they need the full geometry and are
+        O(d³) — the reduction does not apply to them, and they are not the primary gate).
     """
     try:
         _src = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -74,7 +90,7 @@ def _stability_gates(A_tensor):
     except Exception:
         _margin = 0.0
     try:
-        j = jsrr_certificate(A_tensor, margin=_margin)
+        j = jsrr_certificate(jsrr_matrix if jsrr_matrix is not None else A_tensor, margin=_margin)
         out["jsrr"] = {
             "spectral_radius": _finite(j.spectral_radius),
             "radius_estimate": _finite(j.radius_estimate),
@@ -91,6 +107,14 @@ def _stability_gates(A_tensor):
     # — scipy-dependent; best-effort. Certify contraction of the FULL Jacobian and
     # over-reject non-normal A, so they are diagnostic + acceptance fallback, not primary.
     try:
+        # geometry-dependent continuous gates need the full (d,d) and are O(d³); skip them above
+        # the cap (they are diagnostic + fallback, and JSRR above already gave the exact verdict).
+        try:
+            _d = int(A_tensor.shape[0])
+        except Exception:
+            _d = 0
+        if _d > _CONT_GATE_MAX_DIM:
+            return out or None
         from cio_sde.collapse import stability_gates, dichotomy_certificate  # noqa: PLC0415
         g = stability_gates(A_tensor, margin=0.0)
         out.update({
@@ -180,15 +204,25 @@ def assemble_reason_verdict(out):
     regime = str(jsrr.get("regime") or "").lower()   # JSRR discrete verdict (primary gate)
     signal = out.get("canary_signal", "none")
 
-    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. JSRR's discrete regime
-    # is the primary read (it is the acceptance gate); the #768 continuous proven_contracting
-    # and the dichotomy fate corroborate. Absent JSRR (older cert), this reduces exactly to
-    # the prior proven_contracting/fate logic — so the reason_verdict contract is unchanged.
-    if regime == "contraction" or gates.get("proven_contracting"):
+    # stable ∈ {contract, spiral, diverge, None-when-uncertifiable}. The JSRR DISCRETE acceptance
+    # (ρ<1−margin) is AUTHORITATIVE for an iterated loop; the #768 continuous proven_contracting gate
+    # certifies e^{tA} (max Re λ<0) — a DIFFERENT criterion that must NEVER override a discrete
+    # 'divergent' (ρ≥1) verdict (a λ=−2 loop is continuous-stable yet ρ=2 DIVERGES). So JSRR decides
+    # when present; proven_contracting/fate are the FALLBACK only when JSRR is absent (older cert),
+    # preserving the prior reason_verdict contract. Keying on jsrr.stable (not regime=='contraction')
+    # also respects the margin — the near-critical band ρ∈[1−margin,1) is 'spiral', not 'contract'.
+    # (Fix 2026-07-23, math-check: OR-ing the continuous gate mislabelled a discrete-divergent loop
+    # 'contract' → a false 'grounded' when external_grounded=True.)
+    jsrr_accept = jsrr.get("stable")   # True ⟺ ρ<1−margin (margin-respecting); None when no JSRR ran
+    if jsrr_accept is True:
         stable = "contract"
-    elif regime == "divergent" or fate == "DIVERGE":
+    elif jsrr_accept is False:
+        stable = "diverge" if regime == "divergent" else "spiral"   # rejected: diverging vs near-critical
+    elif gates.get("proven_contracting"):
+        stable = "contract"          # FALLBACK: continuous gate, only when the discrete JSRR is absent
+    elif fate == "DIVERGE":
         stable = "diverge"
-    elif regime == "critical" or fate in ("COLLAPSE", "MARGINAL"):
+    elif fate in ("COLLAPSE", "MARGINAL"):
         stable = "spiral"
     else:
         stable = None  # too few tokens / no certificate — honest unknown, not a guess
@@ -214,6 +248,77 @@ def assemble_reason_verdict(out):
         "stable": stable,
         "reason": reason,
     }
+
+
+def sigma0_grounding_verdict(out, external_grounded=None, verifiable=None, experiments_exhausted=False):
+    """The Σ₀-grounding verdict for ONE generated answer — an honest, two-factor certificate with
+    an ACTIVE last leg.
+
+    An answer is Σ₀-GROUNDED iff BOTH hold:
+      1. the reasoning loop was STABLE — it contracted (JSRR ρ<1), i.e. it did not collapse
+         onto a frozen self-agreeing state nor diverge (PROVEN-in-regime; §1/§1.2.3). Necessary,
+         NOT sufficient.
+      2. an EXTERNAL verifier confirmed the answer — execution/held-out tests, or a groundedness
+         signal. A loop-stability signal only becomes a factuality signal once external grounding
+         is supplied (#2236; Freshness Law).
+
+    THE ACTIVE FACE (Certificate Part IV §10, ACT-TO-KNOW): a stable-but-unverified answer is NOT
+    left to rest as "I don't know". The system takes the last leg — it EXPERIMENTS to manufacture
+    the missing verification (run the test, execute, retrieve, escalate). The verdict signals this
+    with ``next_action="experiment"`` and ``grounded=None`` (a PENDING state that DIRECTS action,
+    not a refusal). Only when **all available means are exhausted** does the answer settle to
+    ``grounded=False`` — treated as **EFFECTIVELY FALSE until an experiment proves it true**
+    (a falsificationist stance; NOT a claim of real-world falsity). Refusal/abstention is not a
+    resting place: verify it, or hold it false.
+
+    THE LOAD-BEARING INVARIANT (verified in tests, UNCHANGED): ``grounded=True`` is returned ONLY
+    when the loop is stable AND ``external_grounded is True`` — never on stability alone, and the
+    active-face change only ever moves the undetermined case toward the SAFE (not-grounded) side.
+
+    Args:
+      out: the dict from ``Sigma0LoopLM.generate()`` (or any dict with the verdict fields).
+      external_grounded: True/False from an external verifier upstream; None = not yet checked.
+      verifiable: True if the task admits an external check; False = no experiment can help;
+        None = unknown (default: assume a means exists and experiment).
+      experiments_exhausted: True once the active loop has tried every available means and still
+        could not verify — flips the undetermined case to grounded=False (effectively false).
+
+    Returns ``{ grounded, stable, loop_certified, external_grounded, klass, next_action, why }``.
+    ``next_action ∈ {accept, experiment, escalate, halt}`` — the machine directive for the loop.
+    """
+    rv = assemble_reason_verdict(out) if "stable" not in out else out
+    stable = rv.get("stable")
+    loop_certified = (stable == "contract")   # PROVEN-in-regime contraction gate
+
+    if not loop_certified:
+        # loop collapsed / diverged / too-few-tokens-to-certify → NOT grounded; escalate & retry
+        klass = {"diverge": "diverged", "spiral": "collapsed"}.get(stable, "uncertified")
+        return {"grounded": False, "stable": stable, "loop_certified": False,
+                "external_grounded": external_grounded, "klass": klass, "next_action": "escalate",
+                "why": "reasoning loop did not contract (ρ≥1 / collapse / uncertifiable) — not grounded"}
+
+    # loop is stable; grounding now hinges ENTIRELY on the external check
+    if external_grounded is True:
+        return {"grounded": True, "stable": stable, "loop_certified": True,
+                "external_grounded": True, "klass": "externally_verified", "next_action": "accept",
+                "why": "stable loop AND external verifier confirmed the answer — Σ₀-grounded"}
+    if external_grounded is False:
+        return {"grounded": False, "stable": stable, "loop_certified": True,
+                "external_grounded": False, "klass": "verification_failed", "next_action": "escalate",
+                "why": "stable loop but the external verifier rejected the answer — keep spiraling / escalate"}
+
+    # external_grounded is None — not yet verified. THE ACTIVE FACE: do not refuse; take the last leg.
+    means_left = (verifiable is not False) and (not experiments_exhausted)
+    if means_left:
+        return {"grounded": None, "stable": stable, "loop_certified": True,
+                "external_grounded": None, "klass": "experiment_required", "next_action": "experiment",
+                "why": "stable but unverified — ACT to verify (run the test / exec-verify / retrieve / "
+                       "escalate); this is a PENDING directive, not a resting refusal (Certificate Part IV)"}
+    # every available means exhausted (or the task admits no experiment) → effectively FALSE until true
+    return {"grounded": False, "stable": stable, "loop_certified": True,
+            "external_grounded": None, "klass": "unverifiable_exhausted", "next_action": "halt",
+            "why": "stable but unverifiable after exhausting all means — treated as EFFECTIVELY FALSE "
+                   "until an experiment proves it true (falsificationist; NOT a claim of real-world falsity)"}
 
 
 # ADR-0012 step 2 kill-switch: the door-2 inner break is OPT-IN and per-step revertible.
@@ -585,12 +690,32 @@ class Sigma0LoopLM:
             try:
                 torch, *_ = _lazy()
                 H = torch.stack(exit_hiddens)          # (T, d)
+                # INTENTIONAL BEHAVIOR: for generations longer than the window we measure stability
+                # over the MOST RECENT transitions, not the whole history. This is (a) a cost bound —
+                # the reduced eigenproblem is (T-1,T-1), O(T³), so an unwindowed 2000-token generation
+                # would re-approach the 7s cost the (d,d) path had — and (b) arguably the more relevant
+                # signal ("is the loop stable *now*"). NOTE: this is NOT verdict-preserving vs pre-patch
+                # for T>window; only the low-rank *reduction* (below) is exact. The reduction preserves
+                # ρ to machine precision; the window is a deliberate recency change (SIGMA0_JAC_TOKEN_WINDOW).
+                if H.shape[0] > _JAC_TOKEN_WINDOW + 1:
+                    H = H[-(_JAC_TOKEN_WINDOW + 1):]
                 dH = H[1:] - H[:-1]                   # (T-1, d) deltas
                 norms = H[:-1].norm(dim=-1, keepdim=True).clamp(min=1e-9)
                 dH_norm = dH / norms                   # normalized transitions
-                # Jacobian proxy: mean outer product of consecutive hidden pairs → (d, d)
-                A_emp = (dH_norm.unsqueeze(-1) * H[:-1].unsqueeze(-2)).mean(0)
-                stability_cert = _stability_gates(A_emp)
+                Hprev = H[:-1]                          # (T-1, d)
+                # A_emp = (1/(T-1)) Σ_t dH_norm[t] ⊗ Hprev[t] = (1/(T-1)) dH_normᵀ Hprev — a (d,d)
+                # matrix of rank ≤ T-1. Its NONZERO spectrum (hence ρ, the JSRR acceptance object)
+                # equals that of the (T-1,T-1) Gram G = (1/(T-1)) Hprev dH_normᵀ (UVᵀ↔VᵀU identity),
+                # so ρ is computed EXACTLY from the tiny matrix — ~570× cheaper at d=2048, machine-
+                # precision match (experiments/p0_gate_measure.py M5). eigvals(d=2048)≈7s/gen → sub-
+                # ms. σ_max/‖Av‖ telemetry is NOT preserved by the reduction, so the diagnostic
+                # continuous gates still see the full A_emp (capped by dim so they never cost 7s).
+                Tm1 = Hprev.shape[0]
+                jsrr_mat = (Hprev @ dH_norm.transpose(-1, -2)) / max(Tm1, 1)   # (T-1, T-1), exact ρ
+                # (d,d) via matmul — mathematically the same mean-outer-product, but WITHOUT the
+                # (T-1,d,d) broadcast intermediate (≈2GB at d=2048); only the diagnostics use it.
+                A_emp = (dH_norm.transpose(-1, -2) @ Hprev) / max(Tm1, 1)       # (d, d)
+                stability_cert = _stability_gates(A_emp, jsrr_matrix=jsrr_mat)
             except Exception:
                 pass
 

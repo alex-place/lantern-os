@@ -111,6 +111,32 @@ gate** — the future design enters v-next when these bricks exist:
 Until the gate exists, quoting §1 stability numbers for a routed loop is forbidden (certificate
 §1.2.2 consequence 3) — that is the *only* thing being enforced here.
 
+### 3.2 Anytime budget mode (operator scope enhancement, 2026-07-23)
+
+The cascade's cost posture is a **per-task budget dial, not a global minimization objective**.
+The spiral is an *anytime algorithm*: it can keep proposing → verifying → refining on one
+problem for as long as the budget allows, and its answer only improves (the ratchet commits only
+verified advances). Four levers open when the dial opens, ranked by expected impact:
+
+1. **Raise N under verifier amplification** — more cheap samples before escalating (pass@k
+   compounding; cost ~linear in N).
+2. **Structured search over candidate programs, not raw sampling** — beam/evolutionary/inductive
+   refinement; the known high-value path on ARC-style work. "More spiral helps; smarter spiral
+   helps more."
+3. **Escalate earlier on hard signals** — probe/uncertainty streaks + failed-verify runs route
+   budget away from tasks the small core cannot solve (uncertainty-aware budget allocation is an
+   active 2026 lane: arXiv:2604.14853, 2605.26849, 2606.04402 — IMPORTED, not yet run in-repo).
+4. **Teacher-as-repair, not replacement** — escalation sends the *best local candidate + the
+   failing tests + partial progress*, never a blank prompt. Caution carried honestly: self-repair
+   feedback in frozen *small* models is partly placebo (arXiv:2606.31511), which is why repair
+   here means real execution feedback + a **stronger** repairer — a configuration we've already
+   measured working (rescue 88.4% > 84.8%) — never tiny-model self-repair (measured harmful,
+   6/6→2/6).
+
+Scope honesty: this raises score *within the efficiency band*; it does not chase the
+$10–$200/task frontier cluster. Diminishing returns on raw N are real — the budget buys
+structured search and repair, not indefinite blind sampling.
+
 **Base-model choice is a measured decision, not an assumption:** best of
 {Qwen2.5-Coder-1.5B/3B-class, Ouro-1.4B native loop} by verified-pass@cost + probe signal on the
 reference box, with retrofit recurrence (arXiv:2511.07384) available to add looping to a
@@ -192,6 +218,10 @@ when shipping multiple backbones) · from-scratch pretraining (7.7T-token territ
    on the reference box, or it is dropped without sunk cost.
 6. **Ternary survival:** #2873 — probe AUROC and verified-pass must survive W1.58A8, else the
    capability path falls back to 4-bit and the §2 envelope is re-negotiated.
+7. **The two-budget experiment (§3.2's own falsifier):** same ARC-AGI-2 split, two runs —
+   low budget (minimal-escalation cascade) vs high budget (anytime spiral: higher N, structured
+   search, early escalation, repair prompts). Report score, $/task, score-per-dollar, and the
+   local-vs-escalated solve split. This measures exactly what the budget dial buys.
 
 ## 9. Build order (each step measured before the next)
 
