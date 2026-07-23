@@ -198,6 +198,13 @@ function tradeApiGuard(req, res, url) {
   // (The list is the shared server watchlist.) #guest-watchlist
   if (url.pathname === "/api/trading/watchlist" && req.method === "POST") return false;
   if (url.pathname.startsWith("/api/trading/watchlist/") && req.method === "DELETE") return false;
+  // Champion paper-trading CONTEST (#2552) is open to ALL tiers, not just Pro+ —
+  // it is a VIRTUAL paper book (no real account, no orders), so it must not sit
+  // behind the "trade" entitlement. The leaderboard is a public read; join / stop /
+  // my-book are sign-in-gated (any tier) inside routes/trading/champion.js itself.
+  // Scoped to /contest so the operator champion book (/champion, /champion/rebalance)
+  // stays trade-gated.
+  if (url.pathname.startsWith("/api/trading/champion/contest")) return false;
   if (requireEntitlement(req, res, "trade")) return false;     // allowed → fall through
   return true;                                                  // blocked → 403/302 already sent
 }

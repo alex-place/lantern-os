@@ -99,7 +99,13 @@ async function start(userId, { name, role, tier, goal = null } = {}) {
   const { prices, closesBySym } = await _prices();
   const { weights } = champion.targetWeights(closesBySym);
   if (!Object.keys(weights).length) return { ok: false, reason: 'no_market_data' };
-  const gross = champion._liveGross();
+  // Contest books are UNLEVERAGED (#2552): clamp gross to ≤1 so a book never buys
+  // more than its starting equity. The live operator book uses gross up to 2× for
+  // vol-targeting, but markBook values the whole position as equity without booking
+  // the borrowed half — which showed every fresh book at an absurd +100%. Clamping
+  // keeps the risk-OFF behaviour (gross<1 → a cash buffer, still marks to startEquity)
+  // while removing the phantom leverage, so returns reflect real price movement.
+  const gross = Math.min(1, champion._liveGross());
   const holdings = buildHoldings(weights, prices, START_EQUITY, gross);
   let invested = 0; for (const [s, sh] of Object.entries(holdings)) invested += sh * prices[s];
   const book = {
