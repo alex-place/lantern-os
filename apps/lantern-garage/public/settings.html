@@ -34,8 +34,9 @@
     .row .rl .k { font-size: 14px; font-weight: 600; }
     .row .rl .v { font-size: 13px; color: var(--muted); margin-top: 3px; overflow-wrap: anywhere; }
     .row .rc { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    input.fld, select.fld { padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; min-width: 220px; }
-    input.fld:focus, select.fld:focus { outline: none; border-color: var(--accent); }
+    input.fld, select.fld, textarea.fld { padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; min-width: 220px; }
+    input.fld:focus, select.fld:focus, textarea.fld:focus { outline: none; border-color: var(--accent); }
+    textarea.fld::placeholder { color: var(--muted); }
     .btn { padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
     .btn:hover { border-color: var(--accent); }
     .btn.primary { background: var(--accent-strong); border: none; color: #fff; }
@@ -82,7 +83,7 @@
       .set-nav a { white-space: nowrap; padding: 9px 13px; }
       .set-nav .adv { display: none; }
       .row { flex-wrap: wrap; }
-      input.fld, select.fld { min-width: 0; width: 100%; }
+      input.fld, select.fld, textarea.fld { min-width: 0; width: 100%; }
     }
   </style>
 </head>
