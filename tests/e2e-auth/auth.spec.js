@@ -38,14 +38,14 @@ test.describe('auth: guest experience', () => {
     expect(Array.isArray(s.testRoles)).toBe(true);
   });
 
-  test('a guest visiting the profile page is never shown the real profile editor', async ({ page }) => {
-    await page.goto('/profile.html');
+  test('a guest visiting the settings page is never shown the real account editor', async ({ page }) => {
+    await page.goto('/settings.html');
     // Server-side gating serves the "Unlock this feature" interstitial (or a redirect
-    // to /auth.html) — never the authenticated Profile editor. Confirm both: the
+    // to /auth.html) — never the authenticated account editor. Confirm both: the
     // session is a guest, and the real Profile page did not load.
     const s = await page.context().request.get('/api/auth/session').then((r) => r.json());
     expect(s.authenticated).toBeFalsy();
-    expect(await page.title()).not.toContain('Profile —');
+    expect(await page.title()).not.toContain('Settings —');
   });
 });
 
@@ -91,9 +91,9 @@ test.describe('auth: role picker + session', () => {
   });
 
   test('picking Admin signs in as the test account', async ({ page }) => {
-    await page.goto('/auth.html?returnTo=/profile.html');
+    await page.goto('/auth.html?returnTo=/settings.html');
     // Assert on the test-login response + the shared context cookies rather than the
-    // page, which client-redirects (profile.html re-checks auth) and would race.
+    // page, which client-redirects (settings.html re-checks auth) and would race.
     const [resp] = await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/auth/test-login')),
       page.locator('#test-role-buttons button', { hasText: 'Admin' }).click(),
@@ -106,7 +106,7 @@ test.describe('auth: role picker + session', () => {
   });
 
   test('logout returns to guest', async ({ page }) => {
-    await page.goto('/auth.html?returnTo=/profile.html');
+    await page.goto('/auth.html?returnTo=/settings.html');
     await Promise.all([
       page.waitForResponse((r) => r.url().includes('/api/auth/test-login')),
       page.locator('#test-role-buttons button', { hasText: 'Supporter' }).click(),

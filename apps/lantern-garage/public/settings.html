@@ -236,6 +236,7 @@
       <div class="row"><div class="rl"><div class="k">Email address</div><div class="v">${esc(profile.email || "—")} ${verified ? '<span class="pill ok">verified</span>' : ""}</div></div><div class="rc"><button class="btn" id="a-email">Change</button></div></div>
       <div class="row"><div class="rl"><div class="k">Password</div><div class="v">${hasPw ? "••••••••" : "No password set"}</div></div><div class="rc"><button class="btn" id="a-pw">${hasPw ? "Change" : "Set password"}</button></div></div>
       <div class="row"><div class="rl"><div class="k">Account ID</div><div class="v">${esc(profile.id || "—")}</div></div></div>
+      ${(profile.metadata && profile.metadata.createdAt) ? `<div class="row"><div class="rl"><div class="k">Member since</div><div class="v">${esc(new Date(profile.metadata.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }))}</div></div></div>` : ""}
       <div class="group-label">Sign-in methods</div>${provRows}
       <div class="group-label">Session</div>
       <div class="row"><div class="rl"><div class="k">Sign out</div><div class="v">End your session on this device.</div></div><div class="rc"><button class="btn" id="a-logout">Sign out</button></div></div>

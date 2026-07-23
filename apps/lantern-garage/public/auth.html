@@ -416,7 +416,7 @@
   // A guest can't reach auth-gated pages, so "continue without an account" must not
   // send them to a protected returnTo (e.g. /profile.html after "Switch account") —
   // they'd just bounce straight back here. Fall back to home for those (#2639).
-  const GUEST_BLOCKED = ["/profile.html", "/create.html", "/work.html", "/accounts.html", "/accounts", "/admin-flags.html", "/kalshi-terminal.html"];
+  const GUEST_BLOCKED = ["/settings.html", "/profile.html", "/create.html", "/work.html", "/accounts.html", "/accounts", "/admin-flags.html", "/kalshi-terminal.html"];
   function guestDestination() {
     const rt = safeReturnTo();
     return GUEST_BLOCKED.includes(rt.split("?")[0]) ? "/" : rt;
