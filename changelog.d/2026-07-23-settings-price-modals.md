@@ -1,0 +1,3 @@
+### Changed
+
+- Settings polish: the **plan card now shows the price** (Free / $20 mo / $200 mo next to the plan name), and **Change email / Change password are proper inline modals** instead of `prompt()` dialogs. The password modal collects the current password (verified server-side) + the new one with inline validation and friendly errors; the email modal explains the confirm-by-email step. A small reusable `openModal({title, fields, onSubmit})` helper backs both (Enter-to-submit, click-outside/Cancel to close, inline error line). All against existing endpoints. Verified live: plan card reads "Pilot · $200/mo"; the password modal opens with Current + New fields and submits.

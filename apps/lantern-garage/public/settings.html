@@ -57,6 +57,17 @@
     .banner a { color: var(--accent-strong); }
     .muted-note { color: var(--muted); font-size: 12.5px; margin-top: 10px; line-height: 1.6; }
     .loading-panel { color: var(--muted); padding: 30px 0; }
+    /* Inline modal (change email / password) */
+    .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+    .modal-back.open { display: flex; }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 420px; box-shadow: 0 24px 60px rgba(0,0,0,.4); }
+    .modal-box h3 { font-family: var(--head-font); font-size: 18px; margin: 0 0 4px; }
+    .modal-box .m-sub { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+    .modal-box label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin: 12px 0 5px; }
+    .modal-box input { width: 100%; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; }
+    .modal-box input:focus { outline: none; border-color: var(--accent); }
+    .modal-box .m-err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 0; }
+    .modal-box .m-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
     @media (max-width: 720px) {
       .settings-shell { grid-template-columns: 1fr; gap: 14px; }
       .set-nav { position: static; }
@@ -89,6 +100,8 @@
   </section>
 </main>
 
+<div class="modal-back" id="modal-root"></div>
+
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
@@ -106,6 +119,28 @@
   const initials = (n) => (String(n || "").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("") || "U").toUpperCase();
   const ROLE_PLAN = { guest: "Free", supporter: "Free", deep_dreamer: "Pro", founder: "Pro", pilot: "Pilot", admin: "Pilot" };
   const planName = (role) => ROLE_PLAN[role] || "Free";
+
+  // Reusable inline modal. fields: [{name,label,type?,placeholder?,autocomplete?}].
+  // onSubmit(values, close) → return an error string to show, or falsy on success.
+  function openModal({ title, sub, fields, submitLabel, onSubmit }) {
+    const root = $("modal-root");
+    const inputs = fields.map((f) =>
+      `<label for="m-${f.name}">${f.label}</label><input id="m-${f.name}" type="${f.type || "text"}"${f.placeholder ? ` placeholder="${esc(f.placeholder)}"` : ""}${f.autocomplete ? ` autocomplete="${f.autocomplete}"` : ""}>`).join("");
+    root.innerHTML = `<div class="modal-box" role="dialog" aria-modal="true"><h3>${esc(title)}</h3>${sub ? `<p class="m-sub">${esc(sub)}</p>` : ""}${inputs}<div class="m-err" id="m-err"></div><div class="m-actions"><button class="btn" id="m-cancel">Cancel</button><button class="btn primary" id="m-submit">${esc(submitLabel)}</button></div></div>`;
+    root.classList.add("open");
+    const close = () => { root.classList.remove("open"); root.innerHTML = ""; };
+    $("m-cancel").onclick = close;
+    root.onclick = (e) => { if (e.target === root) close(); };
+    const submit = async () => {
+      const vals = {}; fields.forEach((f) => { vals[f.name] = ($("m-" + f.name) || {}).value || ""; });
+      const btn = $("m-submit"); btn.disabled = true; $("m-err").textContent = "";
+      const err = await onSubmit(vals, close);
+      btn.disabled = false; if (err) $("m-err").textContent = err;
+    };
+    $("m-submit").onclick = submit;
+    root.querySelectorAll("input").forEach((i) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); }));
+    const first = root.querySelector("input"); if (first) first.focus();
+  }
 
   const PANELS = ["general", "account", "billing", "connections"];
   function show(name) {
@@ -197,20 +232,33 @@
       <div class="row"><div class="rl"><div class="k">Sign out</div><div class="v">End your session on this device.</div></div><div class="rc"><button class="btn" id="a-logout">Sign out</button></div></div>
       <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>`;
     const r = $("a-resend"); if (r) r.onclick = async (e) => { e.preventDefault(); await api("/api/profiles/me/resend-verification", { method: "POST" }); e.target.textContent = "Sent ✓"; };
-    $("a-email").onclick = () => { const v = prompt("New email address:"); if (v) api("/api/profiles/me/change-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: v.trim() }) }).then((o) => alert(o.ok ? "Check your inbox to confirm the change." : (o.body && (o.body.error || o.body.message)) || "Could not change email.")); };
-    $("a-pw").onclick = async () => {
-      // Verified change: if the account already has a password, the server requires
-      // the CURRENT one to match before setting a new one (OAuth-only accounts just
-      // set one). Collect it so the change is authenticated, not silent.
-      let current = "";
-      if (hasPw) { current = prompt("Confirm your current password:"); if (current === null) return; }
-      const next = prompt("New password (min 8 characters):"); if (!next) return;
-      const body = hasPw ? { currentPassword: current, newPassword: next } : { newPassword: next };
-      const o = await api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      const err = o.body && (o.body.error || o.body.message);
-      const friendly = { wrong_password: "That current password is incorrect.", weak_password: "Pick a longer password (at least 8 characters)." };
-      alert(o.ok ? "Password updated." : (friendly[err] || err || "Could not update your password."));
-    };
+    $("a-email").onclick = () => openModal({
+      title: "Change email", sub: "We'll email a confirmation link to the new address — the change applies once you click it.",
+      fields: [{ name: "email", label: "New email address", type: "email", placeholder: "you@example.com", autocomplete: "email" }],
+      submitLabel: "Send confirmation",
+      onSubmit: async ({ email }, close) => {
+        if (!email.trim()) return "Enter an email address.";
+        const o = await api("/api/profiles/me/change-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim() }) });
+        if (!o.ok) return (o.body && (o.body.error || o.body.message)) || "Could not change email.";
+        close(); alert("Check your inbox to confirm the change.");
+      },
+    });
+    $("a-pw").onclick = () => openModal({
+      // Verified change: if the account has a password, the server requires the CURRENT
+      // one to match before setting a new one (OAuth-only accounts just set one).
+      title: hasPw ? "Change password" : "Set a password",
+      sub: hasPw ? "Enter your current password, then choose a new one." : "Set a password so you can also sign in with email.",
+      fields: (hasPw ? [{ name: "current", label: "Current password", type: "password", autocomplete: "current-password" }] : [])
+        .concat([{ name: "next", label: "New password (at least 8 characters)", type: "password", autocomplete: "new-password" }]),
+      submitLabel: hasPw ? "Update password" : "Set password",
+      onSubmit: async (v, close) => {
+        if (!v.next || v.next.length < 8) return "Pick a password of at least 8 characters.";
+        const body = hasPw ? { currentPassword: v.current, newPassword: v.next } : { newPassword: v.next };
+        const o = await api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        if (!o.ok) { const e = o.body && (o.body.error || o.body.message); return ({ wrong_password: "That current password is incorrect.", weak_password: "Pick a longer password (at least 8 characters)." })[e] || e || "Could not update your password."; }
+        close(); alert("Password updated.");
+      },
+    });
     el.querySelectorAll("[data-connect]").forEach((b) => b.onclick = () => { location.href = `/api/auth/${b.dataset.connect}/start?returnTo=${encodeURIComponent("/settings.html#account")}`; });
     $("a-logout").onclick = async () => { await api("/api/auth/logout", { method: "POST" }); location.href = "/"; };
     $("a-delete").onclick = () => {
@@ -242,7 +290,7 @@
     el.innerHTML = `
       <h2>Billing</h2><p class="sub">${paid ? "Your plan and subscription." : "You're on the Free plan — upgrade any time."}</p>
       <div class="plan-card">
-        <div class="pc-head"><div><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Current plan</div><div style="font-size:22px;font-weight:800;margin-top:2px">${plan}</div></div><span class="tier-badge2">${esc(plan)}</span></div>
+        <div class="pc-head"><div><div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700">Current plan</div><div style="font-size:22px;font-weight:800;margin-top:2px">${plan} <span style="font-size:14px;font-weight:600;color:var(--muted)">· ${({ Free: "Free", Pro: "$20/mo", Pilot: "$200/mo" })[plan] || "Free"}</span></div></div><span class="tier-badge2">${esc(plan)}</span></div>
         <ul>${(FEATURES[plan] || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul>
       </div>
       ${upsell ? `<div class="group-label">${plan === "Free" ? "Upgrade" : "Go further"}</div>${upsell}
