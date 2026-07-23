@@ -104,7 +104,7 @@ const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
-  "/api-keys-settings.html": "/settings.html", // single-column key page retired → tabbed two-column settings
+  "/api-keys-settings.html": "/orchestration.html", // API keys now live on the operator page (settings.html reworked to user General/Account/Billing/Connections)
 };
 
 function renderDisabledPage(pathname) {
