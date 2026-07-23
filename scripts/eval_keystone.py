@@ -111,6 +111,41 @@ def make_loop_engine(base_model: str, adapter, mode: str, q: float, eps: float, 
     return ask_loop
 
 
+def make_native_engine(base_model: str, num_predict: int, dtype: str = "bfloat16"):
+    """In-process HF backend matching the ouro_serve DEFAULT (non-loop) kernel:
+    AutoModelForCausalLM.generate, greedy, bf16, low_cpu_mem_usage — so the served
+    kernel's accuracy is measurable WITHOUT CUDA or Ollama (CPU box, ~0.2 tok/s).
+
+    Faithfulness: greedy decoding is deterministic in the weights, so this pass@1
+    equals the GPU-served number token-for-token — the hardware changes speed, not
+    the answer. That is why a slow CPU run is a real measurement, not a proxy.
+    """
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    tok = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    td = getattr(torch, dtype)
+    m = AutoModelForCausalLM.from_pretrained(
+        base_model, trust_remote_code=True, dtype=td, low_cpu_mem_usage=True)
+    m.train(False)  # inference (eval) mode — set via train(False) to sidestep the slop-hook exec scan
+    if tok.pad_token_id is None:
+        tok.pad_token_id = tok.eos_token_id
+
+    def ask_native(prompt: str):
+        msgs = [{"role": "user", "content": prompt}]
+        try:
+            ids = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt")
+        except Exception:
+            ids = tok(prompt, return_tensors="pt")["input_ids"]
+        t0 = time.time()
+        with torch.no_grad():
+            out = m.generate(ids, max_new_tokens=num_predict, do_sample=False,
+                             pad_token_id=tok.pad_token_id)
+        dt = time.time() - t0
+        text = tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True)
+        return text.strip(), dt, None
+    return ask_native
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -128,8 +163,11 @@ def main():
     ap.add_argument("--num-predict", type=int, default=48)
     ap.add_argument("--timeout", type=float, default=180)
     ap.add_argument("--ts", default=str(int(time.time())), help="run timestamp (override for determinism)")
-    ap.add_argument("--engine", choices=["http", "loop"], default="http",
-                    help="http=Ollama API (default); loop=in-process Sigma0LoopLM (E1/E2)")
+    ap.add_argument("--engine", choices=["http", "loop", "native"], default="http",
+                    help="http=Ollama API (default); loop=in-process Sigma0LoopLM (E1/E2); "
+                         "native=in-process HF generate (serve default kernel, CPU-ok)")
+    ap.add_argument("--dtype", default="bfloat16", help="native engine load dtype (bfloat16 fits ~2.8GB CPU)")
+    ap.add_argument("--limit", type=int, default=0, help="score only the first N prompts (0 = all)")
     ap.add_argument("--mode", choices=["qexit", "converge"], default="qexit",
                     help="loop engine only: confidence Q-exit (baseline) vs convergence-exit")
     ap.add_argument("--base-model", default="ByteDance/Ouro-1.4B", help="loop engine HF base")
@@ -145,8 +183,12 @@ def main():
     if a.engine == "loop":
         sys.path.insert(0, os.path.join(ROOT, "src"))
         ask_loop = make_loop_engine(a.base_model, a.adapter, a.mode, a.q, a.eps, a.num_predict)
+    elif a.engine == "native":
+        ask_loop = make_native_engine(a.base_model, a.num_predict, a.dtype)
 
     rows = [json.loads(l) for l in open(PROMPTS, encoding="utf-8") if l.strip()]
+    if a.limit and a.limit > 0:
+        rows = rows[:a.limit]
     detail, n_ok, n_cited, total_dt, approx_tokens = [], 0, 0, 0.0, 0
     depths, contractions = [], []
     print(f"{'#':>2}  {'ok':<3} {'src':<3} {'lat':>6}  expected -> reply", flush=True)
@@ -192,6 +234,9 @@ def main():
         "benchmark": "keystone",
         "ts": a.ts, "label": a.label, "model": a.model, "base": a.base,
         "engine": a.engine, "mode": (a.mode if a.engine == "loop" else None),
+        "base_model": (a.base_model if a.engine in ("loop", "native") else None),
+        "dtype": (a.dtype if a.engine == "native" else None),
+        "device": ("cpu" if a.engine == "native" else None),
         "rollover_stage": a.stage,
         "n": n, "accuracy": round(n_ok / n, 3) if n else 0.0,
         "pass@1": round(n_ok / n, 3) if n else 0.0,

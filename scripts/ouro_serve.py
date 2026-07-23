@@ -74,6 +74,15 @@ NATIVE_MAX = int(os.environ.get("OURO_NATIVE_MAX", "80"))
 # is plain HF decode and never sees the canary).
 NATIVE_CANARY = os.environ.get("OURO_CANARY", "1") == "1"
 NATIVE_ADAPT = os.environ.get("OURO_ADAPT", "0") == "1"
+# Σ₀ two-factor grounding verdict (#2883): attach the honesty verdict — grounded=True IFF the
+# reasoning loop was contraction-stable (JSRR ρ<1) AND an external verifier confirmed the answer —
+# as RESPONSE METADATA (x-ouro-grounded header + `sigma0_grounding` body field). OFF by default: it
+# only READS the native loop's stability trace and NEVER changes a token, so with it unset the
+# serving default is byte-identical to before. Opt in with SIGMA0_GROUNDED=1 (native loop only — the
+# fast cached path has no per-token stability trace to certify). No verifier is wired at serve time,
+# so external_grounded=None → the active-face 'experiment_required' PENDING verdict, never a
+# fabricated grounded=True. tests/test_sigma0_grounding_verdict.py pins the invariant.
+SIGMA0_GROUNDED = os.environ.get("SIGMA0_GROUNDED", "0") == "1"
 # Recurrent-loop exit policy (the per-token depth controller). 'qexit' = the trained
 # entropy/confidence gate (Ouro paper §3 — the calibrated native exit, default). 'converge' =
 # first-order latent fixed point ‖Δh‖<eps (E2 research). 'accel' = the spiral-robust second-
@@ -298,6 +307,16 @@ def _generate(prompt, max_new_tokens=512, stream_cb=None):
                   f"adapt={out.get('adapt')} stability_accepted={out.get('stability_accepted')} "
                   f"tokens={out.get('tokens')}", flush=True)
         _persist_loop_meta(out)  # #777: persist depth/contraction to leaderboard
+        if SIGMA0_GROUNDED:
+            # #2883: derive the two-factor honesty verdict from the loop's stability trace and
+            # attach it to `out` as metadata (never mutates `text`). external_grounded=None → the
+            # active-face pending verdict (klass=experiment_required), so serving NEVER emits a
+            # fabricated grounded=True with no verifier behind it.
+            try:
+                from sigma0.loop_lm import sigma0_grounding_verdict
+                out["sigma0_grounding"] = sigma0_grounding_verdict(out, external_grounded=None)
+            except Exception as _e:
+                out["sigma0_grounding"] = {"error": str(_e)}
         if stream_cb is not None and text:
             stream_cb(text)
         return text, out  # also return meta for x-ouro-depth header
@@ -392,18 +411,26 @@ class H(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/x-ndjson")
             self.end_headers()
             try:
-                _generate(prompt, max_tok, stream_cb=lambda p: (self.wfile.write(pack(p, False)), self.wfile.flush()))
-                self.wfile.write(pack("", True)); self.wfile.flush()
+                _s_text, _s_meta = _generate(prompt, max_tok, stream_cb=lambda p: (self.wfile.write(pack(p, False)), self.wfile.flush()))
+                _final = json.loads(pack("", True).decode())
+                if _s_meta and _s_meta.get("sigma0_grounding"):
+                    _final["sigma0_grounding"] = _s_meta["sigma0_grounding"]   # #2883: verdict on the done-frame
+                self.wfile.write((json.dumps(_final) + "\n").encode()); self.wfile.flush()
             except Exception as e:
                 try: self.wfile.write(pack(f"[ouro error: {e}]", True))
                 except Exception: pass
         else:
             try:
                 text, loop_meta = _generate(prompt, max_tok)
-                b = json.dumps(json.loads(pack(text, True).decode())).encode()
+                _resp = json.loads(pack(text, True).decode())
+                if loop_meta and loop_meta.get("sigma0_grounding"):
+                    _resp["sigma0_grounding"] = loop_meta["sigma0_grounding"]   # #2883: verdict in body
+                b = json.dumps(_resp).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(b)))
+                if loop_meta and loop_meta.get("sigma0_grounding"):
+                    self.send_header("x-ouro-grounded", json.dumps(loop_meta["sigma0_grounding"]))
                 if loop_meta:
                     # #777: expose realized DEEP-mode depth in response header
                     depth_str = json.dumps({k: loop_meta.get(k) for k in
