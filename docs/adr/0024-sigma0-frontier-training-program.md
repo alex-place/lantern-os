@@ -74,11 +74,16 @@ input, not an assumed constraint (2026-07-06). The evidence base assembled this 
    (arXiv:2510.25741); MoEUT made shared-layer UTs parameter- and compute-competitive to 1B
    (arXiv:2405.16039). Learned halting is the weak leg (MoEUT's ACT ablation + our Q-exit
    nulls, both MEASURED) — depth control moves to policy.
-4. **The certificate becomes the training spec.** Measured loop quantities (ρ≈0.88,
-   machine-checked ROA #1991, grounding-deadline §3.1), STARS-style stability
+4. **The certificate becomes the training spec.** Certificate machinery (JSRR ρ(J)<1
+   acceptance gate, machine-checked ROA #1991, grounding-deadline §3.1), STARS-style stability
    regularization (arXiv:2605.26733), switched-system dwell-time constraints for MoE
    routing (arXiv:2405.03560), and trainable-with-proof barrier certificates
    (arXiv:2605.02526) collectively define training-time instrumentation and abort criteria.
+   *Correction (2026-07-23):* the earlier ρ_obs≈0.88 was a **trajectory proxy retracted by the
+   certificate's own #2029 correction** — the measured autograd Jacobian is ρ(J)≈8–11
+   (expansive, non-normal), i.e. the current base loop does NOT occupy the certified
+   contracting regime. Certificate quantities here are training-time **targets and abort
+   criteria** (train the student *into* the gate), not properties the base model already has.
 5. **The risk that scales with capability is §7.2** — a trained gamer, honest under audit
    only (alignment faking measured at frontier: arXiv:2412.14093). Anti-gaming bindings are
    a first-class requirement, not post-hoc.
@@ -169,5 +174,5 @@ D1 tiers and cluster shape; dense-recurrent vs MoE-UT (D2); the exact objective 
 | Frontier comparison floor: GPT-4o-mini 0.958 golden / Gemini-2.5-Flash 21.4% confab | golden-bench runs (Vertex ADC), data/eval | High (MEASURED) | in-repo eval |
 | Recurrent-depth family scales: Ouro 7.7T tokens; MoEUT competitive to 1B | arXiv:2510.25741; arXiv:2405.16039 | High | external papers |
 | Learned halting weak | MoEUT ACT ablation (arXiv:2405.16039) + in-repo Q-exit nulls | High (MEASURED both) | external + in-repo |
-| Certificate quantities usable as training-time spec | ρ_obs ≈ 0.88 + machine-checked ROA (#1991); grounding-deadline §3.1 (PR #2157); STARS arXiv:2605.26733; dwell-time arXiv:2405.03560; barrier certificates arXiv:2605.02526 | Medium-High | in-repo + external |
+| Certificate quantities usable as training-time spec | JSRR ρ(J)<1 gate + machine-checked ROA (#1991); grounding-deadline §3.1 (PR #2157); STARS arXiv:2605.26733; dwell-time arXiv:2405.03560; barrier certificates arXiv:2605.02526. ~~ρ_obs≈0.88~~ retracted by #2029 (true ρ(J)≈8–11, expansive) — gate is a training TARGET, not a current property | Medium-High | in-repo + external |
 | Alignment-faking risk at frontier scale (§7.2) | arXiv:2412.14093 | High | external paper |
