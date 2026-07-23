@@ -172,7 +172,7 @@
   }
 
   // ── ACCOUNT ──────────────────────────────────────────────────────────────
-  const PROV = { google: { label: "Google", emoji: "🇬" }, local: { label: "Email + password", emoji: "🔑" }, discord: { label: "Discord", emoji: "💬" } };
+  const PROV = { google: { label: "Google", emoji: "🇬" }, local: { label: "Email + password", emoji: "🔑" } };
   function renderAccount() {
     const el = $("p-account");
     if (!profile) return needSignIn(el, "Account");
@@ -198,10 +198,29 @@
       <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>`;
     const r = $("a-resend"); if (r) r.onclick = async (e) => { e.preventDefault(); await api("/api/profiles/me/resend-verification", { method: "POST" }); e.target.textContent = "Sent ✓"; };
     $("a-email").onclick = () => { const v = prompt("New email address:"); if (v) api("/api/profiles/me/change-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: v.trim() }) }).then((o) => alert(o.ok ? "Check your inbox to confirm the change." : (o.body && (o.body.error || o.body.message)) || "Could not change email.")); };
-    $("a-pw").onclick = () => { const v = prompt("New password (min 8 chars):"); if (v) api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ newPassword: v }) }).then((o) => alert(o.ok ? "Password updated." : (o.body && (o.body.error || o.body.message)) || "Could not set password.")); };
+    $("a-pw").onclick = async () => {
+      // Verified change: if the account already has a password, the server requires
+      // the CURRENT one to match before setting a new one (OAuth-only accounts just
+      // set one). Collect it so the change is authenticated, not silent.
+      let current = "";
+      if (hasPw) { current = prompt("Confirm your current password:"); if (current === null) return; }
+      const next = prompt("New password (min 8 characters):"); if (!next) return;
+      const body = hasPw ? { currentPassword: current, newPassword: next } : { newPassword: next };
+      const o = await api("/api/profiles/me/change-password", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const err = o.body && (o.body.error || o.body.message);
+      const friendly = { wrong_password: "That current password is incorrect.", weak_password: "Pick a longer password (at least 8 characters)." };
+      alert(o.ok ? "Password updated." : (friendly[err] || err || "Could not update your password."));
+    };
     el.querySelectorAll("[data-connect]").forEach((b) => b.onclick = () => { location.href = `/api/auth/${b.dataset.connect}/start?returnTo=${encodeURIComponent("/settings.html#account")}`; });
     $("a-logout").onclick = async () => { await api("/api/auth/logout", { method: "POST" }); location.href = "/"; };
-    $("a-delete").onclick = () => { if (confirm("Delete your account permanently? This cannot be undone.")) alert("For your safety, account deletion is handled by support — email founder@lantern-os.net and we'll remove it right away."); };
+    $("a-delete").onclick = () => {
+      // Two-step confirm for an irreversible action (there is no self-serve delete
+      // endpoint yet — deletion is done by support, so route there after confirming).
+      if (!confirm("Delete your account permanently? This removes your profile and data and cannot be undone.")) return;
+      const typed = prompt('This is permanent. Type DELETE to confirm:');
+      if ((typed || "").trim().toUpperCase() !== "DELETE") return;
+      alert("Thanks — account deletion is handled by support so nothing is removed by mistake. Email founder@lantern-os.net from this address and we'll delete it right away.");
+    };
   }
 
   // ── BILLING ──────────────────────────────────────────────────────────────
@@ -223,8 +242,8 @@
       <div class="group-label">Manage</div>
       ${plan !== "Pilot" ? `<div class="row"><div class="rl"><div class="k">Upgrade</div><div class="v">${plan === "Free" ? "Unlock real-money trading + the creator suite." : "Add the autonomous AI trader."}</div></div><div class="rc"><a class="btn primary" href="/pricing.html">See plans</a></div></div>` : ""}
       <div class="row"><div class="rl"><div class="k">Manage subscription</div><div class="v">Update card, invoices, or cancel — via Stripe.</div></div><div class="rc"><button class="btn" id="b-portal">Open portal</button></div></div>
-      <div class="row"><div class="rl"><div class="k">Already subscribed elsewhere?</div><div class="v">Link a Stripe or Patreon subscription to this account.</div></div><div class="rc"><button class="btn" id="b-link">Link subscription</button></div></div>
-      <p class="muted-note">Payments are handled by Stripe or Patreon — we never see or store your card. The Free plan needs no billing.</p>`;
+      <div class="row"><div class="rl"><div class="k">Already subscribed?</div><div class="v">Link an existing Stripe subscription to this account.</div></div><div class="rc"><button class="btn" id="b-link">Link subscription</button></div></div>
+      <p class="muted-note">Payments are handled securely by Stripe — we never see or store your card. The Free plan needs no billing.</p>`;
     $("b-portal").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/portal", { method: "POST" }); if (o.ok && o.body && o.body.url) location.href = o.body.url; else { alert((o.body && o.body.message) || "No active subscription to manage — upgrade first."); e.target.disabled = false; } };
     $("b-link").onclick = async (e) => { e.target.disabled = true; const o = await api("/api/billing/link", { method: "POST" }); alert(o.ok ? (o.body && o.body.already ? "Already linked." : "Subscription linked — your plan will update shortly.") : (o.body && o.body.message) || "No subscription found for your email."); e.target.disabled = false; if (o.ok) load(); };
   }
