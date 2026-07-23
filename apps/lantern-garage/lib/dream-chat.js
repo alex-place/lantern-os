@@ -498,7 +498,9 @@ function _appendConvergenceRecord(fields) {
     const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
     const RECORDS_PATH = path.join(REPO_ROOT, "data", "convergence", "records.jsonl");
     fs.mkdirSync(path.dirname(RECORDS_PATH), { recursive: true });
-    fs.appendFileSync(RECORDS_PATH, JSON.stringify(record) + "\n", "utf8");
+    // M1 enforced gate (#2872): same invariant on the command/verify write path.
+    const gated = require("./m1-gate").applyM1Gate(record, { file: RECORDS_PATH });
+    fs.appendFileSync(RECORDS_PATH, JSON.stringify(gated) + "\n", "utf8");
   } catch (e) {
     console.error("[convergence] record write failed:", e.message);
   }
@@ -1432,8 +1434,11 @@ async function verifyResponse(draft, userMessage, agentName) {
   try {
     fs.mkdirSync(path.dirname(RECORDS_PATH), { recursive: true });
     const timestamp = new Date().toISOString();
+    const { applyM1Gate } = require("./m1-gate");
     for (const r of records) {
-      fs.appendFileSync(RECORDS_PATH, JSON.stringify({ timestamp, ...r, corrected }) + "\n");
+      // M1 enforced gate (#2872): free confidence rises on a claim-chain clamp here.
+      const gated = applyM1Gate({ timestamp, ...r, corrected }, { file: RECORDS_PATH });
+      fs.appendFileSync(RECORDS_PATH, JSON.stringify(gated) + "\n");
     }
   } catch { /* non-fatal */ }
 

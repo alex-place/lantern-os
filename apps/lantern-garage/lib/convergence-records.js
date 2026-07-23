@@ -9,6 +9,7 @@
 
 const path = require("path");
 const { appendJsonlQueued } = require("./file-queue");
+const { applyM1Gate } = require("./m1-gate");
 
 // Resolve to repo root (same base file-queue's readers use), so writes land
 // where readJsonl("data/convergence/records.jsonl") would read them.
@@ -85,8 +86,11 @@ async function emitConvergenceRecord({
       allowed_max_confidence: allowed_max_confidence == null ? null : Number(allowed_max_confidence),
       verified_by: vb,  // hard, checkable artifacts (pr:/commit:/test:/exec:)
     };
-    await appendJsonlQueued(RECORDS_PATH, record, { rotate: true }); // #872
-    return record;
+    // M1 enforced gate (#2872): a confidence rise on an existing hypothesis-chain
+    // with an unchanged evidence basis is clamped (receipted on the row).
+    const gated = applyM1Gate(record, { file: RECORDS_PATH });
+    await appendJsonlQueued(RECORDS_PATH, gated, { rotate: true }); // #872
+    return gated;
   } catch (err) {
     console.error("[convergence-records] emit failed (non-fatal):", err && err.message);
     return null;
