@@ -217,7 +217,9 @@ def build():
                        times (augments stay x1) -- the corpus training consumes.
     Changelog/S1 commit-message tuples are excluded by policy (#2054, rule 4)."""
     g_train, g_held = split_golden()
-    heldout_ids = [r[0] for r in g_held]
+    # sorted → the frozen holdout is deterministic (#2843): a rebuild never churns the
+    # manifest when the id SET is unchanged, and on-disk == builder output stays true.
+    heldout_ids = sorted(r[0] for r in g_held)
     train_ids = {r[0] for r in g_train}
 
     train_records = [golden_row_to_record(r) for r in g_train]
@@ -273,9 +275,7 @@ def main():
     _write_jsonl(TRAIN_OUT, train_records)
     _write_jsonl(BALANCED_OUT, balanced_records)
     HELDOUT_OUT.write_text(json.dumps(
-        # sorted → the frozen holdout serializes deterministically (#2843), so a
-        # rebuild never churns the manifest when the id SET is unchanged.
-        {"heldout_golden_ids": sorted(heldout_ids),
+        {"heldout_golden_ids": heldout_ids,  # already sorted at source (#2843)
          "note": ("these golden facts were NEVER emitted as training rows; score the "
                   "updated Ouro on THESE to measure honesty without memorization")},
         indent=2), encoding="utf-8")
