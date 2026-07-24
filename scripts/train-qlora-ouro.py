@@ -55,6 +55,10 @@ def main():
     ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
     ap.add_argument("--val-size", type=int, default=100, help="held-out val records for best-checkpoint selection (#2729)")
+    ap.add_argument("--tripwire-loss", type=float, default=float(os.environ.get("OURO_TRIPWIRE_LOSS", "0.2")),
+                    help="abort if TRAIN loss < this before epoch 2 (crude memorization guard). Set 0 to DISABLE "
+                         "and rely on the held-out val best-checkpoint selection — which is the proper overfit guard "
+                         "and only runs at eval_steps=50, so a hot-LR tripwire can fire before it ever evaluates (#2729).")
     a = ap.parse_args()
 
     # datasets must be imported before torch on Windows to avoid pyarrow/CUDA DLL conflict
@@ -207,9 +211,10 @@ def main():
 
     class OverfitTripwire(TrainerCallback):
         def on_log(self, args, state, control, logs=None, **kwargs):
-            if (logs and "loss" in logs and state.epoch is not None
-                    and state.epoch < 2.0 and logs["loss"] < 0.2):
-                print(f"OVERFIT TRIPWIRE: train loss {logs['loss']:.3f} < 0.2 at epoch "
+            thr = a.tripwire_loss
+            if (thr > 0 and logs and "loss" in logs and state.epoch is not None
+                    and state.epoch < 2.0 and logs["loss"] < thr):
+                print(f"OVERFIT TRIPWIRE: train loss {logs['loss']:.3f} < {thr} at epoch "
                       f"{state.epoch:.2f} (< 2) — aborting to avoid a memorized adapter.")
                 control.should_training_stop = True
             return control

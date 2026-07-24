@@ -60,7 +60,7 @@ test('_saveState writes a valid snapshot to the real STATE_FILE; _loadState read
   assert.doesNotThrow(() => at._resetCooldowns());          // clears + _saveState()
   assert.ok(fs.existsSync(at.STATE_FILE), 'snapshot file written');
   const snap = JSON.parse(fs.readFileSync(at.STATE_FILE, 'utf8'));
-  for (const k of ['peak', 'entryAt', 'exitAt', 'lastOrderAt', 'dirStreak']) {
+  for (const k of ['peak', 'entryAt', 'exitAt', 'exitStatus', 'lastOrderAt', 'dirStreak']) {
     assert.ok(Object.prototype.hasOwnProperty.call(snap, k), `snapshot has ${k}`);
   }
   assert.strictEqual(typeof snap.savedAt, 'number');
@@ -82,6 +82,65 @@ test('isFallingKnife: true when momentum still cratering, false once it turns', 
 test('isFallingKnife: fail-open on insufficient data (does not block entries)', () => {
   assert.strictEqual(at.isFallingKnife([]), false);
   assert.strictEqual(at.isFallingKnife(Array.from({ length: 20 }, () => 10)), false);
+});
+
+test('re-exit churn: an UNCONFIRMED exit fires once and does not re-fire while the position stays held (even after the reattempt timer expires)', async () => {
+  // Regression for the 69-exit-rows / 12-real-positions / fabricated-$46k churn:
+  // an exit order that comes back `needs_confirmation` never reduces the position, so
+  // the loop used to re-fire it every ~8 min (the only guard was the timer), re-logging
+  // the same unrealized P&L as realized. Now an in-flight exit freezes the symbol until
+  // it actually leaves the book — independent of the timer.
+  const SYM = 'SHOP';
+  const saved = { ...process.env };
+  const sells = [];
+  let positions = [{ symbol: SYM, qty: 100, avg_entry_price: 125.0, current_price: 124.0, unrealized_pl: -100, pnl_pct: -0.8 }];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => positions,
+    getIBKROpenOrders: async () => [],           // broker reports NO working order for the unconfirmed exit
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => {
+      // Count only the EXIT sells (market/limit) — not the protective STP the
+      // re-protect pass attaches to a naked long.
+      if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) sells.push(o);
+      return { status: 'needs_confirmation' };   // the crux: exit never confirms/fills
+    },
+  };
+  // A persistent, strong BEARISH ENTER on the held long → drives the signal-exit path
+  // (no yahoo bars needed). Relax the unrelated anti-churn gates so the exit is eligible.
+  const bearish = { symbol: SYM, direction: 'BEARISH', entry_price: 124.0, convergence: { decision: 'ENTER', p_win: 0.9 } };
+  try {
+    process.env.TRADER_AUTO_EXECUTE = '1';
+    process.env.TRADER_MANAGE_EXITS = '0';
+    process.env.TRADER_REQUIRE_PERSIST = '0';   // don't require consecutive scans
+    process.env.TRADER_MIN_HOLD_MIN = '0';      // no min-hold block
+    process.env.TRADER_EXIT_MIN_PWIN = '0';     // any bearish is strong enough
+    process.env.TRADER_MOMENTUM_EXIT = '0';     // isolate the signal-exit path
+    process.env.TRADER_EXIT_REATTEMPT_MIN = '8';
+    at._resetCooldowns();
+
+    const t0 = 1_700_000_000_000;
+    const r1 = await at.runAutoTrade({ signals: [bearish] }, { bridge, userId: 'u', now: t0 });
+    assert.strictEqual(sells.length, 1, 'scan 1 fires exactly one exit sell');
+    assert.ok(r1.executed.some((e) => e.action === 'exit_long'), 'scan 1 logged the exit');
+
+    // Scan 2, NINE minutes later — the 8-min reattempt timer has EXPIRED, so only the
+    // in-flight freeze can stop a re-fire. Position is still held (exit never confirmed).
+    const r2 = await at.runAutoTrade({ signals: [bearish] }, { bridge, userId: 'u', now: t0 + 9 * 60000 });
+    assert.strictEqual(sells.length, 1, 'scan 2 does NOT re-fire the exit (in-flight freeze)');
+    assert.ok(r2.skipped.some((s) => /oversell|stacking|resting/i.test(s.why || '')), 'scan 2 skipped via the oversell/in-flight guard');
+
+    // Position finally leaves the book (the exit filled). The freeze clears, so a fresh
+    // future position could be exited again.
+    positions = [];
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 'u', now: t0 + 20 * 60000 });
+    const snap = JSON.parse(fs.readFileSync(at.STATE_FILE, 'utf8'));
+    assert.ok(!Object.prototype.hasOwnProperty.call(snap.exitStatus || {}, SYM), 'freeze cleared once the position left the book');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
 });
 
 test('entryKnifeFilter config defaults on, disables via env', () => {
