@@ -158,21 +158,24 @@ function _liveGross() {
   } catch (_e) { return 1.0; }
 }
 
-// The Sigma Trader ALWAYS trades its own dedicated account — never the caller's
-// identity and never the shared day-trader book. Its broker resolves ONLY to a
-// dedicated Alpaca account (its own connected OAuth or SIGMA_ALPACA_* keys). When no
-// dedicated account is configured, the account fetch returns null → the engine plans
-// but refuses to place a single order, so it can NEVER collide with the day-trader.
-const acctId = () => require('./alpaca-adapter').SIGMA_USER;
+// Which Alpaca account this run trades. Two modes:
+//   • no userId  → the Sigma Trader's OWN dedicated account (SIGMA_ALPACA_* keys /
+//     its own OAuth). The classic standalone Sigma book (scheduler, /sigma-trader).
+//   • a userId   → THAT user's own connected account (Phase 2: the "Champion" trader
+//     the user selected as their active strategy — runs on their own paper account).
+// Either way, if the account fetch returns null the engine plans but places nothing,
+// and the paper-only guard in rebalanceNow refuses any non-paper account.
+const acctId = (userId) => userId || require('./alpaca-adapter').SIGMA_USER;
 
 /**
- * Compute the current plan (weights, targets, drift orders) WITHOUT trading. Reads
- * the Sigma Trader's OWN Alpaca account, daily bars for the universe, and the brake.
+ * Compute the current plan (weights, targets, drift orders) WITHOUT trading. Reads the
+ * target account's Alpaca positions/equity, daily bars for the universe, and the brake.
+ * @param {string} [userId]  run on this user's own account (Champion); omit for Sigma's.
  */
-async function plan({ bandPct = DEFAULT_BAND_PCT } = {}) {
+async function plan({ bandPct = DEFAULT_BAND_PCT, userId } = {}) {
   const alpaca = require('./alpaca-adapter');
   const yahoo = require('./market-data-yahoo');
-  const uid = acctId();
+  const uid = acctId(userId);
   const acct = await alpaca.getAccount(uid).catch(() => null);
   const bm = await yahoo.getBarsMulti(UNIVERSE, '1d').catch(() => ({ bars: {} }));
   const bars = (bm && bm.bars) || {};
@@ -187,8 +190,10 @@ async function plan({ bandPct = DEFAULT_BAND_PCT } = {}) {
   // No dedicated Sigma account yet → return the target allocation but no orders, and
   // flag it, so the UI can prompt "connect the Sigma Trader's own account".
   if (!acct) {
-    return { ok: true, account: 'not_configured', equity: 0, gross, weights, used, dropped,
-      orders: [], targets: {}, note: 'The Sigma Trader has no dedicated account. Set SIGMA_ALPACA_API_KEY_ID/_SECRET (a SEPARATE Alpaca paper account) or connect one — it will not borrow the day-trader’s book.' };
+    const note = userId
+      ? 'No Alpaca account connected for this user. Add your Alpaca paper API keys in Settings → Connections, then switch the active trader to Champion.'
+      : 'The Sigma Trader has no dedicated account. Set SIGMA_ALPACA_API_KEY_ID/_SECRET (a SEPARATE Alpaca paper account) or connect one — it will not borrow the day-trader’s book.';
+    return { ok: true, account: 'not_configured', equity: 0, gross, weights, used, dropped, orders: [], targets: {}, note };
   }
   const equity = Number(acct.equity) || Number(acct.portfolio_value) || 0;
   const pos = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
@@ -202,15 +207,15 @@ async function plan({ bandPct = DEFAULT_BAND_PCT } = {}) {
  * arm:true AND SIGMA_ARM=1. Refuses a non-paper account. Refuses entirely if no
  * dedicated Sigma account is configured (so it never touches the day-trader).
  */
-async function rebalanceNow({ arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders = Infinity } = {}) {
-  const p = await plan({ bandPct });
+async function rebalanceNow({ arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders = Infinity, userId } = {}) {
+  const p = await plan({ bandPct, userId });
   if (!p.ok) return p;
   if (p.account === 'not_configured') return { ...p, executed: false, refused: 'no_dedicated_account' };
   const armed = arm && process.env.SIGMA_ARM === '1';
   if (armed && p.env === 'live') { logLedger({ event: 'refused_live', equity: p.equity }); return { ...p, executed: false, refused: 'live_account_forbidden' }; }
   if (!armed) { logLedger({ event: 'plan_dry', equity: p.equity, gross: p.gross, weights: p.weights, orders: p.orders }); return { ...p, executed: false, dryRun: true }; }
   const alpaca = require('./alpaca-adapter');
-  const uid = acctId();
+  const uid = acctId(userId);
   const results = [];
   for (const o of p.orders.slice(0, maxOrders)) {
     // Free shares reserved by resting orders before a sell (defensive — on its own

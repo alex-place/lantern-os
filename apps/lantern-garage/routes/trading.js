@@ -72,6 +72,17 @@ function _isUsExtendedHours() {
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
+// Champion is a SLOW allocation book — it must not rebalance every autoscan tick like
+// the day-trader. Throttle to at most once per hour per user (the no-churn band means
+// most runs are no-ops anyway, but this avoids the per-tick bar fetch + order churn).
+const _championLastRun = new Map();
+const CHAMPION_MIN_INTERVAL_MS = 60 * 60 * 1000;
+function _championDue(uid, now) {
+  const last = _championLastRun.get(uid) || 0;
+  if (now - last < CHAMPION_MIN_INTERVAL_MS) return false;
+  _championLastRun.set(uid, now);
+  return true;
+}
 // Extended-hours (pre-market / after-hours) trading — OFF by default. When on (⏰ toggle
 // or TRADER_EXTENDED_HOURS=1) the trader also scans + acts during the extended session,
 // placing marketable-limit + outsideRTH orders (regular hours use market orders as before).
@@ -105,12 +116,24 @@ async function _autoscanTick() {
       const users = process.env.TRADER_AUTO_USER
         ? [process.env.TRADER_AUTO_USER]
         : [...new Set([...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()])];
+      const traderMode = require('../lib/trader-mode');
+      const sigma = require('../lib/sigma-trader');
       const _seenAccts = new Set();
       for (const uid of users) {
         const resolved = await brokerFacadeFor(uid, _autoBridge).catch(() => null);
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
         _seenAccts.add(resolved.accountId);
+        // ACTIVE-TRADER switch (Phase 2): one account, one strategy. A 'champion' user
+        // has the day-trader PAUSED — instead we run the Champion allocation book on
+        // their own account (throttled; DRY unless SIGMA_ARM=1, same governance as the
+        // standalone Sigma book). Default 'stock' users fall through to runAutoTrade.
+        if (traderMode.get(uid) === 'champion') {
+          if (_championDue(uid, Date.now())) {
+            await sigma.rebalanceNow({ userId: uid, arm: true }).catch((e) => console.error('[Trading] champion rebalance failed:', e.message));
+          }
+          continue;                                              // day-trader paused for this account
+        }
         // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
         // so entries/signal-exits only touch names they curated. Held-position exits
         // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
@@ -276,6 +299,7 @@ const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
+const traderModeRoutes = require('./trading/mode');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -324,6 +348,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await scorecardRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
+  if (await traderModeRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;
