@@ -206,6 +206,43 @@ test('max-loss backstop: a small loss inside the threshold is NOT force-exited',
   }
 });
 
+test('R take-profit: a long at +1R is banked; below 1R it is held', async () => {
+  const saved = { ...process.env };
+  const mk = (curPx) => ({
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'SPY', qty: 10, avg_entry_price: 100, current_price: curPx, market_value: 10 * curPx, unrealized_pl: (curPx - 100) * 10 }],
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) mk._sells.push(o); return { status: 'placed' }; },
+  });
+  async function run(curPx) {
+    const b = mk(curPx); b.placeIBKROrder = async (uid, o) => { if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) sells.push(o); return { status: 'placed' }; };
+    return b;
+  }
+  let sells = [];
+  try {
+    process.env.TRADER_MANAGE_EXITS = '1';
+    process.env.TRADER_AUTO_EXECUTE = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';
+    process.env.TRADER_MIN_HOLD_MIN = '0';
+    process.env.TRADER_STOP_PCT = '2';
+    process.env.TRADER_TAKE_PROFIT_R = '1';   // 1R = +2% (stopPct)
+    // +2.5% → past 1R → should bank it
+    sells = []; at._resetCooldowns();
+    let out = await at.runAutoTrade({ signals: [] }, { bridge: await run(102.5), userId: 'u', now: 1_700_000_000_000 });
+    assert.strictEqual(sells.length, 1, 'a +2.5% long (>1R) is taken-profit');
+    assert.ok(out.executed.some((e) => /take_profit_R/.test(e.reason || '')), 'reason is take_profit_R');
+    // +1% → below 1R → left to run
+    sells = []; at._resetCooldowns();
+    await at.runAutoTrade({ signals: [] }, { bridge: await run(101), userId: 'u', now: 1_700_000_000_000 });
+    assert.strictEqual(sells.length, 0, 'a +1% long (<1R) is held');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
 test('entryKnifeFilter config defaults on, disables via env', () => {
   const saved = process.env.TRADER_ENTRY_KNIFE_FILTER;
   try {
