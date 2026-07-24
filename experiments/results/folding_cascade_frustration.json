@@ -1,0 +1,262 @@
+{
+  "date": "2026-07-24",
+  "claim": "protein-style partial unfolding (foldback to last verified foldon) beats monotone escalation under frustration, at equal compute",
+  "params": {
+    "K": 8,
+    "foldon": 2,
+    "p_cheap": 0.72,
+    "p_strong": 0.93,
+    "cost": {
+      "cheap": 1.0,
+      "strong": 4.0
+    },
+    "budget": 64.0,
+    "N_per_seed": 4000,
+    "seeds": [
+      11,
+      22,
+      33
+    ]
+  },
+  "frustration_definition": "a step that is INCORRECT but passes local verification (folding: locally favourable, globally conflicting)",
+  "table": [
+    {
+      "phi": 0.0,
+      "monotone_escalation": {
+        "success": 0.9795,
+        "success_sd_over_seeds": 0.0009,
+        "avg_spend": 23.86
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.9917,
+        "success_sd_over_seeds": 0.0007,
+        "avg_spend": 24.34
+      },
+      "global_restart": {
+        "success": 0.9983,
+        "success_sd_over_seeds": 0.0007,
+        "avg_spend": 15.03
+      },
+      "foldback_cascade": {
+        "success": 1.0,
+        "success_sd_over_seeds": 0.0,
+        "avg_spend": 13.97
+      },
+      "foldback_minus_retrymatched_pp": 0.83,
+      "foldback_minus_monotone_pp": 2.05,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.0,
+        "survive_full_restart_(1-q)^K": 1.0,
+        "survive_one_foldon_unfold_(1-q)^F": 1.0,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.0
+      }
+    },
+    {
+      "phi": 0.1,
+      "monotone_escalation": {
+        "success": 0.951,
+        "success_sd_over_seeds": 0.0061,
+        "avg_spend": 27.01
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.9602,
+        "success_sd_over_seeds": 0.0053,
+        "avg_spend": 27.39
+      },
+      "global_restart": {
+        "success": 0.9915,
+        "success_sd_over_seeds": 0.0013,
+        "avg_spend": 18.38
+      },
+      "foldback_cascade": {
+        "success": 0.9998,
+        "success_sd_over_seeds": 0.0001,
+        "avg_spend": 14.73
+      },
+      "foldback_minus_retrymatched_pp": 3.96,
+      "foldback_minus_monotone_pp": 4.88,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.007,
+        "survive_full_restart_(1-q)^K": 0.9454,
+        "survive_one_foldon_unfold_(1-q)^F": 0.986,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.043
+      }
+    },
+    {
+      "phi": 0.2,
+      "monotone_escalation": {
+        "success": 0.9108,
+        "success_sd_over_seeds": 0.0072,
+        "avg_spend": 29.42
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.9177,
+        "success_sd_over_seeds": 0.0061,
+        "avg_spend": 29.68
+      },
+      "global_restart": {
+        "success": 0.9674,
+        "success_sd_over_seeds": 0.0044,
+        "avg_spend": 21.96
+      },
+      "foldback_cascade": {
+        "success": 0.9995,
+        "success_sd_over_seeds": 0.0,
+        "avg_spend": 15.36
+      },
+      "foldback_minus_retrymatched_pp": 8.18,
+      "foldback_minus_monotone_pp": 8.87,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.014,
+        "survive_full_restart_(1-q)^K": 0.8933,
+        "survive_one_foldon_unfold_(1-q)^F": 0.9722,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.0883
+      }
+    },
+    {
+      "phi": 0.3,
+      "monotone_escalation": {
+        "success": 0.8721,
+        "success_sd_over_seeds": 0.0044,
+        "avg_spend": 31.74
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.8781,
+        "success_sd_over_seeds": 0.004,
+        "avg_spend": 32.02
+      },
+      "global_restart": {
+        "success": 0.9287,
+        "success_sd_over_seeds": 0.0045,
+        "avg_spend": 25.84
+      },
+      "foldback_cascade": {
+        "success": 0.999,
+        "success_sd_over_seeds": 0.0004,
+        "avg_spend": 15.82
+      },
+      "foldback_minus_retrymatched_pp": 12.09,
+      "foldback_minus_monotone_pp": 12.69,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.021,
+        "survive_full_restart_(1-q)^K": 0.8438,
+        "survive_one_foldon_unfold_(1-q)^F": 0.9584,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.1358
+      }
+    },
+    {
+      "phi": 0.5,
+      "monotone_escalation": {
+        "success": 0.7915,
+        "success_sd_over_seeds": 0.0018,
+        "avg_spend": 34.54
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.7943,
+        "success_sd_over_seeds": 0.0015,
+        "avg_spend": 34.67
+      },
+      "global_restart": {
+        "success": 0.8079,
+        "success_sd_over_seeds": 0.0095,
+        "avg_spend": 33.46
+      },
+      "foldback_cascade": {
+        "success": 0.9983,
+        "success_sd_over_seeds": 0.0003,
+        "avg_spend": 16.78
+      },
+      "foldback_minus_retrymatched_pp": 20.4,
+      "foldback_minus_monotone_pp": 20.68,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.035,
+        "survive_full_restart_(1-q)^K": 0.752,
+        "survive_one_foldon_unfold_(1-q)^F": 0.9312,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.2383
+      }
+    },
+    {
+      "phi": 0.7,
+      "monotone_escalation": {
+        "success": 0.7062,
+        "success_sd_over_seeds": 0.0071,
+        "avg_spend": 36.63
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.7077,
+        "success_sd_over_seeds": 0.007,
+        "avg_spend": 36.68
+      },
+      "global_restart": {
+        "success": 0.6452,
+        "success_sd_over_seeds": 0.0014,
+        "avg_spend": 40.17
+      },
+      "foldback_cascade": {
+        "success": 0.9946,
+        "success_sd_over_seeds": 0.0014,
+        "avg_spend": 17.48
+      },
+      "foldback_minus_retrymatched_pp": 28.69,
+      "foldback_minus_monotone_pp": 28.84,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.049,
+        "survive_full_restart_(1-q)^K": 0.669,
+        "survive_one_foldon_unfold_(1-q)^F": 0.9044,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.3518
+      }
+    },
+    {
+      "phi": 1.0,
+      "monotone_escalation": {
+        "success": 0.5923,
+        "success_sd_over_seeds": 0.0042,
+        "avg_spend": 37.53
+      },
+      "monotone_multi_retry_matched": {
+        "success": 0.5923,
+        "success_sd_over_seeds": 0.0042,
+        "avg_spend": 37.53
+      },
+      "global_restart": {
+        "success": 0.4628,
+        "success_sd_over_seeds": 0.0039,
+        "avg_spend": 49.61
+      },
+      "foldback_cascade": {
+        "success": 0.9892,
+        "success_sd_over_seeds": 0.0005,
+        "avg_spend": 18.15
+      },
+      "foldback_minus_retrymatched_pp": 39.69,
+      "foldback_minus_monotone_pp": 39.69,
+      "theory": {
+        "q_hidden_error_per_resolved_step": 0.07,
+        "survive_full_restart_(1-q)^K": 0.5596,
+        "survive_one_foldon_unfold_(1-q)^F": 0.8649,
+        "predicted_advantage_factor_(1-q)^-(K-F)": 1.5456
+      }
+    }
+  ],
+  "gates": {
+    "G_F1_no_advantage_at_zero_frustration_vs_RETRYMATCHED": {
+      "delta_pp_at_phi0": 0.83,
+      "threshold_pp": 2.0,
+      "PASS": true
+    },
+    "G_F2_advantage_grows_and_exceeds_10pp": {
+      "max_delta_pp": 39.69,
+      "argmax_phi": 1.0,
+      "monotone_nondecreasing_in_phi": true,
+      "PASS": true
+    },
+    "KILL_no_advantage_anywhere": false,
+    "VERDICT": "SUPPORTED \u2014 advantage absent at phi=0 and grows with frustration"
+  },
+  "prior_art": {
+    "foldons_sequential_stabilization": "Englander & Mayne, PNAS 2012/2014/2017 \u2014 stepwise foldon assembly; predetermined pathways with OPTIONAL ERRORS repaired by partial unfolding",
+    "funnel_minimal_frustration": "Bryngelson & Wolynes; Onuchic, Luthey-Schulten & Wolynes, Annu Rev Phys Chem 1997; minimal-frustration evolution evidence PNAS 2017 (1613892114)",
+    "localized_frustration_is_functional": "Ferreiro/Wolynes, Acc. Chem. Res. 2021 \u2014 frustration is not purely pathological",
+    "llm_landscape_prior": "Landscape of Thoughts (arXiv:2503.22165, ICLR 2026) \u2014 DESCRIPTIVE trajectory visualization; no funneledness/frustration theory, no foldon control flow"
+  }
+}
