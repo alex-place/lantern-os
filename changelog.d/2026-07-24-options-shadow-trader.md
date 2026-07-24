@@ -40,3 +40,15 @@
   rows carry `depth:'penny'` + `sigma`/`dist_pct`, so the penny book is judged on its own
   measured expectancy. Live-verified: real chain snapshot picked SPY 756 (2.31% OTM) at
   ask $0.01.
+
+- trading/data: **cheap-first market-data source picks, adopted + built**
+  (`docs/research/2026-07-25-market-data-source-picks.md`, total $0/mo): Yahoo for
+  underlying bars (already integrated), the Alpaca **free indicative feed** for live
+  chains/quotes (already powering the shadow), and — the new piece — **Alpaca free
+  historical option BARS (2024-02→now)** for backtests. `scripts/options-hist-backtest.js`
+  replays the overnight OTM ladder + penny strategy against **real traded option
+  prices** (entry = day-T close, exit = expiry-day open; penny target = a real ≥2¢
+  print), one multi-symbol bars call per gated night, cached under `data/options-hist/`.
+  DoltHub's free options DB was verified live and **rejected for this use** (SPY carries
+  only 2–6-week expirations — no next-day contracts); optionsDX/MarketData/ThetaData
+  documented as the upgrade ladder, spend gated on measured edge.
