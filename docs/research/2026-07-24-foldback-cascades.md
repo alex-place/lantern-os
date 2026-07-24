@@ -395,3 +395,118 @@ Two honesty caveats fixed in advance:
 
 Whatever the numbers, they are reported in §11 as measured — including the outcome that
 **kills the practical case** (φ̂ < 0.1), which is the one that would most tempt a rewrite.
+
+---
+
+## 11. The adjudicating measurement — result (read against §10, which was fixed FIRST)
+
+φ̂ and ĉ measured on 120 real MBPP/TACO problems the cascade actually ran, generating the
+failing attempts with a 0.5B coder and executing every assertion in isolation
+([`measure_frustration_on_real_traces.py`](../../experiments/measure_frustration_on_real_traces.py)
+→ [`frustration_real_traces.json`](../../experiments/results/frustration_real_traces.json);
+65 failing solutions, 195 tests):
+
+| quantity | value |
+|---|---|
+| global solve rate (0.5B) | 0.458 |
+| **φ̂** (tests still passing in a globally-failing solution) | **0.092** |
+| **ĉ** (mixture / ICC cross-check) | **0.143 / 0.153** |
+| all-or-nothing failures | 78% |
+
+**Read against the pre-registered bands: φ̂ = 0.092 lands in the first band (φ̂ < 0.1) — the
+one §10 flagged as "kills the practical case" and "the outcome that would most tempt a
+rewrite."** I honor it. On this workload the local checks (individual test assertions) catch
+almost every error — a failing solution fails ~91% of its tests — so there is very little
+*hidden* frustration for foldback to exploit. **The repair-policy prescription (rungs A–C) is
+practically inert on this workload**, exactly as pre-registered for this band. ĉ = 0.14 is
+firmly independent (it would put us in the "fixed-depth, worth building" regime *if* φ̂ cleared
+0.1), but φ̂ is the binding constraint and it does not clear.
+
+Two things this does **not** mean, held to the caveats also fixed in §10 before the number:
+1. **Not a refutation of the theory.** The error-threshold law and regime map (§12) are about
+   *when* repair helps; the measurement says this workload sits in the low-φ corner where the
+   theory *predicts* little foldback value — a confirmation of the theory's own boundary, not
+   a contradiction of it.
+2. **Workload- and tier-specific.** Coding with unit tests is an unusually *strong* local
+   verifier (caveat 1), and the 0.5B failures are a proxy for the cheap-tier failures the real
+   cascade repairs (caveat 2). The pre-registered next step stands: re-measure at the escalate
+   tier and on a workload with *weak* per-step verification (multi-step tool use, planning,
+   proof) — the regimes the theory says carry high φ — before any build.
+
+**Net: the "build foldback into the cascade now" case is NOT supported on this workload.**
+Recorded as measured. This is the honest downgrade §10 pre-committed to, and it is the correct
+outcome of the discipline — the number fell below the line, so the practical claim does not
+ship.
+
+## 12. Is it SOTA, not just novel? The fractured envelope + the error threshold
+
+Novel (nobody did exactly this) and SOTA (beats the best existing method) are different bars.
+Answered in [`folding_sota_and_error_threshold.py`](../../experiments/folding_sota_and_error_threshold.py).
+
+**Prior art at the source.** The closest published method is **REPOT** ("Recoverable
+Program-of-Thought via Checkpoint Repair", [arXiv:2605.30052](https://arxiv.org/abs/2605.30052),
+June 2026): it backs up to the failure point and repairs — but, confirmed by reading it, has
+**no closed-form backup depth, no independent-vs-correlated error distinction, and no strategy
+selection.** So REPOT is *one cell* of the regime map (root-localized repair) applied
+unconditionally. Reflexion / Self-Refine = full restart; Tree-of-Thoughts / LATS = shallow
+stepwise backtrack; Self-Backtracking = explicit backtrack actions. Each is a *fixed* policy.
+
+**Finding 1 — the SOTA envelope is regime-fractured.** Steelmanned implementations (REPOT given
+a perfect failure locator), equal compute, over (K, c) at φ = 1:
+
+| K | c | Reflexion (restart) | ToT (stepwise) | REPOT (checkpoint) | fixed-depth 1/q | **selector** |
+|---|---|---|---|---|---|---|
+| 32 | 0.0 | 0.477 | **1.000** | 0.947 | 0.908 | 1.000 |
+| 32 | 0.5 | 0.476 | 0.517 | **0.950** | 0.512 | 0.950 |
+| 32 | 1.0 | 0.480 | 0.049 | **0.950** | 0.122 | 0.950 |
+| 128 | 0.0 | 0.004 | **1.000** | 0.234 | 1.000 | 1.000 |
+| 128 | 0.5 | 0.004 | **0.500** | 0.240 | 0.499 | 0.500 |
+| 128 | 1.0 | 0.003 | 0.000 | **0.239** | 0.000 | 0.239 |
+
+**No single method dominates.** ToT is optimal for independent errors (1.000) and *fails
+completely* under causal poisoning (0.000); REPOT is best under causal errors on short chains
+(0.950) and degrades on long chains (0.234) as its suffix re-solve grows; Reflexion collapses
+at long K (0.004). Whichever fixed method a practitioner commits to, there is a regime where it
+fails badly — **G-S2 passes with 76–99pp margins.** A selector routing on (φ, c, K) — the
+biology-derived candidate set (foldons→fixed-depth, GroEL→restart-in-isolation,
+root-cause→checkpoint) — matches the envelope everywhere (**G-S1, within 2pp**).
+
+*Honest scope on the selector:* recovering the envelope is expected once per-regime routing is
+allowed — the content is the **map** (which method when, from measurable properties) and the
+**fracture** (no universal method), not the selector "winning." The mixed-regime K-crossover
+(64) is *calibrated* on this grid, not derived; its existence and direction come from rung C
+(the phase boundary moves with K), its value does not. And the whole comparison is *simulated*
+— a real-benchmark head-to-head against published REPOT/ToT is the unbuilt rung.
+
+**Finding 2 — the reasoning error threshold (the deeper-biology result).** From Eigen's
+quasispecies theory (1971): information is maintained only below a critical error rate; above
+it, "error catastrophe." Ported: a chain of K steps repaired against per-step hidden-error
+rate q can be produced clean in one pass only up to a critical length K_c. Measured — the
+clean-pass probability crosses 1/e at
+
+> **K_c · q = 0.96, 0.80, 0.80** for q ∈ {0.02, 0.05, 0.1} → **K_c ≈ 1/q**,
+
+the *same* 1/q as rung B's optimal backup depth and Eigen's n < 1/(μs). This unifies three
+biological mechanisms into one design law:
+
+- **Kinetic proofreading** (Hopfield 1974 / Ninio 1975): insert verification checkpoints; each
+  independent checkpoint *multiplies* discrimination, driving effective q down — which *raises*
+  K_c. The cost is energy + speed (the [energy-speed-accuracy relation](https://arxiv.org/pdf/1710.06038)).
+- **Error threshold** (Eigen 1971): a chain longer than ~1/q cannot be repaired at any single
+  backup point — you *must* decompose into segments shorter than 1/q.
+- **Foldback** (rungs A–C): within a below-threshold segment, back up (independent: depth 1/q;
+  causal: root-seek).
+
+Existing methods each implement one fragment (REPOT = root-seek repair; a process-reward model
+= a single checkpoint; ToT = search) with no theory connecting them and **no length bound**.
+The contribution is the bound (K_c ≈ 1/q — none of them have it), the map, and the prescription
+(checkpoint every ~1/q steps to keep each segment below its error threshold).
+
+**Honest SOTA verdict.** *Novel* is established: REPOT and the rest lack the depth law, the
+error-structure distinction, and the threshold bound. *SOTA "by selection"* is shown **in
+simulation** (the selector matches an envelope no fixed method dominates), not yet on a real
+benchmark. And §11 found the one real workload measured sits *below* the frustration threshold
+where any of this repair machinery pays off. So the defensible status is: **a new hard bound
+(K_c ≈ 1/q) and a regime map that no prior method has — strong theory, SOTA-relevant — with the
+empirical SOTA claim gated on (a) a real head-to-head benchmark and (b) a workload in the
+high-φ regime.** That is the honest boundary, stated rather than papered over.

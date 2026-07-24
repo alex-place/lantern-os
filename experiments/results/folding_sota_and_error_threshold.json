@@ -1,0 +1,512 @@
+{
+  "date": "2026-07-24",
+  "part1_sota_envelope": {
+    "m_law_1_over_q": 19,
+    "cells": [
+      {
+        "K": 32,
+        "c": 0.0,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 32,
+        "c": 0.0,
+        "phi": 1.0,
+        "reflexion_restart": 0.4771,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 0.9474,
+        "fixed_depth_biofold": 0.9077,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "tot_stepwise",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 32,
+        "c": 0.5,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 32,
+        "c": 0.5,
+        "phi": 1.0,
+        "reflexion_restart": 0.4762,
+        "tot_stepwise": 0.5166,
+        "repot_checkpoint": 0.9496,
+        "fixed_depth_biofold": 0.5122,
+        "regime_selector": 0.9496,
+        "best_fixed": 0.9496,
+        "best_fixed_method": "repot_checkpoint",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 32,
+        "c": 1.0,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 32,
+        "c": 1.0,
+        "phi": 1.0,
+        "reflexion_restart": 0.4797,
+        "tot_stepwise": 0.0488,
+        "repot_checkpoint": 0.9497,
+        "fixed_depth_biofold": 0.1225,
+        "regime_selector": 0.9497,
+        "best_fixed": 0.9497,
+        "best_fixed_method": "repot_checkpoint",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 0.0,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 0.0,
+        "phi": 1.0,
+        "reflexion_restart": 0.0037,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 0.2338,
+        "fixed_depth_biofold": 0.9999,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "tot_stepwise",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 0.5,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 0.5,
+        "phi": 1.0,
+        "reflexion_restart": 0.0037,
+        "tot_stepwise": 0.4997,
+        "repot_checkpoint": 0.2403,
+        "fixed_depth_biofold": 0.4988,
+        "regime_selector": 0.4997,
+        "best_fixed": 0.4997,
+        "best_fixed_method": "tot_stepwise",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 1.0,
+        "phi": 0.0,
+        "reflexion_restart": 1.0,
+        "tot_stepwise": 1.0,
+        "repot_checkpoint": 1.0,
+        "fixed_depth_biofold": 1.0,
+        "regime_selector": 1.0,
+        "best_fixed": 1.0,
+        "best_fixed_method": "reflexion_restart",
+        "selector_minus_best_fixed_pp": 0.0
+      },
+      {
+        "K": 128,
+        "c": 1.0,
+        "phi": 1.0,
+        "reflexion_restart": 0.0034,
+        "tot_stepwise": 0.0,
+        "repot_checkpoint": 0.2393,
+        "fixed_depth_biofold": 0.0,
+        "regime_selector": 0.2393,
+        "best_fixed": 0.2393,
+        "best_fixed_method": "repot_checkpoint",
+        "selector_minus_best_fixed_pp": 0.0
+      }
+    ],
+    "best_fixed_by_cell": [
+      [
+        32,
+        0.0,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        32,
+        0.0,
+        1.0,
+        "tot_stepwise"
+      ],
+      [
+        32,
+        0.5,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        32,
+        0.5,
+        1.0,
+        "repot_checkpoint"
+      ],
+      [
+        32,
+        1.0,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        32,
+        1.0,
+        1.0,
+        "repot_checkpoint"
+      ],
+      [
+        128,
+        0.0,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        128,
+        0.0,
+        1.0,
+        "tot_stepwise"
+      ],
+      [
+        128,
+        0.5,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        128,
+        0.5,
+        1.0,
+        "tot_stepwise"
+      ],
+      [
+        128,
+        1.0,
+        0.0,
+        "reflexion_restart"
+      ],
+      [
+        128,
+        1.0,
+        1.0,
+        "repot_checkpoint"
+      ]
+    ]
+  },
+  "part2_error_threshold": {
+    "claim": "K_c ~ 1/q (Eigen error catastrophe for reasoning chains)",
+    "by_q": [
+      {
+        "q": 0.02,
+        "predicted_Kc_1_over_q": 50.0,
+        "Kc_at_1_over_e": 48,
+        "Kc_at_0.5": 32,
+        "Kc_at_0.25": 64,
+        "Kc_1e_times_q": 0.96,
+        "curve": [
+          {
+            "K": 2,
+            "clean_prob": 0.9636
+          },
+          {
+            "K": 4,
+            "clean_prob": 0.9232
+          },
+          {
+            "K": 8,
+            "clean_prob": 0.8519
+          },
+          {
+            "K": 12,
+            "clean_prob": 0.7851
+          },
+          {
+            "K": 16,
+            "clean_prob": 0.7231
+          },
+          {
+            "K": 20,
+            "clean_prob": 0.6702
+          },
+          {
+            "K": 24,
+            "clean_prob": 0.6179
+          },
+          {
+            "K": 32,
+            "clean_prob": 0.5208
+          },
+          {
+            "K": 40,
+            "clean_prob": 0.4445
+          },
+          {
+            "K": 48,
+            "clean_prob": 0.3896
+          },
+          {
+            "K": 64,
+            "clean_prob": 0.269
+          },
+          {
+            "K": 80,
+            "clean_prob": 0.2023
+          },
+          {
+            "K": 96,
+            "clean_prob": 0.1447
+          },
+          {
+            "K": 128,
+            "clean_prob": 0.0761
+          },
+          {
+            "K": 160,
+            "clean_prob": 0.0414
+          },
+          {
+            "K": 200,
+            "clean_prob": 0.0158
+          },
+          {
+            "K": 256,
+            "clean_prob": 0.0058
+          }
+        ]
+      },
+      {
+        "q": 0.05,
+        "predicted_Kc_1_over_q": 20.0,
+        "Kc_at_1_over_e": 16,
+        "Kc_at_0.5": 12,
+        "Kc_at_0.25": 24,
+        "Kc_1e_times_q": 0.8,
+        "curve": [
+          {
+            "K": 2,
+            "clean_prob": 0.9022
+          },
+          {
+            "K": 4,
+            "clean_prob": 0.8119
+          },
+          {
+            "K": 8,
+            "clean_prob": 0.6643
+          },
+          {
+            "K": 12,
+            "clean_prob": 0.5436
+          },
+          {
+            "K": 16,
+            "clean_prob": 0.4504
+          },
+          {
+            "K": 20,
+            "clean_prob": 0.3603
+          },
+          {
+            "K": 24,
+            "clean_prob": 0.2918
+          },
+          {
+            "K": 32,
+            "clean_prob": 0.194
+          },
+          {
+            "K": 40,
+            "clean_prob": 0.1336
+          },
+          {
+            "K": 48,
+            "clean_prob": 0.0871
+          },
+          {
+            "K": 64,
+            "clean_prob": 0.0394
+          },
+          {
+            "K": 80,
+            "clean_prob": 0.0173
+          },
+          {
+            "K": 96,
+            "clean_prob": 0.0066
+          },
+          {
+            "K": 128,
+            "clean_prob": 0.0015
+          },
+          {
+            "K": 160,
+            "clean_prob": 0.0003
+          },
+          {
+            "K": 200,
+            "clean_prob": 0.0001
+          },
+          {
+            "K": 256,
+            "clean_prob": 0.0
+          }
+        ]
+      },
+      {
+        "q": 0.1,
+        "predicted_Kc_1_over_q": 10.0,
+        "Kc_at_1_over_e": 8,
+        "Kc_at_0.5": 4,
+        "Kc_at_0.25": 12,
+        "Kc_1e_times_q": 0.8,
+        "curve": [
+          {
+            "K": 2,
+            "clean_prob": 0.8117
+          },
+          {
+            "K": 4,
+            "clean_prob": 0.6603
+          },
+          {
+            "K": 8,
+            "clean_prob": 0.4305
+          },
+          {
+            "K": 12,
+            "clean_prob": 0.2859
+          },
+          {
+            "K": 16,
+            "clean_prob": 0.1942
+          },
+          {
+            "K": 20,
+            "clean_prob": 0.1205
+          },
+          {
+            "K": 24,
+            "clean_prob": 0.0847
+          },
+          {
+            "K": 32,
+            "clean_prob": 0.0355
+          },
+          {
+            "K": 40,
+            "clean_prob": 0.0143
+          },
+          {
+            "K": 48,
+            "clean_prob": 0.0053
+          },
+          {
+            "K": 64,
+            "clean_prob": 0.0013
+          },
+          {
+            "K": 80,
+            "clean_prob": 0.0
+          },
+          {
+            "K": 96,
+            "clean_prob": 0.0
+          },
+          {
+            "K": 128,
+            "clean_prob": 0.0
+          },
+          {
+            "K": 160,
+            "clean_prob": 0.0
+          },
+          {
+            "K": 200,
+            "clean_prob": 0.0
+          },
+          {
+            "K": 256,
+            "clean_prob": 0.0
+          }
+        ]
+      }
+    ]
+  },
+  "gates": {
+    "G_S1_selector_dominates_envelope": {
+      "PASS": true,
+      "worst_selector_minus_best_fixed_pp": 0.0
+    },
+    "G_S2_every_fixed_method_is_regime_specific": {
+      "PASS": true,
+      "max_selector_advantage_over_each_pp": {
+        "reflexion_restart": 99.63,
+        "tot_stepwise": 90.09,
+        "repot_checkpoint": 76.62,
+        "fixed_depth_biofold": 82.72
+      }
+    },
+    "G_T1_error_threshold_at_1_over_q": {
+      "PASS": true,
+      "Kc_times_q_should_be_~1": {
+        "0.02": 0.96,
+        "0.05": 0.8,
+        "0.1": 0.8
+      }
+    },
+    "KILL_a_fixed_method_dominates_selector": false,
+    "VERDICT": "SOTA BY SELECTION + ERROR THRESHOLD CONFIRMED"
+  },
+  "prior_art": {
+    "kinetic_proofreading": "Hopfield 1974 / Ninio 1975 \u2014 multiplicative fidelity per irreversible checkpoint at an energy-speed cost (arXiv:1710.06038 energy-speed-accuracy)",
+    "error_threshold": "Eigen 1971 quasispecies; error catastrophe n < 1/(mu*s)",
+    "sota_baselines": {
+      "REPOT": "arXiv:2605.30052 checkpoint repair, backs up to failure point, NO depth rule, NO error-structure distinction, NO strategy selection",
+      "self_backtracking": "explicit backtrack actions",
+      "ToT_LATS": "branch during search (shallow backtrack)",
+      "reflexion_self_refine": "critique + full regenerate"
+    }
+  }
+}
