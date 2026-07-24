@@ -91,7 +91,7 @@ node apps/lantern-garage/server.js
 **Full stack (dual-boot dev).**
 
 ```bash
-make quickstart
+npm run quickstart --prefix apps/lantern-garage
 # Port 4177: stable (master) · Port 4178: dev (your branch, hot-reload)
 ```
 
@@ -190,7 +190,7 @@ npm run test:ui  --prefix apps/lantern-garage   # requires Playwright
 python -m pytest tests/ -q --tb=short
 
 # Syntax check server entrypoints
-make check-node
+node --check apps/lantern-garage/server.js
 
 # Auth E2E (from repo root)
 npm run test:auth

@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Automatic Enforcement:**
 - Git `post-checkout` hook: reminds you to read docs after branch changes
 - Git `prepare-commit-msg` hook: injects checklist before commits
-- `make quickstart`: prints required reading before starting servers
+- `npm run hooks`: installs the repo-managed git hooks (Makefile removed 2026-07-24)
 
 These documents are non-negotiable for safe, compliant contributions.
 
@@ -95,7 +95,7 @@ unisona.ai is a **persistent local-first reasoning system** led by Alex Place an
 
 **Dual-Boot System** (recommended for development):
 ```bash
-make quickstart
+npm run dev --prefix apps/lantern-garage
 # Starts TWO servers simultaneously:
 # - Port 4177: Stable release (master branch)
 # - Port 4178: Development (current branch, hot-reload)
@@ -142,7 +142,7 @@ node apps/lantern-garage/server.js
 npm start --prefix apps/lantern-garage
 
 # Syntax-check JS files
-make check-node        # runs node --check on server.js + cloud-server.js
+node --check apps/lantern-garage/server.js && node --check apps/lantern-garage/cloud-server.js
 
 # Node API/chat tests (server must be running)
 npm run test:api --prefix apps/lantern-garage
@@ -171,14 +171,6 @@ node services/gpt-web-api/server.js
 python src/discord_lounge_bot/bot.py
 ```
 
-### Docker (Dream Journal stack)
-
-```bash
-make build-dream
-make up-dream
-make down-dream
-make logs-dream
-```
 
 ## Architecture
 
@@ -359,8 +351,7 @@ PRs, so a user or agent can run as many parallel sessions as they like. All lane
 concurrently. The lane key is still the branch's **first path segment** (used for
 attribution and lane grouping, not for a limit): agent prefixes are fixed lanes, every
 other prefix is a **dynamic human lane** named after that prefix. Merge-time
-serialisation is handled by the single in-process merger (`pr-watcher.js`), which lands
-one green + reviewed PR per tick.
+serialisation is manual/session-driven (the in-process pr-watcher merger was removed 2026-07-24).
 
 | Branch prefix | Lane | Kind |
 |---|---|---|
@@ -389,18 +380,7 @@ Rules:
 - Direct push to master is blocked — open a PR, or: `OVERRIDE_MERGE=1 git push origin master`
 - Slop commit messages (empty, < 8 chars, "wip", "placeholder", "temp", etc.) are blocked
 
-**Auto-merge:** the single in-process merger (`apps/lantern-garage/lib/pr-watcher.js`)
-auto-merges a PR once it is **green (all CI checks pass)**, **conflict-free**, **not a
-draft**, and its **fleet auto-review returned `VERDICT: APPROVE`** — except PRs touching
-a **protected path** (auth / money / `.github/workflows/` / secrets / migrations), which
-still need a human. Auto-merge is ON by default on the designated fleet host
-(`PR_WATCHER_ENABLED=1`); set `PR_WATCHER_AUTOMERGE=0` to review-only.
-
-**Assigned-issue convergence gate (now OFF by default):** the former requirement that a
-PR closing a **human-assigned** issue carry a convergence record (`convergance-record`) +
-autowork verification (`autowork-verified`) before merging is **no longer applied** — it
-was removed as a routine blocker so green PRs land. The logic is retained and
-re-enable-able per-host with `PR_WATCHER_ASSIGNED_ISSUE_GATE=1`.
+**Auto-merge:** removed (operator, 2026-07-24). PRs are merged manually or by an agent session after review — green CI + a review verdict remain the bar; protected paths (auth / money / `.github/workflows/` / secrets / migrations) still need a human.
 
 Hooks are **repo-managed**: `core.hooksPath` points git at the tracked
 `scripts/hooks/` directory, so every clone runs the same pre-commit / commit-msg /
@@ -408,7 +388,7 @@ pre-push checks (per-lane workstream + slop + change-record + **sprawl tripwire*
 They install **automatically** via the `prepare` npm script on `npm install`. To
 activate by hand (e.g. you cloned without installing deps):
 ```bash
-make hooks        # or: npm run hooks   — both run scripts/setup-hooks.mjs
+npm run hooks     # runs scripts/setup-hooks.mjs
 ```
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/Install-MonoworkstreamHooks.ps1

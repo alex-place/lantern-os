@@ -166,7 +166,7 @@ single supported way to bring the servers up, and each step self-heals:
 Because every step is a check-then-act, running the command again is the correct fix for almost
 any "a server is down / acting weird" situation — it converges the running state back to intended.
 
-*(If you happen to have `make` installed — it isn't on Windows by default — `make quickstart` does the same thing.)*
+
 
 ### Start automatically when your PC turns on (Windows)
 

@@ -170,7 +170,7 @@ lossy symbolic text compressors); existing on-disk archives still open **read-on
 [`legacy.py`](../src/csf/legacy.py) (`__init__.py:27`, `:38`). Kept: the v07 lattice primitives
 (Tesseract "storage face") and the Status-Cube container ([`status_cube.py`](../src/csf/status_cube.py)).
 Memory-specific helpers: `memory_engine.py`, `trading_memory.py`, `delta_stream.py`.
-The CADD layer is built on top under [`caad/`](../caad/).
+The CADD layer (`caad/`) was archived 2026-07-24 (see docs/ARCHIVE-LEDGER.md).
 
 ---
 

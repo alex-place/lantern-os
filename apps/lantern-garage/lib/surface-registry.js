@@ -96,7 +96,6 @@ const EXTENSION = {
 const SUBSYSTEMS = {
   // CORE — background services that ARE a loop stage
   "mcp-server":       { tier: "core", stage: "Act",      entry: "src/mcp_server/server.py",           flag: "LANTERN_MCP_SERVER" },
-  "pr-watcher":       { tier: "core", stage: "Converge", entry: "apps/lantern-garage/lib/pr-watcher.js",    flag: null },
 
   // EXTENSION — optional capabilities beside the loop
   "discord-bot":      { tier: "extension", module: "community", entry: "src/discord_lounge_bot/bot_v2.py",         flag: "DISCORD_BOT_TOKEN" },
