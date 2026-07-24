@@ -189,6 +189,17 @@ the observation map, not of the diagnoser (Sampath et al., 1995).
 - **Semantic entropy** (Farquhar et al., Nature 2024): detects *confabulations* (arbitrary,
   resample-variable errors) by design; consistent errors are explicitly out of scope — i.e.,
   agreement gates sit inside Theorem C's observable class.
+- **Self-confirming equilibrium** (Fudenberg & Levine, Econometrica 1993; and the
+  model-uncertainty extensions): the game-theoretic ancestor of the phenomenon — wrong
+  beliefs persist because the actions they induce never generate disconfirming data, and
+  escape requires off-path experimentation. An equilibrium concept, not a scheduling
+  analysis: no audit-hazard closed forms, no absorption window, no summability mechanism,
+  no observable-class impossibility, no attribution fix. Theorems A–C are, in that
+  language, a hazard-rate account of *how fast* a verification gate manufactures its own
+  self-confirming trap — and what vocabulary escapes it.
+- **C-RAG** (arXiv:2402.03181): conformal certificates on generation risk *given* the
+  retrieval pipeline — orthogonal object; it does not analyze the retrieve-decision
+  feedback loop that Theorems A–B close.
 - **Degenerate feedback loops in recommenders** (arXiv:1902.10730): formal divergence of a
   self-reinforcing loop under its own outputs — sibling dynamics, different object (interest
   drift), no audit-gating or attribution result.
