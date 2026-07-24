@@ -384,10 +384,12 @@
     const prefConn = prefBody.connected || { alpaca: alConn, ibkr: ibLive };
     const anyBroker = !!(prefConn.alpaca || prefConn.ibkr);
     const curPref = (prefBody.preference === "alpaca" || prefBody.preference === "ibkr") ? prefBody.preference : "auto";
-    const eff = prefBody.effective;
-    const effLabel = eff === "alpaca" ? "⚡ Alpaca" : eff === "ibkr" ? "🔗 IBKR" : null;
+    const effText = (effective, chosen) => {
+      const lbl = effective === "alpaca" ? "⚡ Alpaca" : effective === "ibkr" ? "🔗 IBKR" : null;
+      return lbl ? `${lbl} executes your trades now${chosen === "auto" ? " (Auto → server default)" : ""}.` : "Pick which connected broker routes your trades.";
+    };
     const switchRow = anyBroker ? `
-      <div class="row"><div class="rl"><div class="k">Active broker</div><div class="v">${effLabel ? `${effLabel} executes your trades now${curPref === "auto" ? " (Auto → server default)" : ""}.` : "Pick which connected broker routes your trades."}</div></div><div class="rc">
+      <div class="row"><div class="rl"><div class="k">Active broker</div><div class="v" id="c-broker-eff">${effText(prefBody.effective, curPref)}</div></div><div class="rc">
         <div class="seg" id="c-broker-pref">
           <button data-b="auto" class="${curPref === "auto" ? "on" : ""}" title="Follow the server default">Auto</button>
           <button data-b="alpaca" class="${curPref === "alpaca" ? "on" : ""}"${prefConn.alpaca ? "" : " disabled title='Connect Alpaca first'"}>⚡ Alpaca</button>
@@ -416,14 +418,20 @@
 
     const on = $("c-al-on"); if (on) on.onclick = async () => { const o = await api("/api/broker/alpaca/connect", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else renderConnections(); };
     const off = $("c-al-off"); if (off) off.onclick = async () => { await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
-    // Active-broker switch: POST the choice, then re-render so "executes now" + the
-    // highlighted segment reflect the server's resolved `effective` broker.
+    // Active-broker switch: POST the choice and update the row IN PLACE (highlight +
+    // "executes now" from the server's resolved `effective`) — no full-panel re-render,
+    // so the page doesn't flash/scroll-jump on every switch.
     const prefSeg = $("c-broker-pref"); if (prefSeg) prefSeg.querySelectorAll("button[data-b]").forEach((b) => b.onclick = async () => {
       if (b.disabled || b.classList.contains("on")) return;
-      prefSeg.querySelectorAll("button").forEach((x) => x.disabled = true);
+      const btns = [...prefSeg.querySelectorAll("button")];
+      btns.forEach((x) => x.disabled = true);
       const o = await api("/api/broker/preference", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ broker: b.dataset.b }) });
-      if (!o.ok) { prefSeg.querySelectorAll("button").forEach((x) => x.disabled = false); alert("Couldn't switch broker — try again."); return; }
-      renderConnections();
+      // Re-enable (respect which brokers are actually connected), then reflect the result.
+      btns.forEach((x) => { x.disabled = (x.dataset.b === "alpaca" && !prefConn.alpaca) || (x.dataset.b === "ibkr" && !prefConn.ibkr); });
+      if (!o.ok) { alert("Couldn't switch broker — try again."); return; }
+      const chosen = (o.body && o.body.preference) || b.dataset.b;
+      btns.forEach((x) => x.classList.toggle("on", x.dataset.b === chosen));
+      const effEl = $("c-broker-eff"); if (effEl) effEl.textContent = effText(o.body && o.body.effective, chosen);
     });
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;
