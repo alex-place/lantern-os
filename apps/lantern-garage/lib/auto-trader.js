@@ -46,6 +46,11 @@ const DEFAULTS = {
   cooldownMs: 45 * 60000,  // don't re-ENTER the same symbol within 45 min (anti-churn)
   minPrice: 1,             // skip sub-$1 names
   stopPct: 2,              // protective stop % below entry (broker-side STP)
+  maxLossPct: 8,           // HARD max-loss backstop: market-exit a long down ≥ this %
+                           //    from entry, REGARDLESS of momentum. Catches a loser whose
+                           //    broker stop never placed/filled (gap-down, missing stop) —
+                           //    without it, the only loss protection is the entry STP, so a
+                           //    position with no stop runs unbounded (the -17% TSLA case).
   maxDailyLossPct: 2,      // halt NEW entries once day P&L ≤ -this% of equity
   // ── Anti-churn (added after a 103-fill/-$1k whipsaw day) ──────────────────
   minHoldMin: 20,          // don't signal-EXIT a long within N min of entering
@@ -75,6 +80,7 @@ function cfg() {
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
+    maxLossPct: n('TRADER_MAX_LOSS_PCT', DEFAULTS.maxLossPct),           // hard max-loss backstop exit
     maxDailyLossPct: n('TRADER_MAX_DAILY_LOSS_PCT', DEFAULTS.maxDailyLossPct), // circuit breaker
     minHoldMs: n('TRADER_MIN_HOLD_MIN', DEFAULTS.minHoldMin) * 60000,    // anti-churn: min hold before exit
     exitReattemptMs: n('TRADER_EXIT_REATTEMPT_MIN', DEFAULTS.exitReattemptMin) * 60000, // anti-churn: min gap between exit attempts on the SAME symbol
@@ -271,7 +277,23 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
     if (workingSells.has(sym)) continue;
 
+    const lossPct = ((cur - entry) / entry) * 100;   // signed P&L% (negative = losing)
+
+    // 0) HARD MAX-LOSS BACKSTOP — market-exit a long down ≥ maxLossPct, regardless of
+    //    momentum, peak, OR min-hold. This is the safety net for a loser whose broker
+    //    protective stop never placed/filled (missing stop, gap-down through it): without
+    //    it the ONLY loss protection is the entry STP, so an unprotected position runs
+    //    unbounded (the -17% case). Still honors the exit-reattempt debounce so a still-
+    //    unfilled exit isn't re-fired every scan.
+    const _exitAtBackstop = _exitAt.get(sym) || 0;
+    if (c.maxLossPct > 0 && lossPct <= -c.maxLossPct && !(_exitAtBackstop && (now - _exitAtBackstop) < c.exitReattemptMs)) {
+      await closeLong(bridge, userId, sym, qty, p, `max_loss (${lossPct.toFixed(1)}% ≤ -${c.maxLossPct}%)`, out, now, { extended, refPrice: cur });
+      delete heldQty[sym]; continue;
+    }
+
     // Min-hold: never churn a just-opened long — the broker stop still protects it.
+    // (The max-loss backstop above deliberately runs BEFORE this — a crashing new position
+    //  must be allowed to exit even inside the min-hold window.)
     const entryAt = _entryAt.get(sym) || 0;
     if (entryAt && (now - entryAt) < c.minHoldMs) continue;
 
@@ -391,7 +413,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       const qty = Number(p.qty) || 0;
       if (qty > 0 && !hasStop(sym)) {
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
-        const stop = stopPriceFor(entry, c.stopPct);
+        const curPx = Number(p.current_price) || 0;
+        let stop = stopPriceFor(entry, c.stopPct);
+        // A sell-STOP must sit BELOW the market or the broker rejects it. For a position
+        // already underwater, the entry-based stop (entry×0.98) is ABOVE the current
+        // price — so re-protect would silently fail and the loser stays naked. Clamp the
+        // stop to just below the current price so an underwater long still gets a working
+        // protective stop that caps further downside. (The max-loss backstop in
+        // manageHeldExits is the harder floor if price is already past maxLossPct.)
+        if (stop && curPx > 0 && stop >= curPx) {
+          stop = Math.round(curPx * (1 - Math.max(0.1, c.stopPct) / 100) * 100) / 100;
+        }
         if (stop) {
           const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
           (out.reprotected = out.reprotected || []).push({ symbol: sym, qty, stop, status: sr && sr.status });
