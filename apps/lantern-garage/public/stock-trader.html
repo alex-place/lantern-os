@@ -882,9 +882,9 @@
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <!-- Single broker pill (declutter): shows the broker that EXECUTES your trades and
-       links to Settings (orchestration#broker) to add / configure / switch brokers.
+       links to Settings → Connections to add / configure / switch brokers.
        Replaces the old three-button cluster (switch + ⚡ Alpaca + 🔗 IBKR). -->
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerBtn" style="display:none"
+  <a href="/settings.html#connections" class="nav-link" id="brokerBtn" style="display:none"
     title="Which broker executes your trades — click to add, configure, or switch brokers in Settings"
     data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings."><span id="brokerLabel">🔗 Broker</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
@@ -4685,7 +4685,7 @@ async function refreshBrokerButton(){
   const btn = document.getElementById('brokerBtn'), label = document.getElementById('brokerLabel');
   if(!btn || !label) return;
   btn.style.display = '';                 // entitled trader → always show the pill
-  btn.href = '/orchestration.html#broker';
+  btn.href = '/settings.html#connections';   // switch + connect/disconnect now live in Settings → Connections
   try{
     // One call carries everything: which broker is preferred (`effective`) and which
     // are actually connected. The executor = preferred-if-connected, else the other

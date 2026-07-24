@@ -367,9 +367,9 @@
     const el = $("p-connections");
     if (!profile) return needSignIn(el, "Connections");
     el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p><div class="loading-panel">Checking connections…</div>`;
-    const [ib, al, ref, keys, indeed] = await Promise.all([
+    const [ib, al, ref, keys, indeed, pref] = await Promise.all([
       api("/api/trading/ibkr/connection"), api("/api/broker/alpaca/status"), api("/api/referral/link"),
-      api("/api/providers/set-key"), api("/api/job/indeed/status"),
+      api("/api/providers/set-key"), api("/api/job/indeed/status"), api("/api/broker/preference"),
     ]);
     const ibLive = ib.body && ib.body.live && ib.body.live.connected;
     const ibCreds = ib.body && ib.body.hasCredentials;
@@ -378,10 +378,26 @@
     const keyStatus = {}; ((keys.body && keys.body.keys) || []).forEach((k) => { keyStatus[k.provider || k.id] = k.set || k.configured || k.hasKey; });
     const indeedOn = indeed.body && (indeed.body.connected || indeed.body.status === "connected");
 
+    // Which connected broker executes this user's trades. The switch only makes sense
+    // once a broker is linked; the store may say 'alpaca'/'ibkr'/'auto' (or null=auto).
+    const prefBody = pref.body || {};
+    const prefConn = prefBody.connected || { alpaca: alConn, ibkr: ibLive };
+    const anyBroker = !!(prefConn.alpaca || prefConn.ibkr);
+    const curPref = (prefBody.preference === "alpaca" || prefBody.preference === "ibkr") ? prefBody.preference : "auto";
+    const eff = prefBody.effective;
+    const effLabel = eff === "alpaca" ? "⚡ Alpaca" : eff === "ibkr" ? "🔗 IBKR" : null;
+    const switchRow = anyBroker ? `
+      <div class="row"><div class="rl"><div class="k">Active broker</div><div class="v">${effLabel ? `${effLabel} executes your trades now${curPref === "auto" ? " (Auto → server default)" : ""}.` : "Pick which connected broker routes your trades."}</div></div><div class="rc">
+        <div class="seg" id="c-broker-pref">
+          <button data-b="auto" class="${curPref === "auto" ? "on" : ""}" title="Follow the server default">Auto</button>
+          <button data-b="alpaca" class="${curPref === "alpaca" ? "on" : ""}"${prefConn.alpaca ? "" : " disabled title='Connect Alpaca first'"}>⚡ Alpaca</button>
+          <button data-b="ibkr" class="${curPref === "ibkr" ? "on" : ""}"${prefConn.ibkr ? "" : " disabled title='Connect IBKR first'"}>🔗 IBKR</button>
+        </div></div></div>` : "";
+
     const brokerRows = `
       <div class="group-label">Brokerage</div>
       <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
-      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? "Connected — paper trading" : "One-click paper-trading account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn" id="c-al-on">Connect</button>`}</div></div>`;
+      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? "Connected — paper trading" : "One-click paper-trading account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn" id="c-al-on">Connect</button>`}</div></div>${switchRow}`;
 
     const keyRows = `
       <div class="group-label">Your AI keys (bring-your-own)</div>
@@ -400,6 +416,15 @@
 
     const on = $("c-al-on"); if (on) on.onclick = async () => { const o = await api("/api/broker/alpaca/connect", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else renderConnections(); };
     const off = $("c-al-off"); if (off) off.onclick = async () => { await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    // Active-broker switch: POST the choice, then re-render so "executes now" + the
+    // highlighted segment reflect the server's resolved `effective` broker.
+    const prefSeg = $("c-broker-pref"); if (prefSeg) prefSeg.querySelectorAll("button[data-b]").forEach((b) => b.onclick = async () => {
+      if (b.disabled || b.classList.contains("on")) return;
+      prefSeg.querySelectorAll("button").forEach((x) => x.disabled = true);
+      const o = await api("/api/broker/preference", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ broker: b.dataset.b }) });
+      if (!o.ok) { prefSeg.querySelectorAll("button").forEach((x) => x.disabled = false); alert("Couldn't switch broker — try again."); return; }
+      renderConnections();
+    });
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;
       const o = await api("/api/providers/set-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: id, key: v.trim() }) });
