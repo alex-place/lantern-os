@@ -24,7 +24,7 @@ set -euo pipefail
 : "${R2_BUCKET:?set R2_BUCKET}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$REPO/apps/lantern-garage/public/assets/content"   # contains koh/, etc.
+SRC="$REPO/public/assets/content"   # contains koh/, etc.
 ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
 
 # Resolve rclone — fall back to the winget shim/package path if PATH isn't refreshed yet.

@@ -27,8 +27,8 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 
 | Script | Purpose | How to run |
 |--------|---------|-----------|
-| `npm start` (in `apps/lantern-garage/`) | Starts the web server (port 4177) and spawns the Discord bot automatically if `DISCORD_BOT_TOKEN` + `LANTERN_DISCORD_GUILD_ID` are set in `.env.local` | `cd apps/lantern-garage && npm start` |
-| `apps/lantern-garage/server.js` | Node HTTP server with modular routes. Loads `.env.local` / `.env` from repo root. | `node apps/lantern-garage/server.js` |
+| `npm start` (in ``) | Starts the web server (port 4177) and spawns the Discord bot automatically if `DISCORD_BOT_TOKEN` + `LANTERN_DISCORD_GUILD_ID` are set in `.env.local` | `cd the repo root && npm start` |
+| `server.js` | Node HTTP server with modular routes. Loads `.env.local` / `.env` from repo root. | `node server.js` |
 | `make quickstart` | Dual-boot dev: stable (4177, master) + dev (4178, current branch, hot-reload) | `make quickstart` |
 
 ---
@@ -63,7 +63,7 @@ Python is imported/spawned by the server or MCP, not usually run by hand.
 
 | Script | Purpose | How to run |
 |--------|---------|-----------|
-| `scripts/reports/sigma_trader_report_2026_07.py` | Builds the July 2026 Sigma Trader Report PDF (`apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf`) — the champion's monthly balance, current events, suggestions, receipts. All numbers pinned in-file; reproducible offline. Next month: copy to a new dated file, update the DATA + prose. | `python scripts/reports/sigma_trader_report_2026_07.py` |
+| `scripts/reports/sigma_trader_report_2026_07.py` | Builds the July 2026 Sigma Trader Report PDF (`public/reports/sigma-trader-report-2026-07.pdf`) — the champion's monthly balance, current events, suggestions, receipts. All numbers pinned in-file; reproducible offline. Next month: copy to a new dated file, update the DATA + prose. | `python scripts/reports/sigma_trader_report_2026_07.py` |
 | `scripts/reports/leap-video-2026-07/` (`make_narration.py`, `make_music.py`, `index.html`) | The July Leap video edition (~66s, 16:9): HyperFrames composition + Gemini-TTS narration (Vertex ADC) + synthesized bed → `public/reports/sigma-trader-report-2026-07.mp4`. See its README for the rebuild chain. | `python make_narration.py && python make_music.py && npm run render` (in that dir) |
 
 ---
@@ -98,7 +98,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/honesty_ledger.py` | `tests/test_honesty_ledger.py` | `python scripts/honesty_ledger.py` |
 | `scripts/eval_sigma0_adapter.py` | `tests/test_sigma0_eval.py` | `python scripts/eval_sigma0_adapter.py` |
 | `scripts/eval_coding.py` | `scripts/eval_coding_backend_ab.py` | via the A/B harness |
-| `scripts/eval_coding_backend_ab.py` | `apps/lantern-garage/lib/coding-backend/index.js` | `python scripts/eval_coding_backend_ab.py` |
+| `scripts/eval_coding_backend_ab.py` | `lib/coding-backend/index.js` | `python scripts/eval_coding_backend_ab.py` |
 | `scripts/eval_humaneval_ouro.py` | `scripts/continual_ouro_pipeline.py` | `python scripts/eval_humaneval_ouro.py` |
 | `scripts/humaneval_rerank.py` | `scripts/eval_humaneval_ouro.py` | via `eval_humaneval_ouro.py` |
 | `scripts/eval_humaneval_chat.py` | registered here (docs: BENCHMARKS.md) | `python scripts/eval_humaneval_chat.py` |
@@ -123,9 +123,9 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/ouro_anthropic_bridge.py` | `lib/tool-runner.js`, `scripts/Start-OuroClaudeCode.ps1` | via launcher |
 | `scripts/continual_ouro_pipeline.py` | `lib/keystone-escalation.js`, `lib/stream-chat.js` | `python scripts/continual_ouro_pipeline.py` |
 | `scripts/build_ouro_coding_dataset.py` | `scripts/continual_ouro_pipeline.py` | via pipeline |
-| `scripts/prepare_coding_train_data.py` | `apps/lantern-garage/lib/model-registry.js` | `python scripts/prepare_coding_train_data.py` |
+| `scripts/prepare_coding_train_data.py` | `lib/model-registry.js` | `python scripts/prepare_coding_train_data.py` |
 | `scripts/validate_ouro_coding.py` | `scripts/prepare_coding_train_data.py` | via prep script |
-| `scripts/train-qlora-ouro.py` | `apps/lantern-garage/lib/model-registry.js` | `python scripts/train-qlora-ouro.py` |
+| `scripts/train-qlora-ouro.py` | `lib/model-registry.js` | `python scripts/train-qlora-ouro.py` |
 | `scripts/train-qlora-peft.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/merge-lora.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/fetch_mbpp.py` | registered here — VTD Phase-1 data prep (ADR-0030); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_mbpp.py` |
@@ -138,14 +138,14 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/upload-anthropic-finetune.py` | `scripts/extract-session-pairs.py` | via pairs script |
 | `scripts/fine-tune-ollama-model.py` | `scripts/convert-pairs-to-alpaca.py` | via converter |
 | `scripts/rlvr_grpo_ouro.py` | `tests/test_sigma_theta_gate.py` | `python scripts/rlvr_grpo_ouro.py` |
-| `scripts/gen_sigma0_traces.py` | `apps/lantern-garage/lib/local-model-registry.js` | `python scripts/gen_sigma0_traces.py` |
-| `scripts/lightning_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI |
-| `scripts/modal_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` | via dispatcher UI (Modal twin of lightning_dispatch) |
+| `scripts/gen_sigma0_traces.py` | `lib/local-model-registry.js` | `python scripts/gen_sigma0_traces.py` |
+| `scripts/lightning_dispatch.py` | `lib/training-dispatcher.js` | via dispatcher UI |
+| `scripts/modal_dispatch.py` | `lib/training-dispatcher.js` | via dispatcher UI (Modal twin of lightning_dispatch) |
 | `scripts/reconcile_dual_provider.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §10 | `python scripts/reconcile_dual_provider.py --decision A B` |
 | `scripts/eb_prep_corpus.py` | `docs/SIGMA0-EB-L4-RUNBOOK.md` §3; `scripts/{lightning,modal}_dispatch.py` prep-if-missing | `python scripts/eb_prep_corpus.py --allow-download` (egress host); `--dry-run` validates offline |
 | `scripts/weekly-training-orchestrator.py` | `scripts/Schedule-WeeklyTraining.ps1` | via scheduler |
 | `scripts/build_claude_session_dataset.py` | `tests/test_agent_session_dataset.py` | `python scripts/build_claude_session_dataset.py` |
-| `scripts/harvest_coding_corpus.py` | `apps/lantern-garage/lib/harvest-emitter.js` | server-driven |
+| `scripts/harvest_coding_corpus.py` | `lib/harvest-emitter.js` | server-driven |
 | `scripts/distill_from_teacher.py` | registered here — Qwen→Ouro teacher distillation | `python scripts/distill_from_teacher.py` |
 | `scripts/pr_crystallize.py` | registered here — PR-diff crystallization data prep | `python scripts/pr_crystallize.py` |
 | `scripts/qwen_teacher_crystallize.py` | registered here — teacher-pair crystallization | `python scripts/qwen_teacher_crystallize.py` |
@@ -163,7 +163,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/csf_condense_corpus.py` | `routes/pdfs.js` | server-driven |
 | `scripts/csf_read_member.py` | `routes/pdfs.js` | server-driven |
 | `scripts/csf_split_archive.py` | `routes/pdfs.js` | server-driven |
-| `scripts/build_knowledge_index.py` | `apps/lantern-garage/lib/knowledge-router.js` | `python scripts/build_knowledge_index.py` |
+| `scripts/build_knowledge_index.py` | `lib/knowledge-router.js` | `python scripts/build_knowledge_index.py` |
 | `scripts/arxiv_build_index.py` | `lib/arxiv-index.js`, `lib/csf-memory.js` | server-driven |
 | `scripts/arxiv_harvest.py` | `lib/arxiv-fulltext.js`, `lib/csf-memory.js` | server-driven |
 | `scripts/arxiv_add_papers.py` | `scripts/arxiv_harvest.py` (ShardWriter/dedup) | `python scripts/arxiv_add_papers.py --ids … --pdfs --reindex` (curated tranches; docs/ARXIV-CORPUS.md) |
@@ -219,10 +219,10 @@ removal-wave candidates (#2538, founder sign-off pending), not registry members.
 | Command | Purpose |
 |---------|---------|
 | `python -m pytest tests/ -q --tb=short` | Full Python suite (pythonpath = `apps src` via pytest.ini; `conftest.py` is the pytest anchor) |
-| `npm run test:api --prefix apps/lantern-garage` | Node API tests (server must be running) |
-| `npm run test:chat --prefix apps/lantern-garage` | Chat regression tests |
-| `npm run test:ui --prefix apps/lantern-garage` | Playwright UI tests |
-| `node apps/lantern-garage/test/<name>.test.js` | Framework-free unit suites (surface-boundary, deployment-profile, active-user-metric, …) |
+| `npm run test:api` | Node API tests (server must be running) |
+| `npm run test:chat` | Chat regression tests |
+| `npm run test:ui` | Playwright UI tests |
+| `node test/<name>.test.js` | Framework-free unit suites (surface-boundary, deployment-profile, active-user-metric, …) |
 
 ---
 
@@ -233,7 +233,7 @@ removal-wave candidates (#2538, founder sign-off pending), not registry members.
 make quickstart
 
 # One server
-node apps/lantern-garage/server.js
+node server.js
 
 # MCP server
 python src/mcp_server/server.py

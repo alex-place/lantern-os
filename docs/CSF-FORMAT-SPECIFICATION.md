@@ -193,7 +193,7 @@ list, tamper-detection, traversal).
 
 ### 2.6 App routes
 
-Wired into the server alongside the legacy tesseract pack ([`routes/csf.js`](../apps/lantern-garage/routes/csf.js)):
+Wired into the server alongside the legacy tesseract pack ([`routes/csf.js`](../routes/csf.js)):
 
 ```
 POST /api/csf/pack    { paths: ["docs","README.md"], out: "data/exports/bundle.csf", compress?: true }
@@ -330,7 +330,7 @@ User profile archives are **gitignored** (user data — privacy). Tests:
   source docs into `data/knowledge/index.jsonl` (one record per doc *section* with
   heading path + snippet). This is the base grounding corpus for "better LLM grounding."
 - **Cheaper deterministic / near routing** —
-  [`lib/knowledge-router.js`](../apps/lantern-garage/lib/knowledge-router.js)
+  [`lib/knowledge-router.js`](../lib/knowledge-router.js)
   answers from the KB index **before** paying for an LLM:
   1. **deterministic** — exact heading match → that section verbatim ($0)
   2. **near** — TF-IDF nearest section above threshold → grounded answer ($0)

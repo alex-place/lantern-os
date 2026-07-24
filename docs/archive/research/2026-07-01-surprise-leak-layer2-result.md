@@ -8,7 +8,7 @@
 ## What was tested
 
 #1679's exact question: does feeding `modelUncertainty` into
-[`groundedness-canary.js`](../../../apps/lantern-garage/lib/groundedness-canary.js)'s risk score
+[`groundedness-canary.js`](../../../lib/groundedness-canary.js)'s risk score
 improve hallucination **detection** (recall/FPR through the real, shipped canary) vs the
 text-only baseline it runs today with `SURPRISE_CANARY` off?
 

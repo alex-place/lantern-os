@@ -1,6 +1,6 @@
 # unisona.ai Radio — Feature Backlog
 
-**Surface:** [`apps/lantern-garage/public/fallout-radio.html`](../apps/lantern-garage/public/fallout-radio.html)
+**Surface:** [`public/fallout-radio.html`](../public/fallout-radio.html)
 **Frequency:** `101.5 FM` · "Founder's Frequency"
 **Tracks:** public-domain 78rpm transfers from the Internet Archive [Great 78 Project](https://archive.org/details/georgeblood), served locally from `/radio/`.
 
@@ -12,7 +12,7 @@ Loop stage: **Act** (media playback is a first-class capability of the personal-
 lookup / docs / resume / code / trade / **media**). Nothing here touches Memory/Reason/Verify.
 
 ### Library architecture (300+ offline tracks, lean repo)
-The playlist is a committed manifest — [`apps/lantern-garage/public/radio/stations.json`](../apps/lantern-garage/public/radio/stations.json)
+The playlist is a committed manifest — [`public/radio/stations.json`](../public/radio/stations.json)
 (small JSON: title/artist/year/freq/lore/src + the Internet-Archive `ia`/`iaf` source for each). The
 player `fetch()`es it on load (with the inline 25 as an offline fallback). The **audio files are NOT
 committed** — at 300+ tracks that's hundreds of MB. They are gitignored and populated locally, once
@@ -122,7 +122,7 @@ Continuous playback: a finished song now rolls straight into the next and the di
 
 ## How to add a track
 1. Find a transfer on the [Great 78 Project](https://archive.org/details/georgeblood) (`collection:georgeblood`); note its item `identifier` and the `VBR MP3` filename.
-2. Append a row to `apps/lantern-garage/public/radio/stations.json`: `{ "freq", "title", "artist", "year", "src": "/radio/<slug>.mp3", "lore", "ia": "<identifier>", "iaf": "<filename>" }`.
+2. Append a row to `public/radio/stations.json`: `{ "freq", "title", "artist", "year", "src": "/radio/<slug>.mp3", "lore", "ia": "<identifier>", "iaf": "<filename>" }`.
 3. Run `python scripts/fetch_radio_audio.py` — it downloads + re-encodes any missing tracks to 64 kbps mono.
 4. That's it — the player loads the manifest, and render / search / transport / deep-link / Media Session pick it up automatically.
 

@@ -2,7 +2,7 @@
 """
 Populate the unisona.ai Radio audio library from its committed manifest.
 
-The radio playlist lives in `apps/lantern-garage/public/radio/stations.json`
+The radio playlist lives in `public/radio/stations.json`
 (small, committed). The audio files themselves are NOT committed (they'd be
 hundreds of MB) — they're gitignored and fetched locally by this script, once
 per machine/worktree. After it runs, the radio plays fully OFFLINE.

@@ -41,7 +41,7 @@ Ouro paper [arXiv 2510.25741](https://arxiv.org/abs/2510.25741).
 
 ## 2. The contract
 
-`apps/lantern-garage/lib/local-model-registry.js` declares each local backend:
+`lib/local-model-registry.js` declares each local backend:
 
 | Field | Meaning |
 |---|---|
@@ -138,7 +138,7 @@ OURO_NATIVE=1 OURO_ADAPTER=<dir> python scripts/ouro_serve.py   # speaks Ollama 
 **Qwen (capability lever):**
 ```bash
 ollama pull qwen2.5-coder:7b          # real Ollama on :11434
-LOCAL_CAPABILITY_FIRST=1 LOOP_REASONER=1 npm start --prefix apps/lantern-garage
+LOCAL_CAPABILITY_FIRST=1 LOOP_REASONER=1 npm start
 ```
 `LOOP_REASONER=1` is what actually wraps Qwen in the convergence loop (Ouro
 ignores it — it Q-exits internally). When VRAM grows, registering the next model

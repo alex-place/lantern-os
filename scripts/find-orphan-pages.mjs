@@ -2,7 +2,7 @@
 /**
  * find-orphan-pages — report public HTML pages NOT reachable from index.html.
  *
- * Builds a link graph over apps/lantern-garage/public and BFS's from index.html.
+ * Builds a link graph over public and BFS's from index.html.
  * A page is an edge target if it is referenced by an href/src or a quoted "*.html"
  * string in either (a) the page's own HTML (covers inline <script> nav) or (b) any
  * local <script src> the page loads (covers shared nav: site-chrome.js,

@@ -12,18 +12,18 @@ The Explore page is a **static link directory with three live rails bolted on**:
 
 | Piece | File | Nature |
 |---|---|---|
-| Watch rail | [explore.html:497](../../apps/lantern-garage/public/explore.html) → `/api/youtube/lantern-videos` ([youtube.js](../../apps/lantern-garage/routes/youtube.js)) | one channel, server-scraped |
-| Discover rail | [explore.html:513](../../apps/lantern-garage/public/explore.html) → `/api/feeds/discover` ([discover-feeds.js](../../apps/lantern-garage/routes/discover-feeds.js)) | 3 hardcoded RSS sources, sorted by date |
-| Build rail | [explore.html:524](../../apps/lantern-garage/public/explore.html) → `/api/github/activity` ([github-activity.js](../../apps/lantern-garage/routes/github-activity.js)) | repo releases/commits |
-| 6 static sections | [explore.html:545-679](../../apps/lantern-garage/public/explore.html) | hand-authored `<a class="panel">` link cards |
+| Watch rail | [explore.html:497](../../public/explore.html) → `/api/youtube/lantern-videos` ([youtube.js](../../routes/youtube.js)) | one channel, server-scraped |
+| Discover rail | [explore.html:513](../../public/explore.html) → `/api/feeds/discover` ([discover-feeds.js](../../routes/discover-feeds.js)) | 3 hardcoded RSS sources, sorted by date |
+| Build rail | [explore.html:524](../../public/explore.html) → `/api/github/activity` ([github-activity.js](../../routes/github-activity.js)) | repo releases/commits |
+| 6 static sections | [explore.html:545-679](../../public/explore.html) | hand-authored `<a class="panel">` link cards |
 
 Everything is **chronological or hand-curated**. Nothing is ranked, nothing knows who the user is, and the page is ~10 disconnected boxes. There is no single feed and no personalization signal anywhere.
 
 **Two assets already exist that do the hard part of "algorithm-fed":**
 
-1. **The Σ₀ ranking discipline is already implemented** in [flourishing-feeds.js](../../apps/lantern-garage/lib/flourishing-feeds.js). It pulls candidates from multiple real sources, fuses them by **inverse-variance weighting**, **inflates uncertainty by between-source disagreement** (corroboration tightens, conflict widens), and ranks "what to ground next" with a **Question Machine** score = `uncertainty × leverage` ([flourishing-feeds.js:157](../../apps/lantern-garage/lib/flourishing-feeds.js)). That is exactly the math a content ranker needs — it's just pointed at world-model beliefs instead of content cards.
+1. **The Σ₀ ranking discipline is already implemented** in [flourishing-feeds.js](../../lib/flourishing-feeds.js). It pulls candidates from multiple real sources, fuses them by **inverse-variance weighting**, **inflates uncertainty by between-source disagreement** (corroboration tightens, conflict widens), and ranks "what to ground next" with a **Question Machine** score = `uncertainty × leverage` ([flourishing-feeds.js:157](../../lib/flourishing-feeds.js)). That is exactly the math a content ranker needs — it's just pointed at world-model beliefs instead of content cards.
 
-2. **User profiles already persist** locally, append-only JSONL + role/tier/entitlements ([user-profiles.js](../../apps/lantern-garage/lib/user-profiles.js)). What's missing is a **derived interest signal** — there is no record of what the user reads, watches, or clicks.
+2. **User profiles already persist** locally, append-only JSONL + role/tier/entitlements ([user-profiles.js](../../lib/user-profiles.js)). What's missing is a **derived interest signal** — there is no record of what the user reads, watches, or clicks.
 
 So this is **extension, not addition** (the anti-sprawl rule): reuse the flourishing fusion engine for scoring, reuse the profile store for identity, add one interaction log and one ranking route. No new "recommendation subsystem."
 
@@ -84,9 +84,9 @@ Each candidate becomes a **hypothesis**: *"the user will value this card."* Scor
 | **trust** | source corroboration / reliability | flourishing-feeds fusion idea; per-source reliability |
 | **diversity** | penalize near-duplicates & over-represented sources | within-batch |
 
-`score = w·relevance · freshness · trust · diversity`, and carry an **uncertainty** per card (low-evidence users → high uncertainty → more exploration). The fusion/uncertainty code in [flourishing-feeds.js:108-137](../../apps/lantern-garage/lib/flourishing-feeds.js) ports almost directly.
+`score = w·relevance · freshness · trust · diversity`, and carry an **uncertainty** per card (low-evidence users → high uncertainty → more exploration). The fusion/uncertainty code in [flourishing-feeds.js:108-137](../../lib/flourishing-feeds.js) ports almost directly.
 
-**The Question Machine is the explore/exploit knob.** Its `uncertainty × leverage` ([flourishing-feeds.js:157](../../apps/lantern-garage/lib/flourishing-feeds.js)) decides how much of the pane is *high-confidence relevant* vs *high-uncertainty exploratory* — the principled answer to filter-bubble collapse. Surfacing a card we're *uncertain* the user will like, in a topic we know little about, is the highest-leverage way to *learn the profile* — exactly what the Question Machine is for.
+**The Question Machine is the explore/exploit knob.** Its `uncertainty × leverage` ([flourishing-feeds.js:157](../../lib/flourishing-feeds.js)) decides how much of the pane is *high-confidence relevant* vs *high-uncertainty exploratory* — the principled answer to filter-bubble collapse. Surfacing a card we're *uncertain* the user will like, in a topic we know little about, is the highest-leverage way to *learn the profile* — exactly what the Question Machine is for.
 
 ### 3.4 Verify — provenance is mandatory
 No card ships without `source` + `evidence` + a confidence. Belief cards already carry posterior + uncertainty + source URLs. RSS/video/repo cards carry their origin. The "why surfaced" line is generated from the winning score factor. This keeps the algorithmic feed inside the External-Reality Rule instead of becoming an opaque engagement optimizer.
@@ -107,8 +107,8 @@ Together: **Σ₀ decides *how well-grounded and how novel* a card is; the profi
 
 ## 5. Build path (phased, each phase shippable)
 
-1. **Single-pane shell** — replace the 6 static sections + 3 rails in [explore.html](../../apps/lantern-garage/public/explore.html) with one card stream + filter chips. `/api/explore/feed` initially just merges existing sources sorted by freshness (no personalization). *Ships a unified feed immediately.*
-2. **Σ₀ scoring** — port the fusion/uncertainty + Question Machine from [flourishing-feeds.js](../../apps/lantern-garage/lib/flourishing-feeds.js) into `lib/explore-feed.js`; rank by trust × freshness × diversity. Render "why surfaced." *Now it's algorithm-fed, still anonymous.*
+1. **Single-pane shell** — replace the 6 static sections + 3 rails in [explore.html](../../public/explore.html) with one card stream + filter chips. `/api/explore/feed` initially just merges existing sources sorted by freshness (no personalization). *Ships a unified feed immediately.*
+2. **Σ₀ scoring** — port the fusion/uncertainty + Question Machine from [flourishing-feeds.js](../../lib/flourishing-feeds.js) into `lib/explore-feed.js`; rank by trust × freshness × diversity. Render "why surfaced." *Now it's algorithm-fed, still anonymous.*
 3. **Interaction log + interest vector** — add `interactions.jsonl` + `POST /api/explore/interaction`; derive decayed topic/source weights; fold `relevance` into the score. *Now it's profile-fed.*
 4. **Converge metric** — log click-through on top-ranked cards; expose convergence on the dashboard. *Now it provably improves.*
 
@@ -192,7 +192,7 @@ PCSF is not provider-specific. It is a general mechanism: **a declared candidate
 | cold prior: cloud explored above local | cold prior: editorial order, then exploration |
 | reorders the static fallback chain | reorders the candidate card list |
 
-[`rankCandidates(candidates, taskType, opts)`](../../apps/lantern-garage/lib/model-leaderboard.js) is **already generic** — candidates carry an arbitrary `key`, scored by a cost-aware composite of success-rate + latency, unscored items get a cold-start prior. **Nothing about it assumes LLMs.** We call it with `taskType: "explore"` and content cards instead of providers.
+[`rankCandidates(candidates, taskType, opts)`](../../lib/model-leaderboard.js) is **already generic** — candidates carry an arbitrary `key`, scored by a cost-aware composite of success-rate + latency, unscored items get a cold-start prior. **Nothing about it assumes LLMs.** We call it with `taskType: "explore"` and content cards instead of providers.
 
 ### 8.2 What we build (almost nothing new)
 1. **`data/pcsf/explore.pcsf.json`** — declare the candidate taxonomy (the curated sources, topic tags, card types) + static default priority + state, mirroring [model.pcsf.json](../../data/pcsf/model.pcsf.json). This is the editorial cold-start order.
@@ -203,7 +203,7 @@ PCSF is not provider-specific. It is a general mechanism: **a declared candidate
 The Σ₀ value-model (§3.3) and Question-Machine exploration become **the cold-start priors and the leaderboard's explore/exploit** — which PCSF already implements. We get personalization, exploration, and convergence **for free from infrastructure we already run in production for model routing.**
 
 ### 8.3 The dogfood flywheel (the part that compounds)
-Two loops, both already proven for models in [leaderboard-routing.js](../../apps/lantern-garage/lib/leaderboard-routing.js):
+Two loops, both already proven for models in [leaderboard-routing.js](../../lib/leaderboard-routing.js):
 
 - **We dogfood PCSF.** Pointing our own provider-ranking format at a *completely different* problem (content, not LLMs) is the stress test that makes PCSF better. Whatever the feed needs — multi-key candidates, per-user leaderboards, time-decay — becomes a PCSF improvement that **also upgrades model routing.** One format, two consumers, shared gains. (Feature gate: improves **Reason**; reuses one mechanism; adds no subsystem.)
 - **The feed generates the training corpus for the future recommender.** Exactly as `recordOuroLoss()` captures cloud wins as distillation data for the local coder, every Explore interaction is a labeled `(context → engagement)` row. Shipping the cheap PCSF feed **now** accumulates the impression/click dataset that the embeddings + semantic-ID + LLM-reranker recommender (§7) needs to exist at all. The simple thing today *is* the data pipeline for the sophisticated thing tomorrow.

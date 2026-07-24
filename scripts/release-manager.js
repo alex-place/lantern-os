@@ -14,7 +14,7 @@ const autoChangelog = args.includes('--auto-changelog');
 
 const ROOT = path.join(__dirname, '..');
 const PKG_MAIN = path.join(ROOT, 'package.json');
-const PKG_APP = path.join(ROOT, 'apps/lantern-garage/package.json');
+const PKG_APP = path.join(ROOT, 'package.json');
 const CHANGELOG = path.join(ROOT, 'CHANGELOG.MD');
 
 // Parse version
@@ -126,7 +126,7 @@ try {
 
   // Commit — shell-free: file list + message are discrete argv elements.
   execFileSync('git', [
-    'add', 'package.json', 'apps/lantern-garage/package.json',
+    'add', 'package.json', 'package.json',
     ...(autoChangelog ? ['CHANGELOG.MD'] : []),
   ], { cwd: ROOT });
   execFileSync('git', [

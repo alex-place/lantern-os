@@ -248,9 +248,9 @@ const tokensSaved = routing.cacheHit ? 15 : 0;
 
 ## Files Changed
 
-- `apps/lantern-garage/lib/convergence-router.js` — Core router (existing, enhanced)
-- `apps/lantern-garage/routes/convergence-dispatch.js` — HTTP route integration (new)
-- `apps/lantern-garage/server.js` — Route registration (modified)
+- `lib/convergence-router.js` — Core router (existing, enhanced)
+- `routes/convergence-dispatch.js` — HTTP route integration (new)
+- `server.js` — Route registration (modified)
 - `tests/test_convergence_router_deployment.js` — Test suite (new)
 
 ## Related Issues

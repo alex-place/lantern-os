@@ -97,8 +97,8 @@ function Write-BootHealth($action, $port, $outcome) {
 
 # Absolute entry paths so a restart launches the SAME instance the launcher did,
 # and so it stays identifiable by command line (matches Start-DualServers.ps1).
-$StableEntry = Join-Path $StableRoot 'apps\lantern-garage\server.js'
-$DevEntry    = Join-Path $DevRoot    'apps\lantern-garage\server-dev.js'
+$StableEntry = Join-Path $StableRoot 'server.js'
+$DevEntry    = Join-Path $DevRoot    'server-dev.js'
 
 # --- Hydrate persistent environment once, so any server we relaunch gets its keys.
 # Keys live in the Machine/User environment, not a committed .env (same as launcher).

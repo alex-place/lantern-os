@@ -15,8 +15,8 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const INDEX_PATH = path.join(REPO_ROOT, 'apps/lantern-garage/public/index.html');
-const PUBLIC_DIR = path.join(REPO_ROOT, 'apps/lantern-garage/public');
+const INDEX_PATH = path.join(REPO_ROOT, 'public/index.html');
+const PUBLIC_DIR = path.join(REPO_ROOT, 'public');
 const SITEMAP_PATH = path.join(PUBLIC_DIR, 'sitemap.xml');
 
 // Production origin (canonical). Was 'https://lantern-os.local' — a local dev host

@@ -7,7 +7,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const cb = require("../apps/lantern-garage/lib/coding-backend");
+const cb = require("../lib/coding-backend");
 
 (async () => {
   const task = process.argv[2] || "";

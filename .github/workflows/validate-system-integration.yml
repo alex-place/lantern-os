@@ -5,9 +5,9 @@ on:
     branches: [master]
     paths:
       - "src/mcp_server/**"
-      - "apps/lantern-garage/lib/**"
+      - "lib/**"
       - ".github/workflows/**"
-      - "apps/lantern-garage/server.js"
+      - "server.js"
       - ".env.example"
   pull_request:
     branches: [master]
@@ -67,12 +67,12 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install --prefix apps/lantern-garage
+        run: npm install
 
       - name: Validate server.js syntax
         run: |
-          node --check apps/lantern-garage/server.js
-          node --check apps/lantern-garage/cloud-server.js
+          node --check server.js
+          node --check cloud-server.js
 
       - name: Validate environment configuration
         run: |
@@ -112,7 +112,7 @@ jobs:
           # The chat persona is the single grounded agent `keystone` (#1664 removed
           # the RP personas). The old check looped over 6 agents and only warned,
           # so it passed even though 5 of them no longer exist.
-          if ! grep -q '"keystone"' apps/lantern-garage/lib/dream-chat.js; then
+          if ! grep -q '"keystone"' lib/dream-chat.js; then
             echo "❌ Agent 'keystone' not found in dream-chat.js"
             exit 1
           fi

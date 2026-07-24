@@ -23,7 +23,7 @@ private/**
 # stable deploy). Media now lives in R2, served from media.lantern-os.net.
 # Upload with scripts/sync-media-r2.sh. SVGs stay tracked (text/vector, tiny).
 # Re-include a specific essential raster with an explicit exception, e.g.
-#   !apps/lantern-garage/public/favicon.png
+#   !public/favicon.png
 *.png
 *.jpg
 *.jpeg
@@ -31,7 +31,7 @@ private/**
 *.webp
 
 # Essential brand rasters — tracked in-repo (README hero + social unfurl, #2533).
-!apps/lantern-garage/public/og-image.png
+!public/og-image.png
 !docs/media/dream-chat-light.png
 !docs/media/dream-chat-dark.png
 *.pdf
@@ -64,7 +64,7 @@ data/discord/three-doors/*.json
 data/csf/*.csf
 
 # Large local media (archived in D:\tmp / Google Drive)
-apps/lantern-garage/public/data/video/*.mp4
+public/data/video/*.mp4
 
 # ─── Creator Dashboard generated output (local only, not source) ─────────────
 data/creator/exports/
@@ -140,10 +140,10 @@ apps/data/
 
 # Stray nested app install. The /api/actions/update npm step used a *relative*
 # --prefix, so when repoRoot resolved to the app dir it installed into
-# apps/lantern-garage/apps/lantern-garage/node_modules/ (~975 files). Root cause
+# node_modules/ (~975 files). Root cause
 # fixed in routes/operator.js (absolute prefix anchored to __dirname); this is a
 # belt-and-suspenders guard so the stray tree can never be committed if it recurs.
-apps/lantern-garage/apps/
+apps/
 
 # Research Convergence Loop runtime output (memories, records, reports, queue)
 data/research/*.jsonl
@@ -236,15 +236,15 @@ archive/**/worktrees/**
 
 # Exceptions: legitimately-named Creator V10 source + docs + Σ₀ spectral modules
 !docs/creator-v10/**
-!apps/lantern-garage/lib/safe-zone-v2.js
-!apps/lantern-garage/lib/safe-zone-v3.js
-!apps/lantern-garage/lib/facecam-v3.js
-!apps/lantern-garage/lib/caption-engine-v3.js
-!apps/lantern-garage/lib/variant-engine-v2.js
-!apps/lantern-garage/lib/spectral-analyzer.js
-!apps/lantern-garage/lib/scoring-engine-v2.js
-!apps/lantern-garage/lib/render-pipeline-v2.js
-!apps/lantern-garage/lib/highlight_detector.py
+!lib/safe-zone-v2.js
+!lib/safe-zone-v3.js
+!lib/facecam-v3.js
+!lib/caption-engine-v3.js
+!lib/variant-engine-v2.js
+!lib/spectral-analyzer.js
+!lib/scoring-engine-v2.js
+!lib/render-pipeline-v2.js
+!lib/highlight_detector.py
 
 # IDE / tool artifacts
 .claude/
@@ -423,7 +423,7 @@ models/lantern-sigma0-coder/training-data-5k.jsonl
 # ─── Generated / runtime churn (2026-06-22) — silence the untracked noise ──────
 # Doc-gallery thumbnails: regenerated at runtime, and *.png is LFS-tracked while
 # the LFS endpoint rejects pushes, so these are local-only by design (~247 files).
-apps/lantern-garage/public/knowledge-gallery/
+public/knowledge-gallery/
 # Fast-layer calibration log + eval/harvest per-run outputs (rewritten every run;
 # the curated trail lives in data/convergence/records.jsonl + data/eval/leaderboard.jsonl).
 data/convergence/grounding-calibration.jsonl
@@ -480,20 +480,20 @@ data/convergence/canary-events.jsonl
 
 # Keystone Radio — the bulk offline audio library (250+ tracks) is fetched
 # locally via `python scripts/fetch_radio_audio.py` from the committed manifest
-# (apps/lantern-garage/public/radio/stations.json), NOT committed (hundreds of MB).
+# (public/radio/stations.json), NOT committed (hundreds of MB).
 # The canonical tracks committed before this rule stay tracked; new fetched mp3s
 # are ignored. stations.json itself is committed (it's the playlist).
-/apps/lantern-garage/public/radio/*.mp3
-/apps/lantern-garage/public/radio/*.dl
+/public/radio/*.mp3
+/public/radio/*.dl
 
 # Gallery image bytes live outside git (manifest.json is the tracked source of truth)
-apps/lantern-garage/public/assets/content/**/*.webp
+public/assets/content/**/*.webp
 
 # Gage showcase media also lives in R2 (served from media.lantern-os.net/gage)
-apps/lantern-garage/public/assets/gage/**/*.mp4
-apps/lantern-garage/public/assets/gage/**/*.webp
-apps/lantern-garage/public/assets/gage/**/*.png
-apps/lantern-garage/public/assets/gage/**/*.gif
+public/assets/gage/**/*.mp4
+public/assets/gage/**/*.webp
+public/assets/gage/**/*.png
+public/assets/gage/**/*.gif
 
 # Σ₀ scan cache (runtime state — reuses LLM reads across scans)
 data/lantern-garage/trading/scan-llm-cache.json
@@ -504,7 +504,7 @@ data/ingest-staging/
 data/longmemeval/*
 !data/longmemeval/fixture.json
 # Desktop SEA build output (unisona.exe + sea blob) — built via scripts/build-desktop-exe.mjs, never committed
-apps/lantern-garage/desktop/dist/
+desktop/dist/
 *.blob
 
 # Watchdog runtime health ledger (#2038) — machine-local, never committed
@@ -536,11 +536,11 @@ reports/creator-dashboard-audit.md
 data/sessions/
 
 # Per-user runtime stores (never commit): broker creds + broker choice
-apps/lantern-garage/data/ibkr-credentials/
-apps/lantern-garage/data/alpaca-credentials/
-apps/lantern-garage/data/broker-preference/
-apps/lantern-garage/data/profiles/
-apps/lantern-garage/data/lantern-garage/trading/trader-state.json
+data/ibkr-credentials/
+data/alpaca-credentials/
+data/broker-preference/
+data/profiles/
+data/lantern-garage/trading/trader-state.json
 data/lantern-garage/trading/trader-state.json
 experiments/deep_history.json
 experiments/v1_10_toy/linked-records.sample.jsonl
@@ -549,3 +549,7 @@ data/eval/v1_10/honesty-eval-v1.jsonl
 data/eval/v1_10/honesty-eval-full.jsonl
 data/eval/v1_10/boundary-gsm8k.jsonl
 data/eval/v1_10/v1-sft.jsonl
+coverage/
+.nyc_output/
+*.seed
+*.pid.lock

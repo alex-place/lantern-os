@@ -59,7 +59,7 @@ Held issue:
 ## The `!convergance` chat command (Converge surface)
 
 (Absorbed from `skills/convergence/SKILL.md`, 2026-07-16. Implementation:
-`apps/lantern-garage/lib/dream-chat.js` — `handleConvergenceCommand`,
+`lib/dream-chat.js` — `handleConvergenceCommand`,
 `_deriveConvergenceQuery`, `_appendConvergenceRecord`.)
 
 - **`!convergance`** — synthesize recent entries into ONE grounded insight; the

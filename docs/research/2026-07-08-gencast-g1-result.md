@@ -1,7 +1,7 @@
 # GenCast Phase-0 — Gate G1 result (#2239)
 
 **Status:** measured (real data). **Date:** 2026-07-08. **No trading.**
-Runner: `experiments/gencast_g1_backtest.js` · core: `apps/lantern-garage/lib/ensemble-forecast-core.js`.
+Runner: `experiments/gencast_g1_backtest.js` · core: `lib/ensemble-forecast-core.js`.
 
 ## What was run
 A **wired** NBM proxy feed + the G1 calibration backtest from the scoping (#2280):

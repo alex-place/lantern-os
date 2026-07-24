@@ -6,7 +6,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const RegimeDetector = require("../apps/lantern-garage/lib/regime-detector");
+const RegimeDetector = require("../lib/regime-detector");
 
 const detector = new RegimeDetector();
 

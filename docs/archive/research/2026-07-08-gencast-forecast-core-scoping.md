@@ -10,7 +10,7 @@ after the current oracle has settled outcomes (#2218); the offline calibration b
 
 ## 1. What the issue asks
 Replace the oracle's hand-tuned core (NBS-MOS point forecast + Gaussian + ≥100 °F ceiling hack in
-`apps/lantern-garage/lib/kalshi-weather-edge.js`) with a **calibrated full ensemble** that emits a
+`lib/kalshi-weather-edge.js`) with a **calibrated full ensemble** that emits a
 bucket distribution natively — the exact shape a temp-ladder contract needs — and see if it prices
 the ladder (especially the thin ≥100 °F tail) better than both climatology and the current oracle,
 *and* better than the market.
@@ -60,7 +60,7 @@ ladder, market asks }` → ensemble → **bucket distribution**. Then:
 
 | Gate | Test | Tool that already exists |
 |---|---|---|
-| **G1 calibration** | proxy RPS/PIT-χ²/reliability **<** current oracle **<** climatology, out-of-sample | `apps/lantern-garage/lib/kalshi-weather-verify.js` (RPS/PIT/reliability, n≥20 bar) |
+| **G1 calibration** | proxy RPS/PIT-χ²/reliability **<** current oracle **<** climatology, out-of-sample | `lib/kalshi-weather-verify.js` (RPS/PIT/reliability, n≥20 bar) |
 | **G2 beats-market** | trading the proxy dist vs real asks nets **+EV after fees** AND beats trading the oracle's dist | `robustEdgeReport` (fee-aware band-robust EV) + `econ-nowcast-edge.js` `measureEdge` (beats-market gate) |
 | **G3 promote** | only if G1 **and** G2 pass on held-out days | forecast-core adapter behind a flag in `kalshi-weather-edge.js`; A/B in the deck (#2217) |
 

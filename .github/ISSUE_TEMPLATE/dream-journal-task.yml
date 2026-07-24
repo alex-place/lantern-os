@@ -29,7 +29,7 @@ body:
     attributes:
       label: Files expected to change
       placeholder: |
-        apps/lantern-garage/lib/dream-chat.js
+        lib/dream-chat.js
         src/discord_lounge_bot/bot_v2.py
     validations:
       required: true

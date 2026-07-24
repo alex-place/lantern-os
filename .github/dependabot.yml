@@ -17,7 +17,7 @@ updates:
       timezone: "America/New_York"
 
   - package-ecosystem: "npm"
-    directory: "/apps/lantern-garage"
+    directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"

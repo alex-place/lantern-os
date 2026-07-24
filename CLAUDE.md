@@ -95,7 +95,7 @@ unisona.ai is a **persistent local-first reasoning system** led by Alex Place an
 
 **Dual-Boot System** (recommended for development):
 ```bash
-npm run dev --prefix apps/lantern-garage
+npm run dev
 # Starts TWO servers simultaneously:
 # - Port 4177: Stable release (master branch)
 # - Port 4178: Development (current branch, hot-reload)
@@ -104,7 +104,7 @@ npm run dev --prefix apps/lantern-garage
 
 **Single Server** (development only):
 ```bash
-npm run dev --prefix apps/lantern-garage
+npm run dev
 # Starts only port 4177 with hot-reload (your current branch)
 ```
 
@@ -137,17 +137,17 @@ python -m pytest tests/test_dream_journal.py::test_function_name -q
 
 ```bash
 # Start main web server (port 4177)
-node apps/lantern-garage/server.js
+node server.js
 # or
-npm start --prefix apps/lantern-garage
+npm start
 
 # Syntax-check JS files
-node --check apps/lantern-garage/server.js && node --check apps/lantern-garage/cloud-server.js
+node --check server.js && node --check cloud-server.js
 
 # Node API/chat tests (server must be running)
-npm run test:api --prefix apps/lantern-garage
-npm run test:chat --prefix apps/lantern-garage
-npm run test:ui --prefix apps/lantern-garage   # requires Playwright
+npm run test:api
+npm run test:chat
+npm run test:ui   # requires Playwright
 
 # Auth E2E (Playwright): guest → role-picker → authed → logout, header/SSO emulation,
 # email+password login. Boots the real server with a test-auth token. See docs/TEST-AUTH.md.
@@ -174,13 +174,13 @@ node services/gpt-web-api/server.js
 
 ### Core data flow
 
-The **Lantern Garage server** (`apps/lantern-garage/server.js`) is the single entrypoint. It:
-- Serves all static HTML/JS from `apps/lantern-garage/public/`
+The **Lantern Garage server** (`server.js`) is the single entrypoint. It:
+- Serves all static HTML/JS from `public/`
 - Routes REST API calls (`/api/*`) using plain `if` blocks (no framework)
 - Streams LLM replies via SSE at `/api/dream/stream`
 - Reads/writes persistent state as `.json` and `.jsonl` files under `data/`
 
-Business logic is split into `apps/lantern-garage/lib/`:
+Business logic is split into `lib/`:
 | Module | Responsibility |
 |--------|----------------|
 | `dream-chat.js` | Agent persona selection + LLM call routing (Anthropic/OpenAI/Gemini) |
@@ -193,7 +193,7 @@ Business logic is split into `apps/lantern-garage/lib/`:
 
 ### Dream Journal agents
 
-The chat is **ONE assistant**: the **`keystone`** agent defined in `apps/lantern-garage/lib/dream-chat.js` and loaded from `data/contexts/personas.json`. There is no keyword persona routing — `selectAgent()` always resolves the single assistant, and capabilities (documents, web, market data, repo/GitHub) are **real tool calls** from `lib/tool-runner.js` that the model invokes natively, the way Claude/ChatGPT/Gemini work. (The fictional RP personas were removed in #1664; the keyword-scored trader/engineer/job-application/Σ₀ personas and per-message task-lens prompts were removed in the one-assistant refactor. The string `lantern` persists *only* as the internal assistant message-role used by conversation/CSF storage, not as a selectable persona.)
+The chat is **ONE assistant**: the **`keystone`** agent defined in `lib/dream-chat.js` and loaded from `data/contexts/personas.json`. There is no keyword persona routing — `selectAgent()` always resolves the single assistant, and capabilities (documents, web, market data, repo/GitHub) are **real tool calls** from `lib/tool-runner.js` that the model invokes natively, the way Claude/ChatGPT/Gemini work. (The fictional RP personas were removed in #1664; the keyword-scored trader/engineer/job-application/Σ₀ personas and per-message task-lens prompts were removed in the one-assistant refactor. The string `lantern` persists *only* as the internal assistant message-role used by conversation/CSF storage, not as a selectable persona.)
 
 **Only these skills have real implementations** — note they live in two places: `dream_journal`, `lucid_dreaming`, and `job_application` are backed by a `skills/<name>/SKILL.md` dir; `archive_curator` and `voice_curator` migrated to the three-doors repo with the Discord bot (2026-07-24) and are no longer registered here. All other `skills/*/SKILL.md` entries are design contracts only — do not claim they are live. A "skill" is a capability of the one assistant expressed through tools — never a persona, keyword route, or scripted flow.
 
@@ -203,7 +203,7 @@ The chat is **ONE assistant**: the **`keystone`** agent defined in `apps/lantern
 
 ### Trading System (Sprint 1.5)
 
-The Kalshi trading terminal (`apps/lantern-garage/public/kalshi-terminal.html`) is a swipe-deck UI backed by 60+ REST endpoints in `apps/lantern-garage/routes/trading.js`. Full endpoint reference: **[docs/trading-api-reference.md](docs/trading-api-reference.md)**.
+The Kalshi trading terminal (`public/kalshi-terminal.html`) is a swipe-deck UI backed by 60+ REST endpoints in `routes/trading.js`. Full endpoint reference: **[docs/trading-api-reference.md](docs/trading-api-reference.md)**.
 
 Key runtime components:
 | Module | Responsibility |
@@ -241,8 +241,8 @@ on top of CSF.
 ### Cloud vs local
 
 - **Local:** server binds to `127.0.0.1:4177`
-- **Cloud (Railway):** `apps/lantern-garage/cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. Railway auto-deploys from `master`.
-- **Static UI:** deployed from `gh-pages` branch via GitHub Actions; source in `apps/lantern-garage/public/`.
+- **Cloud (Railway):** `cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. Railway auto-deploys from `master`.
+- **Static UI:** deployed from `gh-pages` branch via GitHub Actions; source in `public/`.
 
 ### Configuration
 

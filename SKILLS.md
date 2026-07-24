@@ -57,7 +57,7 @@ Persisted, resumable long-running research tasks — the Remember + Verify stage
 - Bounded by `RESEARCH_TASK_MAX_ROUNDS` (default 8 total) and `RESEARCH_ROUNDS_PER_TURN` (default 3 per HTTP turn)
 - On completion, emits a Convergence Record (`reasoner: "research-task"`) and a CSF memory entry
 - Backs both `!convergance`'s grounding (1-2 bounded rounds) and autowork's issue research (`AUTOWORK_RESEARCH_ROUNDS`, default 2) — one engine, three entry points
-- Implementation: `apps/lantern-garage/lib/research-task.js` (task state) + `lib/wide-search.js` (per-round search loop)
+- Implementation: `lib/research-task.js` (task state) + `lib/wide-search.js` (per-round search loop)
 
 ### dream_journal
 Dream Journal entry creation, management, and RAG-backed search.

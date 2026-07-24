@@ -3,7 +3,7 @@
 
 /**
  * arxiv_query.js — command-line access to the local arXiv corpus for the /research
- * skill. Reuses the SAME code the chat assistant uses (apps/lantern-garage/lib):
+ * skill. Reuses the SAME code the chat assistant uses (lib):
  *   - BM25 search               -> lib/arxiv-index.js  queryArxiv()
  *   - full untruncated abstract -> lib/arxiv-fulltext.js readAbstractFromRaw()
  *   - the ACTUAL report text    -> lib/arxiv-fulltext.js fetchArxivFullText()

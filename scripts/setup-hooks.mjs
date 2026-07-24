@@ -9,7 +9,7 @@
  * executable in git (git silently ignores non-executable hooks on macOS/Linux).
  *
  * Runs automatically from the `prepare` npm script on `npm install` (root and
- * apps/lantern-garage), and can be run by hand: `npm run hooks` / `make hooks`.
+ * .), and can be run by hand: `npm run hooks` / `make hooks`.
  * It is a deliberate NO-OP (exit 0) outside a git work-tree — e.g. a tarball
  * install or a CI image — so it can never break `npm install`. CI re-runs every
  * one of these checks regardless, so a machine that skips this is still gated.

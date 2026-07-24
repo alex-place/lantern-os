@@ -9,7 +9,7 @@ Writes  $ARXIV_CORPUS_DIR\\index\\postings.json   {term: [[docId, tf], ...]}
         $ARXIV_CORPUS_DIR\\index\\meta.json         {count, avgdl, k1, b, built_at, terms}
 
 Idempotent — safe to re-run after every harvest. The tokenizer here MUST match the
-one in apps/lantern-garage/lib/arxiv-index.js (same lowercase / [a-z0-9]+ / stopword
+one in lib/arxiv-index.js (same lowercase / [a-z0-9]+ / stopword
 rules) or query terms won't line up with indexed terms.
 
 Run:

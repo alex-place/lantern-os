@@ -1,7 +1,7 @@
 # Surface Boundary — Core Loop vs. Extensions
 
-**Status:** Living. Source of truth: [`apps/lantern-garage/lib/surface-registry.js`](../apps/lantern-garage/lib/surface-registry.js).
-Enforced by: [`apps/lantern-garage/test/surface-boundary.test.js`](../apps/lantern-garage/test/surface-boundary.test.js) (`npm run test:boundary`).
+**Status:** Living. Source of truth: [`lib/surface-registry.js`](../lib/surface-registry.js).
+Enforced by: [`test/surface-boundary.test.js`](../test/surface-boundary.test.js) (`npm run test:boundary`).
 
 ## Why this exists
 
@@ -18,7 +18,7 @@ Refs: [modularmonoliths.com](https://modularmonoliths.com/), [Microsoft multi-ag
 Every top-level `public/*.html` surface is exactly one of:
 
 - **CORE** — directly serves one loop stage. It must name which stage (`Observe`/`Remember`/`Reason`/`Act`/`Verify`/`Converge`).
-- **EXTENSION** — an optional capability beside the loop. It must name a `module` cluster, and may name an env `flag` (gated through [`lib/feature-graph.js`](../apps/lantern-garage/lib/feature-graph.js)).
+- **EXTENSION** — an optional capability beside the loop. It must name a `module` cluster, and may name an env `flag` (gated through [`lib/feature-graph.js`](../lib/feature-graph.js)).
 
 A surface that is neither **fails the contract test**. To add a surface you must classify it; to promote/demote one you edit the registry deliberately.
 
@@ -27,7 +27,7 @@ Classification alone only *labels* sprawl, so the contract test also enforces tw
 - **BUDGET** — the `extension : core` ratio may not exceed `MAX_EXTENSION_RATIO` (currently **0.95**). Adding an extension without adding core value trips the gate; the fix is to grow the core loop, or to raise the cap as a **deliberate, reviewable one-line edit** — never silent accretion.
 - **GATEABLE** — every extension must be switch-off-able (name an env `flag`), **except** the always-on shell modules (`account`, `meta`) that must always render. This makes "optional capability beside the loop" true in practice, not just on paper.
 
-The hosted **cloud** profile ([`lib/deployment-profile.js`](../apps/lantern-garage/lib/deployment-profile.js)) is a second, tighter list — and its contract test now cross-checks that every hosted surface **exists on disk and is classified here**, so the two lists can't drift apart (that check would have caught the former dangling `help.html`).
+The hosted **cloud** profile ([`lib/deployment-profile.js`](../lib/deployment-profile.js)) is a second, tighter list — and its contract test now cross-checks that every hosted surface **exists on disk and is classified here**, so the two lists can't drift apart (that check would have caught the former dangling `help.html`).
 
 ## Current boundary (measured)
 

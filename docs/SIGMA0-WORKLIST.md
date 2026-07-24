@@ -22,7 +22,7 @@ behind the frozen-base levers.
 
 | Item | Stage | Artifact |
 |---|---|---|
-| Council unified into one Δ + 3-way answerability gate (grounded / seam-open / pin) | Verify→Converge | [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) + test 7/7 |
+| Council unified into one Δ + 3-way answerability gate (grounded / seam-open / pin) | Verify→Converge | [`lib/council-review.js`](../lib/council-review.js) + test 7/7 |
 | Operator-escalation backtest instrument (honest n=0, ready) | Converge | [`experiments/council_escalation_backtest.py`](../experiments/council_escalation_backtest.py) |
 | LoopCoder-v2 4-bit feasibility probe (FIT/RUNS/SPEED verdict) | Reason | [`experiments/loopcoder_v2_4bit_probe.py`](../experiments/loopcoder_v2_4bit_probe.py) |
 | SWE-bench single-shot chat harness + `--grade` (Docker/Modal) | Verify | [`scripts/eval_swebench_chat.py`](../scripts/eval_swebench_chat.py) |

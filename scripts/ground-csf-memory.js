@@ -40,7 +40,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const csfWriter = require("../apps/lantern-garage/lib/csf-memory-writer");
+const csfWriter = require("../lib/csf-memory-writer");
 
 const repoRoot = path.resolve(__dirname, "..");
 const GROUNDING_SCHEMA = "sigma0-memory-grounding-1";

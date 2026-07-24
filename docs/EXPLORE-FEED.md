@@ -7,7 +7,7 @@ status: current
 
 # Explore Feed — single-pane, PCSF-ranked content (as-built)
 
-**What the page *is* today.** The Explore page ([`public/explore.html`](../apps/lantern-garage/public/explore.html))
+**What the page *is* today.** The Explore page ([`public/explore.html`](../public/explore.html))
 is **one ranked, self-improving content stream** with type-filter chips — not a static link
 directory. It is built on the **same PCSF leaderboard that ranks model providers**, so it adds
 **no new recommender subsystem**: one mechanism, two consumers.
@@ -36,10 +36,10 @@ fetching infrastructure:
 
 | Card type | Producer | Source |
 |---|---|---|
-| `read`   | [`routes/discover-feeds.js`](../apps/lantern-garage/routes/discover-feeds.js) `load()` | curated RSS/Atom (Simon Willison, HN, MIT Tech Review) |
-| `watch`  | [`routes/youtube.js`](../apps/lantern-garage/routes/youtube.js) `load()` | lanternYT channel |
-| `build`  | [`routes/github-activity.js`](../apps/lantern-garage/routes/github-activity.js) `load()` | repo releases + commits |
-| `belief` | [`lib/flourishing-feeds.js`](../apps/lantern-garage/lib/flourishing-feeds.js) `panel()` | fused world-model beliefs |
+| `read`   | [`routes/discover-feeds.js`](../routes/discover-feeds.js) `load()` | curated RSS/Atom (Simon Willison, HN, MIT Tech Review) |
+| `watch`  | [`routes/youtube.js`](../routes/youtube.js) `load()` | lanternYT channel |
+| `build`  | [`routes/github-activity.js`](../routes/github-activity.js) `load()` | repo releases + commits |
+| `belief` | [`lib/flourishing-feeds.js`](../lib/flourishing-feeds.js) `panel()` | fused world-model beliefs |
 | `doc`    | `data/knowledge/index.meta.json` | unisona.ai knowledge index |
 
 Each producer runs under an 8 s timeout; a source that fails or times out drops **only its own
@@ -67,7 +67,7 @@ Every card is normalized to:
 
 ## 3. Ranking & cold start
 
-`rankedFeed()` calls [`rankCandidates(cards, "explore", opts)`](../apps/lantern-garage/lib/model-leaderboard.js)
+`rankedFeed()` calls [`rankCandidates(cards, "explore", opts)`](../lib/model-leaderboard.js)
 — the generic PCSF ranker. Cards then sort by:
 
 1. **PCSF score** (learned `compositeScore` for a source with enough signal; otherwise a cold prior).
@@ -128,7 +128,7 @@ These are why the design doc frames this as the *first* shippable slice that **a
 | File | Role |
 |---|---|
 | [`data/pcsf/explore.pcsf.json`](../data/pcsf/explore.pcsf.json) | candidate taxonomy + editorial cold-start order (#1214) |
-| [`apps/lantern-garage/lib/explore-feed.js`](../apps/lantern-garage/lib/explore-feed.js) | aggregator + ranker; `node explore-feed.js` prints the merged list (#1215) |
-| [`apps/lantern-garage/routes/explore.js`](../apps/lantern-garage/routes/explore.js) | `GET /api/explore/feed` + `POST /api/explore/interaction` (#1216, #1218) |
-| [`apps/lantern-garage/public/explore.html`](../apps/lantern-garage/public/explore.html) | single-pane UI + filter chips; static directory demoted to a collapsed "All tools" (#1217) |
+| [`lib/explore-feed.js`](../lib/explore-feed.js) | aggregator + ranker; `node explore-feed.js` prints the merged list (#1215) |
+| [`routes/explore.js`](../routes/explore.js) | `GET /api/explore/feed` + `POST /api/explore/interaction` (#1216, #1218) |
+| [`public/explore.html`](../public/explore.html) | single-pane UI + filter chips; static directory demoted to a collapsed "All tools" (#1217) |
 | `routes/{discover-feeds,youtube,github-activity}.js` | now export a reusable cache-aware `load()` |

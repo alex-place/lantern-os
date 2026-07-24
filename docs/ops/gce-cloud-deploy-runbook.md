@@ -176,7 +176,7 @@ export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access
 gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48 --command='
   sudo git config --global --add safe.directory /opt/lantern-os
   cd /opt/lantern-os && sudo git pull --ff-only origin master
-  sudo npm install --omit=dev --prefix apps/lantern-garage
+  sudo npm install --omit=dev
   sudo systemctl restart lantern.service
   sleep 6 && curl -s -o /dev/null -w "HTTP %{http_code}\n" http://127.0.0.1:8080/'
 ```

@@ -22,7 +22,7 @@ grounded in on-disk artifacts (paths + counts verified) and primary sources (cit
   - `D:/lantern-train/ouro-sigma0-fc-adapters/final` — **the FC adapter trained this session** (tool-calling).
   - `D:/lantern-train/ouro-sigma0-adapters/final` — the prior **coding** adapter (HumanEval pass@1 **0.518**, 85/164 full set — see `data/eval/leaderboard.jsonl`, row `ouro-final-rerun-full`).
 - **Training script:** [`scripts/train-qlora-ouro.py`](../../scripts/train-qlora-ouro.py) — QLoRA, 4-bit nf4, transformers `Trainer` (no trl), pinned to transformers 4.57.
-- **Serving contract (canonical, refactored this session):** the local model emits a single-line `<tool_call>{"name","input"}</tool_call>`. The proxy ([`apps/lantern-garage/lib/tool-runner.js`](../../apps/lantern-garage/lib/tool-runner.js)) defines **one tool registry** keyed by the canonical Claude-Code names the adapter was trained on — **Read, LS, Glob, Grep, Bash, PowerShell, Write, Edit** — used for *both* the prompt preamble and execution (advertised == emitted == executed). Shell tools route through the shared allowlist ([`lib/command-allowlist.js`](../../apps/lantern-garage/lib/command-allowlist.js)) + [`lib/safe-exec.js`](../../apps/lantern-garage/lib/safe-exec.js), operator-gated. **Retraining MUST target these exact names/schemas.**
+- **Serving contract (canonical, refactored this session):** the local model emits a single-line `<tool_call>{"name","input"}</tool_call>`. The proxy ([`lib/tool-runner.js`](../../lib/tool-runner.js)) defines **one tool registry** keyed by the canonical Claude-Code names the adapter was trained on — **Read, LS, Glob, Grep, Bash, PowerShell, Write, Edit** — used for *both* the prompt preamble and execution (advertised == emitted == executed). Shell tools route through the shared allowlist ([`lib/command-allowlist.js`](../../lib/command-allowlist.js)) + [`lib/safe-exec.js`](../../lib/safe-exec.js), operator-gated. **Retraining MUST target these exact names/schemas.**
 
 ## 2. What was done this session
 
@@ -75,7 +75,7 @@ grounded in on-disk artifacts (paths + counts verified) and primary sources (cit
 | function-masked frac | 0 | **~0.5 of positives** | see Hammer above |
 
 ### P1 — Train/serve format parity (fixes #1)
-Generate the training data through the **same serializer the server uses** ([`ouro_anthropic_bridge.py`](../../scripts/ouro_anthropic_bridge.py) `_render_tools` / [`tool-runner.js`](../../apps/lantern-garage/lib/tool-runner.js) `renderToolPreamble`). Verify byte-for-byte that a rendered training prompt == what the live server sends. Use the **canonical 8 tool names** (Read/LS/Glob/Grep/Bash/PowerShell/Write/Edit).
+Generate the training data through the **same serializer the server uses** ([`ouro_anthropic_bridge.py`](../../scripts/ouro_anthropic_bridge.py) `_render_tools` / [`tool-runner.js`](../../lib/tool-runner.js) `renderToolPreamble`). Verify byte-for-byte that a rendered training prompt == what the live server sends. Use the **canonical 8 tool names** (Read/LS/Glob/Grep/Bash/PowerShell/Write/Edit).
 
 ### P1 — Evaluation (BFCL + in-domain)
 - **Harness:** Berkeley Function-Calling Leaderboard (BFCL) against the served endpoint with the **pinned** tool-call format.

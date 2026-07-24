@@ -2,7 +2,7 @@
 //
 // experiments/longmemeval_harness.py already scores the Python MemoryEngine
 // (src/csf/memory_engine.py) — but that is NOT the retriever a real chat turn uses. The
-// product path is apps/lantern-garage/lib/csf-memory.js::searchConversation: a keyword
+// product path is lib/csf-memory.js::searchConversation: a keyword
 // retriever that windows the LAST 1200 conversation-log turns and ranks by relevanceScore.
 // Its recall was never measured, so the 0.709 recall@5 we quote is the Python engine's, not
 // the product's. This harness closes that gap by driving searchConversation directly over the

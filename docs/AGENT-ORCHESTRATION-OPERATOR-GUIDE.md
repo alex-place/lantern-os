@@ -23,7 +23,7 @@ Agent Worker Loop (spawns claude CLI, commits, opens PR)
 | 1 | `src/queue-manager.js` | JSONL-style queue: pending → assigned → completed/failed |
 | 2 | `src/agent-slot-manager.js` | Slot lifecycle, heartbeat, retry logic |
 | 3 | `src/work-dispatcher.js` | Poll queue, claim slot, create isolated git worktree |
-| 4 | `apps/lantern-garage/routes/agent-status.js` | `GET /api/dream/status/agents` live status |
+| 4 | `routes/agent-status.js` | `GET /api/dream/status/agents` live status |
 | 5 | `src/agent-worker-loop.js` | Spawn agent, commit, push, open PR, complete entry |
 
 ---

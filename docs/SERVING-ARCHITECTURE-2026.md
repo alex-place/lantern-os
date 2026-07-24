@@ -210,7 +210,7 @@ measurable performance history; each run appends one row.
 - Leaderboard tracking
 - CLI: `--run provider:model`, `--summarize`
 
-**`apps/lantern-garage/lib/unified-agent.js`** (TODO in Phase 2)
+**`lib/unified-agent.js`** (TODO in Phase 2)
 - Add `OURO_NATIVE` detection for Node.js side
 - Route requests to correct inference path
 

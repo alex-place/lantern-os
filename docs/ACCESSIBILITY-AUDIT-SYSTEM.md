@@ -26,13 +26,13 @@ node scripts/audit-site.js
 ```
 
 **What it does:**
-- Parses all `<a>` tags from `apps/lantern-garage/public/index.html`
+- Parses all `<a>` tags from `public/index.html`
 - Validates each linked page exists
 - Generates `sitemap.xml` for search engines
 - Fails if any page is missing
 
 **Output:**
-- `apps/lantern-garage/public/sitemap.xml` (auto-generated)
+- `public/sitemap.xml` (auto-generated)
 
 ### 2. Accessibility Tests (`scripts/test-a11y.js`)
 
@@ -76,7 +76,7 @@ Runs on every PR and push to `master` when public HTML files change.
 
 ### Adding a new page
 
-1. Create the HTML file: `apps/lantern-garage/public/new-page.html`
+1. Create the HTML file: `public/new-page.html`
 2. Add link to `index.html`: `<a href="/new-page.html">Page Title</a>`
 3. **Run locally first:**
    ```bash
@@ -128,7 +128,7 @@ Covers:
 
 ## Sitemap
 
-**Generated:** `apps/lantern-garage/public/sitemap.xml`  
+**Generated:** `public/sitemap.xml`  
 **Updated:** On every commit to public HTML files  
 **Used by:** Search engines, automated crawlers
 

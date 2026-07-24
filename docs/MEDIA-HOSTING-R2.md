@@ -49,13 +49,13 @@ scripts/sync-media-r2.sh         # dry-run — shows what would upload
 scripts/sync-media-r2.sh --go    # upload changed files only
 ```
 
-This syncs `apps/lantern-garage/public/assets/content/` → the bucket, preserving the
+This syncs `public/assets/content/` → the bucket, preserving the
 `koh/` prefix, with a 1-year immutable cache header. Re-run it whenever you add art.
 
 ## Flip serving to R2
 
 After the first `--go` upload, set the base in
-`apps/lantern-garage/public/assets/content/koh/manifest.json`:
+`public/assets/content/koh/manifest.json`:
 
 ```json
 "base": "https://media.lantern-os.net/koh/"

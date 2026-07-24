@@ -21,13 +21,13 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).parent.parent
-DEPLOYMENT_CONFIG = REPO_ROOT / "apps/lantern-garage/deployment.json"
-HEALTH_CHECK = REPO_ROOT / "apps/lantern-garage/routes/status.js"
+DEPLOYMENT_CONFIG = REPO_ROOT / "deployment.json"
+HEALTH_CHECK = REPO_ROOT / "routes/status.js"
 QUICKSTART = REPO_ROOT / "QUICKSTART.md"
 
 # Files that affect deployment
 DEPLOYMENT_FILES = re.compile(r"""
-    ^apps/lantern-garage/(
+    ^(
         server\.js|
         cloud-server\.js|
         routes/|
@@ -111,7 +111,7 @@ def health_check_endpoints_exist():
 def validate_api_backwards_compatibility():
     """Check for breaking API changes."""
     # Get staged changes to routes
-    output, _ = run_cmd("git diff --cached apps/lantern-garage/routes/")
+    output, _ = run_cmd("git diff --cached routes/")
 
     if not output:
         return [], "No route changes"
@@ -137,7 +137,7 @@ def validate_api_backwards_compatibility():
 
 def validate_staged_deployment_config():
     """Check staged deployment.json if it exists."""
-    output, code = run_cmd("git show :apps/lantern-garage/deployment.json")
+    output, code = run_cmd("git show :deployment.json")
 
     if code != 0:
         return [], "No staged deployment.json"
@@ -168,7 +168,7 @@ def main():
 
     # Check 1: Deployment config exists
     if not deployment_config_exists():
-        errors.append("[ERROR] apps/lantern-garage/deployment.json not found")
+        errors.append("[ERROR] deployment.json not found")
         errors.append("        Create deployment.json with rollback plan, health checks, and environment info")
     else:
         print("    [✓] Deployment config exists")

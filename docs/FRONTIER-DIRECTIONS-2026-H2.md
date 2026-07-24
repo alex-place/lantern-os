@@ -103,9 +103,9 @@ The Remember stage already writes append-only JSONL with a per-log SHA-256 hash 
 | Succession / handoff doctrine — operator key enrollment, dual-signed handoff, verify-lineage | `src/vault/succession.py` | **new** |
 | 500-Year hardening + format-migration doctrine (epoch gates, attested handoffs, **threat model**, **external anchoring**) | `docs/VAULT-HARDENING-DOCTRINE.md` | **new** |
 | `csf MemoryRecord.verify()` — call as per-leaf secondary check (closes 0-callers gap) | `src/csf/memory_engine.py` | extend |
-| Vault REST surface — `/api/vault/{status,verify,seal,succession,proof/:id}` plain handlers | `apps/lantern-garage/routes/vault.js` | **new** |
-| JS memory writer — chain-field parity with sealer expectations | `apps/lantern-garage/lib/csf-memory-writer.js` | extend |
-| Vault status panel / proof viewer (declare `core:verify` in boundary registry) | `apps/lantern-garage/public/vault.html` | **new** |
+| Vault REST surface — `/api/vault/{status,verify,seal,succession,proof/:id}` plain handlers | `routes/vault.js` | **new** |
+| JS memory writer — chain-field parity with sealer expectations | `lib/csf-memory-writer.js` | extend |
+| Vault status panel / proof viewer (declare `core:verify` in boundary registry) | `public/vault.html` | **new** |
 | Vault test suite — tamper-evidence, seal-chain continuity, signature, succession round-trip | `tests/test_vault.py` | **new** |
 
 **Data model.** Extends Memory, Task, Tool, ConvergenceRecord — no new top-level object. `SealRecord {epoch_id, merkle_root, signature, prev_seal_hash, git_anchor, ts}` is itself a ConvergenceRecord. `SuccessionRecord {outgoing_key, incoming_key, attested_root, attested_epoch, dual_signature}`. The convergence JSONL ledger is the **single sealed source of truth**; CSF/JS records are feeders, not independently sealed (avoids cross-language root mismatch). One canonical-JSON spec is locked in the doctrine doc.
@@ -208,13 +208,13 @@ The plumbing is already built and dormant. `groundedness-canary.js` scores the "
 
 | Name | Path | Status |
 |---|---|---|
-| `token-surprise.js` — fix degenerate `tailMass`; re-weight to mean/p90 + split-conformal calibration | `apps/lantern-garage/lib/token-surprise.js` | extend |
-| `groundedness-canary.js` — already consumes `tokenSurprise` RAISE-ONLY; verify `SURPRISE_ALPHA` vs new scale | `apps/lantern-garage/lib/groundedness-canary.js` | existing |
-| `canary.js runCanaries` — add `surpriseField` to recorded event | `apps/lantern-garage/lib/canary.js` | extend |
-| dream-chat.js local decode — request + capture per-token logprobs at the Ollama `/api/chat` calls; return `reply.surprise` | `apps/lantern-garage/lib/dream-chat.js` | extend (**highest-value wire**) |
-| `serving-modes.js` — add logprobs request flags to Ollama (+ OpenAI non-reasoning) decode options | `apps/lantern-garage/lib/serving-modes.js` | extend |
-| **stream-chat.js:1213** — pass `tokenSurprise` into `runCanaries` (the line that opens the valve) | `apps/lantern-garage/lib/stream-chat.js` | extend |
-| dream-chat-ui.js grounding badge — render live `modelUncertainty` as a user-owned dial, labeled "first-line flag" | `apps/lantern-garage/public/js/dream-chat-ui.js` | extend |
+| `token-surprise.js` — fix degenerate `tailMass`; re-weight to mean/p90 + split-conformal calibration | `lib/token-surprise.js` | extend |
+| `groundedness-canary.js` — already consumes `tokenSurprise` RAISE-ONLY; verify `SURPRISE_ALPHA` vs new scale | `lib/groundedness-canary.js` | existing |
+| `canary.js runCanaries` — add `surpriseField` to recorded event | `lib/canary.js` | extend |
+| dream-chat.js local decode — request + capture per-token logprobs at the Ollama `/api/chat` calls; return `reply.surprise` | `lib/dream-chat.js` | extend (**highest-value wire**) |
+| `serving-modes.js` — add logprobs request flags to Ollama (+ OpenAI non-reasoning) decode options | `lib/serving-modes.js` | extend |
+| **stream-chat.js:1213** — pass `tokenSurprise` into `runCanaries` (the line that opens the valve) | `lib/stream-chat.js` | extend |
+| dream-chat-ui.js grounding badge — render live `modelUncertainty` as a user-owned dial, labeled "first-line flag" | `public/js/dream-chat-ui.js` | extend |
 | `surprise_leak_ab.py` — promote from worktree to mainline; per-model AUROC harness | `experiments/surprise_leak_ab.py` | extend |
 | Surprise calibration store + fit (append-only `{field,label}` rows + fitted thresholds JSON) | `data/convergence/surprise-calibration.jsonl` | **new** |
 | BENCHMARKS entry — register surprise-leak Layer-1 (AUROC, coverage) | `docs/BENCHMARKS.md` | extend |
@@ -329,14 +329,14 @@ The BetterSafe loop: **Observe** = intake profile + local `social_services_regis
 | SocialServicesEligibility — `_score_match` → deterministic per-rule `{met:bool|null, rule_citation, evidence_used, data_present}` | `apps/bettersafe/modules/social_services.py` | extend |
 | `bettersafe_db` registry — non-null `citation` per rule + consent/Part-2 segmentation flag | `apps/bettersafe/bettersafe_db.py` | extend |
 | `casework_verify` — abstention gate (hard data/consent floor → `abstain`; cap confidence; emit `[claim,evidence,confidence,source]`) | `apps/bettersafe/modules/casework_verify.py` | **new** |
-| ConvergenceRecord emitter (schema-locked, cross-language) | `apps/lantern-garage/lib/convergence-records.js` | existing |
-| Claim-packet bridge — generalize hardcoded chat fields to parameters | `apps/lantern-garage/lib/claim-draft.js` | extend |
-| Consent gate (ed25519 sign/approve/immutable) | `apps/lantern-garage/lib/consent-gate.js` | existing |
-| Groundedness canary — uncited recommendation → forced abstain | `apps/lantern-garage/lib/groundedness-canary.js` | existing |
-| Claims API + review queue — add a determination filter | `apps/lantern-garage/routes/claims.js` | extend |
-| Council exec-verify — re-run rule evaluator as `execVerdict`; non-reproducible → refuted | `apps/lantern-garage/lib/council-review.js` | extend |
+| ConvergenceRecord emitter (schema-locked, cross-language) | `lib/convergence-records.js` | existing |
+| Claim-packet bridge — generalize hardcoded chat fields to parameters | `lib/claim-draft.js` | extend |
+| Consent gate (ed25519 sign/approve/immutable) | `lib/consent-gate.js` | existing |
+| Groundedness canary — uncited recommendation → forced abstain | `lib/groundedness-canary.js` | existing |
+| Claims API + review queue — add a determination filter | `routes/claims.js` | extend |
+| Council exec-verify — re-run rule evaluator as `execVerdict`; non-reproducible → refuted | `lib/council-review.js` | extend |
 | BetterSafe casework UI — intake → per-rule grid with prominent ABSTAIN; declare `extension(verify)` | `apps/bettersafe/index.html` | extend |
-| Casework HTTP route — `/api/bettersafe/screen` plain handler | `apps/lantern-garage/routes/bettersafe.js` | **new** |
+| Casework HTTP route — `/api/bettersafe/screen` plain handler | `routes/bettersafe.js` | **new** |
 | Authoritative rule corpus — require per-rule citation + Part-2/consent marker; seed SUD rules | `apps/bettersafe/README.md` (social-services registry section) | extend |
 | **(critic add) Human-review/appeal workflow + impact-assessment artifact + adverse-action-notice path** | *(to be specified)* | **new — currently missing** |
 
@@ -442,10 +442,10 @@ Today autowork (`routes/convergence-dispatch.js`) runs Observe(issue)→Remember
 | `swe_agentic_run` live wiring — connect `propose()`/`apply_and_test()` to the live stack (propose on host; `git apply` + FAIL_TO_PASS test in WSL2/Docker) | `scripts/swe_agentic_run.py` + `scripts/swe_agent_loop.py` | extend |
 | `eval_swebench_chat` grade + leaderboard — run a FROZEN slice, emit resolved% tagged with the epoch's chain head; never fabricate | `scripts/eval_swebench_chat.py` | extend |
 | BENCHMARKS registry row — flip SWE-bench Lite 🟡→✅ only when a real resolved% lands | `docs/BENCHMARKS.md` | extend |
-| Hash-chained ConvergenceRecord (JS) — add `prev_hash` + `record_hash` (sha256 over canonical-JSON incl. `prev_hash`) | `apps/lantern-garage/lib/convergence-records.js` | extend |
+| Hash-chained ConvergenceRecord (JS) — add `prev_hash` + `record_hash` (sha256 over canonical-JSON incl. `prev_hash`) | `lib/convergence-records.js` | extend |
 | Hash-chained ConvergenceRecord (Python parity) — same fields in `to_jsonl()`; reuse `_evidence_hash` from `verify.py` | `src/convergence/objects.py` | extend |
-| Chain verifier + replay — verify `record_hash` chain end-to-end; deterministic replay | `apps/lantern-garage/lib/replay.js` | extend |
-| Autowork → schema-locked record bridge — Converge step also calls `emitConvergenceRecord()` (collapse the ad-hoc logs into the canonical stream) | `apps/lantern-garage/routes/convergence-dispatch.js` | extend |
+| Chain verifier + replay — verify `record_hash` chain end-to-end; deterministic replay | `lib/replay.js` | extend |
+| Autowork → schema-locked record bridge — Converge step also calls `emitConvergenceRecord()` (collapse the ad-hoc logs into the canonical stream) | `routes/convergence-dispatch.js` | extend |
 | Self-improvement delta tracker — resolved% delta between chain epochs; one Converge record per epoch citing changed Memory ids | `scripts/update_convergence_records.py` | extend |
 | Surprise-leak valve — plumb propose() logprobs into `runCanaries(tokenSurprise)` so low-confidence patches abstain (`seam_open`) instead of opening a bad PR | `lib/groundedness-canary.js` + `lib/stream-chat.js:1199` | extend |
 | SR 11-7 / EU AI Act conformity export — read-only chain-verified projection (hypothesis→evidence→result→confidence→source + chain hashes) | `routes/convergence-dispatch.js` (new GET) + `lib/convergence-records.js` | **new** |

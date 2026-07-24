@@ -48,8 +48,8 @@ capability proven), NAP the *must-not*, AAPF the *what-happened*.
   [`test_dilation.py`](../../tests/test_dilation.py), [`test_convergence_io.py`](../../tests/test_convergence_io.py)).
 - **The production chat path is JS, the primitives are Python.** `lib/stream-chat.js` cannot
   import these directly; it consumes a parallel JS adapter
-  ([`lib/grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js),
-  [`lib/convergence-adapter.js`](../../apps/lantern-garage/lib/convergence-adapter.js)) for the
+  ([`lib/grounding-policy.js`](../../lib/grounding-policy.js),
+  [`lib/convergence-adapter.js`](../../lib/convergence-adapter.js)) for the
   parts it uses (notably the dilation→grounding policy). **Not every primitive is on the hot
   path** — treat these docs as the design + tested contract, and check the adapters for what's
   actually live. See [ARCHITECTURE.md](../ARCHITECTURE.md) for the wiring map.

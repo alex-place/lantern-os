@@ -42,7 +42,7 @@ def human(n):
 
 def main():
     files = gather(["docs/*.md", "*.md", "scripts/*.py",
-                    "apps/lantern-garage/lib/*.js"])
+                    "lib/*.js"])
     if not files:
         print("no files gathered")
         return 1

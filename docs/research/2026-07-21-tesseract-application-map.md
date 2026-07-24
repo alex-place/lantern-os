@@ -57,9 +57,9 @@ never re-argued), or **[design — falsifiable]** (proposed here with a kill cri
 |---|---|---|
 | The tesseract/lapse compression thread is closed (E1/E2 run and refuted) | **[killed — cited]** | [kill doc](2026-06-28-csf-tesseract-novelty-and-e1-kill.md) §3–4 |
 | The lapse **field** `L(x)=−log₂p` is real and strongly non-uniform on repo data | **[measured]** (E3: std 1.28–3.03 b/B; 62–70% horizon cells on structured data) | [lapse doc](2026-06-20-lapse-tesseract.md) §4 |
-| Dilation→grounding budget is **live in chat** | **[implemented]** | [`lib/grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) (JS mirror of [`src/convergence_io/dilation.py`](../../src/convergence_io/dilation.py)) |
-| Per-token surprise primitive exists; **valve closed** (no production logprobs flow) | **[implemented, unwired]** | [`lib/token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js); [resonator doc](2026-06-30-pumped-lossy-resonator.md) |
-| Send-on-delta market polling (spend polls where variance is high) | **[implemented, flag-gated]** | [`lib/kalshi-adaptive-poll.js`](../../apps/lantern-garage/lib/kalshi-adaptive-poll.js) (`KALSHI_ADAPTIVE_POLL=1`) |
+| Dilation→grounding budget is **live in chat** | **[implemented]** | [`lib/grounding-policy.js`](../../lib/grounding-policy.js) (JS mirror of [`src/convergence_io/dilation.py`](../../src/convergence_io/dilation.py)) |
+| Per-token surprise primitive exists; **valve closed** (no production logprobs flow) | **[implemented, unwired]** | [`lib/token-surprise.js`](../../lib/token-surprise.js); [resonator doc](2026-06-30-pumped-lossy-resonator.md) |
+| Send-on-delta market polling (spend polls where variance is high) | **[implemented, flag-gated]** | [`lib/kalshi-adaptive-poll.js`](../../lib/kalshi-adaptive-poll.js) (`KALSHI_ADAPTIVE_POLL=1`) |
 | Status-Cube (belief × observer × state) + Convergence-IO primitive stack | **[implemented + unit-tested]** | [`src/convergence_io/`](../../src/convergence_io/), [`../convergence-io/README.md`](../convergence-io/README.md) |
 | 3¹² wavefront/dust store — engineering kept, **novelty claim dropped** | **[implemented; graded]** | IP register [§3.1](../KEYSTONE-IP-AND-BUILDOUT.md) ("folded into CSF as engineering") |
 | The application map + per-surface kill criteria | **[contribution — this doc]** | §3–4 |
@@ -106,11 +106,11 @@ compression" is an occupied name) and the IP register's choice to trademark **CS
 
 | # | Referent | What it actually is | Status |
 |---|---|---|---|
-| 1 | `TesseractEngine` ([`src/convergence_io_engine.py:1616`](../../src/convergence_io_engine.py)) | The **live runtime orchestrator** — a 4-layer × 4-axis grid (SURFACE/INTERFACE/CONVERGENCE/CORE), circuit breakers, CSF+RAG enrichment, streaming; plus the 20-phase `ConvergenceLoop` | **LIVE** (wired via [`convergence-adapter.js`](../../apps/lantern-garage/lib/convergence-adapter.js), CI, operator routes) |
+| 1 | `TesseractEngine` ([`src/convergence_io_engine.py:1616`](../../src/convergence_io_engine.py)) | The **live runtime orchestrator** — a 4-layer × 4-axis grid (SURFACE/INTERFACE/CONVERGENCE/CORE), circuit breakers, CSF+RAG enrichment, streaming; plus the 20-phase `ConvergenceLoop` | **LIVE** (wired via [`convergence-adapter.js`](../../lib/convergence-adapter.js), CI, operator routes) |
 | 2 | `ConvergedTesseract` ([`src/converged_tesseract.py`](../../src/converged_tesseract.py)) | The 3¹² observer-collapsed wavefront prototype (this thread's object) | **Test-only orphan** (14 passing unit tests; no runtime caller; its route hook is a stub) |
 | 3 | [`src/csf/v07/`](../../src/csf/v07/) lattice | The storage-face primitives (qutrit deltas, dust field, Status-Cube binary container) | **Dormant library** (imported by experiments/tests/#2; product compresses via `csf` v2 zstd) |
-| 4 | `TradingTesseract` ([`lib/signal-engine/tesseract.js`](../../apps/lantern-garage/lib/signal-engine/tesseract.js)) | 5-dimension asset evaluator (time/market/signal/layer/asset_state) | **LIVE advisory** inside the scan ([`scan.js:241`](../../apps/lantern-garage/lib/signal-engine/scan.js)) — but **triplicated** (Python + module + inline route copy) and no UI consumes its cube |
-| 5 | Research-library pool ([`data/tesseract/manifest.json`](../../data/tesseract/manifest.json) via [`routes/csf.js`](../../apps/lantern-garage/routes/csf.js)) | PDF→`.csf` research pool injected into chat prompts | **LIVE plumbing, EMPTY pool** (`count: 0` since 2026-07-03) |
+| 4 | `TradingTesseract` ([`lib/signal-engine/tesseract.js`](../../lib/signal-engine/tesseract.js)) | 5-dimension asset evaluator (time/market/signal/layer/asset_state) | **LIVE advisory** inside the scan ([`scan.js:241`](../../lib/signal-engine/scan.js)) — but **triplicated** (Python + module + inline route copy) and no UI consumes its cube |
+| 5 | Research-library pool ([`data/tesseract/manifest.json`](../../data/tesseract/manifest.json) via [`routes/csf.js`](../../routes/csf.js)) | PDF→`.csf` research pool injected into chat prompts | **LIVE plumbing, EMPTY pool** (`count: 0` since 2026-07-03) |
 | 6 | [`src/csf_rust/src/wavefront.rs`](../../src/csf_rust/src/wavefront.rs) | Rust port of the wavefront concept | **CI-built, runtime-orphan** (no JS/Python binding loads it) |
 | 7 | `cadd_rust/src/assess.rs:216` | A comment meaning **Tesseract OCR** | Pure name collision |
 
@@ -151,11 +151,11 @@ grounding)**. E3 measured the field real and strongly non-uniform on repo data
 **[measured]**; Shannon/Kraft make `L` the uniquely correct price **[grounded]**; the
 relativity dress stays dead **[killed — metaphor]**.
 
-Three live incarnations today: [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js)
-(chat, live), [`kalshi-adaptive-poll.js`](../../apps/lantern-garage/lib/kalshi-adaptive-poll.js)
+Three live incarnations today: [`grounding-policy.js`](../../lib/grounding-policy.js)
+(chat, live), [`kalshi-adaptive-poll.js`](../../lib/kalshi-adaptive-poll.js)
 (trade, flag-gated), [`src/convergence_io/dilation.py`](../../src/convergence_io/dilation.py)
 (governance, unit-tested; JS adapter live). One installed-but-closed valve:
-[`token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js).
+[`token-surprise.js`](../../lib/token-surprise.js).
 
 ### K2 — The cube (the projection)
 
@@ -195,14 +195,14 @@ on 2026-07-21.
 
 **Live today.** Canonical compression is `csf` v2 (zstd best-fit + integrity) — the lattice
 plays no part in it. Live chat retrieval is keyword-IDF candidate selection + a
-**nomic-embed-text cosine rerank** ([`csf-memory.js:254-269`](../../apps/lantern-garage/lib/csf-memory.js),
-[`semantic-reranker.js`](../../apps/lantern-garage/lib/semantic-reranker.js), keyword fallback);
+**nomic-embed-text cosine rerank** ([`csf-memory.js:254-269`](../../lib/csf-memory.js),
+[`semantic-reranker.js`](../../lib/semantic-reranker.js), keyword fallback);
 the benchmarked number is LongMemEval multi-signal **recall@5 0.709 vs keyword 0.222**
 ([`../BENCHMARKS.md`](../BENCHMARKS.md)). The v07 store (K3) is dormant substrate.
 
 **Apply next.**
 - **A1 — refill the research pool [operational].** The "tesseract library" prompt-injection
-  pipe is live end-to-end ([`routes/csf.js`](../../apps/lantern-garage/routes/csf.js) →
+  pipe is live end-to-end ([`routes/csf.js`](../../routes/csf.js) →
   `queryResearchLibrary` → chat prompt) but the pool is **empty** — `data/tesseract/manifest.json`
   has `count: 0` since 2026-07-03. Repack via `scripts/csf_research_tesseract.py`, seeding with
   this thread's own seven ledger docs. (The tesseract research pool does not currently contain
@@ -243,17 +243,17 @@ holds it as a patent opt-out candidate (§4.4). The convergance-record ledger
   `confidence` alone). If the field can't predict which claims survive verification, it is
   decoration at the record level — that is this proposal's kill.
 - **A6 — cube surfacing [operational].** Expose a read-only `StatusCube.snapshot()` through the
-  existing `/api/status` aggregation ([`lib/status.js`](../../apps/lantern-garage/lib/status.js))
+  existing `/api/status` aggregation ([`lib/status.js`](../../lib/status.js))
   — today the cube has **no** HTTP or MCP surface at all. No new route family.
 
 ### 3.3 Chat — *Observe + Remember + Verify*
 
 **Live today.** The field runs on chat's hottest path: `chatDilation(message)` →
 `groundingPolicy(D)` → web breadth / corroboration floor / deep-mode
-([`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js)), plus the
+([`grounding-policy.js`](../../lib/grounding-policy.js)), plus the
 **boiling-frog hard cadence** (mandatory external re-grounding every 30 min regardless of
 proximity — the #1012 defense). `recall_memory` is a native tool. The **surprise valve stays
-closed**: [`token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js) is plumbed to
+closed**: [`token-surprise.js`](../../lib/token-surprise.js) is plumbed to
 the canary but no production caller parses provider logprobs, so `modelUncertainty` is always 0.
 
 **Apply next.**
@@ -270,9 +270,9 @@ the canary but no production caller parses provider logprobs, so `modelUncertain
 
 **Live today.** The Σ₀ EV verdict + adaptive signal weights run inside the scan; the Kalshi
 suggest engine gates on **measured resolved-ledger expectancy** (not win-rate) and **emits a
-ConvergenceRecord per tradeable entry** ([`kalshi-suggest.js:415-427`](../../apps/lantern-garage/lib/kalshi-suggest.js))
+ConvergenceRecord per tradeable entry** ([`kalshi-suggest.js:415-427`](../../lib/kalshi-suggest.js))
 — the Trade→Converge link already exists. The field's market form —
-**send-on-delta polling, `dt = β/σ²ₘₐₓ`** ([`kalshi-adaptive-poll.js`](../../apps/lantern-garage/lib/kalshi-adaptive-poll.js),
+**send-on-delta polling, `dt = β/σ²ₘₐₓ`** ([`kalshi-adaptive-poll.js`](../../lib/kalshi-adaptive-poll.js),
 grounded in arXiv:1707.02531 / arXiv:1609.07534) — is implemented, wired into the collector, and
 **default OFF** (`KALSHI_ADAPTIVE_POLL=1`). The `TradingTesseract` 5-dim evaluator (#4 in §1.1)
 runs as an advisory cross-check but exists in **three parallel copies** and no UI shows its cube.
@@ -288,7 +288,7 @@ runs as an advisory cross-check but exists in **three parallel copies** and no U
 ### 3.5 Explore — *Observe + Reason*
 
 **Live today.** Explore is a first-class surface: `explore.html` (top-nav dashboard) +
-[`routes/explore.js`](../../apps/lantern-garage/routes/explore.js) serving a **PCSF-ranked
+[`routes/explore.js`](../../routes/explore.js) serving a **PCSF-ranked
 merged feed** with an interaction leaderboard (`data/explore/interactions.jsonl`) and CTR
 metrics ([`../research/explore-content-machine.md`](explore-content-machine.md)).
 
@@ -297,7 +297,7 @@ metrics ([`../research/explore-content-machine.md`](explore-content-machine.md))
   an engagement leaderboard — pure exploitation. Add the K1 discipline: per-item **Beta
   posterior** over interactions (the grounding-economy math the repo already ships,
   [`../KEYSTONE-IP-AND-BUILDOUT.md`](../KEYSTONE-IP-AND-BUILDOUT.md) §4.3) plus an uncertainty
-  bonus (Thompson-sample or UCB term) in [`explore-feed.js`](../../apps/lantern-garage/lib/explore-feed.js)
+  bonus (Thompson-sample or UCB term) in [`explore-feed.js`](../../lib/explore-feed.js)
   scoring: **exploit wells** (known-high-CTR items), **probe flats** (wide-posterior items).
   An extension of the existing ranker — no new subsystem. Offline-replayable against
   `interactions.jsonl` before any live A/B.
@@ -449,7 +449,7 @@ neutral benchmark, not a new codec.
 - **Models stay interchangeable.** Every application consumes the field through model-agnostic
   interfaces (logprobs, variance, NIS scalars) — never model internals. Where a provider
   exposes no logprobs (Anthropic), the consumer degrades to no-op, exactly as
-  [`token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js) already does.
+  [`token-surprise.js`](../../lib/token-surprise.js) already does.
 - **No physics.** "Dilation" names a scalar multiplier on latency/budget; "horizon" names a
   zero-bit cell. Both are bookkeeping terms over Riemannian/information-theoretic math
   **[grounded]**, and decorative beyond that.

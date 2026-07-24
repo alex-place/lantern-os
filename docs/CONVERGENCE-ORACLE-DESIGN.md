@@ -345,9 +345,9 @@ It is the single Convergence Core expressing itself as an answering interface �
 addition.
 
 ## Sources (in-repo, verified on disk 2026-07-21)
-- Seed: [`src/convergence/oracle.py`](../src/convergence/oracle.py) · [`apps/lantern-garage/lib/convergence-oracle.js`](../apps/lantern-garage/lib/convergence-oracle.js) · [`apps/lantern-garage/test/convergence-oracle.test.js`](../apps/lantern-garage/test/convergence-oracle.test.js)
-- Move 1: council four-way verdict — [`apps/lantern-garage/lib/council-review.js`](../apps/lantern-garage/lib/council-review.js)
-- Move 2: [`docs/convergence-io/DILATION.md`](convergence-io/DILATION.md) · [`apps/lantern-garage/lib/grounding-policy.js`](../apps/lantern-garage/lib/grounding-policy.js) · [`docs/SIGMA0-GROUNDING-LEDGER.md`](SIGMA0-GROUNDING-LEDGER.md)
+- Seed: [`src/convergence/oracle.py`](../src/convergence/oracle.py) · [`lib/convergence-oracle.js`](../lib/convergence-oracle.js) · [`test/convergence-oracle.test.js`](../test/convergence-oracle.test.js)
+- Move 1: council four-way verdict — [`lib/council-review.js`](../lib/council-review.js)
+- Move 2: [`docs/convergence-io/DILATION.md`](convergence-io/DILATION.md) · [`lib/grounding-policy.js`](../lib/grounding-policy.js) · [`docs/SIGMA0-GROUNDING-LEDGER.md`](SIGMA0-GROUNDING-LEDGER.md)
 - Move 3: [`src/convergence/grounding.py`](../src/convergence/grounding.py) · confidence-basis (#2803)
-- Move 4: [`apps/lantern-garage/lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js) (#1011)
+- Move 4: [`lib/grounding-calibration.js`](../lib/grounding-calibration.js) (#1011)
 - Frame: [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](SIGMA0-COLLAPSE-CERTIFICATE.md) (the σ=0 / 42-state collapse) · [`docs/research/question-machine.md`](research/question-machine.md)

@@ -174,5 +174,5 @@ running it on the GPU box under ADR-0010.
 | Ouro-1.4B QLoRA trains on the 8 GB 3070 (~45 s/step); 7.6 B PLT cannot (needs ≥24 GB, #1829) | [[crystallization-grounding-corpus]]; [[unisona-local-model-plan]] | High | repo research |
 | 13-gram decontamination vs HumanEval+MBPP exists and is auditable | [`scripts/decontaminate_training.py`](../../scripts/decontaminate_training.py) | High | this repo |
 | Secret-scrub regexes exist for training-row extraction | `scripts/pr_crystallize.py:75-85` | High | this repo |
-| The "unisona update" surface is the registry `verified` flip + adapter swap | [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js); ADR-0011 | High | this repo |
+| The "unisona update" surface is the registry `verified` flip + adapter swap | [`local-model-registry.js`](../../lib/local-model-registry.js); ADR-0011 | High | this repo |
 | Σ₀ council exists and runs on real decisions | #1598, [[dogfood-loop-reliable-and-council-wired]] | High | this repo |

@@ -37,8 +37,8 @@ const fs = require("fs");
 const path = require("path");
 const https = require("https");
 const F = require("./fit-weather-oracle-params");
-const verify = require("../apps/lantern-garage/lib/kalshi-weather-verify");
-const oracle = require("../apps/lantern-garage/lib/kalshi-weather-edge");
+const verify = require("../lib/kalshi-weather-verify");
+const oracle = require("../lib/kalshi-weather-edge");
 
 const OUT_PATH = path.resolve(__dirname, "../data/kalshi/weather-oracle-params.json");
 const BUCKET_LO = 70, BUCKET_HI = 110; // integer °F buckets for scoring

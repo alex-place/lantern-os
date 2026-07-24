@@ -14,9 +14,9 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 COMMIT=$(git rev-parse --short HEAD)
 BUILD_ID="${VERSION}+${NOW:0:10}.${NOW:11:8//:}"
 
-mkdir -p apps/lantern-garage
+mkdir -p .
 
-cat > apps/lantern-garage/version.json <<EOF
+cat > version.json <<EOF
 {
   "version": "$VERSION",
   "buildId": "$BUILD_ID",
@@ -33,6 +33,6 @@ echo "✓ Commit: $COMMIT"
 
 # If not in CI, stage and commit
 if [ -z "$CI" ]; then
-  git add apps/lantern-garage/version.json
+  git add version.json
   git commit --amend --no-edit 2>/dev/null || true
 fi

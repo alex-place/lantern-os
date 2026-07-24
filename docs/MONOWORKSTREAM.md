@@ -188,7 +188,7 @@ You cannot merge until the other PR from your lane closes or merges.
 
 ### Auto-Merge System
 
-**File:** `apps/lantern-garage/lib/auto-merge-resolver.js`
+**File:** `lib/auto-merge-resolver.js`
 
 Resolver checks monoworkstream in `checkConvergancePattern()`:
 
@@ -219,7 +219,7 @@ Question: Which merges first?
 Answer: PR #100 (older = higher priority in queue)
 ```
 
-**The PR watcher** (`apps/lantern-garage/lib/pr-watcher.js`) merges oldest first. Don't open newer PRs until older ones merge.
+**The PR watcher** (`lib/pr-watcher.js`) merges oldest first. Don't open newer PRs until older ones merge.
 
 ### Scenario 2: You need to rebase your PR
 

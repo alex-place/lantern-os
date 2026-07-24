@@ -3,7 +3,7 @@
 - **Status:** Proposed (awaiting Alex's approval)
 - **Date:** 2026-07-19
 - **Loop stage:** Act (streaming risk reaction + paper execution) + Verify (duel measurement)
-- **Related:** ADR-0019 (IBKR CPAPI via local gateway), ADR-0020 (order placement, gated, dry-by-default — still Proposed), ADR-0022/0027 (per-user broker auth), ADR-0028 (Sharpe mandate gate — unchanged by this ADR), `apps/lantern-garage/lib/brake-monitor.js`, `apps/lantern-garage/lib/champion-book.js`, `apps/lantern-garage/lib/kalshi-adaptive-poll.js`, `experiments/DEEP_HISTORY_RESEARCH_LOG.md`, PR #2744 (the monthly Leap report, where the duel scoreboard will publish)
+- **Related:** ADR-0019 (IBKR CPAPI via local gateway), ADR-0020 (order placement, gated, dry-by-default — still Proposed), ADR-0022/0027 (per-user broker auth), ADR-0028 (Sharpe mandate gate — unchanged by this ADR), `lib/brake-monitor.js`, `lib/champion-book.js`, `lib/kalshi-adaptive-poll.js`, `experiments/DEEP_HISTORY_RESEARCH_LOG.md`, PR #2744 (the monthly Leap report, where the duel scoreboard will publish)
 
 ## Context
 

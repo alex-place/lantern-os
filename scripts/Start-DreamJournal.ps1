@@ -56,7 +56,7 @@ if (-not (Test-Path $venvPython)) {
 }
 
 # Validate module exists (rough check)
-$serverPy = Join-Path $root "apps\lantern-garage\server.py"
+$serverPy = Join-Path $root "server.py"
 if (-not (Test-Path $serverPy)) {
     Write-Warning "Could not find $serverPy — server may fail to start if the module name has changed."
 }

@@ -12,7 +12,7 @@ git worktree add C:/dev/lantern-os-dev -b dev-server origin/master
 # 2. Give it the local env + share installed deps (node_modules is gitignored, not checked out)
 cp C:/dev/lantern-os/.env.local C:/dev/lantern-os-dev/.env.local
 # PowerShell (junctions, no admin needed):
-New-Item -ItemType Junction -Path C:/dev/lantern-os-dev/apps/lantern-garage/node_modules -Target C:/dev/lantern-os/apps/lantern-garage/node_modules
+New-Item -ItemType Junction -Path C:/dev/lantern-os-dev/node_modules -Target C:/dev/lantern-os/node_modules
 New-Item -ItemType Junction -Path C:/dev/lantern-os/.dev-worktree                        -Target C:/dev/lantern-os-dev
 ```
 `.claude/launch.json` → `lantern-dev` points at `.dev-worktree` (cwd) so `preview_start lantern-dev` runs the stable worktree server on 4178.

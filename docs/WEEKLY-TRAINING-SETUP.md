@@ -31,7 +31,7 @@ Or run immediately:
 ### Components
 
 #### 1. Training Dispatcher
-**File**: `apps/lantern-garage/lib/training-dispatcher.js`
+**File**: `lib/training-dispatcher.js`
 
 Routes training jobs to free providers in rotation:
 

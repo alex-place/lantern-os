@@ -121,5 +121,5 @@ Write-Host "  Start GPT Web API:" -ForegroundColor Gray
 Write-Host "    npm start --prefix $gptWebApiDir" -ForegroundColor White
 Write-Host ""
 Write-Host "  Or restart all services:" -ForegroundColor Gray
-Write-Host "    npm start --prefix apps/lantern-garage" -ForegroundColor White
+Write-Host "    npm start" -ForegroundColor White
 Write-Host "==============================================" -ForegroundColor Cyan

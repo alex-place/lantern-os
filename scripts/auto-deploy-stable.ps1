@@ -45,11 +45,11 @@ $PORT   = 4177
 # command line -- the dev worktree and other checkouts have different absolute paths. That
 # identity is what lets us reap leaked ZOMBIES (alive but no longer listening), the root
 # cause of the lantern-os.net 502 churn (2026-06-27).
-$ENTRY  = Join-Path $STABLE 'apps\lantern-garage\server.js'
+$ENTRY  = Join-Path $STABLE 'server.js'
 $LOG    = 'C:\dev\auto-deploy-stable.log'
 $LOCK   = 'C:\dev\auto-deploy-stable.lock'
 $REPO   = 'alex-place/lantern-os'
-$GARAGE = 'apps/lantern-garage'
+$GARAGE = '.'
 $LOCK_STALE_MIN = 15
 
 # --- logging (with simple rotation so the log can't grow unbounded) ---
@@ -245,7 +245,7 @@ try {
   }
 
   $changed = & git -C $STABLE diff --name-only $local $remote
-  $codeRe  = '^(apps/lantern-garage/server(-dev)?\.js|apps/lantern-garage/(lib|routes)/|.*package(-lock)?\.json$)'
+  $codeRe  = '^(server(-dev)?\.js|(lib|routes)/|.*package(-lock)?\.json$)'
   $needRestart = @($changed | Where-Object { $_ -match $codeRe }).Count -gt 0
   $depsChanged = @($changed | Where-Object { $_ -match 'package(-lock)?\.json$' }).Count -gt 0
 

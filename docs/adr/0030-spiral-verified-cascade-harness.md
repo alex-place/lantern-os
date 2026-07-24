@@ -34,8 +34,8 @@ This touches the whole loop but is centered on **Reason → Act → Verify → C
 the pieces in isolation: the live single-shot verified cascade (cheap → run tests → escalate on fail;
 [experiments/verified_cascade_live.py](../../experiments/verified_cascade_live.py), #2800, measured
 8.3× cheaper at ≈0% escalation on a strong cheap tier), the constraint-aware cheap-tier picker
-([`selectCheapStandin`](../../apps/lantern-garage/lib/local-model-registry.js), #2814), the outcome
-router ([`lib/coding-backend/router.js`](../../apps/lantern-garage/lib/coding-backend/router.js)), and
+([`selectCheapStandin`](../../lib/local-model-registry.js), #2814), the outcome
+router ([`lib/coding-backend/router.js`](../../lib/coding-backend/router.js)), and
 the verified convergence ledger (#2797). What was missing is the **loop that runs them on ONE problem
 until it's solved or honestly can't be** — and the honest per-step verifier that gates each turn.
 
@@ -60,9 +60,9 @@ surface is **dream-chat.html** — a user drives a spiral and watches it converg
 Build order, de-risked, most value first:
 
 - **Phase 0 — the verified-cascade harness (NO new weights).** Reassemble the shipped parts into the loop.
-  Implemented here: [`lib/spiral-harness.js`](../../apps/lantern-garage/lib/spiral-harness.js) (the loop
+  Implemented here: [`lib/spiral-harness.js`](../../lib/spiral-harness.js) (the loop
   + per-turn cascade + escalation-corpus emission) and
-  [`lib/spiral-fix-rate.js`](../../apps/lantern-garage/lib/spiral-fix-rate.js) (the M4 ratchet metric).
+  [`lib/spiral-fix-rate.js`](../../lib/spiral-fix-rate.js) (the M4 ratchet metric).
   Emits the escalation corpus (each escalated, advancing step = a frontier demonstration on a step the
   cheap tier couldn't do = a distillation target). Measurable on SWE-bench today.
 - **Phase 1 — VTD-specialize a 7–14B cheap tier** on the Phase-0 escalation corpus (Verified-Trace
@@ -115,10 +115,10 @@ It is `extension over addition` per ADR-0002/0013.
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Single-shot verified cascade works live, ≈8.3× cheaper at ≈0% escalation | [experiments/verified_cascade_live.py](../../experiments/verified_cascade_live.py); #2798/#2800 | High | measured on-box |
-| Fix-Rate ratchet metric implemented + tested (anti-memorization gate) | [lib/spiral-fix-rate.js](../../apps/lantern-garage/lib/spiral-fix-rate.js); [test/spiral-fix-rate.test.js](../../apps/lantern-garage/test/spiral-fix-rate.test.js) | High | this PR (19 tests green) |
-| Spiral loop (grow-memory + per-turn cascade + honest halt + corpus) implemented + tested | [lib/spiral-harness.js](../../apps/lantern-garage/lib/spiral-harness.js); [test/spiral-harness.test.js](../../apps/lantern-garage/test/spiral-harness.test.js) | High | this PR |
+| Fix-Rate ratchet metric implemented + tested (anti-memorization gate) | [lib/spiral-fix-rate.js](../../lib/spiral-fix-rate.js); [test/spiral-fix-rate.test.js](../../test/spiral-fix-rate.test.js) | High | this PR (19 tests green) |
+| Spiral loop (grow-memory + per-turn cascade + honest halt + corpus) implemented + tested | [lib/spiral-harness.js](../../lib/spiral-harness.js); [test/spiral-harness.test.js](../../test/spiral-harness.test.js) | High | this PR |
 | Per-step cascade routing + escalate-inheriting-progress is a real 2026 frontier | arXiv 2605.06116, 2606.27457, 2605.06350 | High | external, web-grounded |
 | Fix Rate is the code step-PRM signal | SWE-Shepherd 2604.10493, SWE-TRACE 2604.14820 | Medium | external |
 | Tiny-recursive wins are largely memorization → verifier must be external | arcprize.org/blog/hrm-analysis; TRM 2510.04871; HRM 2506.21734 | High | external |
-| Constraint-aware cheap-tier picker + outcome router exist to wire the tiers | [local-model-registry.js](../../apps/lantern-garage/lib/local-model-registry.js) (#2814); [coding-backend/router.js](../../apps/lantern-garage/lib/coding-backend/router.js) | High | in-repo |
+| Constraint-aware cheap-tier picker + outcome router exist to wire the tiers | [local-model-registry.js](../../lib/local-model-registry.js) (#2814); [coding-backend/router.js](../../lib/coding-backend/router.js) | High | in-repo |
 | Tiny-recursive arch unproven for code/language (Phase-2 risk) | TRM/HRM demonstrated on ARC/Sudoku/Maze only | High | external |

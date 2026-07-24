@@ -6,12 +6,12 @@
 //
 // The staged layout MIRRORS the repo, because the Core reaches outside the garage
 // app — e.g. lib/job-worker.js requires ../../../src/creator-intelligence. Placing
-// the garage at resources/app (same depth as apps/lantern-garage) and src/ at the
+// the garage at resources/app (same depth as .) and src/ at the
 // install root makes those `../../../src` requires resolve with NO launcher change:
 //
 //   <install>\
 //     unisona.exe              ← the SEA (runtime + launcher; also runs the Core)
-//     resources\app\           ← apps/lantern-garage (server.js, lib, routes, public, node_modules)
+//     resources\app\           ← . (server.js, lib, routes, public, node_modules)
 //     src\                     ← repo src/ (creator-intelligence, worktree-manager, …)
 //     node_modules\            ← repo-root node_modules (src/ deps resolve here)
 //     package.json             ← repo-root package.json (version, etc.)
@@ -33,7 +33,7 @@ const repoRoot = resolve(here, "..");
 const garageDir = join(repoRoot, "apps", "lantern-garage");
 const desktopDir = join(garageDir, "desktop");
 const distDir = join(desktopDir, "dist");
-// Stage OUTSIDE the garage tree — cpSync refuses to copy apps/lantern-garage into a
+// Stage OUTSIDE the garage tree — cpSync refuses to copy . into a
 // subdirectory of itself. <repoRoot>/dist is gitignored and not under the garage.
 const stagingDir = join(repoRoot, "dist", "unisona-stage");
 const exePath = join(distDir, "unisona.exe");           // the Node SEA (Core backend)

@@ -15,7 +15,7 @@ recalled, how recall is ranked, and how the store stays fast as it grows forever
 Every memory is a human-readable JSON **record** with full lineage. The canonical
 engine is [`src/csf/memory_engine.py`](/repo/src/csf/memory_engine.py); the
 runtime JS writer that backs the chat surfaces is
-[`apps/lantern-garage/lib/csf-memory-writer.js`](/repo/apps/lantern-garage/lib/csf-memory-writer.js).
+[`lib/csf-memory-writer.js`](/repo/lib/csf-memory-writer.js).
 Both write the **same on-disk schema** under `data/csf_memory/`.
 
 A record carries: a tier, content, a confidence score (0–1), a privacy scope, a
@@ -62,7 +62,7 @@ Retrieval runs in two places that share the on-disk format:
 1. **The canonical engine** (`MemoryEngine.query`) — used by Python services, the
    MCP server, and repo-learning. It pulls candidates from the inverted index,
    then ranks them.
-2. **The live chat path** (`apps/lantern-garage/lib/csf-memory.js`
+2. **The live chat path** (`lib/csf-memory.js`
    `queryMemories` / `formatCSFContextForPromptAsync`) — recalls relevant past
    turns and memories into the prompt, with an optional semantic rerank.
 

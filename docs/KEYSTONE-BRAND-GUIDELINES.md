@@ -8,7 +8,7 @@ updated: 2026-07-10
 
 **Status:** Living document · v1 (2026-06-20)
 **Scope:** unisona.ai Chat and every surface that carries the unisona.ai name (chat, Help/Knowledge Center, Trader, Create, Explore).
-**Source of truth for tokens:** [`apps/lantern-garage/public/css/site.css`](../apps/lantern-garage/public/css/site.css). This doc *documents* those values — if the two ever disagree, `site.css` wins and this doc should be updated to match.
+**Source of truth for tokens:** [`public/css/site.css`](../public/css/site.css). This doc *documents* those values — if the two ever disagree, `site.css` wins and this doc should be updated to match.
 
 > One rule above all the rest: **unisona.ai is local-first, model-agnostic, and honest.** The brand should always feel like a calm tool you own — never a hype product, never tied to one AI vendor, never jargon for its own sake.
 
@@ -22,7 +22,7 @@ updated: 2026-07-10
 | **Edition** | "Orion Edition" (current release line) |
 | **Motto** | **Observe. Remember. Reason. Act. Verify. Converge.** |
 | **One-liner** | A local-first reasoning system that remembers you, runs on your machine, and improves from evidence — never locked to a single model. |
-| **Mark** | The mandala / Σ₀ glyph ([`/mandala.svg`](../apps/lantern-garage/public/mandala.svg), [`/sigma0-mandala.svg`](../apps/lantern-garage/public/sigma0-mandala.svg)) |
+| **Mark** | The mandala / Σ₀ glyph ([`/mandala.svg`](../public/mandala.svg), [`/sigma0-mandala.svg`](../public/sigma0-mandala.svg)) |
 
 ### Naming rules
 - **Use "unisona.ai"** for the product and "unisona.ai Chat" for the chat. ✦ is the chat's wordmark prefix (`✦ unisona.ai Chat`).
@@ -104,7 +104,7 @@ These are the shared building blocks. Reuse them — don't reinvent per page.
 ### Navigation (`.site-nav`)
 Sticky, 52px, `--surface` background, bottom hairline. Left: `.nav-brand` (mandala + "unisona.ai"). Middle: `.nav-links` (Chat · Trader · Create · Explore · Help, plus a Patreon support link). Right: `.nav-actions` (profile/logout/theme `.nav-btn`s). The active page link gets `.active` (accent, weight 600). On narrow screens the link row scrolls horizontally — there is no hamburger.
 
-> Every page must include [`/js/auth-gate.js`](../apps/lantern-garage/public/js/auth-gate.js). It wires the profile/logout/sign-in buttons, injects the Admin link for admins, and applies admin nav-visibility flags. Public pages (`/`, chat, explore, knowledge center) never force a login.
+> Every page must include [`/js/auth-gate.js`](../public/js/auth-gate.js). It wires the profile/logout/sign-in buttons, injects the Admin link for admins, and applies admin nav-visibility flags. Public pages (`/`, chat, explore, knowledge center) never force a login.
 
 ### Buttons
 - **Primary:** `.btn-primary` — accent fill, white text, 10px radius, subtle lift on hover. One primary action per view.
@@ -177,4 +177,4 @@ The chat is where most people meet unisona.ai, so its voice **is** the brand. Th
 
 ---
 
-*Cross-references:* [README](../README.md) · [SECURITY](../SECURITY.md) · brand tokens in [`site.css`](../apps/lantern-garage/public/css/site.css).
+*Cross-references:* [README](../README.md) · [SECURITY](../SECURITY.md) · brand tokens in [`site.css`](../public/css/site.css).

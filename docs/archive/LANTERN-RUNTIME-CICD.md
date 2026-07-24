@@ -51,7 +51,7 @@ This document covers the local and cloud runtime behavior, deployment gates, and
 ### AWS ECS Fargate
 
 **Configuration:**
-- Docker image: `lantern-garage:latest` (built from `apps/lantern-garage/Dockerfile`)
+- Docker image: `lantern-garage:latest` (built from `Dockerfile`)
 - Container port: `8080`
 - Memory: 512 MB (minimum recommended)
 - CPU: 256 units (0.25 vCPU)
@@ -115,7 +115,7 @@ stops posting `netlify/…` PR checks. Nothing in-repo depends on it.
 **Condition:** Triggered on successful CI completion, pull request merged to `master`
 
 **Steps:**
-1. Build Docker image from `apps/lantern-garage/Dockerfile`
+1. Build Docker image from `Dockerfile`
 2. Push to AWS ECR
 3. Update ECS service with new image
 4. Run smoke test: `curl https://<ecs-endpoint>/api/health`

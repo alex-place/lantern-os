@@ -28,7 +28,7 @@ deploy**, and rolling *back* is the same one-line change.
 ## 2. Routing (#ROUTE)
 
 The kernel path has its own provider selection so it never inherits the chat
-surface's Claude default — [`apps/lantern-garage/lib/provider-router.js`](../apps/lantern-garage/lib/provider-router.js)
+surface's Claude default — [`lib/provider-router.js`](../lib/provider-router.js)
 `selectKernelProvider()`:
 
 - `KEYSTONE_ROLLOVER_MODE = "shadow"` (default when unset) → **anthropic only**

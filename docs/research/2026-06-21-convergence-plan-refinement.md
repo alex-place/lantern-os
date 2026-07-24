@@ -56,7 +56,7 @@ Verification** (arXiv:2603.02798).
 **Refinement.**
 - *claim:* the Act gate should evaluate the **reasoning step that produced the result**, not just the
   final result — a PRM-style inference-time verifier over the record's evidence chain.
-- *do:* extend [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) to consume
+- *do:* extend [`grounding-policy.js`](../../lib/grounding-policy.js) to consume
   per-step evidence (the record already carries `evidence_ids`) and return a **calibrated
   go / look / stop**, not a boolean. "Guideline-grounded evidence accumulation" is the published
   shape of `groundingPolicy`.
@@ -118,7 +118,7 @@ real outcome wire.
 - *claim:* the frozen heuristic confidence **is** the project's uncalibrated-overconfidence failure
   mode; replace it with an **outcome-graded score** evaluated by a **proper scoring rule (Brier)** over
   resolved records.
-- *do:* generalise [`kalshi-convergence-outcomes.js`](../../apps/lantern-garage/lib/kalshi-convergence-outcomes.js)
+- *do:* generalise [`kalshi-convergence-outcomes.js`](../../lib/kalshi-convergence-outcomes.js)
   into a domain-agnostic **outcome grader** — wherever a record has a resolvable truth, compute its
   Brier contribution — and expose a running **Brier / ECE** as a first-class convergence signal (the
   loop's own report card). Grade the **outcome**, never the agent's self-assessment.

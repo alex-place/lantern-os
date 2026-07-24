@@ -23,8 +23,8 @@ const ROOT = path.resolve(__dirname, '..');
 const FRAG_DIR = path.join(ROOT, 'changelog.d');
 const CHANGELOG = path.join(ROOT, 'CHANGELOG.MD');
 const PKG_MAIN = path.join(ROOT, 'package.json');
-const PKG_APP = path.join(ROOT, 'apps/lantern-garage/package.json');
-const VERSION_JSON = path.join(ROOT, 'apps/lantern-garage/version.json');
+const PKG_APP = path.join(ROOT, 'package.json');
+const VERSION_JSON = path.join(ROOT, 'version.json');
 
 // Filename prefix -> default section for un-sectioned bullets.
 const PREFIX_SECTION = {
@@ -169,8 +169,8 @@ function main() {
   updatePackageVersion(PKG_APP, newVersion);
 
   // Refresh version.json for client display (best-effort). TWO files: the root
-  // apps/lantern-garage/version.json (full build metadata) AND the SERVED static
-  // apps/lantern-garage/public/version.json that /version.json returns to the browser
+  // version.json (full build metadata) AND the SERVED static
+  // public/version.json that /version.json returns to the browser
   // footer. Only bumping the root one left the deployed footer stuck at an old version
   // even after a release rolled (the v1.8.0 "shows old build" report, 2026-07-10).
   try {
@@ -183,7 +183,7 @@ function main() {
         2,
       ) + '\n',
     );
-    const PUBLIC_VERSION_JSON = path.join(ROOT, 'apps/lantern-garage/public/version.json');
+    const PUBLIC_VERSION_JSON = path.join(ROOT, 'public/version.json');
     fs.writeFileSync(PUBLIC_VERSION_JSON, JSON.stringify({ version: newVersion }) + '\n');
   } catch { /* non-fatal */ }
 

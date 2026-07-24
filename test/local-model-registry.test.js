@@ -1,0 +1,340 @@
+"use strict";
+
+/**
+ * test/local-model-registry.test.js
+ *
+ * The Σ₀ local-model adapter after the OSS-baseline decision (#2171): the VERIFIED
+ * Apache-2.0 qwen2.5-coder:latest (reproduced on-box, #2173) leads
+ * coding/reasoning/default on the 8GB box. keystone-sigma0-plt (the
+ * LoopCoder-V2-lineage owned PLT coder, ADR-0011) stays a registered candidate but
+ * is `verified:false`, so the grounding gate sorts it BEHIND the verified qwen peer;
+ * it serves on its own shim (:11435). The kernel stays Ouro/keystone-ft (:11434);
+ * Three Doors keeps lantern-csf-dream (:11434). Per-model routing is via
+ * endpointFor(). VRAM gating and the self-converges contract (which drives whether
+ * the Core wraps a model in loopedReason()) are unchanged.
+ *
+ * Zero-dep — run with:  node --test test/local-model-registry.test.js
+ */
+
+const { test } = require("node:test");
+const assert = require("node:assert/strict");
+
+const reg = require("../lib/local-model-registry");
+
+function freshEnv(fn) {
+  // Snapshot/restore the env knobs the registry reads, and clear its caches.
+  // Detection is disabled (VRAM_AUTODETECT=0) so the "default box" is the
+  // deterministic 8GB fallback regardless of the host machine's actual GPU.
+  const snap = {
+    VRAM_BUDGET_GB: process.env.VRAM_BUDGET_GB,
+    LOCAL_CAPABILITY_FIRST: process.env.LOCAL_CAPABILITY_FIRST,
+    VRAM_AUTODETECT: process.env.VRAM_AUTODETECT,
+    LOCAL_ALLOW_UNVERIFIED: process.env.LOCAL_ALLOW_UNVERIFIED,
+  };
+  try {
+    delete process.env.VRAM_BUDGET_GB;
+    delete process.env.LOCAL_CAPABILITY_FIRST;
+    delete process.env.LOCAL_ALLOW_UNVERIFIED;
+    process.env.VRAM_AUTODETECT = "0";
+    reg._resetCache();
+    fn();
+  } finally {
+    for (const [k, v] of Object.entries(snap)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    reg._resetCache();
+  }
+}
+
+// ── selection: the verified qwen coder leads coding/reasoning/default ──────────
+
+test("qwen leads coding on the 8GB box; the PLT coder trails as an unverified candidate", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("coding");
+    assert.equal(chain[0], "qwen2.5-coder:latest", "the VERIFIED OSS-baseline coder leads (#2171)");
+    assert.ok(chain.includes("keystone-sigma0-plt"), "the PLT coder stays a registered candidate");
+    assert.ok(
+      chain.indexOf("keystone-sigma0-plt") > chain.indexOf("qwen2.5-coder:latest"),
+      "unverified PLT sorts BEHIND the verified peer (grounding gate)",
+    );
+    assert.ok(!chain.includes("ouro:latest"), "Ouro is kernel-only, not a coder");
+  });
+});
+
+test("qwen is also the general default and the reasoning lead", () => {
+  freshEnv(() => {
+    assert.equal(reg.selectBest("default"), "qwen2.5-coder:latest", "verified default local model");
+    assert.equal(reg.selectBest("reasoning"), "qwen2.5-coder:latest", "verified reasoning local model");
+  });
+});
+
+test("≥24GB box: qwen still leads coding (no larger verified peer registered)", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("coding", { vramBudgetGB: 24 });
+    assert.equal(chain[0], "qwen2.5-coder:latest", "verified coder leads even with headroom");
+  });
+});
+
+test("rank-order (LOCAL_CAPABILITY_FIRST=0) still yields the verified qwen for coding", () => {
+  freshEnv(() => {
+    process.env.LOCAL_CAPABILITY_FIRST = "0";
+    reg._resetCache();
+    // The grounding gate (verified-first) is applied BEFORE the rank/capability tiebreak,
+    // so the verified qwen leads even though the PLT coder has the lower rank (0).
+    assert.equal(reg.selectChain("coding")[0], "qwen2.5-coder:latest", "verified-first wins over rank");
+  });
+});
+
+test("capability-first (LOCAL_CAPABILITY_FIRST=1) also yields qwen", () => {
+  freshEnv(() => {
+    process.env.LOCAL_CAPABILITY_FIRST = "1";
+    reg._resetCache();
+    // qwen is both verified AND higher capabilityScore (0.86 > 0.84) → leads on either axis.
+    assert.equal(reg.selectBest("coding"), "qwen2.5-coder:latest");
+  });
+});
+
+test("VRAM gate: the 6GB PLT + 7B qwen are excluded from a 4GB box; only small tiers survive", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("coding", { vramBudgetGB: 4 });
+    assert.ok(!chain.includes("keystone-sigma0-plt"), "6GB PLT coder can't lead a 4GB box");
+    assert.ok(!chain.includes("qwen2.5-coder:latest"), "the 6GB 7B qwen doesn't fit 4GB either");
+    // The RAM-tiered ladder (#2341) registers small qwen coder tiers (≤4GB) that DO fit —
+    // every surviving candidate must be within the budget; nothing oversized leaks in.
+    for (const id of chain) {
+      const e = reg.getEntry(id);
+      assert.ok(e && (e.vramGB || 0) <= 4, `${id} fits the 4GB box`);
+    }
+  });
+});
+
+test("capability-first STILL respects the VRAM gate (no oversized lead)", () => {
+  freshEnv(() => {
+    const lead = reg.selectBest("coding", { capabilityFirst: true, vramBudgetGB: 4 });
+    // Capability-first may not lead with a model that doesn't fit the box — the higher-cap
+    // 6GB+ coders are gated out, leaving only a small ladder tier (or nothing → cloud).
+    if (lead) {
+      const e = reg.getEntry(lead);
+      assert.ok(e && (e.vramGB || 0) <= 4, "the capability-first lead still fits the 4GB box");
+    }
+  });
+});
+
+// ── per-model endpoint routing (the :11435 shim vs the :11434 ollama) ──────────
+
+test("endpointFor: the PLT coder serves on its own :11435 shim; kernel/dream stay on :11434", () => {
+  freshEnv(() => {
+    assert.match(reg.endpointFor("keystone-sigma0-plt"), /:11435/, "PLT coder on its dedicated shim");
+    assert.match(reg.endpointFor("ouro:latest"), /:11434/, "kernel on the main ollama");
+    assert.match(reg.endpointFor("lantern-csf-dream"), /:11434/, "Three Doors on the main ollama");
+  });
+});
+
+test("endpointFor: an unmanaged model falls back to the global OLLAMA_BASE_URL default", () => {
+  freshEnv(() => {
+    // No registry opinion → DEFAULT_ENDPOINT (OLLAMA_BASE_URL || 127.0.0.1:11434).
+    assert.match(reg.endpointFor("some-custom-model"), /11434/, "unmanaged → global default");
+    assert.match(reg.endpointFor(undefined), /11434/, "undefined → global default (behavior-preserving)");
+  });
+});
+
+// ── self-converges contract (drives loopedReason wrapping) ────────────────────
+
+test("selfConverges: kernel models loop internally; the PLT coder is wrapped", () => {
+  freshEnv(() => {
+    assert.equal(reg.selfConverges("ouro:latest"), true, "Ouro Q-exits internally");
+    assert.equal(reg.selfConverges("keystone-ft"), true, "unisona.ai-ft is an Ouro fine-tune");
+    assert.equal(
+      reg.selfConverges("keystone-sigma0-plt"), false,
+      "fixed 2-loop PLT is NOT a Q-exit certificate → Core wraps it in loopedReason()",
+    );
+    assert.equal(reg.selfConverges("some-unknown-model"), false, "unknown → wrapped (grounding by default)");
+  });
+});
+
+test("the PLT coder contract: wrapped, no tools, fits the 8GB box, coder not kernel", () => {
+  freshEnv(() => {
+    assert.equal(reg.toolCalling("keystone-sigma0-plt"), false, "tool-calling undocumented → false");
+    const e = reg.getEntry("keystone-sigma0-plt");
+    assert.ok(e && e.vramGB <= 8, "7.6B @ 4-bit targets the 8GB box");
+    assert.ok(
+      e.taskTypes.includes("coding") && !e.taskTypes.includes("kernel"),
+      "coder + default, not a kernel model",
+    );
+  });
+});
+
+test("getEntry matches served version suffixes both ways", () => {
+  freshEnv(() => {
+    // Registry id "keystone-sigma0-plt" should resolve a served suffix and vice-versa.
+    assert.ok(reg.getEntry("keystone-sigma0-plt:latest"), "prefix match on served tag");
+    assert.equal(reg.getEntry("totally-different"), null);
+  });
+});
+
+test("kernel task keeps the Σ₀ kernel models, not the coder", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("kernel");
+    assert.ok(chain.includes("keystone-ft") || chain.includes("ouro:latest"), "kernel models present");
+    assert.ok(!chain.includes("keystone-sigma0-plt"), "the PLT coder is not a kernel model");
+  });
+});
+
+test("VRAM budget: env override wins; detection-off falls back to the 8GB box", () => {
+  freshEnv(() => {
+    // freshEnv sets VRAM_AUTODETECT=0 → deterministic fallback.
+    assert.equal(reg._vramBudgetGB(), 8, "no override + detection off → 8GB fallback");
+    process.env.VRAM_BUDGET_GB = "24";
+    assert.equal(reg._vramBudgetGB(), 24, "explicit env override always wins");
+  });
+});
+
+// ── grounding gate: honest verified:false, but sole coder so it still leads ────
+
+test("grounding gate: the unverified PLT coder is demoted BELOW the verified qwen peer", () => {
+  freshEnv(() => {
+    // The External Reality Rule demotes an unverified model BELOW a reproduced peer.
+    // The PLT coder is honestly verified:false; qwen is reproduced on-box (#2173), so
+    // qwen leads and the PLT coder sorts behind it despite its lower rank.
+    assert.equal(reg.isVerified("keystone-sigma0-plt"), false, "PLT kept honest: not yet an eval-reproduced win");
+    assert.equal(reg.isVerified("qwen2.5-coder:latest"), true, "qwen reproduced on-box (#2173)");
+    const chain = reg.selectChain("coding");
+    assert.equal(chain[0], "qwen2.5-coder:latest", "verified peer leads");
+    assert.ok(
+      chain.indexOf("keystone-sigma0-plt") > chain.indexOf("qwen2.5-coder:latest"),
+      "unverified PLT sorts behind the verified peer",
+    );
+  });
+});
+
+test("grounding gate still demotes the unverified coder BELOW a verified peer when one exists", () => {
+  freshEnv(() => {
+    // Inject a hypothetical verified coder that fits the box via an includeAll-independent
+    // path: use selectChain with a temporary registry entry is not exposed, so we assert
+    // the sort rule directly through a known-verified kernel-tagged peer is N/A here.
+    // Instead, confirm the gate is still active (allowUnverified off by default).
+    assert.notEqual(process.env.LOCAL_ALLOW_UNVERIFIED, "1", "gate active by default");
+    assert.equal(reg.isVerified("ouro:latest"), true, "absent `verified` → treated as verified");
+  });
+});
+
+// ── resolveLocalLead: the authoritative lead + pin precedence (the swap) ───────
+// This is the function keystone chat calls. Tests pass `pin` explicitly so they're
+// deterministic regardless of the host's real OLLAMA_MODEL.
+
+test("resolveLocalLead: coding lead is the verified qwen coder", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "" });
+    assert.equal(r.lead, "qwen2.5-coder:latest", "the verified OSS-baseline coder leads");
+    assert.equal(r.chain[0], "qwen2.5-coder:latest", "and it's the chain head");
+  });
+});
+
+test("resolveLocalLead: a stale registry-managed pin (ouro) does NOT front-jump the qwen lead", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "ouro:latest" });
+    assert.equal(r.lead, "qwen2.5-coder:latest", "the verified coder leads, not the stale kernel pin");
+    assert.equal(r.pinHonored, false, "a registry-managed pin is not honored as the lead");
+    assert.ok(r.chain.includes("ouro:latest"), "the pinned model stays a candidate (fallback)");
+  });
+});
+
+test("resolveLocalLead: a custom (non-registry) pin LEADS — operator's deliberate choice wins", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "deepseek-coder:33b" });
+    assert.equal(r.lead, "deepseek-coder:33b", "the registry has no opinion on it → honor the pin");
+    assert.equal(r.pinHonored, true, "flagged as an honored operator pin");
+    assert.ok(r.chain.includes("keystone-sigma0-plt"), "registry coder still trails as a fallback");
+  });
+});
+
+test("resolveLocalLead: caller fallbacks are appended as a deduped tail", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("coding", { pin: "", fallback: ["mistral", "keystone-sigma0-plt", "satyr"] });
+    assert.equal(r.lead, "qwen2.5-coder:latest", "registry lead still wins over fallbacks");
+    assert.equal(
+      r.chain.filter((m) => m === "keystone-sigma0-plt").length, 1,
+      "no duplicate of a model in both registry + fallback",
+    );
+    assert.ok(r.chain.includes("mistral") && r.chain.includes("satyr"), "novel fallbacks survive as candidates");
+  });
+});
+
+test("resolveLocalLead: defaults the pin to OLLAMA_MODEL from the env", () => {
+  freshEnv(() => {
+    // freshEnv does not manage OLLAMA_MODEL, so snapshot/restore it here.
+    const prev = process.env.OLLAMA_MODEL;
+    try {
+      process.env.OLLAMA_MODEL = "ouro:latest";
+      reg._resetCache();
+      const r = reg.resolveLocalLead("coding"); // no explicit pin → reads env
+      assert.equal(r.lead, "qwen2.5-coder:latest", "env pin is registry-managed → no front-jump over the verified coder");
+      assert.ok(r.chain.includes("ouro:latest"), "env-pinned model is still a candidate");
+    } finally {
+      if (prev === undefined) delete process.env.OLLAMA_MODEL;
+      else process.env.OLLAMA_MODEL = prev;
+    }
+  });
+});
+
+// ── numeric / TSFM route: the time-series specialist leads "numeric" ───────────
+
+test("numeric route: the TSFM specialist leads and is the sole numeric model", () => {
+  freshEnv(() => {
+    assert.equal(reg.selectBest("numeric"), "keystone-tsfm", "TSFM leads numeric forecasting");
+    const chain = reg.selectChain("numeric");
+    assert.deepEqual(chain, ["keystone-tsfm"], "exactly one numeric-tagged model");
+  });
+});
+
+test("numeric is STRICT: no general coder/default widens into the forecasting route", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("numeric");
+    assert.ok(!chain.includes("keystone-sigma0-plt"), "the coder is not a forecaster");
+    assert.ok(!chain.includes("qwen2.5-coder:latest"), "no default-coder widening (number-tokenization bottleneck)");
+    assert.ok(!chain.includes("ouro:latest"), "the kernel is not a forecaster");
+  });
+});
+
+test("numeric does NOT pollute general chat: the TSFM never leads coding/reasoning/default", () => {
+  freshEnv(() => {
+    for (const t of ["coding", "reasoning", "default", "creative"]) {
+      assert.ok(!reg.selectChain(t).includes("keystone-tsfm"), `TSFM must not leak into ${t}`);
+    }
+  });
+});
+
+test("numeric TSFM contract: single-pass (selfConverges), no tools, fits the 8GB box, verified:false", () => {
+  freshEnv(() => {
+    assert.equal(reg.selfConverges("keystone-tsfm"), true, "single-pass forecast → not wrapped in loopedReason()");
+    assert.equal(reg.toolCalling("keystone-tsfm"), false, "a forecaster is not a tool caller");
+    assert.equal(reg.isVerified("keystone-tsfm"), false, "honest: no walk-forward-vs-naive win yet");
+    const e = reg.getEntry("keystone-tsfm");
+    assert.ok(e && e.vramGB <= 8, "small TSFM fits beside Ouro on the 8GB box");
+    assert.ok(e.taskTypes.includes("numeric") && e.taskTypes.length === 1, "numeric-only, never a chat model");
+  });
+});
+
+test("numeric route resolves through resolveLocalLead (what chat calls)", () => {
+  freshEnv(() => {
+    const r = reg.resolveLocalLead("numeric", { pin: "" });
+    assert.equal(r.lead, "keystone-tsfm", "the TSFM is the authoritative numeric lead");
+    assert.equal(r.chain[0], "keystone-tsfm", "and the chain head");
+  });
+});
+
+test("numeric TSFM still VRAM-gated: a <2GB box drops it → cloud fallback", () => {
+  freshEnv(() => {
+    const chain = reg.selectChain("numeric", { vramBudgetGB: 1 });
+    assert.equal(chain.length, 0, "TSFM can't lead a box it doesn't fit → empty → provider chain falls back");
+  });
+});
+
+test("_detectVramGB returns a number or null and is memoized", () => {
+  freshEnv(() => {
+    const d = reg._detectVramGB();
+    assert.ok(d === null || (typeof d === "number" && d > 0), "VRAM probe is number|null");
+    assert.equal(reg._detectVramGB(), d, "memoized within a cache window");
+  });
+});

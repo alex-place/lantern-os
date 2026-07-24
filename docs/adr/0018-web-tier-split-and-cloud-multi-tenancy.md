@@ -51,16 +51,16 @@ Today neither exists as a coherent product:
 - `unisona.ai` / `lantern-os.net` are Cloudflare **tunnels → `localhost:4177`**;
   they only work while the founder's PC is on ([[unisona-second-domain]]).
 - The Railway entrypoint runs the **entire** `server.js` publicly
-  ([`cloud-server.js`](../../apps/lantern-garage/cloud-server.js)), not a subset.
+  ([`cloud-server.js`](../../cloud-server.js)), not a subset.
 - The gh-pages deploy copies the **full** `public/` bundle to `/dream/` as a
   **static mirror with no backend** ([`deploy.yml:52`](../../.github/workflows/deploy.yml#L52)),
   so chat there cannot work.
 - `LANTERN_CHAT_ONLY=1` only skips background collectors/convergence loops
-  ([`server.js:590`](../../apps/lantern-garage/server.js#L590)); it does **not**
+  ([`server.js:590`](../../server.js#L590)); it does **not**
   restrict the served page/route surface.
 - The Core is **single-tenant to the bone**: one `data/` tree, and every chat
   request reads a **global** `process.env.*_API_KEY`
-  ([`dream-chat.js:911`](../../apps/lantern-garage/lib/dream-chat.js#L911)) — there
+  ([`dream-chat.js:911`](../../lib/dream-chat.js#L911)) — there
   is no per-user key path.
 
 **North Star framing.** A hosted tier improves **no loop stage** by itself — like
@@ -102,8 +102,8 @@ justifies managed, autoscaling, node-less infrastructure. Cloudflare Workers/Pag
 Functions are **not** the compute (they cannot run the Core — see Alternatives).
 
 **Model.** The cloud default model is **Gemini via Vertex** on our credits
-(already wired: [`gemini-transport.js:15`](../../apps/lantern-garage/lib/gemini-transport.js#L15),
-[`dream-chat.js:1078`](../../apps/lantern-garage/lib/dream-chat.js#L1078)); other
+(already wired: [`gemini-transport.js:15`](../../lib/gemini-transport.js#L15),
+[`dream-chat.js:1078`](../../lib/dream-chat.js#L1078)); other
 providers require the user's own key. No local LLM in the cloud profile.
 
 **Guardrails (binding conditions):**
@@ -212,14 +212,14 @@ providers require the user's own key. No local LLM in the cloud profile.
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Public domains are CF tunnels → `localhost:4177` (PC-dependent) | [[unisona-second-domain]] | High | memory |
-| Railway entrypoint runs the whole `server.js` publicly, not a subset | [`cloud-server.js`](../../apps/lantern-garage/cloud-server.js) | High | repo |
+| Railway entrypoint runs the whole `server.js` publicly, not a subset | [`cloud-server.js`](../../cloud-server.js) | High | repo |
 | gh-pages ships the full `public/` as a static mirror with no backend | [`deploy.yml:52`](../../.github/workflows/deploy.yml#L52) | High | repo |
-| `LANTERN_CHAT_ONLY=1` gates only background loops, not the served surface | [`server.js:590`](../../apps/lantern-garage/server.js#L590) | High | repo |
-| Core is single-tenant: chat keys are global `process.env`, no per-user path | [`dream-chat.js:911`](../../apps/lantern-garage/lib/dream-chat.js#L911) | High | repo |
-| Login/identity infra already exists (session + OAuth + local) | [`session-identity.js`](../../apps/lantern-garage/lib/session-identity.js), [`oauth-core.js`](../../apps/lantern-garage/lib/oauth-core.js), [`local-auth.js`](../../apps/lantern-garage/lib/local-auth.js), [`routes/auth.js`](../../apps/lantern-garage/routes/auth.js); ADR-0016 | High | repo |
-| Chat already routes Gemini through Vertex (ADC) when `VERTEX_PROJECT` is set | [`gemini-transport.js:15`](../../apps/lantern-garage/lib/gemini-transport.js#L15), [`dream-chat.js:1078`](../../apps/lantern-garage/lib/dream-chat.js#L1078) | High | repo |
-| Vertex bills the Cloud project (AI-Studio free tier is credit-depleted) | [`gemini-transport.js` header](../../apps/lantern-garage/lib/gemini-transport.js) comment (#1376) | High | repo |
-| Native-module deps complicate any isolate/bundle target (`sharp`, `tesseract`) | [`package.json:53`](../../apps/lantern-garage/package.json#L53); ADR-0014 evidence | High | repo |
+| `LANTERN_CHAT_ONLY=1` gates only background loops, not the served surface | [`server.js:590`](../../server.js#L590) | High | repo |
+| Core is single-tenant: chat keys are global `process.env`, no per-user path | [`dream-chat.js:911`](../../lib/dream-chat.js#L911) | High | repo |
+| Login/identity infra already exists (session + OAuth + local) | [`session-identity.js`](../../lib/session-identity.js), [`oauth-core.js`](../../lib/oauth-core.js), [`local-auth.js`](../../lib/local-auth.js), [`routes/auth.js`](../../routes/auth.js); ADR-0016 | High | repo |
+| Chat already routes Gemini through Vertex (ADC) when `VERTEX_PROJECT` is set | [`gemini-transport.js:15`](../../lib/gemini-transport.js#L15), [`dream-chat.js:1078`](../../lib/dream-chat.js#L1078) | High | repo |
+| Vertex bills the Cloud project (AI-Studio free tier is credit-depleted) | [`gemini-transport.js` header](../../lib/gemini-transport.js) comment (#1376) | High | repo |
+| Native-module deps complicate any isolate/bundle target (`sharp`, `tesseract`) | [`package.json:53`](../../package.json#L53); ADR-0014 evidence | High | repo |
 | CF Workers cannot run the Core: no local FS, no child processes | Cloudflare Workers Node.js compatibility docs (developers.cloudflare.com) | High | web |
 | Standard Google Cloud credits apply to Compute Engine, not Vertex-only | cloud.google.com/free ; dev.to 2026 GCP credits guide | Medium | web |
 | Cloud Run is stateless; persistence via GCS-FUSE or Filestore only | docs.cloud.google.com/run cloud-storage-volume-mounts ; cloudwebschool comparison | High | web |

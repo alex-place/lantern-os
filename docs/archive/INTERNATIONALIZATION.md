@@ -13,7 +13,7 @@ Lantern OS supports multiple languages through a JSON-based locale system. This 
 
 ## File Structure
 
-Locale files are stored in: `apps/lantern-garage/public/locales/[LANG].json`
+Locale files are stored in: `public/locales/[LANG].json`
 
 Each file uses a nested JSON structure:
 

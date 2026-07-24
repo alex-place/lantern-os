@@ -34,7 +34,7 @@ This kernel is **buildable now**, but it is **not** a strong model. The local mo
 
 - The swap gate is **behaviour-preserving** (tol=0.25): it routes around an unavailable/expensive node with an **equivalent** one. It is **swap-for-availability/cost**, not swap-for-behavioral-diversity. **[tested]**
 - All nodes must share the **d-dim state ABI** (component 6). Ouro's raw weight-tied hidden tensors are *not* a shared ABI across providers — which is exactly why component 6 (the projection shim) is the blocker, and why CSF (a format) is what makes the state portable.
-- **Open question to settle before building #5:** do *any two* real providers produce drift within tol=0.25 on x? If none do, hot-swap degrades to "swap your own cheaper/cached implementation," and cross-provider *diversity* must live in the text-boundary re-prompt lane ([`loop-reasoner.js`](../apps/lantern-garage/lib/loop-reasoner.js)), not the VM.
+- **Open question to settle before building #5:** do *any two* real providers produce drift within tol=0.25 on x? If none do, hot-swap degrades to "swap your own cheaper/cached implementation," and cross-provider *diversity* must live in the text-boundary re-prompt lane ([`loop-reasoner.js`](../lib/loop-reasoner.js)), not the VM.
 
 ## 3. Acceptance gates (how we'll know it converged — all via `eval_keystone.py`)
 

@@ -57,7 +57,7 @@ Write-Host ""
 # --- Prerequisites -----------------------------------------------------------
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Write-Host "Missing: Node.js" -ForegroundColor Red; exit 1 }
 foreach ($wt in @($StableRoot, $DevRoot)) {
-    if (-not (Test-Path (Join-Path $wt "apps\lantern-garage\server.js"))) {
+    if (-not (Test-Path (Join-Path $wt "server.js"))) {
         Write-Host "Worktree not found or incomplete: $wt" -ForegroundColor Red
         Write-Host "Create the dual-boot worktrees first (see docs/DEV-SERVER-WORKTREE.md):" -ForegroundColor Yellow
         Write-Host "  git worktree add $StableRoot stable-server" -ForegroundColor Gray
@@ -77,7 +77,7 @@ Write-Host ("Node {0}; worktrees present." -f (node --version)) -ForegroundColor
 # surfaced as a warning (non-fatal). Refs the "preview HTTP 000 on node_modules
 # drift" gotcha.
 function Test-WorktreeDeps($wt) {
-    $appDir = Join-Path $wt 'apps\lantern-garage'
+    $appDir = Join-Path $wt '.'
     $nm     = Join-Path $appDir 'node_modules'
     $probe  = 'try{require.resolve("express-session");process.exit(0)}catch(e){process.exit(3)}'
     Push-Location $appDir
@@ -164,7 +164,7 @@ foreach ($scope in 'Machine','User') {
 # every start. Inherited by both Start-Process children below.
 $env:LANTERN_CLOUDFLARE_TUNNEL = 'false'
 
-# The chat assistant's capabilities ARE tool calls (apps/lantern-garage/lib/tool-runner.js):
+# The chat assistant's capabilities ARE tool calls (lib/tool-runner.js):
 # web search/fetch, files, repo/GitHub, market data, and the live system_status probe all run
 # through the native tool-use loop, which is gated by CHAT_TOOL_EXEC. Force it ON here so EVERY
 # model (Claude / GPT / Gemini / Grok / local) can actually use tools -- otherwise the assistant
@@ -179,8 +179,8 @@ $env:LANTERN_MCP_SERVER = 'true'
 # Absolute entry paths so each instance is identifiable by its command line -- this is
 # what lets the reap below (and the stable auto-deploy) clean leaked ZOMBIES, not just
 # the current port owner.
-$StableEntry = Join-Path $StableRoot 'apps\lantern-garage\server.js'
-$DevEntry    = Join-Path $DevRoot    'apps\lantern-garage\server-dev.js'
+$StableEntry = Join-Path $StableRoot 'server.js'
+$DevEntry    = Join-Path $DevRoot    'server-dev.js'
 
 # --- Stop existing servers: tree-kill the port owners + reap leaked zombies --
 # The old flow only Stop-Process'd the port LISTENER, which (a) orphaned the child

@@ -18,7 +18,7 @@ updated: 2026-06-20
 | **Settings Manifest** | `data/pcsf/settings.pcsf.json` | Environment variables, state (present/absent), API key URLs |
 | **Environment Template** | `.env.example` | Local copy with instructions |
 | **Live Configuration** | `.env` (git-ignored) | User's actual API keys and settings |
-| **Server Loader** | `apps/lantern-garage/server.js` | Reads .env at startup (regex `^[A-Z0-9_]+`) |
+| **Server Loader** | `server.js` | Reads .env at startup (regex `^[A-Z0-9_]+`) |
 | **Hot Reload API** | `POST /api/settings/providers` | Change provider keys without restart |
 
 ---
@@ -201,7 +201,7 @@ updated: 2026-06-20
 
 **Where it's defined:**
 - `data/pcsf/provider.pcsf.json` line 50–56: PCSF declarations (includes 5 active providers)
-- `apps/lantern-garage/lib/dream-chat.js` lines 260–437: Actual fallback chain implementation
+- `lib/dream-chat.js` lines 260–437: Actual fallback chain implementation
 - Each provider checks: `const XXX_Key = process.env.XXX_API_KEY; if (XXX_Key && ...)`
 
 ---
@@ -282,7 +282,7 @@ curl -X POST http://127.0.0.1:4177/api/dream/chat/stream \
 
 | Component | File | Port | Purpose |
 |-----------|------|------|---------|
-| **Lantern Garage** | `apps/lantern-garage/server.js` | 4177 | Main web server + API |
+| **Lantern Garage** | `server.js` | 4177 | Main web server + API |
 | **MCP Server** | `src/mcp_server/server.py` | 8771 | Tool integration (optional) |
 | **Ollama** | `ollama serve` | 11434 | Local LLM (optional) |
 | **MiniCheck** | `scripts/serve_minicheck.py` | 8799 | Entailment gate for the #2174 verifier (optional) |
@@ -291,7 +291,7 @@ curl -X POST http://127.0.0.1:4177/api/dream/chat/stream \
 
 ### MiniCheck entailment endpoint (#2186)
 
-The coding-backend verifier (`apps/lantern-garage/lib/coding-backend/verifiers/entailment.js`) has a
+The coding-backend verifier (`lib/coding-backend/verifiers/entailment.js`) has a
 MiniCheck layer that scores whether a proposed change is actually **grounded** in what the backend
 claims — but it stays `skipped` until a model is served. Turn it into a `decisive` check:
 

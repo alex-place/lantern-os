@@ -208,7 +208,7 @@ def main():
         errors.append(f"[WARNING] {rollback_msg} - consider adding rollback instructions")
 
     # Check 5: Backwards compatibility - no removed exports
-    output, _ = run_cmd("git diff --cached apps/lantern-garage/lib/")
+    output, _ = run_cmd("git diff --cached lib/")
     if output:
         removed_exports = re.findall(r'^\s*-\s*module\.exports|^\s*-\s*export', output, re.MULTILINE)
         if removed_exports:

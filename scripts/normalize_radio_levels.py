@@ -5,7 +5,7 @@ Level the unisona.ai Radio library — write a per-track `gain` (dB) into the ma
 The 78rpm transfers vary wildly in loudness, so the dial jumps from a whisper to a
 blast as it rolls. This measures each LOCAL mp3 with ffmpeg's EBU R128 loudnorm
 analysis and stores the dB adjustment needed to reach a common target integrated
-loudness (default -16 LUFS) into its `apps/lantern-garage/public/radio/stations.json`
+loudness (default -16 LUFS) into its `public/radio/stations.json`
 entry. The player (fallout-radio.html) applies that gain at playback with a
 Web-Audio GainNode — so leveling is **lossless** (the mp3s are never re-encoded)
 and lives in the committed manifest (shared across machines).

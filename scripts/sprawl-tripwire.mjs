@@ -26,7 +26,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import registry from "../apps/lantern-garage/lib/surface-registry.js";
+import registry from "../lib/surface-registry.js";
 
 export const VALID_STAGES = ["observe", "remember", "reason", "act", "verify", "converge"];
 
@@ -38,7 +38,7 @@ export const VALID_STAGES = ["observe", "remember", "reason", "act", "verify", "
 export function isRegistryClassified(relPath) {
   return registry.classify(basename(relPath)) !== null;
 }
-const PUBLIC_PREFIX = "apps/lantern-garage/public/";
+const PUBLIC_PREFIX = "public/";
 
 // Pull the declared loop stage out of a page's HTML (meta tag or comment). Returns the
 // lowercased stage, or null if none / invalid.
@@ -89,7 +89,7 @@ const PY_EXEMPT = [/^tests\//, /^experiments\//];
 // Non-python anchor surfaces, as git pathspecs. A reference here = wired.
 const PY_ANCHOR_PATHSPECS = [
   "apps", "src/mcp_server", ".github/workflows", "scripts/hooks",
-  "Makefile", "package.json", "apps/lantern-garage/package.json",
+  "Makefile", "package.json", "package.json",
   "SCRIPTS.md", "*.ps1", "*.sh",
 ];
 

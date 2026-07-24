@@ -52,7 +52,7 @@ now Accepted (above); the model itself is still unpromoted pending the staged on
 
 The owner's directive: **a proprietary Σ₀ model — weights we adjust in future design, that serves
 the Σ₀ council and uses CSF.** Today the local kernel tier leans on third-party checkpoints
-(Ouro, Qwen) plugged into [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js).
+(Ouro, Qwen) plugged into [`local-model-registry.js`](../../lib/local-model-registry.js).
 That satisfies "models are interchangeable" ([ADR-0005](0005-interchangeable-model-providers.md))
 but leaves us **unable to own the reasoning substrate**: we cannot change a model's forward pass,
 and per [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) we may only adjust *adapter*
@@ -110,7 +110,7 @@ not by depending on any vendor's serving path.**
    adapter checkpoints are content-addressed and **archived in CSF** — no new store.
 
 6. **Interchangeable, not hardcoded.** unisona.ai-Σ₀ registers in
-   [`local-model-registry.js`](../../apps/lantern-garage/lib/local-model-registry.js) as one more
+   [`local-model-registry.js`](../../lib/local-model-registry.js) as one more
    VRAM-gated, evidence-gated entry ([ADR-0005](0005-interchangeable-model-providers.md)). It LEADS
    only when a reproduced on-box eval beats the incumbent (Qwen2.5-Coder / the frontier coder). Until
    then it stays `verified:false` and cannot displace a known-good lead (External Reality Rule, #1597).
@@ -177,7 +177,7 @@ not by depending on any vendor's serving path.**
 | Vendor's only serving path is a custom vLLM fork (`yxing-bj/vllm`), bf16, no quant | README.md serve command | High | model card |
 | On-box transformers load fails (`Unrecognized configuration class … for AutoModelForCausalLM`) → `DONT_BUILD` | `experiments/loopcoder_v2_4bit_probe.py`; `data/convergence/loopcoder-probe-log.jsonl` | High | this repo, 2026-06-29 |
 | Adapter-only weight updates are the sanctioned future-weights path | [ADR-0010](0010-verify-gated-continual-learning-last-resort.md) | High | repo ADR |
-| Model plugs in as one interchangeable, evidence-gated registry entry | [`local-model-registry.js:130-148`](../../apps/lantern-garage/lib/local-model-registry.js), #1597 | High | repo |
+| Model plugs in as one interchangeable, evidence-gated registry entry | [`local-model-registry.js:130-148`](../../lib/local-model-registry.js), #1597 | High | repo |
 | Σ₀ council exists and runs on real decisions | #1598, [[dogfood-loop-reliable-and-council-wired]] | High | repo |
 | LoopCoder-V2 is Apache-2.0 (legal to fork weights) | `local-model-registry.js:147` note; model card license | Med | model card |
 | Looped/recurrent depth is the Σ₀ Reason lever | [[sigma0-coder-spiral-consolidation]], [[ouro-adaptive-compute-gate]] | Med | repo research |

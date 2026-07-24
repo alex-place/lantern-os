@@ -115,7 +115,7 @@ def build(records: list[dict], removals: set[str], outdir: Path) -> dict:
     removed_recs = [r for r in records if r["path"] in removals]
     md = ["# Σ₀ Code Baseline", ""]
     md.append(f"Grounded **{len(records)}** code files "
-              f"(src/, scripts/, experiments/, apps/lantern-garage/lib+routes).")
+              f"(src/, scripts/, experiments/, lib+routes).")
     md.append("")
     md.append("## Verdicts")
     for v in ("grounded", "update", "remove"):

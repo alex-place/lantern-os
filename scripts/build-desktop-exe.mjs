@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// build-desktop-exe.mjs — compile the thin desktop launcher (apps/lantern-garage/
+// build-desktop-exe.mjs — compile the thin desktop launcher (
 // desktop/launcher.js) into a single, double-clickable `unisona.exe` using Node's
 // built-in Single Executable Application (SEA) support. This is step 2 of the
-// Phase-1 packaging plan in apps/lantern-garage/desktop/README.md (ADR-0014):
+// Phase-1 packaging plan in desktop/README.md (ADR-0014):
 // wrap ONLY the launcher — the Core (server.js + native modules) ships as a
 // separate app tree + a real node runtime the launcher spawns. We deliberately do
 // NOT use `pkg` (deprecated) or Electron (ADR-0014 rejects a bundled Chromium).
@@ -10,7 +10,7 @@
 // Prereqs: Node >= 20 (this script's own runtime becomes the exe's base). `postject`
 // is fetched on demand via `npx -y postject` (needs network the first time).
 //
-// Output: apps/lantern-garage/desktop/dist/unisona.exe (+ sea-prep.blob).
+// Output: desktop/dist/unisona.exe (+ sea-prep.blob).
 // Sign it (Azure Trusted Signing) and lay it into an installer as later steps.
 //
 // Usage: node scripts/build-desktop-exe.mjs
@@ -108,7 +108,7 @@ if (isWin) {
 console.log(`\n✓ Built ${exePath} (${mb(exePath)} MB)`);
 console.log("  One binary, windowless — runs the launcher AND (re-execed with");
 console.log("  UNISONA_CORE=1) the Core; opens a chromeless app window. Next: sign it");
-console.log("  (SignPath Foundation), then ship the apps/lantern-garage tree beside it.");
+console.log("  (SignPath Foundation), then ship the . tree beside it.");
 
 // Rewrite the PE Optional Header's Subsystem field to IMAGE_SUBSYSTEM_WINDOWS_GUI (2).
 // Layout: e_lfanew (u32 @ 0x3C) → PE sig (4) + COFF header (20) → Optional Header;

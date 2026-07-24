@@ -53,12 +53,9 @@ jobs:
         run: |
           mkdir -p _site
 
-          # Copy surfaces (shareholder index, dashboards, etc.)
-          cp -r surfaces/. _site/ 2>/dev/null || true
-
           # Copy full Dream Journal public bundle into /dream path
           mkdir -p _site/dream
-          cp -r apps/lantern-garage/public/. _site/dream/
+          cp -r public/. _site/dream/
 
           # Root redirect → /dream (heredoc is unquoted so ${PAGES_PATH} expands)
           cat > _site/index.html <<HTML

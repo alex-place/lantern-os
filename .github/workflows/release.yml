@@ -43,20 +43,18 @@ jobs:
           echo "Building release: ${TAG}"
 
       - name: Install dependencies
-        working-directory: apps/lantern-garage
-        run: npm ci --production
+                run: npm ci --production
 
       - name: Validate server
-        working-directory: apps/lantern-garage
-        run: node --check server.js
+                run: node --check server.js
 
       - name: Build release zip — Dream Journal Web App
         run: |
           mkdir -p _release
           zip -r "_release/lantern-dream-journal-${{ steps.version.outputs.version }}.zip" \
-            apps/lantern-garage/public/ \
-            apps/lantern-garage/server.js \
-            apps/lantern-garage/package.json \
+            public/ \
+            server.js \
+            package.json \
             -x "*/node_modules/*" "*.DS_Store" "**/__pycache__/*"
           echo "✓ Dream Journal web app bundle:"
           ls -lh _release/
@@ -130,7 +128,7 @@ jobs:
   # Runs after the release exists and APPENDS the installer to it, so a desktop
   # build failure can never block the web/source release above. Needs Windows for
   # Inno Setup + the win32 native modules (sharp / tesseract.js). Unsigned for now
-  # (see apps/lantern-garage/desktop/README.md — MSIX/SignPath pending).
+  # (see desktop/README.md — MSIX/SignPath pending).
   build-desktop:
     name: Build & attach desktop installer (Windows)
     runs-on: windows-latest
@@ -142,7 +140,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # The native desktop shell (apps/lantern-garage/desktop/shell) is a .NET WPF +
+      # The native desktop shell (desktop/shell) is a .NET WPF +
       # WebView2 app; the installer build runs `dotnet publish` for it.
       - uses: actions/setup-dotnet@v5
         with:
@@ -152,8 +150,7 @@ jobs:
         run: npm ci
 
       - name: Install app deps
-        working-directory: apps/lantern-garage
-        run: npm ci
+                run: npm ci
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
@@ -165,7 +162,7 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.build.outputs.version }}
-          files: apps/lantern-garage/desktop/dist/Unisona-Setup-*.exe
+          files: desktop/dist/Unisona-Setup-*.exe
 
   # ── Deploy to GitHub Pages ────────────────────────────────────────────────────
   deploy-pages:
@@ -185,7 +182,7 @@ jobs:
           mkdir -p _site
           cp -r surfaces/. _site/ 2>/dev/null || true
           mkdir -p _site/dream
-          cp -r apps/lantern-garage/public/. _site/dream/
+          cp -r public/. _site/dream/
           cat > _site/index.html <<'HTML'
           <!doctype html>
           <html>

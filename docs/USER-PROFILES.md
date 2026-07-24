@@ -30,8 +30,8 @@ Session + JSONL log + CSF archive
 
 | File | Purpose |
 |------|---------|
-| `apps/lantern-garage/lib/user-profiles.js` | Core profile system: CRUD, role management, CSF export/import |
-| `apps/lantern-garage/routes/profiles.js` | REST API endpoints for profile management |
+| `lib/user-profiles.js` | Core profile system: CRUD, role management, CSF export/import |
+| `routes/profiles.js` | REST API endpoints for profile management |
 | `data/profiles/index.jsonl` | Append-only log of all profile records |
 | `data/profiles/profiles.csf` | Binary CSF archive backup (for export) |
 

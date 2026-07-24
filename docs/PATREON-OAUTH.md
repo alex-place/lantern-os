@@ -81,7 +81,7 @@ confirm `/api/auth/session` shows `provider:"patreon"` and the mapped role.
 ### 4. Restart the Server
 
 ```bash
-npm run dev --prefix apps/lantern-garage
+npm run dev
 ```
 
 The server will now:
@@ -93,7 +93,7 @@ The server will now:
 
 Patreon tiers are mapped to roles by **pledge amount** (not campaign-specific tier IDs),
 so moving to a new campaign — e.g. `patreon.com/cw/UnisonaAI` — never breaks gating. The
-mapping is defined in `apps/lantern-garage/lib/auth-providers.js` (`roleForAmountCents`),
+mapping is defined in `lib/auth-providers.js` (`roleForAmountCents`),
 and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pledges to
 *other* creators can't grant (or block) a role here.
 
@@ -106,7 +106,7 @@ and role resolution is **scoped to your `PATREON_CAMPAIGN_ID`** so a member's pl
 > **Legacy note:** the **$5 Member** tier is **retired and no longer sold**. Its
 > `≥ $5 → supporter` mapping is retained *only* so grandfathered patrons keep their
 > role; that `supporter` role now sits at the **Free** plan floor (see
-> `apps/lantern-garage/lib/plan-matrix.js` `ROLE_TO_PLAN`). The currently sold ladder is
+> `lib/plan-matrix.js` `ROLE_TO_PLAN`). The currently sold ladder is
 > **Free / $20 Pro / $200 Pilot** — do not re-advertise $5 as a paid gate.
 
 Notes:
@@ -129,7 +129,7 @@ Notes:
 
 ## API Endpoints
 
-All OAuth-related endpoints are in `apps/lantern-garage/routes/auth.js`:
+All OAuth-related endpoints are in `routes/auth.js`:
 
 ### `GET /api/auth/session`
 Returns current session info.
@@ -178,14 +178,14 @@ Clears session and logs out user.
 
 | File | Purpose |
 |------|---------|
-| `apps/lantern-garage/lib/oauth-core.js` | Provider-agnostic flow engine: `handleOAuthStart` / `handleOAuthCallback` (exchange → fetchUser → role → profile → session) |
-| `apps/lantern-garage/lib/auth-providers.js` | Per-provider config incl. the `patreon` block (authorize/token URLs, scope, `fetchUser`, `roleForAmountCents` mapping) |
-| `apps/lantern-garage/lib/user-profiles.js` | `getOrCreateFromIdentity` — profile creation (records `patreonId` + tier) |
-| `apps/lantern-garage/lib/patreon-auth.js` | Legacy Patreon-specific OAuth logic (superseded by the provider-agnostic pair above) |
-| `apps/lantern-garage/routes/auth.js` | Route handlers for OAuth endpoints |
-| `apps/lantern-garage/public/auth.html` | Patreon login page with tier cards |
-| `apps/lantern-garage/public/profile.html` | User profile page with logout button |
-| `apps/lantern-garage/public/js/auth-gate.js` | Client-side auth enforcement script |
+| `lib/oauth-core.js` | Provider-agnostic flow engine: `handleOAuthStart` / `handleOAuthCallback` (exchange → fetchUser → role → profile → session) |
+| `lib/auth-providers.js` | Per-provider config incl. the `patreon` block (authorize/token URLs, scope, `fetchUser`, `roleForAmountCents` mapping) |
+| `lib/user-profiles.js` | `getOrCreateFromIdentity` — profile creation (records `patreonId` + tier) |
+| `lib/patreon-auth.js` | Legacy Patreon-specific OAuth logic (superseded by the provider-agnostic pair above) |
+| `routes/auth.js` | Route handlers for OAuth endpoints |
+| `public/auth.html` | Patreon login page with tier cards |
+| `public/profile.html` | User profile page with logout button |
+| `public/js/auth-gate.js` | Client-side auth enforcement script |
 
 ## Troubleshooting
 

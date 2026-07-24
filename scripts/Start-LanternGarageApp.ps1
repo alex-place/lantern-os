@@ -15,7 +15,7 @@ if (Test-Path $rustSetup) {
 }
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$app = Join-Path $root "apps\lantern-garage"
+$app = Join-Path $root "."
 $healthUrl = "http://127.0.0.1:$Port/api/health"
 $appUrl = "http://127.0.0.1:$Port"
 

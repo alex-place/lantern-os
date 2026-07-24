@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stream one member out of a CSF archive to stdout (raw bytes).
 
-Used by apps/lantern-garage/routes/pdfs.js to serve research PDFs straight from
+Used by routes/pdfs.js to serve research PDFs straight from
 the condensed CSF corpus archive once the loose originals have been removed
 (see scripts/csf_condense_corpus.py). Read-only; verifies the member's SHA-256
 internally via csf.read_file.

@@ -136,7 +136,7 @@ memory the user controls**; (2) a **policy gate that HOLDS consequential actions
 approval**; (3) **verifiable receipts** (diff + test + source + cost + why-this-model); and
 (4) **outcome-based routing** that learns which backend wins on *the user's own* repos.
 
-**How it works** ([implemented] — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) `propose → HOLD → verify → receipt`; [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) operator-gated HTTP seam; [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) Δ + answerability gate; [`lib/pr-watcher.js`](../apps/lantern-garage/lib/pr-watcher.js) green-+-APPROVE auto-merge; provider routing `data/provider.pcsf.json`):
+**How it works** ([implemented] — [`lib/coding-backend/index.js`](../lib/coding-backend/index.js) `propose → HOLD → verify → receipt`; [`routes/coding.js`](../routes/coding.js) operator-gated HTTP seam; [`lib/council-review.js`](../lib/council-review.js) Δ + answerability gate; [`lib/pr-watcher.js`](../lib/pr-watcher.js) green-+-APPROVE auto-merge; provider routing `data/provider.pcsf.json`):
 - A backend **proposes** a change; the plane **holds** it (never applies immediately, unlike
   Aider/OpenHands), attaches a **verifier verdict** (exec-verify + council Δ + canaries), and
   emits a **receipt** to an append-only ledger. Approval is operator-gated.
@@ -191,7 +191,7 @@ Kalman NIS fault detection (aerospace); reference-free-judge failure (arXiv:2607
 an append-only, replayable trust ledger whose folds substitute for fine-tuning: real-time
 per-loop adaptation that is instant, reversible, and never touches weights.
 
-**How it works** ([implemented] — [`lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js); economics [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md)):
+**How it works** ([implemented] — [`lib/grounding-calibration.js`](../lib/grounding-calibration.js); economics [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md)):
 - A grounding event `{key, predicted, outcome}` with `outcome` = **external** truth (web check,
   settled market, passing test — never the model's say-so) appends to
   `data/convergence/grounding-calibration.jsonl`. Fast weight = Beta posterior mean
@@ -218,7 +218,7 @@ composition of OPA/PROV/capability-systems prior art):
   graph `G=(V,E,D,τ,S,H)` that *slows uncertain regions, speeds confident ones* → mapping
   directly to how much grounding to buy where.
 
-**How it works** ([implemented + unit-tested] — [`src/convergence_io/`](../src/convergence_io/); live JS adapter [`grounding-policy.js`](../apps/lantern-garage/lib/grounding-policy.js)).
+**How it works** ([implemented + unit-tested] — [`src/convergence_io/`](../src/convergence_io/); live JS adapter [`grounding-policy.js`](../lib/grounding-policy.js)).
 
 **Loop stage:** Act + Verify.
 
@@ -233,7 +233,7 @@ OPA/Rego; capability security; W3C PROV; constraint-graph planners.
 gates** *and* an honest, both-class record ledger it learns from — reconciling "self-improvement"
 with "no online weight modification."
 
-**How it works** ([implemented] — [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md); ledger [`lib/convergence-records.js`](../apps/lantern-garage/lib/convergence-records.js) → `data/convergence/records.jsonl`; grader [`lib/convergence-outcome-grader.js`](../apps/lantern-garage/lib/convergence-outcome-grader.js); miner [`scripts/session_to_convergence.py`](../scripts/session_to_convergence.py); repair [`scripts/repair_convergence_records.py`](../scripts/repair_convergence_records.py)):
+**How it works** ([implemented] — [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md); ledger [`lib/convergence-records.js`](../lib/convergence-records.js) → `data/convergence/records.jsonl`; grader [`lib/convergence-outcome-grader.js`](../lib/convergence-outcome-grader.js); miner [`scripts/session_to_convergence.py`](../scripts/session_to_convergence.py); repair [`scripts/repair_convergence_records.py`](../scripts/repair_convergence_records.py)):
 - **Gate 1 (input):** only execution-verified (green) subprocesses become training data.
   **Gate 2 (output):** only a *measured* pass@1 win promotes a new adapter. Offline, no user data.
 - The **convergance-record ledger** is the calibration/selection corpus: `[claim, evidence,
@@ -347,11 +347,11 @@ pending" and publish.
 
 ## Sources (verified on disk 2026-07-18)
 
-- Accountability layer — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) · [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) · [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) · [`lib/pr-watcher.js`](../apps/lantern-garage/lib/pr-watcher.js) · [OSS-BASELINE.md](OSS-BASELINE.md)
+- Accountability layer — [`lib/coding-backend/index.js`](../lib/coding-backend/index.js) · [`routes/coding.js`](../routes/coding.js) · [`lib/council-review.js`](../lib/council-review.js) · [`lib/pr-watcher.js`](../lib/pr-watcher.js) · [OSS-BASELINE.md](OSS-BASELINE.md)
 - Decode/verify controller — [`src/sigma0/decode_canary.py`](../src/sigma0/decode_canary.py) · [`experiments/deanchored_verifier.py`](../experiments/deanchored_verifier.py)
-- Grounding economy — [`lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js) · [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md)
+- Grounding economy — [`lib/grounding-calibration.js`](../lib/grounding-calibration.js) · [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md)
 - Convergence-IO — [`src/convergence_io/`](../src/convergence_io/) · [`docs/convergence-io/README.md`](convergence-io/README.md)
-- Verified-gated self-improvement — [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) · [`lib/convergence-records.js`](../apps/lantern-garage/lib/convergence-records.js) · [`scripts/session_to_convergence.py`](../scripts/session_to_convergence.py)
+- Verified-gated self-improvement — [SIGMA0-CONTINUAL-TRAINING.md](SIGMA0-CONTINUAL-TRAINING.md) · [`lib/convergence-records.js`](../lib/convergence-records.js) · [`scripts/session_to_convergence.py`](../scripts/session_to_convergence.py)
 - Collapse certificate — [SIGMA0-COLLAPSE-CERTIFICATE.md](SIGMA0-COLLAPSE-CERTIFICATE.md) · [SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md](SIGMA0-L2-ANISOTROPY-LIFT-PROOF.md)
 - CSF — [CSF-FORMAT-SPECIFICATION.md](CSF-FORMAT-SPECIFICATION.md) · [`src/csf/csf_pack.py`](../src/csf/csf_pack.py) · [`src/csf/v07/`](../src/csf/v07/)
 - North Star — [CONVERGANCE-SIGMA0-BRIEFING.md](CONVERGANCE-SIGMA0-BRIEFING.md)

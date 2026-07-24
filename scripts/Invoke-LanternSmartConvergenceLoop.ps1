@@ -262,7 +262,7 @@ if ($packageScripts -contains "check") {
     }
 } else {
     $steps.Add((New-StepResult "npm-check" "skipped" "Root package.json has no check script; falling back to direct syntax checks." $packageScripts)) | Out-Null
-    foreach ($jsFile in @("apps/lantern-garage/server.js", "apps/lantern-garage/cloud-server.js", "tests/regression/cicd-gates.js", "scripts/convergence-manager.js")) {
+    foreach ($jsFile in @("server.js", "cloud-server.js", "tests/regression/cicd-gates.js", "scripts/convergence-manager.js")) {
         if (Test-Path -LiteralPath (Join-Path $Root $jsFile)) {
             $nodeResult = Invoke-CapturedCommand "node-check-$jsFile" "node" @("--check", $jsFile) 45
             $steps.Add((New-StepResult "node-check-$jsFile" $(if ($nodeResult.exitCode -eq 0) { "passed" } else { "failed" }) "Ran node --check $jsFile." @{

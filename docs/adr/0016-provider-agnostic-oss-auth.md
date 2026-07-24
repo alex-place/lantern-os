@@ -28,14 +28,14 @@ Login today is **Patreon-only**, and the whole system treats the Patreon identit
 identity. The canonical user handle is `req.session.patreon.id` and it is read directly by
 the middleware, the gates, and the profile store:
 
-- `apps/lantern-garage/lib/auth-middleware.js` — `requireAuth`/`requireRole`/`requireEntitlement`/
+- `lib/auth-middleware.js` — `requireAuth`/`requireRole`/`requireEntitlement`/
   `isAdmin`/`attachProfile` all read `req.session?.patreon?.id` (e.g. lines 75, 99, 181, 237, 244).
-- `apps/lantern-garage/lib/patreon-auth.js:311` — `getSessionInfo()` only reports authenticated
+- `lib/patreon-auth.js:311` — `getSessionInfo()` only reports authenticated
   when `req.session.authenticated` was set by the Patreon callback.
-- `apps/lantern-garage/routes/profiles.js:25,38` — `/api/profiles/me` keys off
+- `routes/profiles.js:25,38` — `/api/profiles/me` keys off
   `req.session?.patreon?.id` and **401s for any non-Patreon session, including an authenticated
   local admin** (reproduced live on :4178 — see issue #1876).
-- `apps/lantern-garage/lib/user-profiles.js` — a profile's primary key *is* the Patreon id
+- `lib/user-profiles.js` — a profile's primary key *is* the Patreon id
   (`getOrCreateFromPatreon` keys on `patreonUser.id`), with an ad-hoc `account-links.jsonl`
   bolt-on for a single Discord link (#697).
 
@@ -157,11 +157,11 @@ registry**, owned in-repo, with four concrete decisions:
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| Identity is Patreon-shaped across the middleware | `apps/lantern-garage/lib/auth-middleware.js:75,99,181,237,244` | High | codebase read |
-| `/api/profiles/me` 401s an authenticated admin | `apps/lantern-garage/routes/profiles.js:25`; live repro on :4178 | High | issue #1876 |
-| Existing PKCE + state-cookie flow is sound and reusable | `apps/lantern-garage/lib/patreon-auth.js:25-132,151-165` | High | codebase read |
-| Profile key == Patreon id; single ad-hoc Discord link | `apps/lantern-garage/lib/user-profiles.js:188-214,317-333` | High | codebase read |
-| OAuth misconfig returns a blank 500 | `apps/lantern-garage/lib/patreon-auth.js:99-102`; `public/auth.html:307` | High | issue #1877 |
+| Identity is Patreon-shaped across the middleware | `lib/auth-middleware.js:75,99,181,237,244` | High | codebase read |
+| `/api/profiles/me` 401s an authenticated admin | `routes/profiles.js:25`; live repro on :4178 | High | issue #1876 |
+| Existing PKCE + state-cookie flow is sound and reusable | `lib/patreon-auth.js:25-132,151-165` | High | codebase read |
+| Profile key == Patreon id; single ad-hoc Discord link | `lib/user-profiles.js:188-214,317-333` | High | codebase read |
+| OAuth misconfig returns a blank 500 | `lib/patreon-auth.js:99-102`; `public/auth.html:307` | High | issue #1877 |
 | Lucia deprecated 2025 → own the code | wisp.blog "Lucia Auth is Dead"; lucia-auth/lucia discussion #1714 | Med-High | web (2026-07) |
 | Passport is Express-coupled, lightly maintained (v0.7.0) | passportjs.org | Med | web (2026-07) |
 | Email-only auto-link enables pre-hijacking (35/75 sites) | arXiv:2205.10174 | High | peer-reviewed study |

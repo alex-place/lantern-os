@@ -30,7 +30,7 @@ Convergence Core applied to a weather Task, feeding the existing
 | Remember | PCSF manifest ranks forecast sources; CSF stores forecast→verification scalar pairs | reuse formats |
 | Reason | calibrated bucket distribution — [`experiments/kalshi_weather_edge.py`](../../experiments/kalshi_weather_edge.py) | **landed** |
 | Verify | band-robust edge vs live market (net of fees) + NIS canary + online-conformal coverage | landed + open |
-| Converge | ConvergenceRecord per market; settle via [`kalshi-convergence-outcomes.js`](../../apps/lantern-garage/lib/kalshi-convergence-outcomes.js) | reuse |
+| Converge | ConvergenceRecord per market; settle via [`kalshi-convergence-outcomes.js`](../../lib/kalshi-convergence-outcomes.js) | reuse |
 
 ## Measured calibration (the "reverse-in")
 

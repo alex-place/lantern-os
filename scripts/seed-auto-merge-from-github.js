@@ -12,7 +12,7 @@
  */
 
 const { execSync } = require('child_process');
-const ConverganceMergeTrainer = require('../apps/lantern-garage/lib/convergance-merge-trainer');
+const ConverganceMergeTrainer = require('../lib/convergance-merge-trainer');
 
 function runCommand(cmd) {
   try {

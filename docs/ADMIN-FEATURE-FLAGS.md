@@ -69,16 +69,16 @@ Server-side, use `isFlagEnabled('beta_banner')` from `lib/feature-flags.js`.
 
 ## How it's wired
 
-- **Store:** `apps/lantern-garage/lib/feature-flags.js` — persists to
+- **Store:** `lib/feature-flags.js` — persists to
   `data/admin/feature-flags.json` (cached, latest-wins). Holds the flag map and a
   per-page `{ hidden, disabled }` navigation map. The canonical nav page list
   lives in `NAV_PAGES` and must stay in step with the links in each page's nav.
-- **Client wiring:** `apps/lantern-garage/public/js/auth-gate.js` (loaded on every
+- **Client wiring:** `public/js/auth-gate.js` (loaded on every
   page) fetches the config and applies it by **link href**, so it covers each
   page's inline `<nav class="site-nav">` automatically — not a single header
   component. It also injects the **Admin** link for admins, reusing the session it
   already fetches.
-- **Server enforcement:** `apps/lantern-garage/routes/pages.js` blocks any page
+- **Server enforcement:** `routes/pages.js` blocks any page
   flagged **Disabled** for non-admins (returns a friendly "temporarily disabled"
   page; admins still get through for preview).
 

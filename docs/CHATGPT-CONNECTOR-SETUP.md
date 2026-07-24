@@ -326,7 +326,7 @@ Run the CI/CD validation workflow:
 lsof -i :8772
 
 # Start services
-npm start --prefix apps/lantern-garage
+npm start
 ```
 
 ### Issue: PKCE Code Challenge Mismatch

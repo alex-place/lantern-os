@@ -8,7 +8,7 @@ hook in a PR changes the hook for everyone on their next pull.
 ## Activation
 
 Hooks activate **automatically** from the `prepare` npm script the first time you
-run `npm install` (at the repo root or in `apps/lantern-garage/`). If you cloned
+run `npm install` (at the repo root or in ``). If you cloned
 without installing dependencies, activate them by hand — any one of:
 
 ```bash
@@ -45,7 +45,7 @@ never break an install.
 
 ### Sprawl tripwire (pre-push)
 
-Every **new** `apps/lantern-garage/public/*.html` must declare which loop stage it
+Every **new** `public/*.html` must declare which loop stage it
 strengthens, or the push is blocked:
 
 ```html

@@ -1,7 +1,7 @@
 # Google Sign-In Setup ("Continue with Google")
 
 The provider-agnostic OAuth engine (ADR-0016) already ships a fully-wired Google
-provider ([`apps/lantern-garage/lib/auth-providers.js`](../apps/lantern-garage/lib/auth-providers.js)).
+provider ([`lib/auth-providers.js`](../lib/auth-providers.js)).
 It is **not code work** — you only need to create Google OAuth credentials and put
 them in the environment. The "Continue with Google" button works on `/auth.html`
 **only when both `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are set**; until

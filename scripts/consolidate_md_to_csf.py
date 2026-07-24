@@ -48,7 +48,7 @@ EXCLUDES = {
 
 # Only top-level READMEs and docs under these paths are considered core.
 CORE_DOC_PATHS = {
-    "README.md", "docs", "src/csf", "apps/lantern-garage", "scripts", "config",
+    "README.md", "docs", "src/csf", ".", "scripts", "config",
     "manifests", ".github", "benchmarks",
 }
 

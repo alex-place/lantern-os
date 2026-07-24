@@ -32,8 +32,8 @@ DEFAULT_OUT = REPO_ROOT / "data" / "training" / "haiku-ft-pairs.jsonl"
 SYSTEM_PROMPT = """You are an expert engineering assistant deeply familiar with the Lantern OS codebase — a local-first OS cockpit built by a solo developer (Alex Place).
 
 ## Architecture
-- **Server**: `apps/lantern-garage/server.js` on port 4177, REST API + SSE streaming
-- **Dream Chat**: `apps/lantern-garage/lib/dream-chat.js` — 6 agent personas (lantern, blinkbug, keystone, waterfall, xenon, founder)
+- **Server**: `server.js` on port 4177, REST API + SSE streaming
+- **Dream Chat**: `lib/dream-chat.js` — 6 agent personas (lantern, blinkbug, keystone, waterfall, xenon, founder)
 - **Convergence Engine**: `src/convergence_io_engine.py` — 4-layer TesseractEngine pipeline (~4s, returns JSON)
 - **CSF v07**: `src/csf/` — QuantumDustField, CSFFileWriter/Reader, SymbolicDictionary
 - **StatusCube**: `src/csf/status_cube.py` — player ImagniVerse (stage_index, loop_count, symbols, observations, archetype property)

@@ -21,8 +21,8 @@ Full audit of every tracked `.py` file in the repo (658 files), per the directiv
 
 **Headline findings:**
 
-1. **`/api/csf/search` is broken in production code.** `apps/lantern-garage/routes/dream.js:133` spawns `src/csf_search.py`, which does not exist anywhere in the repo. Every call to the endpoint errors. Fix: back it with the canonical `csf` package (`src/csf/`) or remove the endpoint.
-2. **The Colab training path is stale.** `apps/lantern-garage/lib/training-dispatcher.js` generates a notebook that runs `scripts/train_ouro.py` — a file that doesn't exist. The Kaggle path (which writes its own `train.py` to a temp dir) is fine. Repoint the Colab cell at `scripts/train-qlora-ouro.py` or delete the Colab branch.
+1. **`/api/csf/search` is broken in production code.** `routes/dream.js:133` spawns `src/csf_search.py`, which does not exist anywhere in the repo. Every call to the endpoint errors. Fix: back it with the canonical `csf` package (`src/csf/`) or remove the endpoint.
+2. **The Colab training path is stale.** `lib/training-dispatcher.js` generates a notebook that runs `scripts/train_ouro.py` — a file that doesn't exist. The Kaggle path (which writes its own `train.py` to a temp dir) is fine. Repoint the Colab cell at `scripts/train-qlora-ouro.py` or delete the Colab branch.
 3. **`lib/convergence-lora.js` waits for a script that was never written.** `triggerLocalTraining()` no-ops behind an `existsSync` guard on `scripts/train-convergence-lora.py`. Decide: implement it or delete the dead branch.
 4. **`tests/perf_dream_journal.py` is never run.** Its name doesn't match `test_*.py`, so pytest never collects it, and it targets the old Dream Journal service API. Rename+update it or remove it.
 5. **`src/hff-api/` (31 files) is a fully dead tree.** Zero external wiring; the only "references" are its own internal imports and generated RAG catalogs under `data/`. Its earlier appearance of being alive came from `data/rag-house/flat-rag-house-latest.json` — a *document index*, not execution wiring.
@@ -33,7 +33,7 @@ Full audit of every tracked `.py` file in the repo (658 files), per the directiv
 
 Static reference graph over all tracked files:
 
-- **Anchor surfaces:** `.github/workflows/`, `Makefile`, `package.json`, `scripts/hooks/` (repo-managed git hooks), `apps/lantern-garage/**/*.js` (server + routes + libs), `src/mcp_server/`, tracked `.ps1`/`.sh` launchers, `.mcp.json` and other config. `tests/**/test_*.py` are anchored via `pytest.ini` (`testpaths = tests`) which CI runs.
+- **Anchor surfaces:** `.github/workflows/`, `Makefile`, `package.json`, `scripts/hooks/` (repo-managed git hooks), `**/*.js` (server + routes + libs), `src/mcp_server/`, tracked `.ps1`/`.sh` launchers, `.mcp.json` and other config. `tests/**/test_*.py` are anchored via `pytest.ini` (`testpaths = tests`) which CI runs.
 - **Import closure:** package (`a.b.c`), relative (`from .x import`), and sibling-directory (`from mesh_bridge import …`) imports all resolved; anything imported (or path-spawned) by an anchored file is wired.
 - **Deliberately NOT counted as wiring:** mentions in generated catalogs under `data/` (RAG house, claim registries — they index files, they don't execute them), and generic-basename matches (`__init__.py`, `app.py`, …) without a path.
 - **Verified by spot-check:** MCP sibling imports, the four `validate-*` hook validators (wired via `scripts/hooks/pre-commit-full-validation`), the `/api/csf/search` breakage, the Colab `train_ouro.py` gap, and `tests/test_sigma0_grounding_corpus.py` (its `from experiments import …` works via namespace packages — passes, not broken).
@@ -71,7 +71,7 @@ Grouped, with the strongest evidence (all verified zero-reference; last-commit d
 | One-off generators | ~15 | PDF/audio/image one-shots: `generate_csf_pdf.py`, `generate_world_lore_pdf.py`, `generate-founder-wisdom-packet.py`, `sigma0-stream-image.py`, LoRA/SD trainers (`train-door-images-lora.py`, `retrain-lora-image.py`, `deploy-merged-sd-model.py`, …) |
 | Superseded training/eval | ~10 | `lightning_train_*.py`, `lightning_eval_7b_vs_ouro.py` (superseded by `lightning_dispatch.py` + `train-qlora-ouro.py`), `test_ouro_load.py`, `test_sigma0_loop.py`, `measure_drift_845.py`, `eval_fc_indomain.py` + `rebalance_fc_corpus.py` |
 | Root strays | 7 | `check_gpu.py`, `generate_segments.py`, `mcp_tunnel_proxy.py`, `tunnel_mcp.py` (superseded by the MCP tunnel canary), `test_oauth_flow.py`, `test_status_cube_phases.py` (never pytest-collected — root isn't in `testpaths`), `analyze_shorts.py` |
-| Misc src/apps | ~10 | `src/work_dispatcher.py` + `src/slot_loader.py`, `src/three_doors_classifier.py`, `src/generate_door_lora.py`, `src/lantern-desktop/*.py` (desktop is Node per ADR-0014), `apps/lantern-garage/lib/highlight_detector.py`, `docs/generate_blackbox_program_whitepaper.py` |
+| Misc src/apps | ~10 | `src/work_dispatcher.py` + `src/slot_loader.py`, `src/three_doors_classifier.py`, `src/generate_door_lora.py`, `src/lantern-desktop/*.py` (desktop is Node per ADR-0014), `lib/highlight_detector.py`, `docs/generate_blackbox_program_whitepaper.py` |
 | `apps/bettersafe/` | 9 docs-only + 2 markers | Design-contract-only app, zero wiring. Per the feature gate this is sprawl — remove or move the design doc to `docs/` and delete the stubs (Alex's call) |
 
 **Do NOT remove yet — July-dated orphans (active working set, pending writeup):**
@@ -127,7 +127,7 @@ Grouped, with the strongest evidence (all verified zero-reference; last-commit d
 
 | File | Last commit |
 |---|---|
-| `apps/lantern-garage/lib/highlight_detector.py` | 2026-06-15 |
+| `lib/highlight_detector.py` | 2026-06-15 |
 | `check_gpu.py` | 2026-06-11 |
 | `docs/generate_blackbox_program_whitepaper.py` | 2026-06-16 |
 | `generate_segments.py` | 2026-06-14 |
@@ -489,60 +489,60 @@ Grouped, with the strongest evidence (all verified zero-reference; last-commit d
 |---|---|
 | `scripts/Test-ConvergenceAgentFleet.py` | `scripts/Invoke-LanternConvergenceLoop.ps1`, `scripts/Invoke-LanternSmartConvergenceLoop.ps1` |
 | `scripts/agent_inspector.py` | `scripts/Start-TesseractListener.ps1` |
-| `scripts/arxiv_build_index.py` | `apps/lantern-garage/lib/arxiv-index.js`, `lib/csf-memory.js` |
-| `scripts/arxiv_harvest.py` | `apps/lantern-garage/lib/arxiv-fulltext.js`, `lib/csf-memory.js` |
+| `scripts/arxiv_build_index.py` | `lib/arxiv-index.js`, `lib/csf-memory.js` |
+| `scripts/arxiv_harvest.py` | `lib/arxiv-fulltext.js`, `lib/csf-memory.js` |
 | `scripts/build_claude_session_dataset.py` | `tests/test_agent_session_dataset.py` |
-| `scripts/build_knowledge_index.py` | `apps/lantern-garage/lib/knowledge-router.js` |
-| `scripts/build_library_thumbs.py` | `apps/lantern-garage/routes/library.js` |
+| `scripts/build_knowledge_index.py` | `lib/knowledge-router.js` |
+| `scripts/build_library_thumbs.py` | `routes/library.js` |
 | `scripts/build_ouro_coding_dataset.py` | `scripts/continual_ouro_pipeline.py` |
-| `scripts/continual_ouro_pipeline.py` | `apps/lantern-garage/lib/keystone-escalation.js`, `lib/stream-chat.js` |
-| `scripts/convergence_close_loop.py` | `apps/lantern-garage/lib/convergence-status.js`, `lib/kalshi-convergence-outcomes.js` |
+| `scripts/continual_ouro_pipeline.py` | `lib/keystone-escalation.js`, `lib/stream-chat.js` |
+| `scripts/convergence_close_loop.py` | `lib/convergence-status.js`, `lib/kalshi-convergence-outcomes.js` |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` |
 | `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` |
-| `scripts/csf_condense_corpus.py` | `apps/lantern-garage/routes/pdfs.js` |
-| `scripts/csf_read_member.py` | `apps/lantern-garage/routes/pdfs.js` |
-| `scripts/csf_research_tesseract.py` | `apps/lantern-garage/routes/csf.js`, `server.js` |
-| `scripts/csf_split_archive.py` | `apps/lantern-garage/routes/pdfs.js` |
+| `scripts/csf_condense_corpus.py` | `routes/pdfs.js` |
+| `scripts/csf_read_member.py` | `routes/pdfs.js` |
+| `scripts/csf_research_tesseract.py` | `routes/csf.js`, `server.js` |
+| `scripts/csf_split_archive.py` | `routes/pdfs.js` |
 | `scripts/eval_coding.py` | `scripts/eval_coding_backend_ab.py` |
-| `scripts/eval_coding_backend_ab.py` | `apps/lantern-garage/lib/coding-backend/index.js` |
+| `scripts/eval_coding_backend_ab.py` | `lib/coding-backend/index.js` |
 | `scripts/eval_humaneval_ouro.py` | `scripts/continual_ouro_pipeline.py` |
 | `scripts/eval_keystone.py` | `.github/workflows/eval-leaderboard-gate.yml` |
 | `scripts/eval_ledger.py` | `tests/test_eval_ledger.py` |
 | `scripts/eval_sigma0_adapter.py` | `tests/test_sigma0_eval.py` |
 | `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` |
-| `scripts/facecam_face_detect.py` | `apps/lantern-garage/lib/facecam-v3.js` |
+| `scripts/facecam_face_detect.py` | `lib/facecam-v3.js` |
 | `scripts/fetch_radio_audio.py` | `scripts/normalize_radio_levels.py` |
 | `scripts/fine-tune-ollama-model.py` | `scripts/convert-pairs-to-alpaca.py` |
-| `scripts/gen_sigma0_traces.py` | `apps/lantern-garage/lib/local-model-registry.js` |
-| `scripts/generate-door-images.py` | `apps/lantern-garage/lib/stream-chat.js` |
-| `scripts/generate-with-trained-lora.py` | `apps/lantern-garage/lib/image-generation.js` |
-| `scripts/harvest_coding_corpus.py` | `apps/lantern-garage/lib/harvest-emitter.js` |
+| `scripts/gen_sigma0_traces.py` | `lib/local-model-registry.js` |
+| `scripts/generate-door-images.py` | `lib/stream-chat.js` |
+| `scripts/generate-with-trained-lora.py` | `lib/image-generation.js` |
+| `scripts/harvest_coding_corpus.py` | `lib/harvest-emitter.js` |
 | `scripts/honesty_ledger.py` | `tests/test_honesty_ledger.py` |
 | `scripts/humaneval_rerank.py` | `scripts/eval_humaneval_ouro.py` |
-| `scripts/image_generator.py` | `apps/lantern-garage/routes/image.js` |
+| `scripts/image_generator.py` | `routes/image.js` |
 | `scripts/kalshi_odds.py` | `src/mcp_server/server.py` |
-| `scripts/lightning_dispatch.py` | `apps/lantern-garage/lib/training-dispatcher.js` |
+| `scripts/lightning_dispatch.py` | `lib/training-dispatcher.js` |
 | `scripts/mcp_stdio_bridge.py` | `.mcp.json`, `.mcp/claude-desktop.json` |
 | `scripts/measure_drift_equivalence.py` | `tests/test_drift_equivalence.py` |
 | `scripts/merge-lora-weights.py` | `src/sd_image_server.py` |
 | `scripts/merge-lora.py` | `scripts/continual-train.ps1` |
-| `scripts/normalize_radio_levels.py` | `apps/lantern-garage/public/radio/stations-pending-restore.json` |
+| `scripts/normalize_radio_levels.py` | `public/radio/stations-pending-restore.json` |
 | `scripts/orchestration/lantern-billing.py` | `scripts/orchestration/Deploy-FamilyA-24Hour.ps1` ⚠ launcher itself likely dead |
 | `scripts/orchestration/lantern-chat-ui.py` | same ⚠ |
 | `scripts/orchestration/lantern-kids-ui.py` | same ⚠ |
 | `scripts/orchestration/lantern-telemetry.py` | same ⚠ |
 | `scripts/orchestration/rag_local_knowledge_base.py` | `scripts/Ingest-CaadZip.ps1` |
-| `scripts/ouro_anthropic_bridge.py` | `apps/lantern-garage/lib/tool-runner.js`, `scripts/Start-OuroClaudeCode.ps1` |
+| `scripts/ouro_anthropic_bridge.py` | `lib/tool-runner.js`, `scripts/Start-OuroClaudeCode.ps1` |
 | `scripts/ouro_compat.py` | `tests/test_ouro_compat.py` |
 | `scripts/ouro_serve.py` | `.claude/agent-slots.json`, `.github/workflows/eval-leaderboard-gate.yml` |
 | `scripts/ouro_serve_smoketest.py` | `scripts/rebuild-train-venv.ps1` |
-| `scripts/prepare_coding_train_data.py` | `apps/lantern-garage/lib/model-registry.js` |
-| `scripts/resume_docx.py` | `apps/lantern-garage/routes/docmode.js`, `routes/documents.js` |
+| `scripts/prepare_coding_train_data.py` | `lib/model-registry.js` |
+| `scripts/resume_docx.py` | `routes/docmode.js`, `routes/documents.js` |
 | `scripts/rlvr_grpo_ouro.py` | `tests/test_sigma_theta_gate.py` |
 | `scripts/rollover_gate.py` | `scripts/eval_keystone.py` |
-| `scripts/train-qlora-ouro.py` | `apps/lantern-garage/lib/model-registry.js` |
+| `scripts/train-qlora-ouro.py` | `lib/model-registry.js` |
 | `scripts/train-qlora-peft.py` | `scripts/continual-train.ps1` |
-| `scripts/train-three-doors-lora.py` | `apps/lantern-garage/routes/training.js` |
+| `scripts/train-three-doors-lora.py` | `routes/training.js` |
 | `scripts/upload-anthropic-finetune.py` | `scripts/extract-session-pairs.py` |
 | `scripts/validate-agents-md.py` | `scripts/hooks/pre-commit-full-validation` |
 | `scripts/validate-autoupdate-safety.py` | `scripts/hooks/pre-commit-full-validation` |

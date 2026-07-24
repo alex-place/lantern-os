@@ -50,7 +50,7 @@ function makeNormalFor(normals = {}, defaultNormal = DEFAULT_NORMAL) {
 
 // CSV/day/MOS parsing lives in the serving lib (kalshi-mos) so fit == serve BY CONSTRUCTION —
 // the fit and the live deck use one identical forecast-high definition.
-const { parseCsv, localDayOf, mosForecastHighs } = require("../apps/lantern-garage/lib/kalshi-mos");
+const { parseCsv, localDayOf, mosForecastHighs } = require("../lib/kalshi-mos");
 
 /** ASOS hourly tmpf rows -> {localDayKey -> settledHigh}. Accepts columns station,valid,tmpf.
  *  `roundF: true` rounds the daily max to the nearest whole °F — the ForecastEx U-series

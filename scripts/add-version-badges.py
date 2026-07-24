@@ -2,7 +2,7 @@
 """Add dynamic version badges to all HTML pages in Lantern OS public dir."""
 import re, os
 
-PUBLIC_DIR = 'apps/lantern-garage/public'
+PUBLIC_DIR = 'public'
 
 SHARED_SCRIPT = """\n<!-- Version badge auto-loader -->\n<script>\n(function() {\n  const base = window.location.origin;\n  fetch(base + '/version.json', { cache: 'no-store' })\n    .then(r => r.ok ? r.json() : null)\n    .then(v => {\n      if (!v || !v.version) return;\n      document.querySelectorAll('[data-version-badge]').forEach(el => {\n        const prefix = el.dataset.versionBadge || '';\n        el.textContent = prefix + 'v' + v.version;\n        el.style.cursor = 'pointer';\n        el.title = 'View changelog';\n        el.onclick = function() { window.open('/repo/CHANGELOG.MD', '_blank'); };\n      });\n    })\n    .catch(() => {});\n})();\n</script>\n"""
 

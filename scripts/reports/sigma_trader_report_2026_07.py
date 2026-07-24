@@ -1,6 +1,6 @@
 """Sigma Trader Report - July 2026 -- THE JULY LEAP (comet-leap, for-everyone edition).
 
-Builds apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf: the
+Builds public/reports/sigma-trader-report-2026-07.pdf: the
 monthly report on unisona.ai's Champion trader, written for EVERY user - free or
 paid, plan or no plan, market-fluent or brand new. House COMET LEAP style
 (Lantern Preferred Visual System v0.1: arc-of-past -> node-of-now -> projected

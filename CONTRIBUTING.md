@@ -47,7 +47,7 @@ Before submitting a PR:
 
 When adding UI text:
 
-1. Add to locale files (apps/lantern-garage/public/locales/*.json)
+1. Add to locale files (public/locales/*.json)
 2. Current languages: English, Spanish, German, Japanese
 
 ## Testing

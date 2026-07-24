@@ -61,7 +61,7 @@ This data is served from `/api/positions` via the Trading Dashboard service (por
 
 4. **Restart unisona.ai**
    ```bash
-   npm run dev --prefix apps/lantern-garage
+   npm run dev
    ```
 
 ### Option 2: Demo Account (Paper Trading)
@@ -165,10 +165,10 @@ Response metadata should show:
 ## Connector Implementation (Already Wired)
 
 ### Core Files
-- **Service:** `apps/lantern-garage/lib/trading-service.js` (mock data + market endpoints)
-- **API Bridge:** `apps/lantern-garage/lib/trading-api-bridge.js` (IBKR + KALSHI + Alpaca connectors)
+- **Service:** `lib/trading-service.js` (mock data + market endpoints)
+- **API Bridge:** `lib/trading-api-bridge.js` (IBKR + KALSHI + Alpaca connectors)
 - **Routes:** `apps/lanterns-garage/routes/trading.js` (HTTP endpoints)
-- **Memory:** `apps/lantern-garage/lib/trading-memory.js` (persists trading context)
+- **Memory:** `lib/trading-memory.js` (persists trading context)
 
 ### Bridge Methods (Already Implemented)
 ```javascript

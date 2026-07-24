@@ -13,7 +13,7 @@ const { execSync } = require("child_process");
 
 const repoRoot = path.resolve(__dirname, "..");
 const pkgPath = path.join(repoRoot, "package.json");
-const versionPath = path.join(repoRoot, "apps/lantern-garage/version.json");
+const versionPath = path.join(repoRoot, "version.json");
 const changelogPath = path.join(repoRoot, "CHANGELOG.MD");
 
 function getLastCommitMessage() {

@@ -35,10 +35,10 @@ provider). The server reads `.env` for keys at startup and supports **hot reload
 `POST /api/settings/providers` without a restart ([PROVIDERS.md:17-22](../../PROVIDERS.md)).
 
 All LLM calls route through a selector (`provider-router.js` / `selectProvider`,
-imported by [`dream-chat.js`](../../apps/lantern-garage/lib/dream-chat.js)) with a defined
+imported by [`dream-chat.js`](../../lib/dream-chat.js)) with a defined
 **fallback chain**: Gemini → Claude → OpenAI → Ollama (local Σ₀/Ouro at
 `http://127.0.0.1:11434`, default `ouro:latest`) ([PROVIDERS.md:156-161](../../PROVIDERS.md),
-[`dream-chat.js:430-431`](../../apps/lantern-garage/lib/dream-chat.js)). No module hardcodes a
+[`dream-chat.js:430-431`](../../lib/dream-chat.js)). No module hardcodes a
 single provider as a hard dependency.
 
 ## Options Considered
@@ -77,8 +77,8 @@ See Options. "Do nothing" (hardcode the current best model) is the lock-in the N
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Providers declared as data (PCSF) | `data/pcsf/provider.pcsf.json` (gitignored runtime) + committed [`model.pcsf.json`](../../data/pcsf/model.pcsf.json); [PROVIDERS.md:17](../../PROVIDERS.md) | High | code + doc |
-| Calls route through a selector | `provider-router.js` import in [`dream-chat.js:9`](../../apps/lantern-garage/lib/dream-chat.js) | High | code |
+| Calls route through a selector | `provider-router.js` import in [`dream-chat.js:9`](../../lib/dream-chat.js) | High | code |
 | Fallback chain Gemini→Claude→OpenAI→Ollama | [PROVIDERS.md:156-161](../../PROVIDERS.md) | High | doc |
-| Local model is a peer in the chain | [`dream-chat.js:430-431`](../../apps/lantern-garage/lib/dream-chat.js) | High | code |
+| Local model is a peer in the chain | [`dream-chat.js:430-431`](../../lib/dream-chat.js) | High | code |
 | Keys hot-reload without restart | [PROVIDERS.md:22](../../PROVIDERS.md) | Medium | doc |
 | Never hardcode a provider | [CONVERGANCE-SIGMA0-BRIEFING.md](../CONVERGANCE-SIGMA0-BRIEFING.md) #3 | High | project doc |

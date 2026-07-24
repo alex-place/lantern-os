@@ -125,13 +125,13 @@ function phase3SyntaxChecks() {
   header("Phase 3 — Backend Syntax Checks");
 
   const targets = [
-    "apps/lantern-garage/server.js",
-    "apps/lantern-garage/lib/job-queue.js",
-    "apps/lantern-garage/lib/job-worker.js",
-    "apps/lantern-garage/lib/highlight-engine.js",
-    "apps/lantern-garage/lib/safe-zone-v2.js",
-    "apps/lantern-garage/routes/creator.js",
-    "apps/lantern-garage/routes/creator-entries.js",
+    "server.js",
+    "lib/job-queue.js",
+    "lib/job-worker.js",
+    "lib/highlight-engine.js",
+    "lib/safe-zone-v2.js",
+    "routes/creator.js",
+    "routes/creator-entries.js",
   ];
 
   const results = {};
@@ -182,27 +182,27 @@ function phase5Fixes(issues) {
   // Structural fixes already applied in this maintenance cycle:
   fixes.push({
     description: "fix(creator): /api/creator/job/:id now returns full toJSON() including stages/logs/liveStats/etaSeconds",
-    file: "apps/lantern-garage/routes/creator.js",
+    file: "routes/creator.js",
     applied: true,
   });
   fixes.push({
     description: "feat(creator): highlight_debug.json written per analysis — per-segment scores and signals",
-    file: "apps/lantern-garage/lib/job-worker.js",
+    file: "lib/job-worker.js",
     applied: true,
   });
   fixes.push({
     description: "feat(creator): safe_zone_report.json written per safe-zone detection with enforcement verdict",
-    file: "apps/lantern-garage/lib/job-worker.js",
+    file: "lib/job-worker.js",
     applied: true,
   });
   fixes.push({
     description: "feat(creator): TaskProgressPanel — stage-aware progress with ETA, live stats, logs, completion/failure summary",
-    file: "apps/lantern-garage/public/entry.html",
+    file: "public/entry.html",
     applied: true,
   });
   fixes.push({
     description: "feat(creator): Job model extended with stages[], logs[], liveStats{}, etaSeconds for rich progress tracking",
-    file: "apps/lantern-garage/lib/job-queue.js",
+    file: "lib/job-queue.js",
     applied: true,
   });
   fixes.push({

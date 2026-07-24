@@ -32,9 +32,9 @@ Write-Host ""
 # 1. HTML Pages
 Write-Host "1. HTML Pages" -ForegroundColor Yellow
 $pages = @(
-    "apps/lantern-garage/public/index.html",
-    "apps/lantern-garage/public/dream-chat.html",
-    "apps/lantern-garage/public/outreach.html"
+    "public/index.html",
+    "public/dream-chat.html",
+    "public/outreach.html"
 )
 foreach ($page in $pages) {
     $path = Join-Path $repoRoot $page
@@ -44,8 +44,8 @@ foreach ($page in $pages) {
 # 2. JavaScript Syntax
 Write-Host "`n2. JavaScript Syntax" -ForegroundColor Yellow
 $jsFiles = @(
-    "apps/lantern-garage/server.js",
-    "apps/lantern-garage/public/app.js"
+    "server.js",
+    "public/app.js"
 )
 foreach ($js in $jsFiles) {
     $path = Join-Path $repoRoot $js
@@ -127,7 +127,7 @@ Write-Check "Python integration tests" $pyIntPass $pyInt
 
 # 10. Safety Boundaries
 Write-Host "`n10. Safety Boundaries" -ForegroundColor Yellow
-$indexHtml = Get-Content (Join-Path $repoRoot "apps/lantern-garage/public/index.html") -Raw
+$indexHtml = Get-Content (Join-Path $repoRoot "public/index.html") -Raw
 $noMedical = $indexHtml -notmatch "therapist|diagnosis|prescription|treatment"
 Write-Check "No medical claims in UI" $noMedical
 $privacy = $indexHtml -match "private|local|your device|saved locally"

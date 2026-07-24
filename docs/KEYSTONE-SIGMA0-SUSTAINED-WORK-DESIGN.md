@@ -224,11 +224,11 @@ Converge follow-on (deferred, heavier):
 | Adaptive Loop Gate spec | `models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md` (archived 2026-07-24) |
 | Existing self-converging loop (Ouro) | `src/sigma0/loop_lm.py:179-245`; `src/sigma0/decode_canary.py`; `src/sigma0/quantized_cache.py` |
 | Serving + telemetry to extend | `scripts/ouro_serve.py:185-209,372-377`; `scripts/ouro_anthropic_bridge.py` |
-| Registry / lead resolution | `apps/lantern-garage/lib/local-model-registry.js:81-162,301-334` |
-| The valve wire (Issue B) | `apps/lantern-garage/lib/stream-chat.js:~1199`; `lib/groundedness-canary.js:~135-151`; `lib/token-surprise.js:59-86` |
-| Collapse canary | `apps/lantern-garage/lib/collapse-canary.js:~99-135` |
-| Council answerability gate | `apps/lantern-garage/lib/council-review.js:~106-121` |
-| Autowork dispatch / wedge | `apps/lantern-garage/lib/auto-dispatch.js:42,187-254`; `lib/autowork-research.js` |
+| Registry / lead resolution | `lib/local-model-registry.js:81-162,301-334` |
+| The valve wire (Issue B) | `lib/stream-chat.js:~1199`; `lib/groundedness-canary.js:~135-151`; `lib/token-surprise.js:59-86` |
+| Collapse canary | `lib/collapse-canary.js:~99-135` |
+| Council answerability gate | `lib/council-review.js:~106-121` |
+| Autowork dispatch / wedge | `lib/auto-dispatch.js:42,187-254`; `lib/autowork-research.js` |
 | Measured surprise result | `experiments/surprise_leak_ab.py`; `docs/research/2026-06-30-surprise-leak-layer1-result.md` |
 | Governing ADRs | `docs/adr/0011-*`, `docs/adr/0010-*`, `docs/adr/0005-*`, `docs/adr/0009-*` |
 </content>

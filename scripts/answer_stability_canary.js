@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const { runCanary } = require("../apps/lantern-garage/lib/answer-stability-canary");
+const { runCanary } = require("../lib/answer-stability-canary");
 
 const ROOT = path.resolve(__dirname, "..");
 const QUESTIONS_FILE = path.join(ROOT, "data", "ledger", "canary-questions.json");

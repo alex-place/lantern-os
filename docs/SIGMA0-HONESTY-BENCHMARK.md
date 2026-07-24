@@ -139,7 +139,7 @@ python -m pytest tests/test_golden_web_validation.py             # answer-key co
 ```
 
 Gemini uses **Vertex AI** when `GEMINI_USE_VERTEX=1` or `VERTEX_PROJECT` is set (ADC auth, mirrors
-`apps/lantern-garage/lib/gemini-transport.js`); otherwise it falls back to the AI-Studio `GEMINI_API_KEY`.
+`lib/gemini-transport.js`); otherwise it falls back to the AI-Studio `GEMINI_API_KEY`.
 
 The honest open item is **Table 1's last row**: measure our own honest-Ouro on the golden set once
 the train/serve prompt-format mismatch (#2033) is fixed — that is the whole point of the exercise.

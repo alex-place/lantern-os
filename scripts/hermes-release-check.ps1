@@ -62,16 +62,16 @@ $table.scores.G1 = if ($apiTest.ok -and $chatTest.ok) { 0.82 } else { 0.55 }
 $table.evidence.G1 = @{api_test=$apiTest.detail; chat_test=$chatTest.detail; py_test=$pyTest.detail}
 
 # G2: Real UI browse
-$indexHtml = Check-FileExists (Join-Path $repoRoot "apps\lantern-garage\public\index.html") 300
-$hasRecentEntries = $indexHtml.ok -and (Select-String -Path (Join-Path $repoRoot "apps\lantern-garage\public\index.html") -Pattern "recent-entries" -Quiet)
+$indexHtml = Check-FileExists (Join-Path $repoRoot "public\index.html") 300
+$hasRecentEntries = $indexHtml.ok -and (Select-String -Path (Join-Path $repoRoot "public\index.html") -Pattern "recent-entries" -Quiet)
 $table.scores.G2 = if ($hasRecentEntries) { 0.72 } else { 0.42 }
 $table.evidence.G2 = @{index_html_lines=$indexHtml.detail; has_recent_entries=$hasRecentEntries}
 
 # G3: Semantic memory
 $memosBridge = Check-FileExists (Join-Path $repoRoot "src\convergence_io\memos_bridge.py") 30
-$dreamRoute = Check-FileExists (Join-Path $repoRoot "apps\lantern-garage\routes\dream.js") 100
-$hasMemosIngest = $dreamRoute.ok -and (Select-String -Path (Join-Path $repoRoot "apps\lantern-garage\routes\dream.js") -Pattern "memos" -Quiet)
-$hasMemoryHealth = $dreamRoute.ok -and (Select-String -Path (Join-Path $repoRoot "apps\lantern-garage\routes\dream.js") -Pattern "memory/health" -Quiet)
+$dreamRoute = Check-FileExists (Join-Path $repoRoot "routes\dream.js") 100
+$hasMemosIngest = $dreamRoute.ok -and (Select-String -Path (Join-Path $repoRoot "routes\dream.js") -Pattern "memos" -Quiet)
+$hasMemoryHealth = $dreamRoute.ok -and (Select-String -Path (Join-Path $repoRoot "routes\dream.js") -Pattern "memory/health" -Quiet)
 $table.scores.G3 = if ($hasMemosIngest -and $hasMemoryHealth) { 0.65 } else { 0.46 }
 $table.evidence.G3 = @{memos_bridge=$memosBridge.detail; has_ingest=$hasMemosIngest; has_health=$hasMemoryHealth}
 

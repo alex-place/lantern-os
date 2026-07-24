@@ -9,8 +9,8 @@ Sources:
   skills/lantern-rag-dollhouse/assets/pdfs/*.pdf (the Comet-Leap master PDFs)
 
 Output:
-  apps/lantern-garage/public/library-thumbs/<id>.png
-  apps/lantern-garage/public/library-thumbs/index.json
+  public/library-thumbs/<id>.png
+  public/library-thumbs/index.json
 
 Run:  python scripts/build_library_thumbs.py
 """

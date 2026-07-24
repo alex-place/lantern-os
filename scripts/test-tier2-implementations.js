@@ -4,9 +4,9 @@
  */
 
 const path = require("path");
-const RegimeDetector = require("../apps/lantern-garage/lib/regime-detector");
-const TightBandScheduler = require("../apps/lantern-garage/lib/tightband-daily-scheduler");
-const ImpossibilityC7Gate = require("../apps/lantern-garage/lib/impossibility-c7-gate");
+const RegimeDetector = require("../lib/regime-detector");
+const TightBandScheduler = require("../lib/tightband-daily-scheduler");
+const ImpossibilityC7Gate = require("../lib/impossibility-c7-gate");
 
 console.log("\n=== TIER 2 IMPLEMENTATION TESTS ===\n");
 

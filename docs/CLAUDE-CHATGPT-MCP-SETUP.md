@@ -11,7 +11,7 @@
 All three services are running automatically when you start the main server:
 
 ```bash
-npm start --prefix apps/lantern-garage
+npm start
 ```
 
 | Service | Local | Public | Port |
@@ -294,7 +294,7 @@ curl https://mcp.lantern-os.net/oauth/health
 
 ## Next Steps
 
-1. **Start servers:** `npm start --prefix apps/lantern-garage`
+1. **Start servers:** `npm start`
 2. **Test OAuth:** `curl http://127.0.0.1:8772/.well-known/oauth-authorization-server`
 3. **Claude API:** Connect using the SDK configuration above
 4. **ChatGPT:** Follow the connector setup steps with the OAuth endpoints

@@ -5,7 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$app = Join-Path $root "apps\lantern-garage"
+$app = Join-Path $root "."
 
 $env:LANTERN_GARAGE_PORT = [string]$Port
 Set-Location -LiteralPath $app

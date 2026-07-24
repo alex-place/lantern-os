@@ -124,29 +124,29 @@ Claude is expensive. Use it for design decisions and complex debugging. Delegate
 
 **Claude is for:** Orchestrator bugs, stream architecture, provider chain logic, system prompt design, security review.
 
-**Local coding model:** the local-first coder is **Qwen2.5-Coder** (#2171), served via Ollama on `:11434` and selected by the VRAM-gated registry (`apps/lantern-garage/lib/local-model-registry.js`); it's graded on HumanEval in [BENCHMARKS.md](docs/BENCHMARKS.md). **Ouro-1.4B is the Σ₀ kernel/research base and adapter host — not the coding engine:** its recurrent-depth "Ouro Coder" looping was measured **NEGATIVE** (#2178 — deeper looping adds no accuracy and is ~15× slower; the *adapter*, not the loop, is the capability), so it stays research-only. (Earlier docs had this inverted — claiming an Ouro coder superseded Qwen; the reverse is true.)
+**Local coding model:** the local-first coder is **Qwen2.5-Coder** (#2171), served via Ollama on `:11434` and selected by the VRAM-gated registry (`lib/local-model-registry.js`); it's graded on HumanEval in [BENCHMARKS.md](docs/BENCHMARKS.md). **Ouro-1.4B is the Σ₀ kernel/research base and adapter host — not the coding engine:** its recurrent-depth "Ouro Coder" looping was measured **NEGATIVE** (#2178 — deeper looping adds no accuracy and is ~15× slower; the *adapter*, not the loop, is the capability), so it stays research-only. (Earlier docs had this inverted — claiming an Ouro coder superseded Qwen; the reverse is true.)
 
 ### 4. Don't re-read files you've already read
 
-The route architecture is modular. **The authoritative list of what's registered is the `routes[]` array in [`server.js`](apps/lantern-garage/server.js) (≈ lines 150-221)** — `routes/` holds ~68 modules; the shortlist below is just the high-traffic ones. To find the handler for an endpoint, grep the `routes[]` requires, not this table.
+The route architecture is modular. **The authoritative list of what's registered is the `routes[]` array in [`server.js`](server.js) (≈ lines 150-221)** — `routes/` holds ~68 modules; the shortlist below is just the high-traffic ones. To find the handler for an endpoint, grep the `routes[]` requires, not this table.
 
 | File | Routes / Responsibility |
 |------|------------------------|
-| [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) | ~764 lines — loads `.env` + shared deps, wires the `routes[]` array, then **spawns & supervises child processes** (Discord bot, MCP children on 8771/8772, trading microservice, AI trader, Cloudflare tunnel, crypto observer) and in-process collectors/monitors (Kalshi/crypto/news collectors, position monitor, convergence trainer/enhancer/LoRA). **Not just glue** — read it when debugging startup/child-process behavior. |
-| [`apps/lantern-garage/routes/status.js`](apps/lantern-garage/routes/status.js) | `/api/health`, `/api/status`, wallet, readiness |
-| [`apps/lantern-garage/routes/rag.js`](apps/lantern-garage/routes/rag.js) | `/api/rag-cache`, flat-rag-house |
-| [`apps/lantern-garage/routes/operator.js`](apps/lantern-garage/routes/operator.js) | `/api/operator-notes`, conversations, actions |
-| [`apps/lantern-garage/routes/files.js`](apps/lantern-garage/routes/files.js) | `/repo/*`, `/view` (markdown) |
-| [`apps/lantern-garage/routes/dreamer.js`](apps/lantern-garage/routes/dreamer.js) | `/api/dreamer`, `/api/agents` |
-| [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) | ALL `/api/dream/*` + `/api/settings/providers` + SSE stream |
-| [`apps/lantern-garage/routes/trading.js`](apps/lantern-garage/routes/trading.js) | Kalshi terminal — 60+ `/api/trading/*` endpoints |
-| [`apps/lantern-garage/routes/surfaces.js`](apps/lantern-garage/routes/surfaces.js) | `/hub`, `/surfaces/*`, static catch-all |
-| [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) | SSE streaming (Gemini→Claude→OpenAI→Grok→Ollama) |
-| [`apps/lantern-garage/lib/dream-chat.js`](apps/lantern-garage/lib/dream-chat.js) | Non-streaming chat + persona selection |
-| [`apps/lantern-garage/lib/dreamer-store.js`](apps/lantern-garage/lib/dreamer-store.js) | `readRecentDreams()`, notebook storage |
-| [`apps/lantern-garage/lib/conversation-store.js`](apps/lantern-garage/lib/conversation-store.js) | append/read conversation JSONL |
-| [`apps/lantern-garage/lib/csf-memory.js`](apps/lantern-garage/lib/csf-memory.js) | CSF long-term memory reader, door state persistence |
-| [`apps/lantern-garage/lib/convergence-adapter.js`](apps/lantern-garage/lib/convergence-adapter.js) | **The one guarded seam onto `src/convergence_io_engine.py`** (circuit breaker + timeout). `runEngineCommand('inspect'\|'health')` backs the `convergence_inspect` tool and `GET /api/actions/inspect` — don't spawn the engine ad hoc, call this. |
+| [`server.js`](server.js) | ~764 lines — loads `.env` + shared deps, wires the `routes[]` array, then **spawns & supervises child processes** (Discord bot, MCP children on 8771/8772, trading microservice, AI trader, Cloudflare tunnel, crypto observer) and in-process collectors/monitors (Kalshi/crypto/news collectors, position monitor, convergence trainer/enhancer/LoRA). **Not just glue** — read it when debugging startup/child-process behavior. |
+| [`routes/status.js`](routes/status.js) | `/api/health`, `/api/status`, wallet, readiness |
+| [`routes/rag.js`](routes/rag.js) | `/api/rag-cache`, flat-rag-house |
+| [`routes/operator.js`](routes/operator.js) | `/api/operator-notes`, conversations, actions |
+| [`routes/files.js`](routes/files.js) | `/repo/*`, `/view` (markdown) |
+| [`routes/dreamer.js`](routes/dreamer.js) | `/api/dreamer`, `/api/agents` |
+| [`routes/dream.js`](routes/dream.js) | ALL `/api/dream/*` + `/api/settings/providers` + SSE stream |
+| [`routes/trading.js`](routes/trading.js) | Kalshi terminal — 60+ `/api/trading/*` endpoints |
+| [`routes/surfaces.js`](routes/surfaces.js) | `/hub`, `/surfaces/*`, static catch-all |
+| [`lib/stream-chat.js`](lib/stream-chat.js) | SSE streaming (Gemini→Claude→OpenAI→Grok→Ollama) |
+| [`lib/dream-chat.js`](lib/dream-chat.js) | Non-streaming chat + persona selection |
+| [`lib/dreamer-store.js`](lib/dreamer-store.js) | `readRecentDreams()`, notebook storage |
+| [`lib/conversation-store.js`](lib/conversation-store.js) | append/read conversation JSONL |
+| [`lib/csf-memory.js`](lib/csf-memory.js) | CSF long-term memory reader, door state persistence |
+| [`lib/convergence-adapter.js`](lib/convergence-adapter.js) | **The one guarded seam onto `src/convergence_io_engine.py`** (circuit breaker + timeout). `runEngineCommand('inspect'\|'health')` backs the `convergence_inspect` tool and `GET /api/actions/inspect` — don't spawn the engine ad hoc, call this. |
 
 **Rule: If you need a route, grep the `routes[]` array in `server.js` for the module, then read that module. If you need streaming, read `lib/stream-chat.js`. Read `server.js` itself only for startup / child-process / supervisor behavior.**
 
@@ -168,17 +168,17 @@ python -m pytest tests/test_dashboard_ux.py tests/test_dreamer_integration.py -q
 
 **Dev server (default — auto-restarts on file save):**
 ```bash
-npm run dev --prefix apps/lantern-garage    # port 4177, watch mode
+npm run dev    # port 4177, watch mode
 ```
 
 **One-shot / production:**
 ```bash
-npm start --prefix apps/lantern-garage      # port 4177
+npm start      # port 4177
 ```
 
 **Full stack:**
 ```bash
-npm run dev --prefix apps/lantern-garage &  # web server
+npm run dev &  # web server
 python src/mcp_server/server.py &           # MCP server (optional, port 8771)
 python src/convergence_io_engine.py health  # confirm everything healthy
 ```
@@ -452,7 +452,7 @@ warn when two open PRs reference the same issue. The autowork pipeline already d
 server-side via per-issue claim files; this is the human/agent **chat-lane** equivalent.
 
 ### Auto-merge (green + review-APPROVE)
-The single merger (`apps/lantern-garage/lib/pr-watcher.js`) auto-merges a PR once it is
+The single merger (`lib/pr-watcher.js`) auto-merges a PR once it is
 **green** (all CI checks pass, minus deploy-preview/base-red self-heal), **conflict-free**,
 **not a draft**, and its **fleet auto-review returned `VERDICT: APPROVE`** — except PRs
 touching a **protected path** (auth / money / `.github/workflows/` / secrets / migrations),
@@ -573,16 +573,16 @@ When you start work, get the full stack running so you can test changes end-to-e
 ### 1. Install dependencies
 
 ```bash
-npm install --prefix apps/lantern-garage
+npm install
 python -m pip install -r requirements.txt
 ```
 
 ### 2. Start the web server (required)
 
 ```bash
-npm run dev --prefix apps/lantern-garage    # dev mode — auto-restarts on file changes
+npm run dev    # dev mode — auto-restarts on file changes
 # or for one-shot:
-npm start --prefix apps/lantern-garage
+npm start
 ```
 
 Opens on `http://127.0.0.1:4177`.
@@ -592,7 +592,7 @@ Opens on `http://127.0.0.1:4177`.
 Via the chat UI settings drawer, or `.env.local`:
 
 ```bash
-echo "GEMINI_API_KEY=your_key" > apps/lantern-garage/.env.local
+echo "GEMINI_API_KEY=your_key" > .env.local
 ```
 
 ### 4. Start optional services as needed
@@ -626,12 +626,12 @@ python src/convergence_io_engine.py inspect
 
 | What | Where |
 |------|-------|
-| Server entry | [`apps/lantern-garage/server.js`](apps/lantern-garage/server.js) (~764 lines: `routes[]` wiring + child-process supervisor) |
-| All dream routes | [`apps/lantern-garage/routes/dream.js`](apps/lantern-garage/routes/dream.js) |
-| SSE streaming | [`apps/lantern-garage/lib/stream-chat.js`](apps/lantern-garage/lib/stream-chat.js) |
-| Chat UI | [`apps/lantern-garage/public/chat.html`](apps/lantern-garage/public/chat.html) (legacy `dream-chat.html` is a redirect stub) |
-| Landing page | [`apps/lantern-garage/public/index.html`](apps/lantern-garage/public/index.html) |
-| Provider settings | `POST /api/settings/providers` in [`routes/dream.js`](apps/lantern-garage/routes/dream.js) |
+| Server entry | [`server.js`](server.js) (~764 lines: `routes[]` wiring + child-process supervisor) |
+| All dream routes | [`routes/dream.js`](routes/dream.js) |
+| SSE streaming | [`lib/stream-chat.js`](lib/stream-chat.js) |
+| Chat UI | [`public/chat.html`](public/chat.html) (legacy `dream-chat.html` is a redirect stub) |
+| Landing page | [`public/index.html`](public/index.html) |
+| Provider settings | `POST /api/settings/providers` in [`routes/dream.js`](routes/dream.js) |
 | Orchestrator | [`src/convergence_io_engine.py`](src/convergence_io_engine.py) |
 | Unified agent connector | [`src/unified_agent_connector.py`](src/unified_agent_connector.py) |
 | MemOS bridge | [`src/convergence_io/memos_bridge.py`](src/convergence_io/memos_bridge.py) |

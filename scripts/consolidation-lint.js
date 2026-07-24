@@ -112,11 +112,11 @@ const FORBIDDEN_SUBSYSTEM = [
 ];
 
 // MONO-MERGER RULE (anti-sprawl): the repo must have exactly ONE PR auto-merger.
-// Canonical = apps/lantern-garage/lib/pr-watcher.js (review + verdict gate +
+// Canonical = lib/pr-watcher.js (review + verdict gate +
 // protected-path gate + self-healing ignore-list). Any OTHER executable file that
 // lands PRs via `gh pr merge` is a competing merger — sprawl — and is flagged HIGH.
 // (Two mergers were consolidated into one on 2026-06-29; this rule keeps it that way.)
-const CANONICAL_MERGER = 'apps/lantern-garage/lib/pr-watcher.js';
+const CANONICAL_MERGER = 'lib/pr-watcher.js';
 // Files allowed to mention `gh pr merge`: the canonical merger, and this linter
 // itself (it names the pattern in its own rule definition + report strings).
 const MERGER_EXEMPT = new Set([CANONICAL_MERGER, 'scripts/consolidation-lint.js']);

@@ -5,7 +5,7 @@ updated: 2026-07-16
 ---
 
 <p align="center">
-  <img src="apps/lantern-garage/public/mandala.svg" alt="Unisona mandala mark" width="140">
+  <img src="public/mandala.svg" alt="Unisona mandala mark" width="140">
 </p>
 
 <h1 align="center">Unisona</h1>
@@ -82,16 +82,16 @@ Every feature strengthens one stage of that loop. Nothing else ships.
 **Local development (2 minutes).** Prerequisites: Node.js 20+, Python 3.10+.
 
 ```bash
-npm install --prefix apps/lantern-garage
+npm install
 python -m pip install -r requirements.txt
-node apps/lantern-garage/server.js
+node server.js
 # → http://127.0.0.1:4177
 ```
 
 **Full stack (dual-boot dev).**
 
 ```bash
-npm run quickstart --prefix apps/lantern-garage
+npm run quickstart
 # Port 4177: stable (master) · Port 4178: dev (your branch, hot-reload)
 ```
 
@@ -108,15 +108,15 @@ Capabilities, organized by the loop stage they strengthen:
 | **Observe** | [Explore feed](docs/EXPLORE-FEED.md) — single PCSF-ranked content stream · market-data collectors (Kalshi, stocks) · in-app issue reporter with auto-capture |
 | **Remember** | [CSF](docs/CSF-FORMAT-SPECIFICATION.md) memory archive + append-only JSONL logs · confidence-decay memory (facts fade unless reinforced) · per-user conversation storage · in-chat memory recall |
 | **Reason** | unisona.ai chat — fast-cached default + deep Σ₀ opt-in (`OURO_NATIVE=1`) · personal cockpits (financial reasoning, preference model, tutor) · deterministic convergence router (120+ intent routes, >70% cache hit) over the 10-provider chain |
-| **Act** | ~35 native chat tools ([`tool-runner.js`](apps/lantern-garage/lib/tool-runner.js)) · autowork draft PRs with in-chat Approve / Rework / Discard (the *flow*; end-to-end issue resolution is the tracked frontier — [#2762](https://github.com/alex-place/lantern-os/issues/2762) — and the pipeline stops honestly when verification fails) · trading terminal (60+ [REST endpoints](docs/trading-api-reference.md)) · document generation (.docx/.xlsx/.pptx) |
+| **Act** | ~35 native chat tools ([`tool-runner.js`](lib/tool-runner.js)) · autowork draft PRs with in-chat Approve / Rework / Discard (the *flow*; end-to-end issue resolution is the tracked frontier — [#2762](https://github.com/alex-place/lantern-os/issues/2762) — and the pipeline stops honestly when verification fails) · trading terminal (60+ [REST endpoints](docs/trading-api-reference.md)) · document generation (.docx/.xlsx/.pptx) |
 | **Verify** | Σ₀ verification + convergence records · fact-check button + grounding-diff viewer · drift canaries · council exec-verify · WCAG 2.1 AA on all surfaces · autonomous Playwright test fleet |
 | **Converge** | Decision journal + calibration scoring · [external benchmarks registry](docs/BENCHMARKS.md) · PCSF provider leaderboard · CI convergence gates |
 
-**Main surfaces** (all in [`apps/lantern-garage/public/`](apps/lantern-garage/public/)): `chat.html` (the chat — primary UI; legacy `dream-chat.html` redirects) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
+**Main surfaces** (all in [`public/`](public/)): `chat.html` (the chat — primary UI; legacy `dream-chat.html` redirects) · `explore.html` (feed) · `kalshi-terminal.html` + `stock-trader.html` (trading) · `create.html` (creator studio) · `knowledgecenter.html` (docs RAG) · `orchestration.html` (operator settings).
 
 **Chat commands** (deterministic, server-routed — no model in the loop): `!work #<issue>` runs the observable autowork pipeline on a GitHub issue (research → plan → patch → tests → draft PR, rendered live as a walk of the loop) · `!review #<PR>` reviews a pull request's diff in-chat with Approve / Discard · `!prs` lists open pull requests.
 
-**Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](apps/lantern-garage/public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)). Historical milestone writeup: [Unisona 1.8 — "one front door"](docs/UNISONA-1.8.md).
+**Current release: `1.10.0` (2026-07-14)** — see [CHANGELOG.MD](CHANGELOG.MD) and the in-app [What's New](public/whats-new.html). In flight: the v1.11 polish pass ([open issues](https://github.com/alex-place/lantern-os/issues)). Historical milestone writeup: [Unisona 1.8 — "one front door"](docs/UNISONA-1.8.md).
 
 ---
 
@@ -126,7 +126,7 @@ Capabilities, organized by the loop stage they strengthen:
 Browser UI (public/*.html, PWA)
         │
         ▼
-apps/lantern-garage/server.js ── routes/*  (plain handlers, no framework)
+server.js ── routes/*  (plain handlers, no framework)
         │                         lib/*     (chat, tool-runner, memory, PCSF routing)
         ├── SSE stream  /api/dream/stream
         ├── data/*.json(l)  append-only runtime state
@@ -147,10 +147,10 @@ Autonomous subsystems that run without operator intervention:
 
 | System | Where | What it does |
 |--------|-------|--------------|
-| Health gate | [`lib/health-aggregator.js`](apps/lantern-garage/lib/health-aggregator.js) | One boot health-check + readiness verdict — enumerates every moving part (web server, Ollama, MCP, trader, cloud providers) as up / down / disabled-with-reason |
+| Health gate | [`lib/health-aggregator.js`](lib/health-aggregator.js) | One boot health-check + readiness verdict — enumerates every moving part (web server, Ollama, MCP, trader, cloud providers) as up / down / disabled-with-reason |
 | Auto-deploy | scheduled task `KeystoneAutoDeployStable` | Non-destructive `git merge --ff-only` every 5 min; health check + automatic rollback |
-| Convergence router | [`lib/convergence-router.js`](apps/lantern-garage/lib/convergence-router.js) | Deterministic intent cache — same input, same route; providers only on cache miss |
-| PR watcher | [`lib/pr-watcher.js`](apps/lantern-garage/lib/pr-watcher.js) | Auto-merges green, conflict-free, fleet-approved PRs; protected paths (auth/money/workflows/secrets/migrations) always need a human |
+| Convergence router | [`lib/convergence-router.js`](lib/convergence-router.js) | Deterministic intent cache — same input, same route; providers only on cache miss |
+| PR watcher | [`lib/pr-watcher.js`](lib/pr-watcher.js) | Auto-merges green, conflict-free, fleet-approved PRs; protected paths (auth/money/workflows/secrets/migrations) always need a human |
 
 Full subsystem map: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · design rationale: **[ADR index](docs/adr/README.md)**.
 
@@ -182,15 +182,15 @@ Deep dive: **[Σ₀ briefing](docs/CONVERGANCE-SIGMA0-BRIEFING.md)** · **[AGI c
 
 ```bash
 # Node API/chat tests (server must be running)
-npm run test:api --prefix apps/lantern-garage
-npm run test:chat --prefix apps/lantern-garage
-npm run test:ui  --prefix apps/lantern-garage   # requires Playwright
+npm run test:api
+npm run test:chat
+npm run test:ui    # requires Playwright
 
 # Python tests (full suite runs clean, no --ignore flags)
 python -m pytest tests/ -q --tb=short
 
 # Syntax check server entrypoints
-node --check apps/lantern-garage/server.js
+node --check server.js
 
 # Auth E2E (from repo root)
 npm run test:auth

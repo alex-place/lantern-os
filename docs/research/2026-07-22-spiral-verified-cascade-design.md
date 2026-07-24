@@ -2,8 +2,8 @@
 
 **Status:** the design of record for **[ADR-0030](../adr/0030-spiral-verified-cascade-harness.md)**
 (Accepted). Phase 0 (the verified-cascade harness) is implemented in
-[`lib/spiral-harness.js`](../../apps/lantern-garage/lib/spiral-harness.js) +
-[`lib/spiral-fix-rate.js`](../../apps/lantern-garage/lib/spiral-fix-rate.js). Phases 1–2 are gated
+[`lib/spiral-harness.js`](../../lib/spiral-harness.js) +
+[`lib/spiral-fix-rate.js`](../../lib/spiral-fix-rate.js). Phases 1–2 are gated
 behind Phase-0 evidence.
 **Honest scope up front:** this is a **specialist reasoning core** for *verifiable* domains (code, math),
 not a general AI. General breadth stays **rented** (frontier models). Its value is making a **small model

@@ -9,7 +9,7 @@ never committed.
 ## Why it's trustworthy
 
 It benchmarks the **actual scoring code we ship** — `relevanceScore`,
-`relevanceScoreIdf` + `buildDocFreq` from `apps/lantern-garage/lib/csf-memory.js`
+`relevanceScoreIdf` + `buildDocFreq` from `lib/csf-memory.js`
 — not a re-implementation. Recall@k is **retrieval-only**: no LLM, no API key,
 runs locally and in CI.
 

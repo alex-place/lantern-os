@@ -1,6 +1,6 @@
 # MCP and Dream Chat tool parity
 
-`apps/lantern-garage/lib/tool-runner.js` is the canonical source for shared
+`lib/tool-runner.js` is the canonical source for shared
 tool names, schemas, policies, execution, and receipt shape.
 
 Dream Chat exposes the manifest at `GET /api/dream/tools` and executes tools

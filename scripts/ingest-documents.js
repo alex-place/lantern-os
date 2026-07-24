@@ -2,8 +2,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const { extractDocumentContent, extractFileMetadata } = require('../apps/lantern-garage/lib/document-extractor');
-const { isDuplicate, buildDedupIndex, recordDedupEntry } = require('../apps/lantern-garage/lib/document-deduplicator');
+const { extractDocumentContent, extractFileMetadata } = require('../lib/document-extractor');
+const { isDuplicate, buildDedupIndex, recordDedupEntry } = require('../lib/document-deduplicator');
 
 // Utility functions from files-upload.js
 function chunkText(text, chunkSize = 500) {

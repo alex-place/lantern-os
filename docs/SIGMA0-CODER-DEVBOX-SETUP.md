@@ -35,7 +35,7 @@ git clone <repo-url> lantern-os && cd lantern-os    # or: git pull origin master
 Everything is on `master`: `scripts/ouro_serve.py`, `scripts/ouro_anthropic_bridge.py`,
 `scripts/sigma0_coder_agent.py`, `scripts/harvest_tool_traces.py`,
 `scripts/convert_fc_dataset.py`, `scripts/train-qlora-ouro.py`,
-`apps/lantern-garage/lib/{tool-runner,command-allowlist}.js`, and the docs
+`lib/{tool-runner,command-allowlist}.js`, and the docs
 ([retraining handoff](research/2026-06-21-sigma0-coder-retraining-handoff.md)).
 
 ## 2. Python env (`.venv-train`) — pinned versions matter

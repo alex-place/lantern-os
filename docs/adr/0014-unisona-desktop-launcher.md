@@ -27,7 +27,7 @@ We want a non-developer to run unisona.ai locally by double-clicking something,
 instead of `git clone` + `.env` + `make quickstart`. Today `unisona.ai` is a
 **brand token** hardcoded across ~49 `public/*.html` titles and a domain that
 fronts the local Core; it is not a separate program. The app is already a plain
-Node HTTP server ([`apps/lantern-garage/server.js`](../../apps/lantern-garage/server.js))
+Node HTTP server ([`server.js`](../../server.js))
 that binds `127.0.0.1:4177`, serves static HTML, streams LLM replies over SSE,
 and reads/writes JSONL under `data/`.
 
@@ -76,7 +76,7 @@ toolchain + sidecar cost.
 **Phasing:**
 
 - **Phase 1 — the launcher (this ADR's implementation).**
-  [`apps/lantern-garage/desktop/launcher.js`](../../apps/lantern-garage/desktop/launcher.js):
+  [`desktop/launcher.js`](../../desktop/launcher.js):
   dependency-free (Node builtins only); picks a free loopback port; spawns
   `server.js` in clean chat-only mode; waits for readiness; opens the default
   browser; tears down the child-process tree on exit. Runs today via `node`
@@ -154,14 +154,14 @@ toolchain + sidecar cost.
 
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
-| Core is a plain Node server binding `127.0.0.1:4177`, port via `LANTERN_GARAGE_PORT`/`PORT` | [`server.js:78-79`](../../apps/lantern-garage/server.js#L78) | High | repo |
-| Setting `PORT` flips the bind to `0.0.0.0` (public) — launcher must avoid it | [`server.js:79`](../../apps/lantern-garage/server.js#L79) | High | repo |
-| Clean chat-only mode gates: MCP `LANTERN_MCP_SERVER=false`, OAuth `LANTERN_MCP_OAUTH=false` | [`server.js:426`](../../apps/lantern-garage/server.js#L426), [`:435`](../../apps/lantern-garage/server.js#L435) | High | repo |
-| Trading off via `LANTERN_DISABLE_TRADING=1`; tunnel off via `LANTERN_CLOUDFLARE_TUNNEL=false` | [`server.js:440`](../../apps/lantern-garage/server.js#L440), [`:486`](../../apps/lantern-garage/server.js#L486) | High | repo |
-| Core reads `.env.local`/`.env` from repo root (breaks on a virgin machine) | [`server.js:45-57`](../../apps/lantern-garage/server.js#L45) | High | repo |
-| Core has native-module deps that complicate bundling (`sharp`, `tesseract.js`) | [`apps/lantern-garage/package.json:53-54`](../../apps/lantern-garage/package.json#L53) | High | repo |
-| Node engine requirement is `>=20` | [`apps/lantern-garage/package.json:39-41`](../../apps/lantern-garage/package.json#L39) | High | repo |
-| Optional children (Discord/crypto-observer/pr-watcher) already default OFF | [`server.js:320`](../../apps/lantern-garage/server.js#L320), [`:609`](../../apps/lantern-garage/server.js#L609), [`:714`](../../apps/lantern-garage/server.js#L714) | High | repo |
+| Core is a plain Node server binding `127.0.0.1:4177`, port via `LANTERN_GARAGE_PORT`/`PORT` | [`server.js:78-79`](../../server.js#L78) | High | repo |
+| Setting `PORT` flips the bind to `0.0.0.0` (public) — launcher must avoid it | [`server.js:79`](../../server.js#L79) | High | repo |
+| Clean chat-only mode gates: MCP `LANTERN_MCP_SERVER=false`, OAuth `LANTERN_MCP_OAUTH=false` | [`server.js:426`](../../server.js#L426), [`:435`](../../server.js#L435) | High | repo |
+| Trading off via `LANTERN_DISABLE_TRADING=1`; tunnel off via `LANTERN_CLOUDFLARE_TUNNEL=false` | [`server.js:440`](../../server.js#L440), [`:486`](../../server.js#L486) | High | repo |
+| Core reads `.env.local`/`.env` from repo root (breaks on a virgin machine) | [`server.js:45-57`](../../server.js#L45) | High | repo |
+| Core has native-module deps that complicate bundling (`sharp`, `tesseract.js`) | [`package.json:53-54`](../../package.json#L53) | High | repo |
+| Node engine requirement is `>=20` | [`package.json:39-41`](../../package.json#L39) | High | repo |
+| Optional children (Discord/crypto-observer/pr-watcher) already default OFF | [`server.js:320`](../../server.js#L320), [`:609`](../../server.js#L609), [`:714`](../../server.js#L714) | High | repo |
 | `unisona.ai` is a brand token / second domain over the same Core, not a program | memory [[unisona-second-domain]]; `docs/UNISONA-1.8.md` | High | repo + memory |
 | Loopback requests are treated as local-admin (unsafe on an end-user box) | memory [[lantern-net-cloudflare-bypass]], [[api-auth-gaps-2026-06-20]] | Medium | memory |
 | EV certs no longer bypass SmartScreen (removed 2024) | Microsoft Learn — SmartScreen reputation (learn.microsoft.com/windows/apps/package-and-deploy/smartscreen-reputation) | High | web |
@@ -211,7 +211,7 @@ Edge update surface). It read as a browser, not an app.
 
 **Decision.** Keep the principle behind G5 — **no bundled Chromium, no Electron** — but
 render the window with a **native .NET WPF + WebView2 shell** (`Unisona.exe`,
-[`apps/lantern-garage/desktop/shell/`](../../apps/lantern-garage/desktop/shell/)) instead
+[`desktop/shell/`](../../desktop/shell/)) instead
 of spawning the Edge browser. WebView2 is the Edge *engine* already on Win10/11 (same
 "reuse what's installed" spirit; still no ~150 MB Chromium download), but the window is a
 genuine native app — own process, title bar, taskbar entry, dark immersive chrome, no

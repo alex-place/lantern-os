@@ -40,8 +40,8 @@ const fs = require("fs");
 const path = require("path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
-const { relevanceScoreIdf, buildDocFreq } = require(path.join(REPO_ROOT, "apps/lantern-garage/lib/csf-memory"));
-const { embedText, _cosine } = require(path.join(REPO_ROOT, "apps/lantern-garage/lib/semantic-reranker"));
+const { relevanceScoreIdf, buildDocFreq } = require(path.join(REPO_ROOT, "lib/csf-memory"));
+const { embedText, _cosine } = require(path.join(REPO_ROOT, "lib/semantic-reranker"));
 
 const ALPHA = Number(process.env.ALPHA || 0.5);
 const RERANKER_ENDPOINT = process.env.RERANKER_ENDPOINT || "";

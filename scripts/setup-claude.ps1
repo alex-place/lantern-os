@@ -16,7 +16,7 @@ Write-Host "[lantern] Setting up environment..." -ForegroundColor Cyan
 
 # --- npm install ---
 Write-Host "[lantern] Installing Node dependencies..."
-Push-Location (Join-Path $root "apps/lantern-garage")
+Push-Location (Join-Path $root ".")
 npm install --silent
 Pop-Location
 
@@ -58,6 +58,6 @@ Write-Host "[lantern] Convergence status: $($result.status) | Issues: $($result.
 
 # --- Start server ---
 Write-Host "[lantern] Starting server on http://127.0.0.1:4177 ..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "npm start --prefix `"$root/apps/lantern-garage`""
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "npm start --prefix `"$root/.`""
 
 Write-Host "[lantern] Setup complete. Open http://127.0.0.1:4177" -ForegroundColor Green

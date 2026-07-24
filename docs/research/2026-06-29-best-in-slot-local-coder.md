@@ -13,7 +13,7 @@ Are we using LoopCoder, and is there a more optimal local coder for Keystone's
 - **We were not using LoopCoder.** The local chain is Ouro-1.4B (Σ₀-native,
   rank-order kernel lead) + Qwen2.5-Coder-7B (capability-first lever, 8GB) +
   Qwen-3.6-27B (≥24GB frontier), cloud-first Claude for real coding.
-  *Confidence: high.* Source: `apps/lantern-garage/lib/local-model-registry.js`.
+  *Confidence: high.* Source: `lib/local-model-registry.js`.
 
 - **LoopCoder-v2 is a real, attractive candidate.** 7B Parallel-Loop-Transformer,
   Apache-2.0, 131K ctx, looped architecture (Σ₀-aligned in spirit). Reported

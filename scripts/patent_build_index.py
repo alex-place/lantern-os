@@ -9,7 +9,7 @@ Writes  $PATENT_CORPUS_DIR\\index\\postings.json   {term: [[docId, tf], ...]}
         $PATENT_CORPUS_DIR\\index\\meta.json         {count, avgdl, k1, b, built_at, terms}
 
 Idempotent — safe to re-run after every harvest. The tokenizer here MUST match the one
-in apps/lantern-garage/lib/patent-index.js (same lowercase / [a-z0-9]+ / stopword rules)
+in lib/patent-index.js (same lowercase / [a-z0-9]+ / stopword rules)
 or query terms won't line up with indexed terms. It is byte-identical to
 arxiv_build_index.py's tokenizer on purpose — the two corpora share one tokenization
 contract.

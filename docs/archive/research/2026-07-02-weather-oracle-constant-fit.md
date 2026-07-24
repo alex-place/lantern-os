@@ -97,7 +97,7 @@ OOS *with the served forecast source*. Until then the oracle runs on defaults.
 
 ## Promotion executed (2026-07-02) — path 1: align serving to NBS MOS
 
-Took path 1. New `apps/lantern-garage/lib/kalshi-mos.js` is now the deck's forecast source
+Took path 1. New `lib/kalshi-mos.js` is now the deck's forecast source
 (replacing `kalshi-nws`), owning the **exact** forecast-high definition the fit used (fit/validate
 tools import the pure helpers from it, so **fit == serve by construction**). Live probe confirmed
 real output (2026-07-02: 7-2 100°F, 7-3 101°F).
@@ -120,6 +120,6 @@ Recommended: a short paper-observation window on real settled days before trusti
 Live 2026-07-02: [IEM MOS](https://mesonet.agron.iastate.edu/cgi-bin/request/mos.py?station=KNYC&model=NBS&sts=2025-07-01T00:00Z&ets=2025-07-02T00:00Z&format=csv),
 [IEM ASOS](https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?help=),
 [IEM NWS CLI](https://mesonet.agron.iastate.edu/json/cli.py?station=KNYC&year=2024).
-Related: [`kalshi-weather-edge.js`](../../../apps/lantern-garage/lib/kalshi-weather-edge.js),
-[`kalshi-nws.js`](../../../apps/lantern-garage/lib/kalshi-nws.js),
+Related: [`kalshi-weather-edge.js`](../../../lib/kalshi-weather-edge.js),
+[`kalshi-nws.js`](../../../lib/kalshi-nws.js),
 [distribution Verify #1895](../../research/2026-06-30-sigma0-weather-oracle-kalshi-edge.md), issue #1871.

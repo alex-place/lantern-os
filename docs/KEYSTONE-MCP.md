@@ -10,7 +10,7 @@ unisona.ai chat is linked to the project's real tools and details, so **any prov
 (including Grok)** answers grounded in the live repo — not generic guesses.
 
 ## What gets injected
-Before each non-roleplay chat turn, [`lib/keystone-context.js`](../apps/lantern-garage/lib/keystone-context.js)
+Before each non-roleplay chat turn, [`lib/keystone-context.js`](../lib/keystone-context.js)
 gathers (best-effort, cached 60s) and prepends to the unisona.ai system prompt:
 - **Open GitHub issues + PRs** (via `gh` — the reliable path).
 - **MCP tool inventory + status** (via `callMcpTool` → the MCP server `/tools/*`).
@@ -21,7 +21,7 @@ Because it's injected into the system prompt, it is **provider-agnostic** — Cl
 Gemini, Grok, or the local `lantern-sigma0-coder` all answer with the same live context.
 
 ## MCP client
-[`lib/mcp-bridge.js`](../apps/lantern-garage/lib/mcp-bridge.js) `callMcpTool(name, args)`
+[`lib/mcp-bridge.js`](../lib/mcp-bridge.js) `callMcpTool(name, args)`
 is a real client: `GET ${MCP_BASE_URL}/tools/{name}?args` → JSON. It never throws
 (resolves `null` on server-down/401/timeout). Configure:
 - `MCP_BASE_URL` (default `http://127.0.0.1:8771`)

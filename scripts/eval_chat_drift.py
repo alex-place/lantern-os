@@ -11,7 +11,7 @@ string predicate, so the number can't flatter itself.
 Distinct from routes/drift.js (#1428), which is the passive model-drift canary;
 this measures conversation-level instruction retention of the live chat pipeline.
 
-    # server running (npm start --prefix apps/lantern-garage)
+    # server running (npm start)
     python scripts/eval_chat_drift.py --port 4177 --provider anthropic --turns 12
     python scripts/eval_chat_drift.py --selftest      # offline: checker + parser proof
 

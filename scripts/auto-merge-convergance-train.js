@@ -14,7 +14,7 @@
  */
 
 const path = require('path');
-const ConverganceMergeTrainer = require('../apps/lantern-garage/lib/convergance-merge-trainer');
+const ConverganceMergeTrainer = require('../lib/convergance-merge-trainer');
 
 async function runTrainingCycle() {
   console.log('🔄 Auto Merge Resolver — !convergance Training Cycle');

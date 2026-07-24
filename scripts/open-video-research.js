@@ -17,8 +17,8 @@ const fs = require("fs");
 const path = require("path");
 const os = require("os");
 const { spawn } = require("child_process");
-const { detectMotion, detectSceneChanges, detectAudioSpikes, getVideoMetadata } = require("../apps/lantern-garage/lib/highlight-engine");
-const sz = require("../apps/lantern-garage/lib/safe-zone-v2");
+const { detectMotion, detectSceneChanges, detectAudioSpikes, getVideoMetadata } = require("../lib/highlight-engine");
+const sz = require("../lib/safe-zone-v2");
 
 const REPO = path.join(__dirname, "..");
 const RESEARCH_DIR = path.join(REPO, "research", "open_video");

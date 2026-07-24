@@ -1,7 +1,7 @@
 # D — Time Dilation Field
 
 **Module:** [`src/convergence_io/dilation.py`](../../src/convergence_io/dilation.py) · **Role:** the `D` in CEG's `G=(V,E,D,τ,S,H)` · **Tests:** [`tests/test_dilation.py`](../../tests/test_dilation.py)
-**Status:** Implemented + unit-tested. This is the primitive whose *concept* most clearly reaches the live path — the JS [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) mirrors its dilation→grounding mapping (see [README](README.md#status-honest)).
+**Status:** Implemented + unit-tested. This is the primitive whose *concept* most clearly reaches the live path — the JS [`grounding-policy.js`](../../lib/grounding-policy.js) mirrors its dilation→grounding mapping (see [README](README.md#status-honest)).
 
 ## What it is
 
@@ -51,6 +51,6 @@ grounded execution — the Σ₀ "verification is mandatory" rule expressed as a
 
 - Implemented with the field function, the grounding-policy mapping, dwell caps, health-driven
   updates, and an oscillation guard; directly unit-tested.
-- The **live** consumer is the JS [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js)
+- The **live** consumer is the JS [`grounding-policy.js`](../../lib/grounding-policy.js)
   adapter, not this Python module — the two encode the same dilation→grounding idea and should be
   kept in agreement, but they are separate implementations.

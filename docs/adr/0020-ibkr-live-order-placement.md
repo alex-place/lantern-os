@@ -71,9 +71,9 @@ honest "paper / blocked — why" state. `trader-agent.placeOrder` and
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Decision is implemented and merged | PR #1959 (merged 2026-07-03, commit 418a078e) added the guard, order methods, and this ADR | High | repo |
-| Gates as described (kill-switch, TRADER_LIVE, caps, account tier) | `apps/lantern-garage/lib/trading-guard.js:45-65` | High | code |
-| Order methods + CPAPI reply/confirm loop | `apps/lantern-garage/lib/ibkr-cpapi.js:346-451` | High | code |
-| Dry-run/blocked state surfaced verbatim to the UI | `apps/lantern-garage/routes/trading.js:528-562` | High | code |
-| Paper-account prefixes DU/DI/DF | `apps/lantern-garage/lib/ibkr-cpapi.js:109-116` (`inferMode`) | High | code |
-| OAuth 1.0a preferred, Bearer fallback | `apps/lantern-garage/lib/ibkr-cpapi.js:131-134, 197-204`; ADR-0022 / PR #2133 | High | code |
+| Gates as described (kill-switch, TRADER_LIVE, caps, account tier) | `lib/trading-guard.js:45-65` | High | code |
+| Order methods + CPAPI reply/confirm loop | `lib/ibkr-cpapi.js:346-451` | High | code |
+| Dry-run/blocked state surfaced verbatim to the UI | `routes/trading.js:528-562` | High | code |
+| Paper-account prefixes DU/DI/DF | `lib/ibkr-cpapi.js:109-116` (`inferMode`) | High | code |
+| OAuth 1.0a preferred, Bearer fallback | `lib/ibkr-cpapi.js:131-134, 197-204`; ADR-0022 / PR #2133 | High | code |
 | Python/Alpaca order path removed | PR #1959 (trading_agents deletion) | High | repo |

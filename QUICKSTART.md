@@ -59,7 +59,7 @@ cd lantern-os
 
 ```bash
 # Required — installs the app
-npm install --prefix apps/lantern-garage
+npm install
 
 # Optional — only if you want the Python-based extras later
 python -m pip install -r requirements.txt
@@ -95,7 +95,7 @@ OPENAI_API_KEY=sk-...           # ChatGPT / GPT-4o
 ### Step 4 — Start it
 
 ```bash
-npm run dev --prefix apps/lantern-garage
+npm run dev
 ```
 
 Now open **[http://127.0.0.1:4177](http://127.0.0.1:4177)** in your browser.
@@ -283,7 +283,7 @@ Still stuck? Open an issue on [GitHub](https://github.com/alex-place/lantern-os/
 python -m pytest tests/ -q --tb=short
 
 # Node API tests — start the server first, then in a second terminal:
-npm run test:api --prefix apps/lantern-garage
+npm run test:api
 ```
 
 ---

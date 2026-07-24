@@ -9,8 +9,8 @@ the fetch endpoints to go through the LanternOS proxy routes under
 import re
 
 SRC = r"C:\Independant AI Trader\dashboard.py"
-OUT_DASHBOARD = r"C:\Users\krisk\Desktop\lanternOS\apps\lantern-garage\public\trading.html"
-OUT_NEWS = r"C:\Users\krisk\Desktop\lanternOS\apps\lantern-garage\public\trading-news.html"
+OUT_DASHBOARD = r"C:\Users\krisk\Desktop\lanternOS\public\trading.html"
+OUT_NEWS = r"C:\Users\krisk\Desktop\lanternOS\public\trading-news.html"
 
 with open(SRC, "r", encoding="utf-8") as f:
     src = f.read()

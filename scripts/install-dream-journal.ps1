@@ -321,7 +321,7 @@ if (-not $SkipOllama) {
 # ---------------------------------------------------------------------------
 if (-not $SkipNode -and $hasNode) {
     Write-Header "Legacy Node Surface (lantern-garage)"
-    $appDir = Join-Path $InstallDir "apps\lantern-garage"
+    $appDir = Join-Path $InstallDir "."
     if (Test-Path (Join-Path $appDir "package.json")) {
         Push-Location $appDir
         try {
@@ -334,7 +334,7 @@ if (-not $SkipNode -and $hasNode) {
             Pop-Location
         }
     } else {
-        Write-Warn "No package.json found in apps/lantern-garage. Skipping Node install."
+        Write-Warn "No package.json found in .. Skipping Node install."
     }
 } else {
     Write-Header "Legacy Node Surface"

@@ -4,7 +4,7 @@ swebench_verifier_harness.py — drive SWE-bench Lite instances through the #217
 gold-patched repo and FAIL the un-patched base? (#2187.)
 
 For each instance the flow is: clone → checkout base_commit → apply test_patch (adds the FAIL_TO_PASS
-test) → then call the REAL verifier (apps/lantern-garage/lib/coding-backend/verifiers/tests-run.js
+test) → then call the REAL verifier (lib/coding-backend/verifiers/tests-run.js
 runTests) twice — once materialising the GOLD file contents (expect passed=True) and once the BASE
 contents (expect passed=False), with the instance's pytest FAIL_TO_PASS command as testCommand. Gate
 accuracy = fraction of (gold→pass, base→fail) the verifier gets right.

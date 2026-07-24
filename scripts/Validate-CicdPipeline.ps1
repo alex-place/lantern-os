@@ -68,7 +68,7 @@ try {
 # 3. Check Dockerfile (required for Deploy workflow)
 # ============================================================================
 Write-Host "[3/4] Checking Docker deployment readiness..." -NoNewline
-if (Test-Path "apps/lantern-garage/Dockerfile") {
+if (Test-Path "Dockerfile") {
     Write-Host " ✓" -ForegroundColor Green
     $results.passed += "Dockerfile present"
 } else {

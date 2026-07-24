@@ -288,7 +288,7 @@ These are planning envelopes, not quotes; Phase 1 instruments actuals and enforc
 | "1.4B≈4B / 2.6B≈8B" reasoning equivalence | first-party, **not independently replicated**; reasoning/math-strongest | — | https://arxiv.org/abs/2510.25741 (vendor benchmark; treat as reported, not settled) |
 | Ouro arch facts: parameter-shared loop, `total_ut_steps=4`, 7.7T-token pretrain, entropy-regularized adaptive depth | confirmed | 0.95 | https://arxiv.org/abs/2510.25741 ; https://huggingface.co/ByteDance/Ouro-1.4B |
 | **Σ₀ baseline `0.518` pass@1 / `67.9 s/problem` belongs to the `ouro-fast-cached` (FIXED-depth) engine, NOT the adaptive `OURO_NATIVE` path; native engine is UNMEASURED** | confirmed (repo) | 0.95 | `data/eval/leaderboard.jsonl` (label `ouro-final-rerun-full`, `engine:"ouro-fast-cached"`, `n:164`) — grep returns **zero** native/qexit rows |
-| **Live `OLLAMA_MODEL_CHAIN` omits `ouro:latest` for all intents; coding intent tries `qwen2.5-coder` first; chains list dead/non-served names** | confirmed (repo) | 0.95 | `apps/lantern-garage/lib/stream-chat.js:1273-1310` |
+| **Live `OLLAMA_MODEL_CHAIN` omits `ouro:latest` for all intents; coding intent tries `qwen2.5-coder` first; chains list dead/non-served names** | confirmed (repo) | 0.95 | `lib/stream-chat.js:1273-1310` |
 
 ---
 

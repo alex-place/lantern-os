@@ -177,7 +177,7 @@ b_i* = max(0, (1/γ_i)·ln(γ_i·u_i / ν))        ν = water level from the bud
 ```
 
 Three consequences line up with shipped code
-([`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) /
+([`grounding-policy.js`](../../lib/grounding-policy.js) /
 [`dilation.py`](../../src/convergence_io/dilation.py)):
 1. **The hard cutoff exists** — nodes below the water level get *zero* (shipped:
    `fetch_external = false` for D ≤ 0.5). Falls out of KKT, not taste.
@@ -329,10 +329,10 @@ flat threshold's 14–79** ([`owned_math_m4_envelope.py`](../../experiments/owne
 L3′ is the shippable form; the flat e·n·K bound remains the proof device.
 
 **M5 — the log ramp is now product code, default-off.**
-[`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) gained
+[`grounding-policy.js`](../../lib/grounding-policy.js) gained
 `GROUNDING_RAMP=log` / `{ ramp: "log" }` (breadth = base·(1+ln D) above the water level), with
 Python parity in [`dilation.py`](../../src/convergence_io/dilation.py) and 7 unit tests
-([`grounding-policy-ramp.test.js`](../../apps/lantern-garage/test/grounding-policy-ramp.test.js));
+([`grounding-policy-ramp.test.js`](../../test/grounding-policy-ramp.test.js));
 24 existing dilation tests still green. The live A/B (map A8) can now run by flipping one env
 var.
 
@@ -340,8 +340,8 @@ var.
 signal **trajectory** (sampled where the mid-stream collapse guard already scores; bounded at
 48 points; reset on provider retries) and emits events for healthy generations too — the
 both-class data the lead-time analysis needs
-([`canary.js`](../../apps/lantern-garage/lib/canary.js) `createCanaryTrace`,
-[`stream-chat.js`](../../apps/lantern-garage/lib/stream-chat.js) wiring, 4 unit tests). Local
+([`canary.js`](../../lib/canary.js) `createCanaryTrace`,
+[`stream-chat.js`](../../lib/stream-chat.js) wiring, 4 unit tests). Local
 (ollama) path first — where collapse events actually occur; cloud paths need a token-cadence
 sampler, noted in [#2791](https://github.com/alex-place/lantern-os/issues/2791).
 

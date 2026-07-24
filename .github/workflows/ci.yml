@@ -121,7 +121,7 @@ jobs:
           restore-keys: ${{ runner.os }}-npm-
 
       - name: Install dependencies
-        run: cd apps/lantern-garage && npm ci --prefer-offline
+        run: npm install --prefer-offline
 
       - name: Run Node unit tests (no server)
         run: |
@@ -130,10 +130,10 @@ jobs:
           node tests/test_local_auth_flow.js
           node tests/test_patreon_auth_flag.js
           node tests/test_patreon_oauth_cookie.js
-          node apps/lantern-garage/test/user-provider-keys.test.js
+          node test/user-provider-keys.test.js
 
       - name: Start server
-        run: node apps/lantern-garage/server.js &
+        run: node server.js &
 
       - name: Wait for server to be healthy
         run: |

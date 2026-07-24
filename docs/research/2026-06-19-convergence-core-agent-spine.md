@@ -68,7 +68,7 @@ The four core objects exist as immutable dataclasses in [`src/convergence/object
 | **Memory** | ✓ built + queryable | `@dataclass Memory{id, timestamp, source, confidence, content, evidence_ids}`; `Kernel.observe()` / `Kernel.query_memory(pattern, min_confidence, order_by, limit)` | no JS counterpart; Kernel is in-memory, not called by the serving path |
 | **Task** | ✓ built | `@dataclass Task{…, constraints, status, required_memories, dependencies}` + `is_blocked()`; `TaskStatus` enum | no reasoner emits Tasks; constraints unused at runtime |
 | **Tool** | ⚠ abstract | `@dataclass Tool{name, description, input_schema, output_schema}`; `Kernel.act()` awaits `tool.call()` | **`Tool.call()` is `raise NotImplementedError`** — no concrete tool wraps the 60+ routes / MCP tools, so `act()` over real tools can't run |
-| **ConvergenceRecord** | ✓ built (both langs) + emitted | Python `@dataclass`; JS `emitConvergenceRecord()` → `data/convergence/records.jsonl` ([`convergence-records.js`](../../apps/lantern-garage/lib/convergence-records.js)); **emitted live** by dream-chat ([`routes/dream.js:299-311`](../../apps/lantern-garage/routes/dream.js)) | confidence is a frozen v1 heuristic (0.7 online / 0.3 offline); never graded |
+| **ConvergenceRecord** | ✓ built (both langs) + emitted | Python `@dataclass`; JS `emitConvergenceRecord()` → `data/convergence/records.jsonl` ([`convergence-records.js`](../../lib/convergence-records.js)); **emitted live** by dream-chat ([`routes/dream.js:299-311`](../../routes/dream.js)) | confidence is a frozen v1 heuristic (0.7 online / 0.3 offline); never graded |
 
 **Flagged defect — now resolved.** While grounding this note, [`src/convergence/objects.py`](../../src/convergence/objects.py) was found to define `ToolResult` **twice** (an `Enum` shadowed by a `@dataclass`), so `ToolResult.SUCCESS` no longer resolved. Fixed in commit `84954240`: the enum was renamed `ToolOutcome` (line 29), leaving `ToolResult` unambiguously the dataclass (line 117). Recorded here as a worked example of the External Reality Rule catching a real bug in the chassis it documents.
 
@@ -97,7 +97,7 @@ These are the parts most agent projects never get, and they are real and tested 
 
 | Governor | Role | Real symbols (verified) |
 |---|---|---|
-| **Grounding throttle** | turn uncertainty into an external-grounding budget; deflate toward act/go-look near collapse | [`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js): `dilation()`, `groundingPolicy()`, `chatDilation()`, `D_MIN=0.1`/`D_MAX=5.0` — JS mirror of `src/convergence_io/dilation.py` |
+| **Grounding throttle** | turn uncertainty into an external-grounding budget; deflate toward act/go-look near collapse | [`grounding-policy.js`](../../lib/grounding-policy.js): `dilation()`, `groundingPolicy()`, `chatDilation()`, `D_MIN=0.1`/`D_MAX=5.0` — JS mirror of `src/convergence_io/dilation.py` |
 | **Σ₀ immune system** | detect collapse / re-excite stuck modes; canary on model-vs-reality drift | [`collapse.py`](../../src/cio_sde/collapse.py): free fns `collapse_certificate()`, `lyapunov_value()`; classes `SemanticCollapseOperator`, `AntiCollapseOperator` (methods `.proximity()`, `.excite()`), `ReconstructionOperator`. [`surprise.py`](../../src/cio_sde/surprise.py): `SurpriseMonitor` (Kalman NIS in `.evaluate()`, `.sigma0_proximity()`, `.anti_collapse_signal()`) |
 
 **What's missing is the teeth, not the tools.** Two wires:
@@ -122,7 +122,7 @@ This is the highest-value gap, and the first draft got it exactly backwards. The
 
 **The first genuinely-closed slice:** `kalshi-suggest` emits a record on entry → on trade resolution call `verify_with_test()` (or `Kernel.verify()`) → confidence is graded by the real outcome → `extract_patterns()` compiles the survivors. That single slice turns "coded but open" into "running and closing."
 
-> **✅ Landed (2026-06-19).** The trigger now exists: [`kalshi-convergence-outcomes.js`](../../apps/lantern-garage/lib/kalshi-convergence-outcomes.js) reads each emitted `kalshi-suggest` record, looks up its market via the live Kalshi `GET /markets/{ticker}`, and writes `{record_id, passed}` to `data/convergence/outcomes.jsonl` once the market settles — which [`convergence_close_loop.py`](../../scripts/convergence_close_loop.py) already folds into confidence + `extract_patterns`. End-to-end demonstrated (unverified 0.90 → verified 0.95 → pattern); 12 unit tests in [`tests/test_kalshi_outcomes.js`](../../tests/test_kalshi_outcomes.js). Fetch is injectable (no keys/network in tests) and the pass is idempotent. **Still open:** scheduling the pass (periodic / on-settlement) and §6 step 5.
+> **✅ Landed (2026-06-19).** The trigger now exists: [`kalshi-convergence-outcomes.js`](../../lib/kalshi-convergence-outcomes.js) reads each emitted `kalshi-suggest` record, looks up its market via the live Kalshi `GET /markets/{ticker}`, and writes `{record_id, passed}` to `data/convergence/outcomes.jsonl` once the market settles — which [`convergence_close_loop.py`](../../scripts/convergence_close_loop.py) already folds into confidence + `extract_patterns`. End-to-end demonstrated (unverified 0.90 → verified 0.95 → pattern); 12 unit tests in [`tests/test_kalshi_outcomes.js`](../../tests/test_kalshi_outcomes.js). Fetch is injectable (no keys/network in tests) and the pass is idempotent. **Still open:** scheduling the pass (periodic / on-settlement) and §6 step 5.
 
 ---
 
@@ -135,9 +135,9 @@ The napkin draft feared "several half-built cars." On disk it's milder: **one ru
 | [`src/convergence/kernel.py`](../../src/convergence/kernel.py) | the runtime six-stage orchestrator over the four objects | **this is the spine** (just not wired to serving) |
 | [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) | 20-phase repo/artifact promotion loop | no — different axis (CI self-correction) |
 | ``src/tesseract_convergence.py`` | re-export shim of the engine above | no (alias) |
-| [`convergence-agent.js`](../../apps/lantern-garage/lib/convergence-agent.js) | LLM-free keyword router → grounded local answers | no — Q&A router, name only |
-| [`unified-agent.js`](../../apps/lantern-garage/lib/unified-agent.js) | Node→Python process bridge | no — delegates |
-| [`swarm-orchestrator.js`](../../apps/lantern-garage/lib/swarm-orchestrator.js) | provider/model dispatch (single/parallel/consensus/council) | no — orchestrates *models* ("models are interchangeable") |
+| [`convergence-agent.js`](../../lib/convergence-agent.js) | LLM-free keyword router → grounded local answers | no — Q&A router, name only |
+| [`unified-agent.js`](../../lib/unified-agent.js) | Node→Python process bridge | no — delegates |
+| [`swarm-orchestrator.js`](../../lib/swarm-orchestrator.js) | provider/model dispatch (single/parallel/consensus/council) | no — orchestrates *models* ("models are interchangeable") |
 | ``three-doors-convergence-loop.js`` | bespoke game pipeline (intake→design→build→verify→integrate) | **consolidation candidate** — reframe as a Task through the one loop |
 
 **Verdict:** the debt is *concept/naming* sprawl. The one genuine consolidation target is `three-doors-convergence-loop.js`, whose 5-stage pipeline duplicates the *shape* of the loop for a single domain.
@@ -175,10 +175,10 @@ It is **not** "truly agentic" in the AGI sense: no general world-model, no open-
 - Four core objects — [`src/convergence/objects.py`](../../src/convergence/objects.py) (Memory, Task/TaskStatus, Tool/ToolResult, ConvergenceRecord)
 - Runtime orchestrator — [`src/convergence/kernel.py`](../../src/convergence/kernel.py) (`Kernel`: observe / query_memory / reason / act / verify / extract_patterns)
 - Write-back closure — [`src/convergence/verify.py`](../../src/convergence/verify.py) (wq-007: verify_with_test / _surprise / _monitor)
-- Record emitter + live emit — [`apps/lantern-garage/lib/convergence-records.js`](../../apps/lantern-garage/lib/convergence-records.js) → `data/convergence/records.jsonl`; [`apps/lantern-garage/routes/dream.js`](../../apps/lantern-garage/routes/dream.js) (`emitConvergenceRecord`, lines 299-311)
+- Record emitter + live emit — [`lib/convergence-records.js`](../../lib/convergence-records.js) → `data/convergence/records.jsonl`; [`routes/dream.js`](../../routes/dream.js) (`emitConvergenceRecord`, lines 299-311)
 - Repo-promotion loop (separate axis) — [`src/convergence_io_engine.py`](../../src/convergence_io_engine.py) (`ConvergenceLoop.PHASES`, 20 phases) · shim ``src/tesseract_convergence.py``
-- Governors — [`src/cio_sde/collapse.py`](../../src/cio_sde/collapse.py) · [`src/cio_sde/surprise.py`](../../src/cio_sde/surprise.py) · [`apps/lantern-garage/lib/grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js)
+- Governors — [`src/cio_sde/collapse.py`](../../src/cio_sde/collapse.py) · [`src/cio_sde/surprise.py`](../../src/cio_sde/surprise.py) · [`lib/grounding-policy.js`](../../lib/grounding-policy.js)
 - Architecture spec / roadmap — [`docs/convergence-core-mapping.md`](../convergence-core-mapping.md)
 - North Star — [`CLAUDE.md`](../../CLAUDE.md) · [`CONVERGANCE-SIGMA0-BRIEFING.md`](../CONVERGANCE-SIGMA0-BRIEFING.md) · Σ₀ limits [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](../SIGMA0-COLLAPSE-CERTIFICATE.md)
 
-**Sprawl census modules:** [`convergence-agent.js`](../../apps/lantern-garage/lib/convergence-agent.js) · [`unified-agent.js`](../../apps/lantern-garage/lib/unified-agent.js) · [`swarm-orchestrator.js`](../../apps/lantern-garage/lib/swarm-orchestrator.js) · ``three-doors-convergence-loop.js``
+**Sprawl census modules:** [`convergence-agent.js`](../../lib/convergence-agent.js) · [`unified-agent.js`](../../lib/unified-agent.js) · [`swarm-orchestrator.js`](../../lib/swarm-orchestrator.js) · ``three-doors-convergence-loop.js``

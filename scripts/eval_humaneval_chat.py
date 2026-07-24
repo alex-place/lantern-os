@@ -21,7 +21,7 @@ Provider-parametric — one harness measures the whole comparison:
 The summary records what ACTUALLY served (done.source / done.model histograms),
 so a silent local→cloud fallback is visible, never hidden behind the headline %.
 
-    # server running (npm start --prefix apps/lantern-garage) + a local model
+    # server running (npm start) + a local model
     # served (scripts/ouro_serve.py) for --provider ollama
     python scripts/eval_humaneval_chat.py --provider ollama --limit 10
     python scripts/eval_humaneval_chat.py --provider anthropic --full

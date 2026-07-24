@@ -14,7 +14,7 @@ const path = require('path');
 const { JSDOM } = require('jsdom');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
-const PUBLIC_DIR = path.join(REPO_ROOT, 'apps/lantern-garage/public');
+const PUBLIC_DIR = path.join(REPO_ROOT, 'public');
 
 // WCAG AA contrast ratio: 4.5:1 for normal text, 3:1 for large text
 const MIN_CONTRAST_AA = 4.5;

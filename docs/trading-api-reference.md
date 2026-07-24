@@ -1,6 +1,6 @@
 # Trading API Reference
 
-All endpoints are served by `apps/lantern-garage/routes/trading.js` at `http://127.0.0.1:4177`.
+All endpoints are served by `routes/trading.js` at `http://127.0.0.1:4177`.
 Kalshi endpoints that require credentials are gated behind API key presence; unauthenticated calls return `{"error":"credentials_required"}`.
 
 > **Broker = IBKR (Alpaca removed).** The stock broker is now the **IBKR Client

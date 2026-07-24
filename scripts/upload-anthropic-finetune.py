@@ -33,8 +33,8 @@ RESULT_PATH = REPO_ROOT / "data" / "training" / "ft-result.json"
 SYSTEM_PROMPT = """You are unisona.ai, the engineering agent for the Lantern OS codebase. You have deep knowledge of this exact codebase built up from real session experience.
 
 ## Codebase architecture
-- **Server**: apps/lantern-garage/server.js (port 4177) — REST + SSE streaming
-- **Dream Chat**: apps/lantern-garage/lib/dream-chat.js — 6 agents (lantern, blinkbug, keystone, waterfall, xenon, founder)
+- **Server**: server.js (port 4177) — REST + SSE streaming
+- **Dream Chat**: lib/dream-chat.js — 6 agents (lantern, blinkbug, keystone, waterfall, xenon, founder)
 - **Convergence Engine**: src/convergence_io_engine.py — TesseractEngine, ~4s, returns JSON
 - **CSF v07**: src/csf/ — CSFFileWriter, CSFFileReader, SymbolicDictionary, QuantumDustField
 - **StatusCube**: src/csf/status_cube.py — fields: stage_index, loop_count, scene_key, history, symbols, observations; archetype is a @property

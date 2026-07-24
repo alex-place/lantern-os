@@ -43,9 +43,9 @@ exploration + mandatory verification" restated in physics.
 The loss term is not hypothetical. It is the per-token **surprise** signal:
 
 - `surprise_i = −log₂ p(token_i)` [bits] — the per-token code length — implemented in
-  [`token-surprise.js`](../../apps/lantern-garage/lib/token-surprise.js) and wired into
+  [`token-surprise.js`](../../lib/token-surprise.js) and wired into
   the groundedness canary as `signals.modelUncertainty`
-  ([`groundedness-canary.js:148`](../../apps/lantern-garage/lib/groundedness-canary.js)).
+  ([`groundedness-canary.js:148`](../../lib/groundedness-canary.js)).
   High surprise concentrated on content tokens = the model was *guessing the specifics
   it stated fluently* (token-level reading of semantic-entropy confabulation, Farquhar
   et al., Nature 2024). It is the one live carry-forward from the E1 kill doc
@@ -89,10 +89,10 @@ do not seal the room.
 
 | Claim | Evidence (file:line) | Confidence | Source |
 |---|---|---|---|
-| Per-token surprise `−log₂p` is implemented as the Verify/groundedness primitive | [`token-surprise.js:8`](../../apps/lantern-garage/lib/token-surprise.js) | High | repo |
-| It feeds the groundedness canary as `modelUncertainty` | [`groundedness-canary.js:148`](../../apps/lantern-garage/lib/groundedness-canary.js) | High | repo |
+| Per-token surprise `−log₂p` is implemented as the Verify/groundedness primitive | [`token-surprise.js:8`](../../lib/token-surprise.js) | High | repo |
+| It feeds the groundedness canary as `modelUncertainty` | [`groundedness-canary.js:148`](../../lib/groundedness-canary.js) | High | repo |
 | The valve is closed — no production caller plumbs real logprobs | grep: `fromOpenAILogprobs`/`fromOllamaLogprobs` only in module + tests | High | repo (2026-06-30) |
 | Two collapse axes: degeneration + confident-but-unanchored | `collapse-canary.js`, `groundedness-canary.js`; [[sigma0-two-canary-axes]] | High | repo |
-| Anthropic exposes no logprobs; local decode does | [`token-surprise.js:18-19`](../../apps/lantern-garage/lib/token-surprise.js) | High | repo |
+| Anthropic exposes no logprobs; local decode does | [`token-surprise.js:18-19`](../../lib/token-surprise.js) | High | repo |
 | Elevated generation uncertainty predicts confabulation | Farquhar et al., *Nature* 2024 (semantic entropy) | Med | external |
 | Recurrence is the resonance/exploration lever | [[sigma0-coder-spiral-consolidation]], ADR-0011 | Med | repo research |

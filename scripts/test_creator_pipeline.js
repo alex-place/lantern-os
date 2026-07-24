@@ -14,10 +14,10 @@ const fs = require("fs");
 const { spawnSync } = require("child_process");
 
 const repoRoot = process.cwd();
-const entryStore = require("../apps/lantern-garage/lib/entry-store");
-const { JobQueue } = require("../apps/lantern-garage/lib/job-queue");
-const { JobWorker } = require("../apps/lantern-garage/lib/job-worker");
-const { generateProjectThumbnail } = require("../apps/lantern-garage/lib/thumbnail-generator");
+const entryStore = require("../lib/entry-store");
+const { JobQueue } = require("../lib/job-queue");
+const { JobWorker } = require("../lib/job-worker");
+const { generateProjectThumbnail } = require("../lib/thumbnail-generator");
 
 process.env.LANTERN_JOB_IDLE_TIMEOUT_MS = process.env.LANTERN_JOB_IDLE_TIMEOUT_MS || "1800000";
 

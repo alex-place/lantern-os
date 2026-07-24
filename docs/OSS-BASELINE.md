@@ -187,7 +187,7 @@ compounding owned data** (approvals, rejections, per-repo outcome history, recei
 
 ## First slice (landed) + backlog
 
-**Landed:** the coding-backend control plane — `apps/lantern-garage/lib/coding-backend/`. A backend
+**Landed:** the coding-backend control plane — `lib/coding-backend/`. A backend
 **proposes** a change, the control plane **holds it for approval** (consequence-gate pattern) and
 emits a **receipt** (task, backend, model, cost, files, patch-hash, why, status) that no raw coding
 agent produces; approve applies it, reject drops it. Backends: **mock** (tests), **ollama** (direct

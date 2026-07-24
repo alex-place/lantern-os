@@ -19,7 +19,7 @@
  * Run: node scripts/spiral_borrow_records.js
  */
 
-const { emitConvergenceRecord } = require("../apps/lantern-garage/lib/convergence-records");
+const { emitConvergenceRecord } = require("../lib/convergence-records");
 
 // phase legend: P0 harness/eval · P1 VTD-specialize the cheap tier · P2 tiny-recursive · M4 verifier
 const BORROWS = [

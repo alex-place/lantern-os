@@ -10,7 +10,7 @@
  * for a week — including the testing charter targeting the redirect stub.
  *
  * A reference is DRIFT when the surface it names either:
- *   - does not exist under apps/lantern-garage/public/  (removed surface), or
+ *   - does not exist under public/  (removed surface), or
  *   - exists only as a redirect stub                    (renamed surface — the doc
  *     points at the stub, not the live page).
  * A reference is EXEMPT when its line is an explicitly-marked legacy note (mentions
@@ -121,7 +121,7 @@ function run() {
   for (const f of findings) {
     const why = f.reason === "stub"
       ? "is only a redirect stub (renamed) — point at the live page"
-      : "does not exist under apps/lantern-garage/public/ (removed)";
+      : "does not exist under public/ (removed)";
     console.log(`  ${f.doc}:${f.line}  ${f.ref}  →  ${f.surface} ${why}`);
   }
   console.log(

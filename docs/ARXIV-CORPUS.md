@@ -5,7 +5,7 @@
 *after* the model's training cutoff — and cite them by arXiv id.
 
 This is **one new doc source**, not a new memory system. It reuses the existing chat-context
-assembler (`formatCSFContextForPrompt` in `apps/lantern-garage/lib/csf-memory.js`) exactly like
+assembler (`formatCSFContextForPrompt` in `lib/csf-memory.js`) exactly like
 the "Research library:" seam, and every surfaced paper carries `[claim → evidence = arXiv id →
 source = arXiv url]`.
 
@@ -120,7 +120,7 @@ so chat is never blocked.
 ## Tests
 
 - `tests/test_arxiv_harvest.py` — OAI-PMH parse, id-based dating, category/date filter, sharding.
-- `apps/lantern-garage/test/arxiv-index.test.js` — BM25 ranking, AI-question gate, citable ids.
+- `test/arxiv-index.test.js` — BM25 ranking, AI-question gate, citable ids.
 
 ---
 
@@ -130,7 +130,7 @@ so chat is never blocked.
 
 Status: production-ready (web + task engine); local arXiv grounding + full-text fetch landed on branch `claude/arxiv-corpus`
 Scope: chat (`!research`, natural language), `!convergance` grounding, autowork issue research, and command-line paper lookup
-Source: `apps/lantern-garage/lib/{research-task,wide-search,arxiv-index,arxiv-fulltext}.js`, CLI `scripts/arxiv_query.js`
+Source: `lib/{research-task,wide-search,arxiv-index,arxiv-fulltext}.js`, CLI `scripts/arxiv_query.js`
 
 ## Simple Answer
 
@@ -204,7 +204,7 @@ Use the CLI when researching from Claude Code / an agent that can't hit the chat
 
 ## Validation Path
 
-- `node --check apps/lantern-garage/lib/{research-task,wide-search,arxiv-index,arxiv-fulltext}.js scripts/arxiv_query.js`
+- `node --check lib/{research-task,wide-search,arxiv-index,arxiv-fulltext}.js scripts/arxiv_query.js`
 - CLI: `node scripts/arxiv_query.js "<AI topic>"` → confirm citable papers; `--paper <id>` → confirm full text or an honest PDF-link fallback.
 - Engine: stub `web-search-client` to return `[]`, run `wideSearch({query:"<AI topic>"})`, assert `out.sources` contains `via: "arxiv:*"` entries.
 - Chat: dev preview, `!research <AI topic>`, confirm an `observe/local_arxiv` step streams and arXiv ids appear in the cited sources.
@@ -227,4 +227,4 @@ Use the CLI when researching from Claude Code / an agent that can't hit the chat
 }
 ```
 
-See also: `docs/CONVERGENCE-LOOP.md` (the `!convergance` record-emission side this feeds), `apps/lantern-garage/lib/arxiv-index.js` (BM25 retrieval), `apps/lantern-garage/lib/arxiv-fulltext.js` (full abstract + report fetch), and memory [[arxiv-recent-research-corpus]] (corpus build/harvest/gotchas).
+See also: `docs/CONVERGENCE-LOOP.md` (the `!convergance` record-emission side this feeds), `lib/arxiv-index.js` (BM25 retrieval), `lib/arxiv-fulltext.js` (full abstract + report fetch), and memory [[arxiv-recent-research-corpus]] (corpus build/harvest/gotchas).

@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [master, main]
     paths:
-      - 'apps/lantern-garage/public/**'
+      - 'public/**'
       - '.github/workflows/a11y-audit.yml'
   push:
     branches: [master, main]
     paths:
-      - 'apps/lantern-garage/public/**'
+      - 'public/**'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
@@ -46,7 +46,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: sitemap
-          path: apps/lantern-garage/public/sitemap.xml
+          path: public/sitemap.xml
           retention-days: 7
 
   a11y-tests:
@@ -66,10 +66,10 @@ jobs:
         run: node scripts/test-a11y.js
 
       - name: Run Explore dashboard UI behavioral test
-        run: node apps/lantern-garage/test/explore-feed-ui.test.js
+        run: node test/explore-feed-ui.test.js
 
       - name: Brand guard (user-visible brand is Unisona, #2250)
-        run: node apps/lantern-garage/test/brand-unisona.test.js
+        run: node test/brand-unisona.test.js
 
       - name: WCAG-AA audit — all surfaces, both themes (#2251)
         run: node scripts/a11y-audit.js
@@ -77,12 +77,12 @@ jobs:
       - name: Check keyboard navigation
         run: |
           echo "🔍 Checking for keyboard-accessible elements..."
-          grep -r "a\|button\|input" apps/lantern-garage/public/index.html | wc -l || true
+          grep -r "a\|button\|input" public/index.html | wc -l || true
 
       - name: Check semantic HTML
         run: |
           echo "🔍 Checking semantic HTML elements..."
-          grep -E "nav|main|article|section|footer|header" apps/lantern-garage/public/index.html | wc -l || true
+          grep -E "nav|main|article|section|footer|header" public/index.html | wc -l || true
 
   accessibility-report:
     name: Generate A11y Report
@@ -123,7 +123,7 @@ jobs:
           echo "- Page completeness (sitemap)" >> /tmp/a11y-report.md
           echo "" >> /tmp/a11y-report.md
           echo "## 🔗 Sitemap" >> /tmp/a11y-report.md
-          echo "Generated: \`apps/lantern-garage/public/sitemap.xml\`" >> /tmp/a11y-report.md
+          echo "Generated: \`public/sitemap.xml\`" >> /tmp/a11y-report.md
 
       - name: Comment PR
         if: github.event_name == 'pull_request'
@@ -146,7 +146,7 @@ jobs:
               '- ARIA attributes\n' +
               '- Semantic HTML\n' +
               '- Page completeness check\n\n' +
-              '[View sitemap](apps/lantern-garage/public/sitemap.xml)';
+              '[View sitemap](public/sitemap.xml)';
 
             await github.rest.issues.createComment({
               issue_number: context.issue.number,

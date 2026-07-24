@@ -56,12 +56,12 @@ public surface, and gate merges on it:
    simply persist unclassified.
 
 2. **The register is code, not a document.** The single source of truth is
-   [`apps/lantern-garage/lib/surface-registry.js`](../../apps/lantern-garage/lib/surface-registry.js).
+   [`lib/surface-registry.js`](../../lib/surface-registry.js).
    A markdown table would drift; a code registry is enforceable.
 
 3. **The gate is enforced by tests, not by review vigilance:**
    - the contract test
-     [`apps/lantern-garage/test/surface-boundary.test.js`](../../apps/lantern-garage/test/surface-boundary.test.js)
+     [`test/surface-boundary.test.js`](../../test/surface-boundary.test.js)
      (`npm run test:boundary`) fails if any public surface is unclassified;
    - the registry-aware orphan audit
      [`scripts/find-orphan-pages.mjs`](../../scripts/find-orphan-pages.mjs)
@@ -101,7 +101,7 @@ public surface, and gate merges on it:
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Sprawl was the top-graded gap (D+) and the audit was mandated | Issue #1557 ([SCOPE-1]); closed by PR #1813 (commit `863fe1ce`) | High | GitHub |
-| The register exists as code with CORE stage map + EXTENSION modules | [`apps/lantern-garage/lib/surface-registry.js`](../../apps/lantern-garage/lib/surface-registry.js) | High | repo |
-| Unclassified surfaces fail a contract test | [`apps/lantern-garage/test/surface-boundary.test.js`](../../apps/lantern-garage/test/surface-boundary.test.js); `test:boundary` in `apps/lantern-garage/package.json` | High | repo |
+| The register exists as code with CORE stage map + EXTENSION modules | [`lib/surface-registry.js`](../../lib/surface-registry.js) | High | repo |
+| Unclassified surfaces fail a contract test | [`test/surface-boundary.test.js`](../../test/surface-boundary.test.js); `test:boundary` in `package.json` | High | repo |
 | Orphan audit is registry-aware and fails only on undeclared orphans | [`scripts/find-orphan-pages.mjs`](../../scripts/find-orphan-pages.mjs); `changelog.d/1558-registry-aware-orphan-audit.md` | High | repo |
 | Three colliding drafts of this decision were added by PR #1813 | commit `863fe1ce` file list (`docs/adr/0001-*`, `docs/adr/adr-001-*`, `adr/0001-*`) | High | git |

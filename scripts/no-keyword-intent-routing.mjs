@@ -8,7 +8,7 @@
  * decides capabilities via native tool calls (tool-runner.js). This guard stops the
  * pattern from silently regrowing.
  *
- * It scans ONLY the lines a PR ADDS under apps/lantern-garage/ (excluding test/), so
+ * It scans ONLY the lines a PR ADDS under  (excluding test/), so
  * existing/allowlisted code is never retroactively flagged. It bans:
  *   • re-import of the deleted keyword routers (intent-router, convergance-os/model-router,
  *     task-detector)
@@ -34,13 +34,13 @@ import { execSync } from "node:child_process";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SCOPE = "apps/lantern-garage";
+const SCOPE = ".";
 // Files where these tokens are legitimate (model/measured routers, or this guard's own docs).
 export const ALLOWLIST = [
-  "apps/lantern-garage/lib/ouro-router.js",
-  "apps/lantern-garage/lib/provider-router.js",
-  "apps/lantern-garage/lib/local-model-registry.js",
-  "apps/lantern-garage/lib/route-contract.js",
+  "lib/ouro-router.js",
+  "lib/provider-router.js",
+  "lib/local-model-registry.js",
+  "lib/route-contract.js",
 ];
 // Test dirs are excluded (they assert the ban and name the banned modules).
 const isExcluded = (file) =>

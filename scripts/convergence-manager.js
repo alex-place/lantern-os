@@ -30,9 +30,9 @@ const REQUIRED = [
   "README.md",
   "AGENTS.md",
   "CONTRIBUTING.md",
-  "apps/lantern-garage/server.js",
-  "apps/lantern-garage/cloud-server.js",
-  "apps/lantern-garage/package.json",
+  "server.js",
+  "cloud-server.js",
+  "package.json",
   ".github/workflows/ci.yml",
   ".github/workflows/deploy.yml",
 ];
@@ -130,15 +130,15 @@ function scan() {
   }
 
   // 5. Package.json engine check
-  if (has("apps/lantern-garage/package.json")) {
-    const pkg = JSON.parse(read("apps/lantern-garage/package.json"));
+  if (has("package.json")) {
+    const pkg = JSON.parse(read("package.json"));
     const eng = pkg.engines?.node ?? "";
     if (!eng.includes(">=20") && !eng.includes(">=22")) {
       issues.push(issue(
         "NODE:ENGINE",
         "medium",
         `lantern-garage engines.node is "${eng}", should be >=20`,
-        'Set engines.node to ">=20" in apps/lantern-garage/package.json'
+        'Set engines.node to ">=20" in package.json'
       ));
     }
   }

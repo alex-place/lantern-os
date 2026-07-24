@@ -121,10 +121,10 @@ The default profile foregrounds the loop. Concretely:
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Decision implemented and merged | PR #2147 (commit 3ce7f3db, merged 2026-07-06) | High | repo |
-| Product-mainstay exception exists and is a one-line edit | `apps/lantern-garage/lib/surface-registry.js:119-130` (`NAV_FOREGROUND`) | High | code |
-| Nav tier-gated at one chokepoint | `apps/lantern-garage/lib/feature-flags.js:192-219` (`getNavConfig`, default-hidden) | High | code |
-| Client applies gate to header and footer | `apps/lantern-garage/public/js/auth-gate.js:49-58` (consumes `/api/nav-config`) | High | code |
+| Product-mainstay exception exists and is a one-line edit | `lib/surface-registry.js:119-130` (`NAV_FOREGROUND`) | High | code |
+| Nav tier-gated at one chokepoint | `lib/feature-flags.js:192-219` (`getNavConfig`, default-hidden) | High | code |
+| Client applies gate to header and footer | `public/js/auth-gate.js:49-58` (consumes `/api/nav-config`) | High | code |
 | Tripwire treats registry-classified surfaces as justified | `scripts/sprawl-tripwire.mjs:33-39` | High | code |
-| Moved surfaces are 302s, not stub pages | `apps/lantern-garage/routes/pages.js:56-84` (`REDIRECTS`) | High | code |
+| Moved surfaces are 302s, not stub pages | `routes/pages.js:56-84` (`REDIRECTS`) | High | code |
 | 19 CORE surfaces carry loop-stage meta (1 drift: systems.html) | `public/*.html` meta tags vs `surface-registry.js:49` | High | code |
 | Contract test not yet in CI | grep of `.github/workflows/` → no `surface-boundary` reference; `pr-gates.yml:122-136` runs only the tripwire | High | repo |

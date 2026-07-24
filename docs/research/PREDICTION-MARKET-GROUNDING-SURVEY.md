@@ -150,7 +150,7 @@ self-observation to a real, calibrated, externally-determined price.
 
 ## 6. Live wiring in Lantern OS (absorbed from `docs/prediction-markets-as-grounding.md`, 2026-07-16)
 
-The Kalshi tight-band terminal (`apps/lantern-garage/public/kalshi-terminal.html`)
+The Kalshi tight-band terminal (`public/kalshi-terminal.html`)
 already uses prediction markets as an operational grounding signal:
 
 - **Collapse detection** — a market discontinuity (large price jump) registers as
@@ -162,8 +162,8 @@ already uses prediction markets as an operational grounding signal:
   `data/kalshi/cio-accuracy-log.jsonl` (#425). A/B target: anti-collapse ON vs
   OFF > 2% accuracy gain.
 
-Integration points: `apps/lantern-garage/routes/trading.js` (Kalshi REST),
-`apps/lantern-garage/lib/kalshi-collector.js` (6s polling + 429 backoff with
+Integration points: `routes/trading.js` (Kalshi REST),
+`lib/kalshi-collector.js` (6s polling + 429 backoff with
 `Retry-After`).
 
 Additional verified references carried over: Wolfers & Zitzewitz (2004),

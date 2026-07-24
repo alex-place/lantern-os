@@ -48,7 +48,7 @@ The IP-based local-admin bypass (`isLocalBypass`: loopback socket / dev port 417
 `LANTERN_LOCAL_ADMIN`) was **removed**. A socket address is not proof of the owner
 behind a reverse proxy/tunnel, and it silently made `localhost` look logged-in as
 admin. Dev/test access now uses an explicit, token-gated path
-([`lib/test-auth.js`](apps/lantern-garage/lib/test-auth.js)):
+([`lib/test-auth.js`](lib/test-auth.js)):
 
 - Inert unless `LANTERN_TEST_AUTH_TOKEN` is set (never set in production).
 - Refused on any proxied/tunnelled request even when the token matches — it can never
@@ -95,7 +95,7 @@ Permissions-Policy, Referrer-Policy to all HTML responses.
 
 3. **Test before commit:**
    ```bash
-   npm run test:api --prefix apps/lantern-garage
+   npm run test:api
    curl http://localhost:4177/repo/../../../.env  # Should 403 Forbidden
    ```
 

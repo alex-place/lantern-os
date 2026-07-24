@@ -35,7 +35,7 @@ The creator stack has **two halves that don't talk to each other.**
 ### Half B — JS V10 engine
 `src/creator-intelligence/scoring/`.
 
-- This half **measures real signals**: `apps/lantern-garage/lib/highlight-engine.js`
+- This half **measures real signals**: `lib/highlight-engine.js`
   runs ffmpeg motion/audio/scene/gameplay-density on the operator's **own**
   uploaded clip, and `viral-score-v10.js` scores from that real `HighlightTimeline`
   (exposed under `scoreV10.viral.signals`: `cutsPerMin`, `coverage`,
@@ -168,12 +168,12 @@ insufficient_data→directional→calibrated threshold progression including exa
 Pearson recovery (`r = 1`). Run: `node tests/test_creator_calibration.js`.
 
 ### Wired (Phase 2)
-- **Route:** `apps/lantern-garage/routes/creator-calibration.js` —
+- **Route:** `routes/creator-calibration.js` —
   `GET /api/creator/calibration/status|entries|correlations|recommendations` and
   `POST /api/creator/calibration/import` (`{csvText, manualLinks?, dryRun?}`).
   Flag-gated (clear 403 when off), 5 MB payload cap, no temp file / no multipart
   (the browser reads the CSV client-side and posts text).
-- **UI:** `apps/lantern-garage/public/calibration.html` (linked from the dashboard
+- **UI:** `public/calibration.html` (linked from the dashboard
   header) — tier badge (insufficient / directional / calibrated), readiness
   progress, sample size, an upload-and-confirm flow (exact matches auto-link;
   fuzzy matches wait for confirmation), a correlations table, and **calibrated

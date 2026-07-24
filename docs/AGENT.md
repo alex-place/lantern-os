@@ -89,7 +89,7 @@ loop"); the objects are immutable dataclasses in
 
 **The precise honest gap** (from the spine note): the loop and its write-back closure are *written
 in Python*, the chat path *emits* a `ConvergenceRecord` after every reply
-([`apps/lantern-garage/routes/dream.js`](../apps/lantern-garage/routes/dream.js)), and the **trading
+([`routes/dream.js`](../routes/dream.js)), and the **trading
 slice closes end-to-end** (§5) — but the serving path does not yet *drive the Kernel itself*, and the
 safety governors don't yet *gate* the live loop (§6, §8). This is wiring, not new subsystems.
 
@@ -112,7 +112,7 @@ Everything the agent manipulates is one of four immutable objects
   tool. (The abstract `call()` is `NotImplementedError`; concrete bodies are open work.)
 - **Convergence Record** — `{hypothesis, evidence, result, confidence, source}`. The unit of
   learning. Emitted to `data/convergence/records.jsonl`
-  ([`apps/lantern-garage/lib/convergence-records.js`](../apps/lantern-garage/lib/convergence-records.js)),
+  ([`lib/convergence-records.js`](../lib/convergence-records.js)),
   graded by Verify, compiled by Converge.
 
 ---
@@ -120,7 +120,7 @@ Everything the agent manipulates is one of four immutable objects
 ## 4. The reasoning substrate (the model) — interchangeable, with a local default
 
 **Models are interchangeable.** The agent never hard-binds to one LLM; models plug in behind the
-dispatch seam ([`swarm-orchestrator.js`](../apps/lantern-garage/lib/swarm-orchestrator.js):
+dispatch seam ([`swarm-orchestrator.js`](../lib/swarm-orchestrator.js):
 single / parallel / consensus / council) and the provider fallback chain
 ([`PROVIDERS.md`](../PROVIDERS.md), 10 providers). The model is a *replaceable part*, not the agent.
 
@@ -136,7 +136,7 @@ The DEEP path's local substrate is **`ByteDance/Ouro-1.4B`** — a *weight-tied 
 whose native mechanism is "loop until it converges," which is why it fits the Reason→Converge stages
 — plus the **Σ₀ LoRA adapter**. `loop_lm.py` implements the paper's **Q-exit** (adaptive per-token
 depth) and a **convergence-exit** (iterate the block to a latent fixed point). Two registry entries
-([`apps/lantern-garage/lib/model-registry.js`](../apps/lantern-garage/lib/model-registry.js)):
+([`lib/model-registry.js`](../lib/model-registry.js)):
 
 - `text.coderLoop` — the Ouro **DEEP** coder (this substrate), served via `loop_lm.py`, adapter at
   `D:/lantern-train/ouro-sigma0-adapters/final`.
@@ -154,8 +154,8 @@ ceiling — it is the local reasoning substrate, not a frontier mind.
 
 ## 5. Trade chat — the one slice that closes end-to-end
 
-The Kalshi trading desk ([`apps/lantern-garage/public/kalshi-terminal.html`](../apps/lantern-garage/public/kalshi-terminal.html),
-60+ routes in [`apps/lantern-garage/routes/trading.js`](../apps/lantern-garage/routes/trading.js)) is the
+The Kalshi trading desk ([`public/kalshi-terminal.html`](../public/kalshi-terminal.html),
+60+ routes in [`routes/trading.js`](../routes/trading.js)) is the
 agent pointed at markets — and the **only reasoner with a real ground truth** (a bet wins or loses),
 which makes it the first fully-closed instance of the loop:
 
@@ -174,7 +174,7 @@ keep the survivors.** (Demonstrated unverified 0.90 → verified 0.95 → patter
 grading pass (periodic / on-settlement) so it runs without a human.
 
 Routing for trade chat is cached deterministically by
-[`convergence-router.js`](../apps/lantern-garage/lib/convergence-router.js) (120 unisona.ai routes, >70%
+[`convergence-router.js`](../lib/convergence-router.js) (120 unisona.ai routes, >70%
 hit rate); live data flows collector → server snapshot → UI poll (no UI-direct Kalshi calls).
 
 ---
@@ -223,8 +223,8 @@ Requirements the agent must honor per user:
   records the privacy boundary per interaction.
 - **Entitlement as a precondition on Act** — a Tool call must be allowed for the requesting role.
 - **Per-user memory** — the dreamer/conversation stores
-  ([`dreamer-store.js`](../apps/lantern-garage/lib/dreamer-store.js),
-  [`conversation-store.js`](../apps/lantern-garage/lib/conversation-store.js)) keep per-user JSONL so
+  ([`dreamer-store.js`](../lib/dreamer-store.js),
+  [`conversation-store.js`](../lib/conversation-store.js)) keep per-user JSONL so
   Remember is scoped to the principal.
 
 ---
@@ -235,15 +235,15 @@ The agent is the hub; everything else is a **Tool**, a **provider**, or a **surf
 
 - **Model providers (10)** — Anthropic / OpenAI / Gemini / + the local Ollama/Ouro stack, with a
   fallback chain ([`PROVIDERS.md`](../PROVIDERS.md)). Dispatched via
-  [`swarm-orchestrator.js`](../apps/lantern-garage/lib/swarm-orchestrator.js). Embodies *models are
+  [`swarm-orchestrator.js`](../lib/swarm-orchestrator.js). Embodies *models are
   interchangeable*.
 - **MCP surface** — [`src/mcp_server/server.py`](../src/mcp_server/server.py) (FastAPI + SSE) exposes
   `queue_status`, `task_intake`, `dispatch_work`, `boot_check`, `list_skills`, `get_status`. Only
   tools with real implementations are registered.
-- **Markets** — Kalshi REST ([`kalshi-api.js`](../apps/lantern-garage/lib/kalshi-api.js)) for trade chat.
+- **Markets** — Kalshi REST ([`kalshi-api.js`](../lib/kalshi-api.js)) for trade chat.
 - **Chat / community** — Discord ([`src/discord_lounge_bot/`](../src/discord_lounge_bot)); web UI
   surfaces (dream-chat, trade dashboard, three-doors) served by
-  [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js).
+  [`server.js`](../server.js).
 - **Repo / deploy** — GitHub (PRs/issues) + Railway (auto-deploys `master`).
 
 **Connection rule:** every external connection is wrapped as a `Tool` with an `input_schema` /
@@ -259,7 +259,7 @@ These are the parts most agent stacks never build, and they are real and tested 
 
 | Governor | Role | Symbols | Status |
 |---|---|---|---|
-| **Grounding throttle** | turn uncertainty into an external-grounding budget; near collapse, deflate toward "stop reasoning, go look" | [`grounding-policy.js`](../apps/lantern-garage/lib/grounding-policy.js) (`dilation()`, `groundingPolicy()`, `D_MIN=0.1`/`D_MAX=5.0`) | 🟡 coded; not yet a hard gate on Act |
+| **Grounding throttle** | turn uncertainty into an external-grounding budget; near collapse, deflate toward "stop reasoning, go look" | [`grounding-policy.js`](../lib/grounding-policy.js) (`dilation()`, `groundingPolicy()`, `D_MIN=0.1`/`D_MAX=5.0`) | 🟡 coded; not yet a hard gate on Act |
 | **Σ₀ immune system** | detect collapse / re-excite stuck modes; canary on model-vs-reality drift | [`src/cio_sde/collapse.py`](../src/cio_sde/collapse.py), [`src/cio_sde/surprise.py`](../src/cio_sde/surprise.py) (`SurpriseMonitor`, `AntiCollapseOperator`) | 🟡 coded; not yet observing the live loop ([#766](https://github.com/alex-place/lantern-os/issues/766)) |
 
 **The honest guarantee:** Σ₀ proves the loop won't *collapse* (agree itself into nonsense) or *run

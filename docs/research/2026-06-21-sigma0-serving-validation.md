@@ -469,7 +469,7 @@ Sigma0 is Ouro 1.4B plus a QLoRA adapter served by scripts/ouro_serve.py as a tr
   - docs/KEYSTONE-PRODUCT.md 98-119; data/eval/leaderboard.jsonl ouro-final-rerun-full; docs/SIGMA0-CONTINUAL-TRAINING.md 145-164; scripts/train-qlora-ouro.py 23-114; model-registry.js 58-60.
   - docs/KEYSTONE-PRODUCT.md, data/eval/leaderboard.jsonl, scripts/train-qlora-ouro.py
 - **Chat reaches the model via the Ollama API: dream-chat UI POSTs /api/dream/chat/stream; stream-chat.js posts to OLLAMA_BASE_URL port 11434; dream-chat.js and model-registry default to ouro:latest. Routing gap: the static OLLAMA_MODEL_CHAIN in stream-chat.js omits ouro:latest, so Ouro is reinjected via OLLAMA_MODEL and the leaderboard or falls through to cloud. Roadmap (KEYSTONE-PRODUCT.md item 1d) wants a faster runtime vLLM or TGI; vLLM and SGLang appear ONLY in docs and a repo grep finds zero serving imports; the looped arch is locked to transformers 4.57 and cannot run on llama.cpp; the native loop_lm.py converge mode is research-only and not wired into serving (served deep path uses default qexit).** _(conf 0.9, not web-verified)_
-  - apps/lantern-garage/lib/stream-chat.js 1267-1372; model-registry.js 31, 42; docs/KEYSTONE-PRODUCT.md 121-130; src/sigma0/loop_lm.py 1-32; docs/SIGMA0-OURO-CODER.md 122-145.
-  - apps/lantern-garage/lib/stream-chat.js, docs/KEYSTONE-PRODUCT.md, src/sigma0/loop_lm.py
+  - lib/stream-chat.js 1267-1372; model-registry.js 31, 42; docs/KEYSTONE-PRODUCT.md 121-130; src/sigma0/loop_lm.py 1-32; docs/SIGMA0-OURO-CODER.md 122-145.
+  - lib/stream-chat.js, docs/KEYSTONE-PRODUCT.md, src/sigma0/loop_lm.py
 
 </details>

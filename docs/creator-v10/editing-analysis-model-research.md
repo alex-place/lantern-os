@@ -18,7 +18,7 @@ strengthens Observe/Reason/Verify, it does not add a new subsystem.
 ## A. Analysis model (perception)
 
 ### Current mechanism (verified in code)
-`apps/lantern-garage/lib/highlight-engine.js` runs three ffmpeg passes (motion,
+`lib/highlight-engine.js` runs three ffmpeg passes (motion,
 audio loudness, scene difference) over the operator's own clip and merges them into a
 `HighlightTimeline`. `viral-score-v10.js → deriveSignals()` then turns that timeline
 into the signals the scorer uses.
@@ -174,7 +174,7 @@ A1 makes the headline pacing feature real; A4 + the shipped calibration set make
   calibration namespace. Tests: `tests/test_retention_curve.js` (10/10) + A1 (8/8) +
   calibration (12/12). Honesty: sparse/unknown curves yield nulls, never guesses.
   **Next: A3 (Whisper speech → measured hook/CTA/caption features).**
-- **2026-06-19 — A3 DONE (speech features).** New `apps/lantern-garage/lib/speech-features.js`:
+- **2026-06-19 — A3 DONE (speech features).** New `lib/speech-features.js`:
   `parseWhisperJson()` (tolerant of `{segments}` or bare array) + pure
   `deriveSpeechFeatures(segments, durationSec)` → measured `hookStyle`
   (question/countdown/shock/reaction/text), `wordsPerSec` (real caption density),
@@ -199,7 +199,7 @@ A1 makes the headline pacing feature real; A4 + the shipped calibration set make
   hook-strength proxy, explicitly NOT a calibrated intro-retention %. Tests:
   `tests/test_variant_hookfirst.js` (5/5) + A1/A4/A3/calibration regressions all green.
   **Next: A2 (unsupervised audio-visual recurrence highlight scoring).**
-- **2026-06-19 — A2 DONE (recurrence novelty).** New `apps/lantern-garage/lib/recurrence-novelty.js`:
+- **2026-06-19 — A2 DONE (recurrence novelty).** New `lib/recurrence-novelty.js`:
   `noveltyScores()` scores each time-window by its robust z-distance (median+MAD) from
   the clip's OWN typical window, in the **salient direction only** (a quiet/still window
   is not a highlight). Label-free / self-supervised — replaces "max(motion,audio,scene)"

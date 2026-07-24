@@ -155,7 +155,7 @@ jobs:
       - name: Check docs surface drift
         run: node scripts/check-docs-drift.mjs
       - name: Validate docs-drift gate logic
-        run: node apps/lantern-garage/test/docs-drift-gate.test.js
+        run: node test/docs-drift-gate.test.js
 
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
@@ -194,7 +194,7 @@ jobs:
         with:
           node-version: 24
       - name: Run surface boundary contract test
-        run: npm run test:boundary --prefix apps/lantern-garage
+        run: npm run test:boundary
 
   # ── ADR Registry Lint ───────────────────────────────────────────────────────
   # ADR numbers have collided three times (3×0001 #1813, 2×0008 #1126/#1144,
@@ -217,7 +217,7 @@ jobs:
   # The per-agent open-PR cap (formerly the `gate` job "Single-workstream check")
   # was removed intentionally: lanes may keep any number of concurrent open PRs.
   # Serialisation is handled at merge time by the single in-process merger
-  # (apps/lantern-garage/lib/pr-watcher.js), which lands one green+reviewed PR per
+  # (lib/pr-watcher.js), which lands one green+reviewed PR per
   # tick. See AGENTS.md / CLAUDE.md.
 
   # ── Slop Check ──────────────────────────────────────────────────────────────

@@ -44,16 +44,16 @@ implementation of one loop stage.
 
 | Surface | Entrypoint | Bind | Notes |
 |---|---|---|---|
-| Local web server | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `127.0.0.1:4177` | Default; loopback only (`server.js:69-70`) |
-| Cloud (Railway) | [`apps/lantern-garage/cloud-server.js`](../apps/lantern-garage/cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim: sets `PORT` so `server.js` binds public |
+| Local web server | [`server.js`](../server.js) | `127.0.0.1:4177` | Default; loopback only (`server.js:69-70`) |
+| Cloud (Railway) | [`cloud-server.js`](../cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim: sets `PORT` so `server.js` binds public |
 | Dev (hot-reload) | same server, port **4178** | `127.0.0.1:4178` | Dual-boot; current branch worktree |
-| Static UI | `gh-pages` branch (GitHub Actions) | — | Source in `apps/lantern-garage/public/` |
+| Static UI | `gh-pages` branch (GitHub Actions) | — | Source in `public/` |
 | MCP server | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | `:8771` | Spawned by `server.js:307` |
 | MCP OAuth | `src/mcp_server/server_oauth.py` | `:8772` | Spawned by `server.js:331` |
 | Trader dashboard | (child process) | `:5050` | Spawned by `server.js:357` |
 
 The same `server.js` is the **single Node entrypoint** for local and cloud; the host is chosen at
-startup — `process.env.PORT ? "0.0.0.0" : "127.0.0.1"` ([`server.js:70`](../apps/lantern-garage/server.js)).
+startup — `process.env.PORT ? "0.0.0.0" : "127.0.0.1"` ([`server.js:70`](../server.js)).
 Production-without-a-real-`SESSION_SECRET` is guarded (`server.js:186`).
 
 **Dual-boot topology:** ports 4177 (stable/master) and 4178 (dev/current branch) are served from
@@ -95,12 +95,12 @@ Supporting core modules: `memory.py` / `memory_query.py` (token-budgeted retriev
 ## 4. Web cockpit — Lantern Garage (Node)
 
 `server.js` (655 lines) is a **framework-free** HTTP server. It loads an ordered array of ~52 route
-modules ([`server.js:128+`](../apps/lantern-garage/server.js)); each module is
+modules ([`server.js:128+`](../server.js)); each module is
 `async function(req, res, url, deps) → boolean` and returns `true` once it has handled the request
-(e.g. [`routes/status.js:68`](../apps/lantern-garage/routes/status.js)). The first module to claim
+(e.g. [`routes/status.js:68`](../routes/status.js)). The first module to claim
 the URL wins; LLM replies stream via SSE.
 
-Business logic lives in **[`apps/lantern-garage/lib/`](../apps/lantern-garage/lib/) — ~270 modules**.
+Business logic lives in **[`lib/`](../lib/) — ~270 modules**.
 Grouped by loop stage / domain:
 
 | Domain | Representative modules |
@@ -117,10 +117,10 @@ Grouped by loop stage / domain:
 
 The chat is a single assistant: the `keystone` agent loaded from
 [`data/contexts/personas.json`](../data/contexts/personas.json) (inline fallback in
-[`dream-chat.js`](../apps/lantern-garage/lib/dream-chat.js)). `selectAgent()` always resolves
+[`dream-chat.js`](../lib/dream-chat.js)). `selectAgent()` always resolves
 that one assistant — the earlier keyword-scored persona set (trader / engineer /
 job-application / Σ₀) and per-message task-lens prompts were removed. Capabilities are
-**native tool calls** from [`tool-runner.js`](../apps/lantern-garage/lib/tool-runner.js)
+**native tool calls** from [`tool-runner.js`](../lib/tool-runner.js)
 (web search/fetch, document generation, workspace files, market data, repo/GitHub),
 invoked by the model on its own initiative.
 
@@ -137,7 +137,7 @@ hot-reloaded via `POST /api/settings/providers` without restart ([PROVIDERS.md:2
 **Live fallback chain:** Gemini → Claude (Anthropic) → OpenAI → Ollama (local)
 ([PROVIDERS.md:156-161](../PROVIDERS.md)). Local inference targets Ollama at
 `http://127.0.0.1:11434`, default model `ouro:latest`
-([`dream-chat.js:430-431`](../apps/lantern-garage/lib/dream-chat.js)) — the Σ₀/Ouro served model.
+([`dream-chat.js:430-431`](../lib/dream-chat.js)) — the Σ₀/Ouro served model.
 **Declared but not yet wired:** Grok, Mistral, Cohere, Perplexity ([PROVIDERS.md:167-170](../PROVIDERS.md)).
 
 No module hardcodes a single provider as a dependency — selection routes through
@@ -151,7 +151,7 @@ One append path, one archive — no second memory system.
 
 - **JSONL append logs** under `data/` (~40 subdirectories) — conversations, trading history, agent
   audits, convergence records (`data/convergence/records.jsonl`, `issue-work-records.jsonl`).
-  Concurrent writes funnel through [`lib/file-queue.js`](../apps/lantern-garage/lib/file-queue.js)
+  Concurrent writes funnel through [`lib/file-queue.js`](../lib/file-queue.js)
   to avoid interleaved corruption.
 - **JSON state files** under `data/` for current-state snapshots (feature flags, manifests, PCSF).
 - **CSF archive** — the lossless binary memory/compression layer (see §7).
@@ -179,8 +179,8 @@ The CADD layer (`caad/`) was archived 2026-07-24 (see docs/ARCHIVE-LEDGER.md).
 | Subsystem | Location | Role (loop stage) |
 |---|---|---|
 | **MCP server** | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | FastAPI + SSE; tools `queue_status`, `task_intake`, `dispatch_work`, `boot_check`, `list_skills`, `get_status` (`server.py:11-16`). Act/observe bridge for orchestrators. |
-| **Trading terminal** | `public/kalshi-terminal.html` + [`routes/trading.js`](../apps/lantern-garage/routes/trading.js) | Swipe-deck UI over 60+ REST endpoints; live data via `kalshi-collector` snapshot, not UI-direct calls. Act + first closed loop slice. |
-| **Explore feed** | `public/explore.html` + [`routes/explore.js`](../apps/lantern-garage/routes/explore.js) + [`lib/explore-feed.js`](../apps/lantern-garage/lib/explore-feed.js) | Single-pane content feed ranked by `rankCandidates(cards,"explore")` — a **2nd, non-LLM consumer of the PCSF leaderboard** (§5). Click/dismiss → `recordModelOutcome` reorders it. Reason + Converge. See [EXPLORE-FEED.md](EXPLORE-FEED.md). |
+| **Trading terminal** | `public/kalshi-terminal.html` + [`routes/trading.js`](../routes/trading.js) | Swipe-deck UI over 60+ REST endpoints; live data via `kalshi-collector` snapshot, not UI-direct calls. Act + first closed loop slice. |
+| **Explore feed** | `public/explore.html` + [`routes/explore.js`](../routes/explore.js) + [`lib/explore-feed.js`](../lib/explore-feed.js) | Single-pane content feed ranked by `rankCandidates(cards,"explore")` — a **2nd, non-LLM consumer of the PCSF leaderboard** (§5). Click/dismiss → `recordModelOutcome` reorders it. Reason + Converge. See [EXPLORE-FEED.md](EXPLORE-FEED.md). |
 | **Σ₀ / Ouro serving** | [`src/sigma0/`](../src/sigma0/) (`loop_lm.py`, `provider_node.py`, `quantized_cache.py`, `decode_canary.py`) | The local interchangeable model; served behind Ollama. Reason. |
 | **Self-improvement / training** | `scripts/ouro_*`, `src/training/`, `data/self-improvement/` | LoRA/adapter training jobs; experience capture. Converge. |
 | **Orchestration / autowork / fleet** | `lib/autowork-worktree.js`, `lib/swarm-orchestrator.js`, monoworkstream git hooks | Per-issue worktree-isolated agents; one PR lane per agent prefix. Act. |
@@ -230,7 +230,7 @@ Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 ## 10. Security & deployment posture
 
 - **Local default is loopback** (`127.0.0.1`); public bind only when `PORT` is set
-  ([`server.js:70`](../apps/lantern-garage/server.js)).
+  ([`server.js:70`](../server.js)).
 - **Patreon OAuth** optionally gates the whole site; currently the login *requirement* is behind a
   feature flag (`patreon_auth`) — guests browse, admin/trade stay gated. See
   [PATREON-OAUTH.md](PATREON-OAUTH.md) and the auth-flag memory.
