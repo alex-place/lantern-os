@@ -4,7 +4,7 @@
 //
 // Run: node apps/lantern-garage/test/context-budget.test.js
 const assert = require("assert");
-const { foldContext, estimateTokens } = require("../lib/context-budget");
+const { foldContext, estimateTokens } = require("../lib/stream-chat/context-budget");
 
 let failures = 0;
 function check(name, fn) {

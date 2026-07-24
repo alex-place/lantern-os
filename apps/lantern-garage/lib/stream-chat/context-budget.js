@@ -224,6 +224,56 @@ function assembleBudgetedContext({
   };
 }
 
+// ── Indefinite-horizon folding (#2852, Observe) ─────────────────────────────
+// foldContext() is the eviction DECISION core for long-running loop contexts
+// (AgentFold context-folding; Self-GC 2607.00692): partition a chronological
+// item list into the kept live window (pins + recency floor + newest-that-fit)
+// and the externalized overflow, which the CALLER persists to the existing
+// memory store (csf-memory) — no new store. Pure; never throws. Lives here so
+// there is exactly ONE context-budget module (duplication gate, PR #2908).
+
+function _itemTokens(it) {
+  return estimateTokens(it && (it.text != null ? it.text : it.content));
+}
+
+/**
+ * Fold a chronological context list to fit a token budget.
+ * @param {Array<{text?:string, content?:string, pinned?:boolean}>} items  oldest → newest
+ * @param {{budgetTokens:number, keepRecent?:number}} opts
+ * @returns {{kept:Array, externalized:Array, keptTokens:number, budgetTokens:number, folded:boolean}}
+ *   keptTokens may exceed budget ONLY because pinned/recency-floor items are hard-kept.
+ */
+function foldContext(items, opts = {}) {
+  const list = Array.isArray(items) ? items : [];
+  const budget = Math.max(0, Number(opts.budgetTokens) || 0);
+  const keepRecent = Math.max(0, Number(opts.keepRecent) || 0);
+  const n = list.length;
+  const tokens = list.map(_itemTokens);
+  const total = tokens.reduce((a, b) => a + b, 0);
+
+  if (total <= budget) {
+    return { kept: list.slice(), externalized: [], keptTokens: total, budgetTokens: budget, folded: false };
+  }
+
+  const keep = new Set();
+  let used = 0;
+  for (let i = 0; i < n; i++) {
+    if (list[i] && list[i].pinned) { keep.add(i); used += tokens[i]; }
+  }
+  for (let i = n - 1, c = 0; i >= 0 && c < keepRecent; i--, c++) {
+    if (!keep.has(i)) { keep.add(i); used += tokens[i]; }
+  }
+  for (let i = n - 1; i >= 0; i--) {
+    if (keep.has(i)) continue;
+    if (used + tokens[i] <= budget) { keep.add(i); used += tokens[i]; }
+  }
+
+  const kept = [];
+  const externalized = [];
+  for (let i = 0; i < n; i++) (keep.has(i) ? kept : externalized).push(list[i]);
+  return { kept, externalized, keptTokens: used, budgetTokens: budget, folded: true };
+}
+
 module.exports = {
   estimateTokens,
   contextWindowFor,
@@ -232,6 +282,7 @@ module.exports = {
   coalesceRoles,
   normalizeProviderSequence,
   assembleBudgetedContext,
+  foldContext,
   CONTEXT_WINDOWS,
   SUMMARY_HEADER,
   SUMMARY_ACK,
