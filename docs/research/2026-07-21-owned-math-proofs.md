@@ -1,7 +1,7 @@
-# Owned Math — Proofs I: the No-Free-Confidence lemma (M1), the Passive-Indistinguishability lemma (M3), and the Attribution-Loss lemma (M7)
+# Owned Math — Proofs I: Lemmas 1–5 (No-Free-Confidence M1 · Passive-Indistinguishability M3 · Attribution-Loss M7 · Starve-or-Spend M7 · Freshness-Index M8)
 
 **Date:** 2026-07-21 (third pass on [#2786](https://github.com/alex-place/lantern-os/issues/2786) /
-[#2788](https://github.com/alex-place/lantern-os/issues/2788)) · Lemma 3 added 2026-07-24 (M7)
+[#2788](https://github.com/alex-place/lantern-os/issues/2788)) · Lemmas 3–4 added 2026-07-24 (M7) · Lemma 5 added 2026-07-24 (M8)
 **Type:** Proof note — formal statements + proofs for the claims whose machine checks are
 green, in the L2 pattern: small lemma, named prior art, machine check committed beside it.
 **Slate:** [`2026-07-21-owned-math-conjectures.md`](2026-07-21-owned-math-conjectures.md)
@@ -239,3 +239,61 @@ degenerate feedback loops in recommenders (arXiv:1902.10730); semantic entropy's
 exclusion of consistent errors (Farquhar et al. 2024). **Ours:** endogenous summability, the
 absorption window, the inversion corollary, the dichotomy with the attribution escape, and
 the exact artifact.
+
+---
+
+## Lemma 5 (The freshness index; Whittle index for claim re-verification) — M8
+
+**Setup.** A claim's state is its **paid age** τ ∈ {1,2,…} (steps since evidence was last
+attributed to it — Lemma 3's vocabulary). Passive: τ → τ+1, expected cost c_e·s(τ) with
+staleness probability s(τ) = 1 − (1−ρ)^τ (constant flip hazard ρ — M2's model). Active
+(audit/re-ground): pay c_v, reveal-and-repair, τ → 1. Whittle's λ-subsidy problem pays λ
+per passive step.
+
+**Claim (i) — threshold optimality, one line.** Under any stationary deterministic policy,
+the recurrent class reached from τ = 1 is the cycle 1…A where A is the policy's smallest
+audit age (passive increments, audit resets; states above A are transient). Hence every
+policy's average cost equals g_λ(A) = [c_v + c_e·S(A−1) − λ(A−1)]/A with S(k) = Σ_{u≤k}
+s(u), and the optimum over all policies is the optimum over thresholds. ∎
+
+**Claim (ii) — the index.** Indifference between adjacent thresholds τ and τ+1
+(g_λ(τ) = g_λ(τ+1)) solves to
+
+    W(τ) = c_e·[τ·s(τ) − S(τ−1)] − c_v
+         = c_e·[1 − τβ^τ + (β − β^τ)/(1−β)] − c_v ,   β = 1−ρ.
+
+W is strictly increasing (W(τ+1) − W(τ) = c_e(τ+1)[s(τ+1) − s(τ)] > 0) and bounded above
+by c_e/ρ − c_v. Monotone W ⇒ the optimal threshold T*(λ) = min{τ : W(τ) ≥ λ} is
+nondecreasing in λ ⇒ the passive set grows monotonically ⇒ the arm is **indexable** and W
+is its Whittle index. ∎
+
+**Corollary 1 (EOQ crossing — M2 derived from optimality).** Small-ρ expansion gives
+W(τ) = c_e·ρτ²/2 − c_v + O(ρ²τ³), so the λ = 0 crossing is T* → √(2(c_v/c_e)/ρ) — the M2
+EOQ cadence — and the budgeted crossing satisfies T*(λ) → √(2((c_v+λ)/c_e)/ρ): a budget's
+shadow price is a uniform surcharge on the verification price.
+
+**Corollary 2 (attribution weight zero — M7 closed).** The transition and cost kernels are
+functions of paid age alone; expressed confidence enters neither. Hence the index is
+measurable w.r.t. the paid-evidence history, and any "index" computed on expressed
+freshness assigns a laundered claim (expressed age ≈ 0) the value −c_v < 0 forever — audit
+starvation, rederived inside the optimal-scheduling frame.
+
+**Machine checks.** `owned_math_m8_whittle_freshness.py` (exact, no RNG): indifference-λ by
+bisection on the exact renewal scan matches the closed form to 7.8e-13 across a
+(ρ, c_e, c_v) × τ grid; passive-set monotonicity over 200-point λ sweeps; **exact policy
+iteration** (closed-form cycle evaluation — relative VI oscillates on this periodic chain
+and is not used) recovers the same thresholds; EOQ convergence 0.41 → 0.007 rel. err;
+surcharge law ≤ 2.1%; policy contest with two laundered arms: Whittle-on-paid-age 1.784 <
+EOQ-overdue 1.793 < round-robin 2.020 < expressed-confidence gate 4.470.
+
+**Prior art, named.** Whittle (1988); Tripathi & Modiano (arXiv:1908.10438) — indexability
+and closed-form AoI indices for nondecreasing age costs (ADOPTED, not re-proven);
+maintenance/inspection index tradition (Glazebrook et al.) for the priced-audit variant;
+Weber & Weiss (1990) asymptotic optimality. **Ours:** the claim-verification instantiation,
+the EOQ-crossing identity with the shipped tick's implied economics (c_v/c_e ≈ 0.108 at
+the ledger's measured ρ̂), the budget-surcharge reading, and Corollary 2 tying Lemma 3's
+attribution requirement into the index's sufficient statistic.
+
+**Honest scope.** Constant flip hazard; monotone deterioration required (self-healing
+claims break threshold structure); audit = perfect repair; Whittle optimality under a hard
+per-step budget is asymptotic, not exact at small N — the contest is evidence, not proof.

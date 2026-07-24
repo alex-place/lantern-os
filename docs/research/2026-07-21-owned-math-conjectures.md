@@ -10,8 +10,9 @@ stated before work and a **first test executed the same day**.
 [#2789](https://github.com/alex-place/lantern-os/issues/2789) (M4) ·
 [#2790](https://github.com/alex-place/lantern-os/issues/2790) (M5) ·
 [#2791](https://github.com/alex-place/lantern-os/issues/2791) (M6) ·
-[#2924](https://github.com/alex-place/lantern-os/issues/2924) (M7)
-**Loop stages:** Verify (M1, M3, M4, M6) · Converge (M1, M2, M7) · Act/route (M5)
+[#2924](https://github.com/alex-place/lantern-os/issues/2924) (M7) ·
+[#2926](https://github.com/alex-place/lantern-os/issues/2926) (M8)
+**Loop stages:** Verify (M1, M3, M4, M6) · Converge (M1, M2, M7) · Act/route (M5, M8)
 
 **Grounding contract — External Reality Rule.** Tags: **[measured — this note]** (a number
 produced by a run committed alongside), **[derived — this note]** (analytical result written
@@ -57,6 +58,7 @@ to pretend it is empty.
 | **M5** | Dilation = water-filling optimum | KKT derivation vs shipped code | **[derived]** cutoff + G12 fall out; linear-vs-log mismatch found | [#2790](https://github.com/alex-place/lantern-os/issues/2790) |
 | **M6** | Lasing threshold (per-mode G/L) | — | **[conjecture]** statement only | [#2791](https://github.com/alex-place/lantern-os/issues/2791) |
 | **M7** | Attribution loss: the composed law's anti-runaway guarantee is unsatisfiable over global signals | two-world counterexample vs SHIPPED code | **[derived + measured 2026-07-24]** laundered runaway survives 40/40 steps; keyed guard shipped; starvation corollary measured | [#2924](https://github.com/alex-place/lantern-os/issues/2924) |
+| **M8** | Freshness index: re-verification = AoI bandit with a verification price; Whittle index closed-form | exact indifference + PI + policy contest | **[derived + measured 2026-07-24]** W(τ) verified 7.8e-13; EOQ = zero-crossing (tick ⇒ implied c_v/c_e ≈ 0.108); Whittle beats EOQ/expressed gates under budget | [#2926](https://github.com/alex-place/lantern-os/issues/2926) |
 
 Artifacts: [`owned_math_m1_m2_ledger_scan.py`](../../experiments/owned_math_m1_m2_ledger_scan.py) ·
 [`owned_math_m3_dichotomy_edgecase.py`](../../experiments/owned_math_m3_dichotomy_edgecase.py) ·
@@ -265,6 +267,45 @@ Self-contained note built for posting:
 artifact [`audit_starvation_theorem.py`](../../experiments/audit_starvation_theorem.py).
 Theory companion to the empirically-measured retrieval-state lock-in (arXiv:2606.22728,
 42–59% silent errors — named, no theorem there).
+
+## M8 — The freshness index: re-verification is AoI scheduling with a verification price
+
+**Statement [derived — proofs note Lemma 5] + [measured 2026-07-24 — exact].** The M5
+stretch goal resolves by isomorphism: each claim is an arm of the **Age-of-Information
+restless bandit** with state = **paid age** τ (M7's vocabulary), staleness cost
+c_e·s(τ) (M2's flip rate ρ), and a **verification price** c_v per audit (the term the AoI
+literature lacks and the maintenance-index tradition supplies). Indexability ADOPTED
+(Tripathi & Modiano, arXiv:1908.10438); our variant's index in closed form:
+**W(τ) = c_e·[τ·s(τ) − S(τ−1)] − c_v** — verified against exact bisection to **7.8e-13**
+and against exact policy iteration (threshold optimality is structural: every stationary
+policy's recurrent class is a 1…A cycle). **What it unlocks:** (1) M2's EOQ cadence is the
+index's **zero-crossing** (rel. err → 0.007 as ρ→0), and the shipped 30-min tick at the
+ledger's measured ρ̂ implies **c_v/c_e ≈ 0.108** (de-burst 0.016) — the magic constant is
+now a falsifiable economic claim; (2) a binding audit budget = a **uniform surcharge on
+the verification price** (crossing(λ) ≈ √(2((c_v+λ)/c_e)/ρ), err ≤ 2.1%) — scarcity never
+selectively starves high-ρ claims; (3) **free confidence has index weight zero** (the
+index is measurable w.r.t. paid history — M7 closed from the optimality side); policy
+contest under 1.8× contention: Whittle-on-paid-age **1.784** < EOQ-overdue 1.793 <
+round-robin 2.020 < expressed-confidence gate 4.470. Arc: M3 = *when* (hard cadence
+necessary) · M7 = *whose* (paid keying necessary) · M8 = *in what order* (the index), one
+law. Note: [`2026-07-24-owned-math-m8-freshness-index.md`](2026-07-24-owned-math-m8-freshness-index.md) ·
+artifact [`owned_math_m8_whittle_freshness.py`](../../experiments/owned_math_m8_whittle_freshness.py) ·
+product: `whittleFreshnessIndex()` in
+[`grounding-policy.js`](../../apps/lantern-garage/lib/grounding-policy.js) (pure, tested,
+unwired — the tick remains the M3 floor; wiring spec + kill criteria in
+[#2926](https://github.com/alex-place/lantern-os/issues/2926)).
+
+**Next / kill.** Wire `GROUNDING_PRIORITY=whittle` (default off) once per-key paid age is
+exposed from the ledger; per-topic (ρ, c_e, c_v) blocked on #2787 spaced probes (same
+limit as M2, inherited knowingly). Dies if any indifference-gap cell exceeds tolerance, if
+Whittle stops beating EOQ-overdue under binding budgets as heterogeneity grows (fallback
+verdict pre-stated: "EOQ-overdue is near-optimal"), or if measured per-topic ρ̂ moves the
+implied c_v/c_e outside a defensible range.
+
+**Prior art [grounded]:** Whittle 1988; Tripathi–Modiano AoI indices; Weber–Weiss;
+maintenance/inspection indices (Glazebrook et al.). **Ours:** the claim-verification
+instantiation with the priced-audit term, the EOQ-crossing identity + tick economics, the
+budget-surcharge reading, the attribution corollary, and the tested product function.
 
 ---
 
