@@ -192,3 +192,50 @@ global-bit rule stands regardless, because W_L exists either way. The confidence
 bit, so no modeling choice there carries proof weight. The charitable per-hypothesis reading
 of `evidenceInflux` does not close the hole: M6's modes are sub-hypothesis decode modes while
 M1's evidence is hypothesis-level, so the keying still differs.
+
+---
+
+## Lemma 4 (Starve-or-spend dichotomy; audit starvation) — M7, public form
+
+**Setup.** Belief with odds o_t = o0·g^t, g > 1 (self-reinforcement, zero paid evidence —
+W_L), confidence c_t = o_t/(1+o_t); anchored twin W_G with the same odds path driven by
+genuine per-belief evidence (LR = g each step). All provenance-blind observables coincide on
+the pair (Lemma 3's construction, lifted from activity bits to confidence trajectories). An
+audit policy π emits per-step audit probabilities q_t as a causal function of those
+observables — hence the **same schedule on both worlds**.
+
+**Claim.** Exactly one of:
+1. **Starve:** Σ q_t < ∞ — then P(W_L never audited) = Π(1−q_t) > 0 (product criterion),
+   audits are a.s. finitely many (Borel–Cantelli), and P(never caught) ≥ P(never audited)
+   for any per-audit catch power ρ ≤ 1;
+2. **Spend:** Σ q_t = ∞ — then π audits W_G (evidence-paid, correct in that world)
+   infinitely often a.s.: unbounded verification spend on settled truth.
+
+The deployed gate families sit in branch 1 *endogenously*: a threshold gate (audit iff
+c_t < θ; FLARE form) has q_t = 0 for all t ≥ t* = ⌈log_g(θ/((1−θ)o0))⌉ because {c ≥ θ} is
+absorbing under increasing c_t — total audits ≤ t*, and t* = 0 when o0 ≥ θ/(1−θ) (born
+confident); a proportional gate (q_t = α(1−c_t)) has Σ q_t ≤ α(1/(1+o0) + 1/(o0(g−1))) < ∞.
+The general boundary is Σ 1/o_t < ∞ — any superlinear odds growth. **The summability that
+Rothschild-style incomplete learning treats as a designer's mistake is here imposed by the
+runaway belief on any confidence-vanishing gate.** An attribution gate — audit iff no
+evidence was *paid to this belief* this step — is outside the observable class: constant
+hazard α on W_L (catch ~ Geometric(αρ)), zero audits on W_G. It escapes both branches. ∎
+(Proofs are the two series computations plus the product criterion; written out with worked
+constants in [`2026-07-24-audit-starvation-theorem.md`](2026-07-24-audit-starvation-theorem.md).)
+
+**Corollary (audit inversion).** An honest belief at calibrated c̄ < 1 is audited at rate
+α(1−c̄) forever (linear growth), while the laundered belief's lifetime total is the finite
+constant above — measured 10.0 vs 1.16 expected audits by T = 40 (ratio 8.6×, → ∞).
+
+**Machine check.** [`audit_starvation_theorem.py`](../../experiments/audit_starvation_theorem.py)
+— exact (stdlib only, no RNG): t* = 7; P(never caught) grid incl. the born-confident row
+(= 1 at ρ = 1); E[lifetime audits] = 1.159 ≤ 1.5 bound; P(never audited) = 0.284; the
+4-gate × 2-world dichotomy table.
+
+**Prior art, named.** Rothschild (1974) incomplete learning / summable exploration (survey
+arXiv:1906.10173); FLARE (arXiv:2305.06983); retrieval-state lock-in measured empirically
+(arXiv:2606.22728: 42–59% silent errors — the starve branch in the wild, no theorem there);
+degenerate feedback loops in recommenders (arXiv:1902.10730); semantic entropy's scoped
+exclusion of consistent errors (Farquhar et al. 2024). **Ours:** endogenous summability, the
+absorption window, the inversion corollary, the dichotomy with the attribution escape, and
+the exact artifact.

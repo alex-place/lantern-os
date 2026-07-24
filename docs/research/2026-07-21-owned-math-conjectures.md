@@ -250,6 +250,22 @@ observation-equivalent faulty/nominal traces; static-output-feedback distinguish
 starvation corollary tying M5/G12 into the same mechanism, and the sibling relation to M3
 (trajectory level → step-signal level).
 
+**Public form [derived + measured 2026-07-24 — postable].** The mechanism generalizes from
+our control law to the industry-standard gate pattern (FLARE-style threshold retrieval,
+uncertainty sampling, agreement gates): **audit starvation** — a self-reinforcing false
+belief *endogenously* makes any confidence-vanishing audit schedule summable (the
+Rothschild incomplete-learning trap, manufactured by the adversary instead of the designer),
+giving a finite immortality window under threshold gates (t\* = 7 worked; P(never caught) = 1
+when born-confident, at ANY verifier power) and P(never audited) = 0.284 under proportional
+gates — while auditing the *honest* twin 8.6× more. **Starve-or-spend dichotomy** (Lemma 4):
+every provenance-blind gate either starves (positive escape probability) or spends
+(unbounded audits of settled truth); per-belief paid-evidence accounting escapes both.
+Self-contained note built for posting:
+[`2026-07-24-audit-starvation-theorem.md`](2026-07-24-audit-starvation-theorem.md) · exact
+artifact [`audit_starvation_theorem.py`](../../experiments/audit_starvation_theorem.py).
+Theory companion to the empirically-measured retrieval-state lock-in (arXiv:2606.22728,
+42–59% silent errors — named, no theorem there).
+
 ---
 
 ## 7. Frontier position — how this becomes *ours*
