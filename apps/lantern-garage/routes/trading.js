@@ -113,9 +113,24 @@ async function _autoscanTick() {
       // deduped. TRADER_AUTO_USER pins to one user (back-compat/testing). Per user the
       // broker facade resolves to their actual broker (IBKR preferred), so runAutoTrade
       // is broker-agnostic; every order still passes the per-account hard guard.
-      const users = process.env.TRADER_AUTO_USER
+      // Enumerate accounts to manage. Per-user credential FILES (IBKR / one-click Alpaca)
+      // give a userId each. BUT the common single-operator setup runs on Alpaca *server
+      // env keys* (or the local IBKR) under the id-less 'local-owner' identity — which has
+      // NO credential file, so it was invisible to the autopilot and its positions were
+      // never stopped/exited (losers ran unbounded). When the login gate is OFF (local /
+      // preview box), include 'local-owner' so that account IS managed. brokerFacadeFor
+      // returns null if nothing is actually connected for it, and the per-account dedupe
+      // below drops it if it aliases a file-backed account — so this can't double-trade.
+      let baseUsers = process.env.TRADER_AUTO_USER
         ? [process.env.TRADER_AUTO_USER]
-        : [...new Set([...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()])];
+        : [...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()];
+      if (!process.env.TRADER_AUTO_USER) {
+        try {
+          const { loginGateEnabled } = require('../lib/auth-middleware');
+          if (!loginGateEnabled()) baseUsers.push('local-owner');
+        } catch (_e) { baseUsers.push('local-owner'); }   // auth module absent → single-user box
+      }
+      const users = [...new Set(baseUsers)];
       const traderMode = require('../lib/trader-mode');
       const sigma = require('../lib/sigma-trader');
       const _seenAccts = new Set();
