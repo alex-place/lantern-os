@@ -381,7 +381,7 @@
     const brokerRows = `
       <div class="group-label">Brokerage</div>
       <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
-      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? "Connected — paper trading" : "One-click paper-trading account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn" id="c-al-on">Connect</button>`}</div></div>`;
+      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? `Connected — paper trading${al.body && al.body.accountNumber ? ` · ${esc(al.body.accountNumber)}` : ""}` : "Paste your Alpaca API keys to trade a paper account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn primary" id="c-al-on">Connect</button>`}</div></div>`;
 
     const keyRows = `
       <div class="group-label">Your AI keys (bring-your-own)</div>
@@ -398,8 +398,22 @@
     el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p>${brokerRows}${keyRows}${connectorRows}${inviteRows}
       <p class="muted-note">Everything here is stored encrypted on the server and never leaves it. Your AI keys let the app run on your own provider quota; brokerage credentials stay server-side (Alpaca paper-only, IBKR paper or live).</p>`;
 
-    const on = $("c-al-on"); if (on) on.onclick = async () => { const o = await api("/api/broker/alpaca/connect", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else renderConnections(); };
-    const off = $("c-al-off"); if (off) off.onclick = async () => { await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    const on = $("c-al-on"); if (on) on.onclick = () => openModal({
+      title: "Connect Alpaca",
+      sub: "Paste the API keys from your Alpaca PAPER account (alpaca.markets → Paper Trading → API Keys). They're encrypted on the server and never shared.",
+      fields: [
+        { name: "keyId", label: "API Key ID", placeholder: "PK…" },
+        { name: "secretKey", label: "Secret Key", type: "password", placeholder: "your secret key" },
+      ],
+      submitLabel: "Connect",
+      onSubmit: async ({ keyId, secretKey }, close) => {
+        if (!keyId.trim() || !secretKey.trim()) return "Enter both your API Key ID and Secret Key.";
+        const o = await api("/api/broker/alpaca/connect-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keyId: keyId.trim(), secretKey: secretKey.trim(), env: "paper" }) });
+        if (!o.ok) return (o.body && o.body.message) || "Couldn't connect — check your keys and try again.";
+        close(); renderConnections();
+      },
+    });
+    const off = $("c-al-off"); if (off) off.onclick = async () => { if (!confirm("Disconnect Alpaca? Your stored keys will be removed.")) return; await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;
       const o = await api("/api/providers/set-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: id, key: v.trim() }) });
