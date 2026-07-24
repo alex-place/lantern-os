@@ -32,7 +32,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // Alpaca path: `status=all` so BOTH open orders AND filled/cancelled history
       // populate — the old handler only ever fetched IBKR *open* orders, which is why
       // Order history was always "None" on the Alpaca account.
-      if (pref === 'alpaca' && alpaca.available(uid)) {
+      // Alpaca is the app's primary broker: show its order history whenever Alpaca is
+      // usable and the user hasn't explicitly chosen IBKR (was `pref === 'alpaca'` only,
+      // so an Alpaca-via-keys user on the default preference saw empty IBKR history).
+      if (alpaca.available(uid) && pref !== 'ibkr') {
         const all = await alpaca.getAllOrders(uid, limitParam > 0 ? limitParam : 200).catch(() => []);
         if (Array.isArray(all) && all.length) { sendJson(res, all, 200); return true; }
       }
@@ -110,10 +113,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
   // HARD-GATED + dry by default (lib/trading-guard.js): a blocked order returns
   // status:'dry_run' (HTTP 200, not an error) carrying the reason.
   if (url.pathname === '/api/trading/orders/place' && req.method === 'POST') {
-    if (!traderAgent) {
-      sendJson(res, { status: 'error', error: 'TraderAgent not initialized' }, 503);
-      return true;
-    }
+    // NOTE: no `traderAgent` gate here — placement goes straight to the broker
+    // (alpaca-adapter / IBKR bridge) below, so an Alpaca user can trade even when the
+    // legacy IBKR-era TraderAgent isn't initialized. Broker availability is handled by
+    // the attempt loop + "no broker connected" fallback.
     try {
       const body = await collectRequestBody(req);
       const payload = body ? JSON.parse(body) : {};
@@ -142,16 +145,26 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // Either order keeps the other broker as fallback. Alpaca PAPER fills for
       // real without arming — so a paper trade actually happens instead of a
       // dry-run dead end.
-      const attempts = preferredBroker(uid, req) === 'alpaca'
+      // Alpaca is the primary broker: try it first whenever it's usable, unless the
+      // user explicitly prefers IBKR. (Was hard IBKR-first by default.)
+      const alpacaFirst = preferredBroker(uid, req) !== 'ibkr' && alpaca.available(uid);
+      const attempts = alpacaFirst
         ? [() => alpaca.placeOrder(uid, orderReq), () => bridge.placeIBKROrder(uid, orderReq)]
         : [() => bridge.placeIBKROrder(uid, orderReq), () => alpaca.placeOrder(uid, orderReq)];
+      // The FIRST connected broker to answer wins — its result (placed / dry_run / or a
+      // real error like "insufficient shares") is surfaced as-is. We only fall through
+      // to the next broker when one returns null = NOT CONNECTED. Crucially we do NOT
+      // re-route a user's order to a broker they didn't choose just because their chosen
+      // broker returned an error — that would silently place the trade on the wrong
+      // account. The old default-IBKR-first ordering caused Alpaca users to hit IBKR
+      // errors; `alpacaFirst` above fixes that by trying the intended broker first.
       let result = null;
       for (const attempt of attempts) {
         result = await attempt().catch(() => null);
-        if (result) break;
+        if (result) break;                                  // connected broker answered → done
       }
       result = result
-        || { status: 'error', ticker, side, qty, reason: 'No broker connected. Connect Alpaca (one click) or ask an admin to set Alpaca paper keys to trade.' };
+        || { status: 'error', ticker, side, qty, reason: 'No broker connected. Add your Alpaca API keys in Settings → Connections to trade.' };
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
