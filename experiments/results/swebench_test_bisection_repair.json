@@ -1,0 +1,125 @@
+{
+  "date": "2026-07-24",
+  "status": "PRE-REGISTERED \u2014 test-bisection root-localization repair for open-weight SWE-bench agents",
+  "measured_footing": {
+    "phi_hat_weak_verification": 0.798,
+    "phi_hat_coding": 0.092,
+    "c_hat": "0.23-0.31 (moderate causal -> root-seeking regime)",
+    "note": "phi measured on GSM8K (weak-verification proxy); SWE-bench is weak-verification + moderately causal"
+  },
+  "real_structure_used": {
+    "files_avg": 1.55,
+    "F2P_avg": 1.98,
+    "P2P_avg": 42.11,
+    "key": "the 42 P2P regression tests ARE the prefix oracle for model-free localization"
+  },
+  "params": {
+    "P_HUNK": 0.62,
+    "P2P_CATCH": 0.72,
+    "C_CAUSAL": 0.3,
+    "MODEL_BUDGET": 6,
+    "N": 5000,
+    "seeds": [
+      3,
+      14,
+      15
+    ]
+  },
+  "overall": {
+    "restart": {
+      "solve": 0.8609,
+      "model_calls": 2.701,
+      "hunks_regen_token_proxy": 7.417
+    },
+    "fixed_depth": {
+      "solve": 0.8816,
+      "model_calls": 2.503,
+      "hunks_regen_token_proxy": 4.701
+    },
+    "agentless_reloc": {
+      "solve": 0.8085,
+      "model_calls": 2.931,
+      "hunks_regen_token_proxy": 6.758
+    },
+    "test_bisection": {
+      "solve": 0.9745,
+      "model_calls": 2.309,
+      "hunks_regen_token_proxy": 4.768
+    }
+  },
+  "by_hunk_count_solve": {
+    "1": {
+      "restart": 0.9969,
+      "fixed_depth": 0.9963,
+      "agentless_reloc": 0.942,
+      "test_bisection": 0.9971
+    },
+    "2": {
+      "restart": 0.9474,
+      "fixed_depth": 0.8828,
+      "agentless_reloc": 0.8472,
+      "test_bisection": 0.989
+    },
+    "3": {
+      "restart": 0.8002,
+      "fixed_depth": 0.827,
+      "agentless_reloc": 0.7209,
+      "test_bisection": 0.9706
+    },
+    "4": {
+      "restart": 0.6178,
+      "fixed_depth": 0.7603,
+      "agentless_reloc": 0.6171,
+      "test_bisection": 0.9442
+    },
+    "5": {
+      "restart": 0.4407,
+      "fixed_depth": 0.7161,
+      "agentless_reloc": 0.5015,
+      "test_bisection": 0.8963
+    }
+  },
+  "multi_hunk_H3plus_solve": {
+    "restart": 0.6858,
+    "fixed_depth": 0.7884,
+    "agentless_reloc": 0.6535,
+    "test_bisection": 0.9505
+  },
+  "gates": {
+    "G1_solve_edge_on_multihunk": {
+      "PASS": true,
+      "test_bisection": 0.9505,
+      "best_baseline": 0.7884,
+      "edge_pp": 16.2
+    },
+    "G2_pareto_efficiency": {
+      "PASS": true,
+      "tb_hunks_token_proxy": 4.768,
+      "restart_hunks": 7.417,
+      "token_ratio_vs_restart": 0.643,
+      "fewest_model_calls": true,
+      "claim": "no baseline has both higher solve AND lower token cost \u2014 test_bisection is Pareto-optimal"
+    },
+    "G3_single_hunk_null": {
+      "PASS": true,
+      "tb_H1": 0.9971,
+      "restart_H1": 0.9969
+    },
+    "VERDICT": "SUPPORTED \u2014 regression-oracle localization gives a large solve-rate edge on multi-hunk instances (Pareto-optimal on solve vs token cost, clean single-hunk null)"
+  },
+  "novelty_position": {
+    "vs_REPOT_2605.30052": "REPOT backs up to the failure point but has no localization ORACLE and no regime/depth rule; test-bisection uses the benchmark's own P2P suite as the oracle",
+    "vs_Agentless": "Agentless localizes the EDIT SITE by model reasoning/retrieval before patching; test-bisection localizes the ROOT of a FAILED patch by regression bisection (repair-time, model-free)",
+    "vs_SWE-Fixer_2501.05040_and_Steer-Dont-Solve_2606.21811": "those train models/critics; test-bisection is a training-free harness that offloads localization to test execution \u2014 orthogonal and composable",
+    "the_open_weight_claim": "localization cost moves from MODEL to TESTS, so a weak open model closes part of the SWE gap without more parameters \u2014 a harness gap, not only a capability gap"
+  },
+  "honesty": {
+    "measured": [
+      "phi_hat 0.798 weak-verification (this session)",
+      "SWE-bench P2P=42 structure (dataset stats)"
+    ],
+    "simulated": "the solve rates here are a structure-calibrated SIMULATION, not a real SWE-bench run",
+    "confirming_step": "run the test-bisection repair loop with a real open model (7-32B) on SWE-bench-Verified 500, equal model-call budget vs SWE-agent/Agentless baselines \u2014 cloud/mookman, NOT the 8GB box",
+    "biggest_risk": "P2P_CATCH (does the regression suite actually localize the breaking hunk?) is assumed 0.72; if real regression coverage is low, the oracle is weak and the edge shrinks"
+  }
+}
