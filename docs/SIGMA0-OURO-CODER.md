@@ -31,6 +31,11 @@ run on the computer you already have.**
 
 ## Abstract
 
+**Mission (operator, 2026-07-24):** *build an AI assistant that delivers the maximum useful work
+from ordinary hardware, so people get a private, reliable assistant that simply works wherever
+they are.* Σ₀ is this mission's model program — the local core that grows the share of that work
+done privately on the user's own machine; the verified system around it delivers the rest.
+
 Frontier language models buy capability with scale: hundreds of billions of parameters,
 trillions of training tokens, datacenter serving. Σ₀ ("Sigma-Zero") is a bet on the opposite
 corner of the design space: a **~1.5B-parameter, weight-tied *looped* transformer, trained
