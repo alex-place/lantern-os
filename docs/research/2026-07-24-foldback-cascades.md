@@ -193,3 +193,76 @@ imported and cited, not claimed.
 protein," curling back to older rungs when a hard cascade solves an easy problem. Taken at
 face value and grounded, it produced a falsifiable control-flow claim with a closed form and
 a measured null. Recorded because the origin is part of the evidence trail.*
+
+---
+
+## 8. Rung B — the unfold-depth law: repair granularity is the inverse error rate
+
+Rung A left the foldon size stipulated (fixed 2-step units). But the theorem's own logic
+forbids a free choice: unfolding **too shallow** misses the error; unfolding **too deep**
+re-exposes steps to fresh hidden errors. There must be an interior optimum. Derived before
+running ([`folding_unfold_depth_law.py`](../../experiments/folding_unfold_depth_law.py)):
+a repair unfolding the last *m* of K steps succeeds iff the latent error lies inside the
+suffix **and** no new hidden error appears while re-solving it, so with uniform error
+position
+
+```
+P(fix | m) = (m/K)·(1−q)^m       d/dm ⇒ 1 + m·ln(1−q) = 0
+```
+
+> ### **m\* = −1/ln(1−q) ≈ 1/q — and it does not depend on K.**
+> Unfold exactly as far as you can expect to re-solve before introducing one new hidden
+> error. **Repair granularity is set by the error rate of the machinery doing the repair,
+> not by the length of the thing being repaired.**
+
+**Measured (exact enumeration over 35 (K, φ) cells, plus an independent Monte-Carlo path):**
+
+| K | φ | q | m\* predicted | m measured | advantage vs full restart |
+|---|---|---|---|---|---|
+| 128 | 0.2 | 0.014 | 70.93 | **71** | 1.24× |
+| 128 | 0.3 | 0.021 | 47.12 | **47** | 2.05× |
+| 128 | 0.5 | 0.035 | 28.07 | **28** | 7.71× |
+| 128 | 0.7 | 0.049 | 19.90 | **20** | 35.5× |
+| 128 | 1.0 | 0.070 | 13.78 | **14** | **428×** |
+
+- **G-D1 (pre-registered): PASS** — worst |log₂(m_measured/m\*)| = **0.023** (1.6% error).
+- **G-D3 (pre-registered): PASS** — slope of m_measured vs K is **exactly 0.0** at every φ
+  where the optimum is interior. Depth is K-independent, as derived.
+- **G-D2: FAILED AS WRITTEN.** It demanded an interior optimum across mid-range φ, but 16
+  of those 25 cells have m\* ≥ K, where the theory *itself* predicts the boundary (unfold
+  everything). Splitting cells by what the theory predicts: **13/13 predicted-interior
+  cells are interior, and 22/22 predicted-boundary cells have their optimum exactly at K —
+  35/35 overall.** Recorded as a mis-specified gate rather than a refutation, and flagged
+  as a *post-hoc* split: only G-D1 and G-D3, which are unaffected, carry evidentiary
+  weight here.
+- Monte Carlo (independent implementation) reproduces the closed-form P(fix) at the argmax
+  and its neighbours (e.g. K=128, φ=0.5: closed 0.0807 vs MC 0.0816).
+
+**The two laws together are the engineering result.** Optimal repair depth is **constant**
+in task length, while the penalty for using the wrong depth grows **exponentially** in it:
+at φ=0.5 the advantage of correct-depth unfolding over full restart runs 1.0× → 1.58× →
+**7.71×** as K goes 8 → 64 → 128, and reaches **428×** at φ=1. For short tasks this is a
+rounding error; for long agent trajectories it is the difference between a cascade that
+works and one that does not. **This is Levinthal's paradox for agents:** the failure of
+long-horizon reasoning may be less about per-step capability than about repairing at the
+wrong granularity.
+
+**Biological consistency (heuristic, not a fit).** Observed foldons are ~15–25 residues
+(Englander; cytochrome c folds as five units). If the law holds in the biological setting,
+that implies a per-residue unrecoverable-misfold rate of **~4–7%** — the same range our
+simulation's high-frustration rungs occupy (q = 0.049–0.070 → m\* = 14–20). An
+order-of-magnitude retrodiction of a constant we did not fit, offered as a consistency
+check only; establishing it properly is a biology question we are not equipped to settle.
+
+**What it changes in practice.** The prescription is now quantitative, not directional:
+estimate q from telemetry, set checkpoint/foldon granularity to ≈1/q, and unfold to that
+depth on failure — deeper only when the near unfold fails. It also sharpens the
+instrumentation ask: φ̂ was already the blocking measurement for *whether* to foldback; it
+is now also the input that *sets the parameter*.
+
+**Kill criteria for rung B (pre-stated for the next rung):** the law dies if measured
+optimal depth on real traces is not within 2× of 1/q̂, or if it scales with task length
+(which would falsify K-independence directly). Correlated frustration — an early wrong
+commitment that *causes* later steps to be wrong — violates the independence assumption
+and is the most likely way the constant-depth result breaks; untested, and named here as
+the primary threat to validity.
