@@ -10,7 +10,9 @@ updated: 2026-07-16
 
 <h1 align="center">Unisona</h1>
 
-<p align="center"><b>A persistent, local-first AI operator console — one assistant that remembers, reasons, acts, and verifies.</b></p>
+<p align="center"><b>An AI assistant that delivers the maximum useful work from ordinary hardware — a private, reliable assistant that simply works wherever you are.</b></p>
+
+<p align="center">One persistent, local-first assistant that remembers, reasons, acts, and verifies.</p>
 
 <p align="center">
   <picture>
@@ -47,6 +49,18 @@ Observe → Remember → Reason → Act → Verify → Converge
 Every feature strengthens one stage of that loop. Nothing else ships.
 
 ---
+
+## The mission, measured
+
+*Every word of the tagline is a metric, not a vibe (operator direction, 2026-07-24):*
+
+| Mission word | What it means | Instrument | Honest current state |
+|---|---|---|---|
+| **Maximum useful work** | verified-correct answers per session, per dollar | [eval leaderboard](data/eval/leaderboard.jsonl) + [benchmarks registry](docs/BENCHMARKS.md); precision-of-claimed-solve | Delivered today by the routed **system** (verified cascade: 8.3× cost cut measured); the local kernel is the floor (0.277 golden, raw) and grows via distillation ([#2882](https://github.com/alex-place/lantern-os/issues/2882), [#2911](https://github.com/alex-place/lantern-os/issues/2911)) |
+| **Ordinary hardware** | the reference 8GB box, CPU-viable serving | RAM-fit envelope + [ADR-0026](docs/adr/0026-ternary-serving-artifact-distillation-target.md) ternary target | ≤3B Q4 local core + ΔRAM=0 depth escalation ([architecture decision](docs/research/2026-07-23-sigma0-serving-architecture-decision.md)) |
+| **Private** | local-first state, opt-in providers, no telemetry | [Privacy & security](#privacy--security) | Holds today; local-only honest-halt mode proposed ([#2918](https://github.com/alex-place/lantern-os/issues/2918)) |
+| **Reliable** | it says "done" only when verified; honest-halt otherwise | Σ₀ grounding verdict on the serve path; convergence records | Verdict wired opt-in (PR [#2891](https://github.com/alex-place/lantern-os/pull/2891)); never fabricates `grounded=true` |
+| **Simply works, wherever** | install → first verified answer, unattended; web + desktop; offline-capable | [greenpath gate](docs/GREENPATH-GATE.md) + desktop launcher ([ADR-0014](docs/adr/0014-unisona-desktop-launcher.md)) | Weakest measured axis — now tracked ([#2917](https://github.com/alex-place/lantern-os/issues/2917)) |
 
 ## Why Unisona?
 
