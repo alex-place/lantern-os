@@ -87,3 +87,40 @@ test('summarize: the operator thesis profile — ~35% win with big winners → p
   assert.ok(s.avg_pl_pct_of_premium > 0);
   assert.match(s.verdict, /positive_edge_candidate/);
 });
+
+test('summarize: per-depth split — deep OTM judged on its own expectancy, not win rate', () => {
+  const rows = [];
+  // near (0.25%): 40% win small — negative overall
+  for (let i = 0; i < 40; i++) rows.push({ phase: 'close', depth: 0.25, pl_pct: 30 });
+  for (let i = 0; i < 60; i++) rows.push({ phase: 'close', depth: 0.25, pl_pct: -100 });
+  // deep (2%): 3% win rate but +6000% payoffs — POSITIVE expectancy (the lottery profile)
+  for (let i = 0; i < 3; i++) rows.push({ phase: 'close', depth: 2, pl_pct: 6000 });
+  for (let i = 0; i < 97; i++) rows.push({ phase: 'close', depth: 2, pl_pct: -100 });
+  const s = sh.summarize(rows);
+  assert.ok(s.by_depth['0.25'].avg_pl_pct_of_premium < 0);
+  assert.match(s.by_depth['0.25'].verdict, /negative_edge/);
+  assert.strictEqual(s.by_depth['2'].win_rate_pct, 3);
+  assert.ok(s.by_depth['2'].avg_pl_pct_of_premium > 0);
+  assert.match(s.by_depth['2'].verdict, /positive_edge_candidate/);
+});
+
+test('cfg: ladder parses and defaults to five depths through 2% (deep OTM focus)', () => {
+  const saved = process.env.OPTIONS_SHADOW_LADDER;
+  try {
+    delete process.env.OPTIONS_SHADOW_LADDER;
+    assert.deepStrictEqual(sh.cfg().ladder, [0.25, 0.5, 1, 1.5, 2]);
+    process.env.OPTIONS_SHADOW_LADDER = '1,2,3';
+    assert.deepStrictEqual(sh.cfg().ladder, [1, 2, 3]);
+  } finally {
+    if (saved === undefined) delete process.env.OPTIONS_SHADOW_LADDER; else process.env.OPTIONS_SHADOW_LADDER = saved;
+  }
+});
+
+test('nextTradingDayET: skips weekends (the UTC-roll bug priced weekend time value)', () => {
+  const thu = new Date('2026-07-23T16:00:00');   // Thursday local-ET clone
+  assert.strictEqual(sh.nextTradingDayET(thu), '2026-07-24');   // → Friday
+  const fri = new Date('2026-07-24T16:00:00');
+  assert.strictEqual(sh.nextTradingDayET(fri), '2026-07-27');   // → Monday (skip Sat/Sun)
+  const sat = new Date('2026-07-25T12:00:00');
+  assert.strictEqual(sh.nextTradingDayET(sat), '2026-07-27');
+});

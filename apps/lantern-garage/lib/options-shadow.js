@@ -43,10 +43,25 @@ function cfg() {
   return {
     enabled: process.env.OPTIONS_SHADOW !== '0',
     symbol: (process.env.OPTIONS_SHADOW_SYMBOL || 'SPY').toUpperCase(),
-    otmPct: n('OPTIONS_SHADOW_OTM_PCT', 0.25),      // % OTM for the call strike
+    // STRIKE LADDER (% OTM): the shadow records EVERY depth each eligible night, so the
+    // moneyness curve — near-OTM through DEEP OTM lottery strikes — is measured with
+    // real premiums simultaneously. A 10y gap study put near-OTM EV negative but deep
+    // OTM (1.5–2%) ambiguously positive on a 4–8-event tail; only real nightly quotes
+    // can settle it. Env: OPTIONS_SHADOW_LADDER="0.25,0.5,1,1.5,2".
+    ladder: String(process.env.OPTIONS_SHADOW_LADDER || '0.25,0.5,1,1.5,2')
+      .split(',').map((x) => parseFloat(x)).filter((x) => Number.isFinite(x) && x >= 0).slice(0, 8),
     riskPct: n('OPTIONS_SHADOW_RISK_PCT', 0.5),     // % of equity at risk (premium) — stats only
     volMode: process.env.OPTIONS_SHADOW_VOL_MODE || 'notflat',  // notflat | flat | any (per-symbol regime)
   };
+}
+
+/** Next US trading day (ET calendar, skip Sat/Sun — holidays fall to the chain lookup).
+ *  Fixes the UTC-roll bug where a late-evening ET run computed "tomorrow" in UTC and
+ *  skipped Friday's expiry entirely (pricing weekend time value into the ladder). */
+function nextTradingDayET(fromEt) {
+  const d = new Date(fromEt.getTime());
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ── pure gate math (exported for tests) ──────────────────────────────────────
@@ -83,9 +98,8 @@ function pickStrike(spot, strikes, otmPct) {
   return null;
 }
 
-/** Measured stats + the Σ₀ verdict. Win rate here is an OUTPUT — never a target. */
-function summarize(rows) {
-  const closed = rows.filter((r) => r.phase === 'close' && typeof r.pl_pct === 'number');
+/** Measured stats + the Σ₀ verdict for ONE set of closed rows. Win rate is an OUTPUT. */
+function _stats(closed) {
   const n = closed.length;
   if (!n) return { n: 0, verdict: 'no data yet — shadow collecting' };
   const wins = closed.filter((r) => r.pl_pct > 0).length;
@@ -104,6 +118,18 @@ function summarize(rows) {
   return out;
 }
 
+/** Ladder-aware summary: overall + PER DEPTH, so the deep-OTM thesis is judged at each
+ *  moneyness separately (deep strikes will show ~1–5% win rates with rare huge wins —
+ *  only the measured expectancy decides, never the win rate). */
+function summarize(rows) {
+  const closed = rows.filter((r) => r.phase === 'close' && typeof r.pl_pct === 'number');
+  const out = { overall: _stats(closed), by_depth: {} };
+  const depths = [...new Set(closed.map((r) => (r.depth == null ? 'legacy' : r.depth)))];
+  for (const d of depths) out.by_depth[d] = _stats(closed.filter((r) => (r.depth == null ? 'legacy' : r.depth) === d));
+  // back-compat top-level fields (existing tests/telemetry read these)
+  return { ...out.overall, ...out };
+}
+
 // ── Alpaca options data (free indicative feed) ───────────────────────────────
 function _auth() {
   try { return require('./alpaca-adapter')._authFor('local-owner'); } catch (_e) { return null; }
@@ -120,13 +146,13 @@ function _get(host, p, headers) {
   });
 }
 
-/** Next-day (or nearest later) call contracts for the symbol from the TRADING API. */
+/** Next-trading-day (or nearest later) call contracts for the symbol, ET-correct. */
 async function listNextExpiryCalls(sym) {
   const auth = _auth();
   if (!auth) return { error: 'no alpaca auth' };
-  const tomorrow = new Date(Date.now() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const nextDay = nextTradingDayET(_etNow());
   const host = auth.env === 'live' ? 'api.alpaca.markets' : 'paper-api.alpaca.markets';
-  const r = await _get(host, `/v2/options/contracts?underlying_symbols=${sym}&type=call&status=active&expiration_date_gte=${tomorrow}&limit=300`, auth.headers);
+  const r = await _get(host, `/v2/options/contracts?underlying_symbols=${sym}&type=call&status=active&expiration_date_gte=${nextDay}&limit=300`, auth.headers);
   if (!r.ok || !r.json) return { error: `contracts ${r.status}` };
   const list = r.json.option_contracts || r.json.contracts || [];
   if (!list.length) return { error: 'no contracts' };
@@ -156,7 +182,8 @@ function _readLedger() {
 }
 function _etNow() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); }
 
-/** The would-trade selection for RIGHT NOW (also the live probe): gates + contract + quote. */
+/** The would-trade selection for RIGHT NOW (also the live probe): gates + the full
+ *  strike LADDER with a real contract + quote per depth. */
 async function probe() {
   const c = cfg();
   const yahoo = require('./market-data-yahoo');
@@ -164,14 +191,19 @@ async function probe() {
   try { const r = await yahoo.getBars(c.symbol, '1d'); closes = ((r && r.bars) || []).map((b) => b.close).filter((x) => x > 0); } catch (_e) { /* */ }
   const g = closes.length ? gates(closes, { volMode: c.volMode }) : { eligible: false, why: 'no daily bars' };
   const spot = closes[closes.length - 1] || 0;
-  const out = { symbol: c.symbol, spot, gates: g, otmPct: c.otmPct };
+  const out = { symbol: c.symbol, spot, gates: g, ladder: c.ladder };
   const chain = await listNextExpiryCalls(c.symbol);
   if (chain.error) return { ...out, data: 'unavailable', reason: chain.error };
-  const strike = pickStrike(spot, chain.contracts.map((x) => x.strike_price), c.otmPct);
-  const contract = chain.contracts.find((x) => Number(x.strike_price) === strike);
-  if (!contract) return { ...out, data: 'ok', expiry: chain.expiry, reason: 'no OTM strike found' };
-  const q = await quoteOption(contract.symbol);
-  return { ...out, data: 'ok', expiry: chain.expiry, contract: contract.symbol, strike, quote: q };
+  const strikes = chain.contracts.map((x) => x.strike_price);
+  const legs = [];
+  for (const depth of c.ladder) {
+    const strike = pickStrike(spot, strikes, depth);
+    const contract = strike != null ? chain.contracts.find((x) => Number(x.strike_price) === strike) : null;
+    if (!contract) { legs.push({ depth, reason: 'no strike' }); continue; }
+    const q = await quoteOption(contract.symbol);
+    legs.push({ depth, strike, contract: contract.symbol, quote: q });
+  }
+  return { ...out, data: 'ok', expiry: chain.expiry, legs };
 }
 
 /** Called every scan tick (fail-soft). Opens the shadow at the close window on eligible
@@ -186,13 +218,15 @@ async function tick() {
   const today = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
   const st = _readState();
 
-  // CLOSE WINDOW (15:45–15:59 ET, Mon–Thu): open tonight's shadow position.
+  // CLOSE WINDOW (15:45–15:59 ET, Mon–Thu): open tonight's shadow LADDER (one leg per depth).
   if (dow >= 1 && dow <= 4 && hm >= 1545 && hm <= 1559 && st.lastOpenDate !== today && !st.open) {
     const p = await probe();
-    if (p.gates && p.gates.eligible && p.contract && p.quote && p.quote.mid > 0) {
-      st.open = { date: today, symbol: c.symbol, contract: p.contract, strike: p.strike, expiry: p.expiry, spot_close: p.spot, entry_mid: p.quote.mid };
+    const legs = ((p && p.legs) || []).filter((l) => l.contract && l.quote && l.quote.mid > 0);
+    if (p.gates && p.gates.eligible && legs.length) {
+      st.open = { date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot,
+        legs: legs.map((l) => ({ depth: l.depth, strike: l.strike, contract: l.contract, entry_mid: l.quote.mid })) };
       st.lastOpenDate = today; _writeState(st);
-      _append({ phase: 'open', ...st.open, gates: p.gates });
+      for (const l of st.open.legs) _append({ phase: 'open', date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot, ...l, gates: p.gates });
     } else {
       st.lastOpenDate = today; _writeState(st);   // one decision per night
       _append({ phase: 'skip', date: today, symbol: c.symbol, why: (p.gates && p.gates.why) || p.reason || 'no contract/quote', gates: p.gates || null });
@@ -200,15 +234,23 @@ async function tick() {
     return;
   }
 
-  // OPEN WINDOW (09:31–09:50 ET): close a shadow position from a PRIOR date.
+  // OPEN WINDOW (09:31–09:50 ET): close a shadow ladder from a PRIOR date, leg by leg.
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
-    const q = await quoteOption(st.open.contract);
-    if (q && q.mid > 0) {
-      const pl = ((q.mid - st.open.entry_mid) / st.open.entry_mid) * 100;
-      _append({ phase: 'close', ...st.open, exit_mid: q.mid, pl_pct: +pl.toFixed(1) });
-      st.open = null; _writeState(st);
+    // Back-compat: a pre-ladder single-contract state closes as one leg.
+    const legs = Array.isArray(st.open.legs) ? st.open.legs
+      : (st.open.contract ? [{ depth: null, strike: st.open.strike, contract: st.open.contract, entry_mid: st.open.entry_mid }] : []);
+    const remaining = [];
+    for (const l of legs) {
+      const q = await quoteOption(l.contract);
+      if (q && q.mid > 0) {
+        const pl = ((q.mid - l.entry_mid) / l.entry_mid) * 100;
+        _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol || c.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: q.mid, pl_pct: +pl.toFixed(1) });
+      } else {
+        remaining.push(l);   // no quote yet → retry next tick within the window
+      }
     }
-    // no quote → leave open; retry next tick within the window (else it carries, honestly visible in status)
+    if (remaining.length) { st.open.legs = remaining; _writeState(st); }
+    else { st.open = null; _writeState(st); }
   }
 }
 
@@ -217,4 +259,4 @@ function status() {
   return { ...cfg(), minNights: MIN_N, state: _readState(), measured: summarize(rows), lastRows: rows.slice(-5) };
 }
 
-module.exports = { cfg, gates, pickStrike, summarize, probe, tick, status, LEDGER, MIN_N };
+module.exports = { cfg, gates, pickStrike, summarize, nextTradingDayET, probe, tick, status, LEDGER, MIN_N };

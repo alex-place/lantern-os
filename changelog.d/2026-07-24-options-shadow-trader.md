@@ -17,3 +17,14 @@
   its 15:45–15:59 / 09:31–09:50 ET windows). Config: `OPTIONS_SHADOW`,
   `OPTIONS_SHADOW_SYMBOL/OTM_PCT/RISK_PCT/VOL_MODE`. Pure gate/strike/verdict logic
   covered by `test/options-shadow.test.js` (7 tests).
+
+- trading/options-shadow: **deep-OTM focus — strike LADDER.** The shadow now records
+  every depth of `OPTIONS_SHADOW_LADDER` (default `0.25,0.5,1,1.5,2` % OTM) each eligible
+  night — one real contract + real quote per leg — and `summarize()` reports expectancy
+  **per depth**, so the deep-OTM lottery profile (~1–5% win rate, rare huge payoffs) is
+  judged on its own measured expectancy, never its win rate. A 10y gap study found
+  near-OTM EV clearly negative but 1.5–2% OTM *ambiguously positive on a 4–8-event tail*
+  (spread costs halve it) — exactly what only real nightly premiums can settle. Also fixed
+  an expiry bug: "tomorrow" was computed in UTC, so a late-evening run skipped Friday's
+  expiry and priced weekend time value; `nextTradingDayET()` now picks the ET-correct next
+  trading day. Live-verified: 5-leg SPY ladder with real bid/asks (741→754 strikes).
