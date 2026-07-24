@@ -91,6 +91,9 @@ async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
+  // Asymmetric-options SHADOW trader (Verify stage): measurement only, never orders.
+  // Self-throttles to its own close/open ET windows; fail-soft so it can't break scans.
+  try { require('../lib/options-shadow').tick().catch(() => {}); } catch (_e) { /* absent/failed → skip */ }
   // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
   // (no Python spawn / model call — the price collectors keep polling for free).
   if (marketHours || extNow) {
@@ -315,6 +318,7 @@ const scorecardRoutes = require('./trading/scorecard');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
+const optionsShadowRoutes = require('./trading/options-shadow');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -364,6 +368,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;
+  if (await optionsShadowRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;
