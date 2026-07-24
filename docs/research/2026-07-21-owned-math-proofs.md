@@ -1,8 +1,8 @@
-# Owned Math — Proofs I: the No-Free-Confidence lemma (M1) and the Passive-Indistinguishability lemma (M3)
+# Owned Math — Proofs I: Lemmas 1–5 (No-Free-Confidence M1 · Passive-Indistinguishability M3 · Attribution-Loss M7 · Starve-or-Spend M7 · Freshness-Index M8)
 
 **Date:** 2026-07-21 (third pass on [#2786](https://github.com/alex-place/lantern-os/issues/2786) /
-[#2788](https://github.com/alex-place/lantern-os/issues/2788))
-**Type:** Proof note — formal statements + proofs for the two claims whose machine checks are
+[#2788](https://github.com/alex-place/lantern-os/issues/2788)) · Lemmas 3–4 added 2026-07-24 (M7) · Lemma 5 added 2026-07-24 (M8)
+**Type:** Proof note — formal statements + proofs for the claims whose machine checks are
 green, in the L2 pattern: small lemma, named prior art, machine check committed beside it.
 **Slate:** [`2026-07-21-owned-math-conjectures.md`](2026-07-21-owned-math-conjectures.md)
 **Machine checks:** [`owned_math_m1_precision_check.py`](../../experiments/owned_math_m1_precision_check.py)
@@ -10,7 +10,9 @@ green, in the L2 pattern: small lemma, named prior art, machine check committed 
 (**exact rational arithmetic**, 0/200) ·
 [`owned_math_m3_indistinguishability.py`](../../experiments/owned_math_m3_indistinguishability.py)
 (exact-law corner) · [`owned_math_m3_innovations.py`](../../experiments/owned_math_m3_innovations.py)
-(general case, per noise level)
+(general case, per noise level) ·
+[`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
+(**drives the SHIPPED code paths**, deterministic)
 
 ---
 
@@ -112,3 +114,186 @@ nonstationary worlds may leak passive signal (higher-order statistics); the lemm
 passivity *cannot be guaranteed* to work, not that it never accidentally does. The corollary's
 "necessity" is necessity of the instrument *class* (interventional), not of any particular
 cadence value — the cadence *value* is M2's question.
+
+---
+
+## Lemma 3 (Attribution loss; the laundered doppelgänger) — M7
+
+**Setup.** Modes i ∈ {1,…,m} with per-mode evidence indicators E_i(t) ∈ {0,1} and per-mode
+gain/leak ratios (G/L)_i(t). The composed control law
+([`converge-control.js`](../../apps/lantern-garage/lib/converge-control.js), #2857) observes at
+each step the **global signal vector** s_t = (g_t, e_t, r_t, f_t, σ_t, d_t, b_t): g_t = G/L of
+the focal (max-gain) mode, e_t = ∨_i E_i(t) (the global influx bit), r_t = confidence-rising,
+f_t = fixed point, σ_t = stability, d_t = grounding due, b_t = budget. **No coordinate carries
+the pair (mode, evidence) jointly.** Per M6, a run is **laundered at horizon T** if g_t > 1 and
+E_focal(t) = 0 for all t ≤ T (gain above threshold, zero external-innovation coupling — the
+state M6 says must be killed); **anchored** if g_t > 1 with E_focal(t) = 1 for all t ≤ T.
+
+**Claim.** For **every** policy π mapping signal *histories* to actions (deterministic, causal,
+arbitrary memory), there exist an anchored run W_G and a laundered run W_L with **identical
+signal histories** (s_1,…,s_T) for every T. Consequently π acts identically on both, so π
+either fails M6-soundness (never kills W_L) or fails non-vacuity (kills the genuinely anchored
+W_G). No policy over the global vocabulary satisfies both.
+
+**Proof.** Construct W_G with m = 1: E_1(t) = 1 for all t; the mode's confidence odds multiply
+by g each step (a Bayes update on per-mode evidence with likelihood ratio g). Construct W_L
+with m = 2: E_1(t) = 0 and E_2(t) = 1 for all t (mode 2 is any unrelated feed); mode 1's odds
+multiply by the same g via self-repeat gain. Coordinate check: g_t = g in both (the G/L
+estimator reads magnitude, not provenance); e_t = ∨_i E_i = 1 in both; r_t identical (same
+arithmetic); f, σ, d, b equal by construction. Identical histories give identical actions for
+any causal π. The M6-correct actions differ: W_L is lasing with zero coupling (kill); W_G is
+anchored (must not be killed). ∎
+
+**Corollary 1 (keyed anchor sufficiency).** Augment the vector with e*_t = E_focal(t). The two
+worlds separate at t = 1, and the rule "kill iff g_t > 1 ∧ e*_t = 0" is M6-sound and
+non-vacuous on the pair. Machine-checked against the shipped guard (`evidenceForMode`): kill at
+step 1 in W_L, zero kills in W_G, legacy calls (field omitted) bit-identical to the old law.
+
+**Corollary 2 (cadence is not sufficient — the starvation channel).** Downstream of the kill
+rule, the shipped allocation reads provenance-blind uncertainty u = 1 − c: dilation
+D = (1+u)/((1+c)(1+cp)) = (2−c)/((1+c)(1+cp)) is **strictly decreasing in laundered
+confidence c** (numerator falls, denominator rises), with limit D → 0.5/(1+cp) ≤ 0.5 — the
+`fetchExternal = D > 0.5` cutoff — and the G12 collapse-proximity deflation lowers it further
+(a laser self-repeats, so the degeneration signal plausibly reads p > 0). Measured along the
+laundering path: D = 1.0 → 0.578947 → 0.507538 → 0.50075 → 0.500001. So even when the M2 hard
+tick forces a grounding event (necessary, by Lemma 2's Corollary 2), allocation routes the
+budget *away* from the laundered mode: **the runaway suppresses its own kill switch (the
+Lemma) and de-allocates its own audit (this corollary).** The single coordinate that restores
+both is attribution — M1's paid/free confidence split, keyed per mode, which the ledger
+already emits (free-mass scan, slate §M1).
+
+**Machine checks.** [`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
+(deterministic, no RNG, no toy re-implementation — it `require`s the shipped modules): W_L
+survives **40/40 steps** under the global vocabulary at final confidence 0.9999986 with per-step
+reason "improving on external evidence"; keyed guard kills W_L at step 1; allocation path
+strictly decreasing as above; plus the self-contradictory halt record (action `halt_saturated`
+with `saturated: false` and a reason claiming saturation) found and fixed. JSON:
+[`owned_math_m7_composition_counterexample.json`](../../experiments/results/owned_math_m7_composition_counterexample.json).
+
+**Prior art, named.** Discrete-event fault diagnosability (Sampath, Sengupta, Lafortune,
+Sinnamohideen & Teneketzis, 1995): a fault is diagnosable only if no arbitrarily long faulty
+trace is observation-equivalent to a nominal trace — W_G/W_L are exactly such an equivalent
+pair, so this is a diagnosability failure of the *signal map*, cured by relabeling
+(attribution), not by policy cleverness. Static-output-feedback distinguishability is the
+control-theory cousin. Lemma 2 is the sibling one level down: there, passive internal
+functionals cannot separate grounded from ungrounded *trajectories*; here, global step-signals
+cannot separate anchored from laundered *gain*. **Ours:** the instantiation on the shipped
+control law, the executable two-world artifact against real code paths, the starvation
+corollary tying M5/G12 into the same mechanism, and the default-compatible guard.
+
+**Honest scope.** The impossibility is relative to the **signal map** — the seven global
+coordinates as typed in the shipped law; a richer map dissolves it, and that is the point: the
+fix is a vocabulary fix, not a smarter policy. The anchored world W_G is co-reachable only
+because M6 itself frames G/L and coupling as independent coordinates; if a future M6 estimator
+provably entangles them (gain measurement absorbing coupling, so anchored lasers cannot
+exist), the *impossibility* half degenerates — but the counterexample against the shipped
+global-bit rule stands regardless, because W_L exists either way. The confidence arithmetic
+(odds × g) is illustrative only — the law never reads confidence magnitude, just the rising
+bit, so no modeling choice there carries proof weight. The charitable per-hypothesis reading
+of `evidenceInflux` does not close the hole: M6's modes are sub-hypothesis decode modes while
+M1's evidence is hypothesis-level, so the keying still differs.
+
+---
+
+## Lemma 4 (Starve-or-spend dichotomy; audit starvation) — M7, public form
+
+**Setup.** Belief with odds o_t = o0·g^t, g > 1 (self-reinforcement, zero paid evidence —
+W_L), confidence c_t = o_t/(1+o_t); anchored twin W_G with the same odds path driven by
+genuine per-belief evidence (LR = g each step). All provenance-blind observables coincide on
+the pair (Lemma 3's construction, lifted from activity bits to confidence trajectories). An
+audit policy π emits per-step audit probabilities q_t as a causal function of those
+observables — hence the **same schedule on both worlds**.
+
+**Claim.** Exactly one of:
+1. **Starve:** Σ q_t < ∞ — then P(W_L never audited) = Π(1−q_t) > 0 (product criterion),
+   audits are a.s. finitely many (Borel–Cantelli), and P(never caught) ≥ P(never audited)
+   for any per-audit catch power ρ ≤ 1;
+2. **Spend:** Σ q_t = ∞ — then π audits W_G (evidence-paid, correct in that world)
+   infinitely often a.s.: unbounded verification spend on settled truth.
+
+The deployed gate families sit in branch 1 *endogenously*: a threshold gate (audit iff
+c_t < θ; FLARE form) has q_t = 0 for all t ≥ t* = ⌈log_g(θ/((1−θ)o0))⌉ because {c ≥ θ} is
+absorbing under increasing c_t — total audits ≤ t*, and t* = 0 when o0 ≥ θ/(1−θ) (born
+confident); a proportional gate (q_t = α(1−c_t)) has Σ q_t ≤ α(1/(1+o0) + 1/(o0(g−1))) < ∞.
+The general boundary is Σ 1/o_t < ∞ — any superlinear odds growth. **The summability that
+Rothschild-style incomplete learning treats as a designer's mistake is here imposed by the
+runaway belief on any confidence-vanishing gate.** An attribution gate — audit iff no
+evidence was *paid to this belief* this step — is outside the observable class: constant
+hazard α on W_L (catch ~ Geometric(αρ)), zero audits on W_G. It escapes both branches. ∎
+(Proofs are the two series computations plus the product criterion; written out with worked
+constants in [`2026-07-24-audit-starvation-theorem.md`](2026-07-24-audit-starvation-theorem.md).)
+
+**Corollary (audit inversion).** An honest belief at calibrated c̄ < 1 is audited at rate
+α(1−c̄) forever (linear growth), while the laundered belief's lifetime total is the finite
+constant above — measured 10.0 vs 1.16 expected audits by T = 40 (ratio 8.6×, → ∞).
+
+**Machine check.** [`audit_starvation_theorem.py`](../../experiments/audit_starvation_theorem.py)
+— exact (stdlib only, no RNG): t* = 7; P(never caught) grid incl. the born-confident row
+(= 1 at ρ = 1); E[lifetime audits] = 1.159 ≤ 1.5 bound; P(never audited) = 0.284; the
+4-gate × 2-world dichotomy table.
+
+**Prior art, named.** Rothschild (1974) incomplete learning / summable exploration (survey
+arXiv:1906.10173); FLARE (arXiv:2305.06983); retrieval-state lock-in measured empirically
+(arXiv:2606.22728: 42–59% silent errors — the starve branch in the wild, no theorem there);
+degenerate feedback loops in recommenders (arXiv:1902.10730); semantic entropy's scoped
+exclusion of consistent errors (Farquhar et al. 2024). **Ours:** endogenous summability, the
+absorption window, the inversion corollary, the dichotomy with the attribution escape, and
+the exact artifact.
+
+---
+
+## Lemma 5 (The freshness index; Whittle index for claim re-verification) — M8
+
+**Setup.** A claim's state is its **paid age** τ ∈ {1,2,…} (steps since evidence was last
+attributed to it — Lemma 3's vocabulary). Passive: τ → τ+1, expected cost c_e·s(τ) with
+staleness probability s(τ) = 1 − (1−ρ)^τ (constant flip hazard ρ — M2's model). Active
+(audit/re-ground): pay c_v, reveal-and-repair, τ → 1. Whittle's λ-subsidy problem pays λ
+per passive step.
+
+**Claim (i) — threshold optimality, one line.** Under any stationary deterministic policy,
+the recurrent class reached from τ = 1 is the cycle 1…A where A is the policy's smallest
+audit age (passive increments, audit resets; states above A are transient). Hence every
+policy's average cost equals g_λ(A) = [c_v + c_e·S(A−1) − λ(A−1)]/A with S(k) = Σ_{u≤k}
+s(u), and the optimum over all policies is the optimum over thresholds. ∎
+
+**Claim (ii) — the index.** Indifference between adjacent thresholds τ and τ+1
+(g_λ(τ) = g_λ(τ+1)) solves to
+
+    W(τ) = c_e·[τ·s(τ) − S(τ−1)] − c_v
+         = c_e·[1 − τβ^τ + (β − β^τ)/(1−β)] − c_v ,   β = 1−ρ.
+
+W is strictly increasing (W(τ+1) − W(τ) = c_e(τ+1)[s(τ+1) − s(τ)] > 0) and bounded above
+by c_e/ρ − c_v. Monotone W ⇒ the optimal threshold T*(λ) = min{τ : W(τ) ≥ λ} is
+nondecreasing in λ ⇒ the passive set grows monotonically ⇒ the arm is **indexable** and W
+is its Whittle index. ∎
+
+**Corollary 1 (EOQ crossing — M2 derived from optimality).** Small-ρ expansion gives
+W(τ) = c_e·ρτ²/2 − c_v + O(ρ²τ³), so the λ = 0 crossing is T* → √(2(c_v/c_e)/ρ) — the M2
+EOQ cadence — and the budgeted crossing satisfies T*(λ) → √(2((c_v+λ)/c_e)/ρ): a budget's
+shadow price is a uniform surcharge on the verification price.
+
+**Corollary 2 (attribution weight zero — M7 closed).** The transition and cost kernels are
+functions of paid age alone; expressed confidence enters neither. Hence the index is
+measurable w.r.t. the paid-evidence history, and any "index" computed on expressed
+freshness assigns a laundered claim (expressed age ≈ 0) the value −c_v < 0 forever — audit
+starvation, rederived inside the optimal-scheduling frame.
+
+**Machine checks.** `owned_math_m8_whittle_freshness.py` (exact, no RNG): indifference-λ by
+bisection on the exact renewal scan matches the closed form to 7.8e-13 across a
+(ρ, c_e, c_v) × τ grid; passive-set monotonicity over 200-point λ sweeps; **exact policy
+iteration** (closed-form cycle evaluation — relative VI oscillates on this periodic chain
+and is not used) recovers the same thresholds; EOQ convergence 0.41 → 0.007 rel. err;
+surcharge law ≤ 2.1%; policy contest with two laundered arms: Whittle-on-paid-age 1.784 <
+EOQ-overdue 1.793 < round-robin 2.020 < expressed-confidence gate 4.470.
+
+**Prior art, named.** Whittle (1988); Tripathi & Modiano (arXiv:1908.10438) — indexability
+and closed-form AoI indices for nondecreasing age costs (ADOPTED, not re-proven);
+maintenance/inspection index tradition (Glazebrook et al.) for the priced-audit variant;
+Weber & Weiss (1990) asymptotic optimality. **Ours:** the claim-verification instantiation,
+the EOQ-crossing identity with the shipped tick's implied economics (c_v/c_e ≈ 0.108 at
+the ledger's measured ρ̂), the budget-surcharge reading, and Corollary 2 tying Lemma 3's
+attribution requirement into the index's sufficient statistic.
+
+**Honest scope.** Constant flip hazard; monotone deterioration required (self-healing
+claims break threshold structure); audit = perfect repair; Whittle optimality under a hard
+per-step budget is asymptotic, not exact at small N — the contest is evidence, not proof.

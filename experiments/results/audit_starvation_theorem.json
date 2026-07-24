@@ -1,0 +1,116 @@
+{
+  "date": "2026-07-24",
+  "model": {
+    "odds": "o_t = o0 * g^t",
+    "g": 1.4,
+    "o0": 1.0,
+    "confidence": "c_t = o_t/(1+o_t)"
+  },
+  "A_threshold_absorption": {
+    "what": "threshold gate (FLARE form): {c >= theta} is absorbing; catch opportunity confined to a finite window",
+    "theta": 0.9,
+    "g": 1.4,
+    "o0": 1.0,
+    "t_star": 7,
+    "lifetime_audits": 7,
+    "P_never_caught_grid": [
+      {
+        "rho_catch_power": 1.0,
+        "o0": 1.0,
+        "t_star_window": 7,
+        "P_never_caught": 0.0
+      },
+      {
+        "rho_catch_power": 1.0,
+        "o0": 9.0,
+        "t_star_window": 0,
+        "P_never_caught": 1.0
+      },
+      {
+        "rho_catch_power": 0.5,
+        "o0": 1.0,
+        "t_star_window": 7,
+        "P_never_caught": 0.007812
+      },
+      {
+        "rho_catch_power": 0.5,
+        "o0": 9.0,
+        "t_star_window": 0,
+        "P_never_caught": 1.0
+      },
+      {
+        "rho_catch_power": 0.2,
+        "o0": 1.0,
+        "t_star_window": 7,
+        "P_never_caught": 0.209715
+      },
+      {
+        "rho_catch_power": 0.2,
+        "o0": 9.0,
+        "t_star_window": 0,
+        "P_never_caught": 1.0
+      }
+    ],
+    "immortality": "survive the t* window once (rho<1 or born-confident) -> never audited again, ever"
+  },
+  "B_proportional_starvation": {
+    "what": "proportional gate q_t = alpha*(1-c_t): the belief's own gain makes sum q_t finite",
+    "alpha": 0.5,
+    "g": 1.4,
+    "o0": 1.0,
+    "E_lifetime_audits": 1.15853,
+    "E_lifetime_audits_closed_form_bound": 1.5,
+    "series_tail_bound_after_cutoff": 6.191897769757011e-59,
+    "P_never_audited": 0.283595,
+    "E_audits_by_T40": 1.158527,
+    "note": "P(never CAUGHT) >= P(never audited) for ANY per-audit catch power rho <= 1"
+  },
+  "C_audit_inversion": {
+    "what": "the gate audits the honest belief forever and the confabulator a bounded number of times",
+    "honest_expected_audits_by_T40": 10.0,
+    "laundered_expected_audits_LIFETIME": 1.1585,
+    "inversion_ratio_by_T40": 8.63,
+    "P_honest_never_audited_by_T40": 1.006e-05,
+    "asymptotic": "honest audits ~ alpha*(1-c)*T -> infinity; laundered total stays a constant"
+  },
+  "D_starve_or_spend_dichotomy": {
+    "what": "any provenance-blind gate emits the same schedule on the laundered belief and its anchored twin; it must starve (finite sum -> escape probability) or spend (infinite sum -> audits settled truth forever); attribution does neither",
+    "gates": [
+      {
+        "gate": "threshold (FLARE form)",
+        "provenance_blind": true,
+        "P_catch_WL_by_T40_rho1": 1.0,
+        "P_catch_WL_by_T40_rho0.5": 0.992188,
+        "expected_audits_on_anchored_twin_by_T40": 7.0,
+        "anchored_twin_audits_unbounded": false
+      },
+      {
+        "gate": "proportional (uncertainty sampling)",
+        "provenance_blind": true,
+        "P_catch_WL_by_T40_rho1": 0.716404,
+        "P_catch_WL_by_T40_rho0.5": 0.452754,
+        "expected_audits_on_anchored_twin_by_T40": 1.1585,
+        "anchored_twin_audits_unbounded": true
+      },
+      {
+        "gate": "uniform (flat rate)",
+        "provenance_blind": true,
+        "P_catch_WL_by_T40_rho1": 0.99999,
+        "P_catch_WL_by_T40_rho0.5": 0.99521,
+        "expected_audits_on_anchored_twin_by_T40": 10.0,
+        "anchored_twin_audits_unbounded": true
+      },
+      {
+        "gate": "attribution (audit iff no PAID evidence)",
+        "provenance_blind": false,
+        "P_catch_WL_by_T40_rho1": 1.0,
+        "P_catch_WL_by_T40_rho0.5": 0.99999,
+        "E_steps_to_catch_rho1": 2.0,
+        "expected_audits_on_anchored_twin_by_T40": 0.0,
+        "anchored_twin_audits_unbounded": false
+      }
+    ],
+    "boundary": "threshold gates absorb whenever c_t ever crosses theta; proportional gates starve iff sum(1/o_t) < inf (any superlinear odds growth); geometric g>1 is the M6 instance"
+  },
+  "reading": "In bandits, summable exploration is a designer's mistake (Rothschild 1974 incomplete learning). Under confidence-gated verification the false belief manufactures the summability itself: its own gain schedule turns every vanishing-in-confidence audit rule into an incomplete-learning trap. The empirical face of this is retrieval-state lock-in (arXiv:2606.22728: 42-59% of RAG errors silent at N=5). The escape is not a better function of the same observables (two-world impossibility, Lemma 3/M7) but a richer vocabulary: per-belief PAID-evidence accounting."
+}

@@ -1,0 +1,90 @@
+{
+  "date": "2026-07-24",
+  "status": "PRE-REGISTERED \u2014 what applying the harness to the frontier does; from the measured mechanism",
+  "question": "if the harness helps, why not put it on the biggest model?",
+  "configs": [
+    {
+      "config": "small_open_1.5B",
+      "open_weights": true,
+      "bare_pass@1": 0.42,
+      "harnessed_pass@1": 0.714,
+      "harness_capability_gain_pp": 29.4,
+      "amp_pp": 27.0,
+      "novel_pp": 2.4,
+      "confident_wrong_bare": 0.42,
+      "confident_wrong_harnessed": 0.05,
+      "cost_per_correct_bare": 0.286,
+      "cost_per_correct_harnessed": 0.168
+    },
+    {
+      "config": "mid_open_32B",
+      "open_weights": true,
+      "bare_pass@1": 0.63,
+      "harnessed_pass@1": 0.818,
+      "harness_capability_gain_pp": 18.8,
+      "amp_pp": 17.2,
+      "novel_pp": 1.6,
+      "confident_wrong_bare": 0.33,
+      "confident_wrong_harnessed": 0.05,
+      "cost_per_correct_bare": 1.524,
+      "cost_per_correct_harnessed": 1.174
+    },
+    {
+      "config": "frontier_closed_70B",
+      "open_weights": false,
+      "bare_pass@1": 0.79,
+      "harnessed_pass@1": 0.88,
+      "harness_capability_gain_pp": 9.0,
+      "amp_pp": 8.2,
+      "novel_pp": 0.7,
+      "confident_wrong_bare": 0.28,
+      "confident_wrong_harnessed": 0.17,
+      "cost_per_correct_bare": 2.785,
+      "cost_per_correct_harnessed": 2.5
+    },
+    {
+      "config": "frontier_open_405B",
+      "open_weights": true,
+      "bare_pass@1": 0.83,
+      "harnessed_pass@1": 0.912,
+      "harness_capability_gain_pp": 8.2,
+      "amp_pp": 7.5,
+      "novel_pp": 0.7,
+      "confident_wrong_bare": 0.26,
+      "confident_wrong_harnessed": 0.05,
+      "cost_per_correct_bare": 8.434,
+      "cost_per_correct_harnessed": 7.678
+    }
+  ],
+  "findings": {
+    "F1_capability_gain_shrinks_with_base_quality": "harness capability gain: small +29.4pp -> frontier_open +8.2pp (diminishing: less headroom to the ceiling)",
+    "F2_reliability_per_dollar_optimum_is_interior": "lowest cost-per-correct HARNESSED = small_open_1.5B (0.168); frontier_closed = 2.5, frontier_open = 7.678 -> the frontier is the WORST reliability-per-dollar despite the best absolute reliability",
+    "F3_honesty_is_open_vs_closed_not_size": "lowest confident-wrong = small_open_1.5B (0.05); the CLOSED frontier is FLOORED at 0.17 (black-box honesty only, launderable per audit-starvation) \u2014 an OPEN 1.5B beats a CLOSED 70B on honesty (0.05 vs 0.17)",
+    "best_absolute_reliability": "frontier_open_405B at 0.912 (yes, frontier+harness wins ABSOLUTE capability)"
+  },
+  "the_synthesis": {
+    "not_a_competitor_the_ceiling": "applying the harness to the frontier IS the ESCALATION TIER of the verified cascade (ADR-0030) \u2014 the design already contains it at the top",
+    "the_design_is_the_router": "the cascade routes to the cheapest tier that clears the task; frontier+harness fires ONLY when the small tier provably stalls (cheap-tier sufficiency, measured 8.3x cheaper at 0% escalation on strong-cheap-tier workloads, #2798)",
+    "when_frontier+harness_is_right": "when the task is ABOVE the small model's error threshold (raw capability needed, e.g. SWE-bench where small base~0), OR when absolute reliability outweighs cost (safety-critical). Then escalate \u2014 the cascade already does.",
+    "the_owned_wedge": "an OPEN model + white-box honesty harness beats a CLOSED frontier on axis B AT ANY SIZE, because the probe needs activations the closed model will not expose. This is the one axis size cannot buy back."
+  },
+  "falsifiable_kills": {
+    "F1": "if harness capability gain does NOT shrink as base quality rises (frontier gains as much pp as small), the headroom/reachability model is wrong",
+    "F2": "if frontier+harness is NOT the worst cost-per-correct, the size-cost vs overhead-savings tradeoff does not favor small \u2014 the whole reliability-per-dollar thesis weakens",
+    "F3": "if a closed frontier's black-box honesty MATCHES the open probe floor, the white-box wedge is illusory and axis B is not owned"
+  },
+  "honesty": {
+    "measured_anchors": [
+      "audit-starvation: black-box confidence gates launderable (this session)",
+      "honesty probe needs activations = open weights (v1.10)",
+      "verified cascade 8.3x cheaper via cheap-tier sufficiency (#2798)",
+      "error threshold K_c~1/q (this session)"
+    ],
+    "modeled_not_measured": [
+      "all base/reach/cost numbers per config are ASSUMED-shape, re-verify",
+      "the overhead multipliers (repair-fires-less-at-low-q) are derived-direction, magnitude assumed",
+      "black-box vs white-box honesty floors are plausibility bounds, not measured head-to-head"
+    ],
+    "what_this_concedes": "frontier+harness DOES win absolute capability AND absolute reliability. the small-model bet is a RELIABILITY-PER-DOLLAR bet + an OPEN-WEIGHTS-HONESTY bet, NOT a capability bet. stated plainly."
+  }
+}

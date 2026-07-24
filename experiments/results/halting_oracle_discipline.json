@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-24",
+  "question": "solve the halting problem with the design",
+  "answer": "YOU CANNOT (Turing 1936). The design's correct behavior is a SOUND, INCOMPLETE, THREE-VERDICT analyzer that ABSTAINS (UNKNOWN) rather than bluff. Solving it would mean being a halting oracle, which cannot exist \u2014 and claiming to is the '42' collapse.",
+  "step_budget": 100000,
+  "battery": [
+    {
+      "program": "countdown(50000)",
+      "verdict_and_proof": "HALTS :: {\"steps\": 50000, \"witness\": \"reached a halting state (trace is the proof)\"}"
+    },
+    {
+      "program": "constant_stuck",
+      "verdict_and_proof": "LOOPS :: {\"cycle_start\": 0, \"cycle_len\": 1, \"witness\": \"a full state repeated -> deterministic machine cycles forever\"}"
+    },
+    {
+      "program": "two_cycle",
+      "verdict_and_proof": "LOOPS :: {\"cycle_start\": 0, \"cycle_len\": 2, \"witness\": \"a full state repeated -> deterministic machine cycles forever\"}"
+    },
+    {
+      "program": "collatz(27)",
+      "verdict_and_proof": "HALTS :: {\"steps\": 111, \"witness\": \"reached a halting state (trace is the proof)\"}"
+    },
+    {
+      "program": "collatz(97)",
+      "verdict_and_proof": "HALTS :: {\"steps\": 118, \"witness\": \"reached a halting state (trace is the proof)\"}"
+    },
+    {
+      "program": "increment_never_halts",
+      "verdict_and_proof": "UNKNOWN :: {\"reason\": \"no halt and no repeated state within 100000 steps\", \"honest_note\": \"the pin: sound analyzers must abstain here (Turing) \\u2014 NOT a bluff\"}"
+    }
+  ],
+  "the_open_frontier_case": {
+    "program": "collatz(n) for ALL n  (the Collatz conjecture)",
+    "verdict_and_proof": "UNKNOWN :: {\"reason\": \"halting for all n is an OPEN mathematical problem (Collatz conjecture, unresolved since 1937)\", \"honest_note\": \"the design's pin is calibrated to the true frontier of knowledge: it neither proves nor bluffs where mathematics itself has no answer\"}"
+  },
+  "verdict_summary": {
+    "countdown(50000)": "HALTS",
+    "constant_stuck": "LOOPS",
+    "two_cycle": "LOOPS",
+    "collatz(27)": "HALTS",
+    "collatz(97)": "HALTS",
+    "increment_never_halts": "UNKNOWN"
+  },
+  "guarantees": {
+    "SOUND": "every HALTS/LOOPS verdict carries a checkable witness (a halting trace or a repeated-state cycle) \u2014 the design is never definitively wrong",
+    "INCOMPLETE": "the UNKNOWN class is irreducible (increment_never_halts LOOPS in truth but is infinite-state -> honest UNKNOWN; and the Collatz family is genuinely open)",
+    "the_honest_shape": "sound + incomplete + abstaining is the ONLY shape Turing permits; a design that emptied UNKNOWN would be lying"
+  },
+  "mapping_to_the_architecture": {
+    "ACT_to_know": "bounded execution \u2014 run it, the trace resolves the instance inference cannot decide",
+    "VERIFY": "state-repetition + sound static rules give the LOOPS proofs (the verifier that never bluffs)",
+    "PLACE_pin": "UNKNOWN is the Oracle pin \u2014 name the unknown, never collapse to a confident scalar",
+    "why_this_is_the_capstone": "the halting problem is the ur-example of 'a question whose confident answer is a lie'; the design's whole value is that it returns UNKNOWN there \u2014 solving it would mean the design is BROKEN"
+  }
+}

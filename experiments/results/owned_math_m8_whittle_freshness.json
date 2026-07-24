@@ -1,0 +1,143 @@
+{
+  "date": "2026-07-24",
+  "index_closed_form": "W(tau) = c_e*[tau*s(tau) - S(tau-1)] - c_v ; geometric: c_e*[1 - tau*b^tau + (b-b^tau)/(1-b)] - c_v",
+  "A_value_iteration_crosscheck": {
+    "what": "exact-scan indexability witness + indifference == W(tau) + exact-PI global-optimality spot-check",
+    "grid": [
+      {
+        "rho": 0.02,
+        "c_e": 1.0,
+        "c_v": 0.5,
+        "max_|lambda_star - W(tau)|": 0.0,
+        "closed_form_vs_sum_form_max_gap": 0.0
+      },
+      {
+        "rho": 0.1,
+        "c_e": 1.0,
+        "c_v": 0.5,
+        "max_|lambda_star - W(tau)|": 0.0,
+        "closed_form_vs_sum_form_max_gap": 0.0
+      },
+      {
+        "rho": 0.1,
+        "c_e": 1.0,
+        "c_v": 0.05,
+        "max_|lambda_star - W(tau)|": 0.0,
+        "closed_form_vs_sum_form_max_gap": 0.0
+      },
+      {
+        "rho": 0.3,
+        "c_e": 2.0,
+        "c_v": 1.0,
+        "max_|lambda_star - W(tau)|": 0.0,
+        "closed_form_vs_sum_form_max_gap": 0.0
+      }
+    ],
+    "worst_indifference_gap": 7.824851877558103e-13,
+    "passive_set_monotone_in_lambda": true,
+    "exact_policy_iteration_agrees_with_threshold_scan": true,
+    "PASS": true
+  },
+  "B_eoq_unification_and_tick_economics": {
+    "what": "index zero-crossing -> EOQ law; budget lambda -> price surcharge; tick's implied economics",
+    "eoq_convergence": [
+      {
+        "rho": 0.1,
+        "T_index": 2,
+        "T_eoq": 1.41,
+        "rel_err": 0.4142
+      },
+      {
+        "rho": 0.03,
+        "T_index": 3,
+        "T_eoq": 2.58,
+        "rel_err": 0.1619
+      },
+      {
+        "rho": 0.01,
+        "T_index": 5,
+        "T_eoq": 4.47,
+        "rel_err": 0.118
+      },
+      {
+        "rho": 0.003,
+        "T_index": 8,
+        "T_eoq": 8.16,
+        "rel_err": 0.0202
+      },
+      {
+        "rho": 0.001,
+        "T_index": 14,
+        "T_eoq": 14.14,
+        "rel_err": 0.0101
+      },
+      {
+        "rho": 0.0003,
+        "T_index": 26,
+        "T_eoq": 25.82,
+        "rel_err": 0.007
+      }
+    ],
+    "budget_surcharge": [
+      {
+        "lambda": 0.0,
+        "T_index(lambda)": 14,
+        "T_eoq(c_v + lambda)": 14.14,
+        "rel_err": 0.0101
+      },
+      {
+        "lambda": 0.05,
+        "T_index(lambda)": 17,
+        "T_eoq(c_v + lambda)": 17.32,
+        "rel_err": 0.0185
+      },
+      {
+        "lambda": 0.2,
+        "T_index(lambda)": 25,
+        "T_eoq(c_v + lambda)": 24.49,
+        "rel_err": 0.0206
+      },
+      {
+        "lambda": 0.5,
+        "T_index(lambda)": 35,
+        "T_eoq(c_v + lambda)": 34.64,
+        "rel_err": 0.0104
+      }
+    ],
+    "ledger_tick_economics": [
+      {
+        "rho_source": "raw (48h half-life)",
+        "rho_per_min": 0.00024,
+        "implied_c_v_over_c_e_at_30min_tick": 0.108,
+        "T*_minutes_at_c_v/c_e=0.01": 9,
+        "T*_minutes_at_c_v/c_e=0.1": 29,
+        "T*_minutes_at_c_v/c_e=1.0": 92
+      },
+      {
+        "rho_source": "de-burst (337h half-life)",
+        "rho_per_min": 3.5e-05,
+        "implied_c_v_over_c_e_at_30min_tick": 0.0158,
+        "T*_minutes_at_c_v/c_e=0.01": 24,
+        "T*_minutes_at_c_v/c_e=0.1": 76,
+        "T*_minutes_at_c_v/c_e=1.0": 240
+      }
+    ],
+    "PASS": true
+  },
+  "C_policy_contest": {
+    "whittle_paid_age": 1.784,
+    "eoq_overdue_ratio": 1.7926,
+    "expressed_confidence_gate": 4.4701,
+    "round_robin": 2.0197,
+    "contention": 1.801,
+    "laundered_arm_note": "expressed gate never audits laundered arms -> their cost saturates at c_e; whittle on PAID age schedules them like any arm (M7 corollary inside the index)",
+    "ranking_best_to_worst": [
+      "whittle_paid_age",
+      "eoq_overdue_ratio",
+      "round_robin",
+      "expressed_confidence_gate"
+    ],
+    "PASS": true
+  },
+  "reading": "Claim re-verification is the AoI restless bandit with a verification price. The index imports (Tripathi-Modiano indexability; maintenance-index tradition for the c_v term); what it unlocks here: (1) M2's EOQ cadence is the index's zero-crossing \u2014 the shipped 30-min tick, at the ledger's measured rho, implies verification is priced at ~1.6-11% of an error-step; (2) a binding audit budget enters as a uniform surcharge on the verification price (never a starvation of high-rho claims); (3) the index is measurable w.r.t. PAID age alone \u2014 computing it on expressed freshness reproduces audit starvation (M7), and on paid age it beats EOQ-overdue, expressed-confidence, and round-robin scheduling under a binding budget."
+}
