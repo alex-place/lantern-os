@@ -146,6 +146,17 @@ const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
+const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
+
+// An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
+// manual confirmation and has NOT reduced the position. While one is outstanding for a
+// symbol we must not re-fire (or re-log) another exit for it — that manufactured the
+// phantom "exit ×12 on one position, $46k of re-counted P&L" churn. A `placed` market
+// fill / `error` / `dry_run` is terminal (position leaves the book, or nothing went out),
+// so those do NOT freeze the symbol.
+function _isExitInFlight(status) {
+  return /needs?[_-]?confirm|pending|presubmit|submitted?|working|accepted/i.test(String(status || ''));
+}
 
 // ── Persist the trailing state across restarts ──────────────────────────────────
 // The high-water mark (_peak) and the per-symbol timers live in memory. Without
@@ -161,6 +172,7 @@ function _saveState() {
       peak: Object.fromEntries(_peak),
       entryAt: Object.fromEntries(_entryAt),
       exitAt: Object.fromEntries(_exitAt),
+      exitStatus: Object.fromEntries(_exitStatus),
       lastOrderAt: Object.fromEntries(_lastOrderAt),
       dirStreak: Object.fromEntries(_dirStreak),
       savedAt: Date.now(),
@@ -173,6 +185,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.peak || {})) _peak.set(k, v);
     for (const [k, v] of Object.entries(o.entryAt || {})) _entryAt.set(k, v);
     for (const [k, v] of Object.entries(o.exitAt || {})) _exitAt.set(k, v);
+    for (const [k, v] of Object.entries(o.exitStatus || {})) _exitStatus.set(k, v);
     for (const [k, v] of Object.entries(o.lastOrderAt || {})) _lastOrderAt.set(k, v);
     for (const [k, v] of Object.entries(o.dirStreak || {})) _dirStreak.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
@@ -221,6 +234,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   await cancelRestingStops(bridge, userId, sym);
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
+  _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
@@ -339,8 +353,31 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
   const _openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
   const workingSells = new Set((_openOrders || [])
-    .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working/i.test(o.status || ''))
+    .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
+
+  // ── Re-exit reconciliation (kills the phantom-exit churn) ──────────────────────
+  // Reconcile the frozen-exit set against broker truth, every scan:
+  //  • A symbol we're no longer holding has left the book — its exit filled (or it's
+  //    flat). Clear ALL of its per-symbol state so a legitimate future re-entry starts
+  //    clean and can be exited again.
+  //  • A symbol with an exit order still IN FLIGHT (needs_confirmation / resting /
+  //    unfilled) is added to workingSells, so BOTH exit paths (momentum/trailing and
+  //    signal) skip it. This is what stops one un-filled exit from re-firing every ~8
+  //    min and re-logging its unrealized P&L as realized (69 exit rows / 12 real
+  //    positions, a fabricated $46k → the actual ~$5k, all still needs_confirmation).
+  for (const sym of [..._exitStatus.keys()]) {
+    if (!(Number(heldQty[sym]) > 0)) {
+      // Position gone → exit resolved. Drop its state.
+      _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
+    } else if (_isExitInFlight(_exitStatus.get(sym))) {
+      workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
+    } else {
+      // Position still held but the last exit was terminal-non-fill (error/dry_run):
+      // clear the freeze so a genuine later exit can retry.
+      _exitStatus.delete(sym);
+    }
+  }
 
   // ── Re-protect naked longs: any held long that's lost its protective stop (the
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
@@ -445,6 +482,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
         _entryAt.delete(sym); _exitAt.set(sym, now);
+        _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
         logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
@@ -503,6 +541,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _saveState(); }
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
