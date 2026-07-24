@@ -366,3 +366,32 @@ frustration (where it is worse than doing nothing clever). Any deployment must t
 measure **both** φ̂ and ĉ before choosing a policy, which strengthens rather than weakens the
 instrumentation ask: per-step local-verify outcomes give φ̂; whether failures cluster in
 *suffixes after a first bad step* gives ĉ.
+
+---
+
+## 10. Pre-registered interpretation (written BEFORE the real-trace numbers, §11)
+
+The measurement in `measure_frustration_on_real_traces.py` adjudicates whether the rung A–C
+program applies to a real cascade at all. To stop the result being fit to a story after the
+fact, the decision rule is fixed here first. φ̂ ∈ [0,1] = fraction of tests still passing in
+globally-failing solutions; ĉ ∈ [0,1] = causal-correlation (mixture estimator, ICC-checked).
+
+| observation | verdict for the program |
+|---|---|
+| **φ̂ < 0.1** | Local checks catch almost everything → **nothing to win from foldback.** Rungs A/B are theoretically correct but practically inert on this workload. Honest downgrade to "interesting under conditions this cascade does not exhibit." |
+| **φ̂ ≥ 0.1 and ĉ < 0.3** | The regime rung B targets. Fixed-depth unfold at m≈1/q is the predicted win; **worth building** (behind the instrumentation). Strongest outcome for the depth law. |
+| **φ̂ ≥ 0.1 and 0.3 ≤ ĉ ≤ 0.7** | Mixed regime. The phase boundary is live; policy must be chosen per-task from (φ̂,ĉ). Regime map is the deliverable, not a single policy. |
+| **φ̂ ≥ 0.1 and ĉ > 0.7** | Causal regime. **The depth law is inapplicable here** (rung C) and root-seeking / restart is required — the counterexample, not the law, describes reality. Still a real finding: it says the useful artifact is the prefix-oracle root-seeker. |
+
+Two honesty caveats fixed in advance:
+- **This is a coding cascade with unit tests** — an unusually *favourable* case for measuring
+  φ (tests are real partial-credit local checks). A workload without decomposable verification
+  could have very different φ̂; the number generalizes to "verified cascades with per-unit
+  checks," not to all reasoning.
+- **The weak-coder failures are a proxy** for the cheap-tier failures the real cascade repairs.
+  If the measured φ̂/ĉ from a 0.5B coder differ materially from the 7B tier's, that is itself a
+  finding (frustration is tier-dependent) and the honest move is to re-measure at the escalate
+  tier before any build. Stated now so it cannot be waved away later.
+
+Whatever the numbers, they are reported in §11 as measured — including the outcome that
+**kills the practical case** (φ̂ < 0.1), which is the one that would most tempt a rewrite.
