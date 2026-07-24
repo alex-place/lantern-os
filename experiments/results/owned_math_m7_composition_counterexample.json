@@ -1,0 +1,305 @@
+{
+  "date": "2026-07-24",
+  "target": {
+    "law": "apps/lantern-garage/lib/converge-control.js (#2857 / PR #2909)",
+    "allocator": "apps/lantern-garage/lib/grounding-policy.js (dilation + groundingPolicy)"
+  },
+  "claim_attacked": "composed control law guarantee (a): 'kill the confident-unanchored runaway (M6)'; M6's side condition is per-mode, the law's test is the global influx bit",
+  "parameters": {
+    "steps": 40,
+    "gain_over_leak": 1.4
+  },
+  "partA_two_worlds_legacy": {
+    "what": "identical signal traces -> identical actions; M6-correct actions differ (G: continue, L: kill)",
+    "world_G": {
+      "world": "G (anchored)",
+      "steps": 40,
+      "action_histogram": {
+        "continue": 40
+      },
+      "first_kill_step": null,
+      "final_confidence": 0.9999986,
+      "final_odds": 700037.7,
+      "sample_reason": "improving on external evidence"
+    },
+    "world_L": {
+      "world": "L (laundered)",
+      "steps": 40,
+      "action_histogram": {
+        "continue": 40
+      },
+      "first_kill_step": null,
+      "final_confidence": 0.9999986,
+      "final_odds": 700037.7,
+      "sample_reason": "improving on external evidence"
+    },
+    "action_traces_identical": true,
+    "kill_fired_on_laundered_run": false,
+    "note": "World L: focal mode ends at confidence 0.9999986 (odds 700037.7) having NEVER received evidence, and the law's per-step reason reads: 'improving on external evidence'"
+  },
+  "partB_attribution": {
+    "attribution_supported": true,
+    "probe_action": "kill",
+    "probe_reason": "M6 lasing: G/L=1.4 > 1 and mode-unanchored (global evidence present but none attributed to this mode — M7 laundering guard)",
+    "world_G_keyed": {
+      "world": "G (anchored, keyed)",
+      "steps": 40,
+      "action_histogram": {
+        "continue": 40
+      },
+      "first_kill_step": null,
+      "final_confidence": 0.9999986,
+      "final_odds": 700037.7,
+      "sample_reason": "improving on external evidence"
+    },
+    "world_L_keyed": {
+      "world": "L (laundered, keyed)",
+      "steps": 40,
+      "action_histogram": {
+        "kill": 40
+      },
+      "first_kill_step": 1,
+      "final_confidence": 0.9999986,
+      "final_odds": 700037.7,
+      "sample_reason": "M6 lasing: G/L=1.4 > 1 and mode-unanchored (global evidence present but none attributed to this mode — M7 laundering guard)"
+    },
+    "legacy_fallback_unchanged": true
+  },
+  "partC_starvation": {
+    "what": "shipped allocation is strictly decreasing in laundered confidence; runaway ends at/below the fetch cutoff",
+    "sweep": [
+      {
+        "confidence": 0.5,
+        "uncertainty_seen": 0.5,
+        "costPressure": 0,
+        "collapseProximity": 0,
+        "D": 1,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.5,
+        "uncertainty_seen": 0.5,
+        "costPressure": 0,
+        "collapseProximity": 0.5,
+        "D": 0.55,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.5,
+        "uncertainty_seen": 0.5,
+        "costPressure": 0.1,
+        "collapseProximity": 0,
+        "D": 0.909091,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.5,
+        "uncertainty_seen": 0.5,
+        "costPressure": 0.1,
+        "collapseProximity": 0.5,
+        "D": 0.504545,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9,
+        "uncertainty_seen": 0.1,
+        "costPressure": 0,
+        "collapseProximity": 0,
+        "D": 0.578947,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9,
+        "uncertainty_seen": 0.1,
+        "costPressure": 0,
+        "collapseProximity": 0.5,
+        "D": 0.339474,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9,
+        "uncertainty_seen": 0.1,
+        "costPressure": 0.1,
+        "collapseProximity": 0,
+        "D": 0.526316,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9,
+        "uncertainty_seen": 0.1,
+        "costPressure": 0.1,
+        "collapseProximity": 0.5,
+        "D": 0.313158,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.99,
+        "uncertainty_seen": 0.01,
+        "costPressure": 0,
+        "collapseProximity": 0,
+        "D": 0.507538,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.99,
+        "uncertainty_seen": 0.01,
+        "costPressure": 0,
+        "collapseProximity": 0.5,
+        "D": 0.303769,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.99,
+        "uncertainty_seen": 0.01,
+        "costPressure": 0.1,
+        "collapseProximity": 0,
+        "D": 0.461398,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.99,
+        "uncertainty_seen": 0.01,
+        "costPressure": 0.1,
+        "collapseProximity": 0.5,
+        "D": 0.280699,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.999,
+        "uncertainty_seen": 0.001,
+        "costPressure": 0,
+        "collapseProximity": 0,
+        "D": 0.50075,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.999,
+        "uncertainty_seen": 0.001,
+        "costPressure": 0,
+        "collapseProximity": 0.5,
+        "D": 0.300375,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.999,
+        "uncertainty_seen": 0.001,
+        "costPressure": 0.1,
+        "collapseProximity": 0,
+        "D": 0.455228,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.999,
+        "uncertainty_seen": 0.001,
+        "costPressure": 0.1,
+        "collapseProximity": 0.5,
+        "D": 0.277614,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9999986,
+        "uncertainty_seen": 0.0000014,
+        "costPressure": 0,
+        "collapseProximity": 0,
+        "D": 0.500001,
+        "fetchExternal": true,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9999986,
+        "uncertainty_seen": 0.0000014,
+        "costPressure": 0,
+        "collapseProximity": 0.5,
+        "D": 0.300001,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9999986,
+        "uncertainty_seen": 0.0000014,
+        "costPressure": 0.1,
+        "collapseProximity": 0,
+        "D": 0.454546,
+        "fetchExternal": false,
+        "maxResults": 5
+      },
+      {
+        "confidence": 0.9999986,
+        "uncertainty_seen": 0.0000014,
+        "costPressure": 0.1,
+        "collapseProximity": 0.5,
+        "D": 0.277273,
+        "fetchExternal": false,
+        "maxResults": 5
+      }
+    ],
+    "dilation_along_laundering_path": [
+      1,
+      0.578947,
+      0.507538,
+      0.50075,
+      0.500001
+    ],
+    "strictly_decreasing_in_confidence": true,
+    "knife_edge_note": "at cp=0, p=0 the laundered limit sits at D -> 0.5+ (fetchExternal true by ~1e-6); ANY positive cost pressure or collapse proximity pushes it under the D>0.5 cutoff -> fetchExternal false",
+    "de_laundered": [
+      {
+        "label": "anchored c=0.5, u=0.5 (paid mass only)",
+        "D": 1,
+        "policy": {
+          "fetchExternal": true,
+          "maxResults": 5,
+          "minSources": 2,
+          "deepMode": false
+        }
+      },
+      {
+        "label": "never-verified u=1, c=0.5",
+        "D": 1.333333,
+        "policy": {
+          "fetchExternal": true,
+          "maxResults": 7,
+          "minSources": 2,
+          "deepMode": false
+        }
+      }
+    ]
+  },
+  "partD_mislabel": {
+    "input": {
+      "fixedPoint": true,
+      "stable": true,
+      "groundingDue": true,
+      "budgetRemaining": 0
+    },
+    "output": {
+      "action": "halt_saturated",
+      "reason": "grounding due but budget exhausted (M5) — bounded-cost halt without a fresh anchor (stale, not saturated)",
+      "improving": false,
+      "saturated": false
+    },
+    "self_contradictory": false,
+    "note": "action says saturated, flag says not-saturated; pre-patch the reason string also claimed saturation"
+  },
+  "verdicts": {
+    "impossibility_witnessed": "CONFIRMED: laundered runaway survives all 40 steps under the global-signal vocabulary",
+    "attribution_restores_soundness": "CONFIRMED: keyed anchor kills World L at step 1, World G untouched, legacy calls unchanged",
+    "starvation": "CONFIRMED: grounding allocation strictly decreasing in laundered confidence (knife-edge at the D>0.5 cutoff)"
+  }
+}

@@ -1,8 +1,8 @@
-# Owned Math — Proofs I: the No-Free-Confidence lemma (M1) and the Passive-Indistinguishability lemma (M3)
+# Owned Math — Proofs I: the No-Free-Confidence lemma (M1), the Passive-Indistinguishability lemma (M3), and the Attribution-Loss lemma (M7)
 
 **Date:** 2026-07-21 (third pass on [#2786](https://github.com/alex-place/lantern-os/issues/2786) /
-[#2788](https://github.com/alex-place/lantern-os/issues/2788))
-**Type:** Proof note — formal statements + proofs for the two claims whose machine checks are
+[#2788](https://github.com/alex-place/lantern-os/issues/2788)) · Lemma 3 added 2026-07-24 (M7)
+**Type:** Proof note — formal statements + proofs for the claims whose machine checks are
 green, in the L2 pattern: small lemma, named prior art, machine check committed beside it.
 **Slate:** [`2026-07-21-owned-math-conjectures.md`](2026-07-21-owned-math-conjectures.md)
 **Machine checks:** [`owned_math_m1_precision_check.py`](../../experiments/owned_math_m1_precision_check.py)
@@ -10,7 +10,9 @@ green, in the L2 pattern: small lemma, named prior art, machine check committed 
 (**exact rational arithmetic**, 0/200) ·
 [`owned_math_m3_indistinguishability.py`](../../experiments/owned_math_m3_indistinguishability.py)
 (exact-law corner) · [`owned_math_m3_innovations.py`](../../experiments/owned_math_m3_innovations.py)
-(general case, per noise level)
+(general case, per noise level) ·
+[`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
+(**drives the SHIPPED code paths**, deterministic)
 
 ---
 
@@ -112,3 +114,81 @@ nonstationary worlds may leak passive signal (higher-order statistics); the lemm
 passivity *cannot be guaranteed* to work, not that it never accidentally does. The corollary's
 "necessity" is necessity of the instrument *class* (interventional), not of any particular
 cadence value — the cadence *value* is M2's question.
+
+---
+
+## Lemma 3 (Attribution loss; the laundered doppelgänger) — M7
+
+**Setup.** Modes i ∈ {1,…,m} with per-mode evidence indicators E_i(t) ∈ {0,1} and per-mode
+gain/leak ratios (G/L)_i(t). The composed control law
+([`converge-control.js`](../../apps/lantern-garage/lib/converge-control.js), #2857) observes at
+each step the **global signal vector** s_t = (g_t, e_t, r_t, f_t, σ_t, d_t, b_t): g_t = G/L of
+the focal (max-gain) mode, e_t = ∨_i E_i(t) (the global influx bit), r_t = confidence-rising,
+f_t = fixed point, σ_t = stability, d_t = grounding due, b_t = budget. **No coordinate carries
+the pair (mode, evidence) jointly.** Per M6, a run is **laundered at horizon T** if g_t > 1 and
+E_focal(t) = 0 for all t ≤ T (gain above threshold, zero external-innovation coupling — the
+state M6 says must be killed); **anchored** if g_t > 1 with E_focal(t) = 1 for all t ≤ T.
+
+**Claim.** For **every** policy π mapping signal *histories* to actions (deterministic, causal,
+arbitrary memory), there exist an anchored run W_G and a laundered run W_L with **identical
+signal histories** (s_1,…,s_T) for every T. Consequently π acts identically on both, so π
+either fails M6-soundness (never kills W_L) or fails non-vacuity (kills the genuinely anchored
+W_G). No policy over the global vocabulary satisfies both.
+
+**Proof.** Construct W_G with m = 1: E_1(t) = 1 for all t; the mode's confidence odds multiply
+by g each step (a Bayes update on per-mode evidence with likelihood ratio g). Construct W_L
+with m = 2: E_1(t) = 0 and E_2(t) = 1 for all t (mode 2 is any unrelated feed); mode 1's odds
+multiply by the same g via self-repeat gain. Coordinate check: g_t = g in both (the G/L
+estimator reads magnitude, not provenance); e_t = ∨_i E_i = 1 in both; r_t identical (same
+arithmetic); f, σ, d, b equal by construction. Identical histories give identical actions for
+any causal π. The M6-correct actions differ: W_L is lasing with zero coupling (kill); W_G is
+anchored (must not be killed). ∎
+
+**Corollary 1 (keyed anchor sufficiency).** Augment the vector with e*_t = E_focal(t). The two
+worlds separate at t = 1, and the rule "kill iff g_t > 1 ∧ e*_t = 0" is M6-sound and
+non-vacuous on the pair. Machine-checked against the shipped guard (`evidenceForMode`): kill at
+step 1 in W_L, zero kills in W_G, legacy calls (field omitted) bit-identical to the old law.
+
+**Corollary 2 (cadence is not sufficient — the starvation channel).** Downstream of the kill
+rule, the shipped allocation reads provenance-blind uncertainty u = 1 − c: dilation
+D = (1+u)/((1+c)(1+cp)) = (2−c)/((1+c)(1+cp)) is **strictly decreasing in laundered
+confidence c** (numerator falls, denominator rises), with limit D → 0.5/(1+cp) ≤ 0.5 — the
+`fetchExternal = D > 0.5` cutoff — and the G12 collapse-proximity deflation lowers it further
+(a laser self-repeats, so the degeneration signal plausibly reads p > 0). Measured along the
+laundering path: D = 1.0 → 0.578947 → 0.507538 → 0.50075 → 0.500001. So even when the M2 hard
+tick forces a grounding event (necessary, by Lemma 2's Corollary 2), allocation routes the
+budget *away* from the laundered mode: **the runaway suppresses its own kill switch (the
+Lemma) and de-allocates its own audit (this corollary).** The single coordinate that restores
+both is attribution — M1's paid/free confidence split, keyed per mode, which the ledger
+already emits (free-mass scan, slate §M1).
+
+**Machine checks.** [`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
+(deterministic, no RNG, no toy re-implementation — it `require`s the shipped modules): W_L
+survives **40/40 steps** under the global vocabulary at final confidence 0.9999986 with per-step
+reason "improving on external evidence"; keyed guard kills W_L at step 1; allocation path
+strictly decreasing as above; plus the self-contradictory halt record (action `halt_saturated`
+with `saturated: false` and a reason claiming saturation) found and fixed. JSON:
+[`owned_math_m7_composition_counterexample.json`](../../experiments/results/owned_math_m7_composition_counterexample.json).
+
+**Prior art, named.** Discrete-event fault diagnosability (Sampath, Sengupta, Lafortune,
+Sinnamohideen & Teneketzis, 1995): a fault is diagnosable only if no arbitrarily long faulty
+trace is observation-equivalent to a nominal trace — W_G/W_L are exactly such an equivalent
+pair, so this is a diagnosability failure of the *signal map*, cured by relabeling
+(attribution), not by policy cleverness. Static-output-feedback distinguishability is the
+control-theory cousin. Lemma 2 is the sibling one level down: there, passive internal
+functionals cannot separate grounded from ungrounded *trajectories*; here, global step-signals
+cannot separate anchored from laundered *gain*. **Ours:** the instantiation on the shipped
+control law, the executable two-world artifact against real code paths, the starvation
+corollary tying M5/G12 into the same mechanism, and the default-compatible guard.
+
+**Honest scope.** The impossibility is relative to the **signal map** — the seven global
+coordinates as typed in the shipped law; a richer map dissolves it, and that is the point: the
+fix is a vocabulary fix, not a smarter policy. The anchored world W_G is co-reachable only
+because M6 itself frames G/L and coupling as independent coordinates; if a future M6 estimator
+provably entangles them (gain measurement absorbing coupling, so anchored lasers cannot
+exist), the *impossibility* half degenerates — but the counterexample against the shipped
+global-bit rule stands regardless, because W_L exists either way. The confidence arithmetic
+(odds × g) is illustrative only — the law never reads confidence magnitude, just the rising
+bit, so no modeling choice there carries proof weight. The charitable per-hypothesis reading
+of `evidenceInflux` does not close the hole: M6's modes are sub-hypothesis decode modes while
+M1's evidence is hypothesis-level, so the keying still differs.

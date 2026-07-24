@@ -9,8 +9,9 @@ stated before work and a **first test executed the same day**.
 [#2788](https://github.com/alex-place/lantern-os/issues/2788) (M3) ·
 [#2789](https://github.com/alex-place/lantern-os/issues/2789) (M4) ·
 [#2790](https://github.com/alex-place/lantern-os/issues/2790) (M5) ·
-[#2791](https://github.com/alex-place/lantern-os/issues/2791) (M6)
-**Loop stages:** Verify (M1, M3, M4, M6) · Converge (M1, M2) · Act/route (M5)
+[#2791](https://github.com/alex-place/lantern-os/issues/2791) (M6) ·
+[#2924](https://github.com/alex-place/lantern-os/issues/2924) (M7)
+**Loop stages:** Verify (M1, M3, M4, M6) · Converge (M1, M2, M7) · Act/route (M5)
 
 **Grounding contract — External Reality Rule.** Tags: **[measured — this note]** (a number
 produced by a run committed alongside), **[derived — this note]** (analytical result written
@@ -55,6 +56,7 @@ to pretend it is empty.
 | **M4** | L3: Kreiss-inflated thresholds survive non-normality | synthetic Jordan family | **[supported synthetically]** perfect FA/detection separation | [#2789](https://github.com/alex-place/lantern-os/issues/2789) |
 | **M5** | Dilation = water-filling optimum | KKT derivation vs shipped code | **[derived]** cutoff + G12 fall out; linear-vs-log mismatch found | [#2790](https://github.com/alex-place/lantern-os/issues/2790) |
 | **M6** | Lasing threshold (per-mode G/L) | — | **[conjecture]** statement only | [#2791](https://github.com/alex-place/lantern-os/issues/2791) |
+| **M7** | Attribution loss: the composed law's anti-runaway guarantee is unsatisfiable over global signals | two-world counterexample vs SHIPPED code | **[derived + measured 2026-07-24]** laundered runaway survives 40/40 steps; keyed guard shipped; starvation corollary measured | [#2924](https://github.com/alex-place/lantern-os/issues/2924) |
 
 Artifacts: [`owned_math_m1_m2_ledger_scan.py`](../../experiments/owned_math_m1_m2_ledger_scan.py) ·
 [`owned_math_m3_dichotomy_edgecase.py`](../../experiments/owned_math_m3_dichotomy_edgecase.py) ·
@@ -212,6 +214,41 @@ confident-but-unanchored axis as a sharp threshold, estimable from decode teleme
 is the measured corollary (lead-time over the NIS canary on `canary-events.jsonl`), and it
 inherits M3's boundary — the threshold is only informative *given* external innovation exists
 to couple to. Killed by no lead-time.
+
+## M7 — Attribution loss: the composition is not sound over global signals
+
+**Statement [derived — proofs note Lemma 3] + [measured 2026-07-24 — against SHIPPED code].**
+The unified control law (#2857) composes M1/M2/M4/M5/M6 through a **global per-step signal
+vector**; but M6's kill side-condition ("G/L > 1 *and zero external-innovation coupling*") is
+**per-mode**. Two-world counterexample: an *anchored* run (evidence for the lasing mode every
+step) and a *laundered* run (zero evidence ever for the mode; an unrelated feed sets the
+global influx bit) produce **identical signal histories** — so no causal policy over the
+global vocabulary is both M6-sound and non-vacuous. Measured against the shipped
+`convergeControl`: the laundered runaway survives **40/40 steps** at final confidence
+0.9999986, per-step reason *"improving on external evidence."* **Starvation corollary:** the
+shipped allocation (provenance-blind u = 1−c) is strictly decreasing in laundered confidence
+(D → 0.500001, the knife-edge of the `D > 0.5` fetch cutoff; G12 deflation double-starves a
+self-repeating laser) — the runaway suppresses its own kill switch *and* de-allocates its own
+audit. Completes the M3 arc: **hard cadence is necessary (M3) but cadence + allocation
+without attribution is not sufficient (M7).** Guard shipped default-compatible
+(`evidenceForMode` keyed anchor; kill at step 1; legacy calls unchanged); the attribution
+vocabulary is **M1's paid/free split**, which the ledger already emits. Full note:
+[`2026-07-24-owned-math-m7-attribution.md`](2026-07-24-owned-math-m7-attribution.md) ·
+artifact [`owned_math_m7_composition_counterexample.js`](../../experiments/owned_math_m7_composition_counterexample.js)
+(first slate artifact to drive the real code paths, not toy semantics).
+
+**Next / kill.** #2791 instrumentation must tag grounding events with the mode they anchor
+(else the keyed bit is not computable live and guarantee (a) must be withdrawn from the law's
+header); allocator requirement recorded (u must be anchored uncertainty 1 − c_paid — M5
+IP-gate unchanged). Lemma 3's impossibility half dies if the real M6 estimator provably
+entangles gain and coupling; the counterexample against the shipped global-bit rule survives
+either way.
+
+**Prior art [grounded]:** discrete-event fault diagnosability (Sampath et al. 1995) —
+observation-equivalent faulty/nominal traces; static-output-feedback distinguishability.
+**Ours:** the instantiation on the shipped law, the executable two-world artifact, the
+starvation corollary tying M5/G12 into the same mechanism, and the sibling relation to M3
+(trajectory level → step-signal level).
 
 ---
 
