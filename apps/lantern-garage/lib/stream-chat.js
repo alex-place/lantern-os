@@ -36,7 +36,11 @@ const { resolveGrounding, formatGroundingForPrompt } = require("./mesh-grounding
 const { defaultRings } = require("./grounding-rings");
 const { analyzeImage } = require("./vision");
 const { webSearchMcp, formatGroundingContext, needsGrounding, extractSearchQuery } = require("./web-search-client");
-const { chatDilation, groundingPolicy, isGroundingDue, GROUNDING_TICK_MS } = require("./grounding-policy");
+const { chatDilation, groundingPolicy } = require("./grounding-policy");
+// #2853: the grounding tick is now per-key (EOQ cadence) — isRegroundingDue owns the
+// isGroundingDue + GROUNDING_TICK_MS fallback internally, so they're no longer imported here.
+const { isRegroundingDue } = require("./regrounding-scheduler");
+const { readEvents: readGroundingCalibration } = require("./grounding-calibration");
 // Real news source (RSS discover feed, cached). A bare "today's news" query is a poor
 // web-search term (DuckDuckGo returns "News Today" newspaper, the "Today" TV show, …),
 // so news-intent turns ground on the curated feed instead of a junk search.
@@ -1143,7 +1147,18 @@ async function handleStreamChat(req, url, res) {
   // #1012 boiling-frog defense: a hard time cadence forces an external re-check even
   // when proximity~0 and the message wouldn't otherwise trigger grounding. Internal
   // monitors are provably blind to slow drift, so we ground on a timer regardless.
-  const groundingTickDue = isGroundingDue(_lastGroundingTickMs);
+  // #2853 (M2): the cadence is now PER-KEY. Each agent-key re-grounds on its own EOQ
+  // clock T*=√(2(p_v/p_e)/ρ) derived from its measured staleness ρ in the calibration
+  // ledger (regrounding-scheduler ← the same key grounding-calibration writes). It falls
+  // back to the constant GROUNDING_TICK_MS whenever the ledger can't yet fit ρ for this
+  // key — so behavior is unchanged until longitudinal per-key data supports a derived cadence.
+  const _groundingKey = `agent:${agent.id || agent.name || "keystone"}`;
+  const _reground = isRegroundingDue(_groundingKey, _lastGroundingTickMs, {
+    calRows: readGroundingCalibration(),
+  });
+  const groundingTickDue = _reground.due;
+  const _groundingCadenceMs = _reground.cadenceMs;
+  const _groundingCadenceKind = _reground.derived ? "EOQ-derived" : "constant";
   if (!isKeystoneDebug && (needsGrounding(message) || groundingD >= 1.5 || groundingTickDue || forceGround)) {
     // On a mandatory tick — or an explicit "Ground this" retry — fall back to the
     // message itself when no query extracts, so we still reach external reality on
@@ -1157,7 +1172,7 @@ async function handleStreamChat(req, url, res) {
         }
         if (groundingTickDue) {
           _lastGroundingTickMs = Date.now();
-          console.warn(`[grounding-tick] mandatory external-grounding tick fired (cadence=${GROUNDING_TICK_MS}ms, ok=${!!(searchResult && searchResult.success)})`);
+          console.warn(`[grounding-tick] mandatory external-grounding tick fired (key=${_groundingKey}, cadence=${_groundingCadenceMs}ms ${_groundingCadenceKind}, ok=${!!(searchResult && searchResult.success)})`);
         }
       } catch (e) {
         console.error("[web-search] Grounding failed (non-fatal):", e.message);
@@ -1165,7 +1180,7 @@ async function handleStreamChat(req, url, res) {
     } else if (groundingTickDue) {
       // Due but nothing to query — advance the clock + log so the cadence doesn't retry every turn.
       _lastGroundingTickMs = Date.now();
-      console.warn(`[grounding-tick] due but no query extracted; cadence reset (cadence=${GROUNDING_TICK_MS}ms)`);
+      console.warn(`[grounding-tick] due but no query extracted; cadence reset (key=${_groundingKey}, cadence=${_groundingCadenceMs}ms ${_groundingCadenceKind})`);
     }
   }
 
