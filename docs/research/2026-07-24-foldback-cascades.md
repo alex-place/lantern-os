@@ -266,3 +266,103 @@ optimal depth on real traces is not within 2× of 1/q̂, or if it scales with ta
 commitment that *causes* later steps to be wrong — violates the independence assumption
 and is the most likely way the constant-depth result breaks; untested, and named here as
 the primary threat to validity.
+
+---
+
+## 9. Rung C — the structured counterexample: causal frustration breaks the depth law
+
+Rung B named correlated frustration as the primary threat to validity. This rung attacks it
+and **finds the counterexample** ([`folding_correlated_frustration.py`](../../experiments/folding_correlated_frustration.py)).
+
+**Causal frustration:** a wrong step *poisons everything downstream* — later steps are built
+on a false premise, so re-solving them cannot help. Repair works only if it reaches back
+past the **root**, and the root is the *first* wrong step, hence geometrically distributed
+and concentrated **early**. Derived before running:
+
+```
+P(fix | m) = (1-W)^(K-m) · (1-W')^m       d log P/dm = log(1-W') - log(1-W) = CONSTANT
+```
+
+> The objective is **log-linear in m: no interior optimum exists.** The optimum jumps to a
+> **boundary** — and when the repair tier is better than the original pass, that boundary is
+> **m = K, full restart**. Under causal frustration the depth law is not inaccurate, it is
+> **inapplicable**, and the policy rung A beat becomes optimal again.
+
+**Measured — the optimum migrates from the law to the boundary** (law prescribes m = 19):
+
+| correlation c | K=16 | K=32 | K=64 | K=128 | slope m* vs K |
+|---|---|---|---|---|---|
+| 0.00 | 16 | **19** | **19** | **19** | +0.018 (law holds) |
+| 0.25 | 16 | 32 | 20 | 20 | −0.022 |
+| 0.50 | 16 | 32 | 20 | 20 | −0.022 |
+| 0.75 | 16 | 32 | 64 | 20 | +0.002 |
+| **1.00** | **16** | **32** | **64** | **128** | **+1.000** |
+
+At c = 1 the optimum is m\* = K for *every* K: **K-independence is falsified as sharply as
+it can be** (slope exactly 1.0 against a 0.25 threshold).
+
+**The prescription doesn't just degrade — it inverts, then collapses.** Policy contest at
+equal budget:
+
+| c | K | fixed-depth 1/q (rung B) | full restart | progressive | **root-seeking** |
+|---|---|---|---|---|---|
+| 0.0 | 128 | **1.000** | 0.004 | 0.510 | 0.256 |
+| 0.5 | 32 | 0.546 | 0.480 | 0.234 | **0.955** |
+| 1.0 | 32 | 0.171 | 0.479 | 0.079 | **0.952** |
+| **1.0** | **128** | **0.000** | 0.004 | 0.000 | **0.254** |
+
+- **G-C2 PASS** — at c = 1 the rung-B policy scores **below** plain full restart (−30.8pp at
+  K=32). The advice inverts against the baseline it originally beat.
+- **The purest counterexample is the last row:** at c = 1, K = 128, fixed-depth unfolding
+  succeeds **0.000** of the time. Not a degradation — *total failure*, because the root is
+  early and the prescribed 19-step suffix essentially never reaches it. And "unfold deeper"
+  is no rescue: full restart scores 0.004. **Both known policies collapse together.**
+- **G-C1: PASS on the conjunct that matters, FAIL as written.** The gate ANDed two tests:
+  slope > 0.25 (passed decisively at **1.0**) and depth > 2× the law (fails at K = 16, 32,
+  where the law's own prescription of 19 is ≥ K). Same boundary-cell bug as G-D2 —
+  **that is twice now, and the pattern is worth naming: a gate that compares against a
+  prescription must first check the prescription is feasible.** Reported, not rewritten.
+
+**The constructive answer, and it is a different algorithm.** Root-seeking — binary-search
+the first bad prefix with a *prefix oracle*, then unfold from the root — is
+**correlation-invariant**: 0.952–0.955 at K=32 and 0.252–0.265 at K=128, *across every value
+of c*. It does not care how errors propagate because it localizes the cause exactly (**G-C3
+PASS**, +47.3pp at c=1, K=32). But it is **not a universal winner**: at c = 0, K = 128 it
+scores 0.256 against fixed-depth's 1.000, because it pays oracle cost and re-solves from an
+early root where a shallow unfold would have sufficed.
+
+### The regime map (the actual deliverable)
+
+| frustration structure | optimal policy | why |
+|---|---|---|
+| **independent** (c ≈ 0) | fixed-depth unfold at **m = 1/q** | interior optimum exists; rungs A–B |
+| **causal** (c → 1), prefix oracle available | **root-seeking** (bisect) | localizes the cause; correlation-invariant |
+| **causal**, no prefix oracle | full restart | no interior optimum; must reach an early root |
+
+The phase boundary itself moves with K: at c = 0.75, K=64 has already flipped to the
+boundary while K=128 has not, because full restart degrades exponentially in K and so stays
+unattractive longer. **c, not just φ, is a quantity worth measuring** — it selects the
+*algorithm*, where φ only sets the *parameter*.
+
+### What biology says about this, and where we can beat it
+
+Nature evolved **two** mechanisms, and this result explains why it had to. Native-state
+hydrogen exchange shows foldon-level *local* unfolding and refolding under native
+conditions — the independent-error regime. Kinetically trapped (correlated) states get a
+*different machine*: the **GroEL/GroES chaperonin** encapsulates the substrate and gives it
+a fresh folding attempt in isolation — global restart in a protected box. Two regimes, two
+machines, which is exactly what the regime map predicts.
+
+The third row is ours. **Root-seeking beats both, and biology cannot use it** — bisecting
+for a root cause requires interrogating *prefixes*, and a polypeptide has no way to ask
+"would a valid completion follow from this partial structure?" A reasoning cascade can:
+that is what a verifier over partial solutions *is*. So the honest summary is that we take
+the control flow from ~4 billion years of selection, and then beat it on the one axis where
+our instruments are better than nature's.
+
+**Status of the program after rung C:** the depth law is *scoped*, not refuted — it holds
+under independent frustration (where it is exact to 1.6%) and fails completely under causal
+frustration (where it is worse than doing nothing clever). Any deployment must therefore
+measure **both** φ̂ and ĉ before choosing a policy, which strengthens rather than weakens the
+instrumentation ask: per-step local-verify outcomes give φ̂; whether failures cluster in
+*suffixes after a first bad step* gives ĉ.

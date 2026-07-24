@@ -1,0 +1,484 @@
+{
+  "date": "2026-07-24",
+  "attacks": "the independence assumption behind m* = -1/ln(1-q) (issue #2927 rung B)",
+  "derivation": "causal: P(fix|m) = (1-W)^(K-m) (1-W')^m  =>  d log P/dm constant => NO interior optimum, boundary solution",
+  "params": {
+    "W": 0.12,
+    "W_repair": 0.05,
+    "phi": 1.0,
+    "m_law": 19,
+    "Ks": [
+      16,
+      32,
+      64,
+      128
+    ],
+    "cs": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "N": 4000,
+    "seeds": [
+      101,
+      202,
+      303
+    ],
+    "cost": {
+      "solve": 1.0,
+      "verify_prefix": 0.25
+    }
+  },
+  "analytic_optimum_migration": [
+    {
+      "c": 0.0,
+      "K": 16,
+      "m_star": 16,
+      "p_fix": 0.440127,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 0.84,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.0,
+      "K": 32,
+      "m_star": 19,
+      "p_fix": 0.224054,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.0,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.0,
+      "K": 64,
+      "m_star": 19,
+      "p_fix": 0.112027,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.0,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.0,
+      "K": 128,
+      "m_star": 19,
+      "p_fix": 0.056013,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.0,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.25,
+      "K": 16,
+      "m_star": 16,
+      "p_fix": 0.440127,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 0.84,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.25,
+      "K": 32,
+      "m_star": 32,
+      "p_fix": 0.193711,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.68,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.25,
+      "K": 64,
+      "m_star": 20,
+      "p_fix": 0.084343,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.05,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.25,
+      "K": 128,
+      "m_star": 20,
+      "p_fix": 0.04201,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.05,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.5,
+      "K": 16,
+      "m_star": 16,
+      "p_fix": 0.440127,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 0.84,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.5,
+      "K": 32,
+      "m_star": 32,
+      "p_fix": 0.193711,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.68,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.5,
+      "K": 64,
+      "m_star": 20,
+      "p_fix": 0.05666,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.05,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.5,
+      "K": 128,
+      "m_star": 20,
+      "p_fix": 0.028007,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.05,
+      "at_boundary_K": false
+    },
+    {
+      "c": 0.75,
+      "K": 16,
+      "m_star": 16,
+      "p_fix": 0.440127,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 0.84,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.75,
+      "K": 32,
+      "m_star": 32,
+      "p_fix": 0.193711,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.68,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.75,
+      "K": 64,
+      "m_star": 64,
+      "p_fix": 0.037524,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 3.37,
+      "at_boundary_K": true
+    },
+    {
+      "c": 0.75,
+      "K": 128,
+      "m_star": 20,
+      "p_fix": 0.014004,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.05,
+      "at_boundary_K": false
+    },
+    {
+      "c": 1.0,
+      "K": 16,
+      "m_star": 16,
+      "p_fix": 0.440127,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 0.84,
+      "at_boundary_K": true
+    },
+    {
+      "c": 1.0,
+      "K": 32,
+      "m_star": 32,
+      "p_fix": 0.193711,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 1.68,
+      "at_boundary_K": true
+    },
+    {
+      "c": 1.0,
+      "K": 64,
+      "m_star": 64,
+      "p_fix": 0.037524,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 3.37,
+      "at_boundary_K": true
+    },
+    {
+      "c": 1.0,
+      "K": 128,
+      "m_star": 128,
+      "p_fix": 0.001408,
+      "m_law_1_over_q": 19,
+      "ratio_to_law": 6.74,
+      "at_boundary_K": true
+    }
+  ],
+  "policy_contests": [
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.9052,
+        "avg_spend": 76.94
+      },
+      "full_restart": {
+        "success": 0.4849,
+        "avg_spend": 110.68
+      },
+      "progressive_unfold": {
+        "success": 0.3919,
+        "avg_spend": 50.68
+      },
+      "bisect_root": {
+        "success": 0.9535,
+        "avg_spend": 76.68
+      },
+      "c": 0.0,
+      "K": 32,
+      "budget": 128.0,
+      "fixed_minus_restart_pp": 42.03,
+      "bisect_minus_best_other_pp": 4.83
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.9999,
+        "avg_spend": 178.6
+      },
+      "full_restart": {
+        "success": 0.0038,
+        "avg_spend": 511.48
+      },
+      "progressive_unfold": {
+        "success": 0.5097,
+        "avg_spend": 286.3
+      },
+      "bisect_root": {
+        "success": 0.2557,
+        "avg_spend": 465.56
+      },
+      "c": 0.0,
+      "K": 128,
+      "budget": 512.0,
+      "fixed_minus_restart_pp": 99.61,
+      "bisect_minus_best_other_pp": -74.42
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.724,
+        "avg_spend": 86.91
+      },
+      "full_restart": {
+        "success": 0.4861,
+        "avg_spend": 110.18
+      },
+      "progressive_unfold": {
+        "success": 0.305,
+        "avg_spend": 50.67
+      },
+      "bisect_root": {
+        "success": 0.9543,
+        "avg_spend": 76.81
+      },
+      "c": 0.25,
+      "K": 32,
+      "budget": 128.0,
+      "fixed_minus_restart_pp": 23.79,
+      "bisect_minus_best_other_pp": 23.03
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.7502,
+        "avg_spend": 261.23
+      },
+      "full_restart": {
+        "success": 0.0048,
+        "avg_spend": 511.31
+      },
+      "progressive_unfold": {
+        "success": 0.3801,
+        "avg_spend": 318.66
+      },
+      "bisect_root": {
+        "success": 0.2519,
+        "avg_spend": 465.1
+      },
+      "c": 0.25,
+      "K": 128,
+      "budget": 512.0,
+      "fixed_minus_restart_pp": 74.54,
+      "bisect_minus_best_other_pp": -49.83
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.5461,
+        "avg_spend": 96.92
+      },
+      "full_restart": {
+        "success": 0.4797,
+        "avg_spend": 110.56
+      },
+      "progressive_unfold": {
+        "success": 0.2339,
+        "avg_spend": 50.67
+      },
+      "bisect_root": {
+        "success": 0.9546,
+        "avg_spend": 77.09
+      },
+      "c": 0.5,
+      "K": 32,
+      "budget": 128.0,
+      "fixed_minus_restart_pp": 6.64,
+      "bisect_minus_best_other_pp": 40.85
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.4984,
+        "avg_spend": 343.36
+      },
+      "full_restart": {
+        "success": 0.0049,
+        "avg_spend": 511.42
+      },
+      "progressive_unfold": {
+        "success": 0.2539,
+        "avg_spend": 349.8
+      },
+      "bisect_root": {
+        "success": 0.2646,
+        "avg_spend": 464.99
+      },
+      "c": 0.5,
+      "K": 128,
+      "budget": 512.0,
+      "fixed_minus_restart_pp": 49.35,
+      "bisect_minus_best_other_pp": -23.38
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.3504,
+        "avg_spend": 107.17
+      },
+      "full_restart": {
+        "success": 0.4848,
+        "avg_spend": 110.83
+      },
+      "progressive_unfold": {
+        "success": 0.1624,
+        "avg_spend": 50.7
+      },
+      "bisect_root": {
+        "success": 0.9548,
+        "avg_spend": 76.84
+      },
+      "c": 0.75,
+      "K": 32,
+      "budget": 128.0,
+      "fixed_minus_restart_pp": -13.44,
+      "bisect_minus_best_other_pp": 47.0
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.2538,
+        "avg_spend": 424.08
+      },
+      "full_restart": {
+        "success": 0.0043,
+        "avg_spend": 511.45
+      },
+      "progressive_unfold": {
+        "success": 0.131,
+        "avg_spend": 380.37
+      },
+      "bisect_root": {
+        "success": 0.2559,
+        "avg_spend": 465.0
+      },
+      "c": 0.75,
+      "K": 128,
+      "budget": 512.0,
+      "fixed_minus_restart_pp": 24.95,
+      "bisect_minus_best_other_pp": 0.21
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.1707,
+        "avg_spend": 117.26
+      },
+      "full_restart": {
+        "success": 0.479,
+        "avg_spend": 110.55
+      },
+      "progressive_unfold": {
+        "success": 0.0787,
+        "avg_spend": 50.68
+      },
+      "bisect_root": {
+        "success": 0.9515,
+        "avg_spend": 77.19
+      },
+      "c": 1.0,
+      "K": 32,
+      "budget": 128.0,
+      "fixed_minus_restart_pp": -30.83,
+      "bisect_minus_best_other_pp": 47.25
+    },
+    {
+      "fixed_depth_1_over_q": {
+        "success": 0.0,
+        "avg_spend": 508.0
+      },
+      "full_restart": {
+        "success": 0.0039,
+        "avg_spend": 511.5
+      },
+      "progressive_unfold": {
+        "success": 0.0001,
+        "avg_spend": 413.0
+      },
+      "bisect_root": {
+        "success": 0.2544,
+        "avg_spend": 465.53
+      },
+      "c": 1.0,
+      "K": 128,
+      "budget": 512.0,
+      "fixed_minus_restart_pp": -0.39,
+      "bisect_minus_best_other_pp": 25.05
+    }
+  ],
+  "gates": {
+    "G_C1_law_falsified_under_causal_frustration": {
+      "PASS": false,
+      "m_star_at_c1": {
+        "16": 16,
+        "32": 32,
+        "64": 64,
+        "128": 128
+      },
+      "m_law": 19,
+      "slope_m_vs_K_at_c1": 1.0
+    },
+    "G_C2_prescription_inverts_vs_full_restart": {
+      "PASS": true,
+      "fixed_minus_restart_pp_at_c1": {
+        "32": -30.83,
+        "128": -0.39
+      }
+    },
+    "G_C3_bisect_is_the_correlated_regime_answer": {
+      "PASS": true,
+      "bisect_advantage_pp_at_c1": {
+        "32": 47.25,
+        "128": 25.05
+      }
+    },
+    "NULL_law_robust_everywhere": false,
+    "slopes_m_star_vs_K_by_c": {
+      "0.0": 0.0179,
+      "0.25": -0.0217,
+      "0.5": -0.0217,
+      "0.75": 0.0022,
+      "1.0": 1.0
+    },
+    "VERDICT": "PARTIAL \u2014 see flags"
+  }
+}
