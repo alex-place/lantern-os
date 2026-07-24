@@ -116,6 +116,39 @@ test('cfg: ladder parses and defaults to five depths through 2% (deep OTM focus)
   }
 });
 
+test('parseOcc: decodes an OCC symbol', () => {
+  assert.deepStrictEqual(sh.parseOcc('SPY260727C00741000'), { root: 'SPY', expiry: '2026-07-27', type: 'C', strike: 741 });
+  assert.strictEqual(sh.parseOcc('garbage'), null);
+});
+
+test('pickPenny: first ask ≤ 1¢ strike above spot, honest ask-side pricing', () => {
+  const list = [
+    { strike: 741, ask: 1.72, bid: 1.66 },
+    { strike: 747, ask: 0.16, bid: 0.15 },
+    { strike: 751, ask: 0.05, bid: 0.04 },
+    { strike: 754, ask: 0.01, bid: 0.0 },
+    { strike: 760, ask: 0.01, bid: 0.0 },
+  ];
+  // high-vol night: rv10 = 1%/night → 754 is (754/739−1)=2.03% ≈ 2σ ≤ 3σ → take the FIRST penny (754, not 760)
+  const r = sh.pickPenny(list, 739, { askMax: 0.01, rv10: 0.01, maxSigma: 3 });
+  assert.ok(r.pick && r.pick.strike === 754);
+  assert.strictEqual(r.pick.ask, 0.01);
+});
+
+test('pickPenny: vol-selectivity rejects the penny strike on a quiet night', () => {
+  const list = [{ strike: 754, ask: 0.01, bid: 0 }];
+  // quiet night: rv10 = 0.4%/night → 2.03% ≈ 5.1σ > 3σ → SKIP (the selectivity the operator asked for)
+  const r = sh.pickPenny(list, 739, { askMax: 0.01, rv10: 0.004, maxSigma: 3 });
+  assert.strictEqual(r.pick, null);
+  assert.match(r.reason, /too far for tonight's vol/);
+});
+
+test('pickPenny: no penny available → honest reason with the cheapest ask', () => {
+  const r = sh.pickPenny([{ strike: 745, ask: 0.25, bid: 0.2 }], 739, { askMax: 0.01, rv10: 0.01 });
+  assert.strictEqual(r.pick, null);
+  assert.match(r.reason, /no strike at ≤ \$0.01/);
+});
+
 test('nextTradingDayET: skips weekends (the UTC-roll bug priced weekend time value)', () => {
   const thu = new Date('2026-07-23T16:00:00');   // Thursday local-ET clone
   assert.strictEqual(sh.nextTradingDayET(thu), '2026-07-24');   // → Friday

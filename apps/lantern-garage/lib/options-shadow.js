@@ -52,6 +52,17 @@ function cfg() {
       .split(',').map((x) => parseFloat(x)).filter((x) => Number.isFinite(x) && x >= 0).slice(0, 8),
     riskPct: n('OPTIONS_SHADOW_RISK_PCT', 0.5),     // % of equity at risk (premium) — stats only
     volMode: process.env.OPTIONS_SHADOW_VOL_MODE || 'notflat',  // notflat | flat | any (per-symbol regime)
+    // ── PENNY mode (operator strategy): find the FIRST strike whose ask ≤ 1¢, take it
+    //    ONLY when that strike is within reach of tonight's measured vol (selectivity:
+    //    distance ≤ pennyMaxSigma × rv10 — the penny-strike distance is the market's
+    //    implied-vol gauge; we buy when OUR vol read says the gap is achievable), and
+    //    SELL next day the moment the bid is > 1¢ (target bid ≥ 2¢ = +100% gross),
+    //    else record the expiry loss. Entries priced at the ASK, exits at the BID —
+    //    the honest side of a 1¢ market.
+    pennyEnabled: process.env.OPTIONS_SHADOW_PENNY !== '0',
+    pennyAskMax: n('OPTIONS_SHADOW_PENNY_ASK_MAX', 0.01),   // "1 penny" entry ceiling
+    pennyExitBid: n('OPTIONS_SHADOW_PENNY_EXIT_BID', 0.02), // sell when bid ≥ this (> 1¢)
+    pennyMaxSigma: n('OPTIONS_SHADOW_PENNY_MAX_SIGMA', 3),  // strike must be ≤ N nightly sigmas away
   };
 }
 
@@ -86,8 +97,34 @@ function gates(closes, { volMode = 'notflat' } = {}) {
   const vm = median(hist.filter((x) => x != null));
   const notFlat = v != null && vm != null && v > vm;
   const volOk = volMode === 'any' ? true : volMode === 'flat' ? !notFlat : notFlat;
-  if (!volOk) return { eligible: false, why: `vol regime wrong (want ${volMode}; rv10=${v && v.toExponential(2)}, med=${vm && vm.toExponential(2)})`, trendOk, notFlat };
-  return { eligible: true, trendOk, notFlat };
+  if (!volOk) return { eligible: false, why: `vol regime wrong (want ${volMode}; rv10=${v && v.toExponential(2)}, med=${vm && vm.toExponential(2)})`, trendOk, notFlat, rv10: v, volMed: vm };
+  return { eligible: true, trendOk, notFlat, rv10: v, volMed: vm };
+}
+
+/** Parse an OCC option symbol (e.g. SPY260727C00741000) → {root, expiry:'YYYY-MM-DD', type, strike}. */
+function parseOcc(sym) {
+  const m = String(sym || '').match(/^([A-Z]+)(\d{2})(\d{2})(\d{2})([CP])(\d{8})$/);
+  if (!m) return null;
+  return { root: m[1], expiry: `20${m[2]}-${m[3]}-${m[4]}`, type: m[5], strike: parseInt(m[6], 10) / 1000 };
+}
+
+/**
+ * Pure penny selection (exported for tests): from [{strike, ask, bid}] CALLS above spot
+ * (any order), pick the FIRST (nearest) strike with 0 < ask ≤ askMax, then apply the
+ * vol-selectivity: its distance must be ≤ maxSigma × rv10 (rv10 = daily-return std,
+ * fraction). Returns { pick|null, reason }.
+ */
+function pickPenny(list, spot, { askMax = 0.01, rv10 = null, maxSigma = 3 } = {}) {
+  const above = (list || []).filter((x) => x && x.strike > spot && Number(x.ask) > 0).sort((a, b) => a.strike - b.strike);
+  if (!above.length) return { pick: null, reason: 'no priced calls above spot' };
+  const first = above.find((x) => Number(x.ask) <= askMax);
+  if (!first) return { pick: null, reason: `no strike at ≤ $${askMax.toFixed(2)} (cheapest ask ${Math.min(...above.map((x) => Number(x.ask))).toFixed(2)})` };
+  const distFrac = first.strike / spot - 1;
+  const sigma = rv10 > 0 ? distFrac / rv10 : null;
+  if (sigma != null && sigma > maxSigma) {
+    return { pick: null, reason: `penny strike too far for tonight's vol (${(distFrac * 100).toFixed(2)}% = ${sigma.toFixed(1)}σ > ${maxSigma}σ)`, sigma, distPct: distFrac * 100 };
+  }
+  return { pick: { ...first, distPct: +(distFrac * 100).toFixed(2), sigma: sigma != null ? +sigma.toFixed(2) : null }, reason: 'ok' };
 }
 
 /** Pick the first strike ABOVE spot×(1+otmPct/100) from a strike list (calls, slightly OTM). */
@@ -160,6 +197,30 @@ async function listNextExpiryCalls(sym) {
   return { expiry: firstExp, contracts: list.filter((c) => c.expiration_date === firstExp) };
 }
 
+/** One-call chain snapshot: quotes for EVERY call of the underlying at one expiry
+ *  (indicative feed). Returns [{symbol, strike, bid, ask}] or {error}. */
+async function chainQuotes(sym, expiry) {
+  const auth = _auth();
+  if (!auth) return { error: 'no alpaca auth' };
+  const out = [];
+  let pageToken = null;
+  for (let page = 0; page < 4; page++) {   // ≤4 pages ≈ plenty for one expiry's calls
+    const q = `feed=indicative&type=call&limit=250&expiration_date=${expiry}` + (pageToken ? `&page_token=${encodeURIComponent(pageToken)}` : '');
+    const r = await _get('data.alpaca.markets', `/v1beta1/options/snapshots/${sym}?${q}`, auth.headers);
+    if (!r.ok || !r.json || !r.json.snapshots) return out.length ? out : { error: `snapshots ${r.status}` };
+    for (const [occ, snap] of Object.entries(r.json.snapshots)) {
+      const meta = parseOcc(occ);
+      if (!meta || meta.type !== 'C' || meta.expiry !== expiry) continue;
+      const lq = snap && snap.latestQuote;
+      if (!lq) continue;
+      out.push({ symbol: occ, strike: meta.strike, bid: Number(lq.bp) || 0, ask: Number(lq.ap) || 0 });
+    }
+    pageToken = r.json.next_page_token;
+    if (!pageToken) break;
+  }
+  return out;
+}
+
 /** Indicative quote (mid) for one option contract symbol from the DATA API. */
 async function quoteOption(occSymbol) {
   const auth = _auth();
@@ -203,7 +264,15 @@ async function probe() {
     const q = await quoteOption(contract.symbol);
     legs.push({ depth, strike, contract: contract.symbol, quote: q });
   }
-  return { ...out, data: 'ok', expiry: chain.expiry, legs };
+  // PENNY selection (operator strategy): first ask ≤ 1¢ strike, vol-selective.
+  let penny = null;
+  if (c.pennyEnabled) {
+    const cq = await chainQuotes(c.symbol, chain.expiry);
+    penny = Array.isArray(cq)
+      ? pickPenny(cq, spot, { askMax: c.pennyAskMax, rv10: (g && g.rv10) || null, maxSigma: c.pennyMaxSigma })
+      : { pick: null, reason: cq.error };
+  }
+  return { ...out, data: 'ok', expiry: chain.expiry, legs, penny };
 }
 
 /** Called every scan tick (fail-soft). Opens the shadow at the close window on eligible
@@ -218,15 +287,21 @@ async function tick() {
   const today = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
   const st = _readState();
 
-  // CLOSE WINDOW (15:45–15:59 ET, Mon–Thu): open tonight's shadow LADDER (one leg per depth).
+  // CLOSE WINDOW (15:45–15:59 ET, Mon–Thu): open tonight's shadow LADDER (one leg per depth)
+  // + the vol-selective PENNY leg (entry priced at the ASK — the honest side of a 1¢ market).
   if (dow >= 1 && dow <= 4 && hm >= 1545 && hm <= 1559 && st.lastOpenDate !== today && !st.open) {
     const p = await probe();
     const legs = ((p && p.legs) || []).filter((l) => l.contract && l.quote && l.quote.mid > 0);
     if (p.gates && p.gates.eligible && legs.length) {
       st.open = { date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot,
         legs: legs.map((l) => ({ depth: l.depth, strike: l.strike, contract: l.contract, entry_mid: l.quote.mid })) };
+      if (p.penny && p.penny.pick) {
+        st.open.legs.push({ depth: 'penny', strike: p.penny.pick.strike, contract: p.penny.pick.symbol,
+          entry_mid: p.penny.pick.ask, entry_ask: p.penny.pick.ask, sigma: p.penny.pick.sigma, dist_pct: p.penny.pick.distPct });
+      }
       st.lastOpenDate = today; _writeState(st);
       for (const l of st.open.legs) _append({ phase: 'open', date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot, ...l, gates: p.gates });
+      if (p.penny && !p.penny.pick) _append({ phase: 'skip_penny', date: today, symbol: c.symbol, why: p.penny.reason });
     } else {
       st.lastOpenDate = today; _writeState(st);   // one decision per night
       _append({ phase: 'skip', date: today, symbol: c.symbol, why: (p.gates && p.gates.why) || p.reason || 'no contract/quote', gates: p.gates || null });
@@ -234,13 +309,40 @@ async function tick() {
     return;
   }
 
-  // OPEN WINDOW (09:31–09:50 ET): close a shadow ladder from a PRIOR date, leg by leg.
+  // PENNY WATCH (expiry day, 09:31–15:44 ET): sell the moment the bid clears the target
+  // (> 1¢, default 2¢ = +100% gross); force-settle at the bid (usually 0 → −100%) at
+  // 15:30+ so the book is flat before the next entry window. Runs every tick.
+  if (st.open && Array.isArray(st.open.legs) && st.open.expiry === today && hm >= 931) {
+    const keep = [];
+    for (const l of st.open.legs) {
+      if (l.depth !== 'penny') { keep.push(l); continue; }
+      const q = await quoteOption(l.contract);
+      const bid = (q && q.bid) || 0;
+      if (bid >= c.pennyExitBid) {
+        const pl = ((bid - l.entry_mid) / l.entry_mid) * 100;
+        _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: bid, exit_rule: 'target_bid', pl_pct: +pl.toFixed(1) });
+      } else if (hm >= 1530) {
+        const pl = ((bid - l.entry_mid) / l.entry_mid) * 100;   // usually −100 (bid 0 at expiry)
+        _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: bid, exit_rule: 'expiry', pl_pct: +pl.toFixed(1) });
+      } else {
+        keep.push(l);   // still watching
+      }
+    }
+    st.open.legs = keep;
+    if (!keep.length) st.open = null;
+    _writeState(st);
+  }
+
+  // OPEN WINDOW (09:31–09:50 ET): close the LADDER legs from a PRIOR date at the open
+  // (mid). PENNY legs are deliberately skipped — the intraday watcher above owns them
+  // (they ride until bid ≥ target or expiry settle).
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
     // Back-compat: a pre-ladder single-contract state closes as one leg.
     const legs = Array.isArray(st.open.legs) ? st.open.legs
       : (st.open.contract ? [{ depth: null, strike: st.open.strike, contract: st.open.contract, entry_mid: st.open.entry_mid }] : []);
     const remaining = [];
     for (const l of legs) {
+      if (l.depth === 'penny') { remaining.push(l); continue; }   // watcher's job
       const q = await quoteOption(l.contract);
       if (q && q.mid > 0) {
         const pl = ((q.mid - l.entry_mid) / l.entry_mid) * 100;
@@ -259,4 +361,4 @@ function status() {
   return { ...cfg(), minNights: MIN_N, state: _readState(), measured: summarize(rows), lastRows: rows.slice(-5) };
 }
 
-module.exports = { cfg, gates, pickStrike, summarize, nextTradingDayET, probe, tick, status, LEDGER, MIN_N };
+module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, LEDGER, MIN_N };

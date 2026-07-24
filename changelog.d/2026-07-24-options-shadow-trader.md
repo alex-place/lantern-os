@@ -28,3 +28,15 @@
   an expiry bug: "tomorrow" was computed in UTC, so a late-evening run skipped Friday's
   expiry and priced weekend time value; `nextTradingDayET()` now picks the ET-correct next
   trading day. Live-verified: 5-leg SPY ladder with real bid/asks (741→754 strikes).
+
+- trading/options-shadow: **PENNY mode** (operator strategy) — each eligible night, find
+  the **first strike whose ask ≤ 1¢** via a one-call chain snapshot, and take it **only
+  when tonight's measured vol says the strike is reachable** (distance ≤
+  `OPTIONS_SHADOW_PENNY_MAX_SIGMA`=3 nightly sigmas — the penny-strike distance is the
+  market's implied-vol gauge, so this buys exactly the nights where our vol read exceeds
+  the market's). Exit: an intraday watcher **sells the moment the bid is > 1¢**
+  (`OPTIONS_SHADOW_PENNY_EXIT_BID`=2¢ = +100% gross), else settles at expiry (−100%).
+  Entries priced at the ASK, exits at the BID — the honest sides of a 1¢ market. Ledger
+  rows carry `depth:'penny'` + `sigma`/`dist_pct`, so the penny book is judged on its own
+  measured expectancy. Live-verified: real chain snapshot picked SPY 756 (2.31% OTM) at
+  ask $0.01.
