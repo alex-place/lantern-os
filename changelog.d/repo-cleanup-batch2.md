@@ -8,3 +8,10 @@ the old docker stack (deploy is gh-pages + Railway + GCE, not docker); the Windo
 workflow. Fail-soft server reads verified (mesh→empty, status.js→defaults); all CI gates, model
 registry, and markdown links patched. Windows scheduled-task removal is flagged for the operator
 (several are live production). See docs/ARCHIVE-LEDGER.md.
+
+**Batch 3 (same directive):** all 12 Windows scheduled tasks retired (XMLs archived; deletion
+needs an elevated shell — commands in the session report). Cloudflare tunnel already sunset;
+Discord lounge bot MIGRATED to alex-place/three-doors (PR #2 there) and fully deregistered here
+(MCP curators, surface-registry, server spawn + shutdown, requirements, env, launchers);
+arxiv-harvest and claude-session reaper are now on-demand SKILLS (.claude/skills/) instead of
+scheduled tasks; all task-installer/autostart scripts removed.

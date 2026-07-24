@@ -491,32 +491,7 @@ server.on("error", (error) => {
   throw error;
 });
 
-// ── Discord Bot (optional child process) ──
-let discordBot = null;
-const discordToken = process.env.DISCORD_BOT_TOKEN;
-const discordGuildId = process.env.LANTERN_DISCORD_GUILD_ID;
-if (discordToken && discordGuildId) {
-  const botScript = path.join(repoRoot, "src", "discord_lounge_bot", "bot_v2.py");
-  if (fs.existsSync(botScript)) {
-    const pythonExe = process.platform === "win32" ? "python" : "python3";
-    discordBot = spawn(pythonExe, [botScript], {
-      stdio: "inherit",
-      cwd: repoRoot,
-      env: { ...process.env, DISCORD_BOT_TOKEN: discordToken, LANTERN_DISCORD_GUILD_ID: discordGuildId },
-    });
-    discordBot.on("error", (err) => {
-      console.error(`[Discord Bot] Failed to start: ${err.message}`);
-    });
-    discordBot.on("exit", (code) => {
-      console.log(`[Discord Bot] exited with code ${code}`);
-    });
-    console.log(`[Discord Bot] Spawning ${botScript}`);
-  } else {
-    console.warn(`[Discord Bot] Script not found: ${botScript}`);
-  }
-} else {
-  console.log("[Discord Bot] Skipped (set DISCORD_BOT_TOKEN + LANTERN_DISCORD_GUILD_ID in .env.local to enable)");
-}
+// Discord bot migrated to alex-place/three-doors (operator, 2026-07-24) — no in-process spawn.
 
 // ── MCP child lifecycle (singleton + no-orphan) ─────────────────────────────
 // This same server.js runs as the stable production server AND from any dev /
@@ -671,9 +646,6 @@ if (enableCloudflare) {
 // Graceful shutdown
 function shutdown(signal) {
   console.log(`\n${signal} received. Shutting down...`);
-  if (discordBot && !discordBot.killed) {
-    discordBot.kill("SIGTERM");
-  }
   // Tree-kill MCP children FIRST (before server.close, which can hang on open
   // SSE) so the python grandchild can't be left orphaned holding 8771.
   for (const child of mcpChildren) killMcpChild(child);
@@ -700,7 +672,6 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // Reap child services so a crash never leaves them orphaned holding ports (the
 // documented "children keep squatting ports" 502 failure mode, #2066).
 function reapChildren() {
-  try { if (discordBot && !discordBot.killed) discordBot.kill("SIGTERM"); } catch { /* best-effort */ }
   try { for (const child of mcpChildren) killMcpChild(child); } catch { /* best-effort */ }
   try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
   try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }

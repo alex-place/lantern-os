@@ -167,8 +167,6 @@ python src/mcp_server/server.py
 # GPT Web API (port 3000) — separate Node service
 node services/gpt-web-api/server.js
 
-# Discord bot
-python src/discord_lounge_bot/bot.py
 ```
 
 
@@ -197,7 +195,7 @@ Business logic is split into `apps/lantern-garage/lib/`:
 
 The chat is **ONE assistant**: the **`keystone`** agent defined in `apps/lantern-garage/lib/dream-chat.js` and loaded from `data/contexts/personas.json`. There is no keyword persona routing — `selectAgent()` always resolves the single assistant, and capabilities (documents, web, market data, repo/GitHub) are **real tool calls** from `lib/tool-runner.js` that the model invokes natively, the way Claude/ChatGPT/Gemini work. (The fictional RP personas were removed in #1664; the keyword-scored trader/engineer/job-application/Σ₀ personas and per-message task-lens prompts were removed in the one-assistant refactor. The string `lantern` persists *only* as the internal assistant message-role used by conversation/CSF storage, not as a selectable persona.)
 
-**Only these five skills have real implementations** — note they live in two places: `dream_journal`, `lucid_dreaming`, and `job_application` are backed by a `skills/<name>/SKILL.md` dir; `archive_curator` and `voice_curator` have **no `skills/` dir** — they are implemented in `src/discord_lounge_bot/{archive_curator,voice_curator}.py` and registered in `src/mcp_server/server.py`. All other `skills/*/SKILL.md` entries are design contracts only — do not claim they are live. A "skill" is a capability of the one assistant expressed through tools — never a persona, keyword route, or scripted flow.
+**Only these skills have real implementations** — note they live in two places: `dream_journal`, `lucid_dreaming`, and `job_application` are backed by a `skills/<name>/SKILL.md` dir; `archive_curator` and `voice_curator` migrated to the three-doors repo with the Discord bot (2026-07-24) and are no longer registered here. All other `skills/*/SKILL.md` entries are design contracts only — do not claim they are live. A "skill" is a capability of the one assistant expressed through tools — never a persona, keyword route, or scripted flow.
 
 ### MCP server
 

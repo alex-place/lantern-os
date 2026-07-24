@@ -41,7 +41,7 @@ EXCLUDES = {
     "repo-seeds", "profiles", "ops", "dual-boot", "aws-deployment", "artifacts",
     "offers", "ledger", "infra", "dashboard", "art",
     # Old source trees (preserved in archive; not core docs)
-    "discord_lounge_bot", "mcp_server", "dream_journal",
+    "mcp_server", "dream_journal",
     # Data / runtime dirs
     "data", "archive",
 }

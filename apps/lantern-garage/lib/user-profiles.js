@@ -489,7 +489,7 @@ function linkIdentity(profileId, provider, providerId, email, emailVerified) {
   if (provider === "discord") {
     updates.discordId = pid;
     // Mirror into account-links.jsonl {patreonId, discordId} that the Python bot
-    // (src/discord_lounge_bot/account_link.py) reads directly. `patreonId` here is
+    // (account_link.py — bot migrated to three-doors 2026-07-24) reads directly. `patreonId` here is
     // the canonical profile id (kept named for on-disk/back-compat continuity).
     fs.appendFileSync(
       ACCOUNT_LINKS,
