@@ -142,7 +142,11 @@
       badge.id = 'nav-tier';
       badge.className = 'nav-tier';
       badge.href = '/pricing.html';
-      profileBtn.parentElement.insertBefore(badge, profileBtn);
+      // Lead the actions cluster (leftmost) — sitting between the icon buttons
+      // broke the group up visually (operator, 2026-07-25). flex order pins it
+      // first even when other buttons are reordered/hidden responsively.
+      badge.style.order = '-2';  // beats .nav-menu-toggle's order:-1 on narrow screens
+      profileBtn.parentElement.insertBefore(badge, profileBtn.parentElement.firstChild);
     }
     badge.textContent = label;
     badge.dataset.tier = kind;
