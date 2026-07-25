@@ -13,7 +13,15 @@
   <style>
     .opt-shell { max-width: 1240px; margin: 0 auto; padding: 20px 16px 64px; }
     .opt-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
-    .opt-head h1 { font-size: 22px; margin: 0; }
+    /* The index.html gothic wordmark face (Century Gothic stack) for the page title. */
+    .opt-head h1 { font-size: 26px; margin: 0; font-weight: 700; letter-spacing: -0.01em;
+      font-family: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; }
+    /* Themed thin scrollbars (the volume table's horizontal slider + everything else). */
+    .scrollx, .opt-shell { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .scrollx::-webkit-scrollbar { height: 8px; width: 8px; }
+    .scrollx::-webkit-scrollbar-track { background: transparent; }
+    .scrollx::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+    .scrollx::-webkit-scrollbar-thumb:hover { background: var(--muted); }
     .sym-box { display: flex; align-items: center; gap: 8px; }
     .fld { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
     .btn { padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }

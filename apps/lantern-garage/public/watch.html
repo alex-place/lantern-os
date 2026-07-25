@@ -811,6 +811,19 @@
     .dc-modal{ width:100%; max-width:100%; height:auto; max-height:82vh; border-left:none;
       border-top:1px solid var(--border); border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45); animation:otSlideUp .2s ease; }
   }
+  /* Watch page: the footer row is the NEWS panel — always visible, guests included
+     (the guest/acct-empty collapses above were for the trader's account footer). */
+  body.guest .layout, body.acct-empty .layout{ grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px)) !important; }
+  body.guest .footer, body.acct-empty .footer, body.acct-empty .tp-body{ display:flex !important; }
+  body.acct-empty .tp-body{ display:block !important; }
+  body.guest .footer-resize, body.acct-empty .footer-resize{ display:block !important; }
+  .news-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border)}
+  .news-bar .nb-title{font-family:var(--mono);font-size:12px;color:var(--text0);white-space:nowrap}
+  .news-search{flex:0 1 340px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;color:var(--text0);font-family:var(--mono);font-size:12px;padding:5px 9px;outline:none}
+  .news-search:focus{border-color:var(--blue)}
+  .news-flt{font-family:var(--mono);font-size:11px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+  .news-flt.on{color:var(--blue);border-color:var(--blue)}
+  .news-item .news-sent-pos{color:var(--green)} .news-item .news-sent-neg{color:var(--red)}
 </style>
 </head>
 <body>
@@ -914,6 +927,19 @@
 <!-- Main: ticker cards -->
 <div class="main" role="main" aria-label="Charts">
   <div class="cards-grid" id="cardsGrid"></div>
+</div>
+
+<!-- News panel — fills the layout's third grid row (the trader page keeps its
+     positions footer here; on Watch this row is market news, resizable). -->
+<div class="footer" role="region" aria-label="Market news">
+  <div class="footer-resize" id="footerResize" role="separator" aria-orientation="horizontal" aria-label="Resize the news panel" tabindex="0" title="Drag to resize"></div>
+  <div class="news-bar">
+    <span class="nb-title">📰 MARKET NEWS</span>
+    <input class="news-search" id="newsSearch" placeholder="Search headlines…" aria-label="Search news headlines" oninput="renderNews()">
+    <button class="news-flt" id="newsSymBtn" onclick="toggleNewsSym()" title="Show only news mentioning the selected symbol">All symbols</button>
+    <button class="news-flt" onclick="loadNews(true)" title="Refresh the feed">↻</button>
+  </div>
+  <div class="tp-body" id="newsList"><span class="news-empty">Loading news…</span></div>
 </div>
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
@@ -2701,6 +2727,7 @@ function _fmtNum(v){ return v==null?'—': (+v).toFixed(2); }
 function _fmtPx(v){ return v==null?'—': '$'+(+v).toFixed(2); }
 function _fmtRange(lo,hi){ return (lo==null&&hi==null)?'—': _fmtPx(lo)+' – '+_fmtPx(hi); }
 function renderSymbolInfo(ticker){
+  if(NEWS_SYM_ONLY) renderNews();   // the news filter follows the selection
   const el = document.getElementById('wlInfo'); if(!el) return;
   if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
   const t = wlPrices.find(x=>x.ticker===ticker) || {ticker, price:null, chg_pct:0};
@@ -4260,6 +4287,46 @@ function relTime(iso){
   if(hrs < 24) return hrs+'h ago';
   return Math.round(hrs/24)+'d ago';
 }
+let NEWS = [];            // /api/trading/news/recent records, newest first
+let NEWS_SYM_ONLY = false; // filter to the selected watchlist symbol
+async function loadNews(force){
+  try{
+    const r = await fetch('/api/trading/news/recent?limit=150' + (force ? '&_=' + Date.now() : ''));
+    const d = await r.json();
+    NEWS = Array.isArray(d.records) ? d.records : [];
+  }catch(e){ NEWS = []; }
+  renderNews();
+}
+function toggleNewsSym(){
+  NEWS_SYM_ONLY = !NEWS_SYM_ONLY;
+  const b = document.getElementById('newsSymBtn');
+  if(b){ b.classList.toggle('on', NEWS_SYM_ONLY); b.textContent = NEWS_SYM_ONLY ? (activeTicker||'selected')+' only' : 'All symbols'; }
+  renderNews();
+}
+function renderNews(){
+  const el = document.getElementById('newsList'); if(!el) return;
+  const q = (document.getElementById('newsSearch')?.value||'').trim().toLowerCase();
+  let items = NEWS;
+  if(NEWS_SYM_ONLY && activeTicker){
+    items = items.filter(n => (n.symbols||[]).includes(activeTicker) || (n.headline||'').toUpperCase().includes(activeTicker));
+    const b = document.getElementById('newsSymBtn'); if(b) b.textContent = activeTicker+' only';
+  }
+  if(q) items = items.filter(n => ((n.headline||'')+' '+(n.source||'')).toLowerCase().includes(q));
+  if(!items.length){
+    el.innerHTML = '<span class="news-empty">'+(NEWS.length ? 'No headlines match.' : 'No news yet — the feed fills as the collector runs.')+'</span>';
+    return;
+  }
+  el.innerHTML = items.slice(0,120).map(n=>{
+    const sent = /bullish|positive/i.test(n.text||'') ? '<span class="news-sent-pos">▲</span>'
+               : /bearish|negative/i.test(n.text||'') ? '<span class="news-sent-neg">▼</span>' : '';
+    const syms = (n.symbols||[]).slice(0,4).join(' ');
+    const inner = '<span class="news-head">'+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
+      + '<span class="news-meta">'+newsEsc(n.source||'')+(n.published?' · '+relTime(n.published):'')+(syms?' · '+newsEsc(syms):'')+'</span>';
+    return n.url ? '<a class="news-item" href="'+newsEsc(n.url)+'" target="_blank" rel="noopener noreferrer">'+inner+'</a>'
+                 : '<div class="news-item">'+inner+'</div>';
+  }).join('');
+}
+
 // ── Full refresh (every 30s) ──────────────────────────────────────────────────
 async function fullRefresh(){
   await Promise.all([loadZones(), loadWatchlistPrices(), loadPortfolio(), loadMarketStatus()]);
@@ -4441,6 +4508,8 @@ function startDashboard(){
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   syncRangeButtons(chartTimeframe);
   initFooterResize();
+  loadNews();
+  setInterval(loadNews, 120000);   // news refresh (2 min — the feed itself is slower)
   initWlInfoResize();
   initColumnResizers();
   initChartDrag();
