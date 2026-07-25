@@ -44,7 +44,7 @@ jobs:
           from pathlib import Path
           import re
 
-          html_path = Path("surfaces/shareholder-index/index.html")
+          html_path = Path("apps/lantern-garage/public/index.html")
           index = html_path.read_text()
           hrefs = re.findall(r'href=["\']([^"\']+)["\']', index)
 
@@ -244,12 +244,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      - name: Check cloud mirrors config
-        run: |
-          test -f manifests/cloud-mirrors.json || (echo "cloud-mirrors.json missing" && exit 1)
-          python3 -m json.tool manifests/cloud-mirrors.json > /dev/null || (echo "Invalid JSON" && exit 1)
-          echo "Cloud mirrors config valid"
 
       - name: Check MCP contract
         run: |

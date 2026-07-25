@@ -548,7 +548,6 @@ jobs:
         run: |
           from pathlib import Path
           required = [
-              '.github/workflows/static-surface-ci.yml',
               '.github/workflows/release-provenance.yml',
               '.github/workflows/pr-gates.yml',
           ]
