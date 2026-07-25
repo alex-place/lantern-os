@@ -97,6 +97,10 @@ async function _autoscanTick() {
   // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
   // (no Python spawn / model call — the price collectors keep polling for free).
   if (marketHours || extNow) {
+    // Overnight sleeve book (lib/overnight-trader.js): opt-in (OVERNIGHT_TRADER=1),
+    // dry unless OVERNIGHT_ARM=1. Self-windowing (15:45 enter / 09:31 exit ET) — a
+    // no-op on every other tick. Fail-soft: the scan loop must never die for it.
+    try { await require('../lib/overnight-trader').tick({ bridge: _autoBridge }); } catch (_e) { /* fail-soft */ }
     try {
       traderAgent.cache && (traderAgent.cache['market_scan'] = null); // force fresh each minute
       const scan = await traderAgent.scanMarket();
@@ -319,6 +323,7 @@ const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
 const optionsShadowRoutes = require('./trading/options-shadow');
+const overnightRoutes = require('./trading/overnight');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -369,6 +374,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;
   if (await optionsShadowRoutes(req, res, url, ctx)) return true;
+  if (await overnightRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;

@@ -158,6 +158,57 @@ function _liveGross() {
   } catch (_e) { return 1.0; }
 }
 
+// ── gross mode + financing accounting (23y walk-forward evidence, 2026-07-25) ──
+// Re-measured with REAL financing (Fed Funds + IBKR's 1.5% spread, ACT/360): the
+// static-2× book beat SPY on BOTH CAGR and Sharpe (17.6%/0.79 vs 11.1%/0.66) — the
+// old "leverage doesn't pay" verdict was an artifact of pricier financing assumptions.
+// The brake (0–2×) stays the DEFAULT (best Sharpe 0.96, DD −20%); '2x' is opt-in and,
+// like everything here, paper-gated. Financing/cash-yield are ACCOUNTED in the ledger
+// so the paper track record is honest — un-modeled financing would overstate a levered
+// book by the full borrow cost.
+function grossMode() {
+  const m = String(process.env.SIGMA_GROSS_MODE || 'brake').toLowerCase();
+  return (m === '1x' || m === '2x' || m === 'brake') ? m : 'brake';
+}
+function grossFor(mode) {
+  if (mode === '1x') return 1.0;
+  if (mode === '2x') return 2.0;
+  return _liveGross();                                    // brake (default)
+}
+/** Benchmark (Fed Funds) rate %, cached daily from FRED's keyless CSV; env override
+ *  SIGMA_BENCHMARK_RATE wins; falls back to the last-good/4.5% if offline. */
+let _bmCache = { at: 0, rate: null };
+async function _benchmarkRate() {
+  const env = parseFloat(process.env.SIGMA_BENCHMARK_RATE);
+  if (Number.isFinite(env)) return env;
+  const now = Date.now();
+  if (_bmCache.rate != null && now - _bmCache.at < 24 * 3600 * 1000) return _bmCache.rate;
+  try {
+    const https = require('https');
+    const txt = await new Promise((resolve, reject) => {
+      https.get('https://fred.stlouisfed.org/graph/fredgraph.csv?id=DFF', (r) => {
+        let d = ''; r.on('data', (c) => (d += c)); r.on('end', () => resolve(d));
+      }).on('error', reject).setTimeout(8000, function () { this.destroy(); reject(new Error('timeout')); });
+    });
+    const rows = txt.trim().split('\n');
+    for (let i = rows.length - 1; i > 0; i--) {
+      const v = parseFloat(rows[i].split(',')[1]);
+      if (Number.isFinite(v)) { _bmCache = { at: now, rate: v }; return v; }
+    }
+  } catch (_e) { /* offline → fall through */ }
+  return _bmCache.rate != null ? _bmCache.rate : 4.5;
+}
+/** Daily financing/cash accounting for a gross target. Pure given the rate. */
+function financingFor(gross, equity, benchmarkPct, { spreadPct = 1.5, cashHaircutPct = 0.5 } = {}) {
+  const g = Math.max(0, Math.min(MAX_GROSS, Number(gross) || 0));
+  if (g > 1) {
+    const apr = benchmarkPct + spreadPct;                            // IBKR Pro tier ≈ BM+1.5%
+    return { financing_apr: +apr.toFixed(2), est_daily_cost: +(((g - 1) * equity * apr / 100) / 360).toFixed(2), cash_yield_apr: 0 };
+  }
+  const yieldApr = Math.max(0, benchmarkPct - cashHaircutPct);       // idle cash earns ≈ BM−0.5%
+  return { financing_apr: 0, est_daily_cost: 0, cash_yield_apr: +yieldApr.toFixed(2), est_daily_yield: +(((1 - g) * equity * yieldApr / 100) / 360).toFixed(2) };
+}
+
 // Which Alpaca account this run trades. Two modes:
 //   • no userId  → the Sigma Trader's OWN dedicated account (SIGMA_ALPACA_* keys /
 //     its own OAuth). The classic standalone Sigma book (scheduler, /sigma-trader).
@@ -186,20 +237,22 @@ async function plan({ bandPct = DEFAULT_BAND_PCT, userId } = {}) {
     if (b.length) prices[s] = b[b.length - 1].close;
   }
   const { weights, used, dropped } = targetWeights(closesBySym);
-  const gross = _liveGross();
+  const mode = grossMode();
+  const gross = grossFor(mode);
   // No dedicated Sigma account yet → return the target allocation but no orders, and
   // flag it, so the UI can prompt "connect the Sigma Trader's own account".
   if (!acct) {
     const note = userId
       ? 'No Alpaca account connected for this user. Add your Alpaca paper API keys in Settings → Connections, then switch the active trader to Champion.'
       : 'The Sigma Trader has no dedicated account. Set SIGMA_ALPACA_API_KEY_ID/_SECRET (a SEPARATE Alpaca paper account) or connect one — it will not borrow the day-trader’s book.';
-    return { ok: true, account: 'not_configured', equity: 0, gross, weights, used, dropped, orders: [], targets: {}, note };
+    return { ok: true, account: 'not_configured', equity: 0, gross, gross_mode: mode, weights, used, dropped, orders: [], targets: {}, note };
   }
   const equity = Number(acct.equity) || Number(acct.portfolio_value) || 0;
   const pos = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
   for (const p of pos.positions) if (p.current_price > 0) prices[String(p.symbol).toUpperCase()] = p.current_price;
   const reb = computeRebalance({ equity, gross, weights, prices, positions: pos.positions, bandPct });
-  return { ok: true, account: acct.account_id, env: acct.env || 'paper', equity, gross, weights, used, dropped, prices, positions: pos.positions, ...reb };
+  const financing = financingFor(reb.grossUsed, equity, await _benchmarkRate());
+  return { ok: true, account: acct.account_id, env: acct.env || 'paper', equity, gross, gross_mode: mode, financing, weights, used, dropped, prices, positions: pos.positions, ...reb };
 }
 
 /**
@@ -225,8 +278,8 @@ async function rebalanceNow({ arm = false, bandPct = DEFAULT_BAND_PCT, maxOrders
     const r = await alpaca.placeOrder(uid, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
     results.push({ ...o, cancelledResting: cancelled, status: r && r.status, order_id: r && r.order_id, reason: r && r.reason });
   }
-  logLedger({ event: 'rebalance', account: p.account, equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
+  logLedger({ event: 'rebalance', account: p.account, equity: p.equity, gross: p.gross, gross_mode: p.gross_mode, financing: p.financing, weights: p.weights, orders: results });
   return { ...p, executed: true, results };
 }
 
-module.exports = { UNIVERSE, solve, tangencyDir, targetWeights, computeRebalance, plan, rebalanceNow, _liveGross, LEDGER, MAX_GROSS };
+module.exports = { UNIVERSE, solve, tangencyDir, targetWeights, computeRebalance, plan, rebalanceNow, _liveGross, grossMode, grossFor, financingFor, LEDGER, MAX_GROSS };
