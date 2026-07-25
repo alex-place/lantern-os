@@ -67,5 +67,41 @@ check("unknown budget is treated as affordable (grounds rather than false-halt)"
   assert.strictEqual(r.action, "ground");
 });
 
+// --- M7: attribution loss (docs/research/2026-07-24-owned-math-m7-attribution.md) ---
+
+check("M7: laundered gain — global influx but zero mode-attributed evidence → KILL", () => {
+  // World L: an unrelated feed item arrives every step (evidenceInflux true) while the lasing
+  // mode itself has zero external-innovation coupling. M6's side condition holds → kill.
+  const r = convergeControl({ gainOverLeak: 1.4, evidenceInflux: true, confidenceRising: true, evidenceForMode: false });
+  assert.strictEqual(r.action, "kill");
+  assert.ok(/laundering/.test(r.reason));
+});
+
+check("M7: mode-attributed evidence keeps the anchored laser alive", () => {
+  const r = convergeControl({ gainOverLeak: 1.4, evidenceInflux: true, confidenceRising: true, evidenceForMode: true });
+  assert.notStrictEqual(r.action, "kill");
+});
+
+check("M7: keyed anchor overrides the global bit in BOTH directions (mode-anchored, globally quiet)", () => {
+  // Evidence arrived for this mode but the global bit is off (e.g. aggregator lag): no kill.
+  const r = convergeControl({ gainOverLeak: 1.4, evidenceInflux: false, evidenceForMode: true });
+  assert.notStrictEqual(r.action, "kill");
+});
+
+check("M7: legacy calls (no evidenceForMode) keep the global-fallback reading exactly", () => {
+  const r = convergeControl({ gainOverLeak: 1.5, evidenceInflux: true, confidenceRising: true });
+  assert.notStrictEqual(r.action, "kill");
+  const r2 = convergeControl({ gainOverLeak: 1.5, evidenceInflux: false });
+  assert.strictEqual(r2.action, "kill");
+});
+
+check("M7/F2: converged-but-stale-and-broke halt no longer claims saturation in its reason", () => {
+  const r = convergeControl({ fixedPoint: true, stable: true, groundingDue: true, budgetRemaining: 0 });
+  assert.strictEqual(r.action, "halt_saturated"); // conservative action retained
+  assert.strictEqual(r.saturated, false);
+  assert.ok(!/saturated and grounding/.test(r.reason), "reason must not claim saturation");
+  assert.ok(/stale, not saturated/.test(r.reason));
+});
+
 console.log(failures ? `\n${failures} FAILED` : "\nall passed");
 process.exit(failures ? 1 : 0);

@@ -553,3 +553,6 @@ coverage/
 .nyc_output/
 *.seed
 *.pid.lock
+data/kalshi/settled/
+data/kalshi/mechanism/
+experiments/results/kalshi_mlb_paths.jsonl

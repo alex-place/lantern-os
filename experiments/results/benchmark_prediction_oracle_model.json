@@ -1,0 +1,160 @@
+{
+  "date": "2026-07-24",
+  "status": "PRE-REGISTERED \u2014 a prediction for OUR OWN composed model, before it is fully built/evaluated",
+  "model": {
+    "name": "ORACLE-1.5B",
+    "subtitle": "Sigma-0 reliability-composed, 8GB-served",
+    "is": "a composed serving SYSTEM over a ~1.5B base (NOT a new pretrained checkpoint)",
+    "built_today": [
+      "verified cascade (shipped ADR-0030)",
+      "freshness index (#2926, unwired)",
+      "honesty probe clears gate at 1.5B (measured, assoc AUROC 0.774)",
+      "attribution guard (#2924)"
+    ],
+    "simulated_only": [
+      "foldback repair (rungs A-C)",
+      "the full composed stack end-to-end"
+    ]
+  },
+  "capability_pass_at_1": [
+    {
+      "benchmark": "HumanEval",
+      "base_1.5B": 0.55,
+      "ORACLE-1.5B": {
+        "central": 0.81,
+        "range": [
+          0.76,
+          0.86
+        ]
+      },
+      "frontier_70B_ref": 0.9,
+      "oracle_vs_base_pp": 26.0,
+      "oracle_vs_frontier_pp": -9.0
+    },
+    {
+      "benchmark": "MBPP",
+      "base_1.5B": 0.52,
+      "ORACLE-1.5B": {
+        "central": 0.79,
+        "range": [
+          0.74,
+          0.84
+        ]
+      },
+      "frontier_70B_ref": 0.86,
+      "oracle_vs_base_pp": 27.0,
+      "oracle_vs_frontier_pp": -7.0
+    },
+    {
+      "benchmark": "GSM8K",
+      "base_1.5B": 0.57,
+      "ORACLE-1.5B": {
+        "central": 0.76,
+        "range": [
+          0.67,
+          0.85
+        ]
+      },
+      "frontier_70B_ref": 0.95,
+      "oracle_vs_base_pp": 19.0,
+      "oracle_vs_frontier_pp": -19.0
+    },
+    {
+      "benchmark": "MATH",
+      "base_1.5B": 0.28,
+      "ORACLE-1.5B": {
+        "central": 0.58,
+        "range": [
+          0.46,
+          0.7
+        ]
+      },
+      "frontier_70B_ref": 0.75,
+      "oracle_vs_base_pp": 30.0,
+      "oracle_vs_frontier_pp": -17.0
+    },
+    {
+      "benchmark": "LongMemEval",
+      "base_1.5B": 0.45,
+      "ORACLE-1.5B": {
+        "central": 0.62,
+        "range": [
+          0.5,
+          0.74
+        ]
+      },
+      "frontier_70B_ref": 0.72,
+      "oracle_vs_base_pp": 17.0,
+      "oracle_vs_frontier_pp": -10.0
+    },
+    {
+      "benchmark": "SWE-bench-Ver",
+      "base_1.5B": 0.012,
+      "ORACLE-1.5B": {
+        "central": 0.1,
+        "range": [
+          0,
+          0.22
+        ]
+      },
+      "frontier_70B_ref": 0.55,
+      "oracle_vs_base_pp": 8.8,
+      "oracle_vs_frontier_pp": -45.0
+    }
+  ],
+  "honesty_calibration": {
+    "HaluEval_confident_wrong_rate": {
+      "base_1.5B": 0.42,
+      "ORACLE-1.5B": 0.11,
+      "frontier_70B": 0.28,
+      "note": "base measured-shape ~0.4; ORACLE via probe-filter (AUROC .77-.98) + grounding; frontier calibrated but no activation audit"
+    },
+    "expected_calibration_error": {
+      "base_1.5B": 0.28,
+      "ORACLE-1.5B": 0.08,
+      "frontier_70B": 0.19,
+      "note": "ORACLE reports KNOWN+UNKNOWN envelope, never a bare scalar (anti-42); refuses to collapse"
+    },
+    "abstention_precision_on_unknowns": {
+      "base_1.5B": 0.3,
+      "ORACLE-1.5B": 0.85,
+      "frontier_70B": 0.55,
+      "note": "fraction of 'I don't know / pinned' that are genuinely unanswerable \u2014 the Oracle pin class"
+    }
+  },
+  "cost": {
+    "relative_cost_per_query_frontier=1.0": {
+      "base_1.5B": 0.02,
+      "ORACLE-1.5B": 0.12,
+      "frontier_70B": 1.0
+    },
+    "relative_cost_per_CORRECT_answer": {
+      "base_1.5B": 0.05,
+      "ORACLE-1.5B": 0.197,
+      "frontier_70B": 1.268
+    },
+    "reading": "ORACLE is ~8x cheaper per correct answer than the frontier reference on this mixed workload while trailing it on raw capability \u2014 the reliability-per-dollar axis is the win, not pass@1."
+  },
+  "the_two_axis_thesis": {
+    "axis_A_reliability_per_dollar": "ORACLE cost-per-correct 0.197 vs frontier 1.268 (~6.4x cheaper per correct answer)",
+    "axis_B_honesty": "ORACLE confident-wrong 0.11 vs frontier 0.28 vs base 0.42 \u2014 LEADS both; structurally unavailable to closed frontier models (no activation audit)",
+    "what_ORACLE_does_NOT_claim": "it does NOT beat the 70B frontier on raw pass@1 anywhere (loses MATH 0.58 vs 0.75, SWE 0.10 vs 0.55). Capability scales with parameters; ORACLE is 1.5B."
+  },
+  "falsifiable_core": {
+    "primary": "ORACLE leads BOTH the frontier reference AND base on the honesty axis (confident-wrong, ECE, abstention) while costing <0.15x the frontier per query",
+    "capability_claim_is_modest": "ORACLE > base on every capability row; ORACLE < frontier on every capability row \u2014 a small model does not out-capability a 40x-larger one",
+    "kill": "if ORACLE's confident-wrong rate is NOT below the frontier's, the one owned advantage (white-box honesty) failed to materialize and the product thesis collapses to 'a cheaper, weaker model'"
+  },
+  "honesty_on_this_prediction": {
+    "measured_anchors": [
+      "honesty probe AUROC 0.774-0.980 @1.5B (PR#2849)",
+      "verified cascade 8.3x cheaper (#2798)"
+    ],
+    "biggest_extrapolations": [
+      "confident-wrong reduction from probe AUROC to end-to-end HaluEval score (probe precision != deployment filter precision)",
+      "frontier reference numbers are approx-public, re-verify",
+      "foldback contribution is simulation-only; the capability column inherits that risk"
+    ],
+    "binding_open_input": "real phi on weak-verification workloads (#2928); and the honesty probe surviving ternary serving (#2873) \u2014 if the probe dies at 1.58-bit, axis B on the 8GB box weakens to grounding-gates-only"
+  }
+}

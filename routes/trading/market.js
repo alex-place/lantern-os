@@ -352,8 +352,16 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           return true;
         }
       }
-      const assets = await traderAgent.getAllAssets();
-      let pool = klass ? assets.filter((a) => a.class === klass) : assets;
+      // Alpaca asset universe (the app's primary broker): gives the popup a full
+      // tradable-symbol pool for fuzzy search. traderAgent.getAllAssets() is stubbed to
+      // [] (the IBKR CPAPI has no bulk dump), so without this an Alpaca-only user got
+      // just the single exact-ticker Yahoo probe below.
+      const _alpaca = require('../../lib/alpaca-adapter');
+      let assets = await traderAgent.getAllAssets();
+      if ((!assets || !assets.length) && klass !== 'crypto' && _alpaca.available(getEffectiveUserId(req))) {
+        assets = await _alpaca.listAssets(getEffectiveUserId(req)).catch(() => []);
+      }
+      let pool = klass ? (assets || []).filter((a) => a.class === klass) : (assets || []);
       let results;
       if (!q) {
         results = pool.slice(0, limit);

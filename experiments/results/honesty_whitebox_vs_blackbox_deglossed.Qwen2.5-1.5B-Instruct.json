@@ -1,0 +1,123 @@
+{
+  "date": "2026-07-24",
+  "status": "MEASURED \u2014 valid rerun of the honesty head-to-head on a DE-GLOSSED set",
+  "why_this_rerun": "the HaluEval subset was style-separable (surface-only AUROC 0.9812) -> wedge unmeasurable there",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "n": 294,
+  "n_groups": 224,
+  "arm_A_white_box": {
+    "by_layer": {
+      "L11": {
+        "auroc": 0.713,
+        "fold_sd": 0.0349
+      },
+      "L14": {
+        "auroc": 0.7946,
+        "fold_sd": 0.0241
+      },
+      "L17": {
+        "auroc": 0.8016,
+        "fold_sd": 0.0374
+      },
+      "L20": {
+        "auroc": 0.8349,
+        "fold_sd": 0.0538
+      }
+    },
+    "best_layer": "L20",
+    "auroc": 0.8349
+  },
+  "arms_BC_black_box_raw": {
+    "mean_logprob": 0.6052,
+    "min_logprob": 0.5246,
+    "perplexity": 0.6052,
+    "verbalized_P(True)": 0.7577
+  },
+  "arm_D_black_box_trained": {
+    "auroc": 0.7462,
+    "fold_sd": 0.1076
+  },
+  "best_black_box_any_arm": 0.7577,
+  "wedge_pp": 7.7,
+  "controls": {
+    "surface_degloss": {
+      "auroc": 0.526,
+      "fold_sd": 0.0282
+    },
+    "shuffle_label": {
+      "auroc": 0.4762
+    },
+    "split": "GroupKFold on statement stem (first 4 words) \u2014 stem-sharing pairs never split"
+  },
+  "per_family": {
+    "factual": {
+      "n": 90,
+      "white_box": 0.9659,
+      "black_box_verbalized": 0.9402,
+      "black_box_min_logprob": 0.5556,
+      "surface_control": 0.5825
+    },
+    "assoc": {
+      "n": 84,
+      "white_box": 0.7222,
+      "black_box_verbalized": 0.5899,
+      "black_box_min_logprob": 0.5629,
+      "surface_control": 0.6808
+    },
+    "arith": {
+      "n": 120,
+      "white_box": 0.7393,
+      "black_box_verbalized": 0.695,
+      "black_box_min_logprob": 0.5073,
+      "surface_control": 0.5559
+    }
+  },
+  "gates": {
+    "G_H1_wedge_ge_10pp": {
+      "PASS": false,
+      "white_box": 0.8349,
+      "best_black_box": 0.7577
+    },
+    "G_H2_not_gloss": {
+      "PASS": true,
+      "white_box": 0.8349,
+      "surface": 0.526
+    },
+    "G_H3_no_leakage": {
+      "PASS": true,
+      "shuffle": 0.4762
+    },
+    "VERDICT": "KILL (real) \u2014 de-gloss control passed, but black-box matches white-box: the open-weights honesty wedge is NOT demonstrated"
+  },
+  "honest_scope": {
+    "power": "294 statements / 224 groups \u2014 modest; fold SDs reported",
+    "scale": "1.5B is CONSERVATIVE: the measured ladder showed white-box detectability rises with scale (assoc 0.70->0.92), so an open frontier model should widen any wedge",
+    "no_closed_model": "black-box arm is the signal-class proxy for a closed model of equal capability; no closed frontier model was called"
+  },
+  "post_hoc_per_family_diagnostic": {
+    "note": "POST-HOC, NOT pre-registered \u2014 a lead for the next pre-registration, not a result",
+    "table": {
+      "factual": {
+        "white_box": 0.9659,
+        "surface": 0.5825,
+        "probe_minus_surface_pp": 38.3,
+        "probe_minus_best_blackbox_pp": 2.6
+      },
+      "assoc": {
+        "white_box": 0.7222,
+        "surface": 0.6808,
+        "probe_minus_surface_pp": 4.1,
+        "probe_minus_best_blackbox_pp": 13.2
+      },
+      "arith": {
+        "white_box": 0.7393,
+        "surface": 0.5559,
+        "probe_minus_surface_pp": 18.3,
+        "probe_minus_best_blackbox_pp": 4.4
+      }
+    },
+    "reading": "factual and arith: probe clears the surface control by a wide margin (+38.3pp, +18.3pp) = genuine truth-reading. assoc: probe clears surface by only +4.1pp \u2014 that family is PARTLY GLOSSED (its true/false mean lengths differ 60.2 vs 49.8), so its larger apparent black-box wedge (+13.2pp) is CONFOUNDED with residual style and must NOT be claimed as the wedge appearing."
+  },
+  "bottom_line": "AXIS B NOT DEMONSTRATED at 1.5B. Aggregate wedge +7.7pp vs a pre-registered >=10pp bar, and ~1.4 fold-SDs (sd 0.054) \u2014 direction positive, magnitude below bar and not statistically compelling. Controls clean (surface 0.526, shuffle 0.476) so unlike the HaluEval run this IS a valid measurement of the wedge. Verbalized confidence is a much stronger black-box baseline than the logprob signals (0.758 vs 0.525-0.605), which is what compresses the wedge.",
+  "what_this_costs_the_design": "This is the pre-registered kill condition from the ORACLE-P min/max: the one axis a small open model was claimed to own outright. At 1.5B it is not owned. The pre-specified (BEFORE this run) scale caveat stands \u2014 the measured ladder showed white-box detectability rising with scale (assoc 0.703->0.774->0.924 at 0.5B->1.5B->7B) \u2014 so the 7B open rung is the next test, but that is a PREDICTION, not a rescue. If the wedge fails at 7B too, the product thesis loses its owned advantage and reduces to 'cheaper, weaker'."
+}

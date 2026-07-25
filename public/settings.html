@@ -367,9 +367,9 @@
     const el = $("p-connections");
     if (!profile) return needSignIn(el, "Connections");
     el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p><div class="loading-panel">Checking connections…</div>`;
-    const [ib, al, ref, keys, indeed] = await Promise.all([
+    const [ib, al, ref, keys, indeed, mode, bpref] = await Promise.all([
       api("/api/trading/ibkr/connection"), api("/api/broker/alpaca/status"), api("/api/referral/link"),
-      api("/api/providers/set-key"), api("/api/job/indeed/status"),
+      api("/api/providers/set-key"), api("/api/job/indeed/status"), api("/api/trading/mode"), api("/api/broker/preference"),
     ]);
     const ibLive = ib.body && ib.body.live && ib.body.live.connected;
     const ibCreds = ib.body && ib.body.hasCredentials;
@@ -381,7 +381,41 @@
     const brokerRows = `
       <div class="group-label">Brokerage</div>
       <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
-      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? "Connected — paper trading" : "One-click paper-trading account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn" id="c-al-on">Connect</button>`}</div></div>`;
+      <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? `Connected — paper trading${al.body && al.body.accountNumber ? ` · ${esc(al.body.accountNumber)}` : ""}` : "Paste your Alpaca API keys to trade a paper account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn primary" id="c-al-on">Connect</button>`}</div></div>`;
+
+    // Active-broker switch — WHICH broker the stock day-trader executes through. Only
+    // meaningful when BOTH brokers are connected (else there's nothing to choose). Auto
+    // follows the server default. (Champion always runs on Alpaca regardless.)
+    const bp = bpref.body || {};
+    const bpConn = bp.connected || { alpaca: alConn, ibkr: ibLive };
+    const bothBrokers = bpConn.alpaca && bpConn.ibkr;
+    const curBroker = (bp.preference === "alpaca" || bp.preference === "ibkr") ? bp.preference : "auto";
+    const bEff = bp.effective;
+    const bEffText = (eff, chosen) => {
+      const lbl = eff === "alpaca" ? "⚡ Alpaca" : eff === "ibkr" ? "🔗 IBKR" : null;
+      return lbl ? `${lbl} executes the day-trader's orders now${chosen === "auto" ? " (Auto → server default)" : ""}.` : "Pick which connected broker the day-trader uses.";
+    };
+    const brokerSwitchRow = bothBrokers ? `
+      <div class="group-label">Active broker</div>
+      <div class="row"><div class="rl"><div class="k">Which broker the day-trader uses</div><div class="v" id="b-pref-desc">${bEffText(bEff, curBroker)}</div></div><div class="rc">
+        <div class="seg" id="b-pref">
+          <button data-b="auto" class="${curBroker === "auto" ? "on" : ""}" title="Follow the server default">Auto</button>
+          <button data-b="alpaca" class="${curBroker === "alpaca" ? "on" : ""}">⚡ Alpaca</button>
+          <button data-b="ibkr" class="${curBroker === "ibkr" ? "on" : ""}">🔗 IBKR</button>
+        </div></div></div>` : "";
+
+    // Active-trader switch — one connected account, one active strategy. Shown once a
+    // broker is connected. 📈 Stock = signals + your manual buy/sell; 🏆 Champion = the
+    // automated diversified ETF-allocation book run on your account.
+    const anyBroker = alConn || ibLive;
+    const curMode = (mode.body && mode.body.mode === "champion") ? "champion" : "stock";
+    const traderRow = anyBroker ? `
+      <div class="group-label">Active trader</div>
+      <div class="row"><div class="rl"><div class="k">Which trader runs your account</div><div class="v" id="t-mode-desc">${curMode === "champion" ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)." : "📈 Stock trader — signal entries + your manual buy/sell."}</div></div><div class="rc">
+        <div class="seg" id="t-mode">
+          <button data-m="stock" class="${curMode === "stock" ? "on" : ""}" title="Signals + manual buy/sell">📈 Stock</button>
+          <button data-m="champion" class="${curMode === "champion" ? "on" : ""}" title="Automated ETF allocation book">🏆 Champion</button>
+        </div></div></div>` : "";
 
     const keyRows = `
       <div class="group-label">Your AI keys (bring-your-own)</div>
@@ -395,11 +429,51 @@
       <div class="group-label">Invite</div>
       <div class="row"><div class="rl"><div class="k">Your referral link</div><div class="v">${refUrl ? esc(refUrl) : "Generated once you can refer friends."}</div></div><div class="rc">${refUrl ? `<button class="btn" id="c-copy">Copy</button>` : ""}</div></div>`;
 
-    el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p>${brokerRows}${keyRows}${connectorRows}${inviteRows}
+    el.innerHTML = `<h2>Connections</h2><p class="sub">Brokers, your own AI keys, connectors and your invite link.</p>${brokerRows}${brokerSwitchRow}${traderRow}${keyRows}${connectorRows}${inviteRows}
       <p class="muted-note">Everything here is stored encrypted on the server and never leaves it. Your AI keys let the app run on your own provider quota; brokerage credentials stay server-side (Alpaca paper-only, IBKR paper or live).</p>`;
 
-    const on = $("c-al-on"); if (on) on.onclick = async () => { const o = await api("/api/broker/alpaca/connect", { method: "POST" }); if (o.body && o.body.url) location.href = o.body.url; else renderConnections(); };
-    const off = $("c-al-off"); if (off) off.onclick = async () => { await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    const on = $("c-al-on"); if (on) on.onclick = () => openModal({
+      title: "Connect Alpaca",
+      sub: "Paste the API keys from your Alpaca PAPER account (alpaca.markets → Paper Trading → API Keys). They're encrypted on the server and never shared.",
+      fields: [
+        { name: "keyId", label: "API Key ID", placeholder: "PK…" },
+        { name: "secretKey", label: "Secret Key", type: "password", placeholder: "your secret key" },
+      ],
+      submitLabel: "Connect",
+      onSubmit: async ({ keyId, secretKey }, close) => {
+        if (!keyId.trim() || !secretKey.trim()) return "Enter both your API Key ID and Secret Key.";
+        const o = await api("/api/broker/alpaca/connect-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ keyId: keyId.trim(), secretKey: secretKey.trim(), env: "paper" }) });
+        if (!o.ok) return (o.body && o.body.message) || "Couldn't connect — check your keys and try again.";
+        close(); renderConnections();
+      },
+    });
+    const off = $("c-al-off"); if (off) off.onclick = async () => { if (!confirm("Disconnect Alpaca? Your stored keys will be removed.")) return; await api("/api/broker/alpaca/disconnect", { method: "POST" }); renderConnections(); };
+    // Active-trader switch: POST the choice and update the row IN PLACE (no full re-render).
+    // Active-broker switch: POST the choice and update in place (no full re-render).
+    const bSeg = $("b-pref"); if (bSeg) bSeg.querySelectorAll("button[data-b]").forEach((b) => b.onclick = async () => {
+      if (b.classList.contains("on")) return;
+      const btns = [...bSeg.querySelectorAll("button")];
+      btns.forEach((x) => x.disabled = true);
+      const o = await api("/api/broker/preference", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ broker: b.dataset.b }) });
+      btns.forEach((x) => x.disabled = false);
+      if (!o.ok) { alert("Couldn't switch broker — try again."); return; }
+      const chosen = (o.body && o.body.preference) || b.dataset.b;
+      btns.forEach((x) => x.classList.toggle("on", x.dataset.b === chosen));
+      const d = $("b-pref-desc"); if (d) d.textContent = bEffText(o.body && o.body.effective, chosen);
+    });
+    const tSeg = $("t-mode"); if (tSeg) tSeg.querySelectorAll("button[data-m]").forEach((b) => b.onclick = async () => {
+      if (b.classList.contains("on")) return;
+      const btns = [...tSeg.querySelectorAll("button")];
+      btns.forEach((x) => x.disabled = true);
+      const o = await api("/api/trading/mode", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ mode: b.dataset.m }) });
+      btns.forEach((x) => x.disabled = false);
+      if (!o.ok) { alert("Couldn't switch trader — try again."); return; }
+      const m = (o.body && o.body.mode) || b.dataset.m;
+      btns.forEach((x) => x.classList.toggle("on", x.dataset.m === m));
+      const d = $("t-mode-desc"); if (d) d.textContent = m === "champion"
+        ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)."
+        : "📈 Stock trader — signal entries + your manual buy/sell.";
+    });
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;
       const o = await api("/api/providers/set-key", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: id, key: v.trim() }) });

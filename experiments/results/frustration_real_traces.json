@@ -1,0 +1,744 @@
+{
+  "date": "2026-07-24",
+  "source": "data\\eval\\spiral\\vtd-corpus-all.jsonl",
+  "model": "Qwen/Qwen2.5-Coder-0.5B-Instruct",
+  "n_problems": 120,
+  "global_solve_rate": 0.4583,
+  "estimators": {
+    "n_failing_solutions": 65,
+    "n_tests": 195,
+    "test_pass_rate_in_failing_solutions_p": 0.0923,
+    "phi_hat": 0.0923,
+    "c_hat_mixture": 0.1431,
+    "c_hat_icc_crosscheck": 0.1532,
+    "observed_mixed": 14,
+    "expected_mixed_if_independent": 16.34,
+    "all_or_nothing_fraction": 0.7846
+  },
+  "definitions": {
+    "phi_hat": "mean fraction of individual tests still PASSING in globally-failing solutions (local checks blind to the defect)",
+    "c_hat": "mixture estimator: P(mixed) = (1-c)[1 - p^n - (1-p)^n]; c = P(one root defect decides every test)"
+  },
+  "per_task": [
+    {
+      "id": "mbpp-11",
+      "n_tests": 3,
+      "n_pass": 2,
+      "solved": false
+    },
+    {
+      "id": "mbpp-12",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-14",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-17",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-19",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-20",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-23",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-27",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-28",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-32",
+      "n_tests": 3,
+      "n_pass": 2,
+      "solved": false
+    },
+    {
+      "id": "mbpp-35",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-36",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-37",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-38",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-39",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-40",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-41",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-46",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-49",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-52",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-54",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-58",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-62",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-63",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-64",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-65",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-66",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-67",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-68",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-69",
+      "n_tests": 3,
+      "n_pass": 2,
+      "solved": false
+    },
+    {
+      "id": "mbpp-71",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-72",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-76",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-79",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-80",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-82",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-84",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-85",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-86",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-88",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-89",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-90",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-91",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-92",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-93",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-96",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-97",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-98",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-99",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-100",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-102",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-104",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-105",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-111",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-112",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-113",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-115",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-116",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-120",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-123",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-126",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-127",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-129",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-131",
+      "n_tests": 3,
+      "n_pass": 2,
+      "solved": false
+    },
+    {
+      "id": "mbpp-133",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-135",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-141",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-142",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-153",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-161",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-162",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-163",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-165",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-167",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-168",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-169",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-170",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-171",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-172",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-173",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-174",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-175",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-176",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-179",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-185",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-191",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-192",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    },
+    {
+      "id": "mbpp-194",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-196",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-197",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-199",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-200",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-201",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-203",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-204",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-206",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-207",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-208",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-210",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-212",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-220",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-221",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-222",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-224",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-226",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-227",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-228",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-230",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-232",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-234",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-238",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-240",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-242",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-244",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-247",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-249",
+      "n_tests": 3,
+      "n_pass": 0,
+      "solved": false
+    },
+    {
+      "id": "mbpp-250",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-251",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-252",
+      "n_tests": 3,
+      "n_pass": 3,
+      "solved": true
+    },
+    {
+      "id": "mbpp-253",
+      "n_tests": 3,
+      "n_pass": 1,
+      "solved": false
+    }
+  ]
+}

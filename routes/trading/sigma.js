@@ -23,10 +23,15 @@ const REBAL = new Set(['/api/trading/sigma-trader/rebalance', '/api/trading/cham
 module.exports = async function sigmaRoutes(req, res, url, ctx) {
   const p = url.pathname;
   if (!PLAN.has(p) && !REBAL.has(p)) return false;
-  const { sendJson } = ctx;
+  const { sendJson, getEffectiveUserId } = ctx;
+  // `?mine=1` runs the Champion book on the CURRENT user's own connected account
+  // (Phase 2 — the active-trader switch). Without it, the classic standalone Sigma
+  // book on its own dedicated account (scheduler / operator) is used.
+  const mine = url.searchParams.get('mine') === '1';
+  const userId = mine ? (getEffectiveUserId(req) || 'local-owner') : undefined;
   try {
     if (PLAN.has(p) && req.method === 'GET') {
-      const plan = await sigma.plan();
+      const plan = await sigma.plan({ userId });
       // Attach the scheduler state so the UI shows whether Sigma is running itself.
       let schedule = null;
       try { schedule = require('../../lib/sigma-scheduler').getStatus(); } catch (_e) { /* absent */ }
@@ -34,7 +39,7 @@ module.exports = async function sigmaRoutes(req, res, url, ctx) {
     }
     if (REBAL.has(p) && req.method === 'POST') {
       const arm = url.searchParams.get('arm') === '1';
-      const out = await sigma.rebalanceNow({ arm });
+      const out = await sigma.rebalanceNow({ arm, userId });
       return sendJson(res, out, out.ok === false ? 503 : 200), true;
     }
   } catch (e) {

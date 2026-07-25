@@ -47,7 +47,12 @@ if [ "$SKIP_MONOWORKSTREAM" = "1" ]; then exit 0; fi
 # in-process merger (apps/lantern-garage/lib/pr-watcher.js). Only the slop / secret
 # / consolidation scan below runs here now (SKIP_MONOWORKSTREAM=1 skips it).
 
-# ── Slop scan: inspect staged code files ────────────────────────────────────
+# ── Slop scan: inspect lines ADDED by this commit ───────────────────────────
+# Scans only added diff lines (git diff --cached -U0, '+' lines), NOT whole
+# files: the CI gates (pr-gates.yml secrets-scan / debug-pollution /
+# security-basics) grep '^+' diff lines, and local must match CI — a
+# pre-existing console.log or fixture key in a file you merely touched is
+# master's debt, not this commit's, and used to false-block here.
 slop_fail=0
 
 for file in $(git diff --cached --name-only); do
@@ -57,39 +62,40 @@ for file in $(git diff --cached --name-only); do
     *) continue ;;
   esac
 
-  # Read staged content (not working tree)
-  content=$(git show ":$file" 2>/dev/null) || continue
+  # Lines this commit ADDS ('+' diff lines, minus the '+++' file header)
+  added_lines=$(git diff --cached -U0 -- "$file" | grep '^+' | grep -v '^+++')
+  [ -z "$added_lines" ] && continue
 
   # 1. Hardcoded secrets — pattern: assignment to a key/secret/token/password var
-  if echo "$content" | grep -iqE \
+  if echo "$added_lines" | grep -iqE \
     "(api_key|apikey|api_secret|secret_key|password|passwd|access_token|auth_token|private_key)\s*[=:]\s*['\"][a-zA-Z0-9/+_\-]{12,}['\"]"; then
-    echo "SLOP [secret]: possible hardcoded credential in $file"
+    echo "SLOP [secret]: possible hardcoded credential added in $file"
     echo "  Use environment variables or .env — never commit secrets."
     slop_fail=1
   fi
 
   # 2. Debug pollution — but console.* is the intended interface in test files and
-  # CLI/research tooling, so exempt those (mirrors .github/workflows/slop-check.yml).
+  # CLI/research tooling, so exempt those (mirrors pr-gates.yml debug-pollution).
   case "$file" in
     test/*|tests/*|*/test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) ;;  # console.* expected here (top-level tests/ too, matching pr-gates.yml #1561)
     *)
-      if echo "$content" | grep -qE \
+      if echo "$added_lines" | grep -qE \
         "(^|[^a-zA-Z])(console\.log\(|debugger;|pdb\.set_trace\(\)|breakpoint\(\)|import pdb)"; then
-        echo "SLOP [debug]: debug statement found in $file — remove before committing."
+        echo "SLOP [debug]: debug statement added in $file — remove before committing."
         slop_fail=1
       fi
       ;;
   esac
 
   # 3. SQL injection risk — string-concatenated query
-  if echo "$content" | grep -iqE \
+  if echo "$added_lines" | grep -iqE \
     "(SELECT|INSERT|UPDATE|DELETE).*\+\s*(req\.|params\.|query\.|body\.|args\.)"; then
     echo "SLOP [sqli]: possible SQL string concatenation with user input in $file"
     slop_fail=1
   fi
 
   # 4. eval() / shell injection
-  if echo "$content" | grep -qE \
+  if echo "$added_lines" | grep -qE \
     "(^|[^a-zA-Z])(eval\(|exec\(|os\.system\(|subprocess\.call\([^,]*shell\s*=\s*True)"; then
     echo "SLOP [exec]: unsafe eval/exec/shell call in $file — use safe alternatives."
     slop_fail=1
@@ -98,16 +104,17 @@ done
 
 # 4b. Inline-<script> debug pollution in HTML (#2495). The loop above only scans
 #     .js/.ts/etc, so console.log/debugger left in a page's inline <script> slipped
-#     through (create.html had 8 emoji debug logs). console.log in an .html file only
-#     ever lives in inline JS, so a whole-file scan matches "inline <script>" intent.
-#     Same test/scripts exemption. Mirror in .github/workflows/slop-check.yml.
+#     through (create.html had 8 emoji debug logs). Added lines only, same as the
+#     CI debug-pollution job (which includes '*.html' in its diff scan).
+#     Same test/scripts exemption.
 for file in $(git diff --cached --name-only -- '*.html'); do
   case "$file" in
-    */test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) continue ;;
+    test/*|tests/*|*/test/*|*/tests/*|*.test.*|*.spec.*|test_*|*/test_*|scripts/*|experiments/*) continue ;;
   esac
-  content=$(git show ":$file" 2>/dev/null) || continue
-  if echo "$content" | grep -qE "(^|[^a-zA-Z])(console\.log\(|debugger;)"; then
-    echo "SLOP [debug]: debug statement in an inline <script> of $file — remove before committing (#2495)."
+  added_lines=$(git diff --cached -U0 -- "$file" | grep '^+' | grep -v '^+++')
+  [ -z "$added_lines" ] && continue
+  if echo "$added_lines" | grep -qE "(^|[^a-zA-Z])(console\.log\(|debugger;)"; then
+    echo "SLOP [debug]: debug statement added in an inline <script> of $file — remove before committing (#2495)."
     slop_fail=1
   fi
 done
