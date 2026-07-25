@@ -156,6 +156,60 @@ test('heldSymbols: reads the open overnight legs from state (round-trip)', () =>
   }
 });
 
+test('direction-lock: inverse ETFs are economic shorts on their family', () => {
+  const dl = require('../lib/direction-lock');
+  // holding TQQQ (long QQQ family) → buying SQQQ conflicts, buying QQQ does not
+  const longTech = [{ symbol: 'TQQQ', qty: 100 }];
+  assert.strictEqual(dl.conflicts('SQQQ', longTech).conflict, true);
+  assert.deepStrictEqual(dl.conflicts('SQQQ', longTech).against, ['TQQQ']);
+  assert.strictEqual(dl.conflicts('QQQ', longTech).conflict, false);
+  // holding SQQQ (short QQQ family) → QQQ and TQQQ both conflict
+  const shortTech = [{ symbol: 'SQQQ', qty: 50 }];
+  assert.strictEqual(dl.conflicts('QQQ', shortTech).conflict, true);
+  assert.strictEqual(dl.conflicts('TQQQ', shortTech).conflict, true);
+  // holding SPY → SH and SPXS conflict; QQQ (different family) does not
+  const longSpy = [{ symbol: 'SPY', qty: 10 }];
+  assert.strictEqual(dl.conflicts('SH', longSpy).conflict, true);
+  assert.strictEqual(dl.conflicts('SPXS', longSpy).conflict, true);
+  assert.strictEqual(dl.conflicts('QQQ', longSpy).conflict, false);
+  // cross-family relative value stays allowed: long TQQQ + entering TZA is fine
+  assert.strictEqual(dl.conflicts('TZA', longTech).conflict, false);
+  // unknown single stocks are their own family and never invent conflicts
+  assert.strictEqual(dl.conflicts('AAPL', [{ symbol: 'MSFT', qty: 5 }]).conflict, false);
+  // net exposure decides: SQQQ 300 vs TQQQ 100 → family is net SHORT → TQQQ entry conflicts
+  const net = [{ symbol: 'TQQQ', qty: 100 }, { symbol: 'SQQQ', qty: 300 }];
+  assert.strictEqual(dl.conflicts('TQQQ', net).conflict, true);
+});
+
+test('direction-lock: the intraday engine refuses an entry against family exposure', async () => {
+  const at = require('../lib/auto-trader');
+  const saved = { ...process.env };
+  const buys = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'SQQQ', qty: 200, avg_entry_price: 30, current_price: 30, market_value: 6000 }],
+    getIBKROpenOrders: async () => [{ symbol: 'SQQQ', orderId: 'x', orderType: 'STP', side: 'SELL', status: 'Submitted' }],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { if (/buy/i.test(o.side)) buys.push(o.ticker); return { status: 'placed' }; },
+  };
+  const enter = (sym) => ({ symbol: sym, direction: 'BULLISH', entry_price: 100, convergence: { decision: 'ENTER', p_win: 0.7, size_mult: 1 } });
+  try {
+    process.env.TRADER_AUTO_EXECUTE = '1';
+    process.env.TRADER_REQUIRE_PERSIST = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';
+    process.env.TRADER_ENTRY_KNIFE_FILTER = '0';
+    at._resetCooldowns();
+    const out = await at.runAutoTrade({ signals: [enter('TQQQ'), enter('GLD')] }, { bridge, userId: 'u', now: 1_700_000_000_000 });
+    assert.ok(!buys.includes('TQQQ'), 'TQQQ entry refused while SQQQ is held (QQQ family short)');
+    assert.ok(out.skipped.some((s) => s.symbol === 'TQQQ' && /direction_conflict/.test(s.why)), 'skip reason is direction_conflict');
+    assert.ok(buys.includes('GLD'), 'unrelated family (GLD) still trades');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
 test('sigma grossFor/grossMode: brake default, explicit 1x/2x honored', () => {
   const saved = process.env.SIGMA_GROSS_MODE;
   try {

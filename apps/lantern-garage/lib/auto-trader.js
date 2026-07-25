@@ -549,6 +549,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 
     // ── BULLISH: open a long only if flat. Never pyramid; never sell. ──
     if (held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // DIRECTION LOCK (lib/direction-lock.js): an inverse ETF is an economic short on
+    // its underlying — never open a position whose direction opposes existing family
+    // exposure (e.g. buying SQQQ while long TQQQ/QQQ, or vice versa). Closing is never
+    // blocked; cross-family offsets (TQQQ+TZA) are allowed as relative value.
+    {
+      const dc = require('./direction-lock').conflicts(sym, positions);
+      if (dc.conflict) { out.skipped.push({ ...record, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+') || 'held positions'}` }); continue; }
+    }
     if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }

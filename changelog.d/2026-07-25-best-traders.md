@@ -52,3 +52,13 @@
   discarded: it lives on intraday (SQQQ/SOXS in the #2936 universe) and overnight as the
   SH bear-rally-fade sleeve; only the falsified blanket-inverse-overnight form was
   dropped (oracle ledger `inverse-etf-overnight-test`).
+
+- trading: **direction lock** (`lib/direction-lock.js`) — one account, one direction per
+  underlying FAMILY. Every instrument maps to (underlying, sign) — SQQQ→QQQ-short,
+  SH→SPY-short, SPXL→SPY-long… — and BOTH engines now refuse an ENTRY whose sign opposes
+  existing family exposure (skips logged as `direction_conflict`/`skip_conflict`). Closes
+  the two real contradiction paths the logic review found: the sequential intraday trap
+  (long TQQQ → reversal → also buys SQQQ = hedged-with-fees) and the cross-engine one
+  (intraday SQQQ + the overnight QQQ capitulation long on the same condition). Closing
+  positions is never blocked; cross-family offsets (TQQQ+TZA) remain allowed as relative
+  value — the convex both-ways construct stays the options trader's job.

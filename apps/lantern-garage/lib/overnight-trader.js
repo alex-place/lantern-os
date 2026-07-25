@@ -226,14 +226,21 @@ async function tick({ bridge } = {}) {
     // intraday position, say) — a shared position would make both engines' exits
     // ambiguous about whose shares they're selling.
     let preHeld = {};
+    let posArr = [];
     if (resolved) {
-      const pos = await resolved.facade.getIBKRPositions(c.userId).catch(() => []);
-      for (const p of (pos || [])) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
+      posArr = (await resolved.facade.getIBKRPositions(c.userId).catch(() => [])) || [];
+      for (const p of posArr) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
+    const dlock = require('./direction-lock');
     const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
     const legs = [];
     for (const s of sleeves) {
       if ((preHeld[s.symbol] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
+      // DIRECTION LOCK: never enter against existing family exposure — e.g. the QQQ
+      // capitulation long while the intraday engine holds SQQQ (the same downtrend
+      // condition expressed opposite ways), or SH while the account is long SPY/SPXL.
+      const dc = dlock.conflicts(s.symbol, posArr);
+      if (dc.conflict) { _append({ phase: 'skip_conflict', date: today, symbol: s.symbol, sleeve: s.sleeve, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+')}` }); continue; }
       const px = closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0];
       if (!(px > 0)) continue;
       const qty = Math.max(1, Math.floor(per / px));
