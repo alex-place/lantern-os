@@ -232,3 +232,35 @@ test('sigma financingFor: levered book pays BM+1.5% on borrowed notional; idle c
   assert.strictEqual(f05.financing_apr, 0);
   assert.strictEqual(f05.cash_yield_apr, 3.83);
 });
+
+test('per-sleeve edge bar: the SH fade needs far more live evidence than the default sleeves', () => {
+  const c = { armed: true, edgeGate: true, edgeMinN: 20, edgeMinNBySleeve: { bear_rally_fade: 330 } };
+  assert.strictEqual(ot.minNFor('capitulation_20d_low', c), 20);
+  assert.strictEqual(ot.minNFor('bear_rally_fade', c), 330);
+
+  // 40 profitable nights arms a default sleeve...
+  const sum = { by_sleeve: {
+    capitulation_20d_low: { n: 40, avg_pl_pct: 0.18, verdict: 'positive_edge' },
+    bear_rally_fade:      { n: 40, avg_pl_pct: 0.13, verdict: 'positive_edge' },
+  } };
+  assert.strictEqual(ot.canArm('capitulation_20d_low', sum, c).arm, true);
+  // ...but NOT the fade: 40 << 330, even though summarize() called it 'positive_edge'
+  // using the global minN. The per-sleeve bar must override the verdict label.
+  const fade = ot.canArm('bear_rally_fade', sum, c);
+  assert.strictEqual(fade.arm, false);
+  assert.match(fade.why, /n=40<330/);
+});
+
+test('per-sleeve edge bar: the fade still auto-pauses on a negative live edge once past its bar', () => {
+  const c = { armed: true, edgeGate: true, edgeMinN: 20, edgeMinNBySleeve: { bear_rally_fade: 330 } };
+  const sum = { by_sleeve: { bear_rally_fade: { n: 400, avg_pl_pct: -0.09, verdict: 'negative_edge' } } };
+  const r = ot.canArm('bear_rally_fade', sum, c);
+  assert.strictEqual(r.arm, false);
+  assert.match(r.why, /NEGATIVE/);
+});
+
+test('per-sleeve edge bar: a fade with enough evidence AND a positive edge does arm', () => {
+  const c = { armed: true, edgeGate: true, edgeMinN: 20, edgeMinNBySleeve: { bear_rally_fade: 330 } };
+  const sum = { by_sleeve: { bear_rally_fade: { n: 350, avg_pl_pct: 0.12, verdict: 'positive_edge' } } };
+  assert.strictEqual(ot.canArm('bear_rally_fade', sum, c).arm, true);
+});

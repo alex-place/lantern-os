@@ -43,6 +43,17 @@ function cfg() {
     // evidence. A sleeve whose live expectancy turns NEGATIVE is auto-paused the same way.
     edgeGate: process.env.OVERNIGHT_EDGE_GATE !== '0',
     edgeMinN: n('OVERNIGHT_EDGE_MIN_N', 20),
+    // PER-SLEEVE evidence bar. edgeMinN=20 is far below what detecting these edges actually
+    // requires: a one-sided power calc at alpha=.05 / power=.80 (n = (z_a+z_b)^2 s^2 / d^2)
+    // gives ~155 nights for capitulation (+18bp/night, s~90bp) and ~330 for the bear-rally
+    // fade (13bp/night, s~95bp). The fade is also the ONLY sleeve whose backtest |t| (2.1)
+    // sits BELOW the Harvey-Liu |t|>3.0 bar for a new factor claim under multiple testing, so
+    // it carries the weakest prior and needs the most live evidence before it risks anything.
+    // Raising only the fade here; the others are flagged in the note rather than changed
+    // silently. Override per sleeve with OVERNIGHT_EDGE_MIN_N_FADE.
+    edgeMinNBySleeve: {
+      bear_rally_fade: n('OVERNIGHT_EDGE_MIN_N_FADE', 330),
+    },
     allocPct: n('OVERNIGHT_ALLOC_PCT', 30),             // % of equity deployed across tonight's sleeves
     userId: process.env.OVERNIGHT_USER || process.env.TRADER_AUTO_USER || 'local-owner',
   };
@@ -135,11 +146,20 @@ function summarize(rows, { minN = 20 } = {}) {
   return { n_exits: exits.length, by_sleeve: bySleeve };
 }
 /** May this sleeve place a REAL order right now? Pure. Dry until proven, per sleeve. */
+/** The evidence bar for one sleeve: its own override, else the global default. Pure. */
+function minNFor(sleeve, c) {
+  const per = c && c.edgeMinNBySleeve && c.edgeMinNBySleeve[sleeve];
+  return Number.isFinite(per) ? per : (c && c.edgeMinN) || 20;
+}
 function canArm(sleeve, summary, c) {
   if (!c.armed) return { arm: false, why: 'not armed' };
   if (!c.edgeGate) return { arm: true, why: 'edge gate disabled' };
   const s = summary && summary.by_sleeve && summary.by_sleeve[sleeve];
-  if (!s || s.verdict === 'insufficient_data') return { arm: false, why: 'edge unproven (n=' + ((s && s.n) || 0) + '<' + c.edgeMinN + ') — trading dry to build evidence' };
+  const need = minNFor(sleeve, c);
+  // Check n against THIS sleeve's bar first: summarize() labels verdicts with the global
+  // minN, so a sleeve with a raised bar can read 'positive_edge' on too little evidence.
+  if (!s || s.n < need) return { arm: false, why: 'edge unproven (n=' + ((s && s.n) || 0) + '<' + need + ') — trading dry to build evidence' };
+  if (s.verdict === 'insufficient_data') return { arm: false, why: 'edge unproven (n=' + s.n + '<' + need + ') — trading dry to build evidence' };
   if (s.verdict === 'negative_edge') return { arm: false, why: 'edge measured NEGATIVE live (avg ' + s.avg_pl_pct + '% over n=' + s.n + ') — sleeve auto-paused' };
   return { arm: true, why: 'edge proven live (avg +' + s.avg_pl_pct + '% over n=' + s.n + ')' };
 }
@@ -279,4 +299,4 @@ function heldSymbols() {
   } catch (_e) { return new Set(); }
 }
 
-module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, heldSymbols, tick, status, LEDGER, STATE };
+module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, minNFor, heldSymbols, tick, status, LEDGER, STATE };
