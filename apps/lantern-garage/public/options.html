@@ -22,6 +22,12 @@
     .scrollx::-webkit-scrollbar-track { background: transparent; }
     .scrollx::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
     .scrollx::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
+    .page-tabs { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .pt { font-size: 12px; padding: 5px 12px; color: var(--muted); text-decoration: none; border-right: 1px solid var(--border); white-space: nowrap; }
+    .pt:last-child { border-right: 0; }
+    .pt:hover { color: var(--text); }
+    .pt.on { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
     .sym-box { display: flex; align-items: center; gap: 8px; }
     .fld { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
     .btn { padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
@@ -61,6 +67,9 @@
 <main class="opt-shell">
   <div class="opt-head">
     <h1>Options</h1>
+    <div class="page-tabs" role="navigation" aria-label="Trading pages">
+      <a class="pt" href="/watch.html">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt on" href="/options.html" aria-current="page">Options</a>
+    </div>
     <div class="sym-box">
       <input class="fld" id="sym" value="SPY" maxlength="6" style="width:84px" aria-label="Underlying symbol">
       <button class="btn" onclick="loadAll()">Load</button>

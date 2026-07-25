@@ -193,6 +193,12 @@
   .tp-flat-btn.armed,.tp-flatten-all.armed{background:rgba(255,95,109,.32);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
+  /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
+  .page-tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
+  .pt{font-family:var(--mono);font-size:11.5px;padding:5px 12px;color:var(--text2);text-decoration:none;border-right:1px solid var(--border);white-space:nowrap}
+  .pt:last-child{border-right:0}
+  .pt:hover{color:var(--text0)}
+  .pt.on{color:var(--text0);background:rgba(255,255,255,.07)}
   .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
@@ -836,6 +842,9 @@
 <h1 class="visually-hidden">Unisona Market Watch — tracking watchlist, live charts, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Watch toolbar">
   <div class="logo" title="Unisona Market Watch — tracking, charts, and signals (no trading here)">Unisona<span>Watch</span></div>
+  <div class="page-tabs" role="navigation" aria-label="Trading pages">
+    <a class="pt on" href="/watch.html" aria-current="page">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt" href="/options.html">Options</a>
+  </div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat" title="US equity session status — open, closed, or pre/after hours"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
@@ -893,8 +902,6 @@
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
-  <a href="/stock-trader.html" class="nav-link" title="Open the trading terminal — account, positions, and the AI tradelist"
-    data-hmenu-desc="The trading terminal — account, positions, orders, and the AI tradelist.">📈 Trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
     data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
@@ -937,10 +944,10 @@
 <div class="footer" role="region" aria-label="Market news">
   <div class="footer-resize" id="footerResize" role="separator" aria-orientation="horizontal" aria-label="Resize the news panel" tabindex="0" title="Drag to resize"></div>
   <div class="news-bar">
-    <span class="nb-title">📰 MARKET NEWS</span>
+    <span class="nb-title">MARKET NEWS</span>
     <input class="news-search" id="newsSearch" placeholder="Search headlines…" aria-label="Search news headlines" oninput="renderNews()">
     <button class="news-flt" id="newsSymBtn" onclick="toggleNewsSym()" title="Show only news mentioning the selected symbol">All symbols</button>
-    <button class="news-flt" id="newsBigBtn" onclick="toggleNewsBig()" title="Only the high-impact headlines (the AI news scorer's impact ≥ 75)">⚡ Big news</button>
+    <button class="news-flt" id="newsBigBtn" onclick="toggleNewsBig()" title="Only the high-impact headlines (the AI news scorer's impact ≥ 75)">Big news</button>
     <button class="news-flt" onclick="loadNews(true)" title="Refresh the feed">↻</button>
   </div>
   <div class="tp-body" id="newsList"><span class="news-empty">Loading news…</span></div>
@@ -4334,7 +4341,7 @@ function renderNews(){
                : (dir==='bearish' || /bearish|negative/i.test(n.text||'')) ? '<span class="news-sent-neg">▼</span>' : '';
     const big = (n.impact ?? n.impact_score ?? 0) >= 75;
     const syms = (n.symbols||[]).slice(0,4).join(' ');
-    const inner = '<span class="news-head">'+(big?'⚡ ':'')+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
+    const inner = '<span class="news-head">'+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
       + '<span class="news-meta">'+newsEsc(n.source||'')+(n.published?' · '+relTime(n.published):'')+(syms?' · '+newsEsc(syms):'')+(big?' · <span class="news-impact">HIGH IMPACT</span>':'')+'</span>';
     const cls = 'news-item'+(big?' news-big':'');
     return n.url ? '<a class="'+cls+'" href="'+newsEsc(n.url)+'" target="_blank" rel="noopener noreferrer">'+inner+'</a>'

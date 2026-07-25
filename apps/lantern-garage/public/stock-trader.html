@@ -192,6 +192,12 @@
   .tp-flat-btn.armed,.tp-flatten-all.armed{background:rgba(255,95,109,.32);animation:otArmPulse 1s ease-in-out infinite}
   /* ── Header ── */
   .logo{font-family:var(--display);font-size:15px;font-weight:700;color:var(--green);letter-spacing:.01em;white-space:nowrap}
+  /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
+  .page-tabs{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
+  .pt{font-family:var(--mono);font-size:11.5px;padding:5px 12px;color:var(--text2);text-decoration:none;border-right:1px solid var(--border);white-space:nowrap}
+  .pt:last-child{border-right:0}
+  .pt:hover{color:var(--text0)}
+  .pt.on{color:var(--text0);background:rgba(255,255,255,.07)}
   .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
@@ -817,6 +823,9 @@
 <h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
 <div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
+  <div class="page-tabs" role="navigation" aria-label="Trading pages">
+    <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/options.html">Options</a>
+  </div>
   <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat acct" title="Total account value — cash plus open positions"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
@@ -879,8 +888,6 @@
   <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()"
     title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only."
     data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
-  <a href="/watch.html" class="nav-link" title="Market watch — your tracking watchlist, charts, and signals (no trading)"
-    data-hmenu-desc="Market watch — the tracking page: your watchlist, charts, and signals.">👁 Watch</a>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
   <!-- Trader pill: shows the ACTIVE TRADER (📈 Stock / 🏆 Champion) running your
@@ -2325,8 +2332,9 @@ function editSlot(oldTicker){
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
   if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
-  // The symbol is already Alpaca-validated by the search; add it to the watchlist
-  // so price/zone data flows, then re-render.
+  // The symbol is already Alpaca-validated by the search; charting it also adds it
+  // to the AI tradelist so price/zone data flows — that mutation needs the guard.
+  if(!_tradelistEditGuard()) return;
   try{ await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
   lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
@@ -3359,10 +3367,26 @@ async function loadMyList(force){
 }
 
 // ── Watchlist add/remove ─────────────────────────────────────────────────────
+// Editing the AI tradelist changes what the autopilot trades — warn once per
+// session before the first mutation. The seeded ETF basket is the measured,
+// backtested universe; edits (especially single stocks) are riskier and not
+// recommended for the contest.
+function _tradelistEditGuard(){
+  try{ if(sessionStorage.getItem('tradelist.editWarned')) return true; }catch(e){}
+  const ok = window.confirm(
+    'You are editing the AI tradelist — the set of symbols the autopilot is allowed to trade.\n\n' +
+    'The default ETF basket is the backtested universe the AI’s strategies were measured on. ' +
+    'Changing it is NOT recommended: single stocks and unfamiliar symbols are riskier, ' +
+    'and the AI’s edge estimates may not apply to them.\n\n' +
+    'Continue anyway?');
+  if(ok){ try{ sessionStorage.setItem('tradelist.editWarned','1'); }catch(e){} }
+  return ok;
+}
 async function addWatchlistTicker(){
   const input = document.getElementById('wlAddInput');
   const ticker = (input.value || '').trim().toUpperCase();
   if(!ticker) return;
+  if(!_tradelistEditGuard()) return;
   try{
     const r = await fetch(LIST_API, {
       method: 'POST',
@@ -3383,6 +3407,7 @@ async function addWatchlistTicker(){
 // Add a pre-validated symbol (chosen from the search popup, #1692) to the watchlist.
 async function addWatchlistSymbol(sym){
   if(!sym) return;
+  if(!_tradelistEditGuard()) return;
   try{
     await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
     await loadMyList(true);
@@ -3393,6 +3418,7 @@ async function addWatchlistSymbol(sym){
 
 async function removeWatchlistTicker(ticker, evt){
   if(evt) evt.stopPropagation();
+  if(!_tradelistEditGuard()) return;
   try{
     const r = await fetch(LIST_API+'/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
