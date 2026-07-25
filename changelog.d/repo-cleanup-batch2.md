@@ -15,3 +15,7 @@ Discord lounge bot MIGRATED to alex-place/three-doors (PR #2 there) and fully de
 (MCP curators, surface-registry, server spawn + shutdown, requirements, env, launchers);
 arxiv-harvest and claude-session reaper are now on-demand SKILLS (.claude/skills/) instead of
 scheduled tasks; all task-installer/autostart scripts removed.
+
+**CI alignment (round 2):** stale tests removed with their removed subjects
+(test_cloud_mirrors, test_mcp_tool_parity, test_account_link); the HTML-link gate now guards the
+real product index (server-absolute hrefs mapped to public/, query-string routes skipped).
