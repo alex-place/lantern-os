@@ -549,3 +549,6 @@ data/eval/v1_10/honesty-eval-v1.jsonl
 data/eval/v1_10/honesty-eval-full.jsonl
 data/eval/v1_10/boundary-gsm8k.jsonl
 data/eval/v1_10/v1-sft.jsonl
+data/kalshi/settled/
+data/kalshi/mechanism/
+experiments/results/kalshi_mlb_paths.jsonl

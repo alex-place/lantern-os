@@ -1,0 +1,87 @@
+{
+  "date": "2026-07-25",
+  "status": "PILOT \u2014 thin sample, pre-registered gates; NOT a proven edge",
+  "data_limits": {
+    "markets": 79,
+    "in_sample": 33,
+    "out_of_sample": 46,
+    "no_settlement": "nothing resolved in-window (all active) -> only in-window round trips testable",
+    "no_temporal_oos": "the two daily files cover the same markets -> split is market-level (md5 hash)",
+    "median_market_move_cents": 3
+  },
+  "params": {
+    "JUMP": 4,
+    "LOOKBACK_s": 120,
+    "TP": 3,
+    "SL": 4,
+    "TIMEOUT_s": 900,
+    "band": [
+      20,
+      80
+    ],
+    "COOLDOWN_s": 600
+  },
+  "costs": "cross both ways (buy ask / sell bid) + Kalshi fee ceil(0.07*C*P*(1-P)) on BOTH sides",
+  "in_sample_signal": {
+    "label": "in_sample_fade",
+    "n": 104,
+    "mean_net_cents": -3.817,
+    "total_net_cents": -397,
+    "win_rate": 0.231,
+    "sd": 6.33,
+    "t_stat": -6.15,
+    "exit_reasons": {
+      "take_profit": 60,
+      "stop_loss": 41,
+      "timeout": 3
+    },
+    "median_hold_min": 2.8
+  },
+  "oos_signal": {
+    "label": "oos_fade",
+    "n": 73,
+    "mean_net_cents": -5.37,
+    "total_net_cents": -392,
+    "win_rate": 0.164,
+    "sd": 7.37,
+    "t_stat": -6.22,
+    "exit_reasons": {
+      "take_profit": 35,
+      "stop_loss": 36,
+      "timeout": 2
+    },
+    "median_hold_min": 2.3
+  },
+  "oos_random_control": {
+    "label": "oos_random_control",
+    "n": 90,
+    "mean_net_cents": -5.589,
+    "total_net_cents": -503,
+    "win_rate": 0.0,
+    "sd": 1.55,
+    "t_stat": -34.21,
+    "exit_reasons": {
+      "timeout": 77,
+      "stop_loss": 11,
+      "take_profit": 2
+    },
+    "median_hold_min": 15.1
+  },
+  "gates": {
+    "G1_net_edge_positive": {
+      "PASS": false,
+      "oos_mean_net_cents": -5.37
+    },
+    "G2_beats_random_same_exits": {
+      "PASS": false,
+      "signal": -5.37,
+      "random_control": -5.589,
+      "delta": 0.219
+    },
+    "G3_power_30_trades": {
+      "PASS": true,
+      "oos_trades": 73
+    },
+    "VERDICT": "NO EDGE \u2014 negative net after fees"
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "date": "2026-07-25",
+  "question": "do Kalshi MAKERS profit? realized, on real trades vs real settlements",
+  "method": "every executed trade has a known maker on the opposite side (taker_side is published); settlement is known -> maker P&L is arithmetic, not simulation",
+  "series": {
+    "KXMLBGAME": {
+      "series": "KXMLBGAME",
+      "markets": 59,
+      "trades": 634843,
+      "contracts": 127069628.1,
+      "skipped_rows": 11999,
+      "maker_gross_cents_per_contract": 0.3391,
+      "maker_fee_cents_per_contract": 1.0743,
+      "maker_net_if_maker_pays_fee": -0.7352,
+      "taker_gross_cents_per_contract": -0.3391,
+      "taker_net_after_fee": -1.4134,
+      "per_market_gross_median": -1.4568,
+      "per_market_net_median": -2.2417,
+      "per_market_net_mean": 0.2725,
+      "per_market_net_sd": 16.6843,
+      "t_stat_markets": 0.13,
+      "pct_markets_maker_profitable_net": 49.2
+    },
+    "KXBTC15M": {
+      "series": "KXBTC15M",
+      "markets": 59,
+      "trades": 708000,
+      "contracts": 52034212.2,
+      "skipped_rows": 11999,
+      "maker_gross_cents_per_contract": 0.0932,
+      "maker_fee_cents_per_contract": 0.6753,
+      "maker_net_if_maker_pays_fee": -0.5821,
+      "taker_gross_cents_per_contract": -0.0932,
+      "taker_net_after_fee": -0.7685,
+      "per_market_gross_median": -0.0818,
+      "per_market_net_median": -0.6074,
+      "per_market_net_mean": -0.6479,
+      "per_market_net_sd": 2.7861,
+      "t_stat_markets": -1.79,
+      "pct_markets_maker_profitable_net": 37.3
+    },
+    "KXHIGHNY": {
+      "series": "KXHIGHNY",
+      "markets": 59,
+      "trades": 148499,
+      "contracts": 2871936.0,
+      "skipped_rows": 57,
+      "maker_gross_cents_per_contract": 2.1081,
+      "maker_fee_cents_per_contract": 0.7353,
+      "maker_net_if_maker_pays_fee": 1.3729,
+      "taker_gross_cents_per_contract": -2.1081,
+      "taker_net_after_fee": -2.8434,
+      "per_market_gross_median": 1.922,
+      "per_market_net_median": 1.6619,
+      "per_market_net_mean": 1.2816,
+      "per_market_net_sd": 4.9414,
+      "t_stat_markets": 1.99,
+      "pct_markets_maker_profitable_net": 79.7
+    }
+  },
+  "gates": {
+    "G1_maker_edge_gross": {
+      "PASS": true,
+      "per_series": {
+        "KXMLBGAME": 0.3391,
+        "KXBTC15M": 0.0932,
+        "KXHIGHNY": 2.1081
+      }
+    },
+    "G2_survives_maker_fee": {
+      "PASS": false,
+      "per_series": {
+        "KXMLBGAME": -0.7352,
+        "KXBTC15M": -0.5821,
+        "KXHIGHNY": 1.3729
+      }
+    },
+    "G3_market_level_not_outlier": {
+      "PASS": false,
+      "per_series_median": {
+        "KXMLBGAME": -2.2417,
+        "KXBTC15M": -0.6074,
+        "KXHIGHNY": 1.6619
+      }
+    },
+    "VERDICT": "MAKER EDGE GROSS ONLY \u2014 real but smaller than the fee; viable only with a maker-fee waiver, which must be verified"
+  }
+}
