@@ -251,7 +251,12 @@ async function plan({ bandPct = DEFAULT_BAND_PCT, userId } = {}) {
   const pos = (await alpaca.getPositions(uid).catch(() => null)) || { positions: [] };
   for (const p of pos.positions) if (p.current_price > 0) prices[String(p.symbol).toUpperCase()] = p.current_price;
   const reb = computeRebalance({ equity, gross, weights, prices, positions: pos.positions, bandPct });
-  const financing = financingFor(reb.grossUsed, equity, await _benchmarkRate());
+  // Financing spread is BROKER-SPECIFIC and env-configurable: IBKR Pro ≈ +1.5 (default),
+  // IBKR Lite ≈ +2.5, Alpaca margin ≈ +3.5–4. The 23y re-measure showed the 2× edge
+  // survives even Lite-grade financing (16.5%/yr vs SPY 11.1%), so Alpaca-only users
+  // aren't excluded — they just model THEIR rate honestly here.
+  const _spread = parseFloat(process.env.SIGMA_FINANCING_SPREAD);
+  const financing = financingFor(reb.grossUsed, equity, await _benchmarkRate(), Number.isFinite(_spread) ? { spreadPct: _spread } : {});
   return { ok: true, account: acct.account_id, env: acct.env || 'paper', equity, gross, gross_mode: mode, financing, weights, used, dropped, prices, positions: pos.positions, ...reb };
 }
 

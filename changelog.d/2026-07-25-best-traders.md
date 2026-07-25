@@ -25,3 +25,16 @@
   cash yield (BM−0.5%) when gross<1 — so the paper track record no longer overstates a
   levered book by its un-modeled borrow cost. Still paper-only, SIGMA_ARM-gated, per
   ADR-0028.
+
+- trading/overnight: **per-sleeve edge gate** (`OVERNIGHT_EDGE_GATE`, on by default) — the
+  operator rule "find the edge before entering," enforced in code. Every exit row records
+  an estimated close→open P&L (armed or dry), `summarize()` scores each sleeve's LIVE
+  expectancy, and even when armed a sleeve places real (paper) orders only after its own
+  ledger shows positive expectancy over ≥ `OVERNIGHT_EDGE_MIN_N` (20) nights; a sleeve
+  whose live edge measures negative is auto-paused back to dry. Backtests admit a sleeve
+  to the book; only its live ledger arms it.
+
+- trading/champion: `SIGMA_FINANCING_SPREAD` — the financing spread is broker-specific
+  (IBKR Pro ≈ +1.5 default, Lite ≈ +2.5, Alpaca margin ≈ +3.5–4), so Alpaca-only users
+  model THEIR rate honestly. The 23y re-measure showed the 2× edge survives Lite-grade
+  financing (16.5%/yr vs SPY 11.1%), so nothing about the overlay requires IBKR.

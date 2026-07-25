@@ -74,6 +74,40 @@ test('selectSleeves: composes the book — capitulation long + SH fade from one 
   assert.ok(names.includes('SH:bear_rally_fade'), 'SH fade selected off the SPY signal');
 });
 
+test('edge gate: a sleeve stays DRY until its own ledger proves the edge, and auto-pauses on negative', () => {
+  const c = { armed: true, edgeGate: true, edgeMinN: 20 };
+  const mkRows = (sleeve, n, pl) => Array.from({ length: n }, () => ({ phase: 'exit', sleeve, pl_pct_est: pl }));
+  // unproven (n < minN) → dry
+  let sum = ot.summarize(mkRows('uptrend+notflat', 5, 0.2), { minN: 20 });
+  assert.strictEqual(ot.canArm('uptrend+notflat', sum, c).arm, false);
+  assert.match(ot.canArm('uptrend+notflat', sum, c).why, /unproven/);
+  // proven positive over ≥ minN → armed
+  sum = ot.summarize(mkRows('uptrend+notflat', 25, 0.15), { minN: 20 });
+  assert.strictEqual(ot.canArm('uptrend+notflat', sum, c).arm, true);
+  // measured negative live → auto-paused even though armed
+  sum = ot.summarize(mkRows('capitulation_20d_low', 30, -0.4), { minN: 20 });
+  const g = ot.canArm('capitulation_20d_low', sum, c);
+  assert.strictEqual(g.arm, false);
+  assert.match(g.why, /NEGATIVE/);
+  // a sleeve with NO history at all → dry
+  assert.strictEqual(ot.canArm('bear_rally_fade', sum, c).arm, false);
+  // gate disabled (operator escape hatch) → armed passes through
+  assert.strictEqual(ot.canArm('bear_rally_fade', sum, { ...c, edgeGate: false }).arm, true);
+  // not armed → never places, regardless of evidence
+  assert.strictEqual(ot.canArm('uptrend+notflat', sum, { ...c, armed: false }).arm, false);
+});
+
+test('summarize: per-sleeve verdicts from est. close→open P&L rows', () => {
+  const rows = [
+    ...Array.from({ length: 22 }, () => ({ phase: 'exit', sleeve: 'a', pl_pct_est: 0.1 })),
+    ...Array.from({ length: 3 }, () => ({ phase: 'exit', sleeve: 'b', pl_pct_est: -1 })),
+    { phase: 'enter', sleeve: 'a' },                       // non-exit rows ignored
+  ];
+  const s = ot.summarize(rows, { minN: 20 });
+  assert.strictEqual(s.by_sleeve.a.verdict, 'positive_edge');
+  assert.strictEqual(s.by_sleeve.b.verdict, 'insufficient_data');
+});
+
 test('sigma grossFor/grossMode: brake default, explicit 1x/2x honored', () => {
   const saved = process.env.SIGMA_GROSS_MODE;
   try {

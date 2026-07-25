@@ -37,6 +37,12 @@ function cfg() {
   return {
     enabled: process.env.OVERNIGHT_TRADER === '1',      // opt-in
     armed: process.env.OVERNIGHT_ARM === '1',           // place (paper) orders vs dry-log
+    // "Find the edge BEFORE entering" (operator rule): even when ARMED, a sleeve may
+    // only place real orders after its OWN live ledger shows positive expectancy over
+    // ≥ edgeMinN nights — until then that sleeve keeps trading dry, building the
+    // evidence. A sleeve whose live expectancy turns NEGATIVE is auto-paused the same way.
+    edgeGate: process.env.OVERNIGHT_EDGE_GATE !== '0',
+    edgeMinN: n('OVERNIGHT_EDGE_MIN_N', 20),
     allocPct: n('OVERNIGHT_ALLOC_PCT', 30),             // % of equity deployed across tonight's sleeves
     userId: process.env.OVERNIGHT_USER || process.env.TRADER_AUTO_USER || 'local-owner',
   };
@@ -112,6 +118,35 @@ function _writeState(st) { try { fs.mkdirSync(path.dirname(STATE), { recursive: 
 function _etNow() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); }
 function _etParts() { const et = _etNow(); return { dow: et.getDay(), hm: et.getHours() * 100 + et.getMinutes(), today: `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}` }; }
 
+/** Per-sleeve expectancy from the ledger's own exit rows (est. close→open P&L). */
+function summarize(rows, { minN = 20 } = {}) {
+  const exits = (rows || []).filter((r) => r.phase === 'exit' && typeof r.pl_pct_est === 'number');
+  const bySleeve = {};
+  for (const sl of [...new Set(exits.map((r) => r.sleeve || 'unknown'))]) {
+    const v = exits.filter((r) => (r.sleeve || 'unknown') === sl);
+    const avg = v.reduce((s, r) => s + r.pl_pct_est, 0) / v.length;
+    bySleeve[sl] = {
+      n: v.length,
+      win_pct: +(v.filter((r) => r.pl_pct_est > 0).length / v.length * 100).toFixed(1),
+      avg_pl_pct: +avg.toFixed(3),
+      verdict: v.length < minN ? 'insufficient_data' : avg > 0 ? 'positive_edge' : 'negative_edge',
+    };
+  }
+  return { n_exits: exits.length, by_sleeve: bySleeve };
+}
+/** May this sleeve place a REAL order right now? Pure. Dry until proven, per sleeve. */
+function canArm(sleeve, summary, c) {
+  if (!c.armed) return { arm: false, why: 'not armed' };
+  if (!c.edgeGate) return { arm: true, why: 'edge gate disabled' };
+  const s = summary && summary.by_sleeve && summary.by_sleeve[sleeve];
+  if (!s || s.verdict === 'insufficient_data') return { arm: false, why: 'edge unproven (n=' + ((s && s.n) || 0) + '<' + c.edgeMinN + ') — trading dry to build evidence' };
+  if (s.verdict === 'negative_edge') return { arm: false, why: 'edge measured NEGATIVE live (avg ' + s.avg_pl_pct + '% over n=' + s.n + ') — sleeve auto-paused' };
+  return { arm: true, why: 'edge proven live (avg +' + s.avg_pl_pct + '% over n=' + s.n + ')' };
+}
+function _readLedger() {
+  try { return fs.readFileSync(LEDGER, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch (_e) { return []; }
+}
+
 /** One scheduler tick — called from the autoscan loop (fail-soft). */
 async function tick({ bridge } = {}) {
   const c = cfg();
@@ -122,13 +157,22 @@ async function tick({ bridge } = {}) {
   // EXIT WINDOW (09:31–09:50 ET): flatten last night's legs at ≈the open.
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
     const { brokerFacadeFor } = require('./broker-facade');
+    const yahoo = require('./market-data-yahoo');
     const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
+    // Today's OPEN per held symbol — the est. exit print for EVERY leg (armed or dry),
+    // so the ledger measures each sleeve's live expectancy and feeds the edge gate.
+    const openBySym = {};
+    for (const sym of [...new Set((st.open.legs || []).map((l) => l.symbol))]) {
+      try { const r = await yahoo.getBars(sym, '1d'); const b = ((r && r.bars) || []).slice(-1)[0]; if (b && b.open > 0) openBySym[sym] = b.open; } catch (_e) { /* */ }
+    }
     for (const leg of (st.open.legs || [])) {
-      if (c.armed && resolved && !st.open.dry) {
+      const exitRef = openBySym[leg.symbol] || null;
+      const pl = exitRef && leg.ref_close > 0 ? +(((exitRef - leg.ref_close) / leg.ref_close) * 100).toFixed(3) : null;
+      if (leg.placed && resolved) {
         const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: leg.symbol, side: 'sell', qty: leg.qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-        _append({ phase: 'exit', date: st.open.date, ...leg, status: r && r.status, dry: false });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false });
       } else {
-        _append({ phase: 'exit', date: st.open.date, ...leg, dry: true });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true });
       }
     }
     st.open = null; _writeState(st);
@@ -151,22 +195,27 @@ async function tick({ bridge } = {}) {
     const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
     const account = resolved ? await resolved.facade.getIBKRAccount(c.userId).catch(() => null) : null;
     const equity = (account && Number(account.equity)) || 0;
-    const dry = !c.armed || !resolved || !(equity > 0);
+    const baseDry = !c.armed || !resolved || !(equity > 0);
+    const edge = summarize(_readLedger(), { minN: c.edgeMinN });
     const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
     const legs = [];
     for (const s of sleeves) {
       const px = closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0];
       if (!(px > 0)) continue;
       const qty = Math.max(1, Math.floor(per / px));
+      // Per-sleeve edge gate: a sleeve trades REAL (paper) money only after its own
+      // live ledger proves the edge; until then it runs dry and keeps measuring.
+      const gate = canArm(s.sleeve, edge, c);
+      const placeReal = !baseDry && gate.arm;
       let status = 'dry_run';
-      if (!dry) {
+      if (placeReal) {
         const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: s.symbol, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
         status = (r && r.status) || 'error';
       }
-      legs.push({ symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px });
-      _append({ phase: 'enter', date: today, symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, status, dry });
+      legs.push({ symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
+      _append({ phase: 'enter', date: today, symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, status, dry: !placeReal, edge_gate: gate.why });
     }
-    if (legs.length) { st.open = { date: today, dry, legs }; }
+    if (legs.length) { st.open = { date: today, legs }; }
     _writeState(st);
   }
 }
@@ -176,7 +225,8 @@ function status() {
   const c = cfg();
   let last = [];
   try { last = fs.readFileSync(LEDGER, 'utf8').trim().split('\n').slice(-12).map((l) => JSON.parse(l)); } catch (_e) { /* */ }
-  return { enabled: c.enabled, armed: c.armed, allocPct: c.allocPct, userId: c.userId, state: _readState(), recent: last };
+  return { enabled: c.enabled, armed: c.armed, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
+    edge: summarize(_readLedger(), { minN: c.edgeMinN }), state: _readState(), recent: last };
 }
 
-module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, tick, status, LEDGER };
+module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, tick, status, LEDGER };
