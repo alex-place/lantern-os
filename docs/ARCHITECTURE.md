@@ -45,7 +45,7 @@ implementation of one loop stage.
 | Surface | Entrypoint | Bind | Notes |
 |---|---|---|---|
 | Local web server | [`server.js`](../server.js) | `127.0.0.1:4177` | Default; loopback only (`server.js:69-70`) |
-| Cloud (Railway) | [`cloud-server.js`](../cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim: sets `PORT` so `server.js` binds public |
+| Cloud (GCE) | [`cloud-server.js`](../cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim: sets `PORT` so `server.js` binds public |
 | Dev (hot-reload) | same server, port **4178** | `127.0.0.1:4178` | Dual-boot; current branch worktree |
 | Static UI | `gh-pages` branch (GitHub Actions) | — | Source in `public/` |
 | MCP server | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | `:8771` | Spawned by `server.js:307` |

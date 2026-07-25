@@ -212,7 +212,7 @@ providers require the user's own key. No local LLM in the cloud profile.
 | Claim | Evidence (file:line / commit / PR) | Confidence | Source |
 |---|---|---|---|
 | Public domains are CF tunnels → `localhost:4177` (PC-dependent) | [[unisona-second-domain]] | High | memory |
-| Railway entrypoint runs the whole `server.js` publicly, not a subset | [`cloud-server.js`](../../cloud-server.js) | High | repo |
+| Cloud entrypoint runs the whole `server.js` publicly, not a subset | [`cloud-server.js`](../../cloud-server.js) | High | repo |
 | gh-pages ships the full `public/` as a static mirror with no backend | [`deploy.yml:52`](../../.github/workflows/deploy.yml#L52) | High | repo |
 | `LANTERN_CHAT_ONLY=1` gates only background loops, not the served surface | [`server.js:590`](../../server.js#L590) | High | repo |
 | Core is single-tenant: chat keys are global `process.env`, no per-user path | [`dream-chat.js:911`](../../lib/dream-chat.js#L911) | High | repo |

@@ -241,7 +241,7 @@ on top of CSF.
 ### Cloud vs local
 
 - **Local:** server binds to `127.0.0.1:4177`
-- **Cloud (Railway):** `cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. Railway auto-deploys from `master`.
+- **Cloud (GCE):** `cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. (Railway deploy retired 2026-07-24.)
 - **Static UI:** deployed from `gh-pages` branch via GitHub Actions; source in `public/`.
 
 ### Configuration
