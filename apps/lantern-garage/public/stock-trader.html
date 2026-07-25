@@ -828,11 +828,7 @@
   </div>
   <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
-  <div class="hstat acct" title="Total account value — cash plus open positions"><div class="l">Equity</div><div class="v" id="hEquity">—</div></div>
-  <div class="hstat acct" title="Profit or loss so far today"><div class="l">Day P&L</div><div class="v" id="hDayPnl">—</div></div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
-  <div class="hstat acct" title="How many positions are currently open"><div class="l">Positions</div><div class="v" id="hPos">—</div></div>
-  <div class="hstat" title="US equity session status — open, closed, or pre/after hours"><div class="l">Market</div><div class="v" id="hMkt">—</div></div>
   <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
   <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
@@ -4346,12 +4342,14 @@ async function loadPortfolio(){
     const a  = d.account||{};
     const dayPnl = computeDayPnl(d.positions||[]);
     if(dayPnl != null) a.pnl_today = dayPnl;   // reconcile Day P&L with the visible day moves
-    document.getElementById('hEquity').textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
+    const _he=document.getElementById('hEquity'); if(_he) _he.textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
     const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
-    if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }          // unavailable → honest dash, not +$0
-    else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
-    document.getElementById('hPos').textContent = (d.positions||[]).length;
+    if (pe) {
+      if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }        // unavailable → honest dash, not +$0
+      else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
+    }
+    const _hp=document.getElementById('hPos'); if(_hp) _hp.textContent = (d.positions||[]).length;
     s0Status.equity = a.equity; s0Status.pnl = pnl || 0; s0Status.positions = (d.positions||[]).length;
     renderSigma0Signals();
     renderTpSummary(a);                     // #1712
@@ -4369,7 +4367,7 @@ async function loadMarketStatus(){
     const r = await fetch('/api/trading/market-status');
     const d = await r.json();
     document.getElementById('hVix').textContent = d.vix ? d.vix+' '+d.vix_regime : '—';
-    document.getElementById('hMkt').textContent = d.market||'—';
+    const _hm=document.getElementById('hMkt'); if(_hm) _hm.textContent = d.market||'—';
     s0Status.market = d.market; s0Status.marketOpen = d.market_open; renderSigma0Signals();
     const ms = document.getElementById('mktStatus');
     if(ms) ms.innerHTML = `
@@ -4806,10 +4804,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
   // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
-    // The chart-controls cluster (.hgroup) deliberately STAYS inline on every width
-    // (#2501 item 6): layout/type/timeframe are the most-used mobile controls, and
-    // the header scrolls horizontally — so they sit to the LEFT of the ☰ instead of
-    // hiding inside it.
+    // Header diet (operator, 2026-07-25): layout + timeframe + range stay inline
+    // (the most-used controls); chart type, patterns, and draw live in the ☰ at
+    // every width alongside the other secondary toggles.
+    {sel:'#chartTypeSelect',           narrowOnly:false},
+    {sel:'#patternsToggle',            narrowOnly:false},
+    {sel:'#drawToolSel',               narrowOnly:false},
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
