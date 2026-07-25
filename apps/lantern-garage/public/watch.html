@@ -4,7 +4,8 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Unisona Stock Trader</title>
+<meta name="loop-stage" content="observe">
+<title>Unisona Market Watch</title>
 
 <!-- Apply the saved theme before paint so the global header + light mode don't flash (#1577). -->
 <script>
@@ -374,6 +375,8 @@
   .zone-ladder{position:relative;flex:1 1 auto;min-height:80px;background:var(--bg0);margin:0 14px 10px;border-radius:3px;overflow:hidden;cursor:default}
   /* Order ticket trigger row */
   .order-ticket{display:flex;align-items:center;gap:6px;padding:0 14px 10px}
+  /* WATCH page: tracking only — every BUY/SELL affordance is hidden; trading lives on /stock-trader.html */
+  .order-ticket, .btn-buy, .btn-sell{display:none !important}
   .order-ticket button{flex:1;font-family:var(--mono);font-size:11px;font-weight:600;padding:5px 10px;border-radius:3px;cursor:pointer;border:1px solid transparent;letter-spacing:.05em;transition:background .15s}
   /* #1696: always-vibrant BUY/SELL — bold fill + bright text (no longer relies on
      Σ₀ highlighting to stand out). */
@@ -814,19 +817,34 @@
     .dc-modal{ width:100%; max-width:100%; height:auto; max-height:82vh; border-left:none;
       border-top:1px solid var(--border); border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45); animation:otSlideUp .2s ease; }
   }
+  /* Watch page: the footer row is the NEWS panel — always visible, guests included
+     (the guest/acct-empty collapses above were for the trader's account footer). */
+  body.guest .layout, body.acct-empty .layout{ grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px)) !important; }
+  body.guest .footer, body.acct-empty .footer, body.acct-empty .tp-body{ display:flex !important; }
+  body.acct-empty .tp-body{ display:block !important; }
+  body.guest .footer-resize, body.acct-empty .footer-resize{ display:block !important; }
+  .news-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border)}
+  .news-bar .nb-title{font-family:var(--mono);font-size:12px;color:var(--text0);white-space:nowrap}
+  .news-search{flex:0 1 340px;background:var(--bg0);border:1px solid var(--border);border-radius:7px;color:var(--text0);font-family:var(--mono);font-size:12px;padding:5px 9px;outline:none}
+  .news-search:focus{border-color:var(--blue)}
+  .news-flt{font-family:var(--mono);font-size:11px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+  .news-flt.on{color:var(--blue);border-color:var(--blue)}
+  .news-item .news-sent-pos{color:var(--green)} .news-item .news-sent-neg{color:var(--red)}
+  /* High-impact headlines (collector impact score ≥75) get flagged + a filter chip */
+  .news-item.news-big{border-left:2px solid var(--amber);padding-left:8px;background:rgba(255,180,60,.04)}
+  .news-item.news-big .news-head{font-weight:600}
 </style>
 </head>
 <body>
 <div class="layout">
 
 <!-- Header -->
-<h1 class="visually-hidden">Unisona Stock Trader — live charts, watchlist, and Σ₀ signals</h1>
-<div class="header" role="region" aria-label="Trading toolbar">
-  <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
+<h1 class="visually-hidden">Unisona Market Watch — tracking watchlist, live charts, and Σ₀ signals</h1>
+<div class="header" role="region" aria-label="Watch toolbar">
+  <div class="logo" title="Unisona Market Watch — tracking, charts, and signals (no trading here)">Unisona<span>Watch</span></div>
   <div class="page-tabs" role="navigation" aria-label="Trading pages">
-    <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/options.html">Options</a>
+    <a class="pt on" href="/watch.html" aria-current="page">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt" href="/options.html">Options</a>
   </div>
-  <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
@@ -881,17 +899,8 @@
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
-  <button class="nav-link ovn-toggle" id="ovnToggle" onclick="toggleExtendedHours()"
-    title="Also trade pre-market (04:00–09:30) and after-hours (16:00–20:00 ET). Uses marketable-limit + outside-RTH orders so exits/entries fill in extended hours. OFF = regular hours only."
-    data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
-  <!-- Trader pill: shows the ACTIVE TRADER (📈 Stock / 🏆 Champion) running your
-       connected account, and links to Settings → Connections to add keys / switch. -->
-  <a href="/settings.html#connections" class="nav-link" id="brokerBtn" style="display:none"
-    title="Which trader runs your account — click to add an account or switch traders in Settings"
-    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">📈 Trader</span></a>
-  <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
     data-hmenu-desc="Opens a chat rail beside the charts — ask about markets, symbols, or your positions.">💬 Chat</button>
@@ -906,13 +915,11 @@
 <div class="mobile-view-tabs" role="tablist" aria-label="Switch view">
   <button class="mvt-btn active" data-view="chart" role="tab" aria-selected="true" onclick="setMobileView('chart')">Chart</button>
   <button class="mvt-btn" data-view="tickers" role="tab" aria-selected="false" onclick="setMobileView('tickers')">Tickers</button>
-  <button class="mvt-btn" data-view="positions" role="tab" aria-selected="false" onclick="setMobileView('positions')">Positions</button>
 </div>
 
 <!-- Sidebar -->
-<div class="sidebar" role="complementary" aria-label="AI tradelist">
+<div class="sidebar" role="complementary" aria-label="Watchlist">
   <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
-  <div style="padding:6px 10px 4px;font-size:10.5px;line-height:1.45;color:var(--text2,#8b8b95);border-bottom:1px solid var(--border,#22242e)" title="The autopilot enters ONLY symbols on this list. Your watchlist (Watch page) is tracking-only; manual buy/sell works on any symbol via search.">🤖 AI tradelist — the autopilot trades <b>only</b> these</div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
     <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
@@ -931,28 +938,19 @@
   <div class="cards-grid" id="cardsGrid"></div>
 </div>
 
-<!-- Footer -->
-<div class="footer" style="position:relative">
-  <div class="footer-resize" id="footerResize" role="separator" aria-label="Resize the panel section" tabindex="0" title="Drag to resize"></div>
-  <!-- Account summary row (#1712) -->
-  <div class="tp-summary" id="tpSummary"></div>
-  <!-- Tabs -->
-  <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
-    <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
-    <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
-    <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
+<!-- News panel — fills the layout's third grid row (the trader page keeps its
+     positions footer here; on Watch this row is market news, resizable). -->
+<div class="footer" role="region" aria-label="Market news">
+  <div class="footer-resize" id="footerResize" role="separator" aria-orientation="horizontal" aria-label="Resize the news panel" tabindex="0" title="Drag to resize"></div>
+  <div class="news-bar">
+    <span class="nb-title">MARKET NEWS</span>
+    <input class="news-search" id="newsSearch" placeholder="Search headlines…" aria-label="Search news headlines" oninput="renderNews()">
+    <button class="news-flt" id="newsSymBtn" onclick="toggleNewsSym()" title="Show only news mentioning the selected symbol">All symbols</button>
+    <button class="news-flt" id="newsBigBtn" onclick="toggleNewsBig()" title="Only the high-impact headlines (the AI news scorer's impact ≥ 75)">Big news</button>
+    <button class="news-flt" onclick="loadNews(true)" title="Refresh the feed">↻</button>
   </div>
-  <!-- Tab bodies -->
-  <div class="tp-body">
-    <div class="tp-pane active" id="tp-positions" role="tabpanel" aria-labelledby="tptab-positions" tabindex="0"></div>
-    <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
-  </div>
+  <div class="tp-body" id="newsList"><span class="news-empty">Loading news…</span></div>
 </div>
-
-</div><!-- /layout -->
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
@@ -986,6 +984,24 @@
       </button>
     </form>
   </aside>
+</div>
+
+<!-- Symbol-search popup (#1692) — the markup was lost in the watch/trade page
+     split, which broke "+ Add symbol" here; restored verbatim from the trader. -->
+<div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
+  <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
+    <div class="sym-head">
+      <span aria-hidden="true">🔍</span>
+      <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
+      <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
+    </div>
+    <div class="sym-chips" id="symChips">
+      <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
+      <button type="button" class="sym-chip" data-class="us_equity" onclick="setSymClass('us_equity',this)">Stocks</button>
+      <button type="button" class="sym-chip" data-class="crypto" onclick="setSymClass('crypto',this)">Crypto</button>
+    </div>
+    <div class="sym-results" id="symResults"></div>
+  </div>
 </div>
 
 <!-- Fullscreen ticker chart -->
@@ -1037,115 +1053,7 @@
   </div>
 </div>
 
-<!-- Order ticket -->
-<!-- Symbol-search popup (#1692) -->
-<div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
-  <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
-    <div class="sym-head">
-      <span aria-hidden="true">🔍</span>
-      <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
-      <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
-    </div>
-    <div class="sym-chips" id="symChips">
-      <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
-      <button type="button" class="sym-chip" data-class="us_equity" onclick="setSymClass('us_equity',this)">Stocks</button>
-      <button type="button" class="sym-chip" data-class="crypto" onclick="setSymClass('crypto',this)">Crypto</button>
-    </div>
-    <div class="sym-results" id="symResults"></div>
-  </div>
-</div>
-
-<div class="ot-bg hidden" id="otBg" onclick="if(event.target===this)closeOrderTicket()">
-  <div class="col-resize col-resize-ticket" id="ticketResize" role="separator" aria-orientation="vertical" aria-label="Resize the order panel" tabindex="0" title="Drag to resize the order panel"></div>
-  <div class="ot-modal">
-    <div class="ot-header">
-      <span class="ot-ticker" id="otTickerLabel">—</span>
-      <span class="ot-head-quote" id="otHeadQuote" title="Last price · day change">—</span>
-    </div>
-    <div class="ot-body">
-      <div>
-        <div class="ot-side-row">
-          <div class="ot-side-btn sell" id="otSellBtn" onclick="setOtSide('sell')">
-            <div class="ot-side-label">Sell</div><div id="otSellPrice">—</div>
-          </div>
-          <div class="ot-side-btn buy" id="otBuyBtn" onclick="setOtSide('buy')">
-            <div class="ot-side-label">Buy</div><div id="otBuyPrice">—</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="ot-tabs">
-        <div class="ot-tab" id="otTabMarket" onclick="setOtOrderType('market')">Market</div>
-        <div class="ot-tab" id="otTabLimit" onclick="setOtOrderType('limit')">Limit</div>
-      </div>
-
-      <div class="ot-row" id="otLimitRow" style="display:none">
-        <span class="ot-label">Limit price</span>
-        <input type="number" class="ot-field" id="otLimitPrice" aria-label="Limit price" step="0.01" oninput="renderOrderTicket()">
-      </div>
-
-      <div class="ot-row">
-        <span class="ot-label">Units</span>
-        <input type="number" class="ot-field" id="otQty" aria-label="Quantity" value="1" min="1" step="1" oninput="renderOrderTicket()">
-      </div>
-      <div class="ot-row"><span></span><span class="ot-usd" id="otUsdEquiv">≈ $0.00 USD</span></div>
-      <!-- #2439: risk-based sizing — "risk $X to my stop" → units. Pros size positions
-           by dollars at risk, not share counts. Needs the stop-loss exit enabled. -->
-      <div class="ot-row">
-        <span class="ot-label" title="Auto-size units from dollars risked to the stop">Risk $ → units</span>
-        <input type="number" class="ot-field" id="otRiskUsd" aria-label="Dollars to risk to the stop" placeholder="—" min="0" step="1" oninput="otSizeFromRisk()">
-      </div>
-      <div class="ot-row"><span></span><span class="ot-usd" id="otRiskHint">Enable a stop loss to auto-size</span></div>
-
-      <div class="ot-section">
-        <div class="ot-section-title">Exits</div>
-        <div class="ot-exit-row">
-          <div class="ot-exit-head">
-            <input type="checkbox" id="otTpEnabled" aria-label="Enable take-profit" onchange="otToggleExit('Tp')">
-            <span class="ot-label">Take profit</span>
-          </div>
-          <div class="ot-exit-fields">
-            <label class="ot-fieldcell"><span>Price</span>
-              <input type="number" class="ot-field" id="otTpPrice" aria-label="Take-profit price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('tp')">
-            </label>
-            <label class="ot-fieldcell"><span>Ticks</span>
-              <input type="number" class="ot-field" id="otTpTicks" aria-label="Take-profit ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('tp')">
-            </label>
-          </div>
-        </div>
-        <div class="ot-exit-row">
-          <div class="ot-exit-head">
-            <input type="checkbox" id="otSlEnabled" aria-label="Enable stop-loss" onchange="otToggleExit('Sl')">
-            <span class="ot-label">Stop loss</span>
-          </div>
-          <div class="ot-exit-fields">
-            <label class="ot-fieldcell"><span>Price</span>
-              <input type="number" class="ot-field" id="otSlPrice" aria-label="Stop-loss price" step="0.01" placeholder="0.00" disabled oninput="otSyncFromPrice('sl');otSizeFromRisk()">
-            </label>
-            <label class="ot-fieldcell"><span>Ticks</span>
-              <input type="number" class="ot-field" id="otSlTicks" aria-label="Stop-loss ticks" step="1" placeholder="0" disabled oninput="otSyncFromTicks('sl')">
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div class="ot-section">
-        <div class="ot-section-title">Order info</div>
-        <div class="ot-info-row"><span>Tick size</span><span>$0.01</span></div>
-        <div class="ot-info-row"><span>Tick value</span><span id="otTickValue">$0.00</span></div>
-        <div class="ot-info-row"><span>Trade value</span><span id="otTradeValue">$0.00</span></div>
-      </div>
-
-      <!-- #2445: rapid mode — explicit opt-in; skips confirms + arms Shift+B/S -->
-      <div class="ot-exit-head" style="margin-top:2px">
-        <input type="checkbox" id="otRapid" aria-label="Rapid mode — skip order confirmations" onchange="setRapidMode(this.checked)">
-        <span class="ot-label" title="Skip order confirms; Shift+B / Shift+S fire instant market orders at the last-used quantity">⚡ Rapid mode — no confirms</span>
-      </div>
-
-      <div class="ot-submit" id="otSubmit" onclick="submitOrderTicket()">Buy 1 — MARKET</div>
-    </div>
-  </div>
-</div>
+<div class="ot-bg hidden" id="otBg" style="display:none" aria-hidden="true"></div>
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
@@ -2328,10 +2236,9 @@ function editSlot(oldTicker){
 async function commitSlotSymbol(oldTicker, sym){
   if(!sym || sym===oldTicker) return;
   if(slotCount){ const i = chartSlots.indexOf(oldTicker); if(i>=0) chartSlots[i]=sym; else chartSlots.push(sym); persistSlots(); }
-  // The symbol is already Alpaca-validated by the search; charting it also adds it
-  // to the AI tradelist so price/zone data flows — that mutation needs the guard.
-  if(!_tradelistEditGuard()) return;
-  try{ await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
+  // The symbol is already Alpaca-validated by the search; add it to the watchlist
+  // so price/zone data flows, then re-render.
+  try{ await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})}); await loadMyList(true); }catch(e){}
   lastCardOrder=''; await loadWatchlistPrices({force:true}); await loadZones(); renderCards();
 }
 
@@ -2848,6 +2755,7 @@ function _fmtNum(v){ return v==null?'—': (+v).toFixed(2); }
 function _fmtPx(v){ return v==null?'—': '$'+(+v).toFixed(2); }
 function _fmtRange(lo,hi){ return (lo==null&&hi==null)?'—': _fmtPx(lo)+' – '+_fmtPx(hi); }
 function renderSymbolInfo(ticker){
+  if(NEWS_SYM_ONLY) renderNews();   // the news filter follows the selection
   const el = document.getElementById('wlInfo'); if(!el) return;
   if(!ticker){ el.className='wl-info'; el.innerHTML=''; return; }
   const t = wlPrices.find(x=>x.ticker===ticker) || {ticker, price:null, chg_pct:0};
@@ -3350,10 +3258,9 @@ document.addEventListener('dblclick', function(e){
   renderTicker(dataTicker);
 });
 
-// ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
-// sidebar + cards. /api/trading/watchlist-prices returns the UNION (watchlists +
-// tradelists) so data exists for both pages; we filter to THIS page's list.
-const LIST_API='/api/trading/tradelist'; const LIST_KEY='tradelist';
+// ── Page list (WATCHLIST): this page is TRACKING-ONLY — the user's own watchlist
+// drives the sidebar + cards. Trading lives on /stock-trader.html (AI tradelist).
+const LIST_API='/api/trading/watchlist'; const LIST_KEY='watchlist';
 let MY_LIST=null;
 async function loadMyList(force){
   if(MY_LIST && !force) return MY_LIST;
@@ -3363,28 +3270,12 @@ async function loadMyList(force){
 }
 
 // ── Watchlist add/remove ─────────────────────────────────────────────────────
-// Editing the AI tradelist changes what the autopilot trades — warn once per
-// session before the first mutation. The seeded ETF basket is the measured,
-// backtested universe; edits (especially single stocks) are riskier and not
-// recommended for the contest.
-function _tradelistEditGuard(){
-  try{ if(sessionStorage.getItem('tradelist.editWarned')) return true; }catch(e){}
-  const ok = window.confirm(
-    'You are editing the AI tradelist — the set of symbols the autopilot is allowed to trade.\n\n' +
-    'The default ETF basket is the backtested universe the AI’s strategies were measured on. ' +
-    'Changing it is NOT recommended: single stocks and unfamiliar symbols are riskier, ' +
-    'and the AI’s edge estimates may not apply to them.\n\n' +
-    'Continue anyway?');
-  if(ok){ try{ sessionStorage.setItem('tradelist.editWarned','1'); }catch(e){} }
-  return ok;
-}
 async function addWatchlistTicker(){
   const input = document.getElementById('wlAddInput');
   const ticker = (input.value || '').trim().toUpperCase();
   if(!ticker) return;
-  if(!_tradelistEditGuard()) return;
   try{
-    const r = await fetch(LIST_API, {
+    const r = await fetch('/api/trading/watchlist', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ ticker })
@@ -3403,9 +3294,8 @@ async function addWatchlistTicker(){
 // Add a pre-validated symbol (chosen from the search popup, #1692) to the watchlist.
 async function addWatchlistSymbol(sym){
   if(!sym) return;
-  if(!_tradelistEditGuard()) return;
   try{
-    await fetch(LIST_API, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
+    await fetch('/api/trading/watchlist', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ticker:sym})});
     await loadMyList(true);
     await Promise.all([loadWatchlistPrices({force:true}), loadZones()]);
     renderCards();
@@ -3414,9 +3304,8 @@ async function addWatchlistSymbol(sym){
 
 async function removeWatchlistTicker(ticker, evt){
   if(evt) evt.stopPropagation();
-  if(!_tradelistEditGuard()) return;
   try{
-    const r = await fetch(LIST_API+'/'+encodeURIComponent(ticker), { method: 'DELETE' });
+    const r = await fetch('/api/trading/watchlist/'+encodeURIComponent(ticker), { method: 'DELETE' });
     const result = await r.json();
     if(!r.ok){ _alertToast('Couldn’t remove ticker: ' + (result.error || r.statusText)); return; }
     await loadMyList(true);
@@ -4342,14 +4231,12 @@ async function loadPortfolio(){
     const a  = d.account||{};
     const dayPnl = computeDayPnl(d.positions||[]);
     if(dayPnl != null) a.pnl_today = dayPnl;   // reconcile Day P&L with the visible day moves
-    const _he=document.getElementById('hEquity'); if(_he) _he.textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
+    document.getElementById('hEquity').textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
     const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
-    if (pe) {
-      if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }        // unavailable → honest dash, not +$0
-      else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
-    }
-    const _hp=document.getElementById('hPos'); if(_hp) _hp.textContent = (d.positions||[]).length;
+    if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }          // unavailable → honest dash, not +$0
+    else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
+    document.getElementById('hPos').textContent = (d.positions||[]).length;
     s0Status.equity = a.equity; s0Status.pnl = pnl || 0; s0Status.positions = (d.positions||[]).length;
     renderSigma0Signals();
     renderTpSummary(a);                     // #1712
@@ -4428,6 +4315,64 @@ function relTime(iso){
   if(hrs < 24) return hrs+'h ago';
   return Math.round(hrs/24)+'d ago';
 }
+let NEWS = [];            // /api/trading/news/recent records, newest first
+let NEWS_SYM_ONLY = false; // filter to the selected watchlist symbol
+try { NEWS_SYM_ONLY = localStorage.getItem('watch.newsSym') === '1'; } catch(e) {}
+async function loadNews(force){
+  try{
+    const r = await fetch('/api/trading/news/recent?limit=150' + (force ? '&_=' + Date.now() : ''));
+    const d = await r.json();
+    NEWS = Array.isArray(d.records) ? d.records : [];
+  }catch(e){ NEWS = []; }
+  renderNews();
+}
+function toggleNewsSym(){
+  NEWS_SYM_ONLY = !NEWS_SYM_ONLY;
+  const b = document.getElementById('newsSymBtn');
+  if(b){ b.classList.toggle('on', NEWS_SYM_ONLY); b.textContent = NEWS_SYM_ONLY ? (activeTicker||'selected')+' only' : 'All symbols'; }
+  try { localStorage.setItem('watch.newsSym', NEWS_SYM_ONLY ? '1' : '0'); } catch(e) {}
+  renderNews();
+}
+let NEWS_BIG_ONLY = false; // only high-impact headlines (collector impact ≥ 75)
+try { NEWS_BIG_ONLY = localStorage.getItem('watch.newsBig') === '1'; } catch(e) {}
+function toggleNewsBig(){
+  NEWS_BIG_ONLY = !NEWS_BIG_ONLY;
+  const b = document.getElementById('newsBigBtn');
+  if(b) b.classList.toggle('on', NEWS_BIG_ONLY);
+  try { localStorage.setItem('watch.newsBig', NEWS_BIG_ONLY ? '1' : '0'); } catch(e) {}
+  renderNews();
+}
+// Reflect restored filters on the chips at boot
+(function(){ const b=document.getElementById('newsBigBtn'); if(b&&NEWS_BIG_ONLY) b.classList.add('on');
+  const sb=document.getElementById('newsSymBtn'); if(sb&&NEWS_SYM_ONLY) sb.classList.add('on'); })();
+function renderNews(){
+  const el = document.getElementById('newsList'); if(!el) return;
+  const q = (document.getElementById('newsSearch')?.value||'').trim().toLowerCase();
+  let items = NEWS;
+  if(NEWS_SYM_ONLY && activeTicker){
+    items = items.filter(n => (n.symbols||[]).includes(activeTicker) || (n.headline||'').toUpperCase().includes(activeTicker));
+    const b = document.getElementById('newsSymBtn'); if(b) b.textContent = activeTicker+' only';
+  }
+  if(q) items = items.filter(n => ((n.headline||'')+' '+(n.source||'')).toLowerCase().includes(q));
+  if(NEWS_BIG_ONLY) items = items.filter(n => (n.impact ?? n.impact_score ?? 0) >= 75);
+  if(!items.length){
+    el.innerHTML = '<span class="news-empty">'+(NEWS.length ? 'No headlines match.' : 'No news yet — the feed fills as the collector runs.')+'</span>';
+    return;
+  }
+  el.innerHTML = items.slice(0,120).map(n=>{
+    const dir = n.direction || '';
+    const sent = (dir==='bullish' || /bullish|positive/i.test(n.text||'')) ? '<span class="news-sent-pos">▲</span>'
+               : (dir==='bearish' || /bearish|negative/i.test(n.text||'')) ? '<span class="news-sent-neg">▼</span>' : '';
+    const big = (n.impact ?? n.impact_score ?? 0) >= 75;
+    const syms = (n.symbols||[]).slice(0,4).join(' ');
+    const inner = '<span class="news-head">'+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
+      + '<span class="news-meta">'+newsEsc(n.source||'')+(n.published?' · '+relTime(n.published):'')+(syms?' · '+newsEsc(syms):'')+(big?' · <span class="news-impact">HIGH IMPACT</span>':'')+'</span>';
+    const cls = 'news-item'+(big?' news-big':'');
+    return n.url ? '<a class="'+cls+'" href="'+newsEsc(n.url)+'" target="_blank" rel="noopener noreferrer">'+inner+'</a>'
+                 : '<div class="'+cls+'">'+inner+'</div>';
+  }).join('');
+}
+
 // ── Full refresh (every 30s) ──────────────────────────────────────────────────
 async function fullRefresh(){
   await Promise.all([loadZones(), loadWatchlistPrices(), loadPortfolio(), loadMarketStatus()]);
@@ -4609,6 +4554,8 @@ function startDashboard(){
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
   syncRangeButtons(chartTimeframe);
   initFooterResize();
+  loadNews();
+  setInterval(loadNews, 120000);   // news refresh (2 min — the feed itself is slower)
   initWlInfoResize();
   initColumnResizers();
   initChartDrag();
@@ -4804,9 +4751,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
   // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
-    // Header diet (operator, 2026-07-25): layout + timeframe + range stay inline
-    // (the most-used controls); chart type, patterns, and draw live in the ☰ at
-    // every width alongside the other secondary toggles.
+    // The chart-controls cluster (.hgroup) deliberately STAYS inline on every width
+    // (#2501 item 6): layout/type/timeframe are the most-used mobile controls, and
+    // the header scrolls horizontally — so they sit to the LEFT of the ☰ instead of
+    // hiding inside it.
     {sel:'#chartTypeSelect',           narrowOnly:false},
     {sel:'#patternsToggle',            narrowOnly:false},
     {sel:'#drawToolSel',               narrowOnly:false},
@@ -4998,5 +4946,23 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
 <script src="/js/theme-toggle.js" defer></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
+
+<script>
+// Watch page: TRACKING ONLY. Trading functions are neutralized — buy/sell routes the
+// user to the trading terminal; account/position loaders are no-ops (their DOM is gone).
+function openOrderTicket(){ location.href='/stock-trader.html'; }
+function placeMarketOrder(){ location.href='/stock-trader.html'; }
+function submitOrderTicket(){}
+function closeOrderTicket(){}
+function setRapidMode(){}
+async function loadPortfolio(){}
+async function loadOrders(){}
+async function loadAdvisor(){}
+function computeDayPnl(){}
+function renderPositionsTable(){}
+function refreshBrokerButton(){}
+async function refreshExtendedHours(){}
+function toggleExtendedHours(){}
+</script>
 </body>
 </html>
