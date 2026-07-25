@@ -96,9 +96,9 @@
   body.resizing-col{cursor:ew-resize;user-select:none}
   body.resizing-col .col-resize::before{background:var(--accent)}
   /* Draggable divider to resize the bottom panel section (#1630) */
-  .footer-resize{position:absolute;top:-4px;left:0;right:0;height:8px;cursor:ns-resize;z-index:30}
-  .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:3px;border-radius:3px;background:var(--tv-border)}
-  .footer-resize:hover::before{background:var(--tv-text-secondary)}
+  .footer-resize{position:absolute;top:-4px;left:0;right:0;height:10px;cursor:ns-resize;z-index:30}
+  .footer-resize::before{content:"";position:absolute;left:50%;top:3px;transform:translateX(-50%);width:46px;height:4px;border-radius:3px;background:var(--tv-border,#3a4150)}
+  .footer-resize:hover::before{background:var(--tv-text-secondary,#8892a0)}
   body.resizing-footer{cursor:ns-resize;user-select:none}
   .header{grid-column:1/-1;grid-row:1;background:var(--bg1);border-bottom:1px solid var(--border);box-shadow:0 1px 0 var(--border);display:flex;align-items:center;gap:10px;padding:0 14px;overflow-x:auto;scrollbar-width:none}
   .header::-webkit-scrollbar{height:0}   /* toolbar scrolls if a narrow screen can't fit every control, without a visible bar */
@@ -141,7 +141,7 @@
   #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
   .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
-  .footer{grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  .footer{position:relative;grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
