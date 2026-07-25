@@ -37,6 +37,14 @@ function cfg() {
   return {
     enabled: process.env.OVERNIGHT_TRADER === '1',      // opt-in
     armed: process.env.OVERNIGHT_ARM === '1',           // place (paper) orders vs dry-log
+    // Execution leverage (OVERNIGHT_EXEC=1x|2x|3x): SAME signals, levered ETF
+    // execution. Backtested 2010-03..2026-07 net of slippage (scripts/
+    // overnight-leverage-backtest.js): 3x = 29.3% CAGR / Sharpe 1.24 / maxDD 26%
+    // vs 1x 8.7%/1.02/16% and SPY 12.2%/0.76/34% — and MORE cost-robust (the
+    // per-night edge scales 3x while slippage stays ~1x). Levered ETFs beat
+    // synthetic margin at every level (institutional financing inside the fund).
+    exec: ['1x', '2x', '3x'].includes(String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase())
+      ? String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase() : '1x',
     // "Find the edge BEFORE entering" (operator rule): even when ARMED, a sleeve may
     // only place real orders after its OWN live ledger shows positive expectancy over
     // ≥ edgeMinN nights — until then that sleeve keeps trading dry, building the
@@ -102,6 +110,15 @@ function fadeGate(closes) {
   if (!down) return { pass: false, why: 'not a downtrend' };
   return (closes[i] / closes[i - 1] - 1) >= 0.01 ? { pass: true, rule: 'bear_rally_fade' } : { pass: false, why: 'no ≥+1% rally day' };
 }
+/** Signal symbol → levered execution instrument, per OVERNIGHT_EXEC tier.
+ *  Unmapped symbols (GLD at 2x/3x, IWM at 2x) execute 1x — no levered data/
+ *  backtest support for them. All instruments are covered by direction-lock. */
+const EXEC_MAPS = {
+  '1x': {},
+  '2x': { SPY: 'SSO', QQQ: 'QLD' },
+  '3x': { SPY: 'UPRO', QQQ: 'TQQQ', IWM: 'TNA', SH: 'SPXS' },
+};
+
 /** Tonight's sleeve selection from {SYM: closes[]}. Pure. */
 function selectSleeves(closesBySym) {
   const out = [];
@@ -252,17 +269,33 @@ async function tick({ bridge } = {}) {
       for (const p of posArr) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
     const dlock = require('./direction-lock');
-    const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
+    // Allocation: an explicit OVERNIGHT_ALLOC_PCT pins it; otherwise the capital
+    // allocator's evidence-driven budget for this sleeve owns the number (one book,
+    // one allocator — operator directive 2026-07-26).
+    let allocPct = c.allocPct;
+    if (process.env.OVERNIGHT_ALLOC_PCT === undefined) {
+      try { allocPct = await require('./capital-allocator').budgetPctFor('overnight'); } catch (_e) { /* keep default */ }
+    }
+    const per = (equity > 0 ? equity : 100000) * (allocPct / 100) / sleeves.length;
+    // Levered execution: the signal decides, the exec map picks the instrument.
+    const execMap = EXEC_MAPS[c.exec] || {};
+    const execCloseBySym = {};
+    for (const execSym of new Set(sleeves.map((s) => execMap[s.symbol]).filter(Boolean))) {
+      try { const r = await yahoo.getBars(execSym, '1d'); const b = ((r && r.bars) || []).slice(-1)[0]; if (b && b.close > 0) execCloseBySym[execSym] = b.close; } catch (_e) { /* */ }
+    }
     const legs = [];
     for (const s of sleeves) {
-      if ((preHeld[s.symbol] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
+      const execSym = execMap[s.symbol] || s.symbol;
+      if ((preHeld[execSym] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
       // DIRECTION LOCK: never enter against existing family exposure — e.g. the QQQ
       // capitulation long while the intraday engine holds SQQQ (the same downtrend
       // condition expressed opposite ways), or SH while the account is long SPY/SPXL.
-      const dc = dlock.conflicts(s.symbol, posArr);
-      if (dc.conflict) { _append({ phase: 'skip_conflict', date: today, symbol: s.symbol, sleeve: s.sleeve, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+')}` }); continue; }
-      const px = closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0];
-      if (!(px > 0)) continue;
+      const dc = dlock.conflicts(execSym, posArr);
+      if (dc.conflict) { _append({ phase: 'skip_conflict', date: today, symbol: execSym, sleeve: s.sleeve, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+')}` }); continue; }
+      const px = execSym === s.symbol
+        ? (closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0])
+        : execCloseBySym[execSym];
+      if (!(px > 0)) { _append({ phase: 'skip', date: today, symbol: execSym, sleeve: s.sleeve, why: 'no execution price' }); continue; }
       const qty = Math.max(1, Math.floor(per / px));
       // Per-sleeve edge gate: a sleeve trades REAL (paper) money only after its own
       // live ledger proves the edge; until then it runs dry and keeps measuring.
@@ -270,11 +303,11 @@ async function tick({ bridge } = {}) {
       const placeReal = !baseDry && gate.arm;
       let status = 'dry_run';
       if (placeReal) {
-        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: s.symbol, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
+        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: execSym, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
         status = (r && r.status) || 'error';
       }
-      legs.push({ symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
-      _append({ phase: 'enter', date: today, symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, status, dry: !placeReal, edge_gate: gate.why });
+      legs.push({ symbol: execSym, signal: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
+      _append({ phase: 'enter', date: today, symbol: execSym, signal: s.symbol, sleeve: s.sleeve, exec: c.exec, qty, ref_close: px, status, dry: !placeReal, edge_gate: gate.why });
     }
     if (legs.length) { st.open = { date: today, legs }; }
     _writeState(st);
@@ -286,7 +319,7 @@ function status() {
   const c = cfg();
   let last = [];
   try { last = fs.readFileSync(LEDGER, 'utf8').trim().split('\n').slice(-12).map((l) => JSON.parse(l)); } catch (_e) { /* */ }
-  return { enabled: c.enabled, armed: c.armed, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
+  return { enabled: c.enabled, armed: c.armed, exec: c.exec, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
     edge: summarize(_readLedger(), { minN: c.edgeMinN }), state: _readState(), recent: last };
 }
 
