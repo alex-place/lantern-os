@@ -510,3 +510,35 @@ where any of this repair machinery pays off. So the defensible status is: **a ne
 (K_c ≈ 1/q) and a regime map that no prior method has — strong theory, SOTA-relevant — with the
 empirical SOTA claim gated on (a) a real head-to-head benchmark and (b) a workload in the
 high-φ regime.** That is the honest boundary, stated rather than papered over.
+
+---
+
+## 10. Prior-art correction (2026-07-25, corpus sweep) — LATTS was missed
+
+A corpus query after this note was committed surfaced **LATTS: Locally Adaptive Test-Time
+Scaling** ([arXiv:2509.20368](https://arxiv.org/abs/2509.20368)), which is **closer prior art to
+the foldback mechanism than anything §7 cited** (ToT/LATS, Reflexion, REPOT, classical
+backtracking). LATTS "employs a verifier-based acceptance criterion to decide whether to
+**resample, backtrack, restart, or stop** the generation process," allocating variable compute
+per step from "a precise notion of *local difficulty* derived from the verifier model."
+
+**Recording this as a miss, not burying it.** §7's claim that no prior work adaptively chooses
+between backtrack/restart was too strong: LATTS does exactly that, empirically, and reports
+superior accuracy–compute tradeoffs. What remains unclaimed by LATTS, and is still this note's
+contribution:
+
+1. a **closed-form optimal backup depth** (m\* = −1/ln(1−q) ≈ 1/q, K-independent) — LATTS decides
+   *whether* to backtrack, not *how far*;
+2. the **frustration model** φ, which says *when* backtracking is worth anything and when it is
+   provably worthless (the pre-registered null at φ = 0);
+3. the **regime map** (independent vs causal errors selecting fixed-depth vs root-seeking);
+4. the **error threshold** K_c ≈ 1/q.
+
+**And LATTS sharpens into a testable critique rather than being merely adjacent.** Its control
+signal is a *verifier-derived local difficulty*. This note's central measured quantity is that
+local verification is **blind to frustrated errors** — and φ̂ was measured at **0.80** on
+weak-verification reasoning (vs 0.092 on unit-tested code). Under high φ a locally-derived
+acceptance criterion should systematically *miss* the errors that matter, so LATTS's advantage
+is predicted to concentrate in low-φ regimes. That is a falsifiable prediction about a published
+method, and it is the honest way this note relates to it: not "we did it first," but "here is the
+quantity that decides when their signal works."
