@@ -113,6 +113,18 @@
       <button class="chip" data-n="0" onclick="setStrikes(0)">All</button>
     </div>
     <div id="chainBody" class="muted">Load a symbol to see the chain.</div>
+    <div class="card" id="manualTicket">
+      <b style="font-size:13.5px">Manual paper order</b>
+      <span class="muted" style="margin-left:8px">click any call/put row above to load it — YOUR order on the paper account, the AI has no say in it</span>
+      <div class="chips" style="margin-top:10px">
+        <input class="fld" id="mtContract" placeholder="OCC contract (click a row)" style="width:230px;font-family:ui-monospace,monospace" aria-label="Option contract">
+        <select class="fld" id="mtSide" aria-label="Side"><option value="buy">Buy</option><option value="sell">Sell</option></select>
+        <input class="fld" id="mtQty" value="1" style="width:60px" aria-label="Contracts" title="1-10 contracts">
+        <input class="fld" id="mtLimit" placeholder="limit" style="width:90px" aria-label="Limit price">
+        <button class="btn" onclick="placeManual()">Place paper order</button>
+      </div>
+      <div class="muted" id="mtStatus" style="margin-top:8px"></div>
+    </div>
   </div>
 
   <div id="tab-vol" style="display:none">
@@ -252,9 +264,10 @@ function renderChain(){
       }
       const r = e.rows.get(k); const c = r.call||{}, p = r.put||{};
       const cls = (CHAIN.spot && k < CHAIN.spot ? 'itm-c' : '') + (CHAIN.spot && k > CHAIN.spot ? ' itm-p' : '');
-      const side = (o, sideCls) => `<td class="${sideCls}">${num(o.last)}</td><td class="${sideCls}">${num(o.bid)}</td><td class="${sideCls}">${num(o.ask)}</td>`
-        + `<td class="${sideCls}">${o.delta!=null?num(o.delta,2):'—'}</td>`
-        + `<td class="${sideCls}">${fmtVol(o.volume)}<span class="volbar" style="width:${Math.round(28*(o.volume||0)/maxV)}px"></span></td>`;
+      const side = (o, sideCls) => { const pick = o.contract ? ` onclick="setTicket('${esc(o.contract)}',${o.bid||0},${o.ask||0})" style="cursor:pointer" title="Click to load into the manual ticket"` : '';
+        return `<td class="${sideCls}"${pick}>${num(o.last)}</td><td class="${sideCls}"${pick}>${num(o.bid)}</td><td class="${sideCls}"${pick}>${num(o.ask)}</td>`
+        + `<td class="${sideCls}"${pick}>${o.delta!=null?num(o.delta,2):'—'}</td>`
+        + `<td class="${sideCls}"${pick}>${fmtVol(o.volume)}<span class="volbar" style="width:${Math.round(28*(o.volume||0)/maxV)}px"></span></td>`; };
       rowsHtml += `<tr class="${cls}">${side(c,'cside')}`
         + `<td class="strikeCol">${num(k, k%1?2:0)}</td><td class="strikeCol" style="font-weight:400">${c.implied_volatility!=null?num(c.implied_volatility*100,1)+'%':(p.implied_volatility!=null?num(p.implied_volatility*100,1)+'%':'—')}</td>`
         + `${side(p,'pside')}<td>${fmtVol(p.open_interest)}</td></tr>`;
@@ -383,6 +396,30 @@ function pickSymp(s){
   loadAll();
 }
 document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSymPopup(); });
+
+// ── Manual paper order (the user's OWN ticket — paper account, limit orders) ──
+function setTicket(contract, bid, ask){
+  $('mtContract').value = contract;
+  const side = $('mtSide').value;
+  $('mtLimit').value = (side === 'sell' ? (bid || ask) : (ask || bid) || 0).toFixed(2);
+  $('mtStatus').textContent = 'Loaded ' + contract + ' — bid ' + num(bid) + ' / ask ' + num(ask);
+  $('manualTicket').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+async function placeManual(){
+  const st = $('mtStatus');
+  const body = { contract: $('mtContract').value.trim(), side: $('mtSide').value,
+    qty: parseInt($('mtQty').value, 10) || 1, limit: parseFloat($('mtLimit').value) };
+  if (!body.contract) { st.textContent = 'Pick a contract first — click a row in the chain.'; return; }
+  if (!(body.limit > 0)) { st.textContent = 'Set a limit price.'; return; }
+  st.textContent = 'Placing paper order…';
+  try{
+    const r = await fetch('/api/trading/options/order', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json();
+    if (r.status === 401) { st.innerHTML = 'Sign in to place paper orders — <a href="/auth.html?returnTo=%2Foptions.html">sign in</a>.'; return; }
+    if (!d.ok) { st.textContent = 'Refused — ' + (d.message || d.error || ('HTTP ' + r.status)); return; }
+    st.textContent = '✔ Paper ' + d.side + ' ' + d.qty + '× ' + d.contract + ' @ limit $' + d.limit + ' — ' + d.status + ' (order ' + String(d.order_id).slice(0, 8) + '…)';
+  }catch(e){ st.textContent = 'Failed — ' + e.message; }
+}
 
 // Restore the remembered strike filter + tab, then load.
 for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===N_STRIKES);

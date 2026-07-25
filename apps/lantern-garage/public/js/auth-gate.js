@@ -229,6 +229,13 @@
       // the safe (locked-down) state until the session resolves.
       const isAdminUser = !!(session && session.authenticated && session.role === 'admin');
       document.body.classList.toggle('is-admin', isAdminUser);
+      // Plan classes for tier-gated UI (operator tiering 2026-07-26): Pro+ sees the
+      // Advisor tab / trade terminal; Pilot+ the AI autopilot controls.
+      const _role = String((session && session.role) || 'guest');
+      const _proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(_role);
+      const _pilotPlus = ['pilot','tech_support','admin'].includes(_role);
+      document.body.classList.toggle('is-pro-plus', _proPlus);
+      document.body.classList.toggle('is-pilot-plus', _pilotPlus);
       document.body.classList.toggle('is-guest', !(session && session.authenticated));
       const canTrade = !!(session && session.entitlements && session.entitlements.trade);
       if (!canTrade) hideTradeNav();
