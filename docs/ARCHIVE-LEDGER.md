@@ -17,3 +17,21 @@ external archive with a SHA-256 manifest before removal.
 | `.bak` junk (4) | stale `*.jsonl.bak` at the main checkout | Untracked backups of tracked files | `F:/…/dead-experiments/` |
 
 **Byte-level code dedup:** 0 exact duplicates in the tree (enforced by the CI duplication gate).
+
+### 2026-07-24 (batch 2 — operator directive: "in CI and not on an actual UI → remove")
+
+| Removed | Why | Notes |
+|---|---|---|
+| `assets/brand`, `caad`, `config`, `manifests`, `models`, `research`, `surfaces`, `notebooks` | Legacy scaffolding (shareholder/foundry/dream-journal era), CI-referenced or non-product-UI | Fail-soft server reads confirmed (mesh→empty, status.js→defaults); references + CI gates patched |
+| `lib/pr-watcher.js` + `routes/pr-review.js` | PR-watcher dead — merges are manual now | server.js wiring + surface-registry entry removed |
+| Docker stack (`Dockerfile`, `docker-compose.yml`, `.dockerignore`) | Old — deploy is gh-pages + cloud (`node server.js`) + GCE, not docker | Kept `src/*_rust/Dockerfile` (rust build containers) |
+| `Makefile` | Windows-first; `npm run` scripts replace it | CLAUDE/README/QUICKSTART patched off `make` |
+| `scripts/Deploy-{AWS-ECS,LanternGarageCloud,DiscordBotCloud}.ps1`, `status.ps1`, `eval_humaneval_plt_direct.py`, `.github/workflows/static-surface-ci.yml` | Depend on removed docker/dirs | — |
+
+### 2026-07-24 (batch 3 — same directive)
+
+| Removed | Why | Notes |
+|---|---|---|
+| All 12 Windows scheduled tasks | Tunnel sunset; bot migrated; arxiv/reaper are skills now | XMLs archived to `F:/…/scheduled-tasks/`; deletion needs an elevated shell (block handed to operator) |
+| `src/discord_lounge_bot/` (+ launchers, MCP curator registrations) | Migrated to `alex-place/three-doors` PR #2 | Deregistered: MCP, surface-registry, server spawn/shutdown, requirements, env |
+| Task installers/autostarts (`Register-*`, `*-autostart.ps1`, `Schedule-*`) | Their tasks are gone | Archived to `F:/…/deleted-dirs/task-installers/` |

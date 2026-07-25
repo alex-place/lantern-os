@@ -21,7 +21,6 @@ fi
 # 2. Ensure data directories exist
 mkdir -p "$PROJECT_ROOT/data/archives" \
          "$PROJECT_ROOT/data/logs" \
-         "$PROJECT_ROOT/assets/brand" \
          "$PROJECT_ROOT/assets/incoming"
 
 # 3. Pull/build images and restart

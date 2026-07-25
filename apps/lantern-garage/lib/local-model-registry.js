@@ -90,7 +90,7 @@ const DEFAULTS = [
     toolCalling: false,           // stock Σ₀ has no tool training (see memory)
     vramGB: 3,
     ctxTokens: 8192,
-    taskTypes: ["kernel"],        // KERNEL-ONLY now: keystone-sigma0-plt is the sole local
+    taskTypes: ["kernel"],        // KERNEL-ONLY (PLT registry entry removed 2026-07-24; Qwen is the local
                                   // coder/default (the LoopCoder-lineage Σ₀ model). Ouro stays
                                   // the strict Q-exit Convergence-Core kernel; it no longer
                                   // competes on coding/reasoning/default.
@@ -110,34 +110,8 @@ const DEFAULTS = [
     capabilityScore: 0.45,
     note: "unisona.ai kernel fine-tune of Ouro (kernel chain lead, #894).",
   },
-  {
-    id: "keystone-sigma0-plt",
-    // The SOLE local coder/default. It serves on its own ollama-compatible shim
-    // (models/keystone-sigma0-plt/serve_keystone_plt.py → :11435), separate from the
-    // kernel/dream ollama on :11434. Per-model routing (endpointFor) honors this so the
-    // kernel (Ouro) and dream (lantern-csf-dream) keep working on :11434.
-    endpoint: process.env.KEYSTONE_PLT_ENDPOINT || "http://127.0.0.1:11435",
-    selfConverges: false,         // PLT loops internally (fixed 2-loop) but that is NOT a
-                                  // Q-exit convergence certificate → Core still wraps it in
-                                  // loopedReason() (grounding by default).
-    toolCalling: false,
-    vramGB: 6,                    // 7.6B PLT @ 4-bit ≈ 6.4GB MEASURED on-box (RTX 3070, #1757/serve).
-    ctxTokens: 131072,
-    taskTypes: ["coding", "reasoning", "default"],  // sole local coder AND general default
-    rank: 0,
-    capabilityScore: 0.84,        // vendor two-loop SWE-bench (predicted); it is the only local
-                                  // coder so it leads regardless — no verified peer to displace.
-    verified: false,             // OWNED proprietary PLT bootstrap from the LoopCoder-V2 Apache-2.0
-                                  // weights (ADR-0011). On-box (RTX 3070) it LOADS 4-bit (~6.4GB<8),
-                                  // serves ollama-compatible, and generates coherent code at ~5–6 tok/s
-                                  // (static KV cache). Kept `verified:false` honestly: it is the SOLE
-                                  // local coder by operator decision, not yet a reproduced eval WIN over
-                                  // a peer. The head-to-head vs a frontier coder (HumanEval) remains the
-                                  // gate to flip this true. Requires serve_keystone_plt.py running on
-                                  // :11435 (or KEYSTONE_PLT_ENDPOINT); if the shim is down the provider
-                                  // chain falls back to cloud (Claude), not to another local model.
-    note: "Owned PLT research coder (ADR-0011, LoopCoder-V2 lineage). Registered for coding/reasoning/default but now sorts BEHIND the supported Qwen2.5-Coder default (#2171) — it is unverified AND depends on the :11435 shim (falls back to cloud if down). Its HumanEval head-to-head vs Qwen is the gate to lead again. Serve via models/keystone-sigma0-plt/serve_keystone_plt.py on :11435.",
-  },
+  // keystone-sigma0-plt entry removed 2026-07-24 — models/ dir deleted (operator);
+  // the PLT :11435 shim no longer exists in-tree. Qwen2.5-Coder stays the local coder (#2171).
   {
     // Default local coder — OSS-BASELINE (2026-07-06) decision #2171: ship the local
     // engine on a SUPPORTED Apache-2.0 coder, not the unproven PLT/Ouro path.

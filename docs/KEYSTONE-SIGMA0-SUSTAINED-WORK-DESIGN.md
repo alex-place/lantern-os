@@ -105,7 +105,7 @@ No change to ADR-0011's plan; this design depends on it and sequences behind it.
 
 ### 3.2 The adapter based on loopcoder — the Adaptive Loop Gate (ALG)
 
-This is the heart of the ask: the "adapter based on loopcoder" is the [Adaptive Loop Gate](../models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md) — adapter-scale heads over the **frozen** PLT base that give it the self-converging behaviour the Ouro path already has, so the owned kernel becomes a first-class resonator.
+This is the heart of the ask: the "adapter based on loopcoder" is the Adaptive Loop Gate (models/ archived 2026-07-24) — adapter-scale heads over the **frozen** PLT base that give it the self-converging behaviour the Ouro path already has, so the owned kernel becomes a first-class resonator.
 
 - **Mechanism (already specified in ALG.md):** capture the per-loop post-norm states `h₀ = norm(E)`, `h₁`, `h₂`; a tiny `loop_gate: Linear(hidden→3)` produces a softmax mixture at train time (the differentiable "superposition"), and a `halt_head: Linear(hidden→1)` produces ACT-style per-boundary halting at inference. Expected depth `d = w₁·1 + w₂·2 ∈ [0,2]`; a ponder cost `λ·d` teaches "use depth 2 only when you must." The cap of 2 is the empirically-validated PLT ceiling (>2 regresses).
 - **Why this *is* the convergence certificate:** the halt head is to the PLT base exactly what Ouro's trained Q-exit gate is to `Sigma0LoopLM` — a learned, native "I have converged" signal. It populates `Σ₀Telemetry.halted/haltConf/depth`. This is the unification: **one self-converging contract, two looped backends (Ouro Q-exit; PLT ALG-halt).**
@@ -221,7 +221,7 @@ Converge follow-on (deferred, heavier):
 | Area | File / anchor |
 |---|---|
 | PLT forward + parity knobs | `models/keystone-sigma0-plt/modeling_keystone_plt.py` `_run_loops`; `configuration_keystone_plt.py:94-100`; `check_parity.py` |
-| Adaptive Loop Gate spec | [`models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md`](../models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md) |
+| Adaptive Loop Gate spec | `models/keystone-sigma0-plt/ADAPTIVE-LOOP-GATE.md` (archived 2026-07-24) |
 | Existing self-converging loop (Ouro) | `src/sigma0/loop_lm.py:179-245`; `src/sigma0/decode_canary.py`; `src/sigma0/quantized_cache.py` |
 | Serving + telemetry to extend | `scripts/ouro_serve.py:185-209,372-377`; `scripts/ouro_anthropic_bridge.py` |
 | Registry / lead resolution | `apps/lantern-garage/lib/local-model-registry.js:81-162,301-334` |

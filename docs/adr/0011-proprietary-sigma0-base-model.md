@@ -28,7 +28,7 @@ The owned modeling code exists, partially clears Stage 0, and the model has been
 **sole local coder by operator decision** (still `verified:false` — see below). The ADR is
 now Accepted (above); the model itself is still unpromoted pending the staged on-box gates.
 
-- **Own modeling code authored + merged.** [`models/keystone-sigma0-plt/`](../../models/keystone-sigma0-plt/README.md)
+- **Own modeling code authored + merged.** [`models/keystone-sigma0-plt/`](https://github.com/alex-place/lantern-os/tree/8779c856/models/keystone-sigma0-plt)
   — pure-torch `modeling_keystone_plt.py` + `download_and_patch.py` + `check_parity.py` (Stage-0
   gate) + `train_lora.py` + `serve_keystone_plt.py` (PR #1645; run-fixes #1668).
 - **Stage-0 4-bit smoke: PASS on the 8 GB 3070** — Apache-2.0 weights load through our forward

@@ -5,7 +5,7 @@ own machine with their own provider keys and their own Claude Code login.
 Capacity scales by adding nodes, not by sharing accounts.
 
 Current members: **alex** (operator), **courtney**, **mookman11**, **kirskin** —
-see [config/mesh-members.json](../config/mesh-members.json).
+see `config/mesh-members.json` (archived 2026-07-24; mesh registry now empty by default).
 
 ## The capacity model
 
