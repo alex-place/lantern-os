@@ -1,0 +1,930 @@
+{
+  "date": "2026-07-24",
+  "workload": "GSM8K (weak local verification: arithmetic self-consistency only)",
+  "contrast": "coding+unit-tests gave phi_hat=0.092 (STRONG local verifier)",
+  "definitions": {
+    "phi_hat": "mean fraction of arithmetic steps locally VALID in a globally-WRONG solution",
+    "local_verifier": "arithmetic self-consistency of each 'a op b = c' step (catches calculation slips, blind to reasoning errors)"
+  },
+  "tiers": {
+    "cheap": {
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "n": 150,
+      "solve_rate": 0.4867,
+      "estimators": {
+        "n_failing_solutions": 31,
+        "n_steps": 98,
+        "step_valid_rate_in_failing_p": 0.8061,
+        "phi_hat": 0.7978,
+        "c_hat_mixture": 0.2293,
+        "c_hat_icc": 0.308,
+        "all_or_nothing_fraction": 0.6452
+      },
+      "per": [
+        {
+          "id": "bnd-gsm8k-0000",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0001",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0002",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0003",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0004",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0005",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0006",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0007",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0008",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0009",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0010",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0011",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0012",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0013",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0014",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0015",
+          "n_steps": 6,
+          "n_valid": 6,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0016",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0017",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0018",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0019",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0020",
+          "n_steps": 3,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0021",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0022",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0023",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0024",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0025",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0026",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0027",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0028",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0029",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0030",
+          "n_steps": 8,
+          "n_valid": 8,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0031",
+          "n_steps": 1,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0032",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0033",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0034",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0035",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0036",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0037",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0038",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0039",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0040",
+          "n_steps": 3,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0041",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0042",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0043",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0044",
+          "n_steps": 5,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0045",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0046",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0047",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0048",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0049",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0050",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0051",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0052",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0053",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0054",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0055",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0056",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0057",
+          "n_steps": 7,
+          "n_valid": 7,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0058",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0059",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0060",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0061",
+          "n_steps": 2,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0062",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0063",
+          "n_steps": 2,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0064",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0065",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0066",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0067",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0068",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0069",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0070",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0071",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0072",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0073",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0074",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0075",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0076",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0077",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0078",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0079",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0080",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0081",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0082",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0083",
+          "n_steps": 4,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0084",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0085",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0086",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0087",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0088",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0089",
+          "n_steps": 2,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0090",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0091",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0092",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0093",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0094",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0095",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0096",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0097",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0098",
+          "n_steps": 2,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0099",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0100",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0101",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0102",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0103",
+          "n_steps": 4,
+          "n_valid": 3,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0104",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0105",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0106",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0107",
+          "n_steps": 4,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0108",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0109",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0110",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0111",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0112",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0113",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0114",
+          "n_steps": 2,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0115",
+          "n_steps": 1,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0116",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0117",
+          "n_steps": 3,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0118",
+          "n_steps": 5,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0119",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0120",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0121",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0122",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0123",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0124",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0125",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0126",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0127",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0128",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0129",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0130",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0131",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0132",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0133",
+          "n_steps": 5,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0134",
+          "n_steps": 4,
+          "n_valid": 3,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0135",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0136",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0137",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0138",
+          "n_steps": 5,
+          "n_valid": 5,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0139",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0140",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0141",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0142",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0143",
+          "n_steps": 1,
+          "n_valid": 1,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0144",
+          "n_steps": 0,
+          "n_valid": 0,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0145",
+          "n_steps": 4,
+          "n_valid": 4,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0146",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0147",
+          "n_steps": 3,
+          "n_valid": 3,
+          "solved": true
+        },
+        {
+          "id": "bnd-gsm8k-0148",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        },
+        {
+          "id": "bnd-gsm8k-0149",
+          "n_steps": 2,
+          "n_valid": 2,
+          "solved": false
+        }
+      ]
+    }
+  },
+  "tier_comparison": {
+    "phi_hat_cheap": 0.7978
+  }
+}

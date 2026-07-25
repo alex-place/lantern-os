@@ -259,8 +259,12 @@ def main():
         "tier_comparison": {f"phi_hat_{label}": results[label]["estimators"].get("phi_hat")
                             for label in results},
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    # per-tier-set output path: the CLOUD run (--tiers escalate,frontier) must not clobber the
+    # local cheap-tier result. Found by the harness audit before it bit the mookman lane (#2928).
+    tag = "-".join(sorted(results.keys()))
+    out_path = OUT.replace(".json", f".{tag}.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
     print("\n===== MEASURED (weak-verification workload, per tier) =====")
     for label in results:
@@ -268,7 +272,7 @@ def main():
         print(f"{label:9s} solve={results[label]['solve_rate']:.3f}  "
               f"phi_hat={e.get('phi_hat')}  c_hat={e.get('c_hat_mixture')}/{e.get('c_hat_icc')}  "
               f"(n_fail={e.get('n_failing_solutions')})")
-    print("full report ->", OUT)
+    print("full report ->", out_path)
 
 
 if __name__ == "__main__":

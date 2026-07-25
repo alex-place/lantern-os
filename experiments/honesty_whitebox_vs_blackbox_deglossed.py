@@ -104,6 +104,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=MODEL)
     ap.add_argument("--bits4", action="store_true", help="load 4-bit NF4 (the 7B rung on an 8GB box)")
+    ap.add_argument("--limit", type=int, default=0, help="SMOKE: only N statements — exercises the whole path incl. report writing")
     args = ap.parse_args()
     model_id = args.model
 
@@ -112,6 +113,8 @@ def main():
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     rows = [json.loads(l) for l in open(DATA, encoding="utf-8") if l.strip()]
+    if args.limit:
+        rows = rows[:args.limit]
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"DE-GLOSSED head-to-head | {len(rows)} statements | {model_id} | {device} | 4bit={args.bits4}", flush=True)
 
@@ -236,8 +239,11 @@ def main():
             "no_closed_model": "black-box arm is the signal-class proxy for a closed model of equal capability; no closed frontier model was called",
         },
     }
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    with open(OUT, "w", encoding="utf-8") as f:
+    # per-model output path: a variant run must NEVER clobber another variant's result
+    # (this exact bug destroyed the 1.5B result when the 7B rung ran; recovered from git).
+    out_path = OUT if model_id == MODEL else OUT.replace(".json", f".{model_id.split('/')[-1]}.json")
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
     print("\n===== DE-GLOSSED HONESTY HEAD-TO-HEAD =====")
