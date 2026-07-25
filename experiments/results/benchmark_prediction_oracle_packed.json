@@ -1,0 +1,176 @@
+{
+  "date": "2026-07-24",
+  "status": "PRE-REGISTERED min/max for a PURPOSE-BUILT model (ORACLE-P), before build/eval",
+  "model": {
+    "name": "ORACLE-P",
+    "is": "ORACLE-1.5B's weights CO-DESIGNED for the harness: distilled from exec-verified teachers (ADR-0015), merged from hand-packed small specialists, honesty packed into representations (v1.10), ternary-served (ADR-0026)",
+    "vs_ORACLE_gen": "ORACLE-1.5B = general base + wrapper; ORACLE-P = weights built to run ONLY as the harness intends"
+  },
+  "levers": {
+    "L1_distill_lowers_q": "raises per-step p -> lowers q -> lengthens reliable horizon K_c~1/q (SWE/MATH lever). BOUND: reachable = teacher coverage, not ceiling.",
+    "L2_specialist_merge": "hand-packed experts, harness = hand-built router -> drop breadth -> cheaper serve (axis A). BOUND: off-distribution brittleness, costed.",
+    "L3_honesty_packed": "linearly-honest representations -> sharper+free probe filter (axis B). HARD GATE: gloss trap (measured); applies only if anti-Goodhart red-team passes."
+  },
+  "scenarios": {
+    "conservative": {
+      "scenario": "CONSERVATIVE (Goodhart bites, modest distill)",
+      "q_multiplier": 0.75,
+      "L3_honesty_packed": false,
+      "narrowing_penalty": 0.5,
+      "capability": {
+        "HumanEval": {
+          "packed_pass@1": 0.813,
+          "distilled_cov": 0.84,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 0.3,
+          "vs_frontier_pp": -8.7
+        },
+        "MBPP": {
+          "packed_pass@1": 0.793,
+          "distilled_cov": 0.82,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 0.3,
+          "vs_frontier_pp": -6.7
+        },
+        "GSM8K": {
+          "packed_pass@1": 0.774,
+          "distilled_cov": 0.877,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 1.4,
+          "vs_frontier_pp": -17.6
+        },
+        "MATH": {
+          "packed_pass@1": 0.611,
+          "distilled_cov": 0.64,
+          "reachable": 0.736,
+          "vs_oracle_gen_pp": 3.1,
+          "vs_frontier_pp": -13.9
+        },
+        "LongMemEval": {
+          "packed_pass@1": 0.651,
+          "distilled_cov": 0.695,
+          "reachable": 0.799,
+          "vs_oracle_gen_pp": 3.1,
+          "vs_frontier_pp": -6.9
+        },
+        "SWE-bench-Ver": {
+          "packed_pass@1": 0.121,
+          "distilled_cov": 0.163,
+          "reachable": 0.187,
+          "vs_oracle_gen_pp": 2.1,
+          "vs_frontier_pp": -42.9
+        }
+      },
+      "axis_A_cost_per_correct_frontier_query=1.0": {
+        "ORACLE_gen": 0.197,
+        "ORACLE_P": 0.115,
+        "frontier": 1.268,
+        "P_cheaper_than_frontier_x": 11.0
+      },
+      "axis_B_honesty": {
+        "confident_wrong": 0.11,
+        "ece": 0.08,
+        "vs_frontier_cw": 0.28,
+        "vs_oracle_gen_cw": 0.11
+      },
+      "SWE_focus": {
+        "packed": 0.121,
+        "oracle_gen": 0.1,
+        "frontier": 0.55,
+        "gain_vs_gen_pp": 2.1
+      },
+      "off_distribution_robustness_0to1": 0.5
+    },
+    "optimistic": {
+      "scenario": "OPTIMISTIC (clean distill, probe holds, specialist accepted)",
+      "q_multiplier": 0.5,
+      "L3_honesty_packed": true,
+      "narrowing_penalty": 0.7,
+      "capability": {
+        "HumanEval": {
+          "packed_pass@1": 0.816,
+          "distilled_cov": 0.86,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 0.6,
+          "vs_frontier_pp": -8.4
+        },
+        "MBPP": {
+          "packed_pass@1": 0.796,
+          "distilled_cov": 0.84,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 0.6,
+          "vs_frontier_pp": -6.4
+        },
+        "GSM8K": {
+          "packed_pass@1": 0.788,
+          "distilled_cov": 0.895,
+          "reachable": 0.92,
+          "vs_oracle_gen_pp": 2.8,
+          "vs_frontier_pp": -16.2
+        },
+        "MATH": {
+          "packed_pass@1": 0.652,
+          "distilled_cov": 0.66,
+          "reachable": 0.759,
+          "vs_oracle_gen_pp": 7.2,
+          "vs_frontier_pp": -9.8
+        },
+        "LongMemEval": {
+          "packed_pass@1": 0.689,
+          "distilled_cov": 0.71,
+          "reachable": 0.816,
+          "vs_oracle_gen_pp": 6.9,
+          "vs_frontier_pp": -3.1
+        },
+        "SWE-bench-Ver": {
+          "packed_pass@1": 0.175,
+          "distilled_cov": 0.225,
+          "reachable": 0.259,
+          "vs_oracle_gen_pp": 7.5,
+          "vs_frontier_pp": -37.5
+        }
+      },
+      "axis_A_cost_per_correct_frontier_query=1.0": {
+        "ORACLE_gen": 0.197,
+        "ORACLE_P": 0.081,
+        "frontier": 1.268,
+        "P_cheaper_than_frontier_x": 15.7
+      },
+      "axis_B_honesty": {
+        "confident_wrong": 0.05,
+        "ece": 0.04,
+        "vs_frontier_cw": 0.28,
+        "vs_oracle_gen_cw": 0.11
+      },
+      "SWE_focus": {
+        "packed": 0.175,
+        "oracle_gen": 0.1,
+        "frontier": 0.55,
+        "gain_vs_gen_pp": 7.5
+      },
+      "off_distribution_robustness_0to1": 0.3
+    }
+  },
+  "the_verdict": {
+    "capability_wall_holds": "ORACLE-P still LOSES to the 70B frontier on every capability row in BOTH scenarios \u2014 distillation transfers, it does not manufacture; a 1.5B does not out-capability a 40x-larger model",
+    "SWE_moves_most": "SWE-bench: gen 0.1 -> conservative 0.121 -> optimistic 0.175 (still << frontier 0.55); the long-horizon benchmark gains most from lower q, as the error threshold predicts",
+    "axis_A_win_widens": "cost-per-correct: ORACLE-gen 0.197 -> ORACLE-P 0.081 (optimistic) = ~15.7x cheaper/correct than frontier",
+    "axis_B_win_widens_IF_gate_passes": "confident-wrong: gen 0.11 -> optimistic 0.05 (if anti-Goodhart holds) vs frontier 0.28; conservative stays 0.11 (Goodhart bit)",
+    "the_real_cost": "running 'only as designed' = off-distribution robustness drops to 0.3 (optimistic) \u2014 a specialist product, brittle outside its lane. The min/max on A/B/SWE is PAID FOR in generality."
+  },
+  "falsifiable_kills": {
+    "L1": "if a distilled specialist's SWE-bench does NOT exceed the wrapped-general-base by the predicted margin, q-lowering did not lengthen the horizon as the threshold law claims",
+    "L3": "if the anti-Goodhart red-team FAILS (a model trained to look honest fools the probe without being honest), L3=0 \u2014 axis B does not improve and the confident-wrong stays 0.11. THIS IS THE MOST LIKELY FAILURE (measured gloss trap).",
+    "L2": "if off-distribution robustness collapse makes the specialist unusable as a product, the axis-A win is illusory (cheap but too narrow to deploy)"
+  },
+  "honesty": {
+    "measured_anchors": [
+      "error threshold K_c~1/q (this session)",
+      "honesty probe 0.774-0.980 @1.5B (PR#2849)",
+      "BitDistill ternary viable (ADR-0026)",
+      "verified cascade 8.3x cheaper (#2798)"
+    ],
+    "biggest_extrapolation": "teacher-coverage numbers and the q-multipliers are ASSUMED; the whole capability column is contingent on a distillation run that has not happened, and on real phi (#2928)",
+    "not_claimed": "no frontier-beating capability; no free lunch \u2014 every A/B/SWE gain is paid in generality (L2) or gated on anti-Goodhart (L3) or on a real distill (L1)"
+  }
+}

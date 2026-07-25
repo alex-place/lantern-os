@@ -1,0 +1,81 @@
+{
+  "date": "2026-07-24",
+  "upgrade": "the analyzer now DETECTS TERMINATION PROOFS (ranking functions verified by Fourier-Motzkin), not just runs traces",
+  "domain": "guarded linear integer transition systems over N^n",
+  "soundness": "TERMINATES/NONTERMINATES are universal proofs (ranking fn / preserved-guard recurrence, FM-discharged in exact rationals); HALTS/LOOPS are per-instance witnesses; UNKNOWN is the irreducible Turing pin",
+  "verification_method": "Fourier-Motzkin over Fraction: a discharged implication is rationally-infeasible-negation => integer-sound",
+  "battery": [
+    {
+      "program": "countdown  (while x>=1: x--)",
+      "verdict": "TERMINATES(forall)",
+      "proof": {
+        "proof": "ranking function",
+        "kind": "single_linear",
+        "r": "[1].x + 0"
+      }
+    },
+    {
+      "program": "race  (while x>=1 & y>=1: x--,y--)",
+      "verdict": "TERMINATES(forall)",
+      "proof": {
+        "proof": "ranking function",
+        "kind": "single_linear",
+        "r": "[0, 1].x + 0"
+      }
+    },
+    {
+      "program": "nested  (outer x, inner y:=x-1)",
+      "verdict": "TERMINATES(forall)",
+      "proof": {
+        "proof": "ranking function",
+        "kind": "lexicographic",
+        "order": [
+          "x0",
+          "x1"
+        ]
+      }
+    },
+    {
+      "program": "increment  (loop forever: x++)",
+      "verdict": "NONTERMINATES(forall)",
+      "proof": {
+        "proof": "recurrence",
+        "kind": "preserved_guard_recurrence",
+        "witness": "guard implies guard-after-update and is satisfiable -> infinite run for all enabled inputs"
+      }
+    },
+    {
+      "program": "two_cycle  (0<->1 forever)",
+      "verdict": "LOOPS(this input)",
+      "proof": {
+        "cycle_start": 0,
+        "cycle_len": 2,
+        "witness": "full state repeated in a deterministic system",
+        "note": "no ranking function in template -> per-instance only"
+      }
+    },
+    {
+      "program": "collatz(27)  (non-linear)",
+      "verdict": "HALTS(this input)",
+      "proof": {
+        "steps": 111,
+        "witness": "reached a state with no enabled transition",
+        "universal_note": "guards/updates are non-linear -> outside the linear ranking class; universal claim UNKNOWN"
+      }
+    }
+  ],
+  "the_open_frontier_case": {
+    "program": "collatz(n) for ALL n  (Collatz conjecture)",
+    "verdict": "UNKNOWN",
+    "proof": {
+      "reason": "no ranking function is known for Collatz; universal termination is OPEN since 1937",
+      "honest_note": "synthesis returns nothing AND none is known to exist -> the pin sits at the true math frontier"
+    }
+  },
+  "honest_scope": {
+    "sound": "no false proof: every TERMINATES has an FM-checked ranking function; over N^n as declared",
+    "incomplete": "synthesis is template-bounded (small linear weights + unit-vector lexicographic); a true-but-unfound proof -> UNKNOWN, never a bluff",
+    "not_magic": "does NOT beat Turing \u2014 the linear class is decidable-ish by design; Collatz (non-linear) stays universal-UNKNOWN, which is the point"
+  },
+  "vs_prior": "halting_oracle_discipline.py gave HALTS only by running a trace (per-instance). This proves TERMINATES for ALL inputs when a ranking function exists \u2014 a universal proof, machine-verified."
+}

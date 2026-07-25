@@ -1,0 +1,101 @@
+{
+  "date": "2026-07-24",
+  "status": "PRE-REGISTERED prediction \u2014 committed before the evals; falsifiable",
+  "served_model_assumed": "~1.5B box-served (Qwen2.5-1.5B / Coder-1.5B class); ternary/4-bit on 8GB",
+  "budget_assumed": "~8-12 generation calls + N-verifier bank per task (verifier amplification), foldback repair on failure",
+  "ceiling": 0.92,
+  "predictions": [
+    {
+      "benchmark": "HumanEval",
+      "base_pass@1_approx": 0.55,
+      "verifier_amplification_pp": 25.6,
+      "novel_mechanism_delta_pp": 0.1,
+      "novel_delta_band_pp": "\u00b13",
+      "predicted_system_central": 0.807,
+      "predicted_system_range": [
+        0.739,
+        0.837
+      ],
+      "status": "exec unit tests = STRONG local verifier; phi measured 0.092 (this session); short horizon"
+    },
+    {
+      "benchmark": "MBPP",
+      "base_pass@1_approx": 0.52,
+      "verifier_amplification_pp": 26.6,
+      "novel_mechanism_delta_pp": 0.1,
+      "novel_delta_band_pp": "\u00b13",
+      "predicted_system_central": 0.787,
+      "predicted_system_range": [
+        0.717,
+        0.817
+      ],
+      "status": "same regime as HumanEval; verifier-amplification dominated"
+    },
+    {
+      "benchmark": "GSM8K",
+      "base_pass@1_approx": 0.57,
+      "verifier_amplification_pp": 17.4,
+      "novel_mechanism_delta_pp": 1.8,
+      "novel_delta_band_pp": "\u00b18",
+      "predicted_system_central": 0.762,
+      "predicted_system_range": [
+        0.656,
+        0.842
+      ],
+      "status": "answer-checkable but NO per-step exec oracle; medium horizon; phi predicted moderate"
+    },
+    {
+      "benchmark": "MATH",
+      "base_pass@1_approx": 0.28,
+      "verifier_amplification_pp": 18.7,
+      "novel_mechanism_delta_pp": 11.4,
+      "novel_delta_band_pp": "\u00b112",
+      "predicted_system_central": 0.581,
+      "predicted_system_range": [
+        0.433,
+        0.701
+      ],
+      "status": "long multi-step proofs; weak local verification; the novel mechanism's home turf"
+    },
+    {
+      "benchmark": "SWE-bench-Verified",
+      "base_pass@1_approx": 0.012,
+      "verifier_amplification_pp": 7.0,
+      "novel_mechanism_delta_pp": 2.0,
+      "novel_delta_band_pp": "\u00b112",
+      "predicted_system_central": 0.103,
+      "predicted_system_range": [
+        0.0,
+        0.223
+      ],
+      "status": "base ~0 so sampling barely helps; DECOMPOSITION-dominated (least-tested); widest bars"
+    },
+    {
+      "benchmark": "LongMemEval",
+      "base_pass@1_approx": 0.45,
+      "verifier_amplification_pp": 11.5,
+      "novel_mechanism_delta_pp": 5.3,
+      "novel_delta_band_pp": "\u00b112",
+      "predicted_system_central": 0.618,
+      "predicted_system_range": [
+        0.48,
+        0.738
+      ],
+      "status": "long-context memory QA; verifier weak (no exec); foldback ~ segment+re-ground"
+    }
+  ],
+  "falsifiable_core": {
+    "primary_claim_novel_delta_ordering": "novel_delta(MATH) > novel_delta(LongMemEval) > novel_delta(GSM8K) > novel_delta(HumanEval)~novel_delta(MBPP)~0",
+    "two_reasons_for_zero": "HumanEval/MBPP ~0 because phi is LOW (strong verifier); SWE-bench small because base capability is near-zero (raw inability, not recoverable error) \u2014 the novel gain needs BOTH high phi AND per-step reachability",
+    "ordering_holds_in_model": true,
+    "crossover_claim": "on a benchmark with a tunable length axis, the novel delta rises with horizon and crosses ~0 near K=1/q",
+    "kill": "if HumanEval/MBPP novel_delta exceeds ~2pp (mechanism helping where phi is low \u2192 confounded) OR MATH/LongMemEval novel_delta ~0 (mechanism not helping where phi is high AND model is capable \u2192 mechanism wrong)"
+  },
+  "honesty": {
+    "what_is_mechanism_derived": "the novel_mechanism_delta column and the ORDERING (from measured phi + the foldback/threshold laws)",
+    "what_is_a_lookup": "base_pass@1 (approx public, RE-VERIFY on the exact served checkpoint) and cov (pass@budget shape)",
+    "what_is_standard_not_novel": "verifier_amplification (best-of-N + sound filter) \u2014 real lift, but not this design's contribution",
+    "widest_bars": "SWE-bench (decomposition-dominated, least-tested) and every absolute score",
+    "binding_open_input": "real phi on weak-verification workloads (#2928) \u2014 if it is <0.1 even there, every novel_delta collapses toward 0"
+  }
+}
