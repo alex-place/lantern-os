@@ -824,6 +824,9 @@
   .news-flt{font-family:var(--mono);font-size:11px;color:var(--text2);background:none;border:1px solid var(--border);border-radius:7px;padding:4px 10px;cursor:pointer;white-space:nowrap}
   .news-flt.on{color:var(--blue);border-color:var(--blue)}
   .news-item .news-sent-pos{color:var(--green)} .news-item .news-sent-neg{color:var(--red)}
+  /* High-impact headlines (collector impact score ≥75) get flagged + a filter chip */
+  .news-item.news-big{border-left:2px solid var(--amber);padding-left:8px;background:rgba(255,180,60,.04)}
+  .news-item.news-big .news-head{font-weight:600}
 </style>
 </head>
 <body>
@@ -937,6 +940,7 @@
     <span class="nb-title">📰 MARKET NEWS</span>
     <input class="news-search" id="newsSearch" placeholder="Search headlines…" aria-label="Search news headlines" oninput="renderNews()">
     <button class="news-flt" id="newsSymBtn" onclick="toggleNewsSym()" title="Show only news mentioning the selected symbol">All symbols</button>
+    <button class="news-flt" id="newsBigBtn" onclick="toggleNewsBig()" title="Only the high-impact headlines (the AI news scorer's impact ≥ 75)">⚡ Big news</button>
     <button class="news-flt" onclick="loadNews(true)" title="Refresh the feed">↻</button>
   </div>
   <div class="tp-body" id="newsList"><span class="news-empty">Loading news…</span></div>
@@ -4303,6 +4307,13 @@ function toggleNewsSym(){
   if(b){ b.classList.toggle('on', NEWS_SYM_ONLY); b.textContent = NEWS_SYM_ONLY ? (activeTicker||'selected')+' only' : 'All symbols'; }
   renderNews();
 }
+let NEWS_BIG_ONLY = false; // only high-impact headlines (collector impact ≥ 75)
+function toggleNewsBig(){
+  NEWS_BIG_ONLY = !NEWS_BIG_ONLY;
+  const b = document.getElementById('newsBigBtn');
+  if(b) b.classList.toggle('on', NEWS_BIG_ONLY);
+  renderNews();
+}
 function renderNews(){
   const el = document.getElementById('newsList'); if(!el) return;
   const q = (document.getElementById('newsSearch')?.value||'').trim().toLowerCase();
@@ -4312,18 +4323,22 @@ function renderNews(){
     const b = document.getElementById('newsSymBtn'); if(b) b.textContent = activeTicker+' only';
   }
   if(q) items = items.filter(n => ((n.headline||'')+' '+(n.source||'')).toLowerCase().includes(q));
+  if(NEWS_BIG_ONLY) items = items.filter(n => (n.impact ?? n.impact_score ?? 0) >= 75);
   if(!items.length){
     el.innerHTML = '<span class="news-empty">'+(NEWS.length ? 'No headlines match.' : 'No news yet — the feed fills as the collector runs.')+'</span>';
     return;
   }
   el.innerHTML = items.slice(0,120).map(n=>{
-    const sent = /bullish|positive/i.test(n.text||'') ? '<span class="news-sent-pos">▲</span>'
-               : /bearish|negative/i.test(n.text||'') ? '<span class="news-sent-neg">▼</span>' : '';
+    const dir = n.direction || '';
+    const sent = (dir==='bullish' || /bullish|positive/i.test(n.text||'')) ? '<span class="news-sent-pos">▲</span>'
+               : (dir==='bearish' || /bearish|negative/i.test(n.text||'')) ? '<span class="news-sent-neg">▼</span>' : '';
+    const big = (n.impact ?? n.impact_score ?? 0) >= 75;
     const syms = (n.symbols||[]).slice(0,4).join(' ');
-    const inner = '<span class="news-head">'+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
-      + '<span class="news-meta">'+newsEsc(n.source||'')+(n.published?' · '+relTime(n.published):'')+(syms?' · '+newsEsc(syms):'')+'</span>';
-    return n.url ? '<a class="news-item" href="'+newsEsc(n.url)+'" target="_blank" rel="noopener noreferrer">'+inner+'</a>'
-                 : '<div class="news-item">'+inner+'</div>';
+    const inner = '<span class="news-head">'+(big?'⚡ ':'')+sent+' '+newsEsc(n.headline||n.text||'')+'</span>'
+      + '<span class="news-meta">'+newsEsc(n.source||'')+(n.published?' · '+relTime(n.published):'')+(syms?' · '+newsEsc(syms):'')+(big?' · <span class="news-impact">HIGH IMPACT</span>':'')+'</span>';
+    const cls = 'news-item'+(big?' news-big':'');
+    return n.url ? '<a class="'+cls+'" href="'+newsEsc(n.url)+'" target="_blank" rel="noopener noreferrer">'+inner+'</a>'
+                 : '<div class="'+cls+'">'+inner+'</div>';
   }).join('');
 }
 
