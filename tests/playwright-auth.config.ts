@@ -40,7 +40,11 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     env: {
-      PORT: String(PORT),
+      // LANTERN_GARAGE_PORT (not PORT): PORT flips the server into cloud mode,
+      // whose Secure session cookies never get set over plain-http loopback — the
+      // test-login 200s but no Set-Cookie arrives (same trap documented in
+      // playwright-greenpath.config.ts).
+      LANTERN_GARAGE_PORT: String(PORT),
       LANTERN_GARAGE_HOST: '127.0.0.1',
       SESSION_SECRET: 'e2e-loopback-only-secret',
       LANTERN_TEST_AUTH_TOKEN: TOKEN,
