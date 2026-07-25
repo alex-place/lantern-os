@@ -241,7 +241,7 @@ The agent is the hub; everything else is a **Tool**, a **provider**, or a **surf
   `queue_status`, `task_intake`, `dispatch_work`, `boot_check`, `list_skills`, `get_status`. Only
   tools with real implementations are registered.
 - **Markets** — Kalshi REST ([`kalshi-api.js`](../apps/lantern-garage/lib/kalshi-api.js)) for trade chat.
-- **Chat / community** — Discord ([`src/discord_lounge_bot/`](../src/discord_lounge_bot)); web UI
+- **Chat / community** — Discord (migrated to [three-doors](https://github.com/alex-place/three-doors)); web UI
   surfaces (dream-chat, trade dashboard, three-doors) served by
   [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js).
 - **Repo / deploy** — GitHub (PRs/issues) + Railway (auto-deploys `master`).

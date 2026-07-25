@@ -136,7 +136,7 @@ memory the user controls**; (2) a **policy gate that HOLDS consequential actions
 approval**; (3) **verifiable receipts** (diff + test + source + cost + why-this-model); and
 (4) **outcome-based routing** that learns which backend wins on *the user's own* repos.
 
-**How it works** ([implemented] — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) `propose → HOLD → verify → receipt`; [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) operator-gated HTTP seam; [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) Δ + answerability gate; [`lib/pr-watcher.js`](../apps/lantern-garage/lib/pr-watcher.js) green-+-APPROVE auto-merge; provider routing `data/provider.pcsf.json`):
+**How it works** ([implemented] — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) `propose → HOLD → verify → receipt`; [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) operator-gated HTTP seam; [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) Δ + answerability gate; `lib/pr-watcher.js` (removed 2026-07-24) green-+-APPROVE auto-merge; provider routing `data/provider.pcsf.json`):
 - A backend **proposes** a change; the plane **holds** it (never applies immediately, unlike
   Aider/OpenHands), attaches a **verifier verdict** (exec-verify + council Δ + canaries), and
   emits a **receipt** to an append-only ledger. Approval is operator-gated.
@@ -347,7 +347,7 @@ pending" and publish.
 
 ## Sources (verified on disk 2026-07-18)
 
-- Accountability layer — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) · [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) · [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) · [`lib/pr-watcher.js`](../apps/lantern-garage/lib/pr-watcher.js) · [OSS-BASELINE.md](OSS-BASELINE.md)
+- Accountability layer — [`lib/coding-backend/index.js`](../apps/lantern-garage/lib/coding-backend/index.js) · [`routes/coding.js`](../apps/lantern-garage/routes/coding.js) · [`lib/council-review.js`](../apps/lantern-garage/lib/council-review.js) · `lib/pr-watcher.js` (removed 2026-07-24) · [OSS-BASELINE.md](OSS-BASELINE.md)
 - Decode/verify controller — [`src/sigma0/decode_canary.py`](../src/sigma0/decode_canary.py) · [`experiments/deanchored_verifier.py`](../experiments/deanchored_verifier.py)
 - Grounding economy — [`lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js) · [SIGMA0-GROUNDING-LEDGER.md](SIGMA0-GROUNDING-LEDGER.md)
 - Convergence-IO — [`src/convergence_io/`](../src/convergence_io/) · [`docs/convergence-io/README.md`](convergence-io/README.md)
