@@ -47,15 +47,22 @@
     table.opt th { color: var(--muted); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 5px 7px; border-bottom: 1px solid var(--border); text-align: right; }
     table.opt td { padding: 4px 7px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
     td.strikeCol, th.strikeCol { text-align: center !important; font-weight: 700; background: color-mix(in srgb, var(--text) 6%, transparent); }
-    tr.itm-c td.cside { background: color-mix(in srgb, var(--green) 7%, transparent); }
-    tr.itm-p td.pside { background: color-mix(in srgb, var(--red) 7%, transparent); }
+    tr.itm-c td.cside { background: color-mix(in srgb, var(--green, #34d399) 7%, transparent); }
+    tr.itm-p td.pside { background: color-mix(in srgb, var(--red, #f87171) 7%, transparent); }
     tr.spotrow td { border-top: 2px dashed var(--accent); padding: 3px 7px; text-align: center; color: var(--accent); font-weight: 700; font-size: 11.5px; }
     .expHead { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 4px; user-select: none; }
     .expHead b { font-size: 13.5px; }
     .dte { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+    /* Calls read green, puts read red — subtle tints that keep the theme intact. */
     .volbar { display: inline-block; height: 8px; background: var(--accent); opacity: .55; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
+    td.cside .volbar { background: var(--green, #34d399); }
+    td.pside .volbar { background: var(--red, #f87171); }
+    th.chead { color: var(--green, #34d399) !important; }
+    th.phead { color: var(--red, #f87171) !important; }
+    td.cside { color: color-mix(in srgb, var(--green, #34d399) 26%, var(--text)); }
+    td.pside { color: color-mix(in srgb, var(--red, #f87171) 26%, var(--text)); }
     .hm td { min-width: 44px; }
-    .hm .cc { color: var(--green); } .hm .pp { color: var(--red); }
+    .hm .cc { color: var(--green, #34d399); } .hm .pp { color: var(--red, #f87171); }
     canvas#ivCanvas { width: 100%; max-width: 1100px; height: 380px; }
     .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; }
     .kv .k { color: var(--muted); }
@@ -221,7 +228,7 @@ function renderChain(){
     }
     parts.push(`<details class="card"${open?' open':''}><summary class="expHead"><b>${esc(e.exp)}</b><span class="dte">${e.dte} DTE</span><span class="muted">${ks.length} strikes</span></summary>
       <div class="scrollx"><table class="opt">
-      <tr><th colspan="5" style="text-align:left">Calls</th><th class="strikeCol">Strike</th><th class="strikeCol">IV</th><th colspan="5">Puts</th><th></th></tr>
+      <tr><th colspan="5" class="chead" style="text-align:left">Calls</th><th class="strikeCol">Strike</th><th class="strikeCol">IV</th><th colspan="5" class="phead">Puts</th><th></th></tr>
       <tr><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th class="strikeCol"></th><th class="strikeCol"></th><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th>OI(P)</th></tr>
       ${rowsHtml}</table></div></details>`);
   });
