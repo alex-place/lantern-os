@@ -1,0 +1,132 @@
+{
+  "date": "2026-07-25",
+  "candidate": "buy favorites (high-price YES) and hold to settlement",
+  "source_claim": "Buergi & Whelan, CEPR DP20631 / GWU 2026-001, 300k+ contracts: low-price contracts lose, high-price win and yield small positive returns; takers ~-32%, makers ~-10%",
+  "our_sample": "independent: 42 series, 10 categories, July 2026, settlement ground truth",
+  "cluster_unit": "MARKET (trades in one market share one settlement)",
+  "buckets": [
+    {
+      "bucket": "1-15",
+      "lo": 1,
+      "markets": 970,
+      "contracts": 47872686,
+      "net_c_per_contract": 5.557,
+      "t": 6.01,
+      "p": 0.0,
+      "mean_pct_return": 76.36,
+      "settle_yes_rate": 10.3,
+      "worst_market_c": -14.54,
+      "pct_markets_positive": 10.3
+    },
+    {
+      "bucket": "15-30",
+      "lo": 15,
+      "markets": 778,
+      "contracts": 23952012,
+      "net_c_per_contract": -0.387,
+      "t": -0.27,
+      "p": 0.7887,
+      "mean_pct_return": -9.18,
+      "settle_yes_rate": 22.1,
+      "worst_market_c": -30.44,
+      "pct_markets_positive": 22.1
+    },
+    {
+      "bucket": "30-45",
+      "lo": 30,
+      "markets": 652,
+      "contracts": 18527534,
+      "net_c_per_contract": -6.229,
+      "t": -3.48,
+      "p": 0.0005,
+      "mean_pct_return": -19.47,
+      "settle_yes_rate": 31.9,
+      "worst_market_c": -45.72,
+      "pct_markets_positive": 31.9
+    },
+    {
+      "bucket": "45-55",
+      "lo": 45,
+      "markets": 577,
+      "contracts": 23594933,
+      "net_c_per_contract": -8.566,
+      "t": -4.2,
+      "p": 0.0,
+      "mean_pct_return": -18.22,
+      "settle_yes_rate": 42.5,
+      "worst_market_c": -55.74,
+      "pct_markets_positive": 42.5
+    },
+    {
+      "bucket": "55-70",
+      "lo": 55,
+      "markets": 530,
+      "contracts": 20792793,
+      "net_c_per_contract": -12.134,
+      "t": -5.68,
+      "p": 0.0,
+      "mean_pct_return": -20.73,
+      "settle_yes_rate": 50.8,
+      "worst_market_c": -70.5,
+      "pct_markets_positive": 50.8
+    },
+    {
+      "bucket": "70-85",
+      "lo": 70,
+      "markets": 469,
+      "contracts": 20918178,
+      "net_c_per_contract": -12.82,
+      "t": -5.93,
+      "p": 0.0,
+      "mean_pct_return": -17.09,
+      "settle_yes_rate": 65.5,
+      "worst_market_c": -84.94,
+      "pct_markets_positive": 65.5
+    },
+    {
+      "bucket": "85-95",
+      "lo": 85,
+      "markets": 417,
+      "contracts": 23545117,
+      "net_c_per_contract": -14.667,
+      "t": -7.06,
+      "p": 0.0,
+      "mean_pct_return": -16.66,
+      "settle_yes_rate": 75.5,
+      "worst_market_c": -94.39,
+      "pct_markets_positive": 75.5
+    },
+    {
+      "bucket": "95-99",
+      "lo": 95,
+      "markets": 353,
+      "contracts": 17034922,
+      "net_c_per_contract": -9.508,
+      "t": -5.41,
+      "p": 0.0,
+      "mean_pct_return": -9.83,
+      "settle_yes_rate": 87.5,
+      "worst_market_c": -98.88,
+      "pct_markets_positive": 87.5
+    }
+  ],
+  "high_bucket_by_category": {
+    "Elections": 5.427,
+    "Mentions": 4.079,
+    "Science and Technology": -14.178,
+    "Entertainment": -6.776,
+    "Crypto": 3.962,
+    "Commodities": -30.324,
+    "Sports": 5.005,
+    "Economics": -46.047,
+    "Climate and Weather": 0.665
+  },
+  "spearman_rho_net_vs_price": -0.857,
+  "gates": {
+    "F1_high_price_positive_significant": false,
+    "F2_monotone_flb_signature": false,
+    "F3_breadth_categories": true,
+    "F4_longshots_negative": false,
+    "VERDICT": "DOES NOT REPLICATE \u2014 buying favorites is not profitable net of fees in this sample"
+  }
+}
