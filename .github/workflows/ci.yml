@@ -50,9 +50,12 @@ jobs:
 
           missing = []
           for href in hrefs:
-            if href.startswith(("http", "https", "#", "mailto")):
-              continue
-            target = (html_path.parent / href).resolve()
+            if href.startswith(("http", "https", "#", "mailto")) or "?" in href:
+              continue  # external, anchor, or a server ROUTE (query string) — not a file
+            if href.startswith("/"):
+              target = (html_path.parent / href.lstrip("/")).resolve()  # server-absolute -> public/
+            else:
+              target = (html_path.parent / href).resolve()
             if not target.exists():
               missing.append(href)
 
