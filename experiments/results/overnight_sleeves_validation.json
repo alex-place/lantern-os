@@ -1,0 +1,158 @@
+{
+  "date": "2026-07-25",
+  "data": {
+    "SPY": {
+      "bars": 8428,
+      "from": "1993-01-29",
+      "to": "2026-07-24"
+    },
+    "QQQ": {
+      "bars": 6886,
+      "from": "1999-03-10",
+      "to": "2026-07-24"
+    },
+    "IWM": {
+      "bars": 6578,
+      "from": "2000-05-26",
+      "to": "2026-07-24"
+    },
+    "GLD": {
+      "bars": 5453,
+      "from": "2004-11-18",
+      "to": "2026-07-24"
+    }
+  },
+  "signals": {
+    "capitulation_SPY": {
+      "signal": "capitulation_20d_low",
+      "n": 589,
+      "mean_bp": 13.59,
+      "median_bp": 18.35,
+      "sd_bp": 111.2,
+      "t": 2.97,
+      "p": 0.003,
+      "win_rate_pct": 63.3,
+      "first_half_bp": 8.19,
+      "second_half_bp": 18.98,
+      "date_range": [
+        "1993-06-23",
+        "2026-03-30"
+      ],
+      "claimed_bp": 18.0,
+      "ratio_measured_to_claimed": 0.76
+    },
+    "bear_rally_fade_SPY": {
+      "signal": "bear_rally_fade",
+      "n": 441,
+      "mean_bp": -8.64,
+      "median_bp": -3.63,
+      "sd_bp": 124.2,
+      "t": -1.46,
+      "p": 0.1439,
+      "win_rate_pct": 46.5,
+      "first_half_bp": -2.84,
+      "second_half_bp": -14.42,
+      "date_range": [
+        "1994-04-05",
+        "2026-03-31"
+      ],
+      "claimed_bp": -13.0,
+      "ratio_measured_to_claimed": 0.66
+    },
+    "uptrend_notflat_SPY": {
+      "signal": "uptrend+notflat SPY",
+      "n": 1692,
+      "mean_bp": 5.0,
+      "median_bp": 8.04,
+      "sd_bp": 51.4,
+      "t": 4.0,
+      "p": 0.0001,
+      "win_rate_pct": 57.7,
+      "first_half_bp": 4.85,
+      "second_half_bp": 5.15,
+      "date_range": [
+        "1993-05-20",
+        "2026-07-13"
+      ]
+    },
+    "uptrend_notflat_IWM": {
+      "signal": "uptrend+notflat IWM",
+      "n": 1244,
+      "mean_bp": 5.4,
+      "median_bp": 5.23,
+      "sd_bp": 71.5,
+      "t": 2.66,
+      "p": 0.0078,
+      "win_rate_pct": 54.0,
+      "first_half_bp": 3.77,
+      "second_half_bp": 7.03,
+      "date_range": [
+        "2000-09-19",
+        "2026-06-24"
+      ]
+    },
+    "uptrend_notflat_GLD": {
+      "signal": "uptrend+notflat GLD",
+      "n": 1400,
+      "mean_bp": 4.37,
+      "median_bp": 6.29,
+      "sd_bp": 88.6,
+      "t": 1.84,
+      "p": 0.0652,
+      "win_rate_pct": 53.1,
+      "first_half_bp": 1.73,
+      "second_half_bp": 7.01,
+      "date_range": [
+        "2005-03-04",
+        "2026-03-13"
+      ]
+    },
+    "uptrend_flat_QQQ": {
+      "signal": "uptrend+flat QQQ",
+      "n": 2721,
+      "mean_bp": 4.35,
+      "median_bp": 6.43,
+      "sd_bp": 61.9,
+      "t": 3.66,
+      "p": 0.0002,
+      "win_rate_pct": 55.6,
+      "first_half_bp": 2.71,
+      "second_half_bp": 5.99,
+      "date_range": [
+        "1999-06-30",
+        "2026-06-04"
+      ]
+    }
+  },
+  "baseline_unconditional_overnight_SPY": {
+    "n": 8427,
+    "mean_bp": 3.27,
+    "t": 4.49,
+    "p": 0.0
+  },
+  "gates": {
+    "V1_capitulation_positive_t3": {
+      "PASS": false,
+      "mean_bp": 13.59,
+      "t": 2.97,
+      "n": 589
+    },
+    "V2_magnitude_within_2x_of_claim": {
+      "PASS": true,
+      "measured": 13.59,
+      "claimed": 18.0
+    },
+    "V3_fade_negative": {
+      "PASS": true,
+      "measured": -8.64,
+      "claimed": -13.0,
+      "t": -1.46
+    },
+    "V4_both_halves_positive": {
+      "PASS": true,
+      "first": 8.19,
+      "second": 18.98
+    },
+    "VERDICT": "DOES NOT REPRODUCE \u2014 the shipped capitulation claim fails on 33 years of real data"
+  }
+}
