@@ -156,11 +156,13 @@ async function _autoscanTick() {
           }
           continue;                                              // day-trader paused for this account
         }
-        // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
-        // so entries/signal-exits only touch names they curated. Held-position exits
-        // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
-        const wl = new Set(watchlistStore.getWatchlist(uid).map((s) => String(s).toUpperCase()));
-        const userScan = { ...scan, signals: (scan.signals || []).filter((s) => wl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
+        // The AI trades each user's TRADELIST — its own user-editable universe — never
+        // the watchlist (which is tracking-only now; manual buy/sell stays free on any
+        // symbol). Filter the (union) scan to this user's tradelist so entries/signal-
+        // exits only touch names they explicitly allowed the AI. Held-position exits
+        // (trailing/momentum/backstop) still run for ALL of the account's longs.
+        const tl = new Set(require('../lib/tradelist-store').getTradelist(uid).map((s) => String(s).toUpperCase()));
+        const userScan = { ...scan, signals: (scan.signals || []).filter((s) => tl.has(String((s && (s.symbol || s.ticker)) || '').toUpperCase())) };
         // Every execution is already appended to the durable autopilot-trades.jsonl by
         // auto-trader.logTrade() — that append-only file is the record of what the
         // autopilot did, so a per-tick console echo here would only duplicate it.
@@ -313,6 +315,7 @@ const DIRECT_DASHBOARD_PROXY_PATHS = new Set([
 const marketRoutes = require('./trading/market');
 const ordersRoutes = require('./trading/orders');
 const watchlistRoutes = require('./trading/watchlist');
+const tradelistRoutes = require('./trading/tradelist');
 const dashboardRoutes = require('./trading/dashboard');
 const ibkrRoutes = require('./trading/ibkr');
 const kalshiRoutes = require('./trading/kalshi');
@@ -365,6 +368,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await marketRoutes(req, res, url, ctx)) return true;
   if (await ordersRoutes(req, res, url, ctx)) return true;
   if (await watchlistRoutes(req, res, url, ctx)) return true;
+  if (await tradelistRoutes(req, res, url, ctx)) return true;
   if (await dashboardRoutes(req, res, url, ctx)) return true;
   if (await ibkrRoutes(req, res, url, ctx)) return true;
   if (await kalshiRoutes(req, res, url, ctx)) return true;

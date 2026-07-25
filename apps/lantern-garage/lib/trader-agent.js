@@ -42,9 +42,14 @@ class TraderAgent {
     this.ibkr = new IbkrCpapi();
   }
 
-  // The scan + collectors read the UNION of every user's watchlist so all watched
-  // symbols have data. Per-user lists live in watchlist-store; edit them there.
-  get watchlist() { return watchlistStore.allTickers(); }
+  // The scan + collectors read the UNION of every user's WATCHLIST (tracking) and
+  // TRADELIST (the AI's per-user trading universe) so every symbol either surface
+  // cares about has signals/zones/bars. Per-user lists live in their stores.
+  get watchlist() {
+    const set = new Set(watchlistStore.allTickers());
+    try { for (const t of require('./tradelist-store').allTickers()) set.add(t); } catch (_e) { /* store absent → watchlists only */ }
+    return [...set];
+  }
 
   _parseWatchlist(envString) {
     if (!envString) return ['SPY', 'AAPL', 'TSLA', 'NVDA', 'AMD'];
