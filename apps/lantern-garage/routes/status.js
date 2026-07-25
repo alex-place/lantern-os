@@ -8,6 +8,14 @@ const fs = require("fs");
 let _modelMetricsCache = { data: null, ts: 0 };
 const METRICS_CACHE_TTL_MS = 5000;
 
+// /api/serving/status cache. The handler shells out to Python via execSync — a
+// SYNCHRONOUS ~800ms child-process spawn that froze the WHOLE event loop on every
+// call (every open page's footer polls this every 30s, so the entire site — statics
+// included — stalled behind it; measured 816ms static fetches during page load).
+// The serving mode changes only via env/config, so 15s staleness is free.
+let _servingCache = { payload: null, ts: 0 };
+const SERVING_CACHE_TTL_MS = 15_000;
+
 // Which git branch/checkout is this server serving? Cached for 60s so a /api/health
 // probe (hit frequently by a watchdog) never shells out to git on every call. Returns
 // null if git is unavailable rather than throwing — health must never fail on this.
@@ -399,6 +407,10 @@ module.exports = async function statusRoutes(req, res, url, deps) {
 
   // GET /api/serving/status — Verify active serving mode + decode params (#729)
   if (url.pathname === "/api/serving/status") {
+    if (_servingCache.payload && Date.now() - _servingCache.ts < SERVING_CACHE_TTL_MS) {
+      sendJson(res, { ..._servingCache.payload, cached: true }, 200);
+      return true;
+    }
     const { execSync: _exec } = require("child_process");
     const ouroNative = process.env.OURO_NATIVE || "";
     const fastActive = !/^(1|true|yes)$/i.test(ouroNative);
@@ -416,7 +428,7 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       modeDetail = JSON.parse(raw);
     } catch { /* Python unavailable — fall back to env-based inference */ }
     const localModel = await probeLocalModel();
-    sendJson(res, {
+    const payload = {
       ok: true,
       fast_mode_active: fastActive,
       ouro_native_env: ouroNative || null,
@@ -426,7 +438,9 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       decode_params: modeDetail?.decode_params || null,
       local_model: localModel,
       generatedAt: new Date().toISOString(),
-    });
+    };
+    _servingCache = { payload, ts: Date.now() };
+    sendJson(res, payload);
     return true;
   }
 

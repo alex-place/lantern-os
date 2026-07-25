@@ -62,6 +62,10 @@ const OWNED = new Set([
   '/api/trading/ibkr/connection',
 ]);
 
+// Per-user cache of the live-gateway probe (see GET connection below).
+const _probeCache = new Map(); // userId → { live, ts }
+const PROBE_CACHE_TTL_MS = 20_000;
+
 module.exports = async function ibkrRoutes(req, res, url) {
   const path = url.pathname;
   if (!OWNED.has(path)) return false; // account/positions/status live in routes/trading
@@ -69,10 +73,22 @@ module.exports = async function ibkrRoutes(req, res, url) {
   const userId = getEffectiveUserId(req);
   if (!userId) { _json(res, 401, { error: 'not_authenticated' }); return true; }
 
-  // GET connection status
+  // GET connection status. The live probe hits the IBKR gateway and can take
+  // seconds (measured ~3s) — every trader-page load calls this, pinning one of
+  // the browser's six connections and making the whole page feel slow. The
+  // gateway's state doesn't flap second-to-second: cache the probe 20s per user.
   if (req.method === 'GET' && path === '/api/trading/ibkr/connection') {
     const status = store.publicStatus(userId);
-    if (status.hasCredentials) status.live = await _probe(userId);
+    if (status.hasCredentials) {
+      const hit = _probeCache.get(userId);
+      if (hit && Date.now() - hit.ts < PROBE_CACHE_TTL_MS) {
+        status.live = hit.live;
+        status.cached = true;
+      } else {
+        status.live = await _probe(userId);
+        _probeCache.set(userId, { live: status.live, ts: Date.now() });
+      }
+    }
     _json(res, 200, status);
     return true;
   }
@@ -94,6 +110,7 @@ module.exports = async function ibkrRoutes(req, res, url) {
     if (norm.error) { _json(res, 400, { error: norm.error }); return true; }
     store.save(userId, norm.creds);
     const live = await _probe(userId);
+    _probeCache.set(userId, { live, ts: Date.now() });   // fresh creds → fresh cache
     _json(res, 200, { ok: true, status: store.publicStatus(userId), live });
     return true;
   }
@@ -101,6 +118,7 @@ module.exports = async function ibkrRoutes(req, res, url) {
   // POST disconnect — delete creds
   if (req.method === 'POST' && path === '/api/trading/ibkr/disconnect') {
     const removed = store.remove(userId);
+    _probeCache.delete(userId);
     _json(res, 200, { ok: true, removed });
     return true;
   }
