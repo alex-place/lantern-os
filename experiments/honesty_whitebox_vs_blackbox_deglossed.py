@@ -104,8 +104,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=MODEL)
     ap.add_argument("--bits4", action="store_true", help="load 4-bit NF4 (the 7B rung on an 8GB box)")
-    a = ap.parse_args()
-    model_id = a.model
+    args = ap.parse_args()
+    model_id = args.model
 
     import numpy as np
     import torch
@@ -113,13 +113,13 @@ def main():
 
     rows = [json.loads(l) for l in open(DATA, encoding="utf-8") if l.strip()]
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"DE-GLOSSED head-to-head | {len(rows)} statements | {model_id} | {device} | 4bit={a.bits4}", flush=True)
+    print(f"DE-GLOSSED head-to-head | {len(rows)} statements | {model_id} | {device} | 4bit={args.bits4}", flush=True)
 
     tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
     kw = dict(trust_remote_code=True)
-    if a.bits4:
+    if args.bits4:
         from transformers import BitsAndBytesConfig
         kw["quantization_config"] = BitsAndBytesConfig(
             load_in_4bit=True, bnb_4bit_quant_type="nf4",
@@ -128,7 +128,7 @@ def main():
     else:
         kw["torch_dtype"] = torch.float16 if device == "cuda" else torch.float32
     model = AutoModelForCausalLM.from_pretrained(model_id, **kw)
-    if not a.bits4:
+    if not args.bits4:
         model = model.to(device)
     model.train(False)
 
@@ -216,7 +216,7 @@ def main():
         "date": "2026-07-24",
         "status": "MEASURED — valid rerun of the honesty head-to-head on a DE-GLOSSED set",
         "why_this_rerun": "the HaluEval subset was style-separable (surface-only AUROC 0.9812) -> wedge unmeasurable there",
-        "model": model_id, "bits4": bool(a.bits4), "n": int(len(y)), "n_groups": len(set(grp.tolist())),
+        "model": model_id, "bits4": bool(args.bits4), "n": int(len(y)), "n_groups": len(set(grp.tolist())),
         "arm_A_white_box": {"by_layer": wb, "best_layer": best_L, "auroc": white_box},
         "arms_BC_black_box_raw": bb_scalars,
         "arm_D_black_box_trained": {"auroc": bb_comb, "fold_sd": bb_comb_sd},
