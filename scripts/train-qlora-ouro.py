@@ -55,6 +55,10 @@ def main():
     ap.add_argument("--lora-r", type=int, default=16, help="LoRA rank; alpha=2*r (handoff recipe: 32)")
     ap.add_argument("--seq", type=int, default=1536)  # audited p99=1219 on the FC corpus; 1024 truncates 3% from the END (cuts the tool call)
     ap.add_argument("--val-size", type=int, default=100, help="held-out val records for best-checkpoint selection (#2729)")
+    ap.add_argument("--seed", type=int, default=int(os.environ.get("OURO_SEED", "42")),
+                    help="RNG seed for the val split + weight init + data order (TrainingArguments seed/data_seed). "
+                         "Vary across runs of the SAME recipe to get an honest multi-seed variance estimate — a "
+                         "single-seed pass@1 can't separate a real lift from single-problem noise at n=164 (#2766).")
     ap.add_argument("--tripwire-loss", type=float, default=float(os.environ.get("OURO_TRIPWIRE_LOSS", "0.2")),
                     help="abort if TRAIN loss < this before epoch 2 (crude memorization guard). Set 0 to DISABLE "
                          "and rely on the held-out val best-checkpoint selection — which is the proper overfit guard "
@@ -200,7 +204,7 @@ def main():
     # consensus (Thinking Machines `lora_without_regret`; Unsloth): a small held-out val
     # split, eval every 50 steps, `load_best_model_at_end` on eval_loss.
     val_size = min(a.val_size, max(1, len(ds) // 5))
-    split = ds.train_test_split(test_size=val_size, seed=42, shuffle=True)
+    split = ds.train_test_split(test_size=val_size, seed=a.seed, shuffle=True)
     train_ds, eval_ds = split["train"], split["test"]
     print(f"train rows: {len(train_ds)}  val rows: {len(eval_ds)} (held-out for best-checkpoint selection)")
 
@@ -234,7 +238,7 @@ def main():
             eval_strategy="steps", eval_steps=50,                              # selection loop
             load_best_model_at_end=True, metric_for_best_model="eval_loss", greater_is_better=False,
             logging_steps=10, save_strategy="steps", save_steps=50, save_total_limit=12,
-            optim="paged_adamw_8bit",
+            optim="paged_adamw_8bit", seed=a.seed, data_seed=a.seed,
             gradient_checkpointing=True, report_to="none"))
     resume_arg = True if a.resume == "auto" else (a.resume or None)
     trainer.train(resume_from_checkpoint=resume_arg)
