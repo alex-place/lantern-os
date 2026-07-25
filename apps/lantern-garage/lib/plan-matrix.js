@@ -33,6 +33,8 @@ const ROLE_TO_PLAN = {
   supporter: "free",
   deep_dreamer: "pro",
   founder: "pro", // legacy alias for deep_dreamer (#698)
+  pilot: "pilot",
+  tech_support: "pilot", // staff
   admin: "pilot",
 };
 
@@ -49,6 +51,9 @@ const CAPABILITIES = {
   demo_view:          { minPlan: "free", label: "Live demo account view" },
   // ── Pro adds ($20) ──────────────────────────────────────────────────────────
   live_trading:       { minPlan: "pro", label: "Real-money trading via own broker", entitlement: "trade" },
+  trade_terminal:     { minPlan: "pro", label: "Trading terminal (manual orders + AI tradelist)" },
+  advisor:            { minPlan: "pro", label: "Portfolio advisor (risk/rebalance/planner)" },
+  options_manual:     { minPlan: "pro", label: "Manual paper options orders" },
   byok_keys:          { minPlan: "pro", label: "Bring-your-own AI keys (#2505)" },
   price_alerts:       { minPlan: "pro", label: "Price alerts + auto trade journal" },
   creator_suite:      { minPlan: "pro", label: "Creator Suite (video → shorts)" },

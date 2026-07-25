@@ -56,6 +56,39 @@ module.exports = async function optionsRoutes(req, res, url, ctx) {
     return true;
   }
 
+  // POST /api/trading/options/order — MANUAL paper option order (operator ask
+  // 2026-07-26: the user can place their own paper option trade; the AI doesn't own
+  // the account). Paper-host-only via options-shadow.placePaperOrder (live auth is
+  // refused in code). Signed-in users; Pro capability once PLAN_ENFORCEMENT=1.
+  if (url.pathname === '/api/trading/options/order' && req.method === 'POST') {
+    const uid = _uid();
+    if (!uid) { sendJson(res, { error: 'not_authenticated' }, 401); return true; }
+    if (process.env.PLAN_ENFORCEMENT === '1') {
+      try {
+        const am = require('../../lib/auth-middleware');
+        if (!am.hasEntitlement(req, 'options_manual')) {
+          sendJson(res, { error: 'pro_required', message: 'Manual options orders are a Pro ($20) feature' }, 403);
+          return true;
+        }
+      } catch (_e) { /* gate infra must never break the surface */ }
+    }
+    let body = {};
+    try { body = JSON.parse(await ctx.collectRequestBody(req) || '{}'); } catch (_e) { sendJson(res, { error: 'invalid_json' }, 400); return true; }
+    const shadow = require('../../lib/options-shadow');
+    const contract = String(body.contract || '').trim().toUpperCase();
+    const side = String(body.side || '').toLowerCase();
+    const qty = Math.floor(Number(body.qty));
+    const limit = Number(body.limit);
+    if (!shadow.parseOcc(contract)) { sendJson(res, { error: 'invalid_contract', message: 'expected an OCC option symbol (e.g. SPY260727C00745000)' }, 400); return true; }
+    if (side !== 'buy' && side !== 'sell') { sendJson(res, { error: 'invalid_side' }, 400); return true; }
+    if (!(qty >= 1 && qty <= 10)) { sendJson(res, { error: 'invalid_qty', message: 'qty must be 1-10 contracts' }, 400); return true; }
+    if (!(limit > 0 && limit <= 500)) { sendJson(res, { error: 'invalid_limit' }, 400); return true; }
+    const r = await shadow.placePaperOrder({ contract, side, qty, limit: +limit.toFixed(2) });
+    if (r.error) { sendJson(res, { ok: false, error: r.error }, 502); return true; }
+    sendJson(res, { ok: true, paper: true, order_id: r.order_id, status: r.status, contract, side, qty, limit }, 200);
+    return true;
+  }
+
   if (url.pathname === '/api/trading/options/strategies' && req.method === 'GET') {
     const symbol = url.searchParams.get('symbol') || '';
     const strategy = String(url.searchParams.get('strategy') || '').trim().toLowerCase();

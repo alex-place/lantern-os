@@ -142,6 +142,17 @@ async function _autoscanTick() {
       const sigma = require('../lib/sigma-trader');
       const _seenAccts = new Set();
       for (const uid of users) {
+        // AI-autopilot tier gate (operator tiering 2026-07-26): the autonomous
+        // trader is a $200 Pilot capability. Follows PLAN_ENFORCEMENT like every
+        // plan gate — unset, behavior unchanged. local-owner is the operator.
+        if (process.env.PLAN_ENFORCEMENT === '1' && uid !== 'local-owner') {
+          try {
+            const { getProfile } = require('../lib/user-profiles');
+            const role = String(((getProfile(uid) || {}).role) || 'guest');
+            const pm = require('../lib/plan-matrix');
+            if (!pm.roleHasCapability(role, 'ai_trader')) continue;   // not Pilot → no autopilot
+          } catch (_e) { /* profile store unavailable → fail open (legacy behavior) */ }
+        }
         const resolved = await brokerFacadeFor(uid, _autoBridge).catch(() => null);
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip

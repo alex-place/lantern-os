@@ -830,6 +830,19 @@
   .book-bar div{height:100%;background:var(--blue);border-radius:4px}
   .book-cap{font-family:var(--mono);font-size:9.5px;color:var(--text2);margin-left:6px}
   .book-note{font-family:var(--mono);font-size:12px;color:var(--text2);padding:14px}
+  /* Tier gating (operator tiering 2026-07-26): the Book is an internal/staff surface;
+     the Advisor is a Pro ($20) feature. Tabs stay out of the DOM's visible flow until
+     auth-gate stamps the plan classes on <body>. Server-side gates back these up. */
+  #tptab-book{display:none} body.is-admin #tptab-book{display:inline-block}
+  #tptab-advisor{display:none}
+  body.is-pro-plus #tptab-advisor, body.is-admin #tptab-advisor{display:inline-block}
+  .trade-lock{position:fixed;inset:52px 0 0 0;z-index:1500;display:flex;align-items:center;justify-content:center;
+    background:color-mix(in srgb, var(--bg0,#0b0d12) 72%, transparent);backdrop-filter:blur(7px)}
+  .trade-lock .tl-card{background:var(--bg1);border:1px solid var(--border);border-radius:16px;padding:28px 32px;max-width:430px;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .trade-lock h2{font-family:"Century Gothic","Franklin Gothic Heavy","Arial Rounded MT Bold","Segoe UI Black","Segoe UI",system-ui,sans-serif;font-size:20px;margin:0 0 8px}
+  .trade-lock p{font-family:var(--mono);font-size:12.5px;color:var(--text2);line-height:1.6;margin:0 0 18px}
+  .trade-lock a{display:inline-block;margin:0 6px;padding:9px 18px;border-radius:9px;font-size:13px;font-weight:600;text-decoration:none;border:1px solid var(--border);color:var(--text0)}
+  .trade-lock a.tl-cta{background:var(--blue);border-color:var(--blue);color:#fff}
 </style>
 </head>
 <body>
@@ -974,6 +987,18 @@
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
      move IN here (see hamburger JS); on desktop they live inline in the toolbar. -->
+<!-- Pro gate: the trading terminal is a $20 Pro feature. Watching stays free
+     (the Watch page); this overlay only mounts for guests/Free users when the
+     auth funnel is on. Backed by server-side capability gates (plan-matrix). -->
+<div class="trade-lock" id="tradeLock" style="display:none" role="dialog" aria-label="Pro feature">
+  <div class="tl-card">
+    <h2>The trading terminal is a Pro feature</h2>
+    <p>Watching, charts, news and signals are free on the Watch page. Placing trades and editing the AI tradelist unlock with the <b>$20 Pro</b> plan; the autonomous AI trader is part of <b>$200 Pilot</b>.</p>
+    <a class="tl-cta" href="/pricing.html">See plans</a>
+    <a href="/watch.html">Back to Watch</a>
+    <a href="/auth.html?returnTo=%2Fstock-trader.html" id="tlSignin">Sign in</a>
+  </div>
+</div>
 <div class="hmenu" id="hmenu" hidden role="menu" aria-label="Trader actions"></div>
 <!-- Keyboard hint appended into the menu at runtime (kept out of the mover's way) -->
 
@@ -4657,7 +4682,17 @@ function initChartDrag(){
   });
 }
 
+async function applyTierGate(){
+  try{
+    const s = await (await fetch('/api/auth/session')).json();
+    if (s && s.authRequired === false) return;              // auth funnel off → operator box
+    const proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(String(s && s.role));
+    if (!proPlus) { const el = document.getElementById('tradeLock'); if (el) el.style.display='flex'; }
+  }catch(_e){ /* session unreachable → leave the page usable */ }
+}
+
 function startDashboard(){
+  applyTierGate();
   _restoreBarsCache();          // preload cached bars so the first chart render paints instantly
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).
