@@ -59,6 +59,13 @@ function cfg() {
     //    SELL next day the moment the bid is > 1¢ (target bid ≥ 2¢ = +100% gross),
     //    else record the expiry loss. Entries priced at the ASK, exits at the BID —
     //    the honest side of a 1¢ market.
+    // PAPER BRIDGE (operator go, 2026-07-25): OPTIONS_PAPER=1 → the same tickets the
+    // shadow measures are ALSO placed as real Alpaca PAPER option orders (account
+    // options_trading_level 3, verified), so the ledger gains broker-verified fills
+    // next to its quote-based estimates. Hard-gated to the paper host — a live-mode
+    // auth refuses. Default OFF; qty is contracts per leg (premium ≈ $1-40/leg).
+    paper: process.env.OPTIONS_PAPER === '1',
+    paperQty: Math.max(1, Math.min(10, n('OPTIONS_PAPER_QTY', 1))),
     pennyEnabled: process.env.OPTIONS_SHADOW_PENNY !== '0',
     pennyAskMax: n('OPTIONS_SHADOW_PENNY_ASK_MAX', 0.01),   // "1 penny" entry ceiling
     pennyExitBid: n('OPTIONS_SHADOW_PENNY_EXIT_BID', 0.02), // sell when bid ≥ this (> 1¢)
@@ -233,6 +240,39 @@ async function quoteOption(occSymbol) {
   return mid ? { bid, ask, mid } : null;
 }
 
+// ── paper bridge (Alpaca PAPER options orders — never the live host) ─────────
+function _post(host, p, body, headers) {
+  return new Promise((resolve) => {
+    const data = JSON.stringify(body);
+    const req = https.request({ host, path: p, method: 'POST', headers: { ...headers, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } }, (res) => {
+      let d = ''; res.on('data', (c) => (d += c));
+      res.on('end', () => { let j = null; try { j = JSON.parse(d); } catch (_e) { /* */ } resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json: j }); });
+    });
+    req.on('error', () => resolve({ ok: false, status: 0 }));
+    req.setTimeout(9000, () => { req.destroy(); resolve({ ok: false, status: 0, error: 'timeout' }); });
+    req.write(data); req.end();
+  });
+}
+/** Place ONE paper option order (marketable limit). Returns {order_id}|{error}.
+ *  Refuses anything but the paper trading host — this bridge never touches live. */
+async function placePaperOrder({ contract, side, qty, limit }) {
+  const auth = _auth();
+  if (!auth) return { error: 'no alpaca auth' };
+  if (auth.env === 'live') return { error: 'refused: live auth — the options bridge is paper-only' };
+  const body = { symbol: contract, qty: String(qty), side, type: 'limit', time_in_force: 'day', limit_price: String(limit) };
+  const r = await _post('paper-api.alpaca.markets', '/v2/orders', body, auth.headers);
+  if (!r.ok) return { error: `order ${r.status}: ${(r.json && (r.json.message || r.json.error)) || ''}`.trim() };
+  return { order_id: r.json && r.json.id, status: r.json && r.json.status };
+}
+/** Best-effort fill lookup for a paper order id → {filled_avg_price, status}|null. */
+async function paperOrderFill(orderId) {
+  const auth = _auth();
+  if (!auth || auth.env === 'live' || !orderId) return null;
+  const r = await _get('paper-api.alpaca.markets', `/v2/orders/${encodeURIComponent(orderId)}`, auth.headers);
+  if (!r.ok || !r.json) return null;
+  return { status: r.json.status, filled_avg_price: r.json.filled_avg_price != null ? Number(r.json.filled_avg_price) : null };
+}
+
 // ── shadow orchestration ─────────────────────────────────────────────────────
 function _readState() { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (_e) { return {}; } }
 function _writeState(s) { try { fs.mkdirSync(ROOT, { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(s)); } catch (_e) { /* */ } }
@@ -275,8 +315,29 @@ async function probe() {
   return { ...out, data: 'ok', expiry: chain.expiry, legs, penny };
 }
 
+/** Sell a leg's paper position (marketable limit at the bid, floor 1¢) and log the
+ *  entry order's actual fill next to it. No-op unless the bridge is on AND this leg
+ *  carries an order_id from its own paper entry. */
+async function _paperClose(c, l, bid, rule) {
+  if (!c.paper || !l.order_id) return;
+  try {
+    const entryFill = await paperOrderFill(l.order_id);
+    // An unfilled entry (limit never touched) has nothing to sell — record that.
+    if (entryFill && entryFill.status !== 'filled') {
+      _append({ phase: 'paper_close', date: (new Date()).toISOString().slice(0, 10), contract: l.contract, depth: l.depth, entry_order: l.order_id, entry_status: entryFill.status, note: 'entry never filled — nothing to sell' });
+      return;
+    }
+    const limit = Math.max(0.01, +(bid || 0.01).toFixed(2));
+    const r = await placePaperOrder({ contract: l.contract, side: 'sell', qty: c.paperQty, limit });
+    _append({ phase: 'paper_close', date: (new Date()).toISOString().slice(0, 10), contract: l.contract, depth: l.depth, exit_rule: rule, qty: c.paperQty, limit,
+      entry_order: l.order_id, entry_fill: entryFill && entryFill.filled_avg_price,
+      ...(r.order_id ? { order_id: r.order_id, order_status: r.status } : { error: r.error }) });
+  } catch (_e) { /* the bridge must never break the shadow measurement */ }
+}
+
 /** Called every scan tick (fail-soft). Opens the shadow at the close window on eligible
- *  nights; closes it at the next open window. Never places an order anywhere. */
+ *  nights; closes it at the next open window. The paper bridge (OPTIONS_PAPER=1)
+ *  mirrors the tickets to the Alpaca PAPER account; otherwise nothing is placed. */
 async function tick() {
   const c = cfg();
   if (!c.enabled) return;
@@ -294,10 +355,21 @@ async function tick() {
     const legs = ((p && p.legs) || []).filter((l) => l.contract && l.quote && l.quote.mid > 0);
     if (p.gates && p.gates.eligible && legs.length) {
       st.open = { date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot,
-        legs: legs.map((l) => ({ depth: l.depth, strike: l.strike, contract: l.contract, entry_mid: l.quote.mid })) };
+        legs: legs.map((l) => ({ depth: l.depth, strike: l.strike, contract: l.contract, entry_mid: l.quote.mid, entry_ask: l.quote.ask || null })) };
       if (p.penny && p.penny.pick) {
         st.open.legs.push({ depth: 'penny', strike: p.penny.pick.strike, contract: p.penny.pick.symbol,
           entry_mid: p.penny.pick.ask, entry_ask: p.penny.pick.ask, sigma: p.penny.pick.sigma, dist_pct: p.penny.pick.distPct });
+      }
+      // PAPER BRIDGE: buy the same tickets on the paper account (limit at the ask —
+      // the honest side). Order ids ride on the legs so the exits can close them.
+      if (c.paper) {
+        for (const l of st.open.legs) {
+          const limit = +(l.entry_ask || l.entry_mid).toFixed(2);
+          if (!(limit > 0)) continue;
+          const r = await placePaperOrder({ contract: l.contract, side: 'buy', qty: c.paperQty, limit });
+          if (r.order_id) l.order_id = r.order_id;
+          _append({ phase: 'paper_open', date: today, symbol: c.symbol, depth: l.depth, contract: l.contract, qty: c.paperQty, limit, ...(r.order_id ? { order_id: r.order_id, order_status: r.status } : { error: r.error }) });
+        }
       }
       st.lastOpenDate = today; _writeState(st);
       for (const l of st.open.legs) _append({ phase: 'open', date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot, ...l, gates: p.gates });
@@ -320,9 +392,11 @@ async function tick() {
       const bid = (q && q.bid) || 0;
       if (bid >= c.pennyExitBid) {
         const pl = ((bid - l.entry_mid) / l.entry_mid) * 100;
+        await _paperClose(c, l, bid, 'target_bid');
         _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: bid, exit_rule: 'target_bid', pl_pct: +pl.toFixed(1) });
       } else if (hm >= 1530) {
         const pl = ((bid - l.entry_mid) / l.entry_mid) * 100;   // usually −100 (bid 0 at expiry)
+        await _paperClose(c, l, bid, 'expiry');
         _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: bid, exit_rule: 'expiry', pl_pct: +pl.toFixed(1) });
       } else {
         keep.push(l);   // still watching
@@ -346,6 +420,7 @@ async function tick() {
       const q = await quoteOption(l.contract);
       if (q && q.mid > 0) {
         const pl = ((q.mid - l.entry_mid) / l.entry_mid) * 100;
+        await _paperClose(c, l, q.bid || q.mid, 'open');
         _append({ phase: 'close', date: st.open.date, symbol: st.open.symbol || c.symbol, expiry: st.open.expiry, spot_close: st.open.spot_close, ...l, exit_mid: q.mid, pl_pct: +pl.toFixed(1) });
       } else {
         remaining.push(l);   // no quote yet → retry next tick within the window
@@ -361,4 +436,4 @@ function status() {
   return { ...cfg(), minNights: MIN_N, state: _readState(), measured: summarize(rows), lastRows: rows.slice(-5) };
 }
 
-module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, LEDGER, MIN_N };
+module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, placePaperOrder, paperOrderFill, LEDGER, MIN_N };
