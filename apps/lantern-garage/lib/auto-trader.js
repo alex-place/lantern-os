@@ -63,6 +63,11 @@ const DEFAULTS = {
   trailArmPct: 1.5,        // …but arm the trail only once the position has gained ≥ this %
                            //    (so it locks GAINS; the entry−stopPct broker stop covers losses)
   takeProfitPct: 0,        // hard take-profit % (0 = off — let the trailing stop run)
+  takeProfitR: 1,          // R-MULTIPLE take-profit: exit at +takeProfitR × risk (risk =
+                           //    stopPct). Backtests show this engine's winners don't run —
+                           //    a tight 1R target beat 2R/3R on every basket (leveraged/
+                           //    inverse ETFs: 55% win, PF 1.17 at 1R vs 33% / 0.77 at 2R).
+                           //    0 = off (let the trailing stop run instead).
   // After firing an exit for a symbol, don't re-fire for this long. In extended hours an
   // exit limit can sit unfilled, and without this the loop re-placed the SAME exit every
   // scan — 30+ phantom "exit" log rows for one still-open position, and stacked orders.
@@ -94,6 +99,7 @@ function cfg() {
     trailPct: n('TRADER_TRAIL_PCT', DEFAULTS.trailPct),
     trailArmPct: n('TRADER_TRAIL_ARM_PCT', DEFAULTS.trailArmPct),
     takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
+    takeProfitR: n('TRADER_TAKE_PROFIT_R', DEFAULTS.takeProfitR),        // R-multiple take-profit (tight target)
     momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
     momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
     entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
@@ -310,7 +316,14 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     const peakGainPct = ((peak - entry) / entry) * 100;         // best gain reached
     const dropFromPeakPct = peak > 0 ? ((peak - cur) / peak) * 100 : 0;
 
-    // 1) Hard take-profit.
+    // 1a) R-multiple take-profit — exit at +takeProfitR × risk (risk = stopPct). This
+    //     engine's winners don't run: backtests show a tight 1R target beats 2R/3R on
+    //     every basket, so bank the gain fast instead of round-tripping it. 1R = +stopPct%.
+    if (c.takeProfitR > 0 && c.stopPct > 0 && pnlPct >= c.takeProfitR * c.stopPct) {
+      await closeLong(bridge, userId, sym, qty, p, `take_profit_R (+${pnlPct.toFixed(1)}% ≈ ${c.takeProfitR}R)`, out, now, { extended, refPrice: cur });
+      delete heldQty[sym]; continue;
+    }
+    // 1) Hard take-profit (fixed %, off by default).
     if (c.takeProfitPct > 0 && pnlPct >= c.takeProfitPct) {
       await closeLong(bridge, userId, sym, qty, p, `take_profit (+${pnlPct.toFixed(1)}%)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
