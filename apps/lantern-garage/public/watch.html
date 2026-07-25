@@ -452,7 +452,7 @@
   /* Patterns dropdown: the trigger reads "active" (accent) when any layer is opted in;
      the panel is a floating checklist positioned under whichever button opened it. */
   #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
-  .pat-menu{position:fixed;z-index:200;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
+  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
   .pat-menu[hidden]{display:none}
   .pat-menu-group{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);padding:8px 8px 3px}
   .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
@@ -984,6 +984,24 @@
       </button>
     </form>
   </aside>
+</div>
+
+<!-- Symbol-search popup (#1692) — the markup was lost in the watch/trade page
+     split, which broke "+ Add symbol" here; restored verbatim from the trader. -->
+<div class="sym-bg hidden" id="symSearchBg" onclick="if(event.target===this)closeSymbolSearch()">
+  <div class="sym-modal" role="dialog" aria-modal="true" aria-label="Symbol search">
+    <div class="sym-head">
+      <span aria-hidden="true">🔍</span>
+      <input id="symSearchInput" type="text" placeholder="Search symbol or company…" autocomplete="off" oninput="onSymSearchInput()" onkeydown="symSearchKey(event)" aria-label="Search symbol or company">
+      <span class="sym-close" role="button" tabindex="0" aria-label="Close symbol search" onclick="closeSymbolSearch()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeSymbolSearch()}" title="Close">✕</span>
+    </div>
+    <div class="sym-chips" id="symChips">
+      <button type="button" class="sym-chip active" data-class="" onclick="setSymClass('',this)">All</button>
+      <button type="button" class="sym-chip" data-class="us_equity" onclick="setSymClass('us_equity',this)">Stocks</button>
+      <button type="button" class="sym-chip" data-class="crypto" onclick="setSymClass('crypto',this)">Crypto</button>
+    </div>
+    <div class="sym-results" id="symResults"></div>
+  </div>
 </div>
 
 <!-- Fullscreen ticker chart -->
@@ -4767,7 +4785,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // the result is visible immediately. Chart controls (.hgroup) keep it open —
   // layout/type/timeframe are usually adjusted together.
   menu.addEventListener('click', e=>{
-    if(e.target.closest('.hgroup')) return;
+    // Chart controls keep the menu open (adjusted together): the .hgroup cluster on
+    // narrow screens AND the always-in-menu type/patterns/draw controls — closing
+    // here hid the Patterns popup's anchor, so it opened at 0x0 (operator report).
+    if(e.target.closest('.hgroup, #chartTypeSelect, #patternsToggle, #drawToolSel')) return;
     if(e.target.closest('a,button')) close();
   });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });

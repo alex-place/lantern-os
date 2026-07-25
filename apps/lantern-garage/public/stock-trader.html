@@ -449,7 +449,7 @@
   /* Patterns dropdown: the trigger reads "active" (accent) when any layer is opted in;
      the panel is a floating checklist positioned under whichever button opened it. */
   #patternsToggle.patterns-on,#fsPatternsToggle.patterns-on{background:color-mix(in srgb, var(--accent) 20%, transparent);border-color:var(--accent);color:var(--accent)}
-  .pat-menu{position:fixed;z-index:200;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
+  .pat-menu{position:fixed;z-index:1350;min-width:210px;max-height:70vh;overflow-y:auto;background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.4);padding:6px}
   .pat-menu[hidden]{display:none}
   .pat-menu-group{font-family:var(--mono);font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);padding:8px 8px 3px}
   .pat-menu-item{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:5px;cursor:pointer;font-family:var(--sans);font-size:13px;color:var(--text0);user-select:none}
@@ -4844,7 +4844,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // the result is visible immediately. Chart controls (.hgroup) keep it open —
   // layout/type/timeframe are usually adjusted together.
   menu.addEventListener('click', e=>{
-    if(e.target.closest('.hgroup')) return;
+    // Chart controls keep the menu open (adjusted together): the .hgroup cluster on
+    // narrow screens AND the always-in-menu type/patterns/draw controls — closing
+    // here hid the Patterns popup's anchor, so it opened at 0x0 (operator report).
+    if(e.target.closest('.hgroup, #chartTypeSelect, #patternsToggle, #drawToolSel')) return;
     if(e.target.closest('a,button')) close();
   });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
