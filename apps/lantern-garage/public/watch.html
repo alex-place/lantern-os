@@ -4317,6 +4317,7 @@ function relTime(iso){
 }
 let NEWS = [];            // /api/trading/news/recent records, newest first
 let NEWS_SYM_ONLY = false; // filter to the selected watchlist symbol
+try { NEWS_SYM_ONLY = localStorage.getItem('watch.newsSym') === '1'; } catch(e) {}
 async function loadNews(force){
   try{
     const r = await fetch('/api/trading/news/recent?limit=150' + (force ? '&_=' + Date.now() : ''));
@@ -4329,15 +4330,21 @@ function toggleNewsSym(){
   NEWS_SYM_ONLY = !NEWS_SYM_ONLY;
   const b = document.getElementById('newsSymBtn');
   if(b){ b.classList.toggle('on', NEWS_SYM_ONLY); b.textContent = NEWS_SYM_ONLY ? (activeTicker||'selected')+' only' : 'All symbols'; }
+  try { localStorage.setItem('watch.newsSym', NEWS_SYM_ONLY ? '1' : '0'); } catch(e) {}
   renderNews();
 }
 let NEWS_BIG_ONLY = false; // only high-impact headlines (collector impact ≥ 75)
+try { NEWS_BIG_ONLY = localStorage.getItem('watch.newsBig') === '1'; } catch(e) {}
 function toggleNewsBig(){
   NEWS_BIG_ONLY = !NEWS_BIG_ONLY;
   const b = document.getElementById('newsBigBtn');
   if(b) b.classList.toggle('on', NEWS_BIG_ONLY);
+  try { localStorage.setItem('watch.newsBig', NEWS_BIG_ONLY ? '1' : '0'); } catch(e) {}
   renderNews();
 }
+// Reflect restored filters on the chips at boot
+(function(){ const b=document.getElementById('newsBigBtn'); if(b&&NEWS_BIG_ONLY) b.classList.add('on');
+  const sb=document.getElementById('newsSymBtn'); if(sb&&NEWS_SYM_ONLY) sb.classList.add('on'); })();
 function renderNews(){
   const el = document.getElementById('newsList'); if(!el) return;
   const q = (document.getElementById('newsSearch')?.value||'').trim().toLowerCase();

@@ -143,14 +143,23 @@ const fmtVol = (v) => v==null ? '—' : v>=1000 ? (v/1000).toFixed(1)+'K' : Stri
 let CHAIN = null;   // { spot, expiries: [{exp, dte, rows: Map(strike → {call, put})}] }
 let N_STRIKES = 6;  // per side of spot; 0 = all
 let VOL_EXP = null; // selected expiry on the Volatility tab
+// Remembered view (symbol / strike filter / tab) — same convention as trader.* keys
+try {
+  const savedSym = localStorage.getItem('options.sym');
+  if (savedSym && /^[A-Z.\-]{1,6}$/.test(savedSym)) $('sym').value = savedSym;
+  const savedN = parseInt(localStorage.getItem('options.strikes'), 10);
+  if ([0,6,12].includes(savedN)) N_STRIKES = savedN;
+} catch (e) {}
 
 function showTab(t){
   for (const el of document.querySelectorAll('.tab')) el.classList.toggle('active', el.dataset.tab===t);
   for (const id of ['chain','vol','volume','strat']) $('tab-'+id).style.display = id===t ? '' : 'none';
+  try { localStorage.setItem('options.tab', t); } catch (e) {}
   if (t==='vol') drawIV();
 }
 function setStrikes(n){
   N_STRIKES = n;
+  try { localStorage.setItem('options.strikes', String(n)); } catch (e) {}
   for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===n);
   renderChain(); renderVolume();
 }
@@ -190,6 +199,7 @@ function strikesFor(rows, spot){
 
 async function loadAll(){
   const sym = ($('sym').value||'SPY').trim().toUpperCase();
+  try { localStorage.setItem('options.sym', sym); } catch (e) {}
   $('chainBody').innerHTML = 'Loading…'; $('meta').textContent=''; $('spot').textContent='';
   try{
     const d = await (await fetch('/api/trading/options/chain?symbol='+encodeURIComponent(sym))).json();
@@ -305,6 +315,9 @@ async function loadStrategy(){
   }catch(e){ el.innerHTML='<span class="muted">Failed — '+esc(e.message)+'</span>'; }
 }
 
+// Restore the remembered strike filter + tab, then load.
+for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===N_STRIKES);
+try { const t = localStorage.getItem('options.tab'); if (['chain','vol','volume','strat'].includes(t)) showTab(t); } catch (e) {}
 loadAll();
 </script>
 </html>
