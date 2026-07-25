@@ -36,6 +36,7 @@ Run (GPU venv):  .venv-train/Scripts/python experiments/honesty_whitebox_vs_blac
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import re
@@ -45,7 +46,7 @@ if os.name == "nt":
 
 DATA = os.path.join("data", "eval", "v1_10", "probe-sets-v1.jsonl")
 OUT = os.path.join("experiments", "results", "honesty_whitebox_vs_blackbox_deglossed.json")
-MODEL = "Qwen/Qwen2.5-1.5B-Instruct"
+MODEL = "Qwen/Qwen2.5-1.5B-Instruct"   # default; --model/--bits4 override (7B rung needs 4-bit on 8GB)
 DEPTHS = (0.4, 0.5, 0.6, 0.7)
 SEED = 42
 
@@ -100,20 +101,35 @@ def scalar_auroc(scores, y):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--model", default=MODEL)
+    ap.add_argument("--bits4", action="store_true", help="load 4-bit NF4 (the 7B rung on an 8GB box)")
+    a = ap.parse_args()
+    model_id = a.model
+
     import numpy as np
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer
 
     rows = [json.loads(l) for l in open(DATA, encoding="utf-8") if l.strip()]
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"DE-GLOSSED head-to-head | {len(rows)} statements | {MODEL} | {device}", flush=True)
+    print(f"DE-GLOSSED head-to-head | {len(rows)} statements | {model_id} | {device} | 4bit={a.bits4}", flush=True)
 
-    tok = AutoTokenizer.from_pretrained(MODEL, trust_remote_code=True)
+    tok = AutoTokenizer.from_pretrained(model_id, trust_remote_code=True)
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL, trust_remote_code=True,
-        torch_dtype=torch.float16 if device == "cuda" else torch.float32).to(device)
+    kw = dict(trust_remote_code=True)
+    if a.bits4:
+        from transformers import BitsAndBytesConfig
+        kw["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True)
+        kw["device_map"] = "auto"
+    else:
+        kw["torch_dtype"] = torch.float16 if device == "cuda" else torch.float32
+    model = AutoModelForCausalLM.from_pretrained(model_id, **kw)
+    if not a.bits4:
+        model = model.to(device)
     model.train(False)
 
     with torch.no_grad():
@@ -200,7 +216,7 @@ def main():
         "date": "2026-07-24",
         "status": "MEASURED — valid rerun of the honesty head-to-head on a DE-GLOSSED set",
         "why_this_rerun": "the HaluEval subset was style-separable (surface-only AUROC 0.9812) -> wedge unmeasurable there",
-        "model": MODEL, "n": int(len(y)), "n_groups": len(set(grp.tolist())),
+        "model": model_id, "bits4": bool(a.bits4), "n": int(len(y)), "n_groups": len(set(grp.tolist())),
         "arm_A_white_box": {"by_layer": wb, "best_layer": best_L, "auroc": white_box},
         "arms_BC_black_box_raw": bb_scalars,
         "arm_D_black_box_trained": {"auroc": bb_comb, "fold_sd": bb_comb_sd},
@@ -238,7 +254,7 @@ def main():
               f"{v['black_box_min_logprob']:.3f} | {v['surface_control']:.3f}")
     print(f"\n  GATES: G-H1={g1}  G-H2={g2}  G-H3={g3}")
     print(f"  VERDICT: {verdict}")
-    print("full report ->", OUT)
+    print("full report ->", out_path)
 
 
 if __name__ == "__main__":
