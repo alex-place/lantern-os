@@ -265,6 +265,19 @@ async function scanAll(watchlist) {
       const sector_trend = secEtf && sectorMom[secEtf] != null ? sectorMom[secEtf] : null;
       const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend });
 
+      // ── Trend/regime filter (TRADER_REGIME_FILTER, on by default) ──────────────
+      // The engine buys oversold DIPS; in a downtrend that's catching a falling knife —
+      // walk-forward backtests showed this is where the edge is destroyed (single-stock
+      // longs 26% win / PF 0.65). Only take a BULLISH entry when the name is trend-aligned:
+      // price above its SMA-50 (on the 15m scan bars) AND MACD histogram positive. Same
+      // gate the backtest used to flip the book from negative to positive expectancy.
+      // Fail-open on insufficient history (SMA-50 unknown → don't block on price alone).
+      if (process.env.TRADER_REGIME_FILTER !== '0' && direction === 'BULLISH' && convergence && convergence.decision === 'ENTER') {
+        const sma50 = closes15.length >= 50 ? closes15.slice(-50).reduce((s, x) => s + x, 0) / 50 : null;
+        const trendOk = (sma50 == null || price > sma50) && macd_hist > 0;
+        if (!trendOk) { convergence.decision = 'SKIP'; convergence.skip_reason = 'regime_filter: not trend-aligned (need price>SMA50 & MACD hist>0)'; }
+      }
+
       // Trade plan (framework Step 6): ATR-based risk unit, R-multiple targets, and
       // an ATR-scaled holding-horizon estimate. Levels prefer real S/R when close.
       const a = atr(b15);

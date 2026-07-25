@@ -337,7 +337,7 @@ jobs:
       - name: Check new files don't duplicate existing ones
         shell: python3 {0}
         run: |
-          import subprocess, sys, os, pathlib
+          import difflib, subprocess, sys, pathlib
 
           # Get list of new files added in this PR
           result = subprocess.run(
@@ -360,40 +360,78 @@ jobs:
             "package.json", "package-lock.json", "tsconfig.json",
           }
 
+          # A shared BASENAME alone is not duplication — lib/x.js + routes/**/x.js is
+          # this repo's paired-module convention (a route wrapper requiring its lib;
+          # false-blocked #2937). Flag only when the CONTENT is actually near-identical.
+          SIMILAR = 0.90        # SequenceMatcher ratio at/above this = duplicate
+          MAX_COMPARE = 200_000 # skip similarity on huge files (quadratic worst case)
+
+          def read_text(path):
+            try:
+              return pathlib.Path(path).read_text(errors="ignore")
+            except OSError:
+              return None
+
           slop = []
           for f in new_files:
             name = pathlib.Path(f).name
             if name in UBIQUITOUS:
               continue  # standard boilerplate — not a duplicate signal
+            new_text = read_text(f)
+            if new_text is None or len(new_text) > MAX_COMPARE:
+              continue
             # Find files with the same name anywhere in the repo
             existing = subprocess.run(
               ["git", "ls-files", "--", f"**/{name}", name],
               capture_output=True, text=True
             ).stdout.strip().splitlines()
-            dupes = [e for e in existing if e != f]
+            dupes = []
+            for e in existing:
+              if e == f:
+                continue
+              other = read_text(e)
+              if other is None or not other.strip() or len(other) > MAX_COMPARE:
+                continue
+              sm = difflib.SequenceMatcher(None, new_text, other)
+              # cheap upper bounds first; full ratio only when they clear the bar
+              if (sm.real_quick_ratio() >= SIMILAR and sm.quick_ratio() >= SIMILAR
+                  and sm.ratio() >= SIMILAR):
+                dupes.append(f"{e} ({sm.ratio():.0%} identical)")
             if dupes:
               slop.append(f"  {f} duplicates: {', '.join(dupes)}")
 
           if slop:
-            print("::error::Possible duplicate files added (check before creating new files):")
+            print("::error::Near-duplicate files added (consolidate instead of copying):")
             for s in slop:
               print(s)
             sys.exit(1)
 
-          print(f"Checked {len(new_files)} new file(s) — no duplicates found.")
+          print(f"Checked {len(new_files)} new file(s) — no content duplicates found.")
 
   slop-summary:
     name: Slop gate summary
     runs-on: ubuntu-latest
     needs: [secrets-scan, debug-pollution, security-basics, diff-size, boilerplate-check]
+    # always() so a member FAILURE turns this summary red instead of skipping it
+    # (a skipped summary read as "no verdict" and hid slop failures from the rollup).
+    if: always()
     steps:
-      - name: All slop checks passed
+      - name: Aggregate slop gate results
         run: |
-          echo "secrets-scan=${{ needs.secrets-scan.result }}"
-          echo "debug-pollution=${{ needs.debug-pollution.result }}"
-          echo "security-basics=${{ needs.security-basics.result }}"
-          echo "diff-size=${{ needs.diff-size.result }}"
-          echo "boilerplate-check=${{ needs.boilerplate-check.result }}"
+          fail=0
+          for pair in \
+            "secrets-scan=${{ needs.secrets-scan.result }}" \
+            "debug-pollution=${{ needs.debug-pollution.result }}" \
+            "security-basics=${{ needs.security-basics.result }}" \
+            "diff-size=${{ needs.diff-size.result }}" \
+            "boilerplate-check=${{ needs.boilerplate-check.result }}"; do
+            echo "$pair"
+            case "$pair" in *=success) ;; *) fail=1 ;; esac
+          done
+          if [ "$fail" -eq 1 ]; then
+            echo "::error::One or more slop gates did not pass — see the failing job above."
+            exit 1
+          fi
           echo "Slop gate: clean."
 
   # ── Code Review Gate ────────────────────────────────────────────────────────
@@ -574,10 +612,21 @@ jobs:
     name: Orchestration challenge summary
     runs-on: ubuntu-latest
     needs: [workflow-inventory, mcp-contract, action-pool-contract]
+    # always() so a member FAILURE turns this summary red instead of skipping it.
+    if: always()
     steps:
       - name: Summarize challenge lanes
         run: |
-          echo "workflow-inventory=${{ needs.workflow-inventory.result }}"
-          echo "mcp-contract=${{ needs.mcp-contract.result }}"
-          echo "action-pool-contract=${{ needs.action-pool-contract.result }}"
+          fail=0
+          for pair in \
+            "workflow-inventory=${{ needs.workflow-inventory.result }}" \
+            "mcp-contract=${{ needs.mcp-contract.result }}" \
+            "action-pool-contract=${{ needs.action-pool-contract.result }}"; do
+            echo "$pair"
+            case "$pair" in *=success) ;; *) fail=1 ;; esac
+          done
+          if [ "$fail" -eq 1 ]; then
+            echo "::error::An orchestration challenge lane did not pass."
+            exit 1
+          fi
           echo "Orchestration challenge complete."

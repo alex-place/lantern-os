@@ -76,11 +76,42 @@ jobs:
           path: _release/
           retention-days: 7
 
+  # ── E2E gate: the release must pass the hermetic auth journey ────────────────
+  # Same suite ci.yml runs per-PR (docs/TEST-AUTH.md): boots the real server on
+  # loopback with the token-gated test-auth path — no external keys needed. The
+  # full greenpath gate (LLM + Alpaca keys) is operator-run before tagging:
+  # .github/workflows/e2e-greenpath.yml (docs/GREENPATH-GATE.md).
+  e2e-gate:
+    name: Auth E2E gate (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          # 24 to match ci.yml's e2e-auth lane (the build job's NODE_VERSION=20 is
+          # for the production bundle, not the test runner).
+          node-version: "24"
+
+      - name: Install root deps (Playwright runner)
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install app deps (server under test)
+        working-directory: apps/lantern-garage
+        run: npm ci --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run auth E2E
+        run: npm run test:auth
+
   # ── Create GitHub Release ─────────────────────────────────────────────────────
   github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, e2e-gate]
 
     steps:
       - uses: actions/checkout@v7

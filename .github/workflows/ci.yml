@@ -171,6 +171,56 @@ jobs:
           retention-days: 30
 
   # ============================================================================
+  # E2E: Playwright auth journey (hermetic — boots the real server on loopback
+  # with the token-gated test-auth path; no external keys or services needed).
+  # Guest → role-picker → authed → logout, header/SSO emulation, email+password
+  # login. See docs/TEST-AUTH.md. The greenpath release gate (needs LLM+Alpaca
+  # keys) stays operator-triggered: .github/workflows/e2e-greenpath.yml.
+  # ============================================================================
+  e2e-auth:
+    name: Auth E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install root deps (Playwright runner)
+        # --ignore-scripts: root postinstall builds the Rust CSF engine, which the
+        # e2e runner does not need (csf-rust.yml covers it).
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install app deps (server under test)
+        run: cd apps/lantern-garage && npm ci --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run auth E2E
+        run: npm run test:auth
+
+      - name: Upload Playwright artifacts on failure
+        uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: e2e-auth-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # ============================================================================
   # CONVERGENCE: Consistency checks
   # ============================================================================
   convergence-check:
@@ -374,7 +424,7 @@ jobs:
   all-checks:
     name: All checks passed
     runs-on: ubuntu-latest
-    needs: [validate-repo, test-python, test-node, convergence-check, integration-checks, convergence-loop-validation, convergence-loop, security-scan, csf-cache-validate]
+    needs: [validate-repo, test-python, test-node, e2e-auth, convergence-check, integration-checks, convergence-loop-validation, convergence-loop, security-scan, csf-cache-validate]
     if: always()
     steps:
       - name: Check for failures
@@ -383,6 +433,7 @@ jobs:
           [ "${{ needs.validate-repo.result }}"              != "success" ] && FAILED="$FAILED validate-repo(${{ needs.validate-repo.result }})"
           [ "${{ needs.test-python.result }}"                != "success" ] && FAILED="$FAILED test-python(${{ needs.test-python.result }})"
           [ "${{ needs.test-node.result }}"                  != "success" ] && FAILED="$FAILED test-node(${{ needs.test-node.result }})"
+          [ "${{ needs.e2e-auth.result }}"                   != "success" ] && FAILED="$FAILED e2e-auth(${{ needs.e2e-auth.result }})"
           [ "${{ needs.convergence-check.result }}"          != "success" ] && FAILED="$FAILED convergence-check(${{ needs.convergence-check.result }})"
           [ "${{ needs.integration-checks.result }}"         != "success" ] && FAILED="$FAILED integration-checks(${{ needs.integration-checks.result }})"
           [ "${{ needs.convergence-loop-validation.result }}" != "success" ] && FAILED="$FAILED convergence-loop-validation(${{ needs.convergence-loop-validation.result }})"

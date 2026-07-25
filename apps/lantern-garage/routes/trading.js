@@ -72,6 +72,17 @@ function _isUsExtendedHours() {
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
+// Champion is a SLOW allocation book — it must not rebalance every autoscan tick like
+// the day-trader. Throttle to at most once per hour per user (the no-churn band means
+// most runs are no-ops anyway, but this avoids the per-tick bar fetch + order churn).
+const _championLastRun = new Map();
+const CHAMPION_MIN_INTERVAL_MS = 60 * 60 * 1000;
+function _championDue(uid, now) {
+  const last = _championLastRun.get(uid) || 0;
+  if (now - last < CHAMPION_MIN_INTERVAL_MS) return false;
+  _championLastRun.set(uid, now);
+  return true;
+}
 // Extended-hours (pre-market / after-hours) trading — OFF by default. When on (⏰ toggle
 // or TRADER_EXTENDED_HOURS=1) the trader also scans + acts during the extended session,
 // placing marketable-limit + outsideRTH orders (regular hours use market orders as before).
@@ -80,9 +91,16 @@ async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
+  // Asymmetric-options SHADOW trader (Verify stage): measurement only, never orders.
+  // Self-throttles to its own close/open ET windows; fail-soft so it can't break scans.
+  try { require('../lib/options-shadow').tick().catch(() => {}); } catch (_e) { /* absent/failed → skip */ }
   // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
   // (no Python spawn / model call — the price collectors keep polling for free).
   if (marketHours || extNow) {
+    // Overnight sleeve book (lib/overnight-trader.js): opt-in (OVERNIGHT_TRADER=1),
+    // dry unless OVERNIGHT_ARM=1. Self-windowing (15:45 enter / 09:31 exit ET) — a
+    // no-op on every other tick. Fail-soft: the scan loop must never die for it.
+    try { await require('../lib/overnight-trader').tick({ bridge: _autoBridge }); } catch (_e) { /* fail-soft */ }
     try {
       traderAgent.cache && (traderAgent.cache['market_scan'] = null); // force fresh each minute
       const scan = await traderAgent.scanMarket();
@@ -102,15 +120,42 @@ async function _autoscanTick() {
       // deduped. TRADER_AUTO_USER pins to one user (back-compat/testing). Per user the
       // broker facade resolves to their actual broker (IBKR preferred), so runAutoTrade
       // is broker-agnostic; every order still passes the per-account hard guard.
-      const users = process.env.TRADER_AUTO_USER
+      // Enumerate accounts to manage. Per-user credential FILES (IBKR / one-click Alpaca)
+      // give a userId each. BUT the common single-operator setup runs on Alpaca *server
+      // env keys* (or the local IBKR) under the id-less 'local-owner' identity — which has
+      // NO credential file, so it was invisible to the autopilot and its positions were
+      // never stopped/exited (losers ran unbounded). When the login gate is OFF (local /
+      // preview box), include 'local-owner' so that account IS managed. brokerFacadeFor
+      // returns null if nothing is actually connected for it, and the per-account dedupe
+      // below drops it if it aliases a file-backed account — so this can't double-trade.
+      let baseUsers = process.env.TRADER_AUTO_USER
         ? [process.env.TRADER_AUTO_USER]
-        : [...new Set([...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()])];
+        : [...ibkrCreds.listUsers(), ...alpacaCreds.listUsers()];
+      if (!process.env.TRADER_AUTO_USER) {
+        try {
+          const { loginGateEnabled } = require('../lib/auth-middleware');
+          if (!loginGateEnabled()) baseUsers.push('local-owner');
+        } catch (_e) { baseUsers.push('local-owner'); }   // auth module absent → single-user box
+      }
+      const users = [...new Set(baseUsers)];
+      const traderMode = require('../lib/trader-mode');
+      const sigma = require('../lib/sigma-trader');
       const _seenAccts = new Set();
       for (const uid of users) {
         const resolved = await brokerFacadeFor(uid, _autoBridge).catch(() => null);
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
         _seenAccts.add(resolved.accountId);
+        // ACTIVE-TRADER switch (Phase 2): one account, one strategy. A 'champion' user
+        // has the day-trader PAUSED — instead we run the Champion allocation book on
+        // their own account (throttled; DRY unless SIGMA_ARM=1, same governance as the
+        // standalone Sigma book). Default 'stock' users fall through to runAutoTrade.
+        if (traderMode.get(uid) === 'champion') {
+          if (_championDue(uid, Date.now())) {
+            await sigma.rebalanceNow({ userId: uid, arm: true }).catch((e) => console.error('[Trading] champion rebalance failed:', e.message));
+          }
+          continue;                                              // day-trader paused for this account
+        }
         // Trade each user's OWN watchlist: filter the (union) scan to this user's symbols
         // so entries/signal-exits only touch names they curated. Held-position exits
         // (trailing/momentum) still run for ALL of the account's longs, watchlist or not.
@@ -119,7 +164,12 @@ async function _autoscanTick() {
         // Every execution is already appended to the durable autopilot-trades.jsonl by
         // auto-trader.logTrade() — that append-only file is the record of what the
         // autopilot did, so a per-tick console echo here would only duplicate it.
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours });
+        // Position partitioning: symbols the overnight sleeve book currently owns are
+        // off-limits to the intraday engine (no exits/stops/sells/entries on them) —
+        // each engine manages only its own positions. Fail-soft empty set.
+        let _ovnHeld = [];
+        try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
@@ -276,6 +326,9 @@ const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
+const traderModeRoutes = require('./trading/mode');
+const optionsShadowRoutes = require('./trading/options-shadow');
+const overnightRoutes = require('./trading/overnight');
 
 
 module.exports = async function tradingRoutes(req, res, url, deps) {
@@ -324,6 +377,9 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await scorecardRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
+  if (await traderModeRoutes(req, res, url, ctx)) return true;
+  if (await optionsShadowRoutes(req, res, url, ctx)) return true;
+  if (await overnightRoutes(req, res, url, ctx)) return true;
   if (await miscRoutes(req, res, url, ctx)) return true;
 
   return false;
