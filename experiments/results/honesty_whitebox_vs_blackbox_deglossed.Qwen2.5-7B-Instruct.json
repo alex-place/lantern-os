@@ -1,0 +1,98 @@
+{
+  "date": "2026-07-24",
+  "status": "MEASURED \u2014 valid rerun of the honesty head-to-head on a DE-GLOSSED set",
+  "why_this_rerun": "the HaluEval subset was style-separable (surface-only AUROC 0.9812) -> wedge unmeasurable there",
+  "model": "Qwen/Qwen2.5-7B-Instruct",
+  "bits4": true,
+  "n": 294,
+  "n_groups": 224,
+  "arm_A_white_box": {
+    "by_layer": {
+      "L11": {
+        "auroc": 0.6508,
+        "fold_sd": 0.0736
+      },
+      "L14": {
+        "auroc": 0.7669,
+        "fold_sd": 0.0467
+      },
+      "L17": {
+        "auroc": 0.882,
+        "fold_sd": 0.0318
+      },
+      "L20": {
+        "auroc": 0.9192,
+        "fold_sd": 0.0462
+      }
+    },
+    "best_layer": "L20",
+    "auroc": 0.9192
+  },
+  "arms_BC_black_box_raw": {
+    "mean_logprob": 0.6233,
+    "min_logprob": 0.5211,
+    "perplexity": 0.6233,
+    "verbalized_P(True)": 0.9154
+  },
+  "arm_D_black_box_trained": {
+    "auroc": 0.8236,
+    "fold_sd": 0.0661
+  },
+  "best_black_box_any_arm": 0.9154,
+  "wedge_pp": 0.4,
+  "controls": {
+    "surface_degloss": {
+      "auroc": 0.526,
+      "fold_sd": 0.0282
+    },
+    "shuffle_label": {
+      "auroc": 0.5202
+    },
+    "split": "GroupKFold on statement stem (first 4 words) \u2014 stem-sharing pairs never split"
+  },
+  "per_family": {
+    "factual": {
+      "n": 90,
+      "white_box": 0.9832,
+      "black_box_verbalized": 0.9881,
+      "black_box_min_logprob": 0.6553,
+      "surface_control": 0.5825
+    },
+    "assoc": {
+      "n": 84,
+      "white_box": 0.8968,
+      "black_box_verbalized": 0.9325,
+      "black_box_min_logprob": 0.5765,
+      "surface_control": 0.6808
+    },
+    "arith": {
+      "n": 120,
+      "white_box": 0.8241,
+      "black_box_verbalized": 0.8257,
+      "black_box_min_logprob": 0.5737,
+      "surface_control": 0.5559
+    }
+  },
+  "gates": {
+    "G_H1_wedge_ge_10pp": {
+      "PASS": false,
+      "white_box": 0.9192,
+      "best_black_box": 0.9154
+    },
+    "G_H2_not_gloss": {
+      "PASS": true,
+      "white_box": 0.9192,
+      "surface": 0.526
+    },
+    "G_H3_no_leakage": {
+      "PASS": true,
+      "shuffle": 0.5202
+    },
+    "VERDICT": "KILL (real) \u2014 de-gloss control passed, but black-box matches white-box: the open-weights honesty wedge is NOT demonstrated"
+  },
+  "honest_scope": {
+    "power": "294 statements / 224 groups \u2014 modest; fold SDs reported",
+    "scale": "1.5B is CONSERVATIVE: the measured ladder showed white-box detectability rises with scale (assoc 0.70->0.92), so an open frontier model should widen any wedge",
+    "no_closed_model": "black-box arm is the signal-class proxy for a closed model of equal capability; no closed frontier model was called"
+  }
+}

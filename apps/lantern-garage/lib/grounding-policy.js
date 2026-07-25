@@ -32,6 +32,27 @@ function isGroundingDue(lastGroundedAtMs, nowMs = Date.now(), cadenceMs = GROUND
   return nowMs - lastGroundedAtMs >= cadenceMs;
 }
 
+// #2926 (M8): the freshness index — Whittle index for claim re-verification, i.e. the
+// Age-of-Information restless bandit with a verification price. Priority of re-grounding
+// a key at PAID age tau (steps since evidence was last ATTRIBUTED to it — M7: never
+// expressed confidence), staleness rate rho per step (M2), error cost c_e per stale step,
+// verification price c_v:
+//   W(tau) = c_e*[tau*s(tau) - S(tau-1)] - c_v,  s(tau) = 1-(1-rho)^tau
+// Closed geometric form below. Zero-crossing reproduces the EOQ cadence
+// T* = sqrt(2*(c_v/c_e)/rho) as rho->0 — the shipped 30-min tick is the crossing at the
+// ledger's measured rho with implied c_v/c_e ~ 0.11. Under an audit budget, rank keys by
+// W and spend top-down; the budget's shadow price acts as a uniform surcharge on c_v.
+// PURE and unwired: isGroundingDue stays the hard cadence floor (M3 — the index is a
+// priority on top of the tick, never a replacement). Derivation, indexability witness and
+// machine checks: docs/research/2026-07-24-owned-math-m8-freshness-index.md.
+function whittleFreshnessIndex(tauSteps, rhoPerStep, { verifyCost = 0.1, errorCost = 1.0 } = {}) {
+  const tau = Math.max(1, Math.floor(Number(tauSteps) || 1));
+  const rho = clamp(Number(rhoPerStep) || 0, 1e-12, 1 - 1e-12);
+  const beta = 1 - rho;
+  const bt = Math.pow(beta, tau);
+  return errorCost * (1 - tau * bt + (beta - bt) / (1 - beta)) - verifyCost;
+}
+
 // Mirror of dilation() including the G12 collapse-proximity sign-fix:
 // near collapse (proximity→1) D deflates toward D_MIN instead of inflating.
 function dilation(uncertainty, costPressure = 0, confidence = 0.5, collapseProximity = 0) {
@@ -85,4 +106,4 @@ function chatDilation(message, { confidence = 0.5, collapseProximity = 0 } = {})
   return dilation(clamp(u, 0, 1), 0, confidence, collapseProximity);
 }
 
-module.exports = { dilation, groundingPolicy, chatDilation, isGroundingDue, GROUNDING_TICK_MS, D_MIN, D_MAX, D_DEFAULT };
+module.exports = { dilation, groundingPolicy, chatDilation, isGroundingDue, whittleFreshnessIndex, GROUNDING_TICK_MS, D_MIN, D_MAX, D_DEFAULT };

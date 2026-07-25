@@ -881,12 +881,11 @@
     data-hmenu-desc="Extended-hours trading — pre-market and after-hours sessions. OFF = regular hours only.">⏰ Pre/After —</button>
   <a href="/kalshi-terminal.html" class="nav-link" title="Kalshi event-market terminal — trade yes/no contracts on real-world events"
     data-hmenu-desc="Event-market terminal — trade yes/no contracts on real-world events.">Kalshi →</a>
-  <!-- Single broker pill (declutter): shows the broker that EXECUTES your trades and
-       links to Settings (orchestration#broker) to add / configure / switch brokers.
-       Replaces the old three-button cluster (switch + ⚡ Alpaca + 🔗 IBKR). -->
-  <a href="/orchestration.html#broker" class="nav-link" id="brokerBtn" style="display:none"
-    title="Which broker executes your trades — click to add, configure, or switch brokers in Settings"
-    data-hmenu-desc="Shows the broker that executes your trades. Click to add, configure, or switch brokers in Settings."><span id="brokerLabel">🔗 Broker</span></a>
+  <!-- Trader pill: shows the ACTIVE TRADER (📈 Stock / 🏆 Champion) running your
+       connected account, and links to Settings → Connections to add keys / switch. -->
+  <a href="/settings.html#connections" class="nav-link" id="brokerBtn" style="display:none"
+    title="Which trader runs your account — click to add an account or switch traders in Settings"
+    data-hmenu-desc="Shows the active trader running your account. Click to add an account or switch traders in Settings."><span id="brokerLabel">📈 Trader</span></a>
   <a href="/auth.html?returnTo=%2Fstock-trader.html" class="nav-link signin-cta" id="signinCta" style="display:none" title="Sign in to unlock trading — guests are read-only">Sign in to trade →</a>
   <button type="button" class="nav-link" id="dcToggle" aria-expanded="false" aria-controls="dcPanel" onclick="dcToggle()"
     title="Ask the Unisona assistant about markets, symbols, and your positions"
@@ -4685,33 +4684,32 @@ async function refreshBrokerButton(){
   const btn = document.getElementById('brokerBtn'), label = document.getElementById('brokerLabel');
   if(!btn || !label) return;
   btn.style.display = '';                 // entitled trader → always show the pill
-  btn.href = '/orchestration.html#broker';
+  btn.href = '/settings.html#connections';   // add keys / switch trader in Settings → Connections
   try{
-    // One call carries everything: which broker is preferred (`effective`) and which
-    // are actually connected. The executor = preferred-if-connected, else the other
-    // connected one — mirroring the server-side fallback order (broker-facade.js).
-    const s = await (await fetch('/api/broker/preference',{cache:'no-store'})).json();
-    const con = (s && s.connected) || {};
-    const pref = s && s.effective;
-    let active = null;
-    if(pref === 'alpaca' && con.alpaca) active = 'alpaca';
-    else if(pref === 'ibkr' && con.ibkr) active = 'ibkr';
-    else if(con.alpaca) active = 'alpaca';
-    else if(con.ibkr) active = 'ibkr';
-    if(active){
-      const other = active === 'alpaca' ? con.ibkr : con.alpaca;
-      label.textContent = active === 'alpaca' ? '⚡ Alpaca' : '🔗 IBKR';
-      btn.style.color = 'var(--green)';
-      btn.title = (active === 'alpaca' ? 'Alpaca' : 'IBKR') + ' executes your trades' +
-        (other ? ' (the other broker is the automatic fallback)' : '') +
-        '. Click to configure or switch brokers in Settings.';
-    } else {
-      label.textContent = '🔗 Connect broker';
+    // The pill now shows the ACTIVE TRADER (Phase 2) once an account is connected:
+    // 📈 Stock (signals + manual) or 🏆 Champion (auto ETF allocation). It also reports
+    // "connect" when no broker is linked yet, from the same Alpaca/IBKR status.
+    const [modeRes, alRes, ibRes] = await Promise.all([
+      fetch('/api/trading/mode',{cache:'no-store'}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/broker/alpaca/status',{cache:'no-store'}).then(r=>r.json()).catch(()=>({})),
+      fetch('/api/trading/ibkr/connection',{cache:'no-store'}).then(r=>r.json()).catch(()=>({})),
+    ]);
+    const connected = !!(alRes && (alRes.connected || alRes.status==='connected')) || !!(ibRes && ibRes.live && ibRes.live.connected);
+    if(!connected){
+      label.textContent = '⚡ Connect account';
       btn.style.color = '';
-      btn.title = 'No broker connected — click to add Alpaca or IBKR in Settings.';
+      btn.title = 'No trading account connected — click to add your Alpaca API keys in Settings.';
+      return;
     }
+    const champion = modeRes && modeRes.mode === 'champion';
+    label.textContent = champion ? '🏆 Champion' : '📈 Stock trader';
+    btn.style.color = 'var(--green)';
+    btn.title = (champion
+      ? 'Champion (auto ETF allocation) is running your account — the day-trader is paused.'
+      : 'The stock day-trader is active (signals + your manual buy/sell).')
+      + ' Click to switch the active trader in Settings.';
   }catch(e){
-    label.textContent = '🔗 Broker';      // network hiccup → neutral, still links to Settings
+    label.textContent = '📈 Trader';      // network hiccup → neutral, still links to Settings
   }
 }
 // OAuth return: /api/broker/alpaca/callback bounces back here with ?alpaca=connected

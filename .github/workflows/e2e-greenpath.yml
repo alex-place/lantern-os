@@ -1,0 +1,83 @@
+name: Greenpath release gate
+
+# Operator-triggered E2E release gate (#2545, docs/GREENPATH-GATE.md):
+# N demo accounts × full signup → confirm → login → paper-trade → chat → Pro.
+# NOT wired into per-PR CI on purpose — steps s5 (chat) and s7 (broker) need
+# real provider keys, so this runs on demand before cutting a release:
+#   - full gate: accounts=10 (the first-50 invite bar — every step green)
+#   - smoke:     accounts=2  (default here)
+# Secrets used if configured: ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
+# (chat), ALPACA_API_KEY_ID / ALPACA_API_SECRET_KEY (broker, paper env).
+# Missing keys make those steps honestly RED — that is the gate telling you the
+# release is not ready, not a harness bug (see the doc).
+
+on:
+  workflow_dispatch:
+    inputs:
+      accounts:
+        description: "Demo accounts to run (10 = full release gate, 2 = smoke)"
+        required: false
+        default: "2"
+
+concurrency:
+  group: e2e-greenpath
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  NODE_VERSION: "24"
+
+jobs:
+  greenpath:
+    name: Greenpath journey (${{ github.event.inputs.accounts || '2' }} accounts)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache npm dependencies
+        uses: actions/cache@v6
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Install root deps (Playwright runner)
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install app deps (server under test)
+        working-directory: apps/lantern-garage
+        run: npm ci --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run greenpath gate
+        env:
+          GREENPATH_ACCOUNTS: ${{ github.event.inputs.accounts || '2' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+          ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+          ALPACA_ENV: paper
+        run: npm run test:greenpath
+
+      - name: Upload greenpath report
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: greenpath-report
+          path: |
+            data/greenpath-runs.jsonl
+            test-results/
+            playwright-report/
+          retention-days: 30
+          if-no-files-found: ignore

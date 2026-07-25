@@ -1,0 +1,79 @@
+{
+  "date": "2026-07-24",
+  "status": "MEASURED \u2014 first head-to-head; white-box vs steelmanned black-box on the SAME open model",
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "n_questions": 40,
+  "n_answers": 80,
+  "design_note": "same-model comparison isolates activation access with capability held fixed; black-box arm is the honest proxy for the best a CLOSED model of this capability could do",
+  "arm_A_white_box_probe": {
+    "by_layer": {
+      "L14": {
+        "auroc": 0.9987,
+        "fold_sd": 0.0
+      },
+      "L17": {
+        "auroc": 0.9987,
+        "fold_sd": 0.0
+      },
+      "L20": {
+        "auroc": 0.9969,
+        "fold_sd": 0.0
+      }
+    },
+    "best_layer": "L14",
+    "auroc": 0.9987
+  },
+  "arms_BC_black_box_raw_scalars": {
+    "mean_logprob": 0.8231,
+    "min_logprob": 0.9566,
+    "perplexity": 0.8231,
+    "verbalized_P(Yes)": 0.8294
+  },
+  "arm_D_black_box_trained_combination": {
+    "auroc": 0.9525,
+    "fold_sd": 0.0254
+  },
+  "best_black_box_any_arm": 0.9566,
+  "wedge_pp": 4.2,
+  "controls": {
+    "surface_features_degloss": {
+      "auroc": 0.9812,
+      "fold_sd": 0.0303,
+      "reading": "if ~= white_box, the signal is STYLE not truth (the gloss trap)"
+    },
+    "shuffle_label_leakage": {
+      "auroc": 0.465,
+      "reading": "must be ~0.5; validates the grouped-CV pipeline"
+    },
+    "split": "GroupKFold by question \u2014 the right/hallucinated PAIR is never split across train/test"
+  },
+  "gates": {
+    "G_H1_wedge_ge_10pp": {
+      "PASS": false,
+      "white_box": 0.9987,
+      "best_black_box": 0.9566
+    },
+    "G_H2_not_gloss": {
+      "PASS": false,
+      "white_box": 0.9987,
+      "surface": 0.9812
+    },
+    "G_H3_no_leakage": {
+      "PASS": true,
+      "shuffle_auroc": 0.465
+    },
+    "VERDICT": "INVALID (dataset defect) \u2014 the subset is STYLE-SEPARABLE (surface-only AUROC 0.9812), so both arms saturate and the wedge is UNMEASURABLE here. This is NOT evidence that the white-box wedge is absent; it is evidence this benchmark subset cannot test it. G-H2 (not-gloss) is the failing gate; G-H1's failure is downstream of the ceiling effect it causes."
+  },
+  "honest_scope": {
+    "power": "40 questions / 80 answers is THIN; fold SDs reported; a full HaluEval QA run (10k) is the confirming step",
+    "no_closed_model_run": "no closed frontier model was called (would be real spend + confounds capability); the black-box arm is the signal-class proxy, stated as such",
+    "scale": "1.5B is CONSERVATIVE for the probe \u2014 the measured ladder showed white-box detectability RISES with scale (assoc 0.70->0.92), so an open frontier model should widen this wedge, not narrow it"
+  },
+  "corrected_diagnosis": {
+    "primary_finding": "HaluEval QA pairs (this 40-question subset) are separable by surface style alone at AUROC 0.9812",
+    "consequence": "any probe/black-box AUROC reported on such a set is confounded with style; our own 0.9987 included",
+    "what_this_does_NOT_show": "it does NOT show white-box has no advantage \u2014 the ceiling effect precludes measuring one either way",
+    "what_it_DOES_show": "the de-gloss control is NECESSARY methodology for honesty evals; without it a 0.99 AUROC means nothing. Second independent occurrence of the gloss trap this program (first: 0.5B glossed 1.000 vs de-glossed ~chance).",
+    "the_valid_rerun": "repeat on the de-glossed v1.10 probe set (data/eval/v1_10/probe-sets-v1.jsonl, 294 rows, built style-matched) where surface-only should sit near chance"
+  }
+}

@@ -143,6 +143,106 @@ test('re-exit churn: an UNCONFIRMED exit fires once and does not re-fire while t
   }
 });
 
+test('max-loss backstop: a long past -maxLossPct is market-exited even inside min-hold', async () => {
+  // Regression for the "-17% TSLA never exited" bug: a losing position whose broker
+  // protective stop never placed/filled must still be cut by the hard max-loss backstop,
+  // regardless of momentum or a just-opened min-hold window.
+  const saved = { ...process.env };
+  const exitSells = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    // TSLA down 10% (below the 8% default backstop); freshly "opened" so min-hold would
+    // otherwise block an exit.
+    getIBKRPositions: async () => [{ symbol: 'TSLA', qty: 10, avg_entry_price: 100, current_price: 90, market_value: 900, unrealized_pl: -100 }],
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => {
+      if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) exitSells.push(o);   // the exit, not the protective STP
+      return { status: 'placed' };
+    },
+  };
+  try {
+    process.env.TRADER_MANAGE_EXITS = '1';       // exits-only mode is enough to run manageHeldExits
+    process.env.TRADER_AUTO_EXECUTE = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';      // isolate the max-loss path (no bar fetch)
+    process.env.TRADER_MIN_HOLD_MIN = '30';      // min-hold would block a normal exit…
+    process.env.TRADER_MAX_LOSS_PCT = '8';
+    at._resetCooldowns();
+    const now = 1_700_000_000_000;
+    at._saveState();   // ensure clean state
+    const out = await at.runAutoTrade({ signals: [] }, { bridge, userId: 'u', now });
+    assert.strictEqual(exitSells.length, 1, 'the -10% loser is market-exited by the backstop');
+    assert.ok(out.executed.some((e) => e.action === 'exit_long' && /max_loss/.test(e.reason || '')), 'exit reason is max_loss');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
+test('max-loss backstop: a small loss inside the threshold is NOT force-exited', async () => {
+  const saved = { ...process.env };
+  const exitSells = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'AAPL', qty: 10, avg_entry_price: 100, current_price: 97, market_value: 970, unrealized_pl: -30 }], // -3%, above the 8% floor
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) exitSells.push(o); return { status: 'placed' }; },
+  };
+  try {
+    process.env.TRADER_MANAGE_EXITS = '1';
+    process.env.TRADER_AUTO_EXECUTE = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';
+    process.env.TRADER_MIN_HOLD_MIN = '0';
+    process.env.TRADER_MAX_LOSS_PCT = '8';
+    at._resetCooldowns();
+    const out = await at.runAutoTrade({ signals: [] }, { bridge, userId: 'u', now: 1_700_000_000_000 });
+    assert.strictEqual(exitSells.length, 0, 'a -3% position is left alone (broker stop handles it)');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
+test('R take-profit: a long at +1R is banked; below 1R it is held', async () => {
+  const saved = { ...process.env };
+  const mk = (curPx) => ({
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    getIBKRPositions: async () => [{ symbol: 'SPY', qty: 10, avg_entry_price: 100, current_price: curPx, market_value: 10 * curPx, unrealized_pl: (curPx - 100) * 10 }],
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) mk._sells.push(o); return { status: 'placed' }; },
+  });
+  async function run(curPx) {
+    const b = mk(curPx); b.placeIBKROrder = async (uid, o) => { if (/sell/i.test(o.side || '') && !/stop|stp/i.test(o.type || '')) sells.push(o); return { status: 'placed' }; };
+    return b;
+  }
+  let sells = [];
+  try {
+    process.env.TRADER_MANAGE_EXITS = '1';
+    process.env.TRADER_AUTO_EXECUTE = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';
+    process.env.TRADER_MIN_HOLD_MIN = '0';
+    process.env.TRADER_STOP_PCT = '2';
+    process.env.TRADER_TAKE_PROFIT_R = '1';   // 1R = +2% (stopPct)
+    // +2.5% → past 1R → should bank it
+    sells = []; at._resetCooldowns();
+    let out = await at.runAutoTrade({ signals: [] }, { bridge: await run(102.5), userId: 'u', now: 1_700_000_000_000 });
+    assert.strictEqual(sells.length, 1, 'a +2.5% long (>1R) is taken-profit');
+    assert.ok(out.executed.some((e) => /take_profit_R/.test(e.reason || '')), 'reason is take_profit_R');
+    // +1% → below 1R → left to run
+    sells = []; at._resetCooldowns();
+    await at.runAutoTrade({ signals: [] }, { bridge: await run(101), userId: 'u', now: 1_700_000_000_000 });
+    assert.strictEqual(sells.length, 0, 'a +1% long (<1R) is held');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
 test('entryKnifeFilter config defaults on, disables via env', () => {
   const saved = process.env.TRADER_ENTRY_KNIFE_FILTER;
   try {

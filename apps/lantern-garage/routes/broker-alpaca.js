@@ -88,6 +88,26 @@ function _fetchAccount(token, env) {
   });
 }
 
+// Validate a pasted API key/secret by fetching the account it authorizes. Returns the
+// account JSON on success, or { error } — so we never store keys that don't work.
+function _verifyKeys({ keyId, secretKey, env }) {
+  const host = env === 'live' ? 'api.alpaca.markets' : 'paper-api.alpaca.markets';
+  return new Promise((resolve) => {
+    const req = https.request({ host, path: '/v2/account', method: 'GET',
+      headers: { 'APCA-API-KEY-ID': keyId, 'APCA-API-SECRET-KEY': secretKey } }, (res) => {
+      let d = ''; res.on('data', (c) => (d += c));
+      res.on('end', () => {
+        if (res.statusCode === 200) { let j = null; try { j = JSON.parse(d); } catch (_e) { /* */ } return resolve({ ok: true, account: j }); }
+        if (res.statusCode === 401 || res.statusCode === 403) return resolve({ ok: false, error: 'invalid_keys' });
+        resolve({ ok: false, error: `alpaca_${res.statusCode}` });
+      });
+    });
+    req.on('error', () => resolve({ ok: false, error: 'network' }));
+    req.setTimeout(9000, () => { req.destroy(); resolve({ ok: false, error: 'timeout' }); });
+    req.end();
+  });
+}
+
 module.exports = async function brokerAlpacaRoutes(req, res, url) {
   const p = url.pathname;
   if (!p.startsWith('/api/broker/alpaca/') && p !== '/api/broker/preference') return false;
@@ -216,6 +236,36 @@ module.exports = async function brokerAlpacaRoutes(req, res, url) {
       account_number: acct && acct.account_number,
     });
     return back('connected');
+  }
+
+  // POST /connect-keys — bring-your-own-keys connect. The user pastes their own Alpaca
+  // API key id + secret; we verify them against Alpaca, then store them encrypted. This
+  // is the primary connect path while the OAuth client is inactive. PAPER only for now
+  // (live keys are a separate, gated future step) — a live request is rejected here.
+  if (method === 'POST' && p === '/api/broker/alpaca/connect-keys') {
+    const body = await _readBody(req);
+    const keyId = String((body && (body.keyId || body.key_id)) || '').trim();
+    const secretKey = String((body && (body.secretKey || body.secret_key)) || '').trim();
+    const env = (body && body.env) === 'live' ? 'live' : 'paper';
+    if (env === 'live') {
+      return _json(res, 400, { error: 'live_not_supported', message: 'Live-money keys are not enabled yet — paste PAPER keys (paper-api.alpaca.markets). Live trading is coming in a later, gated release.' }), true;
+    }
+    // Shape validation before any network call (mirror the BYOK provider-key checks:
+    // Alpaca keys are short ASCII tokens — reject obviously-wrong input early).
+    const okShape = (s) => s.length >= 8 && s.length <= 128 && /^[\x21-\x7e]+$/.test(s);
+    if (!okShape(keyId) || !okShape(secretKey)) {
+      return _json(res, 400, { error: 'invalid_input', message: 'Enter both your Alpaca API Key ID and Secret Key.' }), true;
+    }
+    const v = await _verifyKeys({ keyId, secretKey, env });
+    if (!v.ok) {
+      const msg = v.error === 'invalid_keys'
+        ? "Alpaca rejected those keys. Double-check you pasted a PAPER API key + secret from alpaca.markets → Paper Trading → API Keys."
+        : `Couldn't reach Alpaca to verify the keys (${v.error}). Try again.`;
+      return _json(res, 400, { error: v.error, message: msg }), true;
+    }
+    store.saveKeys(userId, { keyId, secretKey, env, account_number: v.account && v.account.account_number });
+    return _json(res, 200, { ok: true, connected: true, via: 'keys', env,
+      accountNumber: (v.account && v.account.account_number) || null }), true;
   }
 
   // POST /disconnect — forget the stored token

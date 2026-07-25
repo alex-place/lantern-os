@@ -1,0 +1,375 @@
+{
+  "date": "2026-07-25",
+  "test": "B \u2014 maker edge vs liquidity (mechanism)",
+  "n_series": 42,
+  "volume_span": [
+    359,
+    2584677
+  ],
+  "regression_net_on_log10_volume": {
+    "slope": -0.1052,
+    "intercept": -0.5716,
+    "t": -0.1455,
+    "p": 0.8843,
+    "r2": 0.0005,
+    "n": 42
+  },
+  "leave_one_category_out": {
+    "Climate and Weather": {
+      "slope": -0.2313,
+      "t": -0.3,
+      "n": 38
+    },
+    "Commodities": {
+      "slope": 0.093,
+      "t": 0.14,
+      "n": 38
+    },
+    "Crypto": {
+      "slope": -0.3048,
+      "t": -0.36,
+      "n": 38
+    },
+    "Economics": {
+      "slope": 0.0921,
+      "t": 0.14,
+      "n": 38
+    },
+    "Elections": {
+      "slope": -0.0808,
+      "t": -0.11,
+      "n": 40
+    },
+    "Entertainment": {
+      "slope": -0.041,
+      "t": -0.05,
+      "n": 39
+    },
+    "Financials": {
+      "slope": -0.1158,
+      "t": -0.16,
+      "n": 41
+    },
+    "Mentions": {
+      "slope": -0.0217,
+      "t": -0.03,
+      "n": 38
+    },
+    "Science and Technology": {
+      "slope": -0.3706,
+      "t": -0.52,
+      "n": 38
+    },
+    "Sports": {
+      "slope": 0.1492,
+      "t": 0.16,
+      "n": 37
+    },
+    "Weather": {
+      "slope": -0.2526,
+      "t": -0.31,
+      "n": 35
+    }
+  },
+  "series": [
+    {
+      "series": "KXNATGASD",
+      "category": "Commodities",
+      "median_volume": 359,
+      "maker_net_c": -1.869,
+      "maker_gross_c": -1.718
+    },
+    {
+      "series": "KXNETFLIXRANKMOVIEGLOBAL2",
+      "category": "Entertainment",
+      "median_volume": 592,
+      "maker_net_c": 1.397,
+      "maker_gross_c": 2.2
+    },
+    {
+      "series": "KXNBA4QTOTAL",
+      "category": "Sports",
+      "median_volume": 763,
+      "maker_net_c": 1.907,
+      "maker_gross_c": 3.297
+    },
+    {
+      "series": "KXLOWTSEA",
+      "category": "Climate and Weather",
+      "median_volume": 766,
+      "maker_net_c": -3.516,
+      "maker_gross_c": -2.788
+    },
+    {
+      "series": "KXLOWTSFO",
+      "category": "Climate and Weather",
+      "median_volume": 1154,
+      "maker_net_c": -1.384,
+      "maker_gross_c": -0.773
+    },
+    {
+      "series": "KXLBPGAME",
+      "category": "Sports",
+      "median_volume": 1258,
+      "maker_net_c": -1.032,
+      "maker_gross_c": -0.036
+    },
+    {
+      "series": "KXNASDAQ100",
+      "category": "Financials",
+      "median_volume": 1567,
+      "maker_net_c": -1.328,
+      "maker_gross_c": -0.823
+    },
+    {
+      "series": "KXNHSALES",
+      "category": "Economics",
+      "median_volume": 1603,
+      "maker_net_c": -4.436,
+      "maker_gross_c": -3.15
+    },
+    {
+      "series": "KXH100W",
+      "category": "Science and Technology",
+      "median_volume": 1639,
+      "maker_net_c": -10.509,
+      "maker_gross_c": -9.202
+    },
+    {
+      "series": "KXWTIMAXM",
+      "category": "Commodities",
+      "median_volume": 1652,
+      "maker_net_c": 1.234,
+      "maker_gross_c": 1.769
+    },
+    {
+      "series": "KXATPMENTION",
+      "category": "Mentions",
+      "median_volume": 1712,
+      "maker_net_c": -0.571,
+      "maker_gross_c": 0.222
+    },
+    {
+      "series": "KXHOUSINGSTART",
+      "category": "Economics",
+      "median_volume": 2044,
+      "maker_net_c": 9.723,
+      "maker_gross_c": 10.763
+    },
+    {
+      "series": "KXLASTWORDCOUNT",
+      "category": "Mentions",
+      "median_volume": 2162,
+      "maker_net_c": 1.64,
+      "maker_gross_c": 1.769
+    },
+    {
+      "series": "KXESGDPYOYF",
+      "category": "Economics",
+      "median_volume": 2617,
+      "maker_net_c": 3.124,
+      "maker_gross_c": 3.527
+    },
+    {
+      "series": "KXLOWTPHX",
+      "category": "Climate and Weather",
+      "median_volume": 2642,
+      "maker_net_c": -2.702,
+      "maker_gross_c": -2.007
+    },
+    {
+      "series": "KXEARTHQUAKE",
+      "category": "Climate and Weather",
+      "median_volume": 2837,
+      "maker_net_c": 0.996,
+      "maker_gross_c": 1.649
+    },
+    {
+      "series": "KXGAPRIMARY",
+      "category": "Elections",
+      "median_volume": 3219,
+      "maker_net_c": 0.704,
+      "maker_gross_c": 1.076
+    },
+    {
+      "series": "KXHYPEMAXMON",
+      "category": "Crypto",
+      "median_volume": 3565,
+      "maker_net_c": -5.261,
+      "maker_gross_c": -4.402
+    },
+    {
+      "series": "KXCBDECISIONKOREA",
+      "category": "Economics",
+      "median_volume": 3831,
+      "maker_net_c": -3.152,
+      "maker_gross_c": -2.585
+    },
+    {
+      "series": "KXHIGHPHIL",
+      "category": "Weather",
+      "median_volume": 5379,
+      "maker_net_c": -1.196,
+      "maker_gross_c": -0.377
+    },
+    {
+      "series": "KXHIGHDEN",
+      "category": "Weather",
+      "median_volume": 5564,
+      "maker_net_c": -5.068,
+      "maker_gross_c": -4.272
+    },
+    {
+      "series": "KXEARNINGSMENTIONAVAV",
+      "category": "Mentions",
+      "median_volume": 5665,
+      "maker_net_c": 3.686,
+      "maker_gross_c": 4.559
+    },
+    {
+      "series": "KXALPRIMARY",
+      "category": "Elections",
+      "median_volume": 6122,
+      "maker_net_c": -0.084,
+      "maker_gross_c": 0.224
+    },
+    {
+      "series": "KXBIGBROTHERELIMINATION",
+      "category": "Entertainment",
+      "median_volume": 6197,
+      "maker_net_c": 0.092,
+      "maker_gross_c": 0.747
+    },
+    {
+      "series": "KXB200Q",
+      "category": "Science and Technology",
+      "median_volume": 6306,
+      "maker_net_c": -1.167,
+      "maker_gross_c": -0.659
+    },
+    {
+      "series": "KXHIGHAUS",
+      "category": "Weather",
+      "median_volume": 7652,
+      "maker_net_c": -1.347,
+      "maker_gross_c": -0.722
+    },
+    {
+      "series": "KXEARNINGSMENTIONDAL",
+      "category": "Mentions",
+      "median_volume": 8910,
+      "maker_net_c": -0.351,
+      "maker_gross_c": 0.348
+    },
+    {
+      "series": "KXBNB15M",
+      "category": "Crypto",
+      "median_volume": 9936,
+      "maker_net_c": -2.335,
+      "maker_gross_c": -1.411
+    },
+    {
+      "series": "KXHIGHCHI",
+      "category": "Weather",
+      "median_volume": 16314,
+      "maker_net_c": -2.358,
+      "maker_gross_c": -1.637
+    },
+    {
+      "series": "KXSURVIVORRANK",
+      "category": "Entertainment",
+      "median_volume": 21987,
+      "maker_net_c": 0.932,
+      "maker_gross_c": 1.048
+    },
+    {
+      "series": "KXHIGHMIA",
+      "category": "Weather",
+      "median_volume": 22179,
+      "maker_net_c": -0.679,
+      "maker_gross_c": -0.122
+    },
+    {
+      "series": "KXBRENTW",
+      "category": "Commodities",
+      "median_volume": 22795,
+      "maker_net_c": 3.835,
+      "maker_gross_c": 4.773
+    },
+    {
+      "series": "KXBRENTMON",
+      "category": "Commodities",
+      "median_volume": 27850,
+      "maker_net_c": -13.536,
+      "maker_gross_c": -12.238
+    },
+    {
+      "series": "KXNBA1HSPREAD",
+      "category": "Sports",
+      "median_volume": 28662,
+      "maker_net_c": -3.193,
+      "maker_gross_c": -1.925
+    },
+    {
+      "series": "KXXRPMAXMON",
+      "category": "Crypto",
+      "median_volume": 28908,
+      "maker_net_c": 1.636,
+      "maker_gross_c": 2.053
+    },
+    {
+      "series": "KXBUNDESLIGATOTAL",
+      "category": "Sports",
+      "median_volume": 35045,
+      "maker_net_c": -4.773,
+      "maker_gross_c": -3.402
+    },
+    {
+      "series": "KXSPACEXSTARSHIP",
+      "category": "Science and Technology",
+      "median_volume": 36044,
+      "maker_net_c": -0.124,
+      "maker_gross_c": 0.618
+    },
+    {
+      "series": "KXHIGHNY",
+      "category": "Weather",
+      "median_volume": 37071,
+      "maker_net_c": 1.372,
+      "maker_gross_c": 2.106
+    },
+    {
+      "series": "KXGPT",
+      "category": "Science and Technology",
+      "median_volume": 37459,
+      "maker_net_c": -0.837,
+      "maker_gross_c": -0.018
+    },
+    {
+      "series": "KXHIGHLAX",
+      "category": "Weather",
+      "median_volume": 99220,
+      "maker_net_c": 0.53,
+      "maker_gross_c": 1.106
+    },
+    {
+      "series": "KXBTC15M",
+      "category": "Crypto",
+      "median_volume": 1796413,
+      "maker_net_c": -0.586,
+      "maker_gross_c": 0.09
+    },
+    {
+      "series": "KXMLBGAME",
+      "category": "Sports",
+      "median_volume": 2584677,
+      "maker_net_c": -0.45,
+      "maker_gross_c": 0.621
+    }
+  ],
+  "gates": {
+    "M1_negative_slope_p05": false,
+    "M2_sign_robust_loco": false,
+    "VERDICT": "MECHANISM REFUTED \u2014 no significant negative volume relationship; the liquidity-provision story does not hold"
+  }
+}

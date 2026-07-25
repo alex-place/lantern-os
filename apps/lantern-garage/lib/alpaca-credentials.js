@@ -50,6 +50,7 @@ function _file(userId) { return path.join(DIR, encodeURIComponent(String(userId)
 function save(userId, creds) {
   fs.mkdirSync(DIR, { recursive: true });
   fs.writeFileSync(_file(userId), JSON.stringify(_encrypt({
+    kind: 'oauth',
     access_token: String(creds.access_token || ''),
     token_type: creds.token_type || 'bearer',
     scope: creds.scope || '',
@@ -57,6 +58,25 @@ function save(userId, creds) {
     account_id: creds.account_id || null,
     account_number: creds.account_number || null,
     obtained_at: creds.obtained_at || new Date().toISOString(),
+  })), { mode: 0o600 });
+}
+
+/**
+ * Persist a fresh API KEY bundle for a user (overwrites any prior). This is the
+ * bring-your-own-keys path (the Alpaca OAuth client isn't activated): the user pastes
+ * their own Alpaca API key id + secret and we store them ENCRYPTED at rest, exactly
+ * like the OAuth token. The key/secret NEVER leave the server or get logged — only the
+ * redacted `publicStatus` does. Paper by default (live gated separately).
+ */
+function saveKeys(userId, { keyId, secretKey, env, account_number } = {}) {
+  fs.mkdirSync(DIR, { recursive: true });
+  fs.writeFileSync(_file(userId), JSON.stringify(_encrypt({
+    kind: 'keys',
+    api_key_id: String(keyId || ''),
+    api_secret_key: String(secretKey || ''),
+    env: env === 'live' ? 'live' : 'paper',          // default paper — the safe posture
+    account_number: account_number || null,
+    obtained_at: new Date().toISOString(),
   })), { mode: 0o600 });
 }
 function load(userId) {
@@ -75,12 +95,13 @@ function listUsers() {
   }).filter(Boolean);
 }
 
-/** Non-secret status for the client (NEVER includes the token). */
+/** Non-secret status for the client (NEVER includes the token or key/secret). */
 function publicStatus(userId) {
   const c = load(userId);
   if (!c) return { connected: false, hasCredentials: false, provider: 'alpaca' };
   return {
     connected: true, hasCredentials: true, provider: 'alpaca',
+    via: c.kind === 'keys' ? 'keys' : 'oauth',       // how this user is connected
     env: c.env || 'paper',
     mode: c.env === 'live' ? 'live' : 'paper',
     accountNumber: c.account_number || null,
@@ -88,4 +109,4 @@ function publicStatus(userId) {
   };
 }
 
-module.exports = { save, load, has, remove, listUsers, publicStatus, _file };
+module.exports = { save, saveKeys, load, has, remove, listUsers, publicStatus, _file };

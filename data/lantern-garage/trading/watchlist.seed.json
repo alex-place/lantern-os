@@ -1,20 +1,21 @@
 {
+  "_note": "Default trader universe. Walk-forward backtests show the mean-reversion engine is negative-expectancy on high-beta single stocks (META/NVDA/AAPL: 26% win, PF 0.65) but positive on liquid + leveraged/inverse ETFs at a tight target (leveraged/inverse basket, longs-only: 55% win, +0.07R, PF 1.17). Single stocks + crypto removed. See changelog.d/2026-07-24-trader-etf-universe.md.",
   "tickers": [
     "SPY",
-    "AAPL",
-    "TSLA",
-    "NVDA",
-    "AMD",
-    "AMZN",
-    "INTC",
-    "SHOP",
-    "ASML",
-    "META",
-    "MSFT",
-    "JPM",
+    "QQQ",
+    "IWM",
+    "DIA",
     "GLD",
-    "BTCUSD",
-    "ETHUSD",
-    "SOLUSD"
+    "TLT",
+    "SMH",
+    "XLK",
+    "TQQQ",
+    "SQQQ",
+    "SOXL",
+    "SOXS",
+    "SPXL",
+    "SPXS",
+    "TNA",
+    "TZA"
   ]
 }
