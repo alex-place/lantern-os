@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    (function () { try { var s = localStorage.getItem('lantern-theme'); var d = window.matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Options — Unisona</title>
+  <style>
+    .opt-shell { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+    .opt-shell h1 { font-size: 22px; margin: 0 0 4px; }
+    .opt-shell .sub { color: var(--muted); font-size: 13.5px; margin: 0 0 22px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 18px; }
+    .card h2 { font-size: 16px; margin: 0 0 4px; }
+    .card .csub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; line-height: 1.5; }
+    table.opt { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.opt th { text-align: right; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+    table.opt th:first-child, table.opt td:first-child { text-align: left; }
+    table.opt td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: right; font-variant-numeric: tabular-nums; }
+    table.opt tr:last-child td { border-bottom: none; }
+    .pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
+    .pill.ok { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+    .pill.warn { color: var(--amber); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+    .pill.bad { color: var(--red); background: color-mix(in srgb, var(--red) 14%, transparent); }
+    .btn { padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .btn:hover { border-color: var(--accent); }
+    .fld { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+    .frow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+    .scrollx { overflow-x: auto; }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; }
+    .kv .k { color: var(--muted); }
+  </style>
+</head>
+
+<main class="opt-shell">
+  <h1>Options</h1>
+  <p class="sub">The options trader (measurement-gated shadow — it earns execution only when its own ledger proves the edge), the live chain, and income-strategy proposals. Nothing on this page places orders.</p>
+
+  <div class="card">
+    <h2>🌙 Options trader (shadow)</h2>
+    <p class="csub">Every eligible night it "buys" a next-day call ladder (0.25–2% OTM) + the vol-selective 1¢ penny strike with real quotes — entries at the ask, exits at the bid — and measures its own expectancy per depth and per entry rule. It stays a shadow until a bucket proves a positive edge.</p>
+    <div id="shadowBody" class="muted">Loading…</div>
+    <div class="frow" style="margin-top:12px">
+      <button class="btn" onclick="loadShadow()">↻ Refresh</button>
+      <button class="btn" onclick="loadProbe()">🔍 What would it trade right now?</button>
+    </div>
+    <div id="probeBody"></div>
+  </div>
+
+  <div class="card">
+    <h2>⛓ Options chain</h2>
+    <p class="csub">Live chain via the connected data feed (free indicative). Calls and puts around the money.</p>
+    <div class="frow">
+      <input class="fld" id="chainSym" value="SPY" maxlength="6" style="width:90px" aria-label="Underlying symbol">
+      <button class="btn" onclick="loadChain()">Load chain</button>
+      <span class="muted" id="chainMeta"></span>
+    </div>
+    <div class="scrollx"><div id="chainBody" class="muted">Enter a symbol and load.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🧮 Strategy proposals (advisory)</h2>
+    <p class="csub">Deterministic income-strategy proposals from the live chain — covered call, cash-secured put, collar. Advisory only; review and place manually if you want them.</p>
+    <div class="frow">
+      <input class="fld" id="stSym" value="SPY" maxlength="6" style="width:90px" aria-label="Symbol">
+      <select class="fld" id="stKind" aria-label="Strategy">
+        <option value="covered_call">Covered call</option>
+        <option value="cash_secured_put">Cash-secured put</option>
+        <option value="collar">Collar</option>
+      </select>
+      <input class="fld" id="stShares" value="100" style="width:90px" title="Shares held (covered call / collar)" aria-label="Shares">
+      <input class="fld" id="stCash" value="10000" style="width:110px" title="Cash available (cash-secured put)" aria-label="Cash">
+      <button class="btn" onclick="loadStrategy()">Propose</button>
+    </div>
+    <div id="stBody" class="muted"></div>
+  </div>
+</main>
+<script src="/js/site-chrome.js" defer></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (x, d=2) => (x==null || isNaN(x)) ? '—' : Number(x).toFixed(d);
+const pillFor = (v) => v==='positive_edge' ? '<span class="pill ok">positive edge</span>'
+  : v==='negative_edge' ? '<span class="pill bad">negative — not armed</span>'
+  : '<span class="pill warn">collecting</span>';
+
+async function loadShadow(){
+  const el=$('shadowBody'); el.innerHTML='Loading…';
+  try{
+    const d = await (await fetch('/api/trading/options-shadow')).json();
+    const s = d.stats || d; const bd = s.by_depth || {}; const br = s.by_rule || {};
+    let h = `<div class="kv"><span class="k">Enabled</span><span>${d.enabled ? 'yes' : 'no'}</span>`
+      + `<span class="k">Closed measurements</span><span>${s.n ?? 0}</span>`
+      + (s.verdict ? `<span class="k">Overall</span><span>${pillFor((s.verdict||'').includes('positive')?'positive_edge':(s.verdict||'').includes('negative')?'negative_edge':'x')} <span class="muted">${esc(s.verdict)}</span></span>` : '')
+      + `</div>`;
+    const rows = (obj, label) => {
+      const ks = Object.keys(obj); if(!ks.length) return '';
+      return `<table class="opt" style="margin-top:12px"><tr><th>${label}</th><th>n</th><th>win %</th><th>avg P&L % of premium</th><th>verdict</th></tr>`
+        + ks.map(k=>{const r=obj[k];return `<tr><td>${esc(k)}</td><td>${r.n??0}</td><td>${num(r.win_rate_pct,1)}</td><td>${num(r.avg_pl_pct_of_premium,1)}</td><td>${pillFor(r.verdict==null?'x':(String(r.verdict).includes('positive')?'positive_edge':String(r.verdict).includes('negative')?'negative_edge':'x'))}</td></tr>`;}).join('')
+        + `</table>`;
+    };
+    h += rows(bd, 'OTM depth') + rows(br, 'Entry rule');
+    const recent=(d.recent||[]).slice(-6).reverse();
+    if(recent.length) h += `<div class="muted" style="margin-top:10px">Recent: `+recent.map(r=>esc(`${r.phase}${r.depth!=null?' '+r.depth:''}${r.pl_pct!=null?' '+r.pl_pct+'%':''}`)).join(' · ')+`</div>`;
+    el.innerHTML=h;
+  }catch(e){ el.innerHTML='<span class="muted">Options trader unavailable — '+esc(e.message)+'</span>'; }
+}
+async function loadProbe(){
+  const el=$('probeBody'); el.innerHTML='<div class="muted" style="margin-top:10px">Probing the live chain…</div>';
+  try{
+    const p = await (await fetch('/api/trading/options-shadow/probe')).json();
+    if(p.data==='unavailable'){ el.innerHTML=`<div class="muted" style="margin-top:10px">Chain unavailable — ${esc(p.reason||'')}</div>`; return; }
+    let h = `<div class="kv" style="margin-top:12px"><span class="k">Spot</span><span>${num(p.spot)}</span>`
+      + `<span class="k">Expiry</span><span>${esc(p.expiry||'—')}</span>`
+      + `<span class="k">Tonight eligible</span><span>${p.gates&&p.gates.eligible?('YES — '+esc(p.gates.rule||'')):('no — '+esc((p.gates&&p.gates.why)||''))}</span></div>`;
+    const legs=(p.legs||[]).filter(l=>l.contract);
+    if(legs.length) h += `<table class="opt" style="margin-top:10px"><tr><th>depth %</th><th>strike</th><th>bid</th><th>ask</th></tr>`
+      + legs.map(l=>`<tr><td>${l.depth}</td><td>${l.strike}</td><td>${num(l.quote&&l.quote.bid)}</td><td>${num(l.quote&&l.quote.ask)}</td></tr>`).join('')+`</table>`;
+    if(p.penny){ h += p.penny.pick
+      ? `<div style="margin-top:8px">🪙 Penny pick: <b>${esc(p.penny.pick.symbol)}</b> strike ${p.penny.pick.strike} ask $${num(p.penny.pick.ask)} · ${num(p.penny.pick.distPct)}% OTM${p.penny.pick.sigma!=null?' · '+num(p.penny.pick.sigma,1)+'σ':''}</div>`
+      : `<div class="muted" style="margin-top:8px">🪙 Penny: skipped — ${esc(p.penny.reason||'')}</div>`; }
+    el.innerHTML=h;
+  }catch(e){ el.innerHTML='<div class="muted" style="margin-top:10px">Probe failed — '+esc(e.message)+'</div>'; }
+}
+async function loadChain(){
+  const sym=($('chainSym').value||'SPY').trim().toUpperCase(); const el=$('chainBody'); const meta=$('chainMeta');
+  el.innerHTML='Loading…'; meta.textContent='';
+  try{
+    const d = await (await fetch('/api/trading/options/chain?symbol='+encodeURIComponent(sym))).json();
+    if(!d.available){ el.innerHTML='<span class="muted">Chain unavailable — '+esc(d.reason||'no data source')+'</span>'; return; }
+    meta.textContent = `${d.count||0} contracts · spot ${num(d.underlying_price)} · ${d.source||''}${d.cached?' (cached)':''}`;
+    const spot = Number(d.underlying_price)||0;
+    const cs=(d.contracts||[]).filter(c=>spot? Math.abs((c.strike||0)-spot)/spot<0.06 : true).slice(0,80);
+    if(!cs.length){ el.innerHTML='<span class="muted">No near-the-money contracts returned.</span>'; return; }
+    el.innerHTML = `<table class="opt"><tr><th>type</th><th>expiry</th><th>strike</th><th>bid</th><th>ask</th><th>IV</th><th>delta</th><th>OI</th></tr>`
+      + cs.map(c=>`<tr><td>${esc(c.type||c.option_type||'')}</td><td>${esc(String(c.expiration||c.expiry||'').slice(0,10))}</td><td>${num(c.strike)}</td><td>${num(c.bid)}</td><td>${num(c.ask)}</td><td>${c.iv!=null?num(c.iv*100,1)+'%':'—'}</td><td>${num(c.delta,2)}</td><td>${c.open_interest??'—'}</td></tr>`).join('')
+      + `</table>`;
+  }catch(e){ el.innerHTML='<span class="muted">Chain failed — '+esc(e.message)+'</span>'; }
+}
+async function loadStrategy(){
+  const el=$('stBody'); el.innerHTML='Computing…';
+  const q = new URLSearchParams({ symbol:($('stSym').value||'SPY').trim().toUpperCase(), strategy:$('stKind').value, shares:$('stShares').value||'0', cash:$('stCash').value||'0' });
+  try{
+    const d = await (await fetch('/api/trading/options/strategies?'+q)).json();
+    if(!d.available){ el.innerHTML='<span class="muted">Unavailable — '+esc(d.reason||'no data source')+'</span>'; return; }
+    const pr = d.proposal;
+    if(!pr || pr.ok===false){ el.innerHTML='<span class="muted">No proposal — '+esc((pr&&pr.reason)||'insufficient inputs')+'</span>'; return; }
+    el.innerHTML = `<pre class="mono" style="white-space:pre-wrap;margin:0">${esc(JSON.stringify(pr,null,2))}</pre>`;
+  }catch(e){ el.innerHTML='<span class="muted">Failed — '+esc(e.message)+'</span>'; }
+}
+loadShadow();
+</script>
+</html>
