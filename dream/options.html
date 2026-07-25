@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    (function () { try { var s = localStorage.getItem('lantern-theme'); var d = window.matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Options — Unisona</title>
+  <style>
+    .opt-shell { max-width: 1240px; margin: 0 auto; padding: 20px 16px 64px; }
+    .opt-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+    /* The index.html gothic wordmark face (Century Gothic stack) for the page title. */
+    .opt-head h1 { font-size: 26px; margin: 0; font-weight: 700; letter-spacing: -0.01em;
+      font-family: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; }
+    /* Themed thin scrollbars (the volume table's horizontal slider + everything else). */
+    .scrollx, .opt-shell { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+    .scrollx::-webkit-scrollbar { height: 8px; width: 8px; }
+    .scrollx::-webkit-scrollbar-track { background: transparent; }
+    .scrollx::-webkit-scrollbar-thumb { background: var(--border); border-radius: 6px; }
+    .scrollx::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+    /* Watch | Trade | Options — in-page switcher (the header nav has one Trader entry) */
+    .page-tabs { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .pt { font-size: 12px; padding: 5px 12px; color: var(--muted); text-decoration: none; border-right: 1px solid var(--border); white-space: nowrap; }
+    .pt:last-child { border-right: 0; }
+    .pt:hover { color: var(--text); }
+    .pt.on { color: var(--text); background: color-mix(in srgb, var(--text) 8%, transparent); }
+    .sym-box { display: flex; align-items: center; gap: 8px; }
+    .fld { padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+    .btn { padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .btn:hover { border-color: var(--accent); }
+    .btn.active { border-color: var(--accent); color: var(--accent); }
+    .spot { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .tabs { display: flex; gap: 8px; margin: 14px 0; flex-wrap: wrap; }
+    .tab { padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+    .tab.active { background: var(--text); color: var(--bg); border-color: var(--text); }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+    .chip { padding: 4px 11px; border-radius: 7px; font-size: 12px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-variant-numeric: tabular-nums; }
+    .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 14px; }
+    .scrollx { overflow-x: auto; }
+    table.opt { width: 100%; border-collapse: collapse; font-size: 12px; }
+    table.opt th { color: var(--muted); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 5px 7px; border-bottom: 1px solid var(--border); text-align: right; }
+    table.opt td { padding: 4px 7px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    td.strikeCol, th.strikeCol { text-align: center !important; font-weight: 700; background: color-mix(in srgb, var(--text) 6%, transparent); }
+    tr.itm-c td.cside { background: color-mix(in srgb, var(--green, #34d399) 7%, transparent); }
+    tr.itm-p td.pside { background: color-mix(in srgb, var(--red, #f87171) 7%, transparent); }
+    tr.spotrow td { border-top: 2px dashed var(--accent); padding: 3px 7px; text-align: center; color: var(--accent); font-weight: 700; font-size: 11.5px; }
+    .expHead { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 4px; user-select: none; }
+    .expHead b { font-size: 13.5px; }
+    .dte { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+    /* Calls read green, puts read red — subtle tints that keep the theme intact. */
+    .volbar { display: inline-block; height: 8px; background: var(--accent); opacity: .55; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
+    td.cside .volbar { background: var(--green, #34d399); }
+    td.pside .volbar { background: var(--red, #f87171); }
+    th.chead { color: var(--green, #34d399) !important; }
+    th.phead { color: var(--red, #f87171) !important; }
+    td.cside { color: color-mix(in srgb, var(--green, #34d399) 26%, var(--text)); }
+    td.pside { color: color-mix(in srgb, var(--red, #f87171) 26%, var(--text)); }
+    .hm td { min-width: 44px; }
+    .hm .cc { color: var(--green, #34d399); } .hm .pp { color: var(--red, #f87171); }
+    canvas#ivCanvas { width: 100%; max-width: 1100px; height: 380px; }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 12.5px; }
+    .kv .k { color: var(--muted); }
+    .mono { font-family: ui-monospace, monospace; font-size: 12px; }
+    .pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
+    /* Symbol-search popup — same pattern as the trader/watch pages' search */
+    .symp-bg { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-start; justify-content: center; background: rgba(5,6,8,.62); padding-top: 9vh; }
+    .symp { width: min(440px, 92vw); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.45); overflow: hidden; }
+    .symp-head { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .symp-head input { flex: 1; }
+    .symp-list { max-height: 46vh; overflow-y: auto; }
+    .symp-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 14px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+    .symp-row:hover, .symp-row.sel { background: color-mix(in srgb, var(--text) 7%, transparent); }
+    .symp-row b { font-variant-numeric: tabular-nums; min-width: 56px; }
+    .symp-row span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symp-empty { padding: 16px 14px; color: var(--muted); font-size: 12.5px; }
+  </style>
+</head>
+
+<main class="opt-shell">
+  <div class="opt-head">
+    <h1>Options</h1>
+    <div class="page-tabs" role="navigation" aria-label="Trading pages">
+      <a class="pt" href="/watch.html">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt on" href="/options.html" aria-current="page">Options</a>
+    </div>
+    <div class="sym-box">
+      <input class="fld" id="sym" value="SPY" maxlength="6" style="width:84px" aria-label="Underlying symbol" onfocus="openSymPopup()" autocomplete="off">
+      <button class="btn" onclick="openSymPopup()" aria-label="Search symbols" title="Search symbols"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+      <button class="btn" onclick="loadAll()">Load</button>
+    </div>
+    <span class="spot" id="spot"></span>
+    <span class="muted" id="meta"></span>
+  </div>
+  <p class="muted" style="margin:0 0 4px">Live chain (free feed, ~15&nbsp;min cache). Viewing and analysis only — nothing here places orders.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="chain" onclick="showTab('chain')">Chain</button>
+    <button class="tab" data-tab="vol" onclick="showTab('vol')">Volatility</button>
+    <button class="tab" data-tab="volume" onclick="showTab('volume')">Volume</button>
+    <button class="tab" data-tab="strat" onclick="showTab('strat')">Strategies</button>
+  </div>
+
+  <div id="tab-chain">
+    <div class="chips" id="strikeFilter">
+      <span class="muted" style="align-self:center">Strikes:</span>
+      <button class="chip active" data-n="6" onclick="setStrikes(6)">±6</button>
+      <button class="chip" data-n="12" onclick="setStrikes(12)">±12</button>
+      <button class="chip" data-n="0" onclick="setStrikes(0)">All</button>
+    </div>
+    <div id="chainBody" class="muted">Load a symbol to see the chain.</div>
+  </div>
+
+  <div id="tab-vol" style="display:none">
+    <div class="chips" id="volExpChips"></div>
+    <div class="card"><canvas id="ivCanvas" width="1100" height="380"></canvas>
+      <div class="muted">Implied volatility by strike (calls + puts averaged at each strike). Dashed line = spot.</div>
+    </div>
+  </div>
+
+  <div id="tab-volume" style="display:none">
+    <div class="card scrollx"><div id="volumeBody" class="muted">Load a symbol first.</div></div>
+  </div>
+
+  <div id="tab-strat" style="display:none">
+    <div class="card">
+      <p class="muted" style="margin:0 0 12px">Deterministic income-strategy proposals from the live chain — advisory only; review and place manually if you want them.</p>
+      <div class="chips">
+        <select class="fld" id="stKind" aria-label="Strategy">
+          <option value="covered_call">Covered call</option>
+          <option value="cash_secured_put">Cash-secured put</option>
+          <option value="collar">Collar</option>
+        </select>
+        <input class="fld" id="stShares" value="100" style="width:90px" title="Shares held (covered call / collar)" aria-label="Shares">
+        <input class="fld" id="stCash" value="10000" style="width:110px" title="Cash available (cash-secured put)" aria-label="Cash">
+        <button class="btn" onclick="loadStrategy()">Propose</button>
+      </div>
+      <div id="stBody" class="muted"></div>
+    </div>
+  </div>
+
+  <p class="muted" style="margin-top:26px">The AI options trader runs as a measurement-only shadow (no orders) — <a href="/api/trading/options-shadow">its live expectancy ledger</a> · <a href="/api/trading/options-shadow/probe">what it would trade tonight</a>.</p>
+
+  <div class="symp-bg" id="sympBg" style="display:none" onclick="if(event.target===this)closeSymPopup()">
+    <div class="symp" role="dialog" aria-label="Search symbols">
+      <div class="symp-head">
+        <input class="fld" id="sympInput" placeholder="Search ticker or company…" aria-label="Search symbols" autocomplete="off"
+          oninput="onSympInput()" onkeydown="onSympKey(event)">
+        <button class="btn" onclick="closeSymPopup()">Esc</button>
+      </div>
+      <div class="symp-list" id="sympList"></div>
+    </div>
+  </div>
+</main>
+<script src="/js/site-chrome.js" defer></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (x, d=2) => (x==null || isNaN(x)) ? '—' : Number(x).toFixed(d);
+const fmtVol = (v) => v==null ? '—' : v>=1000 ? (v/1000).toFixed(1)+'K' : String(v);
+
+let CHAIN = null;   // { spot, expiries: [{exp, dte, rows: Map(strike → {call, put})}] }
+let N_STRIKES = 6;  // per side of spot; 0 = all
+let VOL_EXP = null; // selected expiry on the Volatility tab
+// Remembered view (symbol / strike filter / tab) — same convention as trader.* keys
+try {
+  const savedSym = localStorage.getItem('options.sym');
+  if (savedSym && /^[A-Z.\-]{1,6}$/.test(savedSym)) $('sym').value = savedSym;
+  const savedN = parseInt(localStorage.getItem('options.strikes'), 10);
+  if ([0,6,12].includes(savedN)) N_STRIKES = savedN;
+} catch (e) {}
+
+function showTab(t){
+  for (const el of document.querySelectorAll('.tab')) el.classList.toggle('active', el.dataset.tab===t);
+  for (const id of ['chain','vol','volume','strat']) $('tab-'+id).style.display = id===t ? '' : 'none';
+  try { localStorage.setItem('options.tab', t); } catch (e) {}
+  if (t==='vol') drawIV();
+}
+function setStrikes(n){
+  N_STRIKES = n;
+  try { localStorage.setItem('options.strikes', String(n)); } catch (e) {}
+  for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===n);
+  renderChain(); renderVolume();
+}
+
+function groupChain(d){
+  const spot = Number(d.underlying_price) || inferSpot(d.contracts) || 0;
+  const byExp = new Map();
+  for (const c of d.contracts || []) {
+    const exp = String(c.expiration||'').slice(0,10);
+    if (!exp || (c.type!=='call' && c.type!=='put')) continue;
+    if (!byExp.has(exp)) byExp.set(exp, new Map());
+    const m = byExp.get(exp);
+    if (!m.has(c.strike)) m.set(c.strike, {});
+    m.get(c.strike)[c.type] = c;
+  }
+  const today = new Date();
+  const expiries = [...byExp.entries()].sort((a,b)=>a[0]<b[0]?-1:1).map(([exp, rows]) => ({
+    exp, rows, dte: Math.max(0, Math.round((new Date(exp+'T16:00:00') - today)/86400000)),
+  }));
+  return { spot, expiries, source: d.source, count: d.count, cached: d.cached };
+}
+// put-call parity-ish fallback: strike whose call/put marks are closest
+function inferSpot(cs){
+  const m = new Map();
+  for (const c of cs||[]) { if(!m.has(c.strike)) m.set(c.strike,{}); m.get(c.strike)[c.type]=c.mark; }
+  let best=null, bd=Infinity;
+  for (const [k,v] of m) if (v.call!=null && v.put!=null) { const d=Math.abs(v.call-v.put); if(d<bd){bd=d;best=k;} }
+  return best;
+}
+function strikesFor(rows, spot){
+  const ks = [...rows.keys()].sort((a,b)=>a-b);
+  if (!N_STRIKES || !spot) return ks;
+  const below = ks.filter(k=>k<=spot).slice(-N_STRIKES);
+  const above = ks.filter(k=>k>spot).slice(0, N_STRIKES);
+  return below.concat(above);
+}
+
+async function loadAll(){
+  const sym = ($('sym').value||'SPY').trim().toUpperCase();
+  try { localStorage.setItem('options.sym', sym); } catch (e) {}
+  $('chainBody').innerHTML = 'Loading…'; $('meta').textContent=''; $('spot').textContent='';
+  try{
+    const d = await (await fetch('/api/trading/options/chain?symbol='+encodeURIComponent(sym))).json();
+    if (!d.available) { CHAIN=null; $('chainBody').innerHTML = '<span class="muted">Chain unavailable — '+esc(d.reason||'no data source')+'</span>'; return; }
+    CHAIN = groupChain(d);
+    VOL_EXP = CHAIN.expiries[0] ? CHAIN.expiries[0].exp : null;
+    $('spot').textContent = CHAIN.spot ? num(CHAIN.spot) : '';
+    $('meta').textContent = `${sym} · ${d.count||0} contracts · ${CHAIN.expiries.length} expirations · ${d.source||''}${d.cached?' (cached)':''}`;
+    renderChain(); renderVolChips(); renderVolume();
+    if ($('tab-vol').style.display !== 'none') drawIV();
+  }catch(e){ CHAIN=null; $('chainBody').innerHTML = '<span class="muted">Chain failed — '+esc(e.message)+'</span>'; }
+}
+
+// ── Chain tab: calls | strike | puts, grouped by expiration ────────────────
+function renderChain(){
+  if (!CHAIN) return;
+  const parts = [];
+  CHAIN.expiries.forEach((e, i) => {
+    const open = i===0 ? ' open' : '';
+    const ks = strikesFor(e.rows, CHAIN.spot);
+    const maxV = Math.max(1, ...ks.flatMap(k=>{const r=e.rows.get(k);return [r.call&&r.call.volume||0, r.put&&r.put.volume||0];}));
+    let rowsHtml = ''; let spotDone = false;
+    for (const k of ks) {
+      if (!spotDone && CHAIN.spot && k > CHAIN.spot) {
+        rowsHtml += `<tr class="spotrow"><td colspan="13">${esc($('sym').value.toUpperCase())} ${num(CHAIN.spot)}</td></tr>`;
+        spotDone = true;
+      }
+      const r = e.rows.get(k); const c = r.call||{}, p = r.put||{};
+      const cls = (CHAIN.spot && k < CHAIN.spot ? 'itm-c' : '') + (CHAIN.spot && k > CHAIN.spot ? ' itm-p' : '');
+      const side = (o, sideCls) => `<td class="${sideCls}">${num(o.last)}</td><td class="${sideCls}">${num(o.bid)}</td><td class="${sideCls}">${num(o.ask)}</td>`
+        + `<td class="${sideCls}">${o.delta!=null?num(o.delta,2):'—'}</td>`
+        + `<td class="${sideCls}">${fmtVol(o.volume)}<span class="volbar" style="width:${Math.round(28*(o.volume||0)/maxV)}px"></span></td>`;
+      rowsHtml += `<tr class="${cls}">${side(c,'cside')}`
+        + `<td class="strikeCol">${num(k, k%1?2:0)}</td><td class="strikeCol" style="font-weight:400">${c.implied_volatility!=null?num(c.implied_volatility*100,1)+'%':(p.implied_volatility!=null?num(p.implied_volatility*100,1)+'%':'—')}</td>`
+        + `${side(p,'pside')}<td>${fmtVol(p.open_interest)}</td></tr>`;
+    }
+    parts.push(`<details class="card"${open?' open':''}><summary class="expHead"><b>${esc(e.exp)}</b><span class="dte">${e.dte} DTE</span><span class="muted">${ks.length} strikes</span></summary>
+      <div class="scrollx"><table class="opt">
+      <tr><th colspan="5" class="chead" style="text-align:left">Calls</th><th class="strikeCol">Strike</th><th class="strikeCol">IV</th><th colspan="5" class="phead">Puts</th><th></th></tr>
+      <tr><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th class="strikeCol"></th><th class="strikeCol"></th><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th>OI(P)</th></tr>
+      ${rowsHtml}</table></div></details>`);
+  });
+  $('chainBody').innerHTML = parts.join('') || '<span class="muted">No contracts.</span>';
+}
+
+// ── Volatility tab: IV smile per expiration ────────────────────────────────
+function renderVolChips(){
+  if (!CHAIN) return;
+  $('volExpChips').innerHTML = CHAIN.expiries.map(e =>
+    `<button class="chip${e.exp===VOL_EXP?' active':''}" onclick="VOL_EXP='${e.exp}';renderVolChips();drawIV()">${esc(e.exp.slice(5))} <span class="muted">${e.dte}d</span></button>`).join('');
+}
+function drawIV(){
+  const cv = $('ivCanvas'); const ctx = cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  if (!CHAIN || !VOL_EXP) return;
+  const e = CHAIN.expiries.find(x=>x.exp===VOL_EXP); if (!e) return;
+  const pts = [];
+  for (const [k,r] of [...e.rows.entries()].sort((a,b)=>a[0]-b[0])) {
+    const ivs = [r.call&&r.call.implied_volatility, r.put&&r.put.implied_volatility].filter(v=>v>0.001);
+    if (ivs.length) pts.push({ k, iv: ivs.reduce((a,b)=>a+b,0)/ivs.length });
+  }
+  if (pts.length < 2) { ctx.fillStyle='#888'; ctx.fillText('Not enough IV data for this expiration', 20, 40); return; }
+  const style = getComputedStyle(document.documentElement);
+  const accent = style.getPropertyValue('--accent').trim() || '#06b6d4';
+  const muted = style.getPropertyValue('--muted').trim() || '#888';
+  const W=cv.width, H=cv.height, L=52, R=16, T=14, B=28;
+  const kMin=pts[0].k, kMax=pts[pts.length-1].k;
+  let vMin=Math.min(...pts.map(p=>p.iv)), vMax=Math.max(...pts.map(p=>p.iv));
+  const pad=(vMax-vMin)*0.12||0.02; vMin-=pad; vMax+=pad;
+  const X=(k)=>L+(W-L-R)*(k-kMin)/(kMax-kMin||1), Y=(v)=>T+(H-T-B)*(1-(v-vMin)/(vMax-vMin||1));
+  ctx.font='11px sans-serif'; ctx.fillStyle=muted; ctx.strokeStyle=muted; ctx.lineWidth=0.4;
+  for (let i=0;i<=5;i++){ const v=vMin+(vMax-vMin)*i/5, y=Y(v);
+    ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(W-R,y); ctx.stroke();
+    ctx.fillText((v*100).toFixed(0)+'%', 8, y+4); }
+  for (let i=0;i<=6;i++){ const k=kMin+(kMax-kMin)*i/6; ctx.fillText(k.toFixed(0), X(k)-10, H-8); }
+  if (CHAIN.spot>=kMin && CHAIN.spot<=kMax){ ctx.save(); ctx.setLineDash([5,4]); ctx.strokeStyle=muted; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(X(CHAIN.spot),T); ctx.lineTo(X(CHAIN.spot),H-B); ctx.stroke(); ctx.restore(); }
+  ctx.strokeStyle=accent; ctx.lineWidth=2; ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=X(p.k), y=Y(p.iv); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.stroke();
+}
+
+// ── Volume tab: strikes × expirations heat table ───────────────────────────
+function renderVolume(){
+  if (!CHAIN) { return; }
+  const exps = CHAIN.expiries.slice(0, 10);
+  const strikeSet = new Set();
+  for (const e of exps) for (const k of strikesFor(e.rows, CHAIN.spot)) strikeSet.add(k);
+  const strikes = [...strikeSet].sort((a,b)=>a-b);
+  if (!strikes.length) { $('volumeBody').innerHTML='<span class="muted">No contracts.</span>'; return; }
+  let h = `<table class="opt hm"><tr><th style="text-align:left">Strike</th>${exps.map(e=>`<th colspan="2">${esc(e.exp.slice(5))}<div class="muted" style="font-size:9px">${e.dte}d · C / P</div></th>`).join('')}</tr>`;
+  for (const k of strikes) {
+    h += `<tr><td style="text-align:left;font-weight:700">${num(k, k%1?2:0)}${CHAIN.spot&&Math.abs(k-CHAIN.spot)<0.5?' ◂':''}</td>`;
+    for (const e of exps) {
+      const r = e.rows.get(k) || {};
+      h += `<td class="cc">${r.call&&r.call.volume?fmtVol(r.call.volume):'–'}</td><td class="pp">${r.put&&r.put.volume?fmtVol(r.put.volume):'–'}</td>`;
+    }
+    h += '</tr>';
+  }
+  $('volumeBody').innerHTML = h + '</table><div class="muted" style="margin-top:8px">Session volume per contract — <span class="cc">calls</span> / <span class="pp">puts</span>. First 10 expirations shown.</div>';
+}
+
+// ── Strategies tab (advisory proposals — unchanged endpoints) ──────────────
+async function loadStrategy(){
+  const el=$('stBody'); el.innerHTML='Computing…';
+  const q = new URLSearchParams({ symbol:($('sym').value||'SPY').trim().toUpperCase(), strategy:$('stKind').value, shares:$('stShares').value||'0', cash:$('stCash').value||'0' });
+  try{
+    const d = await (await fetch('/api/trading/options/strategies?'+q)).json();
+    if(!d.available){ el.innerHTML='<span class="muted">Unavailable — '+esc(d.reason||'no data source')+'</span>'; return; }
+    const pr = d.proposal;
+    if(!pr || pr.ok===false){ el.innerHTML='<span class="muted">No proposal — '+esc((pr&&pr.reason)||'insufficient inputs')+'</span>'; return; }
+    el.innerHTML = `<pre class="mono" style="white-space:pre-wrap;margin:12px 0 0">${esc(JSON.stringify(pr,null,2))}</pre>`;
+  }catch(e){ el.innerHTML='<span class="muted">Failed — '+esc(e.message)+'</span>'; }
+}
+
+// ── Symbol-search popup (same backend as the trader pages' search) ─────────
+// Options are equities-only, so crypto results are filtered out. Empty query →
+// a curated optionable-popular list so the popup never opens blank.
+const SYMP_POPULAR = [
+  ['SPY','SPDR S&P 500'],['QQQ','Invesco Nasdaq-100'],['IWM','iShares Russell 2000'],['DIA','SPDR Dow Jones'],
+  ['GLD','SPDR Gold Shares'],['TLT','iShares 20+yr Treasury'],['SMH','VanEck Semiconductor'],['XLK','Technology Select SPDR'],
+  ['TQQQ','ProShares UltraPro QQQ'],['SQQQ','ProShares UltraPro Short QQQ'],['SOXL','Direxion Semis Bull 3X'],['SOXS','Direxion Semis Bear 3X'],
+  ['AAPL','Apple'],['MSFT','Microsoft'],['NVDA','NVIDIA'],['TSLA','Tesla'],['AMZN','Amazon'],['META','Meta Platforms'],['GOOGL','Alphabet'],['AMD','Advanced Micro Devices'],
+];
+let _sympRows = [], _sympSel = 0, _sympDeb = null, _sympEpoch = 0;
+function openSymPopup(){
+  $('sympBg').style.display = 'flex';
+  const inp = $('sympInput'); inp.value = ''; inp.focus();
+  runSympSearch('');
+}
+function closeSymPopup(){ $('sympBg').style.display = 'none'; }
+function onSympInput(){ clearTimeout(_sympDeb); _sympDeb = setTimeout(()=>runSympSearch($('sympInput').value), 170); }
+function onSympKey(e){
+  if (e.key === 'Escape') { closeSymPopup(); return; }
+  if (e.key === 'ArrowDown') { _sympSel = Math.min(_sympSel+1, _sympRows.length-1); renderSymp(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { _sympSel = Math.max(_sympSel-1, 0); renderSymp(); e.preventDefault(); }
+  else if (e.key === 'Enter' && _sympRows[_sympSel]) { pickSymp(_sympRows[_sympSel][0]); e.preventDefault(); }
+}
+async function runSympSearch(q){
+  const query = (q||'').trim(); const ep = ++_sympEpoch;
+  if (!query) { _sympRows = SYMP_POPULAR.slice(); _sympSel = 0; renderSymp(); return; }
+  try {
+    const r = await fetch('/api/trading/symbols/search?limit=30&q=' + encodeURIComponent(query));
+    const d = await r.json();
+    if (ep !== _sympEpoch) return;
+    _sympRows = (d.results||[]).filter(a => a.class !== 'crypto').map(a => [a.symbol, a.name||'']);
+    _sympSel = 0; renderSymp();
+  } catch (e) { if (ep === _sympEpoch) $('sympList').innerHTML = '<div class="symp-empty">Search unavailable</div>'; }
+}
+function renderSymp(){
+  if (!_sympRows.length) { $('sympList').innerHTML = '<div class="symp-empty">No matching symbols</div>'; return; }
+  $('sympList').innerHTML = _sympRows.map(([s,n],i) =>
+    `<div class="symp-row${i===_sympSel?' sel':''}" onclick="pickSymp('${esc(s)}')"><b>${esc(s)}</b><span>${esc(n)}</span></div>`).join('');
+}
+function pickSymp(s){
+  closeSymPopup();
+  $('sym').value = String(s).toUpperCase();
+  loadAll();
+}
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSymPopup(); });
+
+// Restore the remembered strike filter + tab, then load.
+for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===N_STRIKES);
+try { const t = localStorage.getItem('options.tab'); if (['chain','vol','volume','strat'].includes(t)) showTab(t); } catch (e) {}
+loadAll();
+</script>
+</html>

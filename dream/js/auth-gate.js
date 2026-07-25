@@ -19,7 +19,7 @@
   // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
   // body.is-guest and their endpoints are admin-gated server-side. So it must not
   // bounce here either.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/watch.html', '/options.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest
@@ -142,7 +142,11 @@
       badge.id = 'nav-tier';
       badge.className = 'nav-tier';
       badge.href = '/pricing.html';
-      profileBtn.parentElement.insertBefore(badge, profileBtn);
+      // Lead the actions cluster (leftmost) — sitting between the icon buttons
+      // broke the group up visually (operator, 2026-07-25). flex order pins it
+      // first even when other buttons are reordered/hidden responsively.
+      badge.style.order = '-2';  // beats .nav-menu-toggle's order:-1 on narrow screens
+      profileBtn.parentElement.insertBefore(badge, profileBtn.parentElement.firstChild);
     }
     badge.textContent = label;
     badge.dataset.tier = kind;
