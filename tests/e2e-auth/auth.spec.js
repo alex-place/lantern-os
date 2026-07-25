@@ -6,7 +6,8 @@ const { test, expect } = require('@playwright/test');
  * test-auth path enabled (see tests/playwright-auth.config.ts). Covers:
  *   1. Guest sees the "Sign in" affordance on the home page.
  *   2. Guest hitting a gated page is NOT shown an empty profile.
- *   3. The X-Test-Auth header authenticates as an emulated role (admin / supporter).
+ *   3. The X-Test-Auth header authenticates least-privilege by default (#2645);
+ *      admin is reachable only by naming it via X-Test-Role.
  *   4. A proxy/tunnel header makes the token inert (never bypassable from the net).
  *   5. The auth-page role picker signs in as the seeded test account.
  *   6. Logout returns to guest.
@@ -19,9 +20,18 @@ const TEST_PASSWORD = 'test-account-1234';
 
 test.describe('auth: guest experience', () => {
   test('home page shows a Sign in affordance for a guest', async ({ page }) => {
+    // First visit, no entry choice recorded: the first-visit gate (auth-gate.js)
+    // sends an undecided guest to /auth.html ONCE to decide — signed-out-and-asked,
+    // never silently signed in.
     await page.goto('/');
-    // site-chrome injects #profile-btn; for a guest, auth-gate repurposes it into a
-    // Sign in link (class nav-signin) rather than hiding it.
+    await page.waitForURL(/\/auth\.html/);
+    const guestBtn = page.locator('#continue-guest');
+    await expect(guestBtn).toBeVisible();
+    // "Continue without an account" records ln_guest and returns home…
+    await guestBtn.click();
+    await page.waitForURL((url) => !url.pathname.startsWith('/auth'));
+    // …where site-chrome's #profile-btn is repurposed by auth-gate into a Sign in
+    // link (class nav-signin) rather than hidden — the guest is never stranded.
     const signin = page.locator('#profile-btn.nav-signin, a.nav-signin');
     await expect(signin.first()).toBeVisible();
     const href = await signin.first().getAttribute('href');
@@ -50,12 +60,22 @@ test.describe('auth: guest experience', () => {
 });
 
 test.describe('auth: header test-auth', () => {
-  test('X-Test-Auth header authenticates as admin by default', async ({ request }) => {
+  test('X-Test-Auth header authenticates least-privilege by default, admin only explicitly', async ({ request }) => {
+    // #2645: a bare token is NOT admin — defaulting to admin was fail-open. The
+    // token authenticates as the seeded account at guest privilege; operator roles
+    // must be named via X-Test-Role (a deliberate act).
     const res = await request.get('/api/auth/session', { headers: { 'X-Test-Auth': TOKEN } });
     const s = await res.json();
     expect(s.authenticated).toBe(true);
-    expect(s.role).toBe('admin');
+    expect(s.role).toBe('guest');
     expect(s.user.id).toBe('test-user');
+
+    const admin = await request.get('/api/auth/session', {
+      headers: { 'X-Test-Auth': TOKEN, 'X-Test-Role': 'admin' },
+    });
+    const a = await admin.json();
+    expect(a.authenticated).toBe(true);
+    expect(a.role).toBe('admin');
   });
 
   test('X-Test-Role downgrades the emulated role', async ({ request }) => {
@@ -84,10 +104,15 @@ test.describe('auth: header test-auth', () => {
 
 test.describe('auth: role picker + session', () => {
   test('the auth page renders the dev role picker', async ({ page }) => {
+    // One button per server-reported test role (don't hardcode the roster: it
+    // grew from 5 to 6 when tech_support was added and will drift again).
+    const session = await page.request.get('/api/auth/session').then((r) => r.json());
+    expect(Array.isArray(session.testRoles)).toBe(true);
+    expect(session.testRoles.length).toBeGreaterThanOrEqual(5);
     await page.goto('/auth.html');
     const panel = page.locator('#test-login');
     await expect(panel).toBeVisible();
-    await expect(page.locator('#test-role-buttons button')).toHaveCount(5);
+    await expect(page.locator('#test-role-buttons button')).toHaveCount(session.testRoles.length);
   });
 
   test('picking Admin signs in as the test account', async ({ page }) => {
@@ -107,9 +132,15 @@ test.describe('auth: role picker + session', () => {
 
   test('logout returns to guest', async ({ page }) => {
     await page.goto('/auth.html?returnTo=/settings.html');
+    // The picker labels tiers, not role slugs: supporter renders as "Free". Wait for
+    // the post-login navigation to LAND (not just the test-login response) so the
+    // logout below isn't racing an in-flight page load. (Logout durability against
+    // that race is locked separately by test/session-store-logout.test.js.)
     await Promise.all([
-      page.waitForResponse((r) => r.url().includes('/api/auth/test-login')),
-      page.locator('#test-role-buttons button', { hasText: 'Supporter' }).click(),
+      // Match on the PATHNAME: a bare /settings\.html/ regex also matches the
+      // CURRENT url's ?returnTo=/settings.html query and resolves before login.
+      page.waitForURL((url) => url.pathname === '/settings.html'),
+      page.locator('#test-role-buttons button', { hasText: 'Free' }).click(),
     ]);
     // Signed in now (shared context cookie).
     let s = await page.context().request.get('/api/auth/session').then((r) => r.json());

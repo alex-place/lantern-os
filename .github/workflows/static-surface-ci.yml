@@ -129,13 +129,24 @@ jobs:
     name: CI summary gate
     runs-on: ubuntu-latest
     needs: [repo-surface, manifests, html-links, convergence-cloud, workflow-shape]
+    # always() so a member FAILURE turns this summary red instead of skipping it.
+    if: always()
 
     steps:
-      - name: Summarize passed lanes
+      - name: Summarize lanes
         run: |
+          fail=0
+          for pair in \
+            "repo-surface=${{ needs.repo-surface.result }}" \
+            "manifests=${{ needs.manifests.result }}" \
+            "html-links=${{ needs.html-links.result }}" \
+            "convergence-cloud=${{ needs.convergence-cloud.result }}" \
+            "workflow-shape=${{ needs.workflow-shape.result }}"; do
+            echo "$pair"
+            case "$pair" in *=success) ;; *) fail=1 ;; esac
+          done
+          if [ "$fail" -eq 1 ]; then
+            echo "::error::A static-surface CI lane did not pass."
+            exit 1
+          fi
           echo "All static-surface CI lanes passed."
-          echo "repo-surface=${{ needs.repo-surface.result }}"
-          echo "manifests=${{ needs.manifests.result }}"
-          echo "html-links=${{ needs.html-links.result }}"
-          echo "convergence-cloud=${{ needs.convergence-cloud.result }}"
-          echo "workflow-shape=${{ needs.workflow-shape.result }}"
