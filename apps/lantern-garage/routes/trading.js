@@ -164,7 +164,12 @@ async function _autoscanTick() {
         // Every execution is already appended to the durable autopilot-trades.jsonl by
         // auto-trader.logTrade() — that append-only file is the record of what the
         // autopilot did, so a per-tick console echo here would only duplicate it.
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours });
+        // Position partitioning: symbols the overnight sleeve book currently owns are
+        // off-limits to the intraday engine (no exits/stops/sells/entries on them) —
+        // each engine manages only its own positions. Fail-soft empty set.
+        let _ovnHeld = [];
+        try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);

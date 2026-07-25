@@ -71,6 +71,11 @@ async function brokerFacadeFor(userId, ibkrBridge) {
       getIBKROpenOrders: (uid) => alpaca.getOpenOrders(uid),
       getIBKRDayPnl: (uid) => alpaca.getDayPnl(uid),
       placeIBKROrder: (uid, order) => alpaca.placeOrder(uid, order),
+      // Cancel was missing from the facade (the IBKR bridge has it natively), so any
+      // engine cancelling a resting stop through the facade silently couldn't on
+      // Alpaca — leaving orphaned GTC sell-stops that can fire on a flat position
+      // and open an unintended short. Map it.
+      cancelIBKROrder: (uid, orderId) => alpaca.cancelOrder(uid, orderId),
     };
     return { broker: 'alpaca', accountId: acct.account_id, facade };
   };

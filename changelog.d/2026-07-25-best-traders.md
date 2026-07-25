@@ -38,3 +38,17 @@
   (IBKR Pro ≈ +1.5 default, Lite ≈ +2.5, Alpaca margin ≈ +3.5–4), so Alpaca-only users
   model THEIR rate honestly. The 23y re-measure showed the 2× edge survives Lite-grade
   financing (16.5%/yr vs SPY 11.1%), so nothing about the overlay requires IBKR.
+
+- trading/overnight+intraday: **position partitioning + audit fixes** — the integration
+  audit found four real defects between the two engines, all fixed: (1) `broker-facade`
+  lacked `cancelIBKROrder`, so stop-cancels through the facade silently no-oped on
+  Alpaca; (2) the overnight exit now cancels any resting protective SELL-STOP the
+  intraday re-protect pass attached (an orphaned GTC stop on a flat position can fire
+  and open an unintended short) and sells `min(leg qty, live qty)` instead of blind qty;
+  (3) the intraday engine now takes an `excludeSymbols` set (fed live from
+  `overnight-trader.heldSymbols()`) so it never exits/stops/sells/enters overnight-owned
+  positions; (4) the overnight entry skips symbols the account already holds — no
+  commingled positions with ambiguous ownership. The reverse-ETF strategy is NOT
+  discarded: it lives on intraday (SQQQ/SOXS in the #2936 universe) and overnight as the
+  SH bear-rally-fade sleeve; only the falsified blanket-inverse-overnight form was
+  dropped (oracle ledger `inverse-etf-overnight-test`).

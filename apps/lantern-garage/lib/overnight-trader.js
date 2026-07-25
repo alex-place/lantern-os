@@ -165,12 +165,37 @@ async function tick({ bridge } = {}) {
     for (const sym of [...new Set((st.open.legs || []).map((l) => l.symbol))]) {
       try { const r = await yahoo.getBars(sym, '1d'); const b = ((r && r.bars) || []).slice(-1)[0]; if (b && b.open > 0) openBySym[sym] = b.open; } catch (_e) { /* */ }
     }
+    // Live position qtys — never sell more than the account actually holds (the
+    // intraday engine or a stop may have already reduced/closed a leg overnight).
+    let heldQty = {};
+    if (resolved) {
+      const pos = await resolved.facade.getIBKRPositions(c.userId).catch(() => []);
+      for (const p of (pos || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
+    }
     for (const leg of (st.open.legs || [])) {
       const exitRef = openBySym[leg.symbol] || null;
       const pl = exitRef && leg.ref_close > 0 ? +(((exitRef - leg.ref_close) / leg.ref_close) * 100).toFixed(3) : null;
       if (leg.placed && resolved) {
-        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: leg.symbol, side: 'sell', qty: leg.qty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false });
+        const sellQty = Math.min(leg.qty, heldQty[leg.symbol] || 0);
+        if (sellQty > 0) {
+          const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: leg.symbol, side: 'sell', qty: sellQty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: sellQty, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false });
+        } else {
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: 0, exit_ref_open: exitRef, pl_pct_est: pl, status: 'already_flat', dry: false });
+        }
+        // Cancel any resting protective SELL-STOP on this symbol (the intraday
+        // re-protect pass attaches one to every naked long). An orphaned GTC stop on
+        // a now-flat position would fire later and open an unintended short.
+        try {
+          if (typeof resolved.facade.cancelIBKROrder === 'function') {
+            const orders = await resolved.facade.getIBKROpenOrders(c.userId).catch(() => []);
+            for (const o of (orders || [])) {
+              if (String(o.symbol || '').toUpperCase() === leg.symbol && /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '')) {
+                await resolved.facade.cancelIBKROrder(c.userId, o.orderId || o.order_id).catch(() => {});
+              }
+            }
+          }
+        } catch (_e) { /* fail-soft */ }
       } else {
         _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true });
       }
@@ -197,9 +222,18 @@ async function tick({ bridge } = {}) {
     const equity = (account && Number(account.equity)) || 0;
     const baseDry = !c.armed || !resolved || !(equity > 0);
     const edge = summarize(_readLedger(), { minN: c.edgeMinN });
+    // No commingling: skip any sleeve whose symbol the account ALREADY holds (an
+    // intraday position, say) — a shared position would make both engines' exits
+    // ambiguous about whose shares they're selling.
+    let preHeld = {};
+    if (resolved) {
+      const pos = await resolved.facade.getIBKRPositions(c.userId).catch(() => []);
+      for (const p of (pos || [])) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
+    }
     const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
     const legs = [];
     for (const s of sleeves) {
+      if ((preHeld[s.symbol] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
       const px = closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0];
       if (!(px > 0)) continue;
       const qty = Math.max(1, Math.floor(per / px));
@@ -229,4 +263,13 @@ function status() {
     edge: summarize(_readLedger(), { minN: c.edgeMinN }), state: _readState(), recent: last };
 }
 
-module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, tick, status, LEDGER };
+/** Symbols the overnight book currently owns (for the intraday engine's exclusion —
+ *  each engine manages ONLY its own positions). Fail-soft empty set. */
+function heldSymbols() {
+  try {
+    const st = _readState();
+    return new Set(((st.open && st.open.legs) || []).map((l) => String(l.symbol).toUpperCase()));
+  } catch (_e) { return new Set(); }
+}
+
+module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, heldSymbols, tick, status, LEDGER, STATE };

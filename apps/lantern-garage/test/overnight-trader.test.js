@@ -108,6 +108,54 @@ test('summarize: per-sleeve verdicts from est. close→open P&L rows', () => {
   assert.strictEqual(s.by_sleeve.b.verdict, 'insufficient_data');
 });
 
+test('position partitioning: the intraday engine leaves overnight-owned symbols alone', async () => {
+  const at = require('../lib/auto-trader');
+  const saved = { ...process.env };
+  const actions = [];
+  const bridge = {
+    getIBKRAccount: async () => ({ equity: 100000, mode: 'paper' }),
+    // SPY deep in the red — normally the max-loss backstop would market-exit it AND
+    // the re-protect pass would attach a stop. Excluded → neither may touch it.
+    getIBKRPositions: async () => [{ symbol: 'SPY', qty: 10, avg_entry_price: 100, current_price: 85, market_value: 850, unrealized_pl: -150 }],
+    getIBKROpenOrders: async () => [],
+    getIBKRDayPnl: async () => 0,
+    cancelIBKROrder: async () => ({ status: 'cancelled' }),
+    placeIBKROrder: async (uid, o) => { actions.push(o); return { status: 'placed' }; },
+  };
+  try {
+    process.env.TRADER_MANAGE_EXITS = '1';
+    process.env.TRADER_AUTO_EXECUTE = '0';
+    process.env.TRADER_MOMENTUM_EXIT = '0';
+    process.env.TRADER_MIN_HOLD_MIN = '0';
+    process.env.TRADER_MAX_LOSS_PCT = '8';
+    at._resetCooldowns();
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 'u', now: 1_700_000_000_000, excludeSymbols: ['SPY'] });
+    assert.strictEqual(actions.filter((o) => o.ticker === 'SPY').length, 0, 'no exit, no stop — SPY untouched');
+    // control: WITHOUT the exclusion the backstop fires
+    at._resetCooldowns();
+    await at.runAutoTrade({ signals: [] }, { bridge, userId: 'u', now: 1_700_000_000_000 });
+    assert.ok(actions.some((o) => o.ticker === 'SPY' && o.side === 'sell'), 'control: backstop exits SPY when not excluded');
+  } finally {
+    process.env = saved;
+    at._resetCooldowns();
+  }
+});
+
+test('heldSymbols: reads the open overnight legs from state (round-trip)', () => {
+  const fs = require('fs');
+  const prior = fs.existsSync(ot.STATE) ? fs.readFileSync(ot.STATE, 'utf8') : null;
+  try {
+    fs.mkdirSync(require('path').dirname(ot.STATE), { recursive: true });
+    fs.writeFileSync(ot.STATE, JSON.stringify({ open: { date: '2026-01-01', legs: [{ symbol: 'SPY' }, { symbol: 'SH' }] } }));
+    const s = ot.heldSymbols();
+    assert.ok(s.has('SPY') && s.has('SH') && s.size === 2);
+    fs.writeFileSync(ot.STATE, JSON.stringify({}));
+    assert.strictEqual(ot.heldSymbols().size, 0);
+  } finally {
+    if (prior != null) fs.writeFileSync(ot.STATE, prior); else { try { fs.unlinkSync(ot.STATE); } catch (_e) { /* */ } }
+  }
+});
+
 test('sigma grossFor/grossMode: brake default, explicit 1x/2x honored', () => {
   const saved = process.env.SIGMA_GROSS_MODE;
   try {
