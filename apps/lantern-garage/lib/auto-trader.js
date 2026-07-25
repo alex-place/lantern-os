@@ -262,7 +262,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
  *      momentum is dying / about to die" before the full bearish signal would fire.
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
-async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set() }) {
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set() }) {
   const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
   if (!longs.length) return;
 
@@ -275,6 +275,7 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
   }
 
   for (const [sym, p] of longs) {
+    if (exclude.has(sym)) continue;               // another engine (overnight book) owns this position
     const qty = Number(p.qty) || 0;
     const cur = Number(p.current_price) || 0;
     const entry = Number(p.avg_entry_price || p.avg_fill_price) || 0;
@@ -360,7 +361,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
  * @param {object} deps   { bridge, userId, now?, caps? }
  * @returns {Promise<{executed:Array, skipped:Array, enabled:boolean, reason?:string}>}
  */
-async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false } = {}) {
+async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [] } = {}) {
+  // Position partitioning: symbols owned by ANOTHER engine (the overnight sleeve book)
+  // are completely off-limits — no exits, no re-protect stops, no signal-sells, no
+  // entries. Each engine manages only its own positions; the caller (trading.js)
+  // supplies the live exclusion set.
+  const exclude = new Set([...(excludeSymbols || [])].map((s) => String(s).toUpperCase()));
   const c = cfg();
   const out = { executed: [], skipped: [], enabled: c.enabled, manageExits: c.manageExits };
   // Either arm entries+exits (TRADER_AUTO_EXECUTE) or exits-only (TRADER_MANAGE_EXITS).
@@ -423,6 +429,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '') &&
       /submit|pending|presubmit/i.test(o.status || ''));
     for (const [sym, p] of Object.entries(heldPos)) {
+      if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
       if (qty > 0 && !hasStop(sym)) {
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
@@ -448,7 +455,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells }); } catch (_e) { /* fail-soft */ }
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude }); } catch (_e) { /* fail-soft */ }
   // manageHeldExits updates every held position's peak; persist NOW so the common
   // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
   _saveState();
@@ -504,6 +511,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     //    short (longs-only). Critically, cancel the resting protective stop when we
     //    close — an orphaned GTC stop would otherwise fire on the now-flat position
     //    and open an unintended short (this is what put JPM/META short). ──
+    if (exclude.has(sym)) { out.skipped.push({ ...record, why: 'overnight-book position — managed by its own engine' }); continue; }
     if (!bullish) {
       if (held > 0) {
         // Anti-churn gates on the signal-exit (the broker stop still protects the
@@ -541,6 +549,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 
     // ── BULLISH: open a long only if flat. Never pyramid; never sell. ──
     if (held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // DIRECTION LOCK (lib/direction-lock.js): an inverse ETF is an economic short on
+    // its underlying — never open a position whose direction opposes existing family
+    // exposure (e.g. buying SQQQ while long TQQQ/QQQ, or vice versa). Closing is never
+    // blocked; cross-family offsets (TQQQ+TZA) are allowed as relative value.
+    {
+      const dc = require('./direction-lock').conflicts(sym, positions);
+      if (dc.conflict) { out.skipped.push({ ...record, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+') || 'held positions'}` }); continue; }
+    }
     if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
