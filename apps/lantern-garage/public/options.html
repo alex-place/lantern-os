@@ -68,6 +68,17 @@
     .kv .k { color: var(--muted); }
     .mono { font-family: ui-monospace, monospace; font-size: 12px; }
     .pill { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 999px; }
+    /* Symbol-search popup — same pattern as the trader/watch pages' search */
+    .symp-bg { position: fixed; inset: 0; z-index: 1200; display: flex; align-items: flex-start; justify-content: center; background: rgba(5,6,8,.62); padding-top: 9vh; }
+    .symp { width: min(440px, 92vw); background: var(--surface); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.45); overflow: hidden; }
+    .symp-head { display: flex; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .symp-head input { flex: 1; }
+    .symp-list { max-height: 46vh; overflow-y: auto; }
+    .symp-row { display: flex; align-items: baseline; gap: 12px; padding: 8px 14px; cursor: pointer; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+    .symp-row:hover, .symp-row.sel { background: color-mix(in srgb, var(--text) 7%, transparent); }
+    .symp-row b { font-variant-numeric: tabular-nums; min-width: 56px; }
+    .symp-row span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .symp-empty { padding: 16px 14px; color: var(--muted); font-size: 12.5px; }
   </style>
 </head>
 
@@ -78,7 +89,8 @@
       <a class="pt" href="/watch.html">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt on" href="/options.html" aria-current="page">Options</a>
     </div>
     <div class="sym-box">
-      <input class="fld" id="sym" value="SPY" maxlength="6" style="width:84px" aria-label="Underlying symbol">
+      <input class="fld" id="sym" value="SPY" maxlength="6" style="width:84px" aria-label="Underlying symbol" onfocus="openSymPopup()" autocomplete="off">
+      <button class="btn" onclick="openSymPopup()" aria-label="Search symbols" title="Search symbols"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="vertical-align:-2px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
       <button class="btn" onclick="loadAll()">Load</button>
     </div>
     <span class="spot" id="spot"></span>
@@ -131,7 +143,18 @@
     </div>
   </div>
 
-  <p class="muted" style="margin-top:26px">🌙 The AI options trader runs as a measurement-only shadow (no orders) — <a href="/api/trading/options-shadow">its live expectancy ledger</a> · <a href="/api/trading/options-shadow/probe">what it would trade tonight</a>.</p>
+  <p class="muted" style="margin-top:26px">The AI options trader runs as a measurement-only shadow (no orders) — <a href="/api/trading/options-shadow">its live expectancy ledger</a> · <a href="/api/trading/options-shadow/probe">what it would trade tonight</a>.</p>
+
+  <div class="symp-bg" id="sympBg" style="display:none" onclick="if(event.target===this)closeSymPopup()">
+    <div class="symp" role="dialog" aria-label="Search symbols">
+      <div class="symp-head">
+        <input class="fld" id="sympInput" placeholder="Search ticker or company…" aria-label="Search symbols" autocomplete="off"
+          oninput="onSympInput()" onkeydown="onSympKey(event)">
+        <button class="btn" onclick="closeSymPopup()">Esc</button>
+      </div>
+      <div class="symp-list" id="sympList"></div>
+    </div>
+  </div>
 </main>
 <script src="/js/site-chrome.js" defer></script>
 <script>
@@ -314,6 +337,52 @@ async function loadStrategy(){
     el.innerHTML = `<pre class="mono" style="white-space:pre-wrap;margin:12px 0 0">${esc(JSON.stringify(pr,null,2))}</pre>`;
   }catch(e){ el.innerHTML='<span class="muted">Failed — '+esc(e.message)+'</span>'; }
 }
+
+// ── Symbol-search popup (same backend as the trader pages' search) ─────────
+// Options are equities-only, so crypto results are filtered out. Empty query →
+// a curated optionable-popular list so the popup never opens blank.
+const SYMP_POPULAR = [
+  ['SPY','SPDR S&P 500'],['QQQ','Invesco Nasdaq-100'],['IWM','iShares Russell 2000'],['DIA','SPDR Dow Jones'],
+  ['GLD','SPDR Gold Shares'],['TLT','iShares 20+yr Treasury'],['SMH','VanEck Semiconductor'],['XLK','Technology Select SPDR'],
+  ['TQQQ','ProShares UltraPro QQQ'],['SQQQ','ProShares UltraPro Short QQQ'],['SOXL','Direxion Semis Bull 3X'],['SOXS','Direxion Semis Bear 3X'],
+  ['AAPL','Apple'],['MSFT','Microsoft'],['NVDA','NVIDIA'],['TSLA','Tesla'],['AMZN','Amazon'],['META','Meta Platforms'],['GOOGL','Alphabet'],['AMD','Advanced Micro Devices'],
+];
+let _sympRows = [], _sympSel = 0, _sympDeb = null, _sympEpoch = 0;
+function openSymPopup(){
+  $('sympBg').style.display = 'flex';
+  const inp = $('sympInput'); inp.value = ''; inp.focus();
+  runSympSearch('');
+}
+function closeSymPopup(){ $('sympBg').style.display = 'none'; }
+function onSympInput(){ clearTimeout(_sympDeb); _sympDeb = setTimeout(()=>runSympSearch($('sympInput').value), 170); }
+function onSympKey(e){
+  if (e.key === 'Escape') { closeSymPopup(); return; }
+  if (e.key === 'ArrowDown') { _sympSel = Math.min(_sympSel+1, _sympRows.length-1); renderSymp(); e.preventDefault(); }
+  else if (e.key === 'ArrowUp') { _sympSel = Math.max(_sympSel-1, 0); renderSymp(); e.preventDefault(); }
+  else if (e.key === 'Enter' && _sympRows[_sympSel]) { pickSymp(_sympRows[_sympSel][0]); e.preventDefault(); }
+}
+async function runSympSearch(q){
+  const query = (q||'').trim(); const ep = ++_sympEpoch;
+  if (!query) { _sympRows = SYMP_POPULAR.slice(); _sympSel = 0; renderSymp(); return; }
+  try {
+    const r = await fetch('/api/trading/symbols/search?limit=30&q=' + encodeURIComponent(query));
+    const d = await r.json();
+    if (ep !== _sympEpoch) return;
+    _sympRows = (d.results||[]).filter(a => a.class !== 'crypto').map(a => [a.symbol, a.name||'']);
+    _sympSel = 0; renderSymp();
+  } catch (e) { if (ep === _sympEpoch) $('sympList').innerHTML = '<div class="symp-empty">Search unavailable</div>'; }
+}
+function renderSymp(){
+  if (!_sympRows.length) { $('sympList').innerHTML = '<div class="symp-empty">No matching symbols</div>'; return; }
+  $('sympList').innerHTML = _sympRows.map(([s,n],i) =>
+    `<div class="symp-row${i===_sympSel?' sel':''}" onclick="pickSymp('${esc(s)}')"><b>${esc(s)}</b><span>${esc(n)}</span></div>`).join('');
+}
+function pickSymp(s){
+  closeSymPopup();
+  $('sym').value = String(s).toUpperCase();
+  loadAll();
+}
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeSymPopup(); });
 
 // Restore the remembered strike filter + tab, then load.
 for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===N_STRIKES);
