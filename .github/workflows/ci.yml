@@ -44,7 +44,7 @@ jobs:
           from pathlib import Path
           import re
 
-          html_path = Path("apps/lantern-garage/public/index.html")
+          html_path = Path("public/index.html")
           index = html_path.read_text()
           hrefs = re.findall(r'href=["\']([^"\']+)["\']', index)
 
