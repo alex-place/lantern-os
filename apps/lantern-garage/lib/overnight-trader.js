@@ -269,7 +269,14 @@ async function tick({ bridge } = {}) {
       for (const p of posArr) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
     const dlock = require('./direction-lock');
-    const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
+    // Allocation: an explicit OVERNIGHT_ALLOC_PCT pins it; otherwise the capital
+    // allocator's evidence-driven budget for this sleeve owns the number (one book,
+    // one allocator — operator directive 2026-07-26).
+    let allocPct = c.allocPct;
+    if (process.env.OVERNIGHT_ALLOC_PCT === undefined) {
+      try { allocPct = await require('./capital-allocator').budgetPctFor('overnight'); } catch (_e) { /* keep default */ }
+    }
+    const per = (equity > 0 ? equity : 100000) * (allocPct / 100) / sleeves.length;
     // Levered execution: the signal decides, the exec map picks the instrument.
     const execMap = EXEC_MAPS[c.exec] || {};
     const execCloseBySym = {};

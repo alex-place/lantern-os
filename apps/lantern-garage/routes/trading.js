@@ -316,6 +316,7 @@ const marketRoutes = require('./trading/market');
 const ordersRoutes = require('./trading/orders');
 const watchlistRoutes = require('./trading/watchlist');
 const tradelistRoutes = require('./trading/tradelist');
+const allocatorRoutes = require('./trading/allocator');
 const dashboardRoutes = require('./trading/dashboard');
 const ibkrRoutes = require('./trading/ibkr');
 const kalshiRoutes = require('./trading/kalshi');
@@ -369,6 +370,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await ordersRoutes(req, res, url, ctx)) return true;
   if (await watchlistRoutes(req, res, url, ctx)) return true;
   if (await tradelistRoutes(req, res, url, ctx)) return true;
+  if (await allocatorRoutes(req, res, url, ctx)) return true;
   if (await dashboardRoutes(req, res, url, ctx)) return true;
   if (await ibkrRoutes(req, res, url, ctx)) return true;
   if (await kalshiRoutes(req, res, url, ctx)) return true;
