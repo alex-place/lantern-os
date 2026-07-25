@@ -1,0 +1,87 @@
+{
+  "date": "2026-07-25",
+  "test": "A \u2014 weather maker OOS vs pre-registered gates (78efbf58)",
+  "in_sample": {
+    "series": "KXHIGHNY",
+    "day_clustered_mean_c": 1.146,
+    "t": 2.02,
+    "days": 10
+  },
+  "oos_cities": {
+    "KXHIGHCHI": {
+      "days": 10,
+      "raw_mean_c": -2.2904,
+      "js_shrunk_mean_c": -1.9522
+    },
+    "KXHIGHLAX": {
+      "days": 10,
+      "raw_mean_c": 0.3653,
+      "js_shrunk_mean_c": -0.6243
+    },
+    "KXHIGHMIA": {
+      "days": 10,
+      "raw_mean_c": -0.9951,
+      "js_shrunk_mean_c": -1.3045
+    },
+    "KXHIGHDEN": {
+      "days": 10,
+      "raw_mean_c": -4.1554,
+      "js_shrunk_mean_c": -2.8847
+    },
+    "KXHIGHAUS": {
+      "days": 10,
+      "raw_mean_c": -1.3936,
+      "js_shrunk_mean_c": -1.5038
+    },
+    "KXHIGHPHIL": {
+      "days": 10,
+      "raw_mean_c": -1.2146,
+      "js_shrunk_mean_c": -1.4143
+    }
+  },
+  "js_shrink_factor": 0.5,
+  "pooled": {
+    "city_day_units": 60,
+    "mean_c": -1.614,
+    "sd": 3.1876,
+    "t": -3.922,
+    "p_two_sided_normal_approx": 0.0001
+  },
+  "fill_realism": {
+    "uniform_25pct_c": -0.3706,
+    "adverse_worst_25pct_c": -33.936
+  },
+  "gates": {
+    "W1_clustered_significance": {
+      "PASS": false,
+      "mean": -1.614,
+      "t": -3.922,
+      "p": 0.0001
+    },
+    "W2_post_selection_shrinkage": {
+      "applied": true,
+      "shrink_factor": 0.5
+    },
+    "W3_parameter_lock": {
+      "PASS": true,
+      "note": "identical fee model, P&L arithmetic and estimator as the IS run"
+    },
+    "W4_majority_and_veto": {
+      "PASS": false,
+      "cities_positive": 0,
+      "of": 6,
+      "worst_city_c": -2.8847
+    },
+    "W5_decay": {
+      "PASS": false,
+      "oos_mean": -1.614,
+      "floor": 0.573
+    },
+    "W6_fill_realism": {
+      "literal_PASS": false,
+      "adverse_PASS": false,
+      "note": "literal gate is weak by construction; adverse variant is the real risk"
+    },
+    "VERDICT": "REFUTED \u2014 W1 or W4 failed; the weather maker candidate is dead"
+  }
+}
