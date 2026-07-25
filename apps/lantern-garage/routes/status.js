@@ -8,11 +8,10 @@ const fs = require("fs");
 let _modelMetricsCache = { data: null, ts: 0 };
 const METRICS_CACHE_TTL_MS = 5000;
 
-// /api/serving/status cache. The handler shells out to Python via execSync — a
-// SYNCHRONOUS ~800ms child-process spawn that froze the WHOLE event loop on every
-// call (every open page's footer polls this every 30s, so the entire site — statics
-// included — stalled behind it; measured 816ms static fetches during page load).
-// The serving mode changes only via env/config, so 15s staleness is free.
+// /api/serving/status cache. The handler spawns Python (~800ms) to read the
+// authoritative serving mode; the spawn is async (execFile) so it never blocks
+// other requests, and the full response is cached so it runs at most once per
+// TTL — the mode only changes via env/config, so 15s staleness is free.
 let _servingCache = { payload: null, ts: 0 };
 const SERVING_CACHE_TTL_MS = 15_000;
 
@@ -411,21 +410,24 @@ module.exports = async function statusRoutes(req, res, url, deps) {
       sendJson(res, { ..._servingCache.payload, cached: true }, 200);
       return true;
     }
-    const { execSync: _exec } = require("child_process");
+    const { execFile: _execFile } = require("child_process");
     const ouroNative = process.env.OURO_NATIVE || "";
     const fastActive = !/^(1|true|yes)$/i.test(ouroNative);
-    // Call serving_modes.py to get authoritative params (same Python used by inference)
+    // Call serving_modes.py to get authoritative params (same Python used by
+    // inference). Async execFile — the old execSync froze the event loop ~800ms
+    // per spawn; now even the once-per-TTL cold call never blocks other requests.
     let modeDetail = null;
     try {
       // Forward-slash the path before embedding it in a Python string literal —
       // a raw Windows path (e.g. "...\Users\...") makes Python parse "\U" as the
       // start of a \UXXXXXXXX unicode escape and throw a SyntaxError (#1268).
       const pyRoot = path.join(deps.repoRoot, "src").replace(/\\/g, "/");
-      const raw = _exec(
-        `python -c "import sys; sys.path.insert(0,'${pyRoot}'); from serving_modes import get_serving_mode, get_decode_params, describe_mode; import json; m=get_serving_mode(); print(json.dumps({'mode':m.name,'description':m.description,'max_latency_ms':m.max_latency_ms,'decode_params':get_decode_params(m)}))"`,
-        { encoding: "utf-8", timeout: 5000 }
-      ).trim();
-      modeDetail = JSON.parse(raw);
+      const pyCode = `import sys; sys.path.insert(0,'${pyRoot}'); from serving_modes import get_serving_mode, get_decode_params, describe_mode; import json; m=get_serving_mode(); print(json.dumps({'mode':m.name,'description':m.description,'max_latency_ms':m.max_latency_ms,'decode_params':get_decode_params(m)}))`;
+      const raw = await new Promise((resolve, reject) => {
+        _execFile("python", ["-c", pyCode], { encoding: "utf-8", timeout: 5000 },
+          (err, stdout) => (err ? reject(err) : resolve(stdout)));
+      });
+      modeDetail = JSON.parse(String(raw).trim());
     } catch { /* Python unavailable — fall back to env-based inference */ }
     const localModel = await probeLocalModel();
     const payload = {
