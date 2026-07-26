@@ -192,7 +192,7 @@ jobs:
         run: npm ci --ignore-scripts --prefer-offline
 
       - name: Install app deps (server under test)
-        run: cd apps/lantern-garage && npm ci --prefer-offline
+        run: npm install --prefer-offline
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
