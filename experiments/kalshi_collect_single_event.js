@@ -83,7 +83,10 @@ async function tradesFor(ticker) {
     out.push(...(j.trades || []));
     cursor = j.cursor; pages++;
     await sleep(90);
-  } while (cursor && pages < 5);
+  } while (cursor && pages < 40);   // 40k/market — MLB-scale games need far more than 5 pages
+  // Completeness matters more than volume: a truncated tail slice silently becomes "end of game
+  // only" and fabricates edges (measured 2026-07-25). Report it so the analysis can exclude.
+  out.truncated = !!cursor;
   return out;
 }
 
@@ -102,17 +105,18 @@ async function tradesFor(ticker) {
     const ms = await settledMarkets(s, maxMarkets);
     if (!ms.length) { manifest.series[s] = { markets: 0, trades: 0, note: "no settled markets" }; continue; }
     fs.writeFileSync(path.join(OUT, `${s}.markets.jsonl`), ms.map((m) => JSON.stringify(m)).join("\n") + "\n");
-    let nTrades = 0;
+    let nTrades = 0, nTruncated = 0;
     const tf = fs.createWriteStream(path.join(OUT, `${s}.trades.jsonl`));
     for (const m of ms) {
       const tr = await tradesFor(m.ticker);
       for (const t of tr) tf.write(JSON.stringify(t) + "\n");
       nTrades += tr.length;
+      if (tr.truncated) nTruncated++;
     }
     tf.end();
-    manifest.series[s] = { markets: ms.length, trades: nTrades, product_type: "single_event" };
+    manifest.series[s] = { markets: ms.length, trades: nTrades, truncated_markets: nTruncated, product_type: "single_event" };
     manifest.totals.markets += ms.length; manifest.totals.trades += nTrades;
-    console.log(`${s.padEnd(16)} markets=${String(ms.length).padStart(4)}  trades=${nTrades}`);
+    console.log(`${s.padEnd(16)} markets=${String(ms.length).padStart(4)}  trades=${nTrades}  truncated=${nTruncated}`);
   }
   fs.writeFileSync(path.join(OUT, "MANIFEST.json"), JSON.stringify(manifest, null, 2));
   console.log(`\nTOTAL markets=${manifest.totals.markets} trades=${manifest.totals.trades}`);

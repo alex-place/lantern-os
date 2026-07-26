@@ -9,3 +9,12 @@ wrong-sign +5.56c low bucket is explained as selection-on-ever-touching. Adverse
 the seller's favour (taker-buys-yes: maker +1.77c, actual 4.1% vs implied 6.2%), reconciling with
 the earlier maker refutation (different trade, different band). Generality remains UNPROVEN:
 10/12 series are weather, ~203 effective events, 2 series negative, fills unsimulated.
+
+**Cross-family pass (same day):** extended beyond weather (10,190-series universe discovered,
+candidates probed for settled depth). Adding MLB produced an apparent sports edge (+6.78c, t=21.5)
+that was traced to a COLLECTION ARTIFACT: 88% of MLB markets hit the per-market trade cap,
+capturing a median 1.6h of 75h markets (end-of-game only). Added C8 truncation guard (exclude
+capped markets; collector now paginates 40x deeper and records completeness) and C9 minimum-n
+generality gate (>=30 events/family, after the first verdict read "cross-family" off a 3-event
+family). Corrected verdict: PARTIAL — holds in weather (200 events, t=3.09) and sports (60 events,
+selection-caveated); macro underpowered.

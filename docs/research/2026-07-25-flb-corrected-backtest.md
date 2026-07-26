@@ -91,9 +91,39 @@ good *here*.
   (`kalshi_longshot_probe.js`) exists to measure exactly that, and remains unarmed.
 - **Recent period only** (~last 10–20 trading days per series). No regime variation.
 
+## Cross-family extension (same day, second pass) — and a bias it exposed
+
+Extending beyond weather required discovering the real series universe (**10,190 non-parlay
+series**) and probing candidates for settled depth rather than collecting blindly. Adding
+KXMLBGAME (497 events) produced an apparently spectacular sports result — **+6.78¢, t=21.5** —
+which did **not** survive checking:
+
+**C8 truncation guard (the artifact).** The collector capped trades per market. Measured: **88% of
+MLB markets hit that cap**, capturing a median of **1.6 hours** of markets that run up to **75
+hours**. The captured slice was the *end of the game*, where the losing side genuinely is ~0% — so
+the "edge" was a sampling artifact, not a market fact. Capped markets are now excluded from the
+analysis (decision-point fractions are meaningless on a tail slice) and the collector paginates
+40× deeper and records per-market completeness.
+
+**C9 minimum-n generality gate.** The first cross-family verdict read "CROSS-FAMILY" off a family
+with **3 events** (macro). A family now needs ≥30 independent events to count.
+
+**Corrected cross-family picture** (post-guard):
+
+| family | series | events | maker net | t | implied | actual |
+|---|---|---|---|---|---|---|
+| weather-temp | 10 | 200 | +1.96¢ | 3.09 | 6.4% | 3.9% |
+| sports | 1 | 60 | +6.98¢ | 32.7 | 6.8% | 0.0% |
+| macro | 2 | 3 | +4.39¢ | 2.64 | 2.9% | — (underpowered, excluded) |
+
+**Verdict: PARTIAL — holds in 2 qualified families.** And the sports figure carries its own
+selection caveat: after excluding 88% of MLB markets as truncated, the survivors are precisely the
+*quiet* games, so that t=32.7 should be treated as unproven until a full-depth re-collection runs.
+
 ## Status
 
 Design 3 moves from *plausible, not internally reproduced* → **reproduced on a corrected,
-committed chain for weather markets in a recent window, with favourable adverse selection; not
-established beyond that family, and not fill-validated.** The evidence bar for risking money is
+committed chain: longshot overpricing is robust in weather (200 events, t=3.09) and directionally
+present in sports (60 events, selection-caveated); macro remains underpowered (3 events).
+Adverse selection runs in the seller's favour. Generality is PARTIAL, not established.** The evidence bar for risking money is
 unchanged: cross-family n, a fill model, and correlated-tail sizing must land first.
