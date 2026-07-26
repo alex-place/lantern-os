@@ -40,7 +40,7 @@ class TestMcpServerEndpoints:
         server_code_path = Path("src/mcp_server/server.py")
         assert server_code_path.exists(), "MCP server code not found"
 
-        server_content = server_code_path.read_text()
+        server_content = server_code_path.read_text(encoding="utf-8")
         for tool in expected_tools:
             assert tool in server_content, f"Tool '{tool}' not found in server code"
 
@@ -66,7 +66,7 @@ class TestMcpServerEndpoints:
         env_example = Path(".env.example")
         assert env_example.exists(), ".env.example not found"
 
-        content = env_example.read_text()
+        content = env_example.read_text(encoding="utf-8")
         required_vars = [
             "MCP_SERVER_PORT",
             "MCP_OAUTH_PORT",
@@ -86,7 +86,7 @@ class TestOAuthEndpoints:
         oauth_file = Path("src/mcp_server/server_oauth.py")
         assert oauth_file.exists()
 
-        content = oauth_file.read_text()
+        content = oauth_file.read_text(encoding="utf-8")
 
         # Verify key OAuth components
         assert "FastAPI" in content or "uvicorn" in content
@@ -98,7 +98,7 @@ class TestOAuthEndpoints:
         """Verify JWT token configuration is properly defined."""
         from pathlib import Path
         oauth_file = Path("src/mcp_server/server_oauth.py")
-        content = oauth_file.read_text()
+        content = oauth_file.read_text(encoding="utf-8")
 
         # Check for token expiration
         assert "expir" in content.lower() or "ttl" in content.lower()
@@ -110,7 +110,7 @@ class TestOAuthEndpoints:
         """Verify OAuth server exposes MCP tools correctly."""
         from pathlib import Path
         oauth_file = Path("src/mcp_server/server_oauth.py")
-        content = oauth_file.read_text()
+        content = oauth_file.read_text(encoding="utf-8")
 
         # Should expose same tools as main MCP server
         assert "queue_status" in content
@@ -129,7 +129,7 @@ class TestCloudflareConfiguration:
 
         server_file = Path("apps/lantern-garage/server.js")
         if server_file.exists():
-            content = server_file.read_text()
+            content = server_file.read_text(encoding="utf-8")
             # Should mention cloudflare tunnel configuration
             assert "cloudflared" in content or "tunnel" in content
         else:
@@ -141,7 +141,7 @@ class TestCloudflareConfiguration:
         server_file = Path("apps/lantern-garage/server.js")
         assert server_file.exists()
 
-        content = server_file.read_text()
+        content = server_file.read_text(encoding="utf-8")
 
         # Verify tunnel spawn code exists
         assert "cloudflared" in content
@@ -156,7 +156,7 @@ class TestCloudflareConfiguration:
         # Check that tunnel routing is properly documented or configured
         env_file = Path(".env.example")
         if env_file.exists():
-            content = env_file.read_text()
+            content = env_file.read_text(encoding="utf-8")
             # Should mention MCP configuration
             assert "MCP_" in content
         else:
@@ -241,7 +241,7 @@ class TestDataIntegrity:
         gitignore_file = Path(".gitignore")
         assert gitignore_file.exists()
 
-        content = gitignore_file.read_text()
+        content = gitignore_file.read_text(encoding="utf-8")
 
         # Should ignore data files
         assert any(pattern in content for pattern in ["data/", "*.json", "*.jsonl"])
