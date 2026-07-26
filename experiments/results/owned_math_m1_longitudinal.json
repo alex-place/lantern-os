@@ -1,0 +1,26 @@
+{
+  "source": "data\\convergence\\records.jsonl",
+  "n_records": 1200,
+  "malformed_lines": 0,
+  "n_distinct_hypotheses": 914,
+  "n_series_ge2": 47,
+  "n_genuine_series": 46,
+  "n_placeholder_buckets": 1,
+  "genuine_series_with_numeric_conf": 46,
+  "genuine_series_with_conf_variation": 0,
+  "confidence_growth_steps_examined": 0,
+  "no_free_confidence_violations": 0,
+  "violations": [],
+  "placeholder_buckets": {
+    "model interaction": {
+      "n_records": 187,
+      "distinct_confidences": [
+        0.3,
+        0.6
+      ],
+      "note": "unrelated interactions under one stub label; not a trajectory"
+    }
+  },
+  "eps": 0.01,
+  "verdict": "UNDER-POWERED: 0 confidence-growth steps across 46 genuine series -- the ledger records hypotheses one-shot (no re-assessment with rising confidence), so the longitudinal test cannot fire. It confirms the STATIC clamp holds but does not stress the trajectory claim. To gain power the ledger needs a stable per-hypothesis id linking re-assessments (and to stop bucketing unrelated records under placeholder hypothesis text)."
+}
