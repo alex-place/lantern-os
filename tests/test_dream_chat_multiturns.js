@@ -189,6 +189,55 @@ async function run() {
     assert.ok(Array.isArray(turn3Done.suggestions) && turn3Done.suggestions.length === 3, "turn 3 must have 3 suggestions");
   });
 
+  // ── Memory recall — regression for #2956 ────────────────────────────────
+  // The turns above thread history but only assert a reply comes back — they do
+  // NOT check the reply USES the history. That gap let a bug ship where the
+  // default gemini path built its request from only the current message, so the
+  // model forgot everything earlier in the conversation. This states a
+  // distinctive codeword, then requires it back. Gated on the provider being
+  // ONLINE: an offline/fallback reply can't recall, and that is a provider
+  // outage, not a memory regression — skip the assertion then rather than flake.
+  console.log("\nMemory recall: the model must remember a codeword across turns (#2956)");
+  const CODEWORD = "ZQXW4417";
+  const codewordMsg = `Remember this codeword exactly for later: ${CODEWORD}. Reply "noted" to confirm.`;
+  let recallHistory = [];
+  await test("recall setup: state a codeword, capture the reply", async () => {
+    const r = await streamPost("/api/dream/chat/stream", { message: codewordMsg, history: [] });
+    const reply = r.events.filter(e => e.type === "token").map(e => e.text).join("");
+    assert.ok(reply.length > 0, "codeword turn should return a reply");
+    recallHistory = [
+      { role: "user", text: codewordMsg },
+      { role: "assistant", text: reply },
+    ];
+  });
+
+  // A reply is "offline" (degraded, no LLM) when it carries the no-provider stub
+  // markers — a reliable signal even when the done event mislabels online. Recall
+  // cannot be exercised without a live model, so skip (never false-fail) then.
+  const isOffline = (s) => {
+    const t = (s || "").toLowerCase();
+    return t.includes("no local model") || t.includes("providers are unreachable") ||
+      t.includes("no llm") || t.includes("can't answer that right now") ||
+      t.includes("degraded mode");
+  };
+  await test("the model recalls the codeword from history (conversation memory threads)", async () => {
+    const setupReply = (recallHistory[1] && recallHistory[1].text) || "";
+    const r = await streamPost("/api/dream/chat/stream", {
+      message: "What was the exact codeword I asked you to remember? Reply with only the codeword.",
+      history: recallHistory,
+    });
+    const done = r.events.find(e => e.type === "done");
+    const reply = r.events.filter(e => e.type === "token").map(e => e.text).join("");
+    if (!done || done.online !== true || isOffline(setupReply) || isOffline(reply)) {
+      console.log("    (skipped: no live provider — recall needs an LLM; not a memory regression)");
+      return;
+    }
+    assert.ok(
+      reply.toUpperCase().includes(CODEWORD),
+      `reply must recall the codeword ${CODEWORD} that was in the history, got: "${reply.slice(0, 140)}"`,
+    );
+  });
+
   // ── Save conversation as dream entry ────────────────────────────────────
   console.log("\nSave conversation as dream entry");
 
