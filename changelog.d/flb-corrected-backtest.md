@@ -18,3 +18,11 @@ capped markets; collector now paginates 40x deeper and records completeness) and
 generality gate (>=30 events/family, after the first verdict read "cross-family" off a 3-event
 family). Corrected verdict: PARTIAL — holds in weather (200 events, t=3.09) and sports (60 events,
 selection-caveated); macro underpowered.
+
+**Fill simulation (final):** built free-data 1-minute bid/ask history (Kalshi candlesticks; the
+public API serves no historical depth, so this is the OSS path commercial vendors sell) and
+required a real buyer at our price before booking a fill. Result: DOES NOT SURVIVE — only the
+latest decision point is positive, its t is degenerate (0 winners of 29 fills), ~50% of offers
+never fill, and filled offers wait 1-2.5h. Same "latest-point-only" fragility that disqualified
+buy-favourites. Simulated fills ignore queue priority/partial fills/impact, so this is an UPPER
+bound on a result that already fails.

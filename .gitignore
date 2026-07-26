@@ -554,3 +554,4 @@ data/kalshi/mechanism/
 experiments/results/kalshi_mlb_paths.jsonl
 data/equities/
 data/kalshi/settled-single/
+data/kalshi/candles-1m/

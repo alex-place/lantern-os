@@ -127,3 +127,45 @@ committed chain: longshot overpricing is robust in weather (200 events, t=3.09) 
 present in sports (60 events, selection-caveated); macro remains underpowered (3 events).
 Adverse selection runs in the seller's favour. Generality is PARTIAL, not established.** The evidence bar for risking money is
 unchanged: cross-family n, a fill model, and correlated-tail sizing must land first.
+
+---
+
+## Fill simulation (the last caveat) — the strategy DOES NOT SURVIVE
+
+The earlier passes counted trades that happened and assumed we could have been the resting maker on
+them. That assumption is the most common way a paper edge dies in production. It is now removed,
+using **free public data**: Kalshi's `candlesticks` endpoint serves **1-minute yes_bid/yes_ask
+OHLC**, which is enough to require that a real buyer existed at our price before we book a fill.
+
+**Method** ([`kalshi_flb_fillmodel.js`](../../experiments/kalshi_flb_fillmodel.js), data via
+[`kalshi_collect_candles.js`](../../experiments/kalshi_collect_candles.js), 103 markets / 417k
+minute-candles): post a resting offer to sell 1 YES at the quoted ask; it fills **only** if a later
+minute's `yes_bid` high reaches that price. Unfilled offers earn nothing and are counted.
+
+| decision point | offers | fills | fill % | mean wait | net/fill | t | actual YES |
+|---|---|---|---|---|---|---|---|
+| 0.25 | 47 | 24 | 51% | 157 min | **−7.46¢** | −0.91 | 12.5% |
+| 0.40 | 48 | 26 | 54% | 106 min | +3.46¢ | 1.32 | 3.8% |
+| 0.50 | 50 | 32 | 64% | 125 min | +0.34¢ | 0.09 | 6.3% |
+| 0.60 | 54 | 33 | 61% | 71 min | −0.31¢ | −0.05 | 3.0% |
+| 0.75 | 59 | 29 | 49% | 140 min | +5.80¢ | 7.68 | **0.0%** |
+
+**Verdict: DOES NOT SURVIVE fill simulation.** Three findings kill it:
+
+1. **Only the latest decision point is positive-and-significant — and its statistic is
+   degenerate.** At 0.75 all 29 fills settled NO, so P&L variance collapses and t=7.68 is an
+   artifact of price jitter, exactly the C6 trap. With 29 fills a true 6% rate predicts ~1.7
+   winners; observing 0 is unremarkable, not significant.
+2. **"Works only at the latest observation point" is the same fragility that disqualified
+   Design 2 (buy-favourites).** Applying our own standard consistently, it disqualifies this too.
+3. **Half the offers never fill, and filled ones wait 1–2.5 hours.** Capital is committed while
+   idle, so per-fill edge overstates the business: the `net_c_per_offer` column is roughly half the
+   per-fill number even before that.
+
+ForecastEx economics were checked as the friendlier venue (flat 1¢/contract embedded in the spread,
+$0 IBKR commission, no maker/taker split — versus Kalshi charging even on resting fills). Its flat
+cent removes another cent per fill, which does not rescue any point.
+
+**Honesty limit:** queue priority, partial fills, and our own market impact are all ignored, and
+each makes real fills *worse*. These simulated results are an **upper bound** — the true strategy
+performs no better than the table above, and the table is already a failure.
