@@ -1,0 +1,88 @@
+{
+  "date": "2026-07-26",
+  "markets": 553,
+  "decisions": 224018,
+  "leaks_fixed": [
+    "ask open not close",
+    "prior-minute liquidity"
+  ],
+  "disclosed_limits": [
+    "band chosen post-hoc; pre-registered for future data",
+    "series survivorship",
+    "settled-only"
+  ],
+  "rows": [
+    {
+      "band": "5-15",
+      "obs": 25977,
+      "events": 119,
+      "avg_ask": 8.78,
+      "fee": 0.55,
+      "net_c": -4.822,
+      "t": -4.18
+    },
+    {
+      "band": "15-30",
+      "obs": 28003,
+      "events": 120,
+      "avg_ask": 21.97,
+      "fee": 1.19,
+      "net_c": -1.297,
+      "t": -0.52
+    },
+    {
+      "band": "30-45",
+      "obs": 36244,
+      "events": 121,
+      "avg_ask": 37.24,
+      "fee": 1.62,
+      "net_c": -1.371,
+      "t": -0.49
+    },
+    {
+      "band": "45-55",
+      "obs": 54193,
+      "events": 119,
+      "avg_ask": 49.59,
+      "fee": 1.74,
+      "net_c": 1.418,
+      "t": 0.49
+    },
+    {
+      "band": "55-70",
+      "obs": 34975,
+      "events": 120,
+      "avg_ask": 59.98,
+      "fee": 1.67,
+      "net_c": -3.086,
+      "t": -0.86
+    },
+    {
+      "band": "70-80",
+      "obs": 8101,
+      "events": 118,
+      "avg_ask": 72.93,
+      "fee": 1.38,
+      "net_c": -1.958,
+      "t": -0.56
+    },
+    {
+      "band": "80-90",
+      "obs": 4572,
+      "events": 117,
+      "avg_ask": 84.59,
+      "fee": 0.91,
+      "net_c": 1.382,
+      "t": 0.52
+    },
+    {
+      "band": "90-97",
+      "obs": 3797,
+      "events": 114,
+      "avg_ask": 93.33,
+      "fee": 0.43,
+      "net_c": 3.01,
+      "t": 2.29
+    }
+  ]
+}
