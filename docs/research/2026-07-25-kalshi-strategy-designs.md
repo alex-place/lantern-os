@@ -103,3 +103,26 @@ market at a fixed point, and it reversed the entire conclusion.
 
 No design here is cleared for capital. The one survivor is worth a fill-realism study and a
 Kelly/tail analysis next — not an order.
+
+---
+
+## Independent review addendum (2026-07-25, #2954) — Design 3 status corrected
+
+The committed artifact **contradicts the Design 3 verdict above**: the reproducible script
+(`kalshi_favorite_longshot_replication.py`) emits `VERDICT: DOES NOT REPLICATE` — F1/F2/F4 all
+false, Spearman(net, price) = **−0.857** (the wrong sign for FLB), and the 1–15¢ bucket is
+**+5.56¢/contract** on the whole-life conditioning. The decision-point tables that Design 2's
+rejection and Design 3's survival both rest on have **no committed code** and cannot be
+regenerated.
+
+Both tables can be honestly described at once: the whole-life bucket conditions on *ever traded
+cheap* (selection-on-ever-touching — eventual winners pass through cheap prices, inflating the
+low-bucket settle rate to 10.3% vs ~1% for is-cheap-now), so it is biased **for** longshots and
+is not tradeable evidence; the decision-point conditioning is the decision-relevant one — and is
+the missing artifact.
+
+**Corrected status of Design 3: plausible (CEPR DP20631 externally + the 2026-07-23 census
+direction), NOT internally reproduced.** Restoration requirements are tracked in #2954: commit
+the decision-point code, cluster by EVENT not market, account the trade as the SELLER
+(net = −buyer − 2·fee) reconciled against the maker refutation, and break low buckets out by
+category. No sizing, shadow, or Act-path discussion before that lands.
