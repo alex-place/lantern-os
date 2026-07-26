@@ -1,0 +1,509 @@
+{
+  "date": "2026-07-26",
+  "corrections": [
+    "C1 decision-point",
+    "C2 event-cluster",
+    "C3 maker-seller",
+    "C4 no parlays",
+    "C5 adverse-selection"
+  ],
+  "product_type": "single_event_only",
+  "markets": 1228,
+  "trades": 1216347,
+  "decision_points": {
+    "0.25": {
+      "1-5": {
+        "events": 193,
+        "markets": 402,
+        "net_c": 1.795,
+        "t": 4.89,
+        "t_degenerate": false,
+        "implied_pct": 2.29,
+        "actual_pct": 0.5,
+        "actual_ci95": [
+          0.14,
+          1.8
+        ],
+        "overpriced": true
+      },
+      "5-10": {
+        "events": 120,
+        "markets": 160,
+        "net_c": 3.818,
+        "t": 2.54,
+        "t_degenerate": false,
+        "implied_pct": 6.74,
+        "actual_pct": 2.5,
+        "actual_ci95": [
+          0.98,
+          6.25
+        ],
+        "overpriced": true
+      },
+      "10-15": {
+        "events": 77,
+        "markets": 89,
+        "net_c": -1.905,
+        "t": -0.49,
+        "t_degenerate": false,
+        "implied_pct": 11.71,
+        "actual_pct": 12.36,
+        "actual_ci95": [
+          7.04,
+          20.79
+        ],
+        "overpriced": false
+      }
+    },
+    "0.4": {
+      "1-5": {
+        "events": 196,
+        "markets": 442,
+        "net_c": 2.117,
+        "t": 36.82,
+        "t_degenerate": true,
+        "implied_pct": 2.11,
+        "actual_pct": 0,
+        "actual_ci95": [
+          0,
+          0.86
+        ],
+        "overpriced": true
+      },
+      "5-10": {
+        "events": 110,
+        "markets": 136,
+        "net_c": 5.906,
+        "t": 6.58,
+        "t_degenerate": false,
+        "implied_pct": 6.76,
+        "actual_pct": 0.74,
+        "actual_ci95": [
+          0.13,
+          4.05
+        ],
+        "overpriced": true
+      },
+      "10-15": {
+        "events": 79,
+        "markets": 92,
+        "net_c": 10.006,
+        "t": 7.92,
+        "t_degenerate": false,
+        "implied_pct": 11.27,
+        "actual_pct": 1.09,
+        "actual_ci95": [
+          0.19,
+          5.9
+        ],
+        "overpriced": true
+      }
+    },
+    "0.5": {
+      "1-5": {
+        "events": 195,
+        "markets": 446,
+        "net_c": 1.958,
+        "t": 35.53,
+        "t_degenerate": true,
+        "implied_pct": 1.95,
+        "actual_pct": 0,
+        "actual_ci95": [
+          0,
+          0.85
+        ],
+        "overpriced": true
+      },
+      "5-10": {
+        "events": 110,
+        "markets": 146,
+        "net_c": 5.211,
+        "t": 4.94,
+        "t_degenerate": false,
+        "implied_pct": 6.76,
+        "actual_pct": 2.05,
+        "actual_ci95": [
+          0.7,
+          5.87
+        ],
+        "overpriced": true
+      },
+      "10-15": {
+        "events": 82,
+        "markets": 91,
+        "net_c": 9,
+        "t": 5.16,
+        "t_degenerate": false,
+        "implied_pct": 11.43,
+        "actual_pct": 2.2,
+        "actual_ci95": [
+          0.6,
+          7.66
+        ],
+        "overpriced": true
+      }
+    },
+    "0.6": {
+      "1-5": {
+        "events": 197,
+        "markets": 465,
+        "net_c": 1.81,
+        "t": 34.79,
+        "t_degenerate": true,
+        "implied_pct": 1.83,
+        "actual_pct": 0,
+        "actual_ci95": [
+          0,
+          0.82
+        ],
+        "overpriced": true
+      },
+      "5-10": {
+        "events": 131,
+        "markets": 168,
+        "net_c": 5.162,
+        "t": 6.7,
+        "t_degenerate": false,
+        "implied_pct": 6.68,
+        "actual_pct": 2.38,
+        "actual_ci95": [
+          0.93,
+          5.96
+        ],
+        "overpriced": true
+      },
+      "10-15": {
+        "events": 78,
+        "markets": 93,
+        "net_c": 8.624,
+        "t": 4.55,
+        "t_degenerate": false,
+        "implied_pct": 11.76,
+        "actual_pct": 3.23,
+        "actual_ci95": [
+          1.1,
+          9.06
+        ],
+        "overpriced": true
+      }
+    },
+    "0.75": {
+      "1-5": {
+        "events": 201,
+        "markets": 523,
+        "net_c": 1.721,
+        "t": 37.44,
+        "t_degenerate": true,
+        "implied_pct": 1.76,
+        "actual_pct": 0,
+        "actual_ci95": [
+          0,
+          0.73
+        ],
+        "overpriced": true
+      },
+      "5-10": {
+        "events": 125,
+        "markets": 156,
+        "net_c": 5.548,
+        "t": 6.31,
+        "t_degenerate": false,
+        "implied_pct": 6.74,
+        "actual_pct": 1.28,
+        "actual_ci95": [
+          0.35,
+          4.55
+        ],
+        "overpriced": true
+      },
+      "10-15": {
+        "events": 90,
+        "markets": 106,
+        "net_c": 8.865,
+        "t": 5.35,
+        "t_degenerate": false,
+        "implied_pct": 11.66,
+        "actual_pct": 2.83,
+        "actual_ci95": [
+          0.97,
+          7.99
+        ],
+        "overpriced": true
+      }
+    }
+  },
+  "adverse_selection": {
+    "takerBuysYes": {
+      "trades": 222484,
+      "events": 203,
+      "maker_net_c": 1.766,
+      "t": 2.81,
+      "implied_pct": 6.25,
+      "actual_pct": 4.07
+    },
+    "takerSellsYes": {
+      "trades": 206273,
+      "events": 203,
+      "maker_net_c": 0.795,
+      "t": 1.41,
+      "implied_pct": 6.02,
+      "actual_pct": 5.08
+    }
+  },
+  "all_trade_maker_seller": {},
+  "flb_curve": [
+    {
+      "bucket": "1-5",
+      "lo": 1,
+      "events": 203,
+      "trades": 191784,
+      "buyer_net_c": -1.126,
+      "t": -3.84,
+      "actual_yes_pct": 0.96
+    },
+    {
+      "bucket": "5-10",
+      "lo": 5,
+      "events": 202,
+      "trades": 128372,
+      "buyer_net_c": -1.72,
+      "t": -2.25,
+      "actual_yes_pct": 4.58
+    },
+    {
+      "bucket": "10-15",
+      "lo": 10,
+      "events": 202,
+      "trades": 90241,
+      "buyer_net_c": -2.399,
+      "t": -2.02,
+      "actual_yes_pct": 10.05
+    },
+    {
+      "bucket": "15-25",
+      "lo": 15,
+      "events": 202,
+      "trades": 155897,
+      "buyer_net_c": -1.609,
+      "t": -1.09,
+      "actual_yes_pct": 20.99
+    },
+    {
+      "bucket": "25-40",
+      "lo": 25,
+      "events": 201,
+      "trades": 222435,
+      "buyer_net_c": -3.756,
+      "t": -2.55,
+      "actual_yes_pct": 29.9
+    },
+    {
+      "bucket": "40-60",
+      "lo": 40,
+      "events": 202,
+      "trades": 216560,
+      "buyer_net_c": 1.034,
+      "t": 0.58,
+      "actual_yes_pct": 47.5
+    },
+    {
+      "bucket": "60-75",
+      "lo": 60,
+      "events": 202,
+      "trades": 87456,
+      "buyer_net_c": 3.134,
+      "t": 1.36,
+      "actual_yes_pct": 63.28
+    },
+    {
+      "bucket": "75-85",
+      "lo": 75,
+      "events": 202,
+      "trades": 37645,
+      "buyer_net_c": 3.814,
+      "t": 1.79,
+      "actual_yes_pct": 75.59
+    },
+    {
+      "bucket": "85-95",
+      "lo": 85,
+      "events": 202,
+      "trades": 46297,
+      "buyer_net_c": 1.381,
+      "t": 0.89,
+      "actual_yes_pct": 88.04
+    },
+    {
+      "bucket": "95-99",
+      "lo": 95,
+      "events": 203,
+      "trades": 25432,
+      "buyer_net_c": 0.443,
+      "t": 0.49,
+      "actual_yes_pct": 98.19
+    }
+  ],
+  "per_series": {
+    "KXHIGHLAX": {
+      "markets": 120,
+      "events": 20,
+      "trades": 71968,
+      "maker_net_c": 3.221,
+      "t": 2.55,
+      "implied_pct": 5.98,
+      "actual_pct": 2.62,
+      "actual_ci95": [
+        2.51,
+        2.74
+      ]
+    },
+    "KXHIGHNY": {
+      "markets": 120,
+      "events": 20,
+      "trades": 38168,
+      "maker_net_c": 1.523,
+      "t": 0.89,
+      "implied_pct": 6.37,
+      "actual_pct": 4.7,
+      "actual_ci95": [
+        4.49,
+        4.91
+      ]
+    },
+    "KXHIGHCHI": {
+      "markets": 120,
+      "events": 20,
+      "trades": 22925,
+      "maker_net_c": 3.419,
+      "t": 2.78,
+      "implied_pct": 6.87,
+      "actual_pct": 3.83,
+      "actual_ci95": [
+        3.59,
+        4.09
+      ]
+    },
+    "KXHIGHTSEA": {
+      "markets": 120,
+      "events": 20,
+      "trades": 17224,
+      "maker_net_c": 0.404,
+      "t": 0.2,
+      "implied_pct": 6.9,
+      "actual_pct": 6.78,
+      "actual_ci95": [
+        6.42,
+        7.17
+      ]
+    },
+    "KXHIGHPHIL": {
+      "markets": 120,
+      "events": 20,
+      "trades": 11201,
+      "maker_net_c": 1.899,
+      "t": 0.82,
+      "implied_pct": 7.4,
+      "actual_pct": 5.84,
+      "actual_ci95": [
+        5.42,
+        6.29
+      ]
+    },
+    "KXHIGHTHOU": {
+      "markets": 120,
+      "events": 20,
+      "trades": 11029,
+      "maker_net_c": 2.669,
+      "t": 1.59,
+      "implied_pct": 6.07,
+      "actual_pct": 3.08,
+      "actual_ci95": [
+        2.78,
+        3.42
+      ]
+    },
+    "KXHIGHTLV": {
+      "markets": 120,
+      "events": 20,
+      "trades": 10529,
+      "maker_net_c": 2.07,
+      "t": 0.95,
+      "implied_pct": 6.54,
+      "actual_pct": 6.12,
+      "actual_ci95": [
+        5.67,
+        6.59
+      ]
+    },
+    "KXHIGHTATL": {
+      "markets": 120,
+      "events": 20,
+      "trades": 10490,
+      "maker_net_c": -0.603,
+      "t": -0.27,
+      "implied_pct": 6.93,
+      "actual_pct": 7.14,
+      "actual_ci95": [
+        6.66,
+        7.65
+      ]
+    },
+    "KXHIGHDEN": {
+      "markets": 120,
+      "events": 20,
+      "trades": 10005,
+      "maker_net_c": 3.279,
+      "t": 2.4,
+      "implied_pct": 6.91,
+      "actual_pct": 4.6,
+      "actual_ci95": [
+        4.2,
+        5.03
+      ]
+    },
+    "KXFEDDECISION": {
+      "markets": 5,
+      "events": 1,
+      "trades": 9893,
+      "maker_net_c": 1.555,
+      "t": 0,
+      "implied_pct": 1.55,
+      "actual_pct": 0,
+      "actual_ci95": [
+        0,
+        0.04
+      ]
+    },
+    "KXHIGHTDC": {
+      "markets": 120,
+      "events": 20,
+      "trades": 6163,
+      "maker_net_c": -0.672,
+      "t": -0.2,
+      "implied_pct": 7.16,
+      "actual_pct": 7.87,
+      "actual_ci95": [
+        7.22,
+        8.57
+      ]
+    },
+    "KXCPI": {
+      "markets": 23,
+      "events": 2,
+      "trades": 2889,
+      "maker_net_c": 6.418,
+      "t": 4.74,
+      "implied_pct": 7,
+      "actual_pct": 0,
+      "actual_ci95": [
+        0,
+        0.13
+      ]
+    }
+  },
+  "composition_warning": "10/12 series are weather (KXHIGH*); pooled results are weather-dominated — treat cross-family generality as UNPROVEN until macro series have comparable n.",
+  "gates": {
+    "F_longshots_negative_for_buyer": true,
+    "F_favorites_positive_for_buyer": true
+  }
+}
