@@ -210,3 +210,50 @@ roughly **double the events (~240)** would be needed to reach t≈2.
 
 This is materially different from the eight refuted strategies: it is *underpowered*, not
 *refuted* — the first candidate to end that way. It stays unarmed until the event count doubles.
+
+---
+
+## External grounding + the structural argument (why the extremes, and why Kalshi ≠ a bookmaker)
+
+**The serious counter-argument, found and confronted.** [datagolf](https://datagolf.com/fav-longshot-not-a-bias)
+argues the favourite–longshot bias is *not* a behavioural bias at all: in **bookmaker** markets it
+falls out mechanically because bookmakers allocate roughly **equal absolute margin (~0.8–1% per
+side) across all odds** (Pinnacle, 27,150 matches 2012–2020). Every participant is rational,
+returns decline at long odds anyway, and — crucially — **all bets stay negative-EV**, favourites
+merely less so. On that account the pattern is real but *unexploitable*, and the football evidence
+agrees (favourites −3.64%, outsiders −26.08%: both losers).
+
+**Why that critique does not transfer to Kalshi.** Kalshi is an **exchange**, not a bookmaker —
+no house sets one-sided odds with an embedded margin — and its fee is `7·P·(1−P)/100` cents, a
+**convex curve minimised at the price extremes**. Measured in our own data: **0.43¢ in the 90–97¢
+band versus 1.74¢ mid-book — a 4× difference.** A small gross edge can therefore survive net at the
+extremes while being eaten alive in the middle. The CEPR study of 300k+ Kalshi contracts reports
+exactly the outcome the bookmaker model does *not* predict: high-price contracts yield **"small
+positive returns" net of fees** — positive, not merely less negative.
+
+**Decomposition of our own edge** ([`kalshi_fee_curve_decomposition.js`](../../experiments/kalshi_fee_curve_decomposition.js),
+liquid minutes, real ask, event-clustered):
+
+| band | events | gross | fee | **net** | t(net) |
+|---|---|---|---|---|---|
+| **5–15¢** | 119 | −4.26¢ | 0.55 | **−4.82¢** | **−4.18** |
+| 15–30¢ | 120 | −0.12¢ | 1.19 | −1.30¢ | −0.52 |
+| 30–45¢ | 121 | +0.24¢ | 1.62 | −1.39¢ | −0.50 |
+| 45–55¢ | 119 | +3.16¢ | 1.74 | +1.41¢ | 0.49 |
+| 55–70¢ | 120 | −1.43¢ | 1.67 | −3.09¢ | −0.86 |
+| 70–80¢ | 118 | −0.58¢ | 1.38 | −1.91¢ | −0.55 |
+| 80–90¢ | 117 | +2.30¢ | 0.91 | +1.38¢ | 0.52 |
+| **90–97¢** | 114 | +3.43¢ | 0.43 | **+3.01¢** | **2.29** |
+
+**Both tails behave as the theory predicts, with opposite signs, and the loser side is strongly
+significant:** buying deep longshots loses **−4.82¢ (t=−4.18)**; buying deep favourites gains
+**+3.01¢ (t=2.29)** where the fee is cheapest. The middle is noise.
+
+**The caveat applied to ourselves: 8 bands were tested.** A single cell at t=2.29 does **not** clear
+the Harvey–Liu |t|>3 bar for a new factor claim under multiple testing (Bonferroni-adjusted
+p≈0.19). What is defensible is the *pattern* — a monotone-tailed signature predicted a priori by an
+externally documented bias, with the fee curve explaining where it survives — not that one cell.
+
+**Status unchanged: promising, not proven.** The strongest single number in the whole programme is
+still the one that says *buying longshots reliably loses* (t=−4.18) — and the profitable mirror of
+that requires being a maker, which the fill simulation already killed.

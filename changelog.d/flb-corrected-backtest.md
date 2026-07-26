@@ -34,3 +34,11 @@ events. Directionally right, NOT significant; needs ~2x the events. First candid
 underpowered rather than refuted. Two sampling corrections were load-bearing: real ask vs traded
 price (+0.60c gap), and liquid-minutes-only (all-minutes sampling produced spurious significant
 negatives from stale asks).
+
+**External grounding + structural argument:** confronted the strongest counter-argument (datagolf:
+FLB is a mechanical artifact of flat bookmaker margins, hence unexploitable). It does not transfer
+to Kalshi, an EXCHANGE whose fee 7*P*(1-P) is convex and minimised at the extremes — measured 0.43c
+at 90-97c vs 1.74c mid-book (4x). Decomposition confirms: buying deep longshots -4.82c (t=-4.18),
+buying deep favourites +3.01c (t=2.29), middle is noise. Self-applied caveat: 8 bands tested, so
+t=2.29 does NOT clear the Harvey-Liu |t|>3 multiple-testing bar. Pattern is defensible; the single
+cell is not.
