@@ -1,0 +1,164 @@
+{
+  "date": "2026-07-26",
+  "strategy": "buy favourites at the ask (taker, immediate fill), hold to settlement",
+  "markets": 553,
+  "execution": "TAKER — fills structurally certain; taker fee 0.07*P*(1-P) charged",
+  "cells": {
+    "0.1|60-75": {
+      "trades": 19,
+      "events": 17,
+      "avg_ask": 63.68,
+      "net_c": -18.235,
+      "t": -1.44,
+      "degenerate": false,
+      "implied_pct": 63.68,
+      "actual_pct": 42.11,
+      "actual_ci95": [
+        23.14,
+        63.72
+      ],
+      "underpriced": false
+    },
+    "0.25|60-75": {
+      "trades": 21,
+      "events": 17,
+      "avg_ask": 64.24,
+      "net_c": -6.723,
+      "t": -0.55,
+      "degenerate": false,
+      "implied_pct": 64.24,
+      "actual_pct": 57.14,
+      "actual_ci95": [
+        36.55,
+        75.53
+      ],
+      "underpriced": false
+    },
+    "0.4|60-75": {
+      "trades": 16,
+      "events": 14,
+      "avg_ask": 64.94,
+      "net_c": -2.19,
+      "t": -0.17,
+      "degenerate": false,
+      "implied_pct": 64.94,
+      "actual_pct": 62.5,
+      "actual_ci95": [
+        38.64,
+        81.52
+      ],
+      "underpriced": false
+    },
+    "0.5|60-75": {
+      "trades": 28,
+      "events": 24,
+      "avg_ask": 64.5,
+      "net_c": -12.732,
+      "t": -1.24,
+      "degenerate": false,
+      "implied_pct": 64.5,
+      "actual_pct": 53.57,
+      "actual_ci95": [
+        35.81,
+        70.47
+      ],
+      "underpriced": false
+    },
+    "0.6|60-75": {
+      "trades": 23,
+      "events": 22,
+      "avg_ask": 65.87,
+      "net_c": -13.017,
+      "t": -1.19,
+      "degenerate": false,
+      "implied_pct": 65.87,
+      "actual_pct": 56.52,
+      "actual_ci95": [
+        36.81,
+        74.37
+      ],
+      "underpriced": false
+    },
+    "0.75|60-75": {
+      "trades": 31,
+      "events": 29,
+      "avg_ask": 66.29,
+      "net_c": 1.353,
+      "t": 0.15,
+      "degenerate": false,
+      "implied_pct": 66.29,
+      "actual_pct": 70.97,
+      "actual_ci95": [
+        53.41,
+        83.9
+      ],
+      "underpriced": false
+    },
+    "0.9|60-75": {
+      "trades": 18,
+      "events": 18,
+      "avg_ask": 67.67,
+      "net_c": -24.741,
+      "t": -2.07,
+      "degenerate": false,
+      "implied_pct": 67.67,
+      "actual_pct": 44.44,
+      "actual_ci95": [
+        24.56,
+        66.28
+      ],
+      "underpriced": false
+    },
+    "0.9|75-85": {
+      "trades": 12,
+      "events": 12,
+      "avg_ask": 79.33,
+      "net_c": 2.858,
+      "t": 0.26,
+      "degenerate": false,
+      "implied_pct": 79.33,
+      "actual_pct": 83.33,
+      "actual_ci95": [
+        55.2,
+        95.3
+      ],
+      "underpriced": false
+    },
+    "0.9|85-95": {
+      "trades": 16,
+      "events": 16,
+      "avg_ask": 90.75,
+      "net_c": 2.418,
+      "t": 0.38,
+      "degenerate": false,
+      "implied_pct": 90.75,
+      "actual_pct": 93.75,
+      "actual_ci95": [
+        71.67,
+        98.89
+      ],
+      "underpriced": false
+    },
+    "0.9|95-99": {
+      "trades": 17,
+      "events": 15,
+      "avg_ask": 96.59,
+      "net_c": 3.15,
+      "t": 11.74,
+      "degenerate": true,
+      "implied_pct": 96.59,
+      "actual_pct": 100,
+      "actual_ci95": [
+        81.57,
+        100
+      ],
+      "underpriced": false
+    }
+  },
+  "summary": {
+    "cells": 10,
+    "positive_significant": 0,
+    "distinct_decision_points": 0,
+    "verdict": "NO EDGE — no non-degenerate cell is positive at t>2"
+  }
+}

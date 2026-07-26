@@ -26,3 +26,11 @@ latest decision point is positive, its t is degenerate (0 winners of 29 fills), 
 never fill, and filled offers wait 1-2.5h. Same "latest-point-only" fragility that disqualified
 buy-favourites. Simulated fills ignore queue priority/partial fills/impact, so this is an UPPER
 bound on a result that already fails.
+
+**Favourite side (literature-directed):** the academic synthesis identifies buying favourites — a
+TAKER trade with structurally certain fills — as the retail-accessible expression of longshot bias.
+Tested on real asks in liquid minutes: 75-95c nets +1.6 to +2.6c/contract, t=0.5-1.4 on ~115
+events. Directionally right, NOT significant; needs ~2x the events. First candidate to end
+underpowered rather than refuted. Two sampling corrections were load-bearing: real ask vs traded
+price (+0.60c gap), and liquid-minutes-only (all-minutes sampling produced spurious significant
+negatives from stale asks).

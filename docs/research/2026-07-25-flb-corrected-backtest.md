@@ -169,3 +169,44 @@ cent removes another cent per fill, which does not rescue any point.
 **Honesty limit:** queue priority, partial fills, and our own market impact are all ignored, and
 each makes real fills *worse*. These simulated results are an **upper bound** — the true strategy
 performs no better than the table above, and the table is already a failure.
+
+---
+
+## The favourite side — the one candidate still standing (underpowered, not proven)
+
+Prompted to search the literature rather than keep grinding our own data, the academic synthesis
+([QuantPedia](https://quantpedia.com/systematic-edges-in-prediction-markets/), ~20 studies) ranks
+the documented edges by *retail accessibility*: inter-exchange arbitrage needs sub-second execution,
+intra-exchange arbitrage is largely closed, and **only longshot bias remains "still live" with "no
+special technology needed"** — expressed as **buying favourites**, not selling longshots.
+
+That distinction is decisive against our own week's work: selling longshots is a **maker** trade
+(needs someone to lift a resting offer; ~50% never filled), while buying favourites is a **taker**
+trade — **fills are structurally certain**. The property that killed the previous candidate is
+absent by construction.
+
+**Two sampling corrections, both of which changed the answer** ([`kalshi_favorites_liquid.js`](../../experiments/kalshi_favorites_liquid.js)):
+
+- **Real ask, not traded price** — a taker pays the ask. Measured gap: **+0.60¢**.
+- **Liquid minutes only (volume > 0)** — sampling every quoted minute is dominated by stale asks in
+  untraded markets, and produced *spurious significant negatives* (50–60¢ t=−2.60, 95–99¢ t=−5.48)
+  that vanish once a real trade is required in the same minute. You cannot lift a quote nobody is
+  honouring.
+
+**Result** (553 markets, event-clustered, real asks, taker fees, liquid minutes):
+
+| band | obs | events | avg ask | net/contract | t | actual |
+|---|---|---|---|---|---|---|
+| 50–60¢ | 46,945 | 120 | 54.0 | −3.25¢ | −0.94 | 46.9% |
+| 60–75¢ | 21,799 | 120 | 65.9 | −2.99¢ | −0.84 | 59.3% |
+| **75–85¢** | 4,259 | 115 | 79.4 | **+1.63¢** | 0.52 | 69.2% |
+| **85–95¢** | 4,911 | 116 | 89.6 | **+2.60¢** | 1.40 | 79.9% |
+| 95–99¢ | 2,878 | 106 | 96.6 | +0.72¢ | 0.52 | 94.7% |
+
+**Verdict: directionally positive in the favourite bands, NOT statistically significant.** The
+75–95¢ range nets +1.6 to +2.6¢/contract with t = 0.5–1.4 on ~115 events — the right sign, matching
+both the literature and our own trades-based pass, but short of proof. At the observed variance,
+roughly **double the events (~240)** would be needed to reach t≈2.
+
+This is materially different from the eight refuted strategies: it is *underpowered*, not
+*refuted* — the first candidate to end that way. It stays unarmed until the event count doubles.
