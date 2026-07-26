@@ -1,0 +1,147 @@
+{
+  "construction": "OU witness pair; G anchor=m*, U anchor=slow directed ramp tracked by EW monitor",
+  "params": {
+    "kappa": 0.15,
+    "sigma": 1.0,
+    "drift_std": 0.001,
+    "lam": 0.98,
+    "T": 8000,
+    "burn": 1000,
+    "alpha": 0.05,
+    "surprise_thresh": 6.63,
+    "vels": [
+      0.0003,
+      0.0006,
+      0.001,
+      0.0015,
+      0.003,
+      0.006,
+      0.012,
+      0.024
+    ],
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "sweep": [
+    {
+      "drift_vel": 0.0003,
+      "approx_global_displacement": 2.4,
+      "canary_separations": 0,
+      "highpower_separations": 0,
+      "external_separations": 5,
+      "canary_z_p_median": 0.4302,
+      "highpower_ks_p_median": 0.2916,
+      "external_mean_gap_median": 0.4151,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.0006,
+      "approx_global_displacement": 4.8,
+      "canary_separations": 0,
+      "highpower_separations": 0,
+      "external_separations": 5,
+      "canary_z_p_median": 0.5253,
+      "highpower_ks_p_median": 0.3013,
+      "external_mean_gap_median": 1.4347,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.001,
+      "approx_global_displacement": 8.0,
+      "canary_separations": 0,
+      "highpower_separations": 2,
+      "external_separations": 5,
+      "canary_z_p_median": 0.4302,
+      "highpower_ks_p_median": 0.0952,
+      "external_mean_gap_median": 3.098,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.0015,
+      "approx_global_displacement": 12.0,
+      "canary_separations": 0,
+      "highpower_separations": 3,
+      "external_separations": 5,
+      "canary_z_p_median": 0.3397,
+      "highpower_ks_p_median": 0.0322,
+      "external_mean_gap_median": 5.2827,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.003,
+      "approx_global_displacement": 24.0,
+      "canary_separations": 0,
+      "highpower_separations": 5,
+      "external_separations": 5,
+      "canary_z_p_median": 0.6653,
+      "highpower_ks_p_median": 0.0001,
+      "external_mean_gap_median": 11.9792,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.006,
+      "approx_global_displacement": 48.0,
+      "canary_separations": 0,
+      "highpower_separations": 5,
+      "external_separations": 5,
+      "canary_z_p_median": 0.7087,
+      "highpower_ks_p_median": 0.0,
+      "external_mean_gap_median": 25.4533,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.012,
+      "approx_global_displacement": 96.0,
+      "canary_separations": 0,
+      "highpower_separations": 5,
+      "external_separations": 5,
+      "canary_z_p_median": 0.8792,
+      "highpower_ks_p_median": 0.0,
+      "external_mean_gap_median": 52.4223,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    },
+    {
+      "drift_vel": 0.024,
+      "approx_global_displacement": 192.0,
+      "canary_separations": 0,
+      "highpower_separations": 5,
+      "external_separations": 5,
+      "canary_z_p_median": 0.9902,
+      "highpower_ks_p_median": 0.0,
+      "external_mean_gap_median": 106.3603,
+      "n_seeds": 5,
+      "canary_silent": true,
+      "external_detects": true
+    }
+  ],
+  "blindspot_band_vels": [
+    0.0003,
+    0.0006,
+    0.001,
+    0.0015,
+    0.003,
+    0.006,
+    0.012,
+    0.024
+  ],
+  "verdict": "LEMMA HOLDS for the DEPLOYED monitor across the ENTIRE swept range: the surprise canary never fires on the ungrounded loop (0 separations at every velocity, up to global displacement 192) while the external functional |X-m*| separates 5/5 throughout. A CONSTANT-velocity drift is perfectly EW-trackable, so the pure boiling frog is invisible to the canary at ANY speed -- the blind spot is unbounded in displacement, not a bounded band. The canary would only fire on drift that exceeds its tracking bandwidth (acceleration or jumps), NOT tested here. So the loop is undetectable internally and detectable only by an observation exogenous to the trajectory -> external hard-cadence re-grounding is NECESSARY, not prudent (#1012 becomes a theorem conclusion). HONEST CAVEAT: a high-power n=7000 two-sample test detects the constant EW-lag residual bias from vel>=0.0010, so the two laws are only APPROXIMATELY equal on M (exact equality is the vel->0 limit of the proof); the point is the DEPLOYED threshold canary is fooled across the whole range."
+}
