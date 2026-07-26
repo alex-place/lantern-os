@@ -123,7 +123,16 @@ def test_pcsf_files_exist() -> None:
 def test_pcsf_files_are_valid_json() -> None:
     import json
     pcsf_dir = ROOT / "data" / "pcsf"
+    # Validate only COMMITTED PCSF source configs. settings.pcsf.json and
+    # provider.pcsf.json are runtime-refreshed + gitignored (see test_pcsf_files_exist,
+    # #781) — they are NOT committed source files, and provider.pcsf.json uses the newer
+    # versioned `schema` field (provider.pcsf/2) rather than the `pcsf_type` source shape.
+    # Globbing them made this test fail on any box where the server had run and generated
+    # provider.pcsf.json (it passes in a fresh CI checkout only because the file is absent).
+    RUNTIME_GENERATED = {"settings.pcsf.json", "provider.pcsf.json"}
     for f in pcsf_dir.glob("*.pcsf.json"):
+        if f.name in RUNTIME_GENERATED:
+            continue
         data = json.loads(f.read_text(encoding="utf-8"))
         assert "pcsf_type" in data, f"{f.name} missing pcsf_type"
         assert "pcsf_version" in data, f"{f.name} missing pcsf_version"
