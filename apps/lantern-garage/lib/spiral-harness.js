@@ -110,6 +110,12 @@ const noop = () => {};
  *                        long horizon can't saturate the cheap tier's context.
  *   memoryTextCap {number} #2977: per-step candidate text cap (chars, default 4000)
  *                        in that prompt view; `_truncated` carries the true length.
+ *   holdoutVerify {function|null} #2999: async (text) => raw test-result set over
+ *                        the HELD-OUT split. Selection/ratcheting stays on the
+ *                        visible `verify`; every commit is holdout-scored, the run
+ *                        returns the holdout-best (`y`; visible-best in `yVisible`),
+ *                        confidence becomes the held-out pass fraction, and a
+ *                        visible "solved" that fails holdout does NOT halt.
  *   failureCache {object|null} #2869 failure-mode cache ({avoidFor, recordFailures});
  *                        opt-in — when set, known-failed approaches for the task
  *                        signature ride into every tiers ctx as `avoid`, and an
@@ -150,6 +156,7 @@ async function runSpiral(args) {
     failureCache = null,
     memoryWindow = 4,
     memoryTextCap = 4000,
+    holdoutVerify = null,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -190,6 +197,10 @@ async function runSpiral(args) {
   let consecutiveDupTurns = 0;
   let rung = "cheap";
   const seenStalled = new Set();
+  // #2999: best commit as scored on the HELD-OUT split (null until first commit
+  // under a configured holdoutVerify) — what the run returns instead of the
+  // visible-best, so the answer was never selected on the tests it optimized.
+  let bestHoldout = null;
 
   // Coerce a verify() return into a Fix-Rate result. If verify already returned a
   // scored result (has `advanced`), trust it; else treat it as a raw test-result set
@@ -322,12 +333,37 @@ async function runSpiral(args) {
       rung = "cheap";
       consecutiveStalls = 0;
       consecutiveDupTurns = 0;
+      // #2999: the held-out split. SELECTION ran on the visible tests above; every
+      // COMMIT is additionally scored on tests the loop never optimizes against.
+      // The best held-out scorer is what the run RETURNS, and a visible "solved"
+      // that breaks held-out behavior is NOT solved (the transduction trap — a
+      // memorizer passes every visible test and fails the unseen one; measured
+      // −3.1pp/60 turns in the no-skill regime, ~60% of it removed by this split).
+      let holdoutFrac = null;
+      if (holdoutVerify) {
+        try {
+          const hs = summarize(await holdoutVerify(cand.text));
+          holdoutFrac = hs.total > 0 ? hs.passed / hs.total : 0;
+          if (!bestHoldout || holdoutFrac > bestHoldout.frac) {
+            bestHoldout = { text: cand.text, frac: holdoutFrac, turn };
+          }
+          onStep({ type: "holdout_score", turn, frac: holdoutFrac });
+        } catch (e) {
+          onStep({ type: "holdout_error", turn, message: e && e.message });
+        }
+      }
       onStep({ type: "commit", turn, tier, fixRate: v.fixRate, solved: !!v.solved, memorySize: memory.length });
       if (v.solved) {
-        solved = true;
-        haltReason = "solved";
-        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved: true, cost, escalations });
-        break;
+        if (holdoutVerify && holdoutFrac !== null && holdoutFrac < 1) {
+          // Visible-solved but held-out broken: the doc's halt condition ("passed,
+          // including held-out checks") refuses this. Keep spiraling.
+          onStep({ type: "holdout_reject", turn, frac: holdoutFrac });
+        } else {
+          solved = true;
+          haltReason = "solved";
+          onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved: true, cost, escalations });
+          break;
+        }
       }
     } else {
       // Neither tried rung advanced — de-ratchet (rotate focus / ground externally
@@ -383,11 +419,16 @@ async function runSpiral(args) {
     escalations,
     escalationRate: turns ? escalations / turns : 0,
     cost,
-    y,
     memory,
     corpusRows,
     corpusFile: corpus.file || null,
-    confidence: _wholeAnswerConfidence(best, solved),
+    // #2999: with a holdout configured, the returned answer is the HOLDOUT-best
+    // commit and confidence is its held-out pass fraction — the answer was never
+    // selected on the tests it optimized. Without one, legacy visible semantics.
+    y: holdoutVerify && bestHoldout ? bestHoldout.text : y,
+    yVisible: y,
+    holdout: holdoutVerify ? (bestHoldout ? { frac: bestHoldout.frac, turn: bestHoldout.turn } : { frac: null, turn: null }) : null,
+    confidence: holdoutVerify && bestHoldout ? (solved ? 1 : bestHoldout.frac) : _wholeAnswerConfidence(best, solved),
   };
 }
 
