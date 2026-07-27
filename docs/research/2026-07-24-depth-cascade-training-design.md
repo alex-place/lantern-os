@@ -75,7 +75,11 @@ that won the serving comparison) instead of two resident models.
 
 - Not a new subsystem: it is RC1 §6 (VTD → RLVR-FixRate → ternary) made
   depth-aware. Same phases, same gates, one added axis.
-- Not MoE/routing (certificate §1.2.2 scope intact; one dense looped model ≤3B).
+- Not MoE-dependent — but MoE-compatible: the operator decision of 2026-07-24
+  (ADR-0034) adopts MoE for the core as soon as the switched-system admission gate
+  exists. This design trains the DENSE core first (P0/RC1 sequencing unchanged);
+  under an MoE core its contraction objective must hold per active-expert
+  composition and every gate below carries over unchanged.
 - Not runtime weight modification (offline, opt-in, Σ_θ-gated — North Star rule).
 - Not a claim: every number above is a target with a kill test, per the External
   Reality Rule.
