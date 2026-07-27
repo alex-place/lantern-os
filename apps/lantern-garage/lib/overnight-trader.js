@@ -43,8 +43,16 @@ function cfg() {
     // vs 1x 8.7%/1.02/16% and SPY 12.2%/0.76/34% — and MORE cost-robust (the
     // per-night edge scales 3x while slippage stays ~1x). Levered ETFs beat
     // synthetic margin at every level (institutional financing inside the fund).
-    exec: ['1x', '2x', '3x'].includes(String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase())
+    // 'options' is the 4th tier: the SAME nightly signal executed as a next-day OTM
+    // CALL ladder instead of shares (operator 2026-07-27 — the options trader was a
+    // duplicate of this book's SPY uptrend sleeve, so it folded in here as execution
+    // rather than a second engine with its own copy of the gate).
+    exec: ['1x', '2x', '3x', 'options'].includes(String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase())
       ? String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase() : '1x',
+    // Call-ladder depths (% OTM) when exec='options', and contracts per leg.
+    optionLadder: String(process.env.OVERNIGHT_OPTION_LADDER || '0.25,0.5,1,1.5,2')
+      .split(',').map((x) => parseFloat(x)).filter((x) => Number.isFinite(x) && x > 0),
+    optionQty: Math.max(1, Math.min(10, n('OVERNIGHT_OPTION_QTY', 1))),
     // "Find the edge BEFORE entering" (operator rule): even when ARMED, a sleeve may
     // only place real orders after its OWN live ledger shows positive expectancy over
     // ≥ edgeMinN nights — until then that sleeve keeps trading dry, building the
@@ -128,6 +136,27 @@ const EXEC_MAPS = {
   '2x': { SPY: 'SSO', QQQ: 'QLD' },
   '3x': { SPY: 'UPRO', QQQ: 'TQQQ', IWM: 'TNA', SH: 'SPXS' },
 };
+
+/** OPTIONS execution tier: the next-expiry OTM call ladder for one sleeve symbol.
+ *  Chain discovery / quotes / paper order placement all live in options-shadow —
+ *  that module is the options EXECUTION ADAPTER; the signal lives here. Returns
+ *  [{depth, strike, contract, ask, bid}] (only legs with a real quote), or [].
+ */
+async function optionLadderFor(symbol, spot, ladder) {
+  const ox = require('./options-shadow');
+  const chain = await ox.listNextExpiryCalls(symbol).catch(() => ({ error: 'chain failed' }));
+  if (!chain || chain.error || !Array.isArray(chain.contracts)) return { expiry: null, legs: [] };
+  const strikes = chain.contracts.map((x) => Number(x.strike_price)).filter((x) => x > 0);
+  const legs = [];
+  for (const depth of ladder) {
+    const strike = ox.pickStrike(spot, strikes, depth);
+    const contract = strike != null ? chain.contracts.find((x) => Number(x.strike_price) === strike) : null;
+    if (!contract) continue;
+    const q = await ox.quoteOption(contract.symbol).catch(() => null);
+    if (q && q.ask > 0) legs.push({ depth, strike, contract: contract.symbol, ask: q.ask, bid: q.bid });
+  }
+  return { expiry: chain.expiry, legs };
+}
 
 /** Tonight's sleeve selection from {SYM: closes[]}. Pure. */
 function selectSleeves(closesBySym) {
@@ -220,6 +249,23 @@ async function tick({ bridge } = {}) {
       for (const p of (pos || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
     for (const leg of (st.open.legs || [])) {
+      // OPTION legs settle against the CONTRACT's bid at the open (not the underlying's
+      // print) — entry at the ask, exit at the bid, the honest sides of a thin market.
+      if (leg.instrument === 'option') {
+        const ox = require('./options-shadow');
+        const q = await ox.quoteOption(leg.contract).catch(() => null);
+        const bid = (q && q.bid) || 0;
+        const pl = leg.ref_close > 0 ? +(((bid - leg.ref_close) / leg.ref_close) * 100).toFixed(2) : null;
+        let status = 'dry';
+        if (leg.placed) {
+          const r = bid > 0
+            ? await ox.placePaperOrder({ contract: leg.contract, side: 'sell', qty: leg.qty, limit: bid }).catch((e) => ({ error: e.message }))
+            : { error: 'no bid — leg left to expire worthless' };
+          status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
+        }
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed });
+        continue;
+      }
       const exitRef = openBySym[leg.symbol] || null;
       const pl = exitRef && leg.ref_close > 0 ? +(((exitRef - leg.ref_close) / leg.ref_close) * 100).toFixed(3) : null;
       if (leg.placed && resolved) {
@@ -306,11 +352,34 @@ async function tick({ bridge } = {}) {
         ? (closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0])
         : execCloseBySym[execSym];
       if (!(px > 0)) { _append({ phase: 'skip', date: today, symbol: execSym, sleeve: s.sleeve, why: 'no execution price' }); continue; }
-      const qty = Math.max(1, Math.floor(per / px));
       // Per-sleeve edge gate: a sleeve trades REAL (paper) money only after its own
       // live ledger proves the edge; until then it runs dry and keeps measuring.
       const gate = canArm(s.sleeve, edge, c);
       const placeReal = !baseDry && gate.arm;
+
+      // ── OPTIONS tier: the same signal as a next-day OTM call ladder ──────────
+      if (c.exec === 'options') {
+        const ox = require('./options-shadow');
+        const { expiry, legs: ladder } = await optionLadderFor(s.symbol, px, c.optionLadder);
+        if (!ladder.length) { _append({ phase: 'skip', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'no option ladder / quotes' }); continue; }
+        for (const l of ladder) {
+          let status = 'dry_run';
+          if (placeReal) {
+            // Marketable limit AT the ask — the honest side of a thin option market
+            // (the same fill assumption the expectancy ledger measures against).
+            const r = await ox.placePaperOrder({ contract: l.contract, side: 'buy', qty: c.optionQty, limit: l.ask }).catch((e) => ({ error: e.message }));
+            status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
+          }
+          legs.push({ instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol, sleeve: s.sleeve,
+            depth: l.depth, strike: l.strike, expiry, qty: c.optionQty, ref_close: l.ask, placed: placeReal && status === 'placed' });
+          _append({ phase: 'enter', date: today, instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol,
+            sleeve: s.sleeve, exec: 'options', depth: l.depth, strike: l.strike, expiry, spot_close: px,
+            qty: c.optionQty, ref_close: l.ask, status, dry: !placeReal, edge_gate: gate.why });
+        }
+        continue;
+      }
+
+      const qty = Math.max(1, Math.floor(per / px));
       let status = 'dry_run';
       if (placeReal) {
         const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: execSym, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));

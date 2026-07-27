@@ -89,12 +89,23 @@ function macdLine(closes) { if (closes.length < 35) return 0; const t = closes.s
 function median(a) { if (!a.length) return null; const s = [...a].sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; }
 
 /** All-gates check on a daily closes series ending "today at the close". */
+// SINGLE SOURCE OF TRUTH (operator 2026-07-27): this gate was a byte-for-byte
+// duplicate of overnight-trader's uptrendGate — same close>SMA50 & MACD>0, same
+// rv10-vs-trailing-60d-median, same nightly window. The overnight book now OWNS the
+// signal (options is its 4th execution tier); this wrapper delegates the pass/fail
+// decision there and only adds the vol context the penny selector needs (rv10),
+// so the two can never drift apart again.
 function gates(closes, { volMode = 'notflat' } = {}) {
   const i = closes.length - 1;
   if (i < 70) return { eligible: false, why: 'insufficient history' };
+  let delegated = null;
+  try { delegated = require('./overnight-trader').uptrendGate(closes, volMode); } catch (_e) { delegated = null; }
   const px = closes[i];
   const s50 = smaAt(closes, 50, i);
   const trendOk = (s50 == null || px > s50) && macdLine(closes) > 0;
+  if (delegated && delegated.pass === false) {
+    return { eligible: false, why: delegated.why, trendOk, delegated: true };
+  }
   if (!trendOk) return { eligible: false, why: 'not trend-aligned (need close>SMA50 & MACD>0)', trendOk };
   // 10d realized vol vs trailing 60d median of the same measure (causal)
   const dret = []; for (let k = 1; k <= i; k++) if (closes[k - 1] > 0) dret.push(closes[k] / closes[k - 1] - 1);
@@ -348,12 +359,22 @@ async function tick() {
   const today = `${et.getFullYear()}-${String(et.getMonth() + 1).padStart(2, '0')}-${String(et.getDate()).padStart(2, '0')}`;
   const st = _readState();
 
+  // The overnight book owns the LADDER when its 4th exec tier is options — running
+  // both would double-expose the SAME nightly signal on the same underlying (and the
+  // direction lock can't catch it: both legs are long the same family). The PENNY
+  // sleeve stays here either way — its intraday 2c-target exit is a genuinely
+  // different holding period, not a duplicate of the close->open trade.
+  const _overnightOwnsLadder = process.env.OVERNIGHT_TRADER === '1' &&
+    String(process.env.OVERNIGHT_EXEC || '').toLowerCase() === 'options';
+
   // CLOSE WINDOW (15:45–15:59 ET, Mon–Thu): open tonight's shadow LADDER (one leg per depth)
   // + the vol-selective PENNY leg (entry priced at the ASK — the honest side of a 1¢ market).
   if (dow >= 1 && dow <= 4 && hm >= 1545 && hm <= 1559 && st.lastOpenDate !== today && !st.open) {
     const p = await probe();
-    const legs = ((p && p.legs) || []).filter((l) => l.contract && l.quote && l.quote.mid > 0);
-    if (p.gates && p.gates.eligible && legs.length) {
+    const legs = _overnightOwnsLadder ? []
+      : ((p && p.legs) || []).filter((l) => l.contract && l.quote && l.quote.mid > 0);
+    const _pennyOnly = _overnightOwnsLadder && p.penny && p.penny.pick;
+    if (p.gates && p.gates.eligible && (legs.length || _pennyOnly)) {
       st.open = { date: today, symbol: c.symbol, expiry: p.expiry, spot_close: p.spot,
         legs: legs.map((l) => ({ depth: l.depth, strike: l.strike, contract: l.contract, entry_mid: l.quote.mid, entry_ask: l.quote.ask || null })) };
       if (p.penny && p.penny.pick) {
@@ -436,4 +457,6 @@ function status() {
   return { ...cfg(), minNights: MIN_N, state: _readState(), measured: summarize(rows), lastRows: rows.slice(-5) };
 }
 
-module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, placePaperOrder, paperOrderFill, LEDGER, MIN_N };
+module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, placePaperOrder, paperOrderFill, LEDGER, MIN_N,
+  // options EXECUTION ADAPTER surface — the overnight book's 4th exec tier calls these
+  listNextExpiryCalls, chainQuotes, quoteOption };
