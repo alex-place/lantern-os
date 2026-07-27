@@ -1,3 +1,1076 @@
+## [1.13.0] - 2026-07-27
+
+### Added
+- dream-chat: rich markdown in replies — headings, bulleted/numbered lists, tables, blockquotes, and italics now render as real HTML instead of flat `<br>` text; fenced code blocks keep their newlines. Verified live in the dev preview against a table/list/heading/code sample (finalize and history-replay paths).
+- experiments(survivorship): **measured** the survivorship-free single-stock momentum result on real point-in-time data, plus a live data-vendor sweep (`experiments/survivorship_momentum/free_data/`, `docs/research/2026-07-18-market-data-vendors-survivorship.md`). Corrected the earlier claim that Tiingo is the "accessible fix": Tiingo free tier caps at 50 req/hr + 500 symbols/mo with spotty pre-2013 delisted coverage, and the free stooq bulk is itself survivorship-biased (survivors 100%, delisted cohort only 41% — the truly-dead names are absent). Ran 12-1 momentum with **point-in-time S&P 500 membership** (fja05680) + stooq prices (an inflated upper bound): full-cycle 2002–2026 Sharpe **0.60** (−54% maxDD), **dead even with plain SPY (0.598)** and below the champion's 0.66; the 2014–2026 "win" (0.755) was entirely the benign window. survivors-only ≈ partial-debiased in both windows — proof you can't de-bias with free data. Verdict unchanged and now measured: **champion NOT upgraded** with single-stock momentum; clean numbers need paid data (Sharadar ~$30/mo or HistoricalData.net $299).
+- experiments(survivorship): measured the survivorship-bias magnitude in single-stock momentum backtests (`experiments/survivorship_momentum/`, FINDINGS.md). Reconstructed the point-in-time S&P 500 ever-member universe (incl. Enron/WorldCom/Lehman/GM/Kodak…) and proved all three of Yahoo/Alpaca/IBKR drop delisted data (84% coverage gap on the free path). Hand-picked-winners 12-1 momentum printed +33,937% (Sharpe 1.19); a partial de-biasing cut it to +8,490% (Sharpe 0.91); the published CRSP ceiling is Sharpe ~0.5 with −50%+ momentum crashes — **below** the champion's own 0.66. Conclusion: the "$2M momentum champion" was a survivorship mirage; the champion is NOT upgraded with single-stock momentum. Trustworthy momentum stays via the XMMO/SPMO ETFs already in the mix. Free fix requires a Tiingo key or Sharadar + the fja05680 constituent file.
+- AGI Convergence Blueprint (docs/AGI-CONVERGENCE-BLUEPRINT.md): the whole system mapped to the North-Star loop Observe/Remember/Reason/Act/Verify/Converge - each stage with 2026 best-practice (cited), in-repo status, and the honest gap. Grounds the strategy: rent the six frontier capabilities (data/architecture/optimizer/scaling/pretraining/post-training/systems), own Verify+Converge-gating; the cert is the loop's grounding discipline, not a model-building recipe
+- Corpus-grounded edge checks + instrumented Modal dispatch: two runnable experiments reproduce corpus claims with pre-registered hypotheses (looped-recall well-posedness from arXiv:2604.15259 — recall=per-step grounding; calibration-to-profit from arXiv:2607.00164 — the trading edge is a real info advantage, calibration+sizing are thin second-order levers), each with the refute-then-correct record kept; modal_dispatch gains subprocess error capture (no more opaque signal-6), --repo-ref branch dispatch, and 32GiB worker RAM; distill-replay.jsonl committed for E-B arm B
+- Frontier verification primitive + RSI stabilizer spectrum, grounded in the 1250-paper RSI survey (arXiv:2607.07663) that names governance-grade measurement of self-improvement the field's most underpopulated niche: deanchored_verifier.py implements the commit-first judge (arXiv:2607.05904) that resists self-reward-hacking without external truth (mock: anchored rubber-stamps 62% of wrong answers, de-anchored 0%); rsi_gated_vs_ungrounded expanded to the 5-arm verification hierarchy the survey describes (self-anchored collapses, de-anchored prevents the basin, reused filters slow-not-stop, fresh gate bounds) reproducing all of it
+- Greenpath release gate (#2545): `npm run test:greenpath` boots the real server and walks the full signup → paper-trade → chat → Pro journey for 10 demo accounts (real-browser signup with the hard email gate, watchlist, Free→Pro upgrade gate + staff upgrade, Kalshi paper trade, two-turn chat recall of the trade, Alpaca status, BYOK set/clear, journal + exit-tag). Per-account × per-step pass/fail is persisted to data/greenpath-runs.jsonl; docs/GREENPATH-GATE.md documents it as the gate for the first-50 invite program
+- `scripts/session_to_convergence.py` — mines Claude Code session history into both-class ConvergenceRecords (claim + `verified`/`refuted`/`corrected`, confidence capped by grounding strength) appended to the canonical `data/convergence/records.jsonl` ledger. `--records` appends a pre-extracted set from the current session (the Claude that lived it is the extractor, no second model call); `--transcript` extracts a past session via a Claude model. Idempotent (deterministic ids from session+claim), honesty-disciplined (verified only with in-session evidence; refutations kept, not discarded; provenance tagged `reasoner=claude-code-session`). Writer schema mirrors `lib/convergence-records.js`; complements `convergence_close_loop.py` (which resolves records) by populating them from history. Seeded with this session's 10 records (3 verified / 5 refuted / 5 corrected).
+- Autowork / `!convergance` grounding now retrieves from the arXiv research corpus (Σ₀ Remember stage), not just repo git-grep + web search. `autowork-research.js researchIssue()` queries the BM25 corpus (`lib/arxiv-index`) and folds matching post-cutoff papers into `researchContext.arxivEvidence` + `grounding_signals` (arxiv ids) + `allowed_max_confidence` — 0.85 with corpus support, 0.6 on a research question the corpus can't support, so a convergence record emitted from this research can't launder confidence past its evidence (retrieval is grounding, not verification). The council/canary `groundingContext` (`routes/convergence-dispatch.js`) surfaces the papers as citable lines to the Verify stage. Gated on `KEYSTONE_ARXIV_RETRIEVAL=1` + `arxiv-index.isAvailable()` — a fail-safe no-op wherever the corpus is absent (e.g. the GCE web tier). The corpus path is env-configurable (`ARXIV_CORPUS_DIR`), so it moves to a cloud-hosted corpus by config, not a rewrite. Verified end-to-end: a looped-transformer query retrieves 3 relevant papers; flag-off path is a clean no-op.
+- Sigma Trader Report - July 2026, "The July Leap" (apps/lantern-garage/public/reports/sigma-trader-report-2026-07.pdf, Vol. 1, first monthly issue, COMET LEAP visual style, for-everyone edition): a 5-page monthly written for free AND paid users with zero assumed knowledge - a "new here? sixty seconds of backstory" intro to the champion, a drawn comet-arc chart of the real 2000-2026 monthly balances (champion $91,537 vs plain S&P drip $54,278 on $8,380 paid in) with storm markers and projected leap, a cockpit status-gem row, four current-events explainers each layered backstory / what happened / why it touches your wallet / the calm move (US-Iran oil spike, momentum rotation, Fed hold + cash-still-pays, gold's year), a six-word plain-language dictionary, a trader layer (page-1 board of Friday marks: SPY $743.29 / VIX 18.77 / 10Y 4.55% / WTI $82+ / gold $4,017 / FOMC 7/28-29; full ticker table SPY/TLT/QQQ/GLD/IWM/EFA/XMMO/SPMO with closes+weights; a dials box with the brake's actual parameters), a humanized signed letter from the trading desk, and the retail-report conventions benchmarked from Yahoo Finance / Robinhood-Snacks / JPMorgan / Vanguard / Fidelity / Schwab / Morgan Stanley-E*TRADE / BlackRock / Morningstar / Wealthfront / Acorns formats (a 9-row asset scoreboard with week + 2026-so-far columns, a verified road-ahead calendar incl. Alphabet/Tesla 7/22 + FOMC 7/28-29 under new chair Warsh, Snacks-style THE TAKEAWAY labels, and a dedicated back page with About-the-report masthead + plain-English disclosures), "your next $20" in three lanes (pay down debt + cushion first, one-fund index drip, the champion's 8-slice pour with split bar), lean-on/glide-past habit columns, the 24-for-24 dip-recovery badge, and leap projections with the money-in guaranteed row. Generator: scripts/reports/sigma_trader_report_2026_07.py (reportlab, all numbers pinned in-file from the 2026-07-17 walk-forward run + live brake state + dated web sources; reproducible offline) Video edition: apps/lantern-garage/public/reports/sigma-trader-report-2026-07.mp4 - a 66.5s 16:9 animated cut (HeyGen HyperFrames HTML+GSAP composition, 1995 frames, deterministic) narrated by Gemini 2.5 Flash TTS on Vertex (voice Charon, per-scene clips for sync) over a synthesized ambient bed with timeline ducking; six scenes (comet title, the drawn 2000-2026 arc with live count-up, July -6.4% + the 24-for-24 badge, the $20 split bar, road ahead, keep-the-drip outro with the practice-mode disclaimer); pipeline committed at scripts/reports/leap-video-2026-07/ (README covers the rebuild chain).
+- ADR-0029 (Proposed): the IBKR streaming Challenger - a design to beat the Champion in returns, framed as a pre-registered duel rather than a promise. Three upgrades only, each receipt-backed: send-on-delta streaming cadence via the IBKR CPAPI gateway (the hourly-vs-daily brake already measured $51,355 vs $47,077 over 2.5y with 71h-faster de-lever), real IBKR tiered margin + bill-ETF cash sweep replacing the monitor's flat 3%/+150bp model, and minute-accurate split/dividend-correct history (Polygon, train 2004-15 / validate 2016-26) with survivorship-free cross-checks. Duel protocol: backtest win requires higher final value AND <= drawdown AND bootstrap CI excluding 0 AND 2-20bp cost robustness; then >=3 months IBKR-paper vs Alpaca-paper with the scoreboard in the monthly Leap; real dollars stay behind the unchanged ADR-0028 gate. Honest fold path: on a loss the friction-accuracy fixes are adopted into the Champion and subscriptions cancel. Retired paths stay retired (single-stock 12-1 momentum measured non-upgrade; gross >2x rejected) Phase A free-data variant RUN (experiments/challenger_free_rates.py + challenger_free.json): real ^IRX T-bill series (free, 1998-2026) replacing the flat 3%/+150bp carry, engine-equivalence $0.0000 - challenger $102,294 vs champion $91,702 (+11.6%) at shallower maxDD (-25.2% vs -25.5%), Sharpe 0.667 vs 0.648; bootstrap delta +0.34%/yr CI [-0.11,+0.74] P>0 93.2% (not significant at 95% - recorded honestly; deterministic accuracy fix -> fold-path adopts it); IBKR-Lite +250bp spread erases the win (broker tier is a return decision); ZIRP-era attribution documented in the ADR Cadence duel RUN (experiments/challenger_realtime_brake.py + challenger_realtime.json, free Yahoo hourly OHLC 2024-03..2026-07, wick-guarded with 131 close repairs + 3,118 low clamps): realtime intra-bar braking $51,543 vs hourly $50,902 (+$641, ~+0.5%/yr) at equal maxDD -19.8%, the entire edge from ONE mid-hour trend-gate cut (lambda 0.80 ~ 12min early, zero whipsaw); marginal-cadence curve measured end-to-end: daily->hourly +$4,239, hourly->realtime +$641 (diminishing returns as pre-registered); bootstrap +0.07%/yr CI [+0.00,+0.21] P>0 63% (fragile n=1 sample, recorded); bull-window caveat printed (static 2x won the window - brakes trail strong bulls); IRX carry costs this high-rate window (mirror of the 26y +11.6% gain) Sigma-cert holdout-theater audit RUN on the champion's own selection (experiments/champion_holdout_theater.py + .json, research-log iteration 11): 81-config grid, TRAIN<2013/VAL 2013-19/TEST>=2020 touched once, 40-query hill-climb researcher under naive vs Thresholdout vs fresh-proxy regimes (24 seeds) - the champion as actually chosen beats every adaptive val-Sharpe optimizer on the untouched test window (Sharpe 1.02 vs ~0.91, growth 3.65x vs ~2.6x, $91,703 vs ~$68k full-period) and sits near the test oracle; naive reuse did NOT corrupt picks at this coarse granularity (adopt Thresholdout for fine-grained hunts); the cert's warning bit the REPORTED scores instead (+0.27/+0.59 winner's-curse inflation on noisy channels -> publish re-measured truth only); objective choice dominated holdout discipline ~10:1 Contender cook-off RUN (experiments/contender_cookoff.py + .json, research-log iteration 12, iteration-11 discipline: pre-2020 tuning only, test graded once, engine equivalence $91,703 vs $91,702): six challengers vs the champion - grid-refit $81,945, dual-momentum top5 $62,745 (best non-BTC Sharpe 0.80), dualmom+brake $90,797 at -35% DD, Moreira-Muir sigma2 $75,736 at -43% DD all LOSE on wealth; champion+10% BTC sleeve $277,980 and +IRX sink $312,092 WIN (test growth 5.74x vs 3.65x through two crypto winters) with the universe-hindsight flag stated unmissably - asset-menu survivorship cannot be cleared by backtest, only by the Phase-B live paper duel; champion stays unbeaten within its own 8-ETF universe
+- docs(agi #2775): added a **ten-faculty cognitive-profile companion view** to `docs/AGI-CONVERGENCE-BLUEPRINT.md`. The blueprint's Observe→…→Converge structure is a *process* decomposition; Burnell et al.'s taxonomy (arXiv:2605.28405, canon [07]) is an orthogonal *capability* decomposition, so faculties with no loop stage (attention = UNMEASURED, social cognition = CEDED) were invisible in the otherwise-rigorous honest-assessment section. The new section scores v1.10 by faculty (OWNED / RENTED / CEDED / UNMEASURED / partial) mapped to the blueprint's existing `RENTED`/`OURS`/`GAP` characterizations, puts the deliberate **cessions** on the record (speech generation, motor control, audio perception, social cognition), restates the one OWNED faculty — **metacognition** — in externally-defined vocabulary (calibration↔decision journal, error-monitoring↔drift canaries, source-judgments↔convergence records, limits-knowledge↔honesty probe, inhibitory-control↔Σ_θ gate), and records the **moat-is-a-lead** finding (DeepMind is building held-out metacognition evals, so validation must parallelize). Strategy item 4 and the trap paragraph amended accordingly; frontmatter `updated:` bumped to 2026-07-21.
+- docs(canon #2774): adopted the strongest external AGI-measurement standards into `docs/RESEARCH-CANON.md` **[07] LANTERN-VERIFY** as the yardstick for the Verify/Converge discipline. New "AGI-scope capability measurement" entry covers **Burnell et al., *Measuring Progress Toward AGI: A Cognitive Framework*** (Google DeepMind, arXiv:2605.28405 — full-text read; §3/§4.1/§4.3 verified): the ten-faculty cognitive taxonomy, the three-stage held-out-tasks → human-baselines → cognitive-profiles protocol, §4.3's "score the system *with* its tools" (legitimizing the rent-capability/own-grounding strategy), §4.1's metacognition-as-largest-coverage-gap (the faculty our calibration/drift-canary/convergence-record/honesty-probe discipline occupies), and §4.3's tool-contamination warning (the named #2322 groundedness-noise class). Plus the companion **Hendrycks et al., *A Definition of AGI*** (arXiv:2510.18212 — abstract-verified): the ten-domain Cattell–Horn–Carroll framework, jagged profiles, and long-term-memory-storage as the critical frontier deficit. Read-status annotated honestly per the no-ID-cited-unread rule; canon Last-Updated bumped. The blueprint companion cognitive-profile view remains tracked in #2775.
+- External CSF benchmarks on real competitor tests (`experiments/csf_external_bench.py` + results JSON, registered in `docs/BENCHMARKS.md`): on the **Silesia corpus** (industry-standard, 212 MB, external mirror) **CSF-Omni places FIRST at 4.460×**, beating raw xz/lzma-9e (4.374×), brotli-11 (4.211×) and zstd-19+LDM (4.007×) with every round-trip verified — the per-file best-fit envelope beating any single codec across a heterogeneous corpus, exactly omni's design claim (our zstd-19 figure matches the publicly known Silesia number, anchoring the harness). On the **AITDCC-2026 public corpus** (the 2026 lossless-compression challenge's own 8-file set) **CSF-Omni again places FIRST at 1.884×** vs brotli-11 1.866×, xz 1.848×, zstd-19 1.787× (+11.7% over the gzip baseline its Weissman score uses) — flipping the registry's AITDCC row from Planned to Partial (hidden-test submission not made; CM-class heavyweights not in panel; omni encode ~0.2–0.4 MB/s = cold tier, stated). Honest nuance measured: solid concatenation slightly *hurts* on type-mixed corpora (heterogeneous neighbors dilute context) — its +18–31% wins belong to homogeneous small-file sets.
+- CSF **generative members** (format v0.9): archive entries defined by a safe generator spec instead of stored bytes — closed registry (`zeros`, `repeat`, `sha256-ctr` counter-mode DRBG; no eval, 1 GiB guard), materialized on read and verified against the recorded sha256 (*observation = verified materialization*). Measured: a 16 MiB lawful stream + siblings in a ~3.5 KB archive — a description-length win for recipe-bearing data, explicitly not an entropy claim. 4 new tests (67 csf-suite green). Spec §2.2.2.
+- `docs/research/2026-07-21-csf-cosmological-frontier.md`: the honest frontier map for the "observer slice of the universe / compress the Library of Congress" vision — defines the CSF frontier as a Pareto surface with today's measured tiers, translates the vision into the three lawful programs (F1b slice-addressable generators with Merkle partial integrity; F1c version-pinned scientific generators, anchored in SZ3/zfp cosmology practice at 300–3,000×; F2 FastCDC corpus dedup; F3 amortized neural cold tier — where the E1 model-accounting kill mathematically flips past ~100 GB, verified LoC scale: 21 PB / 914M files), each with a pre-stated kill criterion. Local arXiv corpus checked as asked: no compression tranche exists (harvest action filed); geometry-as-compression stays permanently closed at every scale.
+- CSF `read_slice(archive, path, offset, length)` (F1b, epic #2799): read a window of one member without materializing the rest — generative members at **O(window)** cost (`sha256-ctr` computes only covering blocks; a 100 KB slice costs the same whether the member is 16 MiB or 1 GiB), solid archives decompress only the covering frame(s), store slices directly. Exported from the `csf` facade; spec §2.2.3.
+- CSF **framed solid** (`solid_frame_mb=N` / `--solid-frame-mb`): the solid stream is cut into ~N MiB frames at member boundaries, so single-member reads decompress one frame instead of the whole stream. Measured at 7 MB / 1 MiB frames: **+18.5% over per-file** (framing cost ≈ +6% of full-solid bytes at that scale, ≈0% when the corpus fits one frame) and **4.3× faster single-member reads** (3.4 ms vs 14.6 ms warmed median) — a locality gap that grows linearly with corpus size. Members provably lie in exactly one frame (tested). 4 new tests; csf suites 72 green.
+- CSF-Pack **solid mode** (`solid=True` / CLI `--solid`, format v0.9): one compressed stream over the concatenation of all members for cold archives — cross-file redundancy reaches the coder directly instead of being approximated by a trained dictionary. Measured through the real pack API, unpack-verified (`experiments/csf_solid_bench.py`): **+18.4–30.8% over per-file zstd-19** on real sets (src/csf py, docs/research md, changelog fragments), with `solid + codec="omni"` adding a further **+6.4–9.3%** as the max-ratio cold tier; the `use_dict` path measured net-negative on small sets (its stored dictionary outweighs its savings) and is subsumed/ignored under solid. Per-file sha256 + footer integrity unchanged; solid archives stamp v0.9 so pre-solid readers refuse them cleanly; readers accept 0.8 and 0.9; 5 new tests (pack/col/omni suites 42+ green). Trade-off by design: single-member reads decompress the whole stream — hot/random-access archives keep the per-file default. Also probed and closed this session: sort-before-compress (reversible row permutation) loses everywhere once permutation overhead is counted — zstd's window already sees cross-line redundancy regardless of order.
+- process(#2808): documented a lightweight **issue-claim convention** in `AGENTS.md` (under Multi-Contributor Workstream Rule). With no open-PR cap, concurrent lanes twice double-built the same issue in one day (#2774/#2775 and #2805), paying a merge/reconcile tax. The convention: before starting an issue, check it isn't already assigned / `claimed`-labeled / referenced by an open PR; when starting, self-assign (or add a `claimed` label) **and** comment naming your branch; the claim releases when the PR merges or you unassign. Enforcement stays soft (a `/refinement` pass flags double-claims; the pr-watcher can warn on two open PRs for one issue) — the chat-lane equivalent of the autowork pipeline's server-side per-issue claim files. No new infra.
+- **CSF-Omni cross-domain transforms** — answering "why are we still losing?" by borrowing from adjacent compression domains rather than adding a slow general codec. A threaded, incremental panel probe (`experiments/omni_crossdomain_probe.py`) over Silesia + AITDCC found **5 of 13 files where a domain pre-pass beats the prior per-file panel best**, all shipped as omni extensions (codec id 9 `lzma-bcjx86`, transforms 3/4/5 `shuf2/4/8`):
+-   - **BCJ x86 branch filter** (executable-compression domain — xz/UPX): rewrites x86 call/jump relative targets to absolute so the LZ matcher sees the repetition. Wins Silesia **ooffice +16.45%** and AITDCC **H (ELF) +3.42%** over lzma.
+-   - **Byte-shuffle / SoA planes** (scientific-array domain — HDF5/Blosc): splits fixed-width records into byte planes. Wins AITDCC **E +7.70%** (stride 4, +zstd — the *fast* codec beating brotli), **G +2.41%** (stride 8), **F +1.01%** (stride 2) — numeric arrays brotli/bz2 could not decorrelate.
+-   - Aggregate: **−7.5% on those 5 files, +0.833% overall omni-max ratio** on the combined corpus; the winning stride recovers each file's record width (2/4/8).
+-   - Placed in `max`/`exhaustive` only (they cost a pass on text/hash data where they never win); the fast `balanced` default is unchanged. Every tier stays lossless + deterministic + self-describing; all prior blobs still decode. Honest scope recorded: no win on already-optimal text/hash files, and this beats the *general codecs* we ship against, not the ~1000×-slower context-mixing frontier (cmix/nncp). 82 CSF tests green (6 new). Dominated-and-rejected in the same probe: BCJ on mixed archives (mozilla), shuffle on high-entropy floats (sao) and BWT-friendly images (mr/x-ray/osdb) — bz2/lzma already win those.
+- **CSF-Omni research-borrowed transforms** — tested two documented lossless numeric techniques against the byte-shuffle/BCJ already shipped (harness `experiments/omni_bitshuffle_probe.py`, every candidate round-trip verified):
+-   - **SPDP shuffle→delta chain** (Claggett & Burtscher, *SPDP*): shipped as composite transforms `shuf2/4/8+delta` (ids 6/7/8), **exhaustive-tier only** — measured **Silesia x-ray +0.85%** over bz2 on 16-bit image data (`shuf2+delta+lzma-9`). A small but real incremental gain on a genuine file class (medical/sensor images).
+-   - **Bitshuffle** (Masui et al. 2015, [arXiv:1503.00638](https://arxiv.org/pdf/1503.00638), the bit-level generalization of byte-shuffle) — **tested and DROPPED: 0 wins across 8 numeric/binary files** (top-3 contender on 4, beat nothing). Honest reason recorded: bitshuffle needs *smooth/correlated* arrays (CHIME radio-telescope data → 28% of original), while this corpus's numeric files are either byte-aligned (byte-shuffle already wins) or high-entropy uncorrelated floats like `sao` (no decorrelation helps — bitshuffle was 41% *worse* there). Data-dependence documented in FCBench ([arXiv:2312.10301](https://arxiv.org/pdf/2312.10301)). Not shipped; the probe is committed so the door stays closed with evidence.
+-   - Every tier stays lossless + deterministic + self-describing; all prior blobs decode; transform ids still fit the method nibble. 52 omni/col/csf tests green (3 new).
+- oracle(active loop): the fifth move — **ACT-TO-KNOW** — built and run, the first working brick of
+-   the ceiling-break the Oracle design / collapse-certificate Part IV describe. Passive grounding
+-   (inference from a fixed corpus) ceilings at the ideal inductive predictor; active grounding
+-   manufactures a fact no corpus held by *executing an action and reading reality's answer*.
+-   `experiments/oracle_active_loop.py` (unit-tested — `tests/test_oracle_active_loop.py`, 7 passed)
+-   runs the loop on the cheapest, most reversible surface the design mandates first — local code
+-   execution (no money, undoable; money/irreversible surfaces stay behind the authority gates). It
+-   poses a question, records the best inference-only belief, executes, and files a grounded record
+-   classified `pin` / `confirmed` / `ceiling_break`. First run: **5 corpus-absent facts manufactured
+-   by action** (current git SHA, live file counts, a computed hash, current doc state — each provably
+-   outside any fixed corpus) plus one `pin` named and not bluffed (`data/oracle/active-loop-runs.jsonl`).
+-   **Honest scope:** proves the *mechanism* on a real surface; does not prove the loop beats a
+-   frontier model (the passive baseline is a frozen heuristic) — that model-in-the-loop run, and
+-   value-of-information experiment selection, are the tracked next rungs. Certificate §10.2 + audit
+-   table updated; Oracle design §5 GAP-5 upgraded to SEED-BUILT.
+- Owned-math conjecture slate (`docs/research/2026-07-21-owned-math-conjectures.md`, issues #2786–#2791): six theorem-shaped claims built only from objects the project owns (the both-class ledger, the instrumented loop, the dilation field), each with a pre-stated kill criterion and a **first test executed the same day** (`experiments/owned_math_m{1_m2,3,4}*.py` + results). Day-one verdicts: M4 (Kreiss-inflated canary thresholds) **supported** — naive monitor false-alarms 100% on healthy non-normal transients vs 0% inflated, detection kept; M3 (two-canary completeness) **refuted as stated** — 27/45 ungrounded cells silent — and pivoted to an indistinguishability lemma whose corollary makes the #1012 hard re-grounding cadence *mathematically necessary*; M1 terms measured on the real ledger (free-confidence mass 20.8%, zero high-confidence unanchored — the clamp holds); M2 staleness half-life 48–337h (instrumentation-limited, derived T\* bracket contains the shipped 30-min tick); M5 derived — the dilation heuristic's cutoff and G12 collapse-deflation both fall out of one KKT water-filling frame, with a linear-vs-log breadth mismatch flagged for A/B (IP-gated per the register §6); M6 stated. Two v1 instrument-circularity bugs kept as findings.
+- chat(#2757): **structured-output mode** for `POST /api/dream/chat`. Pass a JSON Schema as `responseSchema` in the body and the reply is locked to that shape: the model is steered with a schema hint, its JSON is extracted and validated against the schema, and one repair round-trip is issued if it doesn't conform. The validated object comes back as `result.structured = { ok, value, errors }` and, on success, `result.reply` is canonicalised to clean fence-free JSON. Provider-agnostic (rides whatever provider the normal path selects — no transport changes), and a strict opt-in: with no `responseSchema` (or a malformed one) the endpoint behaves exactly as before. The Σ₀ prose-hedging verify pass is skipped under a schema so it can't break the JSON. New reusable core in `lib/structured-output.js` (extract → validate → repair; hand-rolled recursive JSON-Schema validator, no new dependency). Covered by `test/structured-output.test.js` (29 core cases) and `test/structured-output-route.test.js` (5 route-wiring cases). Streaming (`/api/dream/stream`) structured output remains a follow-up.
+- chat-eval(#2777): **per-faculty tool gating** for capability evals. Burnell et al. (arXiv:2605.28405 §4.3) — *"if the system can simply search the internet … we are no longer measuring the system's memory, only its ability to search"* (the named #2322 groundedness-noise class). `runTool` now honors a gate set — the env `CHAT_EVAL_GATED_TOOLS` (comma/space-separated) union `ctx.gatedTools` — and **denies each gated tool before it executes**, returning `reason_code: "tool_gated"` and logging the denial so a run record shows exactly which tools were gated. Case-insensitive; unset ⇒ no gating (normal runs unaffected). Added a "Tool gating — measure the faculty, not the tool" section to `docs/CHAT-EVAL-RECIPE.md` mapping each faculty/stage under test → tools to disable (memory ⇒ web off; closed-context reasoning ⇒ web + retrieval off), and documented the var in `.env.example`. Covered by `apps/lantern-garage/test/tool-gating.test.js`. (The acceptance's closed-context eval **re-run** with gating recorded is the validation step — it needs a served model, so it's the follow-up; the mechanism + recipe land here.)
+- chat(#2805): **plain-language trust chip for non-operator users.** #2332 correctly hid the raw Σ₀ council chips (seam-open/pin/refuted jargon reads as an error to consumers) — but that left the product knowing more about its own reliability than it told the person deciding whether to trust the answer. For non-operators, the non-healthy council verdicts now render as a subtle, plain-language chip beside the reply — `seam_open` → "⚠ unverified — worth double-checking", `refuted` → "✗ failed a live check (see output)" (with a "show what failed" disclosure of the failing check output), `pin` → "? no verifiable answer exists" — while `grounded` (the healthy case) stays quiet. The operator view (`isSigma0OperatorView()`) is unchanged, so #2332 is respected: this is translation, not jargon exposure. Frontend-only (`dream-chat-ui.js`); the verdict data was already on the message dataset. Verified in the dev preview across all four verdicts (screenshot).
+- skill(`/bandits`): a new invocable skill that chases the convergence loop's highest-value open
+-   uncertainties. It treats each unresolved question/PR/GAP/unverified-claim/planned-benchmark as a
+-   bandit *arm*, scores them by value-of-information per cost (the `oracle_voi_select` discipline,
+-   PR #2821), pulls the top **cheap and reversible** one by taking a real resolving action, records
+-   what reality answered as a grounded fact, and reports what's next by value. It is the operational
+-   form of the loop's directed-exploration leg — the *steering* that sits on the anti-collapse
+-   *no-regret* floor (certificate §10 / Oracle design §7). Honesty guards are built into the skill:
+-   never bluff a pin (a structurally-unresolvable unknown is named, not guessed), claim only what the
+-   action resolved, stage pulls by irreversibility (money/irreversible surfaces recommended + gated),
+-   no "solved" (the bandit is not solvable for an open-ended loop — the promise is a valuable unknown
+-   *closed*, and the next named), and enumerate arms from the real system, never imagined. Mechanism
+-   is established (Howard 1966 / Lindley 1956 / Krause–Guestrin); no novelty claimed.
+- **CSF-Converge — a designed compression mechanism** (`docs/research/2026-07-22-csf-converge-compression-mechanism.md`): a retrieval-anchored, surprise-routed tier ladder that synthesizes the cross-domain transforms *and* the project's own research into one compressor built to use two assets no generic codec has — a corpus-wide retrieval index and a resident predictive model. Tiers: T0 predictive transform routing (BCJ / shuffle / Col), T∞ generative members (shipped), **T1 retrieval-keyed delta** (the dust principle made global — anchor each record to its most-similar prior record across the whole corpus, not a byte window), T2 shape-keyed columnar (shipped), T3 omni best-fit floor (shipped), T4 grounded residual coding (resident model as an amortized arithmetic coder, cold-only), with the surprise/dilation field as the router. Unifies the scattered #1593–1596 techniques into one mechanism; novelty is the composition (defensive-publication grade), each tier cited to prior art. **Load-bearing tier measured (C2, `experiments/csf_converge_rkd_probe.py`, round-trip verified):** RKD loses to solid+omni by 12.6–13.4% on the current 1–2 MB ledgers — the kill criterion firing *for the data, not the law*, because the ledgers fit entirely inside zstd's window; RKD is a scale tier whose real test is a corpus beyond the LDM window. Honest verdict: the current-scale wins are the shipped tiers; RKD/GRC pay only at scale/cold.
+- **CSF patent prior-art & freedom-to-operate review** (`docs/research/2026-07-22-csf-patent-prior-art.md`): a live patent search on every shipped CSF technique, done independently of the (empty) worldwide patent corpus so it re-verifies from linked records. Finding: **named prior art or an open standard for all of it** — best-fit codec selection (US8111704/US6804238/US5953503), seed/regeneration storage (US20040267773/US11967975), byte-shuffle (HDF5/Blosc), BCJ filters (xz), and framed random-access archives (US20120109909/US9503123 + the zstd seekable format) — which **confirms and grounds** the IP register's existing LOW-novelty grade for CSF. Two real gains, neither a patent: **freedom-to-operate is clean** (the blocking-looking patents are packet-header-specific or term-expired), and one thin composition sliver (integrity-checked container mixing best-fit-compressed + verified-generative members) routed to **defensive publication**, not a filing. Register §4.7 now cites this as the CSF prior-art record.
+- research(#2833): **measured** the load-bearing claim of the self-triggered Oracle/Spiral amendment (#2830) — *does the loop's decay rate `λ̂` (+ `ρ(J)`) predict the ADR-0012 door?* New harness `experiments/oracle_spiral/measure_decay_predicts_door.py` runs the real Ouro native loop (`ByteDance/Ouro-1.4B`, `loop_lm._truncated_forward`) over a 21-prompt set and logs per loop-step `r_t`, `λ̂`, `ρ(J)`/`‖J‖₂` (STARS JSRR certificate), the trained Q-exit + convergence doors, and the stability verdict; the pure prediction/decision core `experiments/oracle_spiral/decay_prediction.py` is unit-tested on synthetic trajectories (`test_decay_prediction.py`). **Result: NOT predictive** — on Ouro-1.4B (R4) the loop plateaus (`ρ(J)>1` and JSRR-unstable in **21/21**, residual never below 0.24 vs ε=0.05), so there is *no Converge-door crossing to forecast*; per the decision rule the self-triggered convergence schedule is not earned and the amendment degrades to fixed-cadence routing (recorded in `docs/research/2026-07-22-self-triggered-verification-oracle-spiral.md` → *Measured result*). Honest confound: R4 is too shallow (3 residual ratios) to fully power the test — the doc calls for a deeper-R re-run before the graft is finally kept or dropped. Raw data: `data/oracle/decay-predicts-door.jsonl`. A MEASURED answer where there was a design claim.
+- ci(#2811): **docs-drift gate** — the mirror of the sprawl tripwire for *removed/renamed* surfaces. `scripts/check-docs-drift.mjs` scans the four canonical entry docs (README, CLAUDE.md, AGENTS.md, QUICKSTART.md) and fails when a `public/*.html` reference points at a page that no longer exists or is only a redirect stub, exempting lines explicitly marked as legacy (mention `legacy`/`redirect`/`renamed`/…, or an inline `<!-- drift-ok -->`). Wired into `pr-gates.yml` (`Markdown link integrity` job) beside the relative-link check, with `apps/lantern-garage/test/docs-drift-gate.test.js` validating the flag/exempt logic. Motivated by the chat.html rename (#2751), which left eleven stale `dream-chat.html` references across those docs for a week.
+- sigma0(#2859): **serve-from-ledger path + answer-stability canary** — the deterministic-from-outside directive's first landing. `lib/ledger-serve.js` maps an EXACT-normalized question to its converged ConvergenceRecords (confidence ≥ 0.8, never refuted/corrected, per-claim dedupe, byte-stable ordering) and returns the claims verbatim + provenance + content hashes; a miss is a miss (no fuzzy hits — this deliberately honors the stream-chat ~L2032 #1778 scar by caching MODEL-GENERATED converged answers, never doc chunks). `lib/answer-stability-canary.js` + `scripts/answer_stability_canary.js` (cron-ready, nonzero exit on alarm) re-ask the canonical set in `data/ledger/canary-questions.json` and classify per question: stable / changed-with-evidence-receipt / **unstable (answer moved with NO evidence delta — the M1 violation, drift alarm)** / coverage-lost, appending runs to `data/ledger/stability-canary.jsonl` so determinism is a measured number, not a vibe. Chat wiring is intentionally a follow-up reviewed change. 11 zero-dep tests in `test/ledger-serve.test.js`.
+- oracle(convergence loop): **VoI steering** — the Converge stage's directed-exploration leg, the
+-   precise hole the bandit analysis named. The active loop (ACT-TO-KNOW) manufactures corpus-absent
+-   facts but ran every candidate blindly; `experiments/oracle_voi_select.py` (unit-tested,
+-   `tests/test_oracle_voi_select.py` 7 passed) adds budgeted greedy **value-of-information**
+-   selection — run the highest-VoI experiments first, within a cost budget, never on pins. Its run
+-   ranks corpus-absent facts (VoI 1.0, only knowable by acting) above obvious facts inference already
+-   knows (`2+2==4`, VoI ~0.01) and excludes the pin (VoI 0), capturing 3.00/5.06 available VoI under
+-   a budget of 3. This is the **bandit's steering** on top of the anti-collapse **no-regret floor**
+-   (persistent excitation = never get stuck): the loop now explores *with direction*. Mechanism is
+-   established — value of information (Howard 1966), optimal experimental design (Lindley 1956),
+-   submodular greedy (1−1/e) (Krause–Guestrin) — **no novelty claimed**. Honest scope: the VoI is a
+-   heuristic prior-entropy proxy, not a computed Bayesian posterior-entropy reduction, and
+-   submodularity is assumed not verified — so this builds the steering *structure*, not an optimality
+-   claim; a real Bayesian VoI estimate is the tracked next rung. Certificate §10.2 and Oracle design
+-   §5 updated from GAP to SEED-BUILT for VoI selection.
+- research: design amendment folding a cross-domain control graft into the **Oracle=Spiral** — [Self-triggered verification](../docs/research/2026-07-22-self-triggered-verification-oracle-spiral.md) (Status: Proposed). Makes the Oracle's **PRICE** step a *self-triggered controller*: from the reasoning loop's measured convergence dynamics (`ρ(J)`, residual decay, the surprise/groundedness canaries ADR-0012 leaves passive) it predicts the step where a Reason unit crosses the Converge door or a collapse barrier, and pays for the Fix-Rate verify / escalation-check only there — the same event-triggered-control transfer already used in the Kalshi adaptive poll (`β/σ²`), now aimed at the spiral's verifier budget. Upgrades the collapse certificate from passive diagnostic to a predictive reach-while-avoid barrier. Not a new subsystem — it drives existing primitives (PRICE, `ReasonVerdict`, spiral escalation, the escalation corpus) to make "escalation rate designed to only fall" a measured control target. Novelty is grounded against the 2026-07-22 patent cross-check (not in Google's Universal Transformers family, not in STARS, not in ADR-0012); the load-bearing claim (decay predicts the door) is falsifiable and unmeasured until #2029 runs.
+- **Spiral borrow survey → convergence records + Phase-0 runner + SSOT doc (ADR-0030).** Borrowing
+-   from open research is now grounded, not hand-waved: each candidate open **weight** or **training
+-   set** is validated as one honest ConvergenceRecord.
+-   - `scripts/spiral_borrow_records.js` — 11 borrows (SWE-Gym, SWE-rebench V2, SWE-HERO exec-verified
+-     subset, KodCode, TACO, Open-SWE-Traces, OpenCoder, DeepCoder, Qwen2.5-Coder-7B, TRM/HRM,
+-     pass-rate reward) each emitted with claim/evidence/confidence/source/`verified_by`. Only the
+-     reproduced-on-box Qwen2.5-Coder-7B is `verified`; the rest are web-grounded **candidates**, and
+-     synthesized trajectory sets are gated behind our own exec-verification before becoming VTD
+-     targets (Gekhman 2405.05904). Records land in the gitignored canonical ledger.
+-   - `experiments/spiral_phase0.js` — runs the verified spiral over real executable tasks, emits the
+-     escalation corpus (the Phase-1 VTD fuel), and self-emits a ConvergenceRecord. Default mode is a
+-     free, deterministic **mechanics** run (real exec + Fix-Rate ratchet + corpus); `--live` uses real
+-     model tiers (spend-gated). Observed: 4/6 cheap-tier sufficiency, 2/6 escalated with real
+-     `distillTarget` rows.
+-   - `docs/SIGMA0-OURO-CODER.md` — **rewritten as the single source of truth** on the owned local
+-     coder and its whole legacy: Qwen-3B QLoRA → Ouro-1.4B looped kernel → the owned PLT coder → the
+-     verified Qwen-7B default → **the Spiral** (ADR-0030). Includes the borrow evidence table, the
+-     three phases, the moat framing (the system, not a home-grown model; generalization from the
+-     verifier, not scale), and the preserved Ouro recurrent-depth kernel mechanism.
+- **spiral: Phase 0 run LIVE on-box, fully local, zero spend.** `experiments/spiral_phase0.js --live`
+-   now runs a real cascade (`cheap=qwen2.5-coder:0.5b → escalate=qwen2.5-coder:7b`) on the local
+-   Ollama daemon. Observed: **5/6 solved at 33% escalation** (4/6 cheap-tier sufficiency); the 6th
+-   (`rle`) honestly reported **unsolved** after both tiers plateaued, and the escalated rescue
+-   (`two_sum`) captured as a `distillTarget` corpus row. `SPIRAL_FRONTIER_PROVIDER=openai|gemini`
+-   escalates to a cloud tier instead. The Phase-0 ConvergenceRecord is now `verified:true` in both
+-   modes (the "harness runs end-to-end + emits a corpus" claim is confirmed by the run; the
+-   capability number is carried as a measurement, not an eval-leaderboard benchmark).
+- **spiral: Phase-0 runner takes a borrowed open benchmark (`--dataset mbpp`).** Normalizes
+-   `data/eval/mbpp-basic.jsonl` (`checks` → per-test Python `assert`s) into the spiral task schema.
+-   Fully-local run (0.5B → 7B) solved **18/18 at 6% escalation** (17/18 cheap-tier sufficiency);
+-   MBPP-basic is a *basic* curated set, so this is honestly a sufficiency demonstration on easy open
+-   problems, not a hard-task claim. Also fixed a misleading tier label (a cloud escalate no longer
+-   prints a qwen model name).
+- **The Spiral — a verified-cascade convergence loop (ADR-0030, Phase 0).** The owned local
+-   reasoning core, built as the CLAUDE.md loop run on ONE problem: each turn is a verified cascade —
+-   the cheap/owned tier proposes a step, a **real bounded exec-test verifier** gates it by **Fix Rate**
+-   (fraction of failing tests newly passed, minus a regression penalty), and only on a stall does it
+-   **escalate to a frontier tier inheriting the accumulated progress**. A step commits to growing
+-   verified memory only when reality ratchets it (the anti-memorization gate); the loop halts on
+-   solved / honest-can't / a turn cap, and emits an **escalation corpus** (each frontier rescue is a
+-   Verified-Trace-Distillation target). No new weights — it reassembles the shipped live cascade
+-   (#2800), the constraint-aware cheap-tier picker (#2814), and the verified ledger (#2797).
+-   - `apps/lantern-garage/lib/spiral-fix-rate.js` — the M4 ratchet metric (SWE-Shepherd-grounded), pure.
+-   - `apps/lantern-garage/lib/spiral-harness.js` — the loop + per-turn cascade + escalation-corpus emit.
+-   - `apps/lantern-garage/lib/spiral-tiers.js` — real exec verifier + injectable model tiers (via the
+-     provider-agnostic `verify-llm` legs; no chat-loop recursion).
+-   - `apps/lantern-garage/lib/exec-verify.js` — added a non-blocking `verifyExecAsync` twin so the
+-     verifier never freezes the server event loop.
+-   - **Chat surface:** a `spiral_solve` operator tool in the chat tool-runner — a user drives a spiral on
+-     a tested coding task from dream-chat and watches it converge; returns the verified solution, the
+-     transcript, and the escalation rate. Honest scope: verifiable code/math on the smallest hardware;
+-     if no interpreter or no tests are present it says so rather than guessing.
+-   - Design of record: `docs/research/2026-07-22-spiral-verified-cascade-design.md`. Tests:
+-     `npm run test:spiral --prefix apps/lantern-garage` (24 cases, incl. real-sandbox end-to-end).
+- **spiral: TACO-scale corpus path + LlamaFactory adoption (founder-directed borrows).** License
+-   triage first (records `cr-mrwclxc3` + amendment `cr-mrwcmob0`): KodCode's *dataset* is
+-   CC BY-NC 4.0 — usable for research now (unisona is not commercial yet), but NC-trained weights
+-   get tagged `nc-contaminated`; the Apache KodCode *pipeline* is the clean borrow. **TACO** is the
+-   primary scale corpus: `scripts/fetch_taco.py` normalizes `likaixin/TACO-verified` (12,898
+-   problems with verified solutions + executable stdio tests; canonical BAAI/TACO uses a legacy
+-   loading script modern `datasets` refuses).
+- **spiral: stdio verifier mode.** `makeVerifier` now runs TACO/competitive-style
+-   `{stdin, expected}` tests — a base64-embedded Python wrapper patches stdin, captures stdout,
+-   and asserts normalized equality in the same bounded sandbox. Correct-passes/wrong-fails proven
+-   by real exec + a python-guarded unit test.
+- **spiral: honest escalation.** A cloud escalate leg now retries with backoff and falls over to
+-   the OTHER cloud legs only — if no cloud tier answers it FAILS ("") instead of silently degrading
+-   to the same local model it was called to rescue (the suspected cause of the VTD batch-2 rescue
+-   collapse, 36 → 9).
+- LlamaFactory (Apache-2.0) installing into its own venv (`D:\venvs\llamafactory`) as the Phase-1
+-   trainer going forward — native dataset **mixing** is the retention-mix fix run 2 called for.
+- **spiral: measured that retrieval-based self-improvement HURTS a 0.5B coder (→ VTD is the path).**
+-   `experiments/tiny_model_selfimprove.js` builds a verified corpus from SEEN problems and measures
+-   the tiny model (`qwen2.5-coder:0.5b`) on HELD-OUT problems, baseline vs top-k retrieved
+-   verified-solution few-shot (leakage-controlled; retrieval from SEEN only). Result on-box, zero
+-   spend: **baseline 6/6 → +retrieval 2/6** (regressed 4, rescued 0). The raw generations show the
+-   mechanism: the tiny model *copies the retrieved template's structure* (e.g. shown `min_distance`,
+-   it wrote an edit-distance-shaped answer to `longest_common_subsequence`, dropping the `+1`) —
+-   weak in-context learning at this scale means a relevant-but-different example contaminates the
+-   algorithm. Conclusion: for a model this tiny, coding capability cannot be carried in context; it
+-   must be baked into the WEIGHTS (Verified-Trace Distillation). A real caveat to the CLAUDE.md
+-   "improve via retrieval, not retraining" principle at 0.5B, with evidence.
+- **spiral: Phase-1 VTD pipeline for the tiny coder — corpus generator + QLoRA trainer + held-out
+-   eval (ADR-0030).** The measured path to a more capable tiny model is weight distillation on
+-   verified traces (retrieval was shown to *hurt* the 0.5B). End-to-end pipeline:
+-   - `scripts/fetch_mbpp.py` — normalize MBPP (500) to the spiral task schema (`{id, entry_point,
+-     prompt, tests}`), entry point parsed from the reference solution.
+-   - `experiments/spiral_gen_traces.js` — run the verified cascade (`qwen2.5-coder:0.5b` → cloud
+-     escalate) over problems and emit **only exec-verified** `{prompt → solution}` traces; frontier
+-     rescues are flagged as the distill targets (the hard tail the tiny model can't yet do).
+-   - `scripts/train_qlora_qwen_coder.py` — QLoRA-VTD fine-tune Qwen2.5-Coder-0.5B on the corpus,
+-     using the model's **native chat template** (fair base-vs-adapter eval), completion-only loss,
+-     bf16 + 4-bit nf4, val-split best-checkpoint selection + overfit tripwire — on the local RTX
+-     3070 (`.venv-train`, torch cu121).
+-   - `scripts/eval_qwen_coder.py` — base vs base+adapter pass@1 on a **held-out** MBPP slice
+-     (never in training), exec-verified, same template + name tolerance.
+-   - `lib/spiral-tiers.js`: the name-tolerance shim now also covers Python (single-defined-function
+-     fallback), so MBPP's arbitrary function names don't undercount correct solutions.
+-   - **Run 1 result (measured, honest negative):** 63 traces → QLoRA (6 epochs, r=16, lr 2e-4) →
+-     held-out MBPP [400–450): base **21/50 (42%)** → +VTD **15/50 (30%)**, delta **−6** (ledger
+-     `cr-mrvvxsuc`). At 55 train rows the corpus is memorized and the update damages instruct
+-     behavior — dose, not mechanism. Next iteration: corpus scale (remaining MBPP generating) +
+-     gentler update (lr ~5e-5, ≤3 epochs, r=8).
+-   - **Run 2 (dose-response confirmed):** 204 traces + gentle config (lr 5e-5, 3 epochs, r=8) →
+-     held-out delta **−6 → ±0** (21/50 both arms; 3 genuine fixes, 3 regressions; ledger
+-     `cr-mrvxt1li`). Damage eliminated; the crossover to a net lift needs order-of-magnitude more
+-     traces — next corpus source is the borrowed verifiable sets (KodCode/TACO) + a retention mix.
+- research: **worldwide-patent grounding** — a local BM25 corpus of patents (harvested offline from EPO Open Patent Services, the only free worldwide API) that folds into the one research loop and backs a new `patent_search` chat tool. Answers prior-art / freedom-to-operate / patent-landscape / "who holds the patent on X" questions with a citable publication number + URL for every claim. Built as a near-exact twin of the arXiv corpus (`lib/patent-index.js` BM25 retrieval + `scripts/patent_harvest.py` + `scripts/patent_build_index.py`), self-gated to patent/IP intent, and fail-safe (a missing corpus never blocks chat). Worldwide coverage is bibliographic + abstract across 90+ offices; full text is free only for EP/WO/US. Requires a free EPO OPS key (see [docs/PATENT-CORPUS.md](../docs/PATENT-CORPUS.md)); retrieval, index-build, fold-in, and the tool are verified offline against a fixture corpus.
+- **Custom instructions for Unisona** (Settings → General → "Instructions for Unisona"): a textarea where you tell the assistant how to behave — tone, format, what you're working on — and it **keeps them in mind across all your chats**. Stored on your profile (`preferences.instructions`, ≤2000 chars) and injected into the chat's system prompt for every real turn, resolved from the SESSION user (never the request body). Skipped for internal one-shot modes (reviews etc.), clipped so a huge paste can't crowd the base prompt, and explicitly subordinate to safety, honesty, and the assistant's core identity. Verified end-to-end live: with the instruction "begin every reply with BANANA" saved, a fresh chat reply started with **"BANANA"** — the assistant honored it.
+- **Paper-trading contest** (#2552) — a public leaderboard page (`/contest.html`) surfacing the existing `champion-contest` engine: any signed-in user (Free/Pro/Pilot) can **join**, get a virtual paper book at a fixed starting equity, and see their **live rank** by return %; anyone can watch the board (public read). Snapshots starting equity on join, marks to real prices on every read, one book per user. Strengthens **Act** (paper) + **Verify** (measured, ranked). Fixed three things that blocked it from working as designed: **(1)** the contest endpoints (`/api/trading/champion/contest*`) sat behind the Pro-only "trade" entitlement in `server.js` `tradeApiGuard`, so Free users couldn't join and guests couldn't watch — now exempted (leaderboard public; join/stop sign-in-gated inside `champion.js`, all tiers); **(2)** contest books applied the operator brake's leverage (`gross` up to 2×) when buying but `markBook` valued the whole position as equity without booking the borrowed half, showing every fresh book at an absurd **+100%** — contest books are now clamped to ≤1× (unleveraged), so a fresh book marks at exactly its starting equity (0%) and returns reflect real price movement; **(3)** `/contest.html` added to both `PUBLIC_PAGES` (server) and `auth-gate.js`'s `PUBLIC` list (client) so guests aren't bounced to sign-in, plus a "Contest" nav link. Verified live: page served 200 public, leaderboard endpoint public, Free-tier join succeeds, fresh book = $100k/0%; `champion-contest`/`champion-book` tests green. (Traction wiring — counting participants as active — is a noted follow-up.)
+- Settings → Billing now shows the full in-app billing surface from the design (Payment · Invoices · Cancellation), for paid users. Three new Stripe-backed endpoints, all scoped to the caller's OWN Stripe customer and auto-gated to `503 billing_not_configured` when Stripe is off: **`GET /api/billing/payment-method`** (card brand + last4 + expiry, read-only — editing stays in the Stripe portal for PCI), **`GET /api/billing/invoices`** (last 12: date, total, status, hosted-invoice link), **`POST /api/billing/cancel`** (cancel-at-period-end — the user keeps paid access until the period closes, then the `subscription.updated` webhook drops the role). The Billing panel renders a Payment row (card + Update→portal), an Invoices table (Date / Total / Status / View), and a Cancellation row (Cancel, with confirm) — degrading to "Billing not configured" when Stripe is off. Verified: all three endpoints return `billing_not_configured` (503) on an unconfigured box and the panel renders the sections gracefully; the live Stripe flow needs a real test customer to exercise end-to-end.
+- docs/adr: **ADR-0033 — the Apex trader** (design only). The operator-requested
+-   "maximize profitability at the highest **acceptable** risk" trader, designed from this
+-   session's measured results. Core argument: for an overnight book the binding risk is
+-   the **un-stoppable overnight gap**, not variance — Gaussian/Kelly sizing (~47×) is
+-   rejected and acceptability is defined by a stress bound (a −6% gap must cost ≤ ~20%
+-   equity ⇒ **hard 3× leverage cap**; the measured 5× ladder rung is explicitly rejected).
+-   Composition: SPY overnight vol-gated 3× core (measured Sharpe 2.77 / CAGR 11.3% at 3×)
+-   + QQQ calm-night complement (regimes fire on different nights) + T-bill carry on idle
+-   equity + a **measurement-gated** convex OTM-options sleeve (arms only on the
+-   options-shadow ledger's positive verdict). Brake-scaled leverage, consecutive-loss and
+-   monthly circuit breakers, kill-file honored; 3× ETFs / single stocks / the unproven
+-   intraday day-trader excluded (dominated or no edge). Paper-first; real money remains
+-   behind ADR-0028 + ADR-0032. Indexed in `docs/adr/README.md`.
+- docs/adr: **ADR-0032 — real-money trading onboarding** (Phase 3 of the Alpaca-first
+-   work). A design-only contract for how a user safely crosses from paper to live: live
+-   keys are a **separate, explicitly-entered credential** (never an auto-promotion of
+-   paper keys), enabling live is a **multi-step opt-in** behind the existing operator
+-   double-gate (`TRADER_LIVE=1` + `TRADER_ALLOW_LIVE_ACCOUNT=1`) plus a recorded risk
+-   attestation, **manual** live orders require per-order confirmation (never one-click),
+-   **autopilot** on real money stays gated on the ADR-0028 Sharpe-CI mandate, and the
+-   assistant never places trades. **No live trading is enabled by this ADR** — it's the
+-   contract the eventual implementation must satisfy. Indexed in `docs/adr/README.md`.
+- adr(0034) **ACCEPTED** (Alex Place, in-session 2026-07-24) + **gate tooling slice 1 started the same day**: `src/sigma0/switched_gate.py` — the model-agnostic switched-system certification kit the ADR's feasibility gate requires. Per-mode contraction receipts (JSRR margin semantics), the average-dwell-time certificate (per-mode discrete Lyapunov via convergent series, conservative τ* = ⌊ln μ / ln(1/λmax)⌋+1), a cheap common-Lyapunov attempt (found ⇒ arbitrary switching certified; not-found claims nothing), and the serve-time `DwellMonitor` (dwell violations = grounds to reject a generation; router-entropy + churn as canary axes). 9 deterministic tests (`tests/test_sigma0_switched_gate.py`) pin the load-bearing physics: two individually-stable modes (ρ=0.7) provably diverge under per-step alternation and provably contract under the certified dwell — the exact reason cert §1.2.2 voids Part I for routed loops. Certifies nothing about any real MoE until measured mode Jacobians are fed in — the honest boundary.
+- trading/alpaca: **bring-your-own-keys Alpaca connect.** A user can now paste their own
+-   Alpaca **paper** API Key ID + Secret in Settings → Connections → Alpaca and be
+-   connected immediately — no OAuth (the Alpaca OAuth client is still pending activation).
+-   Keys are verified against Alpaca `/v2/account` before saving and stored AES-256-GCM
+-   encrypted per user (`lib/alpaca-credentials.js` `saveKeys`), exactly like the OAuth
+-   token and the BYOK AI-provider keys. New endpoint `POST /api/broker/alpaca/connect-keys`
+-   (paper-only; live is a later gated step). `alpaca-adapter._authFor` precedence is now
+-   **user OAuth → user keys → shared server keys**.
+- settings/trading: restored the **Active broker** switch (Auto / ⚡ Alpaca / 🔗 IBKR) in
+-   Settings → Connections, now **alongside** the Active-trader switch. It picks which
+-   connected broker the stock day-trader executes through, and only appears when **both**
+-   brokers are connected (otherwise there is no choice to make). Updates in place, backed
+-   by the existing `/api/broker/preference`. This is needed while IBKR is still connected
+-   on preview/local so the operator can flip the day-trader between Alpaca and IBKR;
+-   Champion always runs on Alpaca regardless. (The earlier standalone broker-switch PR was
+-   closed when the trader switch replaced it; this brings the control back as a companion
+-   to it rather than a replacement.)
+- research(sigma0): **depth-cascade training design** (`docs/research/2026-07-24-depth-cascade-training-design.md`) — the operator-prompted answer to the measured R2 depth plateau: attach a training signal to depth instead of accepting the plateau. Depth-conditioned VTD (shallow rung = propose, deep rung = repair-given-failing-tests, supervised by the Spiral's own verified traces), per-rung Fix-Rate credit in the RLVR stage, and the R9 contraction objective (its first implementation vehicle) so deep rungs become JSRR-certifiable instead of expansive. Five pre-registered gates including the monotone-depth kill test (curve must beat 0.10/0.22/0.22 on held-out or the bet dies), the ≥60% anchor mandate run-1 violated, and escalation-rate-only-falls as the governing number. Not a new subsystem: RC1 §6 made depth-aware; blocked behind P0 like all training.
+- adr(0034, Proposed): **MoE for the Σ₀ core — adopted as soon as feasible** (operator decision 2026-07-24). Feasibility is defined, not vibed: per-expert JSRR contraction receipts, dwell-time certification with a serve-time dwell monitor, router-entropy/churn canaries, and unchanged external verification. Until the gate exists and passes, the dense ≤3B core remains the product and cert §1.2.2 stands (no Part-I numbers for routed loops). The gate tooling moves to the front of the R lane. The depth-cascade design's "not MoE" clause is amended to MoE-compatible under ADR-0034.
+- verify+remember(#2870, #2871): **verify-then-refine + the surrogate leash** — the last two mechanism items of the kriskin cross-domain cluster. `lib/verify-then-refine.js` (Bowe Bell+Howell US20100094676A1) extends the Fix-Rate discipline from tests to arbitrary metrics: a remediation OPENS with the failing metric's before-reading (no baseline = refused as unverifiable), recovery is direction-aware and target-gated from a REAL after-reading, the only exits are `closed-recovered` / `kept-open-not-recovered`, and every outcome lands in the keyed append-only playbook (`data/ops/remediation-playbook.jsonl`) so the next fix of the same failure class starts from measured history. `lib/surrogate-leash.js` (UIUC US8131656B2) makes distrust the DEFAULT for any cheap stand-in signal (canary-as-filter, future PRMs, cheap-tier self-assessments): trust is earned by measured agreement with ground truth over a sliding pair window, lost on drift (agreement < floor) or staleness (observation-counted re-fit clock — the M2/EOQ tie, #2853), and an untrusted verdict means "no signal, pay for real verification." 8 zero-dep tests.
+- trading: **asymmetric-options SHADOW trader** (`lib/options-shadow.js`, loop stage:
+-   Verify). Implements the operator's thesis — buy a slightly-OTM next-day CALL at the
+-   close on Mon–Thu nights that are trend-aligned + measurable-vol, sell at the open,
+-   accepting a low (~30–40%) win rate for convex payoffs — but in **measurement-only
+-   shadow mode**: it selects a real contract from the real Alpaca options chain (free
+-   indicative feed), records real entry/exit quotes to `options-shadow.jsonl`, and
+-   reports **measured** win rate / expectancy with a Σ₀ verdict. A win rate is an
+-   outcome, not a parameter — the module never targets one, and it **refuses arming**
+-   until expectancy is measured positive over ≥30 nights (`insufficient_data` →
+-   `negative_edge — do NOT arm` / `positive_edge_candidate — needs OOS + operator
+-   approval`). Places NO orders anywhere. Endpoints: `GET /api/trading/options-shadow`
+-   (status + measured stats), `GET …/probe` (what it would trade right now — verified
+-   live: real SPY chain, correct weekend-skipping expiry, 0.25%-OTM strike, real
+-   bid/ask), `POST …/tick`. Driven by the autoscan loop (fail-soft, self-throttled to
+-   its 15:45–15:59 / 09:31–09:50 ET windows). Config: `OPTIONS_SHADOW`,
+-   `OPTIONS_SHADOW_SYMBOL/OTM_PCT/RISK_PCT/VOL_MODE`. Pure gate/strike/verdict logic
+-   covered by `test/options-shadow.test.js` (7 tests).
+- trading/options-shadow: **deep-OTM focus — strike LADDER.** The shadow now records
+-   every depth of `OPTIONS_SHADOW_LADDER` (default `0.25,0.5,1,1.5,2` % OTM) each eligible
+-   night — one real contract + real quote per leg — and `summarize()` reports expectancy
+-   **per depth**, so the deep-OTM lottery profile (~1–5% win rate, rare huge payoffs) is
+-   judged on its own measured expectancy, never its win rate. A 10y gap study found
+-   near-OTM EV clearly negative but 1.5–2% OTM *ambiguously positive on a 4–8-event tail*
+-   (spread costs halve it) — exactly what only real nightly premiums can settle. Also fixed
+-   an expiry bug: "tomorrow" was computed in UTC, so a late-evening run skipped Friday's
+-   expiry and priced weekend time value; `nextTradingDayET()` now picks the ET-correct next
+-   trading day. Live-verified: 5-leg SPY ladder with real bid/asks (741→754 strikes).
+- trading/options-shadow: **PENNY mode** (operator strategy) — each eligible night, find
+-   the **first strike whose ask ≤ 1¢** via a one-call chain snapshot, and take it **only
+-   when tonight's measured vol says the strike is reachable** (distance ≤
+-   `OPTIONS_SHADOW_PENNY_MAX_SIGMA`=3 nightly sigmas — the penny-strike distance is the
+-   market's implied-vol gauge, so this buys exactly the nights where our vol read exceeds
+-   the market's). Exit: an intraday watcher **sells the moment the bid is > 1¢**
+-   (`OPTIONS_SHADOW_PENNY_EXIT_BID`=2¢ = +100% gross), else settles at expiry (−100%).
+-   Entries priced at the ASK, exits at the BID — the honest sides of a 1¢ market. Ledger
+-   rows carry `depth:'penny'` + `sigma`/`dist_pct`, so the penny book is judged on its own
+-   measured expectancy. Live-verified: real chain snapshot picked SPY 756 (2.31% OTM) at
+-   ask $0.01.
+- trading/data: **cheap-first market-data source picks, adopted + built**
+-   (`docs/research/2026-07-25-market-data-source-picks.md`, total $0/mo): Yahoo for
+-   underlying bars (already integrated), the Alpaca **free indicative feed** for live
+-   chains/quotes (already powering the shadow), and — the new piece — **Alpaca free
+-   historical option BARS (2024-02→now)** for backtests. `scripts/options-hist-backtest.js`
+-   replays the overnight OTM ladder + penny strategy against **real traded option
+-   prices** (entry = day-T close, exit = expiry-day open; penny target = a real ≥2¢
+-   print), one multi-symbol bars call per gated night, cached under `data/options-hist/`.
+-   DoltHub's free options DB was verified live and **rejected for this use** (SPY carries
+-   only 2–6-week expirations — no next-day contracts); optionsDX/MarketData/ThetaData
+-   documented as the upgrade ladder, spend gated on measured edge.
+- ci/e2e: new `e2e-auth` job in `ci.yml` runs the hermetic Playwright auth journey (real server, token-gated test-auth, no external keys) on every PR/push and feeds the `All checks passed` gate; `release.yml` runs the same suite as an `e2e-gate` the GitHub Release now depends on.
+- ci/e2e: `e2e-greenpath.yml` — operator-triggered (workflow_dispatch) greenpath release gate (#2545): N demo accounts × signup → trade → chat → Pro, default 2-account smoke, 10 for the full first-50 bar; uploads `data/greenpath-runs.jsonl` + Playwright artifacts.
+- spiral(#2867, #2868): **contractive-escalation enforcement + whole-answer confidence surfaced in chat.** Every VERIFIED escalation must strictly advance the ratchet or the run halts honestly with `haltReason:"escalation-noncontractive"` — the ILC ρ<1 condition (US7345448B2/US8094405B1): no runaway frontier spend on a plateau (dup-skipped escalations carry no new information and stay with the loop detector; knob `escalationContract`, default on). `spiral_solve` replies now carry the **whole-answer confidence** line — the best committed candidate's test pass fraction, decoupled from where the cascade stopped (HP US20120243734A1) — completing the #2862 harness field's path to the user. 39/39 spiral tests green (2 new contract tests; the sticky-mechanics tests pin their behavior with the contract explicitly off). Closes the shipped-elsewhere pair too: #2865 (stop-on-stall + state-hash loop detection) and #2866 (pass-terminates + de-escalation) landed in PR #2862 — verified against master and closed with evidence.
+- spiral(#2869): **failure-mode cache keyed by task signature** — the RRO-servo pattern (US8094405B1): approaches that verifiably FAILED a task are repeatable error; `lib/spiral-failure-cache.js` records them append-only (`data/spiral/failure-modes.jsonl`) on unsolved halts and injects up to 4 as NEGATIVE-space avoid-constraints into every tiers prompt before the cheap tier proposes (`ctx.avoid` → `renderAvoid`). Honest boundaries by construction: verified failures only (dup-skips excluded), snippets + failing-test names only (never solutions — retrieval of solutions into tiny models is measured harmful), guidance never a hard block (the verifier stays the only judge), opt-in at the harness (`failureCache` arg; `spiral_solve` wires the real cache). 6 cache tests + 2 harness-integration tests; 47/47 across the five spiral suites.
+- spiral(#2999): **the held-out split the docs promised, shipped** — SIGMA0-OURO-CODER §2/§3 call held-out checks mandatory ("passed, including held-out checks"); the code had none, and the withdrawn anytime-counterexample measured the one regime where that bites (no-skill proposer: −3.1pp/60 turns, ~60% removed by the split). `runSpiral` gains `holdoutVerify`: selection/ratcheting stays on the visible `verify`, every COMMIT is additionally scored on tests the loop never optimizes against, the run RETURNS the holdout-best (`y`; visible-best kept as `yVisible`), `confidence` becomes the held-out pass fraction, and a visible "solved" that fails holdout does NOT halt (the transduction trap, rejected live — `holdout_reject` step event). `splitHoldout(tests, n)` in spiral-tiers holds out the last n deterministically (visible never empties); `spiral_solve` wires it automatically for ≥2 tests. 53/53 across the five spiral suites.
+- spiral(#2977): **memory cap + per-turn recall view** — the thing ADR-0030's own Negatives said breaks first on real horizons. Prompt-facing calls (tiers, answerability) now receive a deterministic recency-windowed view of committed memory (`memoryWindow`, default 4 steps; `memoryTextCap`, default 4000 chars/step with the true length receipted as `_truncated`) so a long SWE-grade episode can't saturate the cheap tier's context. The internal ratchet history and the returned `memory` stay complete, and advancing corpus rows now carry the FULL candidate `text` — the distillation record is complete even when the prompt view is truncated. `memoryWindow: 0` restores the uncapped legacy view. 49/49 across the five spiral suites (2 new tests).
+- spiral(#2975, #2976): **the SWE-repair primitives, substrate-independent first landing.** `lib/spiral-edit-format.js` kills the apply-failure class (20% of the graded SWE-Lite run): models emit SEARCH/REPLACE pairs, the search text must match the file EXACTLY and UNIQUELY before anything applies, any failure aborts the whole application with per-edit observations the loop retries on (a failed match is a verifier signal, never a committed broken patch), and the unified diff is computed by us from real before/after — never trusted from the model. `lib/hunk-bisect.js` turns the ~42 PASS_TO_PASS tests per SWE-bench instance from a final gate into a prefix ORACLE: memoized binary search localizes the first subset-breaking hunk in ≤⌈log₂H⌉+2 injected test runs, keeps the verified prefix (the ratchet), and refuses to localize on a broken baseline. Both are pure modules with injected I/O — the #2973 environment tier wires them to real repos/pytest; 9 zero-dep tests.
+- trading: **active-trader switch** (Phase 2 of the Alpaca-first work) — one connected
+-   account, one active strategy. In Settings → Connections a new **Active trader** control
+-   lets a user pick **📈 Stock trader** (signal entries + their manual buy/sell — the
+-   default) or **🏆 Champion** (the automated diversified ETF-allocation book,
+-   `lib/sigma-trader.js`, run on their OWN account). The stock-trader dashboard pill now
+-   shows the active trader and links to the switch (replacing the broker pill, since the
+-   app is Alpaca-only now).
+-   - New per-user store `lib/trader-mode.js` + `GET/POST /api/trading/mode` (+ a
+-     `trader_mode` cookie), mirroring the broker-preference store.
+-   - `lib/sigma-trader.js` `plan()` / `rebalanceNow()` now accept an optional `userId` so
+-     the Champion book can run on the user's own connected account (paper-only; DRY unless
+-     `SIGMA_ARM=1`, same governance as the standalone Sigma book). `GET/POST
+-     /api/trading/champion?mine=1` targets the current user's account.
+-   - The autopilot loop (`routes/trading.js` `_autoscanTick`) honors the mode: a
+-     'champion' user's day-trader is **paused** and the Champion rebalance runs on their
+-     account instead (throttled to ≤ once/hour). 'stock' users are unchanged.
+-   - Covered by `apps/lantern-garage/test/trader-mode.test.js`; verified on the dev server
+-     (switch flips in place, pill reflects the mode, Champion plan computed real target
+-     weights on the user's $96k paper account).
+- trading/overnight: **the overnight sleeve book** (`lib/overnight-trader.js` + `GET/POST
+-   /api/trading/overnight`) — the day-trader's measured best self, productized from the
+-   research arc's strongest results (oracle ledger `bandits-trader-*`,
+-   `downtrend-decomposition-*`): 4 trend+vol-gated long sleeves (SPY/IWM/GLD "notflat",
+-   QQQ "flat"), 2 **capitulation** longs (downtrend closing at a 20-day low → overnight
+-   gaps up, +18bp/night, t=3.5 over 30y), and a **bear-rally fade** via SH (SPY-only
+-   signal, t=−2.1). Backtested book: Sharpe 1.78, max DD −3.1% (23y, net of IBKR costs).
+-   Enters 15:45–15:59 ET Mon–Thu, exits at the next open — the auction prints the
+-   backtests measured. **Opt-in and dry by default** (`OVERNIGHT_TRADER=1` to tick,
+-   `OVERNIGHT_ARM=1` to place paper orders through the broker facade; live accounts stay
+-   behind trading-guard). Ledger `overnight-trades.jsonl`; ticked fail-soft from the
+-   autoscan loop.
+- **Options paper-trading bridge** (`OPTIONS_PAPER=1`, default off): the options
+-   shadow's nightly tickets (ladder + penny calls) are mirrored as REAL Alpaca paper
+-   option orders (limit-at-ask entries, marketable-limit exits, entry-fill lookup on
+-   close) so the expectancy ledger gains broker-verified fills. Hard-gated to the
+-   paper host — live auth is refused in code. Verified end-to-end: order accepted +
+-   canceled on account PA3KZEWVVZTP (options level 3).
+- `scripts/overnight-leverage-backtest.js` + `scripts/overnight-book-backtest.js` —
+-   drive the production engine's own exported gates; no re-implementation drift.
+- trading/ui: **the trader is now three purpose-built pages** (operator-requested split):
+-   1. **`/watch.html` (NEW — CORE "Observe")**: the tracking page — your personal
+-      watchlist, live charts, fullscreen chart, symbol search, Σ₀ signals/council. No
+-      trading anywhere on it (every BUY/SELL affordance hidden; account/positions/order
+-      UI removed; an inert `#otBg` stub keeps legacy handlers null-safe). Guest-friendly.
+-   2. **`/stock-trader.html` (repurposed — the TRADING terminal)**: account bar,
+-      positions/orders/history/advisor, the order ticket, broker/trader pill — and its
+-      sidebar is now the **🤖 AI tradelist**: the autopilot enters ONLY symbols on this
+-      user-editable list (contest-ready). Manual buy/sell still works on ANY symbol via
+-      the ticket's search. Cross-links to Watch.
+-   3. **`/options.html` (NEW — EXTENSION trading/TRADING_ENABLED)**: the options trader
+-      (shadow) with per-depth/per-rule expectancy verdicts + "what would it trade right
+-      now" probe, a live options-chain viewer, and advisory covered-call/CSP/collar
+-      proposals — all on existing endpoints; nothing places orders.
+- trading/tradelist: **watchlist ≠ tradelist.** New `lib/tradelist-store.js` +
+-   `GET/POST/DELETE /api/trading/tradelist` (mirrors the watchlist store/routes; seeds
+-   from `tradelist.seed.json` = the measured ETF basket, never from the watchlist). The
+-   scanner now covers the **union** of watchlists + tradelists (`trader-agent`), and the
+-   autoscan **autopilot filter switched from watchlist → tradelist** — the AI trades its
+-   own list; the watchlist is tracking-only. Covered by `test/tradelist-store.test.js`.
+-   Surface governance: watch=CORE Observe (loop-stage meta), options=EXTENSION → 21
+-   core / 22 ext = ratio 1.048 ≤ 1.05 cap; surface-boundary suite green. Pages
+-   registered in pages.js PUBLIC_PAGES, auth-gate PUBLIC, and site-chrome nav
+-   (Watch · Trader · Options).
+- **Capital allocator** (`lib/capital-allocator.js`, `GET /api/trading/allocator`) —
+-   one book over the trader sleeves: Kelly-lite budgets from each sleeve's OWN live
+-   ledger (evidence-shrunk, per-sleeve caps 20/60/1%, exploration floors while
+-   unproven, shared-regime damper pins the long-biased intraday sleeve to its floor
+-   in an SPY downtrend). The overnight engine now takes its allocation from the
+-   allocator unless OVERNIGHT_ALLOC_PCT explicitly pins it. Places nothing; engines'
+-   own safety gates unchanged. 5 unit tests.
+- **Manual paper options ticket** (`POST /api/trading/options/order` + the Options
+-   page): click any call/put row in the chain to load the contract, set side/qty/
+-   limit, and place YOUR OWN paper option order — the AI has no control over it.
+-   Paper-host-only in code; signed-in users (Pro capability once enforcement is on).
+-   Verified live: order accepted on the paper account and canceled cleanly.
+- `scripts/verify-exits.mjs` — pairs each logged exit decision against broker truth
+-   (order status + whether the position is actually gone). It **aborts** rather than
+-   reporting success when positions can't be read: its own first version printed a clean
+-   bill of health for 13 stalled exits purely because the API call had 302'd.
+- research(#2924, M7 public form): **the audit-starvation theorem** — a postable, self-contained note (`docs/research/2026-07-24-audit-starvation-theorem.md`) proving that confidence-gated verification (FLARE-style threshold retrieval, uncertainty sampling, agreement gates) *protects* self-reinforcing false beliefs: the belief endogenously makes any confidence-vanishing audit schedule summable (Rothschild's incomplete-learning trap, manufactured by the adversary instead of the designer). Exact worked results (stdlib-only deterministic artifact `experiments/audit_starvation_theorem.py`): threshold gates give a 7-step immortality window and **P(never caught) = 1 for born-confident beliefs at any verifier power**; proportional gates never even audit the belief with probability 0.284; the honest calibrated twin is audited 8.6× more by step 40 (audit inversion). Plus the **starve-or-spend dichotomy** (proofs note Lemma 4): every provenance-blind gate either starves (positive escape probability) or spends (unbounded audits of settled truth); per-belief paid-evidence accounting escapes both. Positioned as the theory companion to the empirically measured retrieval-state lock-in (arXiv:2606.22728); prior art named (Rothschild 1974, FLARE, semantic entropy's scoped exclusion, degenerate feedback loops).
+- research(reason): **foldback cascades** — protein folding's error-repair control flow ported to the verified cascade, with a closed-form mechanism and a pre-registered simulation (`docs/research/2026-07-24-foldback-cascades.md`, `experiments/folding_cascade_frustration.py`). Every cascade we ship escalates monotonically (cheap → re-solve the whole task at a stronger tier); folding never does — it assembles verified cooperative units (foldons), each stabilizing the next, and repairs errors by **partially unfolding back to the last stable foldon**. Theorem: a retry re-solving *m* steps survives the hidden-error draw w.p. (1−q)^m, so partial unfolding beats full restart by (1−q)^−(K−m) — exponential in the **preserved prefix**, and identically 1 when no error can hide from local verification. Measured at equal compute against a retry-matched baseline: **+0.83pp at zero frustration (the predicted null) → +39.7pp at high frustration, using half the compute**; same-tier global restart degrades *below* monotone, as the theorem predicts. The first run failed its own anti-confound gate (+2.05pp) and the retry-matched control that isolated the mechanism is recorded in the note rather than hidden. Prescription (gated on measuring the real frustration rate — instrumentation ask filed): on global-verify failure, unfold the last verified segment and escalate *that*, not the task.
+- research(v1.10): coverage-stratified probe test (P1 rung A) — **pre-registered gates FAILED**, honestly recorded: the known/unknown AUROC gap on associated claims was +0.109 (Qwen-1.5B) but only +0.045 (phi-2), and the cross-model double dissociation did not hold in both directions. Coverage remains a correlation, not a demonstrated mechanism; P1's claim reverts to correlation-grade until a stronger design lands (`experiments/v1_10_toy/coverage_stratified_probe.py`).
+- research(M7): slate entry + full note `docs/research/2026-07-24-owned-math-m7-attribution.md` with the **starvation corollary**, measured against shipped `dilation`/`groundingPolicy`: allocation is strictly decreasing in laundered confidence (D → 0.500001, the knife-edge of the `D > 0.5` fetch cutoff; G12 collapse-deflation double-starves a self-repeating laser) — the runaway suppresses its own kill switch *and* de-allocates its own audit. Completes the M3 arc: hard cadence necessary (M3), cadence + allocation without attribution not sufficient (M7). Executable artifact `experiments/owned_math_m7_composition_counterexample.js` is the first slate machine-check that drives the real code paths rather than toy instrument semantics.
+- research(#2926, M8): **the freshness index** — claim re-verification is the Age-of-Information restless bandit with a verification price. Closed-form Whittle index `W(τ) = c_e·[τ·s(τ) − S(τ−1)] − c_v` over **paid age** (M7's attribution vocabulary), verified against exact bisection to 7.8e-13 and exact policy iteration (`experiments/owned_math_m8_whittle_freshness.py`, all checks PASS). Unifications measured: M2's EOQ cadence is the index's zero-crossing (the shipped 30-min grounding tick, at the ledger's measured staleness rate, implies a verification price of ~10.8% of an error-step — the magic constant is now falsifiable economics); a binding audit budget acts as a uniform surcharge on the verification price (never selective starvation); free confidence has index weight zero (M7 closed from the optimality side). Policy contest under 1.8× contention: Whittle-on-paid-age 1.784 < EOQ-overdue 1.793 < round-robin 2.020 < expressed-confidence gate 4.470. Shipped `whittleFreshnessIndex()` in `lib/grounding-policy.js` — pure, exported, 5 unit tests, unwired (the hard tick stays the M3 floor; wiring behind `GROUNDING_PRIORITY=whittle` is specified in #2926). Docs: research note + slate §M8 + proofs-note Lemma 5; prior art adopted, not republished (Tripathi–Modiano AoI indexability, Whittle, Weber–Weiss, maintenance indices).
+- research: **the oracle-machine end-state as a threshold theorem for reasoning** (`docs/research/2026-07-24-oracle-machine-threshold-theorem-for-reasoning.md`) — places the session's measured K_c≈1/q in the deepest applicable lineage (reliable computation from unreliable components: von Neumann 1956, quantum fault-tolerance, Eigen quasispecies — one theorem in three fields). Verdict: the threshold theorem SUPPORTS AND EXTENDS the 1/q bound as its no-redundancy corner, does not supplant it; the verifier bank is the restoring organ that crosses from bounded (1/q) to unbounded reliable reasoning. Locates controlled falsehood precisely: lying/noise/dreaming is essential on the GENERATION side (Eigen's nonzero optimal mutation rate just below threshold; adversarial liars as hard-negative generators for the honesty probe) and forbidden on the VERIFICATION side (a fooled verifier = error catastrophe, measured this session as audit-starvation + the gloss trap; the defense is the activation honesty probe = arXiv:2502.03407). The asymmetry — generator lies freely, verifier never does — is the machine.
+- corpus: ingested 11 papers to `F:\arxiv-corpus` (reindexed to 115,757; 7 full-text PDFs) spanning fault-tolerance thresholds, kinetic proofreading, Eigen quasispecies, LLM deception, and synthetic-data diversity. Reading pack: `docs/research/2026-07-24-ORACLE-THRESHOLD-READING-PACK.md`.
+- research: **SOTA-for-the-box reliability architecture** (`docs/research/2026-07-24-sota-for-the-box-reliability-architecture.md`, Status: Proposed) — synthesizes the session's measured results (foldback cascades, the reasoning error threshold K_c≈1/q, the regime map, attribution/audit-starvation) with the standing program (verified cascade ADR-0030, ternary serving ADR-0026, white-box honesty v1.10, freshness index #2926) into one design whose defining property is that the 8GB box's constraint and molecular biology's error-correction method are the *same regime*: small model → high per-step error rate q → short error threshold (decompose below ~1/q) + largest foldback gain (up to 428×) + largest kinetic-proofreading gain (N cheap diverse verifiers drive q down multiplicatively). Four biological principles mapped to box-affordable implementations; performance from architecture not scale. The binding open number is the weak-verification φ̂ (#2928, mookman cloud).
+- research: **SWE-bench for open-weight models — the regression suite is a free repair oracle** (`docs/research/2026-07-24-swebench-test-bisection-open-weights.md`, `experiments/swebench_test_bisection_repair.py`). The binding open question is resolved by measurement: frustration φ̂ = 0.80 on weak-verification (GSM8K) vs 0.092 on coding+unit-tests — so SWE-bench (weak per-edit verification, moderately causal ĉ≈0.23-0.31) sits in the regime where the repair layer is live and root-seeking wins. Key realization: every SWE-bench-Verified instance ships ~42 PASS_TO_PASS regression tests that agents ignore for repair — they are a prefix oracle for **test-bisection root-localization** (apply hunks in order, bisect to the first hunk that breaks a passing test, repair only from the root). Because localization moves from model capability to test execution, a weak open model gets the causal-repair benefit without more parameters — the open-weight SWE gap is partly a harness gap. Pre-registered structure-calibrated simulation: **+16pp solve on multi-hunk instances (0.951 vs 0.788), gap widening with patch complexity (0.896 vs 0.716 at 5 hunks), Pareto-optimal on solve-vs-cost, clean single-hunk null.** Novelty positioned vs REPOT / Agentless / SWE-Fixer / Steer-Don't-Solve. NOT a leaderboard claim — the confirming real-agent run (open 7-32B on the 500, vs SWE-agent baselines) is scoped to cloud (#2929); the biggest risk (real regression-catch rate) is named.
+
+### Fixed
+- trading/alpaca: the server paper-key resolver (`alpaca-adapter._serverKeys()`) now accepts every documented spelling of the Alpaca credentials — `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` (what the trader docs and the shipped `.env` use), the official SDK names `APCA_API_KEY_ID` / `APCA_API_SECRET_KEY`, and the previous `ALPACA_API_KEY_ID` / `ALPACA_API_SECRET_KEY`. It previously read **only** the `_API_KEY_ID` / `_API_SECRET_KEY` names, so an operator who set the documented `ALPACA_API_KEY` / `ALPACA_SECRET_KEY` had their keys silently ignored: `available()` returned false, the Alpaca paper account reported **disconnected**, and the trader terminal showed **$0.00** equity/positions despite valid credentials. Covered by `apps/lantern-garage/test/alpaca-server-key-names.test.js`.
+- chat(#2753): validate tool arguments against each tool's JSON schema in `runTool` before execution — a malformed call now returns a correctable `invalid_arguments` error the model can retry from, instead of silently degrading to `{}` and a mystery empty result. Applies to every provider (shared executor).
+- dream-chat: the assistant's own reply could be dropped from the send-history when a convergence-router reply carried action chips — `renderActionChips` was *called* at finalize but never *defined*, so a ReferenceError aborted finalize before the `history.push`, and on the next turn the model "forgot what it just said" (reproduced with Gemini Flash). Implemented `renderActionChips`, and moved the assistant `history.push` to run immediately after the reply renders (guarded), so no optional decoration error can erase the turn. Also removed a broken `xenon-starship-art` tool-replay branch (bare expression, no return).
+- Completed #2535 (stale training wiring; epic #2543). Removed the `convergence-lora` dead training branch: `triggerLocalTraining()` spawned `scripts/train-convergence-lora.py` — a file that never existed — so it only ever returned a `no-op:script-missing` sentinel while the caller advertised a phantom "training" run and wedged the state machine in a `training` status nothing cleared (permanently blocking collection after the 100-pair threshold). The distilled convergence→distillation pairs are now marked as a batch ready for external/cloud training and collection keeps running; local weight training stays off-architecture per CLAUDE.md ("persistent learning, not weight modification"). Also repaired two related stale-wiring bugs the audit's Colab fix (#2675) left behind: the invalid `--resume_from` flag on every resume dispatch path (Kaggle, Paperspace bash template, Lightning) — `scripts/train-qlora-ouro.py` defines only `--resume`, so resume runs errored `unrecognized arguments` — and the Paperspace `--data` pointing at the never-existent `models/lantern-sigma0-coder/training-data.jsonl`, now the committed `data/eval/distill.jsonl` (the trainer's own default).
+- `scripts/repair_convergence_records.py` — retroactively makes ConvergenceRecords honest. The legacy research-loop store held 68 records marked `verified:True` on notes that literally read "single-source; unverified" — the confidence-laundering the collapse cert warns about. The repair demotes single-source/unverified records to `verified:false` (kept as open claims, not deleted), keeps genuine multi-source-corroborated ones, caps confidence, lifts source domains out of the notes, and merges the honest versions into the canonical `data/convergence/records.jsonl`. Every change is auditable (`repaired`, `original_verified`, `repair_note`, `.bak`). Applied: canonical ledger 1005 → 1073 rows, **0 remaining laundered records** (60 demoted, 8 kept-verified), plus 2 same-session mislabels corrected to `refuted`.
+- autowork(#2762): **deterministic verify floor** — the first end-to-end run shipped
+-   `verified: false` because the plan specified zero tests, leaving the Verify stage empty.
+-   Two-layer fix: the plan prompt now requires non-empty, REAL, allowlist-family test commands
+-   for any code change (never invented paths); and when a plan still names none, the pipeline
+-   derives a floor from the files the patch actually changed — a syntax/compile check per
+-   source file plus the repo's real unit tests for that file where they exist
+-   (`tests/test_<base>.py`, `apps/lantern-garage/test/<base>.test.js`) — so verification is
+-   never zero for a code change. Floor commands are emitted only if they pass the existing
+-   #873 closed-class test allowlist verbatim (extended with `node --check`, `py_compile`, and
+-   the standalone-unit-test patterns); unit-tested in
+-   `apps/lantern-garage/test/verify-floor.test.js` (8 checks, incl. shell-metachar paths
+-   skipped and allowlist round-trip). Finale + step details say when the floor (not planned
+-   tests) did the verifying.
+- autowork(#2762): the apply-retry's self-correction mechanism was poisoning itself. The
+-   retry feedback DID include the targeted file's real content — but line-numbered
+-   (`102: <line>`) with the instruction "copy context lines VERBATIM from here", so an obedient
+-   model produced hunk context prefixed `NN: ` that exists in no file, failing identically every
+-   attempt; the failed hunk's own @@ coordinate (a hallucination) was the only position signal;
+-   and content was capped at the file's first 400 lines. `targetedFileContext` now emits RAW
+-   un-numbered content (whole file when ≤520 lines, head+tail windows with true ranges
+-   otherwise), locates the failed hunks' believed lines in the real file and states the true
+-   anchor line numbers in prose ("your claimed context exists near line N" / "NONE of your
+-   context lines exist — that content was invented"), and instructs explicitly that diff lines
+-   must carry no line numbers. The freshness law applied to the Act seam: fresh truth into the
+-   retry, not another sample of the stale prompt.
+- chat(autowork): the loop strip derived stage state by forward-marking ("everything before the
+-   current stage is done"), but the pipeline is not in loop order — `branch` (an Act phase) runs
+-   before `research` (Remember) — so Reason lit as done before the plan step ever ran. Stage state
+-   is now recomputed from the actual step rows (active if any phase active/retrying, error if one
+-   errored, done once at least one finished) — order-independent. Caught live on the first real
+-   run. `runAutowork` also null-guards its offer-button reference so command-started runs (no
+-   button) can't crash the finale.
+- autowork(server): the `done` event's `convergence.confidence.research` was read from a
+-   nonexistent field (`confidence.research`; the record stores `codebaseResearch`) and was always
+-   `undefined` — now mapped correctly. The run log's `result` record now also persists the
+-   convergence summary + council verdict + tests outcome, and `GET
+-   /api/convergence/autonomous-work/status` surfaces them, so re-attached clients (background
+-   watcher, dropped-SSE reconnect) render the same verify/converge evidence as a live one.
+- ci: the **Boilerplate / duplication check** (`.github/workflows/pr-gates.yml`) now treats Node manifests — `package.json`, `package-lock.json`, `tsconfig.json` — as `UBIQUITOUS`, the same standard-filename allowlist that already exempts `pyproject.toml` / `setup.py` / `index.html`. Every sub-package or tool directory legitimately carries its own manifest, so flagging a new one as a "duplicate" of the root/app manifests was a false positive (surfaced when #2744's `scripts/reports/leap-video-2026-07/package.json` failed the gate). Unblocks any PR that adds a scoped Node package.
+- chat: repaired the CI fallout from the `dream-chat.html` → `chat.html` surface rename (#2751). The rename left three gates red — all one root cause (stale references to the old page name): `test_dashboard_ux.py` and `test_dream_journal_api.js` now assert against `chat.html` and read the real chat surface for `provider-select`, and the leftover `dream-chat.html` redirect stub is now classified in `lib/surface-registry.js` as a `meta` (always-on) legacy alias so the surface-boundary contract no longer flags it as unclassified sprawl (kept as a redirect for old bookmarks; core:extension ratio 1:1, within the 1.05 cap). Asset files `js/dream-chat.js` / `css/dream-chat.css` / `lib/dream-chat.js` were intentionally **not** renamed, so references to them stay valid.
+- **Convergence-IO governance gates (NAP + CCF) — adversarial hardening.** Applied the same measure-first-then-fix discipline used on CSF to the security primitives: 10 adversarial probes (`tests/test_convergence_io_security.py`) confirmed real bypasses, now all closed:
+-   - **Canonicalization (CWE-178/289):** a NAP safety denial keyed on `financial_trade` (or a required capability `chat`) was defeated by `Financial_Trade` / `FINANCIAL_TRADE` / `financial-trade` / `financial trade` / trailing-space / `PII.SSN`. Both gates now canonicalize every action, provider, boundary, data-class, capability, and tier token (lowercase + unify whitespace/hyphens, dots preserved for hierarchical labels) before any allow/deny decision — one shared `canon()` used by both.
+-   - **Fail-closed on unknown tier (XACML):** an unrecognized *required* tier (e.g. `pilot`) acted as *no requirement* and let a `wanderer` claim through; it now denies. The tier ladder is one shared `TIER_ORDER`, and an unknown *claim* tier ranks below the floor.
+-   - **Hard denials are now structural (IP register §4.4):** the "a hard denial cannot be overridden by a capability claim" invariant was only conventional (safety NAPs happened not to set `tier_override`). Added a `hard` flag that ignores `tier_override` entirely; `dreamer_safety_nap` is now `hard=True`, so no tier can lift a financial/credential/PII denial. Soft operator policies keep tier-override behavior.
+-   - **Honesty accounting:** the P6 tracker used ANY-overlap (`expected & actual`), so an agent with one real capability could keep claiming capabilities it lacked at honesty 1.0 forever. Now honest iff it actually held everything required (`expected ⊆ actual`), so persistent over-claimers fall below the floor and get gated.
+-   - 13 new adversarial tests green; 86 existing convergence-io/pcsf/ceg/dilation regression tests still green.
+- convergence(#2803): autowork confidence fields **stop performing measurement.** The convergence record's confidence values are mostly hard-coded constants (`codebaseResearch 0.85/0.5`, `webGrounded 0.8/0.4`, `testsPassed 0.9/0.3/0.0`, `overall` = a capped weighted sum) — exactly **one** is genuinely outcome-calibrated: `calibratedTrust` (#1011, Brier). Presenting the weighted sum as "Confidence: 84%" passed a label prior off as a measurement, corrosive for a product whose differentiator is "knows when it doesn't know." Now every field carries its **basis** — `measured` (only `calibratedTrust`) vs `prior` (a formula constant): `confidence_basis` on the convergence record, `dimensions_basis` + `overall_basis` on the `data/agi-benchmark.jsonl` row, a basis summary on the convergence done-event, and the chat finale message now reads *"prior estimate 84%; calibrated trust 50%"* instead of a bare "confidence: 84%". New pure helper `lib/confidence-basis.js` (the `MEASURED_FIELDS` set is the single extension point for step 2 — extending #1011 calibration to more fields as outcome data accrues). Covered by `apps/lantern-garage/test/confidence-basis.test.js`.
+- **Sitemap + robots.txt** — `sitemap.xml` was generated at `https://lantern-os.local` (a local dev host crawlers can't reach), listed only 7 stale URLs at wrong paths (`settings/providers.html`, `dream-journal/index.html`), and **excluded the Knowledge Center** (`scripts/audit-site.js` had it in `IGNORED_PATHS` mislabeled "external redirect"). Root-caused and fixed the generator: correct production origin (`https://www.unisona.ai`), and it now enumerates the real public pages (`public/*.html` minus a denylist of auth/admin/dev/personal surfaces) instead of scraping only the JS-injected homepage — 14 indexable URLs with sensible priorities and fresh `lastmod`, including the KC, chat, trader, explore, pricing, welcome, faq, proof, and legal pages. Dropped the missing `jsdom` dependency (the broken-link CI check is now a dependency-free regex; `node scripts/audit-site.js` passes 0-missing). Added `robots.txt` (there was none) declaring the sitemap and keeping crawlers out of auth/operator/`/api/` surfaces so the sitemap is actually discoverable.
+- chat(#2802): **identity floor** — product self-facts are now a deterministic block in the desk prompt, so the assistant stops web-searching its own identity and hedging stale external sources against its own truth. (Live 2026-07-21 it self-contradicted in one paragraph — *"not designed to run solely on the user's machine … designed to run on the user's own machine,"* prefixed "according to available sources.") The block states, as primary-source truth, that unisona.ai is local-first (runs on the user's machine; a hosted try-it option at lantern-os.net notwithstanding), needs no account to try, is model-agnostic across a provider chain, and keeps the user's memory local — with an explicit rule that for questions about unisona.ai itself these facts win, web/context may supplement but never contradict or hedge against them. Applied to every persona idempotently (`__unisona_identity__`), same pattern as the response-style/session-protocol blocks. Covered by `apps/lantern-garage/test/identity-floor.test.js`. (The behavioral acceptance — a live chat turn — needs a served provider to confirm end-to-end.)
+- mcp(#2760): `lib/mcp-client.callTool()` now speaks the MCP server's JSON-RPC `tools/call` over `/messages` — the working endpoint the stdio bridge and `lib/stream-chat/mcp-tools.js` already use. It previously POSTed to `/tool/<name>`, a route the server never exposes (404), so **every** call through this client errored and `keystone-context`'s MCP skill-inventory enrichment silently degraded; `mcp-tools.js` had to route around the client entirely. The client now honors `MCP_HOST`/`MCP_PORT` (#2759), parses the tool's payload (JSON when the result is a JSON string, else `{ text }`), and standardizes RPC/`isError` failures to `{ status, reason_code, error }`. Covered by `apps/lantern-garage/test/mcp-client-messages.test.js`. (Broader #2760 goals — making MCP the first-class extensibility spine and deduping built-ins that overlap MCP — remain follow-ups.)
+- chat(local model): when the configured `OLLAMA_MODEL` isn't installed, the chat now returns an **honest, actionable error** instead of a misleading `no_provider_configured`. Ollama reports a missing model as an error envelope (`{"error":"model 'X' not found"}`), but the chat path read only `json.message.content`, got undefined, and silently fell through — so an operator whose `.env` pinned e.g. `lantern-sigma0-coder-loop` (not pulled) was told "no provider configured" when the fix was one `ollama pull` away. New `lib/ollama-error.js` classifies the envelope into the existing `lastProviderError` shape; the reply now carries `error: "ollama_model_not_installed"` and help *"Local model 'X' is not installed in Ollama … Run `ollama pull X`, or set OLLAMA_MODEL to an installed model."* Live-verified in the dev preview (pointed at an uninstalled model → honest error; installed model → normal reply). Covered by `apps/lantern-garage/test/ollama-error.test.js`. Honest-error family: #2725, #2760; helps diagnose #2758-class "local model unreliable" reports that are actually a missing model.
+- oracle(grounding): third strike of the bare-cosmology-word disease. #1268 stopped defaulting
+-   every question to the NOW band and #1275 dropped "now"/"today"/"current", but real cosmology
+-   terms that also live in everyday/technical language still false-matched alone — "transparent"
+-   grounded a CSS question in the CMB, "begin"/"beginner" in the Planck epoch, "inflation" (the
+-   economic kind) in cosmic inflation, "final state" (a reducer) in the heat death, "singularity"
+-   (the AI kind) in the initial singularity. The matcher now splits **STRONG** phrases
+-   (unambiguous — match alone) from **WEAK** words (real anchors that additionally require
+-   cosmology context in the same question), applied identically in the Node hot-path twin
+-   (`lib/convergence-oracle.js`) and the Python canonical (`src/convergence/oracle.py`). Covered
+-   by 5 Node cases + 6 Python cases (the measured false positives + the still-must-ground set).
+- autowork(#2741): research evidence (web + arXiv corpus) now grounds the code-**generation** prompt, not just Verify. `routes/convergence-dispatch.js` passed `researchContext` as `generatePlan`'s 4th arg — which is `history` (rendered `${role}: ${text}`) — so the whole research object serialized to `undefined: undefined` in the plan prompt and never informed the code the model wrote (it only reached the Verify stage via PR #2737). Added `renderResearchContext()` in `self-edit-engine.js` (a pure, exported renderer for `webEvidence` + `arxivEvidence` + `webSummary`), threaded it into both `generatePlan` (new 5th `research` param) and `generatePatch` (`opts.research`), and fixed the four dispatch call sites to pass research in the right slot. Other `generatePlan` callers (stream-chat, self-edit route) pass no research and are unchanged. Covered by `apps/lantern-garage/test/research-context-render.test.js`.
+- cleanup(#2525): `models/lantern-sigma0-coder/` is named after the **retired** Qwen2.5-Coder-3B QLoRA (weights deleted, #811/#823) but actually holds two *live* Ouro-coder training datasets (`humaneval-train.jsonl` ~15k rows, `coding-seed.jsonl`), so auditing `models/` by name misreads it as a stale model package. Restored `docs/LANTERN-SIGMA0-CODER.md` — now documenting both the model's retirement **and** the directory's live dataset contents + their writers — rather than moving the datasets and disturbing every reader/writer + the training scripts. (An in-dir `README.md` isn't possible: the anti-sprawl gate blocks new tracked files under the non-allowlisted `models/` top-level dir.) Also fixed the stale docstring in `scripts/build_humaneval_corpus.py` that still cited the deleted `training-data.jsonl` (243 rows, removed in #1850) and pointed it at the doc. Relocating the datasets to an allowlisted home (`data/training/ouro-coder/`) remains an optional follow-up.
+- trading(#2725): the chat's `trader_positions` tool no longer reports a scary "the trading endpoint returned an error" when no broker is connected. Root cause: the tool guarded on `d.available === false`, but `GET /api/trading/positions` never set `available` — with no broker it returned `{ positions: [], account: {} }` at 500/503, which the tool either mis-read as a real $0 account or surfaced as a raw error. The route now emits an explicit `{ available:false, reason }` on its no-broker paths (additive — `positions`/`account` still present), and the tool detects the not-connected shape robustly (explicit flag, or an empty account with no equity/cash/buying_power and no positions) and degrades honestly. Transient reach failures (timeout / bad gateway) now read as "broker unavailable — couldn't reach the trading account" instead of a bare error. Covered by `apps/lantern-garage/test/trader-positions-honest.test.js`.
+- chat(#2804): **guard the deterministic-affordance enumeration in the desk prompt** so the model can't silently forget its own commands. PR #2795 delivered the `KNOW YOUR OWN AFFORDANCES` clause (naming `!work #<issue>`, `!review #<PR>`, `!prs` with the instruction to restate the matching command verbatim rather than dead-ending in a "I need more specifics" clarification loop), but the clause lived unguarded inside one giant `ROUTER_PROMPT` template literal — a prompt edit could drop it with nothing failing. New source-guard `apps/lantern-garage/test/desk-affordances-guard.test.js` (dependency-free, worktree-safe, mirroring the #1925 clause-drift check) asserts all three commands and both halves of the no-clarification instruction stay present. Live evidence for why it matters (2026-07-21): "run autowork on issue #2762" hit the clarification loop three times because the model had no knowledge of `!work #N`.
+- docs(#2811): QUICKSTART's surface map pointed **Trader** at `/trader-dashboard.html`, which does not exist (no page, no route) — the new gate caught it. Repointed to `/stock-trader.html`, the live surface the home nav's "Trader" link uses.
+- ci: the anti-sprawl gate now allows `.claude` as a top-level directory for new files (repo-managed skills already live at `.claude/skills/*` — four are tracked), and the Boilerplate / duplication check treats `SKILL.md` as `UBIQUITOUS` (one per skill directory by definition, like `__init__.py` per package). Both were false positives blocking #2822's `/bandits` skill; same class as the Node-manifest allowlist (#2767).
+- spiral(#2835): **honest-labeling preflight on the Phase-0 runner** — requesting a cloud escalate tier (`SPIRAL_FRONTIER_PROVIDER=openai|gemini|…`) on a box where that provider's leg isn't configured now refuses to run with a clear error instead of silently answering the escalate leg from the first reachable (local) model while labeling every corpus row `frontier:<provider>`. Without this, the "frontier-grade distillTarget" corpus the run exists to seed would be local-model output wearing a frontier label — poisoned VTD fuel that no downstream check could catch.
+- **spiral: the local cheap tier resolves a real pulled coder, not the `ouro:latest` pin.** The
+-   spiral's `ollama` tier (`lib/spiral-tiers.js`) routed through the raw `OLLAMA_MODEL` env, which on
+-   the fleet host pins `ouro:latest` — a model served only by the separate `ouro_serve.py` shim, so a
+-   plain-daemon call returns *"model not found"* and the local cheap tier 404'd. It now resolves via
+-   the constraint-aware registry (`selectCheapStandin` → `qwen2.5-coder`) with a `SPIRAL_LOCAL_MODEL`
+-   override, so `spiral_solve` and the Phase-0 runner work against whatever coder is actually pulled
+-   in Ollama, independent of the Ouro serving state.
+- honesty corpus (#2843): de-gloss the shipped training corpus + enforce it in CI. E1 (`data/sigma0/e1_degloss_report.json`) proved the v1 "10% confab" headline was substantially a **gloss leak** — negatives announced their own status in the statement text (`"The Riemann hypothesis -- OPEN conjecture"`), so the tune learned to *read the stamp* instead of judging truth (de-gloss spiked Ouro confab 10%→55% while GPT-4o-mini held 0%→0%). The de-gloss transform (`degloss_statement`/`REWORD_V2`) already existed in `sigma0_seed_facts.py` but the corpus **builder never applied it** — `ouro_honesty_train_balanced.jsonl` shipped **60 leaking statements** (20 in the train shard) straight into training. `sigma0_ouro_honesty_corpus.py` now de-glosses every emitted statement (status lives only in the answer key); regenerated → **0 leaks**, labels unchanged, balanced negative fraction 0.517 (in the 0.40–0.55 band), id/entity contamination PASS. New `tests/test_honesty_corpus_gate.py` turns this into an enforced invariant: de-gloss lint (0 leaks over the shipped corpus), the balanced-ratio band, and a frozen-holdout-disjoint check (the 66-fact heldout is now written sorted so a rebuild never churns it). Verified the lint has teeth (catches re-injected `-- OPEN` stamps 2/2); SEED web-validation test still green.
+- Settings → Account: the password change now collects the **current password** and sends it, so the change is authenticated by the server (which requires it — a wrong or missing current password is rejected `wrong_password`/`403`; OAuth-only accounts still just set one). Email changes already require inbox confirmation. **Delete account** is now a two-step confirm (dialog + type `DELETE`) before routing to support (there is no self-serve delete endpoint — deletion is staff-only, so it can't silently fire). **Discord and Patreon are fully removed** from Settings — Discord is no longer offered as a sign-in method, and Billing is Stripe-only (no "Stripe or Patreon" copy), matching their retirement (#2722). Verified live: wrong current password → rejected; Account shows only Google + Email; zero Discord/Patreon anywhere on the page.
+- trading/auto-trader: stopped the **phantom re-exit churn** where an exit order that came back with a non-terminal broker status (`needs_confirmation`, resting, unfilled) never reduced the position, so the held long reappeared on the next scan and the loop re-fired the SAME exit every ~8 min — re-logging the position's **unrealized** P&L as realized each time. One week produced **69 exit rows across only 12 real positions** and a fabricated **~$46k** of re-counted P&L (true de-duped figure ~$5k, all still `needs_confirmation`). Root cause: the oversell-guard status regex recognized `submit/pending/presubmit/working` but **not** `needs_confirmation`, so such an exit never entered `workingSells` and only the 8-min timer gated it. Fix: `auto-trader.js` now tracks each exit's broker status in a persisted `_exitStatus` map; an in-flight (unconfirmed) exit **freezes the symbol from re-exit** — via `workingSells`, which both exit paths already honor — independent of the timer, and the freeze is reconciled against broker truth every scan (cleared once the position leaves the book, or on a terminal non-fill so a genuine exit can retry). Covered by a new regression test in `apps/lantern-garage/test/auto-trader-trailing.test.js`.
+- trading/orders: **manual buy/sell now works on Alpaca.** `POST /api/trading/orders/place`
+-   used to try IBKR first by default and break its attempt loop on the *first non-null*
+-   result, so an Alpaca user's order could hit an IBKR error (or the "No broker connected"
+-   dead-end) and never reach Alpaca. It now tries the user's **intended** broker first
+-   (Alpaca-first unless the user explicitly prefers IBKR) and surfaces that broker's own
+-   answer, only falling through when a broker is genuinely not connected — so an order is
+-   never silently re-routed to a broker the user didn't choose. Also removed the legacy
+-   `traderAgent`-required 503 gate (placement goes straight to the broker adapter) and made
+-   the order-history tab read Alpaca whenever Alpaca is the active broker.
+- trading/search: the symbol-search popup now has a real Alpaca universe. `alpaca-adapter`
+-   gained a cached `listAssets()` (`/v2/assets`, ~13k tradable US equities/ETFs); when
+-   Alpaca is the connected broker (and IBKR isn't), `/api/trading/symbols/search` fuzzy-
+-   matches against it instead of degrading to a single exact-ticker Yahoo probe.
+- Charts (Yahoo), news (Yahoo RSS) and watchlist add/remove are broker-independent and
+- already work on Alpaca. Verified end-to-end on the dev server: paste-keys connect
+- (account PA3KZEWVVZTP), bad keys rejected, a paper BUY accepted by Alpaca, a SELL kept on
+- Alpaca (surfaced Alpaca's own error, no IBKR leak), and 13,288-asset fuzzy search.
+- docs(sigma0): **reconcile the cert + honesty benchmark with what actually landed** — the full-corpus consolidation review found four drift points the cert's own audit contract forbids. Collapse-cert crosswalk: M1 is an ENFORCED runtime gate since 2026-07-23 (#2872/PR #2881), not owed; serve-from-ledger + answer-stability canary LANDED (#2859/PR #2864), not planned; the spiral cascade-policy quick wins + honest-labeling preflight shipped (PR #2862/#2863); the V1 honest-teacher verdict is recorded (🔴 honest negative, #2850 — confab +0.253, anchor-fraction 0.31 vs the ≥0.60 mandate as the post-mortem lead). SIGMA0-HONESTY-BENCHMARK.md now carries the E1 de-gloss RETRACTION banner + struck-through tuned-Ouro rows (the 0.958/10% numbers were retracted 2026-07-06 in FRONTIER-TRAIN-BRIEF but this file still displayed them as current MEASURED). ADR-0030's Phase-1 "7–14B cheap tier" gains a bracketed note recording the 2026-07-23 operator ≤3B envelope (records the later decision; changes no ADR text).
+- hooks/slop: the pre-commit slop scan now inspects only the lines a commit **adds** (`git diff --cached -U0`), matching the CI slop gates — a pre-existing `console.log` or fixture key in a file you merely touched no longer false-blocks the commit (the local hook previously whole-file-scanned staged files while CI grepped `^+` diff lines).
+- ci/slop: the "Boilerplate / duplication check" flags a new file only when its **content** is ≥90% identical to a same-named existing file (difflib ratio). A shared basename alone is this repo's paired-module convention (`lib/x.js` + `routes/**/x.js`) and false-blocked PR #2937.
+- ci: the "Slop gate summary", "Orchestration challenge summary" and static-surface "CI summary gate" jobs now run with `if: always()` and **fail** when a member lane fails — previously they were skipped on member failure, which read as "no verdict" in the rollup.
+- auth/session: `FileSessionStore.touch()` is extend-only — it refreshes an existing session file's expiry but never re-creates one that `destroy()` unlinked. A request in flight during logout (another tab loading a page) used to re-write the just-destroyed session, undoing the logout; `destroy()` also dropped the touch-throttle entry, guaranteeing that resurrection touch was unthrottled. Locked by `apps/lantern-garage/test/session-store-logout.test.js`.
+- e2e/auth: `tests/playwright-auth.config.ts` boots the server with `LANTERN_GARAGE_PORT` instead of `PORT` — `PORT` flips cloud mode, whose Secure session cookies are never set over plain-http loopback, so `test-login` returned 200 with no `Set-Cookie` and every session-dependent spec failed (same trap already documented in the greenpath config).
+- e2e/auth: the spec matches the current product contracts — the #2645 least-privilege header default (bare `X-Test-Auth` is guest; admin only via explicit `X-Test-Role`), the first-visit entry gate (fresh guest → `/auth.html` once → "Continue without an account" → home with the `nav-signin` affordance), tier-labeled role-picker buttons ("Free", not "Supporter"), a roster-agnostic button count, and a pathname-anchored `waitForURL` (a bare `/settings\.html/` regex matched the `?returnTo=` query of the auth page and resolved before login).
+- trading/auto-trader: **losing positions are now actually cut.** A user's paper book had
+-   longs down −8% to −17% that the autopilot never exited. Three defects fixed:
+-   1. **The autopilot wasn't managing the account at all.** The autoscan loop enumerated
+-      accounts only by per-user credential *file*; the common single-operator setup runs on
+-      Alpaca *server env keys* under the id-less `local-owner` identity (no file), so it was
+-      invisible — no stops, no exits ever ran. `routes/trading.js` now includes
+-      `local-owner` when the login gate is off (local/preview), deduped by account id so it
+-      can't double-trade.
+-   2. **No loss-side exit existed.** `manageHeldExits` only had a trailing stop that arms
+-      after +1.5% gain and a momentum-death that fires only while in profit — a position
+-      that goes straight down triggered neither, leaving the entry stop as the *only* loss
+-      protection. Added a **hard max-loss backstop**: market-exit any long down ≥
+-      `TRADER_MAX_LOSS_PCT` (default **8%**), regardless of momentum/peak/min-hold (still
+-      debounced by the exit-reattempt guard).
+-   3. **Re-protect couldn't stop an already-underwater position** — the entry-based stop
+-      (entry×0.98) sits *above* market for a loser, which the broker rejects, so the loser
+-      stayed naked. The re-protect pass now clamps the stop to just below the current price
+-      so an underwater long still gets a working protective stop.
+-   All thresholds are env-overridable. Covered by new tests in
+-   `apps/lantern-garage/test/auto-trader-trailing.test.js` (a −10% loser is backstop-exited
+-   even inside min-hold; a −3% position is left for the broker stop).
+- **Working orders can now be canceled** (`DELETE /api/trading/orders/:id`) — user
+-   testing found manual limit orders could be placed but never canceled (only Kalshi
+-   had a cancel route). Routes by order-id shape (Alpaca UUID vs numeric IBKR) with an
+-   honest cross-broker fallback; the first cut resolved the preferred-broker facade,
+-   which "canceled" an Alpaca order against IBKR and reported success — caught by
+-   verifying order state on the broker, now covered in the handler comment.
+- **Risk-reducing sells now clear IBKR order warnings.** In the first fully-armed
+-   session the engine made 13 correct exit decisions and executed **none** — every order
+-   returned `needs_confirmation` because IBKR raised warnings and the code refused to
+-   confirm them. A max-loss sell decided at −16.9% was still open at −18.9%, and an AMD
+-   take-profit at +3.9% gave the entire gain back (−3.7%). Exits and protective stops
+-   (which only ever *reduce* exposure) now opt into `acceptWarnings`; **entries still
+-   surface warnings for a human**, which is what the original guard was protecting.
+- **The overnight book only defers to positions it opened itself.** Its no-commingling
+-   check vetoed the QQQ capitulation sleeve because *some other* strategy's legacy QQQ
+-   shares sat in the account. Unrelated or stale holdings are not this engine's business
+-   — it manages only what it opened. Additionally the check no longer applies at all on
+-   the **options** tier: holding QQQ shares cannot make a QQQ *call* exit ambiguous.
+- **Quoted prices now reflect pre-market and after-hours.** The charts already drew
+-   extended-hours bars (`includePrePost=true`), but the price beside them came from
+-   `meta.regularMarketPrice`, which freezes at the 16:00 close — measured 2026-07-27 at
+-   17:46 ET: SPY's last bar was 739.47 while the displayed price still said 739.09. Two
+-   causes: the quote path fetched a **daily** bar (where `includePrePost` is a no-op) and
+-   Yahoo leaves `post/preMarketPrice` null. It now fetches a 5-minute intraday series and
+-   derives the latest print from it, tagging each quote with its `session`
+-   (`regular` | `pre` | `post` | `extended`) so the UI can label an extended-hours price
+-   honestly instead of passing it off as the close.
+- **IBKR `Inactive` orders are no longer reported as `open`.** IBKR parks an order at
+-   `Inactive` when it was submitted but never transmitted — e.g. it hit the order-warning
+-   gate and nothing confirmed it. The `/api/trading/orders` normalizer mapped
+-   `inactive → open`, so **972 inert orders looked like live resting orders**: it made a
+-   reviewer report a 25× oversell exposure that did not exist, and the orders are not even
+-   cancellable (`"Order is inactive"`). They now normalize to `inactive`.
+- **The re-protect pass caps its retries.** A stop that never transmits is correctly not
+-   counted as protection, but the pass then retried every scan forever — 972 inert stop
+-   attempts, ~33 per symbol. After 3 attempts it stops adding and records *why* in the
+-   skip list, so the underlying failure surfaces instead of being buried under duplicates.
+- **The options exec tier now refuses a symbol with no next-session expiry.** The trade
+-   being measured is close → next open, but `listNextExpiryCalls` returns the nearest
+-   *available* expiry — measured 2026-07-27: SPY/QQQ/IWM list next-day, **GLD +1 day, SH
+-   +24 days** (monthlies only). Without the guard the SH fade sleeve would have bought a
+-   multi-week option and sold it at the next open — a different instrument entirely
+-   (weeks of theta/vega held for one night) — silently corrupting that sleeve's measured
+-   expectancy. Those sleeves are now skipped with the real reason in the ledger.
+- **The re-protect pass was stacking a protective stop every scan.** Its `hasStop()`
+-   guard matched only IBKR's *native* status words (PreSubmitted/Submitted/Pending) and
+-   only an `orderType` key, but the normalized order shape says **`open`** and puts the
+-   kind in **`type`** — so the guard never matched, the engine believed every long was
+-   naked, and it added another GTC stop-sell on every pass. Measured on the live paper
+-   account: **488 resting stop-sells, ~33 per symbol, 95,561 shares against 3,772
+-   held — a 25× oversell** that would have flipped the book heavily short on any gap
+-   down. The guard now accepts every status/key spelling the stack produces.
+- converge(#2924, M7): **the unified control law's anti-runaway guarantee was launderable** — M6's kill side-condition is per-mode ("G/L > 1 and zero external-innovation coupling") but rule 1 tested the *global* `evidenceInflux` bit, so any ambient evidence stream (a subscribed feed, tool heartbeats) suppressed the kill while a mode snowballed unanchored. Proven as a two-world impossibility (identical signal histories, divergent M6-correct actions — proofs note **Lemma 3**) and measured against the shipped code: the laundered runaway survived 40/40 steps at confidence 0.9999986 with per-step reason "improving on external evidence". Shipped the default-compatible keyed anchor `evidenceForMode` (kill fires at step 1; omitted field = legacy fallback; 10 pre-existing tests unchanged, 5 added). Also fixed the self-contradictory halt record (`action: "halt_saturated"` with `saturated: false` and a reason claiming saturation) in the converged-but-stale-and-broke cell.
+
+### Changed
+- chat: renamed the primary page **dream-chat.html → chat.html** (page title now "Chat"). A redirect stub is kept at the old path so existing links/bookmarks still work, and every reference was updated: nav (site-chrome + per-page footers), PWA manifest `start_url`, sitemap, the server route map (`routes/pages.js`), the cloud surface allowlist (`deployment-profile.js`), auth-gate PUBLIC list, feature-flags/feature-graph nav, OAuth landing + Indeed callback redirects. Verified live: `/chat.html` serves, `/dream-chat.html` redirects, nav points to `/chat.html`, no console errors.
+- chat(#2755): raised the agentic tool-iteration cap (cloud 6→12, local 5→10) and made it configurable via `CHAT_MAX_TOOL_ITERS`, so deep multi-step tasks don't stop short.
+- chat(#2759): made the MCP host/port configurable via `MCP_HOST` / `MCP_PORT` (was hardcoded `127.0.0.1:8771`). The GitHub default repo was already `GH_REPO`-overridable.
+- _Deferred from this batch (need dedicated PRs — all touch the 5 copy-pasted provider branches, verifiable only on one provider in a preview): #2752 parallel tool exec, #2756 unified provider loop, #2758 local-model native tool protocol, #2760 MCP-first-class. #2754 (real token indicator) stays open: the single-shot Gemini path was NOT the primary streaming path on the live server (the patch didn't fire), so real-usage capture needs the primary path identified first — no chars/4 estimate was shipped._
+- docs: propagated the survivorship-free momentum result + data-vendor grounding into the canonical docs. **AGI Convergence Blueprint** gains a worked Verify example — the discipline (internal signals detect, only fresh truth informs) run end-to-end on a live market surface, where fresh point-in-time truth killed the "$2M momentum upgrade" mirage (measured Sharpe 0.60, ties SPY, < champion 0.66), with independent external confirmation from arXiv:2603.19380. **Unisona Sharpe Certificate** gains a 2026-07-18 evidence update + table row E5 (single-stock 12-1 momentum REJECTED — measured survivorship-free). **Research Canon [07] VERIFY** gains the survivorship/backtest-bias references (incl. the newly pulled full-text papers). **README** now links the previously-unlinked flagship grounding docs (AGI blueprint, collapse certificate, grounding ledger) and adds the survivorship study + market-data vendor survey to the traders row.
+- dream-chat: pruned ~386 lines of dead code — the `runWorkspace` self-edit UI + `showWksReceipt` (0 callers), the MCP connector sidecar (targeted DOM that doesn't exist in the page), the `updateContext`/`ctx-*` toggles, and the personal-cube DOM-insights writer + its 5-minute poll. The `personalContext` fetch used by the chat request is preserved.
+- docs(knowledge): registered the recent flagship docs in the Knowledge Center catalog so they are discoverable and RAG-grounded (previously invisible to product search) — AGI Convergence Blueprint, Σ_G Grounding Ledger, Unisona Sharpe Certificate, the 2026-07-18 market-data-vendor survey, the $2k-plan collapse certificate, and the E-B L4 runbook. Regenerated `knowledgecenter.html` (`build_doc_library.js`, 166 keep-cards) and the grounding index (`build_knowledge_index.py`, 2,598 sections from 237 docs). arXiv corpus delta-harvested + reindexed (114,499 papers; 0 new — already current).
+- docs(invest): the $2k plan artifact (`docs/investing-2k-plan.html`) gains an appendix drawer answering "does the 2× borrowing actually help?" — measured 1× vs 2× on the champion mix (`experiments/leverage_1x_vs_2x.py`): the **unlevered version is better by every quality measure** — Sharpe 0.85 vs 0.65 (0.85 clears the ADR-0028 Buffett bar; 2× drops back below), worst dip −13% vs −25% — while margin only ~doubles raw dollars ($47k → $91k) by ~doubling risk. Adds the real-account margin reality (2× on ~$91.7k = ~$183k exposure / ~$91.7k borrowed, margin call at a ~29-33% drop, interest ~$5.3k/yr at IBKR-like rates but ~$10k/yr at typical retail brokers). Conclusion recorded: for return-per-risk, margin is the wrong lever; the contribution is the right one. Leverage stays in practice mode until the gate clears (nothing has).
+- chat(#2756): collapsed the **five copy-pasted per-provider agentic tool loops** (Anthropic / OpenAI / xAI / Cohere / Gemini) into one shared `runToolLoop` driver + a thin adapter each (`lib/stream-chat/tool-turns.js`). The loop mechanics — iterate to the cap, run the turn's tool calls, stream the two-phase call/result SSE, feed results back until the model stops calling tools — are now defined once, so fixes land in one place instead of five (this is what made #2752 a one-line change). The local free-text loop is unchanged.
+- chat(#2752): tool calls within a single turn now execute **concurrently** (`Promise.all` in the driver, call order preserved) instead of one-at-a-time — cutting latency when the model requests several tools at once.
+- Verified live in the dev preview (`CHAT_TOOL_EXEC=1`, Gemini via Vertex): a `web_search` tool call executed, its result fed back through the driver, and the model produced a final answer; the plain no-tool path (direct answer) also works; no console errors. The other four providers route through the same driver with adapters extracted line-for-line from their original loops (couldn't smoke-test them without their keys/credits — the risk the operator explicitly accepted).
+- Sigma-0 certificate conventional-grounding pass: every gap now cites the established method it is (simulated annealing/stochastic acceptance for the 8.4.1 de-ratcheting result; bounded-input reachable-set theory for the 3.1 commitment inequality) with a gap-to-conventional-grounding map across the whole document. No theorem changed; no arXiv IDs invented (classic venue-verifiable citations only)
+- Marked the **Cloudflare-tunnel-to-local-fleet-host** deployment path **DEPRECATED** in favor of the **GCE origin** (per the Accepted ADR-0018, `docs/adr/0018-web-tier-split-and-cloud-multi-tenancy.md`). `docs/CLOUDFLARE-TUNNEL-DEPLOYMENT.md` now carries a deprecation banner pointing to the GCE deploy runbook (`docs/ops/gce-cloud-deploy-runbook.md`); `docs/ARCHITECTURE.md`'s prod-origin bullet now says GCE VM + Cloudflare edge/CDN, not a tunnel to local 4177. The tunnel remains a local-dev / fallback option only.
+- docs(skills): de-staled `SKILLS.md` (was 2026-06-20 with a 2026-06-16 internal AGI-benchmark table) — flagged the internal per-stage estimates as stale and pointed to the authoritative eval ledgers + `BENCHMARKS.md` for the current grounded standing (2026-07-20 review: HumanEval-chat 0.83/0.70/0.22, SWE-bench Lite 0/5, LongMemEval multi-recall@5 0.775). Added a `refinement` skill gotcha: chunk the apply into sub-batches of ≤15 issues (each apply is ~4-5s of `gh` calls, so a full backlog blows the 2-minute Bash timeout — observed grooming 27 issues, needed two passes). `docs/BENCHMARKS.md` review-stamped in the same review.
+- docs(agi): the AGI roadmap is now grounded against the two external AGI-measurement
+-   frameworks. **Research Canon [07] VERIFY** adopts DeepMind's ten-faculty cognitive framework
+-   (Burnell et al., arXiv:2605.28405 — read in full) as the external yardstick, with Hendrycks
+-   et al.'s *A Definition of AGI* (arXiv:2510.18212, web-verified) as the companion ten-domain
+-   score — whose headline deficit (long-term memory storage) independently confirms the owned
+-   Remember-stage investment. **AGI Convergence Blueprint** gains the cognitive-profile companion
+-   view: a ten-faculty capability table with honest classes (OWNED / RENTED / CEDED / UNMEASURED),
+-   the metacognition mapping that restates the Verify edge in externally-defined vocabulary
+-   (calibration ↔ decision journal, error monitoring ↔ drift canaries, source judgments ↔
+-   convergence records, inhibitory control ↔ Σ_θ gate), explicit on-the-record cessions (speech,
+-   motor, audio, social cognition), and the moat-is-a-lead finding — DeepMind is instrumenting the
+-   same metacognition gap, so validation must parallelize (E-B #2691 + external metacognition
+-   evals #2776), not serialize. Follow-up work filed: #2776 (metacognition external evals),
+-   #2777 (tool-gated faculty eval conditions), and — from the 2026-07-21 gap audit the view
+-   enabled — #2782 (attention eval plan), #2783 (skill-acquisition eval plan), #2784 (video
+-   perception cede-or-plan decision), wired into the profile rows so every faculty now has a
+-   plan, a cession, or a tracked decision. Closes #2774, #2775.
+- chat(autowork): the autowork panel now walks the Σ₀ loop visibly, and the Approve moment
+-   carries the verification evidence. **Loop strip** — a six-node Observe → Remember → Reason →
+-   Act → Verify → Converge tracker at the top of every autowork panel (live, background-watcher,
+-   and reconnect paths) lights each stage as its phases run; every step row also carries a small
+-   stage chip, so a run is legibly one walk of the North-Star loop. **Convergence finale** — the
+-   server has always streamed the full convergence record (hypothesis, evidence, confidence
+-   breakdown), council verdict, and tests outcome on the `done` event, and the client discarded
+-   all of it, rendering only "View PR"; the finale now shows a verdict chip (`grounded` green /
+-   `seam_open` amber-warned / other blue), a tests chip, an overall-confidence meter with a
+-   per-axis tooltip, and the evidence list in a collapsible convergence-record block.
+-   **Warn-aware Approve** — when the run is unverified (council `seam_open`, tests failed, or
+-   tests not run) the one-click Approve becomes an explicit amber "⚠ Approve anyway" with the
+-   reason in the button, tooltip, and confirm dialog, so a chat-side merge can no longer silently
+-   launder unverified work.
+- chat(autowork): **deterministic `!work #<issue>` / `!autowork #<issue>` command** — the server
+-   route validates the issue number and tags the done event `source:"work"` (the same
+-   server-tags/client-acts contract `!review` uses); the client then opens the one real run panel
+-   (`runAutowork`). Fixes the dead end where an explicit "run autowork on issue #N" request got a
+-   clarification reply and **no autowork affordance at all** whenever the Ouro intent router — the
+-   only source of `coding_change` — is offline (which is every fresh install: ollama down ⇒ no
+-   offer, ever). Explicit bang-commands are the sanctioned deterministic path; NL phrasing stays
+-   with the model.
+- chat(autowork): guests who trigger autowork now get an actionable auth message — the stream
+-   endpoint (correctly) refuses non-operator sessions, but the panel showed the raw
+-   "Connection lost — stream_unavailable_403"; it now explains autowork changes the repo, needs an
+-   operator sign-in, and links `/auth.html` with the retry command.
+- chat(self-awareness): four fixes from the 2026-07-21 self-awareness assessment, all
+-   reproduced live before fixing. **Identity floor** (#2802) — the router prompt's own
+-   web-search rule sent the model to the web about its *own* identity, where it hedged stale
+-   sources against its spec and self-contradicted ("not designed to run solely on the user's
+-   machine… It is a local-first system designed to run on the user's own machine"); the
+-   identity block now carries authoritative product self-facts with an explicit precedence
+-   rule over retrieval and injected context. **Capability self-knowledge** (#2804) — natural-
+-   language autowork requests dead-ended in clarification loops because the model didn't know
+-   `!work` / `!review` / `!prs` exist; the prompt now enumerates the deterministic affordances
+-   and routes NL requests to them. **Honest confidence** (#2803) — convergence-record and
+-   agi-benchmark confidence values are formula constants with exactly one Brier-calibrated
+-   term (`calibratedTrust`, #1011); every field now declares its basis (`prior` /
+-   `prior-formula` / `measured`) in the record, the done-event summary, and the finale
+-   tooltip, so the numbers stop performing calibration they don't have (full calibration
+-   remains open in #2803). **User-facing self-check** (#2805) — implemented
+-   independently and better in PR #2807 (adds the "show what failed" disclosure on refuted
+-   verdicts); this PR's duplicate implementation was reverted in favor of it — the second
+-   same-day double-build, tracked as a lane-claim-convention gap.
+- CSF-Col v2 (#1593): the columnar pre-transform (`src/csf/col_transform.py`, auto-selected by omni) gained **per-line passthrough** (one non-flat line no longer disables the transform for a whole corpus — v1 declined the entire 2 MB `csf_memory/raw.jsonl`) and **shape-keyed columns** (mixed-schema ledgers stop interleaving different fields into the same positional column), with **best-of-both layout selection** since neither layout dominates (single-shape streams prefer v1). Measured on the real ledgers, round-trip verified (`experiments/csf_col_v2_bench.py`): `raw.jsonl` NotApplicable → **+5.4% vs zstd-19 / +5.8% vs brotli-11**; `records.jsonl` +3.2% → **+5.2%**; `conversations.jsonl` keeps +3.6% via auto-selected v1. The v1 reader is retained (existing archives decode); 4 new tests, 17/17 green + pack suite green. Honest ledger updated in `docs/research/2026-06-29-csf-beating-zstd.md`: the 1.5–2.5× prediction is **falsified** — measured reality is single-digit percent, and the closed doors (hex→raw checksum packing is a mirage: entropy coders already sit at the 4-bit/char hex floor) are recorded.
+- docs(drift sweep): the canonical entry docs caught up with the code. **Rename sweep** — all
+-   eleven stale `dream-chat.html` references across README, CLAUDE.md, QUICKSTART, and AGENTS
+-   now say `chat.html` (renamed #2751), each keeping one deliberate legacy-redirect note; the
+-   CLAUDE.md testing charter's `dream-chat-agent-select` scenario (personas were removed in
+-   #1664) is replaced with a real `chat-provider-select` scenario. **Chat commands documented
+-   for humans** — README now lists the deterministic `!work` / `!review` / `!prs` commands (they
+-   were taught to the model in #2804 but documented nowhere user-facing). **Act-stage honesty**
+-   — README's v1.10 Act row and the AGI blueprint's Act GAP now carry the 2026-07-21 measured
+-   evidence: the autowork pipeline has not yet resolved a real issue end-to-end (live run failed
+-   at apply with hallucinated patch context; SWE-bench Lite single-shot 0/5; #2762), with the
+-   freshness-law diagnosis. **ARCHITECTURE.md** gets a targeted 2026-07-21 delta note (rename,
+-   the `!work` claim now actually true, loop-strip panels) and an honest "full re-ground remains
+-   due" marker. Follow-ups filed: PROVIDERS.md re-ground and a CI check for references to
+-   renamed/removed public surfaces.
+- **Knowledge Center consolidation** — every KC doc is now a reviewed, cross-linked card; the dead experiments are retired. The catalog (`data/knowledge/doc-catalog.json`, the KC source of truth) had drifted: 80 docs created since the last audit were fallback-scraped into the KC uncurated, 1 card pointed at a deleted file, and 11 archive-flagged docs still sat among live ones. Fixed: **removed the broken card**; **catalogued 76 previously-uncurated docs** with reviewed descriptions/status/grounding (5 session research docs cross-linked into the mesh, all 18 ADRs 0012–0029, 15 live guides/design/ops docs, and 38 dated research docs triaged keep-vs-archive); **retired 15 superseded/one-off experiment docs** from the KC (`action:archive`, each with a `mergeInto` pointer to its canonical successor); and **physically moved 11 genuinely-dead zero-inbound docs** to `docs/archive/`. Superseded docs with live inbound links (the killed tesseract trio, several settled pilots) are retired from the KC surface but kept in place so the survivors' historical ledger stays connected. Result: uncatalogued sprawl **80 → 5** (the 5 are core required-reading + the archive index), **0 broken cards**, KC HTML + grounding index regenerated (2551 sections). Every surfaced card carries a verified description and a status/grounding badge — no scraped first-lines, no dead ends.
+- **CSF-Omni speed fix + one new codec**, both evidence-selected by a full-encode panel probe over Silesia + AITDCC-2026 (`experiments/omni_panel_probe.py`; no sampling — every candidate is a real encode). New default effort **`balanced`** = the full panel minus brotli: measured **3.43× faster (257s vs 882s over 225 MB; 0.26→0.87 MB/s) at +0.125% size**, because brotli is the 4×-slowest codec (1115–1302s vs lzma's 315s) and its *unique* ratio contribution across both corpora is <0.2%. `max` stays the strict all-codec envelope (adds brotli for the ~0.15% it leads on some line-structured text); `fast`/`exhaustive` unchanged; every tier stays lossless + deterministic + self-describing, and blobs from any tier (including older brotli-encoded ones) always decode. New codec **`lzma-9`** (plain preset-9, codec id 8) — the only one of 7 exhaustively-tested candidates with measured unique wins (it beats `lzma-9e` on the mozilla/ooffice/sao class where `PRESET_EXTREME` overfits binary/float data; selected on 3–4 real files; decodes via the standard XZ path). Dominated-and-rejected candidates recorded as closed doors: lzma-delta d2/d3/d4/d8, zstd-22-ultra-long, brotli-q10, zopfli (0 unique wins each). The archive path (`csf_pack` omni codec) inherits the 3.4× speedup automatically via the new default. 88 CSF tests green (6 new omni-tier tests). `docs/BENCHMARKS.md` updated.
+- Worked all six owned-math issues (#2786–#2791) the day they were filed — second-pass machine checks committed (`experiments/owned_math_m{1_precision_check,2_bootstrap,3_indistinguishability,4_ensemble,5_allocation_sim,6_canary_census}.py` + results; progress log in `docs/research/2026-07-21-owned-math-conjectures.md` §8): **M1** decomposition lemma 0 violations over 9,000 filter steps AND 0 paid-growth violations in the live ledger (50 same-hypothesis pairs); **M2** kill criterion executed — fires for the data (33% of bootstrap resamples undefined, half-life CI 21.6–866h) so per-topic cadences are blocked on spaced-probe instrumentation; **M3** the lemma's computational half done — 5 passive functionals non-separating (KS p 0.08–0.85) while the interventional probe separates perfectly (1 vs 22 steps, p≈0), demonstrating cadence-necessity end to end; **M4** envelope universal over 150 random non-normal systems (0 violations) with the honest trade surfaced (L3: 0% false alarms, 93% detection vs naive 44%/100% — latency on extreme-K, pointing at the band-limited refinement); **M5** water-filling gain quantified offline (median 6.1% vs shipped, robust at 5.2% under misspecification → live A/B decides); **M6** blocked-with-spec (0 time-series signals in canary events; per-token trajectory logging specified). Each issue carries its results comment.
+- Third pass on the owned-math slate (#2786–#2791): **M1 and M3 are now proof-grade** — formal statements + proofs in `docs/research/2026-07-21-owned-math-proofs.md` (Lemma 1: confidence growth = paid-evidence + contraction-capped dynamics, exact-rational machine check 0/200 with no tolerances; Lemma 2: via the innovations representation every steady-state Kalman tracker has an ungrounded doppelgänger of identical law, so passive monitors have zero separating power and the hard-cadence intervention is the only permitted instrument class — with gain-equals-separability measured). **M4** gained the L3′ envelope threshold (τ_t from the nominal transient curve): FA 0.0 and detection 1.00 everywhere with 3–7-step median detection vs the flat threshold's 14–79. **M5** is now product code default-off: `GROUNDING_RAMP=log` in `lib/grounding-policy.js` + Python parity in `convergence_io/dilation.py` (+7 unit tests; 24 existing green) — the live A/B is one env var away. **M6** instrumentation landed default-off: `CANARY_TRACE=1` records bounded per-generation signal trajectories (sampled at the existing mid-stream guard, both-class emission, reset-safe on retries; +4 unit tests). **M2**'s cross-ledger survey closed the "maybe another stream works" question: no existing ledger is ρ-fittable — spaced probes are the only path.
+- chat(#2759): the chat's GitHub tools (`github_issue`, `list_pull_requests`) now resolve their target repo via a shared `lib/gh-repo.resolveRepo()` — `GH_REPO` env override, else **auto-detected `owner/repo` from `git remote get-url origin`**, else the project default. A clone/fork with a different origin now points its issue/PR lookups at its *own* repo instead of the hardcoded `alex-place/lantern-os`. Covered by `apps/lantern-garage/test/gh-repo.test.js`.
+- chat(#2759): the per-provider reply-length caps (Anthropic 512, Gemini 4096, xAI 512 output tokens) are now env-overridable via `CHAT_MAX_TOKENS_<PROVIDER>` (with `CHAT_MAX_TOKENS` as a shared fallback). Defaults are unchanged, so behaviour is identical unless configured. Together with the earlier `MCP_HOST`/`MCP_PORT` work this closes the last "assume the wrong repository/host/budget for my setup" gaps; new vars documented in `.env.example`.
+- Reviewed, updated, and expanded the (closed) tesseract research thread into a single application register: new `docs/research/2026-07-21-tesseract-application-map.md` ledgers all seven thread docs with today's verdicts, names the four surviving primitives (the surprise/dilation field, the Status-Cube, the wavefront/dust store, the kill-criteria harness), and maps them onto CSF, Convergence-IO, chat, trade, and explore — each application tagged with loop stage, live-today evidence, and a kill criterion (A1–A11). Documents the name-collision reality (web-verified: on arXiv "Tesseract" is a QEC decoder / tensor-parallelism scheduler / OCR engine — never compression; in-repo the word names seven different objects, three of them cubes) and adds a qutrit↔binary + higher-dimensional-binary research brief with a graded brainstorm: trit-packing is a solved 99% craft whose one real home is the ADR-0026 ternary serving artifact (llama.cpp TQ1_0 1.6875 bpw vs TQ2_0 — benchmark gate Q1), GDDR7 PAM-3 is adopted as the canon anchor for "ternary pays in hardware, not codecs," and the 2026 landscape sweep (DBF, BiSCo-LLM, RaBitQ, CID, AITDCC) yields two more gated candidates — a RaBitQ 1-bit/dim embedding cache for the memory reranker (A12) and neutral grading of CSF-Omni on the AITDCC-2026 benchmark (Q2, registered as a 📋 Planned row in `docs/BENCHMARKS.md`). Fixed the review findings along the way: `TESSERACT-CSF-SINGULARITY.md` now carries the supersession banner the spiral/lapse docs already had, and `RESEARCH-CANON.md` no longer calls dust-sparsity BitNet's "storage twin" (the repo's own X3 refined it to a population coincidence) and records the E2 spiral refutation in the convergence-dynamics section. No killed claim is revived; no new subsystem is proposed.
+- Consolidated the IP register (`docs/KEYSTONE-IP-AND-BUILDOUT.md`) from 8 scattered claims to 7 honestly-graded inventions. Promoted the **accountability layer** (owned memory + HOLD-for-approval + verifiable receipts + per-repo outcome routing — the OSS-BASELINE moat) to #1; folded the prior-art-heavy claims (fast-layer plasticity → grounding economy, ternary-lattice novelty → CSF engineering, CSF-Omni "422×" headline, convergence-exit) into the primitives where they're load-bearing or explicitly downgraded them with an honest "what was cut" ledger; added this session's additions (Σ_G grounding ledger, de-anchored verifier, accountable coding-backend, both-class convergance-record ledger). Each item carries an honest novelty grade + named prior art. SCAMPER invention *candidates* are deliberately held in a private ideation doc **off this public repo** to preserve the patent opt-out (public disclosure would foreclose it).
+- **Docs consolidation pass.** Assessed all 360 tracked `.md` files. Finding: the repo's docs are well-maintained — the prior consolidation + `doc-catalog.json` keep them mostly referenced/canonical, there are **no clean orphans**, and the only *verifiably* stale docs are the 2 creator-V10 pipeline guides whose scripts were removed in #2734. Archived **`V10-TRAINING-QUICKSTART.md`** + **`YOUTUBE-API-SETUP.md`** → `docs/archive/creator-v10/` (updated their knowledgecenter.html links + `doc-catalog.json` paths), and added **`docs/archive/README.md`** codifying the policy: archive only *verifiably-gone or superseded* docs; the `docs/research/`, `docs/adr/`, and Σ₀ design records are the External-Reality-Rule grounding trail and are **not** archived by age. The live creator-intelligence scoring docs are untouched.
+- spiral(ADR-0030, relates #2855): **cascade-policy quick wins in the harness loop** — the cross-domain prior-art batch from the 2026-07-22 incremental backlog, all in `lib/spiral-harness.js`. (1) **Stop-on-stall** (ECC iterative decoders): `stallLimit` (default 3) consecutive non-advancing turns halt the run honestly with `haltReason:"stalled"` instead of grinding to `maxTurns`, and a state-hash loop detector halts `"loop"` when the generator re-proposes an already-failed candidate on consecutive turns. (2) **Pass-terminates / cheapest-check-first** (hierarchical assay US6013436A): a candidate identical to one that already stalled — or to the current best — is scored as a stall *without paying the exec verifier* (`verifySkipped` flagged on the corpus row). (3) **Bidirectional tiering** (US7254641B2): after a fully-stalled turn the next turn starts at the frontier rung (skipping the proven-futile cheap try); any commit de-escalates back to cheap (`stickyTiers`, default on). (4) **Whole-answer confidence** (HP US20120243734A1): the run now returns `confidence` = the best committed candidate's pass fraction — decoupled from where the loop stopped. `spiral_solve` in chat inherits all four: hopeless tasks now halt in 3 turns with an honest reason instead of grinding 8, and hard streaks stop double-paying the cheap tier. New zero-dep suite `test/spiral-stall-tiering.test.js` (10 tests); the existing `maxTurns` cap test pins the outer cap via `stallLimit:0`.
+- **Profile merged into Settings** — one place for account/profile instead of two overlapping pages. The nav profile button (and kalshi-terminal's "Account" link) now open `/settings.html`, and `/profile.html` **302-redirects to `/settings.html`** (old links/bookmarks keep working); the `profile.html` file is retired (removed from `PUBLIC_PAGES` + the surface registry, added to `REDIRECTS`). Settings already covered the important bits (name, email + verify, password, sign-in methods, account ID, plan + billing, referral); the one genuinely-missing field — **"Member since"** (account creation date) — was added to Settings → Account. The other profile-only bits (bio, the feature access-card grid) were slated for removal, so they weren't ported. `auth-gate.js` points the restored profile button at `/settings.html`, the auth returnTo guest-blocklist covers `/settings.html`, and the e2e auth spec was updated. Verified live: `/profile.html` → 302 `/settings.html`; the nav button targets settings; "Member since" renders; surface-boundary green.
+- Settings → Billing reworked so you can actually buy/upgrade from it. Removed the confusing **"Already subscribed? Link an existing Stripe subscription"** row. The panel now shows plan-aware **Upgrade** buttons — Free → *Upgrade to Pro ($20/mo)* + *Upgrade to Pilot ($200/mo)*, Pro → *Upgrade to Pilot*, Pilot → none — each starting **inline Stripe checkout** via `/api/billing/checkout`; if billing isn't configured or the tier has no live price (or on any snag) it gracefully falls through to `/pricing.html` (and an existing subscription opens the Stripe portal to change plan). A **"Compare all plans → Pricing"** link is always available, and **"Manage subscription"** (Stripe portal) now shows only for paid users (a Free user has nothing to manage). Verified live: Pilot view shows no upgrades + Manage and **no** "already subscribed"; Free/Pro branches render the right upgrade buttons; the buy button falls back to /pricing.html when checkout returns `billing_not_configured`.
+- Settings polish (follow-up to the rework): headings + section labels now use the index.html brand display face (`--head-font`, Century Gothic stack) so Settings matches the home page. **API keys and connectors are folded into the Connections panel** — no separate page: Connections now shows **Brokerage** (IBKR / Alpaca), **Your AI keys (bring-your-own)** for Claude / ChatGPT / Gemini (add/remove via the per-user `#2505` `/api/providers/set-key` store, encrypted server-side), **Connectors** (Indeed OAuth via `/api/job/indeed/*`), and your **referral link** — one scrollable panel. General gains a **"What best describes your work?"** selector (persisted to `preferences.work`). All wired to existing endpoints; no new backend, no new surface.
+- **Settings page reworked into a user-friendly full-page layout** (the Claude-style sidebar + panels). The "Settings" nav now opens `/settings.html` (was the dense operator `orchestration.html`), which presents four panels: **General** (avatar, full name, "what should we call you?" → `preferences.displayName`, and a System/Light/Dark appearance toggle), **Account** (email + verify/change, password set/change, sign-in methods, account ID, sign out, delete), **Billing** (current plan card from role → Free/Pro/Pilot, upgrade → pricing, manage subscription → Stripe portal, link existing subscription), and **Connections** (IBKR + Alpaca broker status/connect, referral link). Hash-routed (`#general`/`#account`/…), responsive (sidebar → scroll tabs on mobile), and wired entirely to existing endpoints (`/api/profiles/me`, `/api/billing/*`, `/api/broker/*`, `/api/trading/ibkr/connection`, `/api/referral/link`) — no new backend. Power-user API-keys/connectors/context management stays on `orchestration.html`, linked from the settings sidebar ("API keys & connectors →"); the retired `/api-keys-settings.html` redirect now points there too. Verified live: authed load renders all four panels with real profile data, panel switching works, and saving the name persists via `PUT /api/profiles/me`.
+- Settings polish: the **plan card now shows the price** (Free / $20 mo / $200 mo next to the plan name), and **Change email / Change password are proper inline modals** instead of `prompt()` dialogs. The password modal collects the current password (verified server-side) + the new one with inline validation and friendly errors; the email modal explains the confirm-by-email step. A small reusable `openModal({title, fields, onSubmit})` helper backs both (Enter-to-submit, click-outside/Cancel to close, inline error line). All against existing endpoints. Verified live: plan card reads "Pilot · $200/mo"; the password modal opens with Current + New fields and submits.
+- Σ₀ model program — P0 gate work + docs (2026-07-23). (1) The JSRR ρ<1 stability gate now runs on
+- the EXACT low-rank reduction of the empirical loop Jacobian (src/sigma0/loop_lm.py) — ρ from the
+- (T-1,T-1) Gram VᵀU, machine-precision, ~570× cheaper (7s→sub-ms at d=2048); matmul build (kills a
+- latent 2GB OOM); continuous diagnostics capped by dim; JSRR authoritative over the continuous gate
+- (math-check caught a false-'contract' bug on λ=−2 loops). (2) sigma0_grounding_verdict() — a
+- two-factor certificate: grounded=True IFF loop-stable AND externally verified; its ACTIVE FACE means
+- a stable-but-unverified answer EXPERIMENTS to verify (next_action=experiment) and only settles
+- effectively-false-until-true once all means are exhausted — never a resting abstention. (3) Docs:
+- the from-scratch whitepaper (SIGMA0-OURO-CODER rewrite), the technical paper, the RC1 model spec,
+- the design-of-record anytime-budget scope, research-canon from-scratch + modern-design landscape,
+- and the home trading-chips + model-picker. Experiments: p0_gate_measure, spiral_arc_smoketest,
+- convergence_world_model, oracle-active-loop records. The serve-path wiring of the grounding verdict
+- (SIGMA0_GROUNDED default + response surfacing) is deferred to #2883 — it changes the serving default
+- and requires a measured leaderboard row.
+- v1.10 white-box honesty program: probe scale-ladder verified (assoc 0.70->0.92), powered honesty eval (162 negatives) + gates-off arm, V1 honest-teacher chain + parser fix, M1 ledger instrument (clean), certificate white-paper restructure with formula registry + novelty ladder + stage crosswalk, cross-domain patent landscape, citation grounding ledger
+- small-model SOTA theory: Pareto operating-point definition, verifier-amplification + cascade + abstention math with validated-vs-predicted table, CPU-first size envelope (7B too large for product tier), falsification plan
+- trading/strategy: **retuned the day-trader toward its measured edge.** Walk-forward
+-   backtests (real signal engine, no-lookahead, ~1mo 15m bars) showed the mean-reversion
+-   engine is **negative-expectancy on high-beta single stocks** (META/NVDA/AAPL basket: 26%
+-   win, avg −0.26R, PF 0.65) but **positive on liquid + leveraged/inverse ETFs at a tight
+-   target** (leveraged/inverse basket, longs-only: 55% win, +0.07R, PF 1.17). Three changes:
+-   1. **Default universe → ETFs.** `data/lantern-garage/trading/watchlist.seed.json` and the
+-      `watchlist-store` hardcoded fallback now seed liquid broad ETFs + high-vol leveraged/
+-      inverse ETFs (SPY/QQQ/IWM/DIA/GLD/TLT/SMH/XLK + TQQQ/SQQQ/SOXL/SOXS/SPXL/SPXS/TNA/TZA)
+-      instead of single stocks + crypto. Existing users' saved watchlists are untouched.
+-   2. **Trend/regime entry filter** (`scan.js`, `TRADER_REGIME_FILTER`, on by default): a
+-      BULLISH entry is only taken when the name is trend-aligned — price above its SMA-50
+-      (15m) AND MACD histogram positive. Stops the engine catching falling knives (buying
+-      dips in a downtrend), which is where the single-stock edge was destroyed. Fail-open on
+-      thin history.
+-   3. **R-multiple take-profit** (`auto-trader.js`, `TRADER_TAKE_PROFIT_R`, default **1**):
+-      exit a long at +1R (= `stopPct`). This engine's winners don't run — a 1R target beat
+-      2R/3R on every basket in the sweep — so gains are banked instead of round-tripped.
+-   All env-overridable. Covered by new tests in `auto-trader-trailing.test.js` (a +1R long
+-   is banked, a <1R long is held). Note: this is a backtest-grounded improvement on a **thin
+-   ~1mo sample** (leveraged-ETF decay unmodeled, single regime) — a real but modest edge
+-   (PF 1.17), pending out-of-sample validation, not a proven money-maker.
+- trading/champion: **honest leverage accounting + gross modes** (`lib/sigma-trader.js`).
+-   The 23y walk-forward re-measured with real financing (Fed Funds + IBKR's 1.5% spread)
+-   showed the static-2× book beating SPY on both CAGR and Sharpe (17.6%/0.79 vs
+-   11.1%/0.66) — so the overlay is now selectable: `SIGMA_GROSS_MODE=brake|1x|2x`
+-   (default **brake**, the best-Sharpe variant, unchanged behavior). Every plan/ledger row
+-   now carries `gross_mode` and a `financing` block — borrow APR (live Fed Funds via
+-   FRED, cached daily, `SIGMA_BENCHMARK_RATE` override) and est. daily cost when gross>1,
+-   cash yield (BM−0.5%) when gross<1 — so the paper track record no longer overstates a
+-   levered book by its un-modeled borrow cost. Still paper-only, SIGMA_ARM-gated, per
+-   ADR-0028.
+- trading/overnight: **per-sleeve edge gate** (`OVERNIGHT_EDGE_GATE`, on by default) — the
+-   operator rule "find the edge before entering," enforced in code. Every exit row records
+-   an estimated close→open P&L (armed or dry), `summarize()` scores each sleeve's LIVE
+-   expectancy, and even when armed a sleeve places real (paper) orders only after its own
+-   ledger shows positive expectancy over ≥ `OVERNIGHT_EDGE_MIN_N` (20) nights; a sleeve
+-   whose live edge measures negative is auto-paused back to dry. Backtests admit a sleeve
+-   to the book; only its live ledger arms it.
+- trading/champion: `SIGMA_FINANCING_SPREAD` — the financing spread is broker-specific
+-   (IBKR Pro ≈ +1.5 default, Lite ≈ +2.5, Alpaca margin ≈ +3.5–4), so Alpaca-only users
+-   model THEIR rate honestly. The 23y re-measure showed the 2× edge survives Lite-grade
+-   financing (16.5%/yr vs SPY 11.1%), so nothing about the overlay requires IBKR.
+- trading/overnight+intraday: **position partitioning + audit fixes** — the integration
+-   audit found four real defects between the two engines, all fixed: (1) `broker-facade`
+-   lacked `cancelIBKROrder`, so stop-cancels through the facade silently no-oped on
+-   Alpaca; (2) the overnight exit now cancels any resting protective SELL-STOP the
+-   intraday re-protect pass attached (an orphaned GTC stop on a flat position can fire
+-   and open an unintended short) and sells `min(leg qty, live qty)` instead of blind qty;
+-   (3) the intraday engine now takes an `excludeSymbols` set (fed live from
+-   `overnight-trader.heldSymbols()`) so it never exits/stops/sells/enters overnight-owned
+-   positions; (4) the overnight entry skips symbols the account already holds — no
+-   commingled positions with ambiguous ownership. The reverse-ETF strategy is NOT
+-   discarded: it lives on intraday (SQQQ/SOXS in the #2936 universe) and overnight as the
+-   SH bear-rally-fade sleeve; only the falsified blanket-inverse-overnight form was
+-   dropped (oracle ledger `inverse-etf-overnight-test`).
+- trading: **direction lock** (`lib/direction-lock.js`) — one account, one direction per
+-   underlying FAMILY. Every instrument maps to (underlying, sign) — SQQQ→QQQ-short,
+-   SH→SPY-short, SPXL→SPY-long… — and BOTH engines now refuse an ENTRY whose sign opposes
+-   existing family exposure (skips logged as `direction_conflict`/`skip_conflict`). Closes
+-   the two real contradiction paths the logic review found: the sequential intraday trap
+-   (long TQQQ → reversal → also buys SQQQ = hedged-with-fees) and the cross-engine one
+-   (intraday SQQQ + the overnight QQQ capitulation long on the same condition). Closing
+-   positions is never blocked; cross-family offsets (TQQQ+TZA) remain allowed as relative
+-   value — the convex both-ways construct stays the options trader's job.
+- research/trading: **the Kalshi maker-side edge is REFUTED**, on real settled data with two pre-registered tests. Pulled 1.49M real executed trades across 180 settled markets using the public trades feed — which publishes `taker_side`, giving trade-direction ground truth the Polymarket microstructure result (arXiv:2604.24366) says an order-book feed cannot supply (~59% accuracy). Because every executed trade has a known maker on the other side and every market has a known `result`, realized maker P&L is arithmetic rather than simulation. **Test A (out-of-sample weather cities):** 0 of 6 positive, pooled −1.61c/contract over 60 city-day units, t = −3.92 — the in-sample sign (+1.15c) *inverted*. **Test B (mechanism across 42 series, 10 categories, ~4 orders of magnitude of volume):** maker edge vs log10(volume) slope −0.105c/decade, t = −0.15, p = 0.88, R² = 0.001 — no relationship, and leave-one-category-out flips the sign. Gates were committed (`78efbf58`) before scoring and were not rewritten when they failed. **What survives, better evidenced: takers lose** (MLB −1.41c, crypto −0.77c, weather −2.84c per contract with settlement ground truth), and makers earn positive *gross* while still losing *net* in 2 of 3 original series — the venue fee is the binding constraint on both sides. Retracts the earlier suggestion that the trader was "on the wrong side" of weather markets: that rested on the in-sample number and does not survive. Docs: `docs/research/2026-07-25-kalshi-maker-edge-REFUTED.md`.
+- research/verify: **the open-weights honesty wedge is retracted** — a white-box activation probe does not beat a steelmanned black-box baseline on the same model. Measured on a de-glossed set (surface-only control at chance, 0.526): 1.5B wedge +7.7pp, **7B wedge +0.4pp** — it *collapses* with scale rather than widening, because verbalized confidence improves faster (0.758 → 0.915) than the probe does (0.835 → 0.919). At 7B the black-box arm wins on 2 of 3 claim families. Pre-registered ≥10pp gate failed at both rungs and was not moved. An earlier HaluEval run was invalidated by its own de-gloss control (a style-only classifier scored 0.9812 there), making a surface-only baseline required methodology for honesty evals. Docs: `docs/research/2026-07-25-axis-b-retraction-honesty-wedge.md`.
+- **Overnight book: levered execution** (`OVERNIGHT_EXEC=1x|2x|3x`) — same measured
+-   signals, levered-ETF execution (SSO/QLD at 2x; UPRO/TQQQ/TNA/SPXS at 3x). Backtested
+-   2010–2026 via the shipped gates: 3x = 29.3% CAGR / Sharpe 1.24 / maxDD 26.3% vs SPY
+-   12.2%/0.76/34.1% — and more cost-robust than 1x (edge scales, slippage doesn't).
+-   Synthetic margin financing measured worse than the levered ETFs at every tier.
+-   Direction-lock covers all execution instruments; ledger records signal + exec symbol.
+- trading/overnight: **per-sleeve evidence bar before a sleeve may risk anything** (`lib/overnight-trader.js`). The shipped `edgeMinN=20` applied one bar to every sleeve; a one-sided power calculation (α=.05, power=.80, `n=(z_α+z_β)²σ²/δ²`) says detecting these edges needs ~155 nights for capitulation (+18bp/night, σ≈90bp) and **~330 for the bear-rally fade** (13bp/night, σ≈95bp) — so 20 nights arms the fade on roughly **7% of the evidence required**. The fade is also the only sleeve whose backtest **|t| = 2.1 sits below the Harvey–Liu |t| > 3.0 bar** for a new factor claim under multiple testing, so it carries the weakest prior and needs the most live proof. Adds `edgeMinNBySleeve` with the fade raised to 330 (`OVERNIGHT_EDGE_MIN_N_FADE`), and `canArm()` now checks each sleeve's own bar **before** trusting the verdict label — `summarize()` tags verdicts using the global `minN`, so without this a raised-bar sleeve could read `positive_edge` on far too little data. Only the fade is changed; the other sleeves are also under-powered at 20 and that is flagged rather than altered silently. 3 tests added (17 total, all green).
+- **Champion account separation** (operator rule): the Champion is an INVESTOR —
+-   `rebalanceNow` executes only on its own dedicated identity (`CHAMPION_ALPACA_*`
+-   keys / a `champion-book` connection, same no-borrowing contract as Sigma) and
+-   refuses with a clear reason when none is configured. Advisory `plan()` still
+-   works on any account; orders never touch the traders' book.
+- **Trader tier gating** (operator tiering): the allocator **Book** is a staff-only
+-   surface (admin tab + 403 on the API for everyone else); the **Advisor** is a $20
+-   Pro capability; the **trading terminal** page locks for Free users behind an
+-   upgrade card (Watch stays free); the **AI autopilot** is a $200 Pilot capability
+-   (per-user autoscan skip). Plan gates follow the product-wide PLAN_ENFORCEMENT
+-   flag; UI hiding is live now. plan-matrix gains trade_terminal / advisor /
+-   options_manual (pro) and the missing pilot→pilot role mapping.
+- adr(#3002): **both 2026-07-27 amendments approved by the operator** (in-session): ADR-0024 A1 — Phase 1 narrowed from "pretrain a frontier model" to "post-train a strong open base into a VERIFIER" (grounded in the measured product workload, docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md); ADR-0026 A1 — the additive deployment-shape amendment. Status flipped Proposed → Accepted with the approval recorded per ADR-0001; the base ADR-0024 program status is untouched.
+- docs(BENCHMARKS): record the agent-harness swing caveat — scaffold choice moves agentic
+-   benchmark scores 10–26 points (Opus 4.8 69.2% vendor vs 51.9% SEAL; Gemini 3.1 Pro 26.4pt
+-   spread; Kimi K3 Terminal-Bench 88.3 vendor vs 84.6 independent), so vendor tables are
+-   system-level directional evidence, not model rankings. Adds four rules: never rank across
+-   harnesses, stamp the harness with the score, treat reasoning-history handling as a
+-   measurement-affecting scaffold setting (relevant to the verified-cascade/spiral rungs),
+-   and prefer boards that run the models under a common harness.
+- **The options trader is now the overnight book's 4th execution tier**, not a second
+-   engine. Its entry gate was a byte-for-byte duplicate of the book's SPY
+-   `uptrend+notflat` sleeve — same `close>SMA50 & MACD>0`, same rv10-vs-trailing-median,
+-   same 15:45 entry / 09:31 exit, same underlying — so the signal now lives in ONE place
+-   and `options-shadow` becomes the options *execution adapter* (chain discovery,
+-   quotes, paper order placement). `OVERNIGHT_EXEC=options` executes every sleeve as a
+-   next-day OTM call ladder (entry at the ask, exit at the contract's bid) instead of
+-   shares; `1x|2x|3x` are unchanged. `options-shadow.gates()` delegates its pass/fail
+-   to `uptrendGate` so the two can never diverge again, and when the book owns options
+-   execution the shadow's own ladder stands down — otherwise both would double-expose
+-   the same nightly signal on the same underlying, which the direction lock cannot
+-   catch (both legs are long the same family). The PENNY sleeve stays in the shadow: its
+-   intraday 2¢-target exit is a genuinely different holding period, not a duplicate.
+- **Each trading engine gets its own account** (operator rule): the intraday day-trader
+-   and the overnight sleeve book no longer share a book, so each engine's P&L is
+-   independently measurable — entangled equity made "did the overnight book make money?"
+-   unanswerable, and measurement is the point while the sleeves earn their edge.
+-   `overnight-trader` gains a dedicated `overnight-book` identity (`OVERNIGHT_ALPACA_*`
+-   keys, no fallback to the day-trader's account — the same no-borrowing contract Sigma
+-   and Champion already have) plus an explicit `OVERNIGHT_BROKER=alpaca|ibkr` switch
+-   that bypasses the global `BROKER_PREFER` so the book can't drift onto another
+-   engine's broker. Status now reports `broker` + `account`.
+- feat(spiral): self-training set builder + richer escalation-corpus rows. New
+-   `scripts/spiral_build_self_train.py` turns the spiral corpus sink into a
+-   replay-balanced, reward-weighted SFT set (v1: 237 exec-verified records —
+-   47 rung-lift @1.0, 190 replay @0.4 per #2729 replay-balance + RWOPD
+-   arXiv:2605.13501 verdict weighting). The harness corpus row now persists the
+-   three fields the build surfaced as gaps: the FAILED cheap attempt on
+-   escalated turns (`cheapAttempt` — the contrastive half of a repair pair),
+-   per-test verify detail (`verifyDetail` — enables partial-credit weights),
+-   and `model`. Control flow stays in the harness per Aletheia (arXiv:2601.14290,
+-   5% backtracking transfer): the student trains only on prompt→verified-solution.
+- QLoRA trainer (#2729) gains the missing selection loop: a held-out val split +
+-   eval every 50 steps + load_best_model_at_end (was selection-blind, kept the last
+-   step). Recipe fixes: dropout 0, weight_decay 0.01, cosine, warmup 0.05, 3 epochs
+-   (~375 steps, not a fixed 600), overfit tripwire. Modal dispatch defaults to
+-   epochs, not --steps 600; fixes the latent --resume_from arg.
+- Coding turns now log the exec-verify outcome as a router-training row (#2798):
+-   [intent, tier, provider/model, verified pass/fail, latency] →
+-   data/convergence/coding-outcomes.jsonl. The verify gate already ran; this only
+-   records its real label — the data a cascade-router needs and that the
+-   convergance records / pcsf receipts don't carry. Additive, never breaks a reply.
+- Local model is now picked by the user's hardware constraints × our capability
+-   shaping and can run on a local CPU or a cheap GCP CPU instance as a cheap chat
+-   stand-in. No-GPU boxes CPU/RAM-gate (was: VRAM-only, falling back to 8GB and
+-   picking an unservable 7B → cloud). Adds Qwen2.5-Coder 3B/1.5B CPU tiers +
+-   selectCheapStandin(); GPU boxes unchanged.
+- convergance records gain a `verified_by` field — typed, checkable artifacts
+-   (pr:/commit:/test:/exec:). `verified=true` is now legitimate only with one,
+-   structurally foreclosing confidence laundering. Seeded 10 PR-verified records
+-   mined from recent Claude sessions.
+- research(trader): 11-paper survivorship-free-backtesting tranche curated into the arXiv
+- corpus (max-Sharpe post-selection inference, drawdown significance, two-centuries trend
+- canon, backtest-overfitting testing; all ids arXiv-API title-verified, PDFs stored, index
+- rebuilt 114,275→114,286 and retrieval verified). Chat gate gains a survivorship/look-ahead/
+- trend-following term group so the tranche is reachable; analysis + free-data point-in-time
+- universe recipe + published bias magnitudes in docs/research/2026-07-18-survivorship-backtest-tranche.md.
+- verified cascade proven live end-to-end on the chat server (#2798): cheap-first,
+-   real exec-verify gate, escalate only on failure. Measured 8.3x cheaper than
+-   frontier-alone at equal quality; router-corpus rows emitted.
+
+### Removed
+- Resolved #2541 (epic #2543) — removed two zero-wiring dead trees after founder sign-off. **`apps/bettersafe`** (11 files): a standalone Tkinter app nothing in the Node server ever launched or imported; deleted entirely per CLAUDE.md's feature gate. **Creator-V10 shorts pipeline** (7 scripts — `filter_gaming_shorts.py`, `v10_training_loop.py`, `youtube_shorts_collector_v2.py`, `youtube_shorts_ingestion.py`, `rerun_shorts_real.py`, `shorts_research_loop.py`, `lantern_v6_1_shorts_editor.py`) plus its orphan `data/youtube/*.jsonl` mock outputs: abandoned since 2026-06, zero live anchors, and its own orchestrator spawned two already-deleted files. Kept `docs/creator-v10/learning-pipeline-research.md` as the record of the negative result. The third #2541 cluster, `scripts/serve_minicheck.py`, was verified **still wired** (coding-backend source-entailment verifier chain, documented in PROVIDERS.md) and retained unchanged.
+- Scrubbed the last user-facing Discord/Patreon mentions from the product surfaces (they were retired in #2722 but copy lingered). **pricing.html**: removed both "Subscribe on Patreon" buttons and the "Stripe or Patreon" billing notes / "via Patreon" payment-method copy — billing is now Stripe-only (the Stripe checkout buttons are untouched). **profile.html**: Discord and Patreon are no longer offered as connectable sign-in methods (`LINKABLE_PROVIDERS` = Google only), and the "Patreon tiers apply when you connect Patreon" copy + Patreon/Discord display labels + `patreonId`/`discordId` fallbacks are gone. **explore.html**: dropped the "♥ Patreon ↗" footer link. **faq.html**: "billed through Patreon" → "billed securely by card (Stripe)". (Combined with the earlier Settings scrub, all user-facing product copy is now Discord/Patreon-free. Remaining references are internal only — chat.html's legacy `.patreon-pill`/`data-patreon-role` CSS naming, the staff-only accounts.html identity view, and historical ADR/doc titles in the knowledge center — none user-visible.)
+
+### Spiral: action-shaped tiers + repo sandbox (#2973)
+- The Phase-0 spiral could only take a whole-answer proposal per turn — right for MBPP/TACO,
+- wrong for a real repository, where it degenerates to blind single-shot patching (the
+- configuration that measured **0/5 resolved** on SWE-bench Lite, #2246).
+- A tier may now return `{ action }` — one bash command — instead of `{ text }`. The new
+- `lib/spiral-env.js` runs it in the instance checkout, bounded by a timeout, with output
+- middle-elided so one `cat` can't eat the cheap tier's context, and reports whether the
+- working tree changed.
+- That mutation bit is what makes exploration affordable: `ls`/`grep`/`cat` change nothing, so
+- they commit to memory, cost no verifier run, never de-ratchet and never buy a frontier call
+- — only a **mutating** action is a step that faces the Fix-Rate verifier. Exploration is
+- bounded by `observeLimit` (new halt reason `observation-limit`). Mutation is measured from
+- git, not guessed from the command string, so a write via a python heredoc still counts.
+- `escalationRate` — ADR-0030's one governing number — now divides step-escalations by step
+- turns, so a chatty explorer can't fake it downward and an exploring frontier call can't push
+- it above 1. Total billed frontier calls stay on `escalations`; `stepEscalations` is new.
+- The whole control loop is unchanged (stop-on-stall, loop detection, duplicate rejection,
+- bidirectional tiering, the ratchet, honest-can't), and the answer-shaped contract the 204-row
+- VTD corpus was built on is pinned by test. 14 new tests, existing spiral suites green;
+- `test:spiral` now also runs the stall-tiering and env suites.
+- Follow-ups tracked: #2974 (SWE-shaped focus rotation + reflection), #2975 (search/replace
+- edits), #2976 (PASS_TO_PASS bisection), #2977 (memory cap + retrieval), #2978 (width).
+
+### Spiral: SWE-shaped focus rotation (#2974) + search/replace edits (#2975)
+- **Edits (#2975).** One of our 5 graded SWE-bench Lite predictions failed to apply at all —
+- 20% of the run lost to patch *format*, not reasoning. A unified diff asks the model to
+- reproduce exact surrounding lines and correct `@@` numbers from memory; small models can't,
+- and the 111-138/164 no-parse counts on HumanEval are the same weakness seen from another
+- angle. New `lib/spiral-edit.js`: the model emits `<<<<<<< SEARCH / ======= / >>>>>>> REPLACE`
+- blocks naming a file, we locate the text ourselves, and the diff is rendered from disk by
+- git afterward — nobody has to get line numbers right.
+- The exact-match rule is the point: if the SEARCH text is missing or appears twice, **nothing
+- is written** and the reason comes back as an observation. A patch that lands in the wrong
+- function is worse than one that doesn't land — it burns the turn and poisons the Fix-Rate
+- signal for it. Multi-block sets are all-or-nothing for the same reason. Indentation drift is
+- forgiven (only when the match is still unique, splicing the file's own bytes), paths can't
+- escape the repo, and a no-op write is skipped so the tree can't look mutated by a turn that
+- changed nothing.
+- A tier may now return `{ edit }` alongside `{ action }` and `{ text }`; `env.applyEdits`
+- mirrors `env.run`'s contract, so the loop treats all three identically.
+- **Focus (#2974).** New `lib/spiral-swe-focus.js` replaces the MBPP-shaped
+- `outline/edge-cases/simplify` cycle with `localize → reproduce → patch → regress → reflect`.
+- Rotation is **state-aware, not a clock**: phase advances on evidence in memory (something
+- was read; a test was touched; files changed) with a `maxPhaseTurns` anti-wedge, so the loop
+- can't patch before it has looked or move on from `reproduce` without a reproduction. The
+- `reproduce` phase is the load-bearing one — our own measurement puts frustration at
+- phi-hat 0.80 on weak verification vs 0.092 with unit tests, and a reproduction moves
+- SWE-bench from the first regime to the second.
+- Honest note on reflection: Live-SWE-agent's +3-5pp comes from reflection folded into the
+- step prompt, which is what `focusGuidance()` does on every phase. The standalone `reflect`
+- phase (forced after repeated unproductive turns) is our adaptation and costs a turn — it
+- should not be reported as reproducing their number.
+- 21 new tests; `test:spiral` now 72 green.
+
+### Σ₀ grounding verdict wired into the serve path + measured on CPU (#2883)
+- The served Ouro kernel can now attach its **two-factor honesty verdict** to a response —
+- `grounded=True` **only** when the reasoning loop was contraction-stable (JSRR ρ<1) **and** an
+- external verifier confirmed the answer. It rides as pure metadata (`x-ouro-grounded` header +
+- `sigma0_grounding` body field) and is **opt-in** (`SIGMA0_GROUNDED=1`, native loop only): with the
+- flag unset the serving default is byte-identical — the verdict never changes a token. With no
+- verifier wired at serve time the verdict is the active-face **pending** state
+- (`klass=experiment_required`), so serving can never emit a fabricated `grounded=True`.
+- Measurement: added a `native` engine to `scripts/eval_keystone.py` — in-process
+- `AutoModelForCausalLM.generate` (bf16, greedy, `low_cpu_mem_usage`) matching the serve kernel, so
+- the golden set is now measurable **CPU-only**, no CUDA/Ollama. Greedy decoding is deterministic in
+- the weights, so a CPU pass@1 equals the GPU-served number token-for-token — a real measurement, not
+- a proxy. Measured row `ouro-native-cpu-bf16`: **accuracy 0.277** on the 65-prompt golden set
+- (smoke 1.0, easy 0.286, medium 0.25, hard 0.136; avg 47.3 s/prompt at ~0.3 tok/s). Honest read:
+- this is the RAW-kernel floor — no context injection, 32-token cap — and it sits in-family with the
+- prior raw-Ouro rows (0.10–0.22 at depths 1/2/4), slightly above them. The 0.72–0.85 rows on the
+- same board are a 7B model behind chat-with-context; not comparable surfaces.
+
+### Chat escalation meter: measure how often a turn actually needs the expensive tier
+- New `lib/chat-escalation-meter.js` + `GET /api/metrics/escalation`, hooked at the single
+- `logConversation` funnel in `lib/stream-chat.js` so one site covers all ~15 provider legs. Records
+- derived scalars only — tier, sizes, latency, a one-way session hash — never message text, because
+- the trader surface carries positions and P&L through this same chat path; fail-open so metering
+- can never break a turn. 20 unit tests.
+- Why: measured from the product (`docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md`),
+- serving 10,000 users' ordinary chat on the cheap tier costs ~$5.9k/mo — trivial against $20 Pro —
+- while one frontier turn costs 37–67× a cheap one. The escalation premium *is* the cost curve, and
+- that number existed for the coding path (`keystone-escalation.readRolloverShare`) but never for
+- chat. First reading, backfilled over 35 real turns: **0% realized, 2.9% demand** — against the
+- spec's own 20% assumption, so the cost case for owning a model is weaker than assumed (n=35 is far
+- below the 1,000-turn bar; not decisive). The capability case — calibrated confidence, positions
+- that stay on the box, latency inside the decision — is unaffected.
+- Two traps caught and pinned with tests: substring tier matching classified `gemini-2.5-pro` as
+- cheap (`mini` inside "ge-mini-"), which would have understated the rate; and a realized rate of 0
+- means "escalation is switched off", not "nobody needed it" — so the meter also computes the router
+- gate in measure-only mode and reports `POLICY-BOUND` rather than `BUILD-NEGATIVE` in that case.
+- Docs: ADR-0024 and ADR-0026 carry **Proposed** amendments (re-scope Phase 1 from pretraining a
+- frontier model to post-training an open base into a verifier; add a batched cloud deployment shape
+- since an 8GB box cannot serve thousands, plus a calibration check in the accept gate). ADR-0030
+- gains concrete Phase-1 content (fuse the model's early-exit signal with the Spiral's escalation
+- trigger). `SIGMA0-OURO-CODER.md` records a verified doc/code gap: the documented verified-halt
+- includes held-out checks, and the shipped spiral harness implements none.
+
+### FLB backtest rebuilt on a reproducible chain (#2954): signature replicates, sign flip explained
+- Regenerated the missing source data via a committed collector (1,228 single-event settled markets,
+- 1.22M trades, 12 series) and rebuilt the analysis with all six corrections (decision-point
+- conditioning, event clustering, maker-seller accounting, parlay exclusion, adverse-selection
+- measurement, Wilson CIs + degeneracy flags). The FLB signature replicates out-of-sample — longshot
+- buyers lose (1-5c: -1.13c, t=-3.84), favourite buyers win — and the old whole-life method's
+- wrong-sign +5.56c low bucket is explained as selection-on-ever-touching. Adverse selection runs in
+- the seller's favour (taker-buys-yes: maker +1.77c, actual 4.1% vs implied 6.2%), reconciling with
+- the earlier maker refutation (different trade, different band). Generality remains UNPROVEN:
+- 10/12 series are weather, ~203 effective events, 2 series negative, fills unsimulated.
+- **Cross-family pass (same day):** extended beyond weather (10,190-series universe discovered,
+- candidates probed for settled depth). Adding MLB produced an apparent sports edge (+6.78c, t=21.5)
+- that was traced to a COLLECTION ARTIFACT: 88% of MLB markets hit the per-market trade cap,
+- capturing a median 1.6h of 75h markets (end-of-game only). Added C8 truncation guard (exclude
+- capped markets; collector now paginates 40x deeper and records completeness) and C9 minimum-n
+- generality gate (>=30 events/family, after the first verdict read "cross-family" off a 3-event
+- family). Corrected verdict: PARTIAL — holds in weather (200 events, t=3.09) and sports (60 events,
+- selection-caveated); macro underpowered.
+- **Fill simulation (final):** built free-data 1-minute bid/ask history (Kalshi candlesticks; the
+- public API serves no historical depth, so this is the OSS path commercial vendors sell) and
+- required a real buyer at our price before booking a fill. Result: DOES NOT SURVIVE — only the
+- latest decision point is positive, its t is degenerate (0 winners of 29 fills), ~50% of offers
+- never fill, and filled offers wait 1-2.5h. Same "latest-point-only" fragility that disqualified
+- buy-favourites. Simulated fills ignore queue priority/partial fills/impact, so this is an UPPER
+- bound on a result that already fails.
+- **Favourite side (literature-directed):** the academic synthesis identifies buying favourites — a
+- TAKER trade with structurally certain fills — as the retail-accessible expression of longshot bias.
+- Tested on real asks in liquid minutes: 75-95c nets +1.6 to +2.6c/contract, t=0.5-1.4 on ~115
+- events. Directionally right, NOT significant; needs ~2x the events. First candidate to end
+- underpowered rather than refuted. Two sampling corrections were load-bearing: real ask vs traded
+- price (+0.60c gap), and liquid-minutes-only (all-minutes sampling produced spurious significant
+- negatives from stale asks).
+- **External grounding + structural argument:** confronted the strongest counter-argument (datagolf:
+- FLB is a mechanical artifact of flat bookmaker margins, hence unexploitable). It does not transfer
+- to Kalshi, an EXCHANGE whose fee 7*P*(1-P) is convex and minimised at the extremes — measured 0.43c
+- at 90-97c vs 1.74c mid-book (4x). Decomposition confirms: buying deep longshots -4.82c (t=-4.18),
+- buying deep favourites +3.01c (t=2.29), middle is noise. Self-applied caveat: 8 bands tested, so
+- t=2.29 does NOT clear the Harvey-Liu |t|>3 multiple-testing bar. Pattern is defensible; the single
+- cell is not.
+
+### Design 3 (fade-the-longshot) status corrected: plausible, NOT internally reproduced
+- Deep review (#2954) found the doc's "survives every robustness check" rests on decision-point
+- tables with no committed code, while the committed artifact's own verdict is DOES NOT REPLICATE
+- (Spearman −0.857, low bucket +5.56¢ under selection-on-ever-touching bias). Addendum appended to
+- the research doc; restoration requirements tracked in #2954.
+
+### Mission adopted and made measurable
+- Operator direction 2026-07-24: *"Build an AI assistant that delivers the maximum useful work from
+- ordinary hardware, so people get a private, reliable assistant that simply works wherever they
+- are."* Landed as the README headline with a **"mission, measured"** table binding every mission
+- word to an instrument and its honest current state (useful-work → eval leaderboard + verified
+- cascade; ordinary-hardware → 8GB envelope + ternary target; private → opt-in providers +
+- local-only-mode proposal #2918; reliable → Σ₀ grounding verdict; simply-works → greenpath +
+- launcher, tracked #2917). Mirrored in the whitepaper abstract: Σ₀ is the mission's model program,
+- not the mission.
+
+### Remove dead notebooks/ (2 unreferenced Colab notebooks)
+- `notebooks/humaneval_ouro_colab.ipynb` + `notebooks/ouro_train_both_adapters.ipynb` — zero code,
+- workflow, or doc references; archived to F:/lantern-os-archive/2026-07-24/ with SHA-256 manifest,
+- recoverable from git history. The other 7 top-level dirs in the operator's delete list
+- (assets/brand, caad, config, manifests, models, research, surfaces) were verified LIVE — wired
+- into CI gates, the status/model-registry server modules, served knowledge-center content, and
+- research scripts — and were NOT removed. See docs/ARCHIVE-LEDGER.md.
+
+### Repo cleanup batch 2: remove legacy scaffolding, docker, Makefile, dead PR-watcher
+- Operator directive 2026-07-24. Removed (archived to F: with SHA-256 manifest + git history):
+- 7 legacy top-level dirs (assets/brand, caad, config, manifests, models, research, surfaces);
+- the dead in-process PR-watcher (`lib/pr-watcher.js` + `routes/pr-review.js` + server wiring);
+- the old docker stack (deploy is gh-pages + Railway + GCE, not docker); the Windows-first Makefile
+- (replaced by `npm run` scripts); and dependent docker/deploy scripts + the surfaces-only CI
+- workflow. Fail-soft server reads verified (mesh→empty, status.js→defaults); all CI gates, model
+- registry, and markdown links patched. Windows scheduled-task removal is flagged for the operator
+- (several are live production). See docs/ARCHIVE-LEDGER.md.
+- **Batch 3 (same directive):** all 12 Windows scheduled tasks retired (XMLs archived; deletion
+- needs an elevated shell — commands in the session report). Cloudflare tunnel already sunset;
+- Discord lounge bot MIGRATED to alex-place/three-doors (PR #2 there) and fully deregistered here
+- (MCP curators, surface-registry, server spawn + shutdown, requirements, env, launchers);
+- arxiv-harvest and claude-session reaper are now on-demand SKILLS (.claude/skills/) instead of
+- scheduled tasks; all task-installer/autostart scripts removed.
+- **CI alignment (round 2):** stale tests removed with their removed subjects
+- (test_cloud_mirrors, test_mcp_tool_parity, test_account_link); the HTML-link gate now guards the
+- real product index (server-absolute hrefs mapped to public/, query-string routes skipped).
+
+### Repo cleanup: archived mined captures + dead one-offs outside the tree
+- Removed from the working tree (nothing lost — git history for tracked files, SHA-256 manifest
+- for blobs): 9 zero-referenced pre-July one-off scripts (`scripts/*.js`,
+- `experiments/kalshi_grounding_demo.js`); 4.6 GB of fully-mined Kalshi tight-band captures moved to
+- the external archive. Byte-level code dedup found 0 exact duplicates (CI duplication gate already
+- enforces it). New `docs/ARCHIVE-LEDGER.md` records what moved, why, and how to recover it.
+
+### Research-review outcomes: novelty-verification protocol + decided supersessions
+- Outcome of the 2026-07-23 corpus review (10-cluster claim map + 5 adversarial critic lenses, 41
+- findings) and the operator's decisions on its discussion questions:
+- **New:** `docs/research/2026-07-23-ai-novelty-verification-protocol.md` — the repeatable AI
+-   novelty-verification protocol (decompose → per-atom prior art → structural search beyond the
+-   home literature → citation-authenticity audit → adversarial refutation → capped verdict
+-   vocabulary → human ratification), grounded in six verified external works (axiomatic novelty
+-   benchmark 2604.15145, patent-novelty LLM study 2502.06316, RND 2503.01508, semantic novelty
+-   2108.10851, human+LLM novelty eval 2507.11330, the 2026 arXiv hallucinated-citation ban) and a
+-   same-day worked example in which the ensemble demoted a "novel synthesis" candidate
+-   (verifier-gated depth escalation on one weight pool) to **known-repackaged algorithm +
+-   unmeasured empirical instantiation** — the composition is Korf 1985 / Luby 1993 /
+-   Hansen–Zilberstein under classical vocabulary.
+- **Whitepaper supersession** (`docs/SIGMA0-OURO-CODER.md`): operator decision 2026-07-23 —
+-   **distill, not from-scratch**. The from-scratch program is preserved as costed contingency;
+-   all verifier/serving/stability/honesty claims carry to the distilled ≤3B looped student.
+- **Stale-ρ correction** (`docs/adr/0024`): retracted trajectory proxy ρ_obs≈0.88 replaced with
+-   the post-#2029 measured ρ(J)≈8–11 (expansive); certificate quantities reframed as training
+-   **targets/abort criteria**, not current properties.
+- **Canonical naming rule** (`docs/RESEARCH-CANON.md`): ONE machine — the Convergence Core;
+-   Spiral / Oracle / certificate-engine / owned-math-engine / CSF-Converge demoted to stages or
+-   contracts; new proper-noun "machines" rejected at doc review; shared measurement anchors cited
+-   from BENCHMARKS.md, never re-stated as independent evidence.
+
+### Σ₀ serving-architecture decision memo landed as a repo doc
+- `docs/research/2026-07-23-sigma0-serving-architecture-decision.md` — the refutation-corrected
+- E+C recommendation (verifier-gated depth ladder on one resident ≤3B pool under the cloud rescue),
+- the surviving math (ΔRAM=0 unconditional; mediant/regime-sandwich corrections adopted), the final
+- audited novelty grade (known-repackaged + empirical-instantiation), and the pre-registered rung
+- experiment that gates the wiring.
+
+### Weather-edge forward tests: first oracle-vs-market certification runs (read-only)
+- Three rerunnable harnesses promoted to `experiments/weather_*.js` + grounded findings in
+- `docs/research/2026-07-23-weather-edge-forward-tests.md`: day-ahead UHLGA certification FAILS
+- (oracle RPS 0.253 vs board 0.177, −$1.68/unit hypothetical); day-of nowcast vs Kalshi executable
+- prices is breakeven (+$0.32/38 trades net) with the market efficient by ~1pm ET; cross-venue
+- Kalshi→ForecastEx shows +$6.63 (7/7 days) that is explicitly LOOK-AHEAD (overnight info flow,
+- not edge) pending same-time live FEX quotes; realized LGA−KNYC basis measured +1.48°F σ1.70
+- (n=52). Lesson codified: beating a default model ≠ beating the market.
+
 ## [1.12.1] - 2026-07-18
 
 ### Added

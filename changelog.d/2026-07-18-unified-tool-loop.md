@@ -1,6 +1,0 @@
-### Changed
-
-- chat(#2756): collapsed the **five copy-pasted per-provider agentic tool loops** (Anthropic / OpenAI / xAI / Cohere / Gemini) into one shared `runToolLoop` driver + a thin adapter each (`lib/stream-chat/tool-turns.js`). The loop mechanics — iterate to the cap, run the turn's tool calls, stream the two-phase call/result SSE, feed results back until the model stops calling tools — are now defined once, so fixes land in one place instead of five (this is what made #2752 a one-line change). The local free-text loop is unchanged.
-- chat(#2752): tool calls within a single turn now execute **concurrently** (`Promise.all` in the driver, call order preserved) instead of one-at-a-time — cutting latency when the model requests several tools at once.
-
-Verified live in the dev preview (`CHAT_TOOL_EXEC=1`, Gemini via Vertex): a `web_search` tool call executed, its result fed back through the driver, and the model produced a final answer; the plain no-tool path (direct answer) also works; no console errors. The other four providers route through the same driver with adapters extracted line-for-line from their original loops (couldn't smoke-test them without their keys/credits — the risk the operator explicitly accepted).
