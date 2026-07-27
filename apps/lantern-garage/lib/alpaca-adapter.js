@@ -135,10 +135,29 @@ function _authFor(userId) {
     return { host: HOSTS[env], env, source: 'user-keys', accountLabel: c.account_number || null,
       headers: { 'APCA-API-KEY-ID': c.api_key_id, 'APCA-API-SECRET-KEY': c.api_secret_key } };
   }
-  const k = _serverKeys();
-  if (k) {
-    return { host: HOSTS[k.env], env: k.env, source: 'server-keys', accountLabel: null,
-      headers: { 'APCA-API-KEY-ID': k.id, 'APCA-API-SECRET-KEY': k.secret } };
+  // The shared operator keys. NOT for ordinary signed-in users (#2546): falling through to
+  // them pooled every user who hadn't connected BYOK into ONE account, so person B saw
+  // person A's positions and orders and the Free-tier promise of "your own paper-trading
+  // account" was false. That is a privacy bug, not just a product gap.
+  //
+  // Server keys now serve only the identities they were meant for:
+  //   - the owner on a single-user / auth-off box, where every trading route resolves the
+  //     uid as null or 'local-owner' (routes/accounts.js convention), and
+  //   - the named engine identities handled above (sigma / champion / overnight), which
+  //     return before reaching here.
+  // A real signed-in profile id gets NO shared account — it connects its own Alpaca paper
+  // account with BYOK keys (POST /api/broker/alpaca/connect-keys), and until it does, the
+  // broker facade hands it the per-user house practice account (lib/house-paper-broker.js).
+  //
+  // ALPACA_SHARED_KEYS_FOR_ALL=1 restores the old pooled behavior for an operator who
+  // deliberately wants one shared account (e.g. a private single-tenant deployment).
+  const isOwnerIdentity = userId == null || userId === '' || userId === 'local-owner';
+  if (isOwnerIdentity || process.env.ALPACA_SHARED_KEYS_FOR_ALL === '1') {
+    const k = _serverKeys();
+    if (k) {
+      return { host: HOSTS[k.env], env: k.env, source: 'server-keys', accountLabel: null,
+        headers: { 'APCA-API-KEY-ID': k.id, 'APCA-API-SECRET-KEY': k.secret } };
+    }
   }
   return null;
 }
