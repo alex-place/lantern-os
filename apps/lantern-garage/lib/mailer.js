@@ -22,6 +22,54 @@ function smtpConfigured() {
   return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 }
 
+// ── Resend (HTTP API) provider ───────────────────────────────────────────────
+// One env var (RESEND_API_KEY) instead of four SMTP ones, and HTTPS:443 instead
+// of an SMTP port — cloud hosts (incl. GCE) throttle/block SMTP egress, which is
+// a classic silent cause of "the confirmation email never arrived". Free tier
+// covers transactional volume; MAIL_FROM must be a verified sender/domain in the
+// Resend dashboard. Takes precedence over SMTP when both are configured.
+function resendConfigured() {
+  return !!process.env.RESEND_API_KEY;
+}
+function sendViaResend({ to, subject, html, text }) {
+  const https = require("https");
+  const payload = JSON.stringify({
+    from: fromAddress(), to: [to], subject,
+    ...(html ? { html } : {}), ...(text ? { text } : {}),
+  });
+  return new Promise((resolve) => {
+    const req = https.request({
+      host: "api.resend.com", path: "/emails", method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+        "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload),
+      },
+    }, (res) => {
+      let d = ""; res.on("data", (c) => (d += c));
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) return resolve({ ok: true });
+        // Surface Resend's reason (bad from-domain, invalid key…) — never the key.
+        resolve({ ok: false, error: `resend ${res.statusCode}: ${d.slice(0, 200)}` });
+      });
+    });
+    req.on("error", (e) => resolve({ ok: false, error: `resend request failed: ${e.message}` }));
+    req.setTimeout(15000, () => { req.destroy(); resolve({ ok: false, error: "resend timeout" }); });
+    req.write(payload); req.end();
+  });
+}
+
+/** Which transport would a send use right now? For diagnostics/status pages. */
+function mailerStatus() {
+  return {
+    transport: resendConfigured() ? "resend" : smtpConfigured() ? "smtp" : "dev",
+    from: fromAddress(),
+    resend: resendConfigured(),
+    smtp: smtpConfigured(),
+    note: resendConfigured() || smtpConfigured() ? null
+      : "no mail provider configured — emails go to the server log + data/mail-outbox.jsonl only",
+  };
+}
+
 function getTransport() {
   if (_checked) return _transport;
   _checked = true;
@@ -48,6 +96,15 @@ const OUTBOX = path.join(process.cwd(), "data", "mail-outbox.jsonl");
  * Never throws to the caller for a delivery failure — logs and reports ok:false.
  */
 async function sendMail({ to, subject, html, text, link }) {
+  // Provider chain: Resend (HTTP) → SMTP → dev outbox. On a provider failure the
+  // result is reported honestly (ok:false + reason) — never silently swallowed.
+  if (resendConfigured()) {
+    const r = await sendViaResend({ to, subject, html, text });
+    if (r.ok) return { ok: true, transport: "resend" };
+    console.error(`[mailer] resend send failed to ${to}: ${r.error}`);
+    // Fall through to SMTP if that's also configured; otherwise report the failure.
+    if (!smtpConfigured()) return { ok: false, transport: "resend", error: r.error };
+  }
   const transport = getTransport();
   if (!transport) {
     // Dev fallback — make the action link impossible to miss in the logs, and
@@ -119,10 +176,36 @@ async function sendNewSignInEmail(to, name, provider) {
   });
 }
 
+async function sendWelcomeEmail(to, name) {
+  return sendMail({
+    to,
+    subject: `Welcome to ${BRAND}`,
+    text: `Hi ${name || "there"}, your email is confirmed — welcome aboard. Start at https://unisona.ai`,
+    html: shell("You're in",
+      `<p>Hi ${name || "there"}, your email is confirmed and your ${BRAND} account is ready.</p>
+       <p>Start with the chat, watch the markets, or connect a paper-trading broker.</p>${button("https://unisona.ai", "Open " + BRAND)}`),
+  });
+}
+
+async function sendPasswordChangedEmail(to, name) {
+  return sendMail({
+    to,
+    subject: `Your ${BRAND} password was changed`,
+    text: `Hi ${name || "there"}, your password was just changed. If this wasn't you, reset it immediately.`,
+    html: shell("Password changed",
+      `<p>Hi ${name || "there"}, your ${BRAND} password was just changed.</p>
+       <p><strong>If this wasn't you</strong>, reset your password immediately and consider signing in with Google instead.</p>${button("https://unisona.ai/auth.html", "Review your account")}`),
+  });
+}
+
 module.exports = {
   sendMail,
   smtpConfigured,
+  resendConfigured,
+  mailerStatus,
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendNewSignInEmail,
+  sendWelcomeEmail,
+  sendPasswordChangedEmail,
 };
