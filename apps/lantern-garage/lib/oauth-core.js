@@ -233,6 +233,19 @@ async function handleOAuthCallback(providerId, req, res, query) {
   const cookieProvider = req.session.oauth_provider || (ck && ck.provider) || providerId;
 
   if (!expectedState || state !== expectedState || cookieProvider !== providerId) {
+    // Three distinct causes shared one opaque message, so a real outage was
+    // indistinguishable from a stale tab: (a) no recoverable state — the signed
+    // cookie failed HMAC verification, which is what a rotated/unset SESSION_SECRET
+    // or a cross-instance callback looks like; (b) the state genuinely differs;
+    // (c) the cookie was minted for another provider. Log which, never the values.
+    try {
+      const why = !expectedState
+        ? (readCookie(req, OAUTH_COOKIE) ? "cookie_present_but_unverifiable (SESSION_SECRET rotated/unset, or cookie expired past its 10min TTL)" : "no_session_and_no_cookie (cookie dropped — check SameSite/Secure and the redirect_uri host)")
+        : state !== expectedState ? "state_value_differs (concurrent/stale login attempt)"
+        : `provider_mismatch (cookie=${cookieProvider} callback=${providerId})`;
+      console.error(`[oauth] state check FAILED provider=${providerId} reason=${why}` +
+        ` session_state=${req.session.oauth_state ? "present" : "absent"} cookie=${readCookie(req, OAUTH_COOKIE) ? "present" : "absent"}`);
+    } catch (_e) { /* logging must never mask the response */ }
     res.writeHead(403, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
     return res.end(JSON.stringify({ error: "State mismatch" }));
   }
@@ -321,6 +334,21 @@ async function handleOAuthCallback(providerId, req, res, query) {
       },
       (err) => {
         if (err) {
+          // Log the UNDERLYING store error. This branch fires when req.session.save()
+          // fails — i.e. the session STORE refused the write (read-only filesystem,
+          // missing/unwritable session dir, unreachable external store, disk full).
+          // It previously returned a five-word body and logged nothing, so a live
+          // sign-in outage produced no evidence at all (unisona.ai, 2026-07-27).
+          // Never log the OAuth code/token or the profile — only fault diagnostics.
+          try {
+            console.error(
+              `[oauth] session save FAILED provider=${providerId}` +
+              ` code=${err.code || "-"} errno=${err.errno || "-"} syscall=${err.syscall || "-"}` +
+              ` path=${err.path || "-"} store=${(req.sessionStore && req.sessionStore.constructor && req.sessionStore.constructor.name) || "unknown"}` +
+              ` msg=${err.message || String(err)}`
+            );
+            if (err.stack) console.error(`[oauth] session save stack: ${String(err.stack).slice(0, 400)}`);
+          } catch (_e) { /* logging must never mask the response */ }
           res.writeHead(500, { "Content-Type": "application/json", "Set-Cookie": clearCookie });
           return res.end(JSON.stringify({ error: "Session save failed" }));
         }
