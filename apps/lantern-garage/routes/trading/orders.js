@@ -11,6 +11,41 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent, tradingMemory, tradingStore, getEffectiveUserId } = ctx;
 
 
+  // DELETE /api/trading/orders/:id — cancel ONE working order (user-testing gap
+  // 2026-07-26: manual limit orders could be placed but never canceled — only
+  // Kalshi had a cancel route). Cancels on the user's preferred broker; the
+  // adapters only ever cancel orders belonging to the resolved account.
+  if (req.method === 'DELETE') {
+    const m = url.pathname.match(/^\/api\/trading\/orders\/([A-Za-z0-9-]{6,64})$/);
+    if (m) {
+      const uid = getEffectiveUserId(req);
+      try {
+        // Route by ORDER-ID SHAPE, not by broker preference: Alpaca ids are UUIDs,
+        // IBKR ids are numeric. (First cut asked the preferred-broker facade, which
+        // "canceled" an Alpaca order against IBKR and reported success — caught by
+        // verifying the order state on the broker afterward.)
+        const id = m[1];
+        const isAlpacaId = /[a-f0-9]{8}-[a-f0-9]{4}/i.test(id);
+        let ok = false; let broker = null;
+        const tryAlpaca = async () => {
+          const alpaca = require('../../lib/alpaca-adapter');
+          return alpaca.available(uid) ? alpaca.cancelOrder(uid, id).catch(() => false) : false;
+        };
+        const tryIbkr = async () => bridge ? bridge.cancelIBKROrder?.(uid, id).catch(() => false) : false;
+        if (isAlpacaId) { ok = await tryAlpaca(); broker = ok ? 'alpaca' : null; }
+        else { ok = await tryIbkr(); broker = ok ? 'ibkr' : null; }
+        if (!ok) { // cross-broker fallback, tried honestly
+          ok = isAlpacaId ? await tryIbkr() : await tryAlpaca();
+          if (ok) broker = isAlpacaId ? 'ibkr' : 'alpaca';
+        }
+        sendJson(res, ok ? { ok: true, canceled: id, broker } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
+      } catch (error) {
+        sendJson(res, { ok: false, error: error.message }, 500);
+      }
+      return true;
+    }
+  }
+
   // GET /api/trading/orders
   // Broker truth from Alpaca (#1714): every order the account submitted —
   // autonomous (Σ₀ engine) AND manual — so the Orders / Order-history tabs

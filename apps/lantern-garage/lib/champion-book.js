@@ -204,19 +204,31 @@ async function plan(userId, { bandPct = DEFAULT_BAND_PCT, conservative = false, 
  * CHAMPION_ARM=1. Refuses a non-paper account. Places fractional PAPER market orders.
  */
 async function rebalanceNow(userId, { arm = false, bandPct = DEFAULT_BAND_PCT, conservative = false, maxGross } = {}) {
-  const p = await plan(userId, { bandPct, conservative, maxGross });
-  if (!p.ok) return p;
+  // ACCOUNT SEPARATION (operator rule 2026-07-26): the Champion is an INVESTOR,
+  // not a trader — like a personal investing account next to a trading account, it
+  // EXECUTES only on its own dedicated identity (CHAMPION_ALPACA_* keys or a
+  // connection stored under 'champion-book'). plan(userId) stays advisory on any
+  // account; ORDERS never touch the traders' book.
+  const alpaca = require('./alpaca-adapter');
   const armed = arm && process.env.CHAMPION_ARM === '1';
+  const execUser = alpaca.CHAMPION_USER;
+  if (armed && !alpaca.championAvailable()) {
+    const p = await plan(userId, { bandPct, conservative, maxGross });
+    logLedger({ event: 'refused_shared_account', equity: p.ok ? p.equity : null });
+    return { ...(p.ok ? p : {}), ok: p.ok, executed: false, refused: 'no_dedicated_account',
+      reason: 'The Champion is an investor and will not trade the traders’ account. Give it its own: CHAMPION_ALPACA_API_KEY_ID/_SECRET (a separate Alpaca paper account).' };
+  }
+  const p = await plan(armed ? execUser : userId, { bandPct, conservative, maxGross });
+  if (!p.ok) return p;
   // Hard refuse: never trade a live account from this engine.
   if (armed && p.env === 'live') { logLedger({ event: 'refused_live', equity: p.equity }); return { ...p, executed: false, refused: 'live_account_forbidden' }; }
   if (!armed) { logLedger({ event: 'plan_dry', equity: p.equity, gross: p.gross, weights: p.weights, orders: p.orders }); return { ...p, executed: false, dryRun: true }; }
-  const alpaca = require('./alpaca-adapter');
   const results = [];
   for (const o of p.orders) {
-    const r = await alpaca.placeOrder(userId, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
+    const r = await alpaca.placeOrder(execUser, { ticker: o.symbol, side: o.side, qty: o.qty, type: 'market', timeInForce: 'day' }).catch((e) => ({ status: 'error', reason: e.message }));
     results.push({ ...o, status: r && r.status, order_id: r && r.order_id });
   }
-  logLedger({ event: 'rebalance', equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
+  logLedger({ event: 'rebalance', account: 'champion-dedicated', equity: p.equity, gross: p.gross, weights: p.weights, orders: results });
   return { ...p, executed: true, results };
 }
 

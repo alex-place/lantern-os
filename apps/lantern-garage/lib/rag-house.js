@@ -12,7 +12,7 @@ const { readJsonl } = require("./file-queue");
 const repoRoot = path.resolve(__dirname, "..", "..");
 const appPaths = require("./app-paths");
 const flatRagHousePath = path.join(appPaths.dataRoot(), "rag-house", "flat-rag-house-latest.json");
-const flatRagHouseManifestPath = path.join(appPaths.repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
+const flatRagHouseManifestPath = path.join(appPaths.repoRoot, "data", "rag-house", "FLAT-RAG-HOUSE-LATEST.md");
 
 function repoSources() {
   return [

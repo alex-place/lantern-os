@@ -264,8 +264,6 @@ def _ledger(event: str, **payload: Any) -> None:
 _skills_db: Dict[str, Dict[str, Any]] = {
     "dream_journal":    {"enabled": True,  "version": "1.0.0", "module": "skills/dream_journal/dream_journal.py"},
     "lucid_dreaming":   {"enabled": True,  "version": "1.0.0", "module": "skills/lucid_dreaming/mild_wbtb_protocol.py"},
-    "archive_curator":  {"enabled": True,  "version": "1.0.0", "module": "src/discord_lounge_bot/archive_curator.py"},
-    "voice_curator":    {"enabled": True,  "version": "1.0.0", "module": "src/discord_lounge_bot/voice_curator.py"},
     "job_application":  {"enabled": True,  "version": "1.0.0", "module": "skills/job_application/job_application.py"},
 }
 

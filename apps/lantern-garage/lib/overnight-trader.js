@@ -37,6 +37,22 @@ function cfg() {
   return {
     enabled: process.env.OVERNIGHT_TRADER === '1',      // opt-in
     armed: process.env.OVERNIGHT_ARM === '1',           // place (paper) orders vs dry-log
+    // Execution leverage (OVERNIGHT_EXEC=1x|2x|3x): SAME signals, levered ETF
+    // execution. Backtested 2010-03..2026-07 net of slippage (scripts/
+    // overnight-leverage-backtest.js): 3x = 29.3% CAGR / Sharpe 1.24 / maxDD 26%
+    // vs 1x 8.7%/1.02/16% and SPY 12.2%/0.76/34% — and MORE cost-robust (the
+    // per-night edge scales 3x while slippage stays ~1x). Levered ETFs beat
+    // synthetic margin at every level (institutional financing inside the fund).
+    // 'options' is the 4th tier: the SAME nightly signal executed as a next-day OTM
+    // CALL ladder instead of shares (operator 2026-07-27 — the options trader was a
+    // duplicate of this book's SPY uptrend sleeve, so it folded in here as execution
+    // rather than a second engine with its own copy of the gate).
+    exec: ['1x', '2x', '3x', 'options'].includes(String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase())
+      ? String(process.env.OVERNIGHT_EXEC || '1x').toLowerCase() : '1x',
+    // Call-ladder depths (% OTM) when exec='options', and contracts per leg.
+    optionLadder: String(process.env.OVERNIGHT_OPTION_LADDER || '0.25,0.5,1,1.5,2')
+      .split(',').map((x) => parseFloat(x)).filter((x) => Number.isFinite(x) && x > 0),
+    optionQty: Math.max(1, Math.min(10, n('OVERNIGHT_OPTION_QTY', 1))),
     // "Find the edge BEFORE entering" (operator rule): even when ARMED, a sleeve may
     // only place real orders after its OWN live ledger shows positive expectancy over
     // ≥ edgeMinN nights — until then that sleeve keeps trading dry, building the
@@ -55,7 +71,17 @@ function cfg() {
       bear_rally_fade: n('OVERNIGHT_EDGE_MIN_N_FADE', 330),
     },
     allocPct: n('OVERNIGHT_ALLOC_PCT', 30),             // % of equity deployed across tonight's sleeves
-    userId: process.env.OVERNIGHT_USER || process.env.TRADER_AUTO_USER || 'local-owner',
+    // OWN ACCOUNT (operator rule 2026-07-27). The intraday day-trader and this book
+    // must not share a book: entangled equity makes each engine's P&L unattributable,
+    // and measurement is the whole point while the sleeves earn their edge. Defaults
+    // to the dedicated 'overnight-book' identity (OVERNIGHT_ALPACA_* keys, no
+    // fallback to the day-trader's account — same contract as Sigma/Champion).
+    // OVERNIGHT_USER still pins a specific identity for testing/back-compat.
+    userId: process.env.OVERNIGHT_USER || require('./alpaca-adapter').OVERNIGHT_USER,
+    // Which broker runs this book: 'alpaca' (default — API keys never expire, so the
+    // 09:31 exit can't be orphaned by a dead session) or 'ibkr' (needs a live CPAPI
+    // gateway session; an expired one would strand an open overnight leg).
+    broker: process.env.OVERNIGHT_BROKER === 'ibkr' ? 'ibkr' : 'alpaca',
   };
 }
 
@@ -102,6 +128,45 @@ function fadeGate(closes) {
   if (!down) return { pass: false, why: 'not a downtrend' };
   return (closes[i] / closes[i - 1] - 1) >= 0.01 ? { pass: true, rule: 'bear_rally_fade' } : { pass: false, why: 'no ≥+1% rally day' };
 }
+/** Signal symbol → levered execution instrument, per OVERNIGHT_EXEC tier.
+ *  Unmapped symbols (GLD at 2x/3x, IWM at 2x) execute 1x — no levered data/
+ *  backtest support for them. All instruments are covered by direction-lock. */
+const EXEC_MAPS = {
+  '1x': {},
+  '2x': { SPY: 'SSO', QQQ: 'QLD' },
+  '3x': { SPY: 'UPRO', QQQ: 'TQQQ', IWM: 'TNA', SH: 'SPXS' },
+};
+
+/** OPTIONS execution tier: the next-expiry OTM call ladder for one sleeve symbol.
+ *  Chain discovery / quotes / paper order placement all live in options-shadow —
+ *  that module is the options EXECUTION ADAPTER; the signal lives here. Returns
+ *  [{depth, strike, contract, ask, bid}] (only legs with a real quote), or [].
+ */
+async function optionLadderFor(symbol, spot, ladder) {
+  const ox = require('./options-shadow');
+  const chain = await ox.listNextExpiryCalls(symbol).catch(() => ({ error: 'chain failed' }));
+  if (!chain || chain.error || !Array.isArray(chain.contracts)) return { expiry: null, legs: [], why: (chain && chain.error) || 'no chain' };
+  // The trade being measured is CLOSE → NEXT OPEN. An option whose nearest expiry is
+  // days or weeks out is a DIFFERENT instrument (multi-week theta/vega held for one
+  // night), and silently substituting it would corrupt the sleeve's expectancy. Only
+  // symbols listing a next-session expiry are tradable on this tier — measured
+  // 2026-07-27: SPY/QQQ/IWM list next-day, GLD +1d, SH +24d (monthlies only).
+  const nextSession = ox.nextTradingDayET(_etNow());
+  if (chain.expiry !== nextSession) {
+    return { expiry: chain.expiry, legs: [], why: `no next-session expiry (nearest ${chain.expiry}, need ${nextSession}) — this symbol lists no overnight option` };
+  }
+  const strikes = chain.contracts.map((x) => Number(x.strike_price)).filter((x) => x > 0);
+  const legs = [];
+  for (const depth of ladder) {
+    const strike = ox.pickStrike(spot, strikes, depth);
+    const contract = strike != null ? chain.contracts.find((x) => Number(x.strike_price) === strike) : null;
+    if (!contract) continue;
+    const q = await ox.quoteOption(contract.symbol).catch(() => null);
+    if (q && q.ask > 0) legs.push({ depth, strike, contract: contract.symbol, ask: q.ask, bid: q.bid });
+  }
+  return { expiry: chain.expiry, legs };
+}
+
 /** Tonight's sleeve selection from {SYM: closes[]}. Pure. */
 function selectSleeves(closesBySym) {
   const out = [];
@@ -178,7 +243,7 @@ async function tick({ bridge } = {}) {
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
     const { brokerFacadeFor } = require('./broker-facade');
     const yahoo = require('./market-data-yahoo');
-    const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
+    const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
     // Today's OPEN per held symbol — the est. exit print for EVERY leg (armed or dry),
     // so the ledger measures each sleeve's live expectancy and feeds the edge gate.
     const openBySym = {};
@@ -193,6 +258,23 @@ async function tick({ bridge } = {}) {
       for (const p of (pos || [])) heldQty[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
     for (const leg of (st.open.legs || [])) {
+      // OPTION legs settle against the CONTRACT's bid at the open (not the underlying's
+      // print) — entry at the ask, exit at the bid, the honest sides of a thin market.
+      if (leg.instrument === 'option') {
+        const ox = require('./options-shadow');
+        const q = await ox.quoteOption(leg.contract).catch(() => null);
+        const bid = (q && q.bid) || 0;
+        const pl = leg.ref_close > 0 ? +(((bid - leg.ref_close) / leg.ref_close) * 100).toFixed(2) : null;
+        let status = 'dry';
+        if (leg.placed) {
+          const r = bid > 0
+            ? await ox.placePaperOrder({ contract: leg.contract, side: 'sell', qty: leg.qty, limit: bid }).catch((e) => ({ error: e.message }))
+            : { error: 'no bid — leg left to expire worthless' };
+          status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
+        }
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed });
+        continue;
+      }
       const exitRef = openBySym[leg.symbol] || null;
       const pl = exitRef && leg.ref_close > 0 ? +(((exitRef - leg.ref_close) / leg.ref_close) * 100).toFixed(3) : null;
       if (leg.placed && resolved) {
@@ -237,7 +319,7 @@ async function tick({ bridge } = {}) {
     if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, why: 'no sleeve gate passed' }); return; }
 
     const { brokerFacadeFor } = require('./broker-facade');
-    const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
+    const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
     const account = resolved ? await resolved.facade.getIBKRAccount(c.userId).catch(() => null) : null;
     const equity = (account && Number(account.equity)) || 0;
     const baseDry = !c.armed || !resolved || !(equity > 0);
@@ -252,29 +334,68 @@ async function tick({ bridge } = {}) {
       for (const p of posArr) preHeld[String(p.symbol).toUpperCase()] = Number(p.qty) || 0;
     }
     const dlock = require('./direction-lock');
-    const per = (equity > 0 ? equity : 100000) * (c.allocPct / 100) / sleeves.length;
+    // Allocation: an explicit OVERNIGHT_ALLOC_PCT pins it; otherwise the capital
+    // allocator's evidence-driven budget for this sleeve owns the number (one book,
+    // one allocator — operator directive 2026-07-26).
+    let allocPct = c.allocPct;
+    if (process.env.OVERNIGHT_ALLOC_PCT === undefined) {
+      try { allocPct = await require('./capital-allocator').budgetPctFor('overnight'); } catch (_e) { /* keep default */ }
+    }
+    const per = (equity > 0 ? equity : 100000) * (allocPct / 100) / sleeves.length;
+    // Levered execution: the signal decides, the exec map picks the instrument.
+    const execMap = EXEC_MAPS[c.exec] || {};
+    const execCloseBySym = {};
+    for (const execSym of new Set(sleeves.map((s) => execMap[s.symbol]).filter(Boolean))) {
+      try { const r = await yahoo.getBars(execSym, '1d'); const b = ((r && r.bars) || []).slice(-1)[0]; if (b && b.close > 0) execCloseBySym[execSym] = b.close; } catch (_e) { /* */ }
+    }
     const legs = [];
     for (const s of sleeves) {
-      if ((preHeld[s.symbol] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
+      const execSym = execMap[s.symbol] || s.symbol;
+      if ((preHeld[execSym] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
       // DIRECTION LOCK: never enter against existing family exposure — e.g. the QQQ
       // capitulation long while the intraday engine holds SQQQ (the same downtrend
       // condition expressed opposite ways), or SH while the account is long SPY/SPXL.
-      const dc = dlock.conflicts(s.symbol, posArr);
-      if (dc.conflict) { _append({ phase: 'skip_conflict', date: today, symbol: s.symbol, sleeve: s.sleeve, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+')}` }); continue; }
-      const px = closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0];
-      if (!(px > 0)) continue;
-      const qty = Math.max(1, Math.floor(per / px));
+      const dc = dlock.conflicts(execSym, posArr);
+      if (dc.conflict) { _append({ phase: 'skip_conflict', date: today, symbol: execSym, sleeve: s.sleeve, why: `direction_conflict: opposite ${dc.family} exposure via ${dc.against.join('+')}` }); continue; }
+      const px = execSym === s.symbol
+        ? (closesBySym[s.symbol] && closesBySym[s.symbol].slice(-1)[0])
+        : execCloseBySym[execSym];
+      if (!(px > 0)) { _append({ phase: 'skip', date: today, symbol: execSym, sleeve: s.sleeve, why: 'no execution price' }); continue; }
       // Per-sleeve edge gate: a sleeve trades REAL (paper) money only after its own
       // live ledger proves the edge; until then it runs dry and keeps measuring.
       const gate = canArm(s.sleeve, edge, c);
       const placeReal = !baseDry && gate.arm;
+
+      // ── OPTIONS tier: the same signal as a next-day OTM call ladder ──────────
+      if (c.exec === 'options') {
+        const ox = require('./options-shadow');
+        const { expiry, legs: ladder, why: ladderWhy } = await optionLadderFor(s.symbol, px, c.optionLadder);
+        if (!ladder.length) { _append({ phase: 'skip', date: today, symbol: s.symbol, sleeve: s.sleeve, exec: 'options', why: ladderWhy || 'no option ladder / quotes' }); continue; }
+        for (const l of ladder) {
+          let status = 'dry_run';
+          if (placeReal) {
+            // Marketable limit AT the ask — the honest side of a thin option market
+            // (the same fill assumption the expectancy ledger measures against).
+            const r = await ox.placePaperOrder({ contract: l.contract, side: 'buy', qty: c.optionQty, limit: l.ask }).catch((e) => ({ error: e.message }));
+            status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
+          }
+          legs.push({ instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol, sleeve: s.sleeve,
+            depth: l.depth, strike: l.strike, expiry, qty: c.optionQty, ref_close: l.ask, placed: placeReal && status === 'placed' });
+          _append({ phase: 'enter', date: today, instrument: 'option', contract: l.contract, symbol: s.symbol, signal: s.symbol,
+            sleeve: s.sleeve, exec: 'options', depth: l.depth, strike: l.strike, expiry, spot_close: px,
+            qty: c.optionQty, ref_close: l.ask, status, dry: !placeReal, edge_gate: gate.why });
+        }
+        continue;
+      }
+
+      const qty = Math.max(1, Math.floor(per / px));
       let status = 'dry_run';
       if (placeReal) {
-        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: s.symbol, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
+        const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: execSym, side: 'buy', qty, type: 'market', equity }).catch((e) => ({ status: 'error', reason: e.message }));
         status = (r && r.status) || 'error';
       }
-      legs.push({ symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
-      _append({ phase: 'enter', date: today, symbol: s.symbol, sleeve: s.sleeve, qty, ref_close: px, status, dry: !placeReal, edge_gate: gate.why });
+      legs.push({ symbol: execSym, signal: s.symbol, sleeve: s.sleeve, qty, ref_close: px, placed: placeReal && status === 'placed' });
+      _append({ phase: 'enter', date: today, symbol: execSym, signal: s.symbol, sleeve: s.sleeve, exec: c.exec, qty, ref_close: px, status, dry: !placeReal, edge_gate: gate.why });
     }
     if (legs.length) { st.open = { date: today, legs }; }
     _writeState(st);
@@ -286,7 +407,7 @@ function status() {
   const c = cfg();
   let last = [];
   try { last = fs.readFileSync(LEDGER, 'utf8').trim().split('\n').slice(-12).map((l) => JSON.parse(l)); } catch (_e) { /* */ }
-  return { enabled: c.enabled, armed: c.armed, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
+  return { enabled: c.enabled, armed: c.armed, exec: c.exec, broker: c.broker, account: c.userId, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
     edge: summarize(_readLedger(), { minN: c.edgeMinN }), state: _readState(), recent: last };
 }
 
@@ -299,4 +420,4 @@ function heldSymbols() {
   } catch (_e) { return new Set(); }
 }
 
-module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, minNFor, heldSymbols, tick, status, LEDGER, STATE };
+module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, optionLadderFor, summarize, canArm, minNFor, heldSymbols, tick, status, LEDGER, STATE };

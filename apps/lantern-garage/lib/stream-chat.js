@@ -2473,7 +2473,13 @@ async function handleStreamChat(req, url, res) {
       const groundingEnabled = process.env.GEMINI_GROUNDING !== "false" && isGroundable;
       const searchInstruction = groundingEnabled ? "\n\nYou have access to live web search. Use it to find current information, verify facts, or answer questions about recent events when relevant." : "";
       const geminiPayloadBase = {
-        contents: [{ role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] }],
+        // Thread the prior conversation turns so this single-shot fallback has memory
+        // (the CHAT_TOOL_EXEC path above already does; this default path dropped them,
+        // so every default gemini turn forgot the conversation — greenpath s5).
+        contents: [
+          ...compacted.map((h) => ({ role: h.role === "assistant" ? "model" : "user", parts: [{ text: h.text }] })),
+          { role: "user", parts: [{ text: `${systemPrompt}${searchInstruction}\n\n${message}` }] },
+        ],
         // Non-RP gets the same 4096 as the tool path (was 1024) — a 1024 cap truncated long
         // code answers on this single-shot fallback too. thinkingBudget:0 keeps the budget visible.
         generationConfig: { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },

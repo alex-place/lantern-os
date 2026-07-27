@@ -65,6 +65,8 @@ const PUBLIC_PAGES = {
   // client-side; the trade-gated data endpoints stay blocked server-side by
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
+  "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
+  "/options.html":        "options.html",   // options trader (shadow) + chain — advisory, no orders placeable
   // Public read-only spectator view of the demo (paper) account (#2548): a
   // logged-out visitor can watch it trade live. No order controls exist on the
   // page and its feed endpoint is a sanitized public read (PUBLIC_TRADING_READS).

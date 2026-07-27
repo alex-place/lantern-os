@@ -1,0 +1,21 @@
+{
+  "_note": "The AI autopilot's default TRADING universe (fresh users' tradelists seed from this). The measured ETF basket: mean-reversion+regime+1R is negative on high-beta single stocks and positive on liquid + leveraged/inverse ETFs — see changelog.d/2026-07-24-trader-etf-universe.md. The user-curated WATCHLIST is tracking-only and never traded by the AI.",
+  "tickers": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "DIA",
+    "GLD",
+    "TLT",
+    "SMH",
+    "XLK",
+    "TQQQ",
+    "SQQQ",
+    "SOXL",
+    "SOXS",
+    "SPXL",
+    "SPXS",
+    "TNA",
+    "TZA"
+  ]
+}

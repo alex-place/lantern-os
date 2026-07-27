@@ -91,7 +91,7 @@ node apps/lantern-garage/server.js
 **Full stack (dual-boot dev).**
 
 ```bash
-make quickstart
+npm run quickstart --prefix apps/lantern-garage
 # Port 4177: stable (master) · Port 4178: dev (your branch, hot-reload)
 ```
 
@@ -150,7 +150,7 @@ Autonomous subsystems that run without operator intervention:
 | Health gate | [`lib/health-aggregator.js`](apps/lantern-garage/lib/health-aggregator.js) | One boot health-check + readiness verdict — enumerates every moving part (web server, Ollama, MCP, trader, cloud providers) as up / down / disabled-with-reason |
 | Auto-deploy | scheduled task `KeystoneAutoDeployStable` | Non-destructive `git merge --ff-only` every 5 min; health check + automatic rollback |
 | Convergence router | [`lib/convergence-router.js`](apps/lantern-garage/lib/convergence-router.js) | Deterministic intent cache — same input, same route; providers only on cache miss |
-| PR watcher | [`lib/pr-watcher.js`](apps/lantern-garage/lib/pr-watcher.js) | Auto-merges green, conflict-free, fleet-approved PRs; protected paths (auth/money/workflows/secrets/migrations) always need a human |
+| PR merging | manual / agent-session driven (watcher removed 2026-07-24) | Green CI + review verdict remain the bar; protected paths (auth/money/workflows/secrets/migrations) always need a human |
 
 Full subsystem map: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · design rationale: **[ADR index](docs/adr/README.md)**.
 
@@ -190,7 +190,7 @@ npm run test:ui  --prefix apps/lantern-garage   # requires Playwright
 python -m pytest tests/ -q --tb=short
 
 # Syntax check server entrypoints
-make check-node
+node --check apps/lantern-garage/server.js
 
 # Auth E2E (from repo root)
 npm run test:auth

@@ -90,7 +90,7 @@ const noop = () => {};
  * @param {object} args
  *   problem   {object}   REQUIRED. { id, prompt, tests? } — the one problem.
  *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>.
- *                        `ctx` = { problem, memory, focus, y, turn }. `escalate` is
+ *                        `ctx` = { problem, memory: memoryView, focus, y, turn, avoid }. `escalate` is
  *                        optional; if absent, a cheap stall simply de-ratchets.
  *   verify    {function} REQUIRED. async (candidateText, { problem, memory, before }) =>
  *                        either a Fix-Rate result ({ advanced, solved, ... }) OR a raw
@@ -103,6 +103,21 @@ const noop = () => {};
  *   stickyTiers {boolean} bidirectional rung movement (default true): a fully-stalled
  *                        turn starts the NEXT turn at the frontier rung; any commit
  *                        returns to cheap.
+ *   memoryWindow {number} #2977: prompt-facing calls (tiers, answerability) see only
+ *                        the LAST N committed steps (default 4; 0 = uncapped). The
+ *                        internal ratchet history and the returned `memory` stay
+ *                        complete — only the per-turn PROMPT VIEW is windowed, so a
+ *                        long horizon can't saturate the cheap tier's context.
+ *   memoryTextCap {number} #2977: per-step candidate text cap (chars, default 4000)
+ *                        in that prompt view; `_truncated` carries the true length.
+ *   failureCache {object|null} #2869 failure-mode cache ({avoidFor, recordFailures});
+ *                        opt-in — when set, known-failed approaches for the task
+ *                        signature ride into every tiers ctx as `avoid`, and an
+ *                        unsolved halt records this run's verified failures.
+ *   escalationContract {boolean} contractive-escalation enforcement (#2867, default
+ *                        true): a verified escalation that fails to advance halts the
+ *                        run ("escalation-noncontractive") — every frontier spend must
+ *                        measurably help or the loop stops honestly.
  *   answerability {function} optional async (ctx) => number ∈ [0,1]; halt "honest can't"
  *                        when it declines below `answerabilityFloor` (M5).
  *   answerabilityFloor {number} default 0.15.
@@ -117,7 +132,8 @@ const noop = () => {};
  *   cost:number, y:(string|null), memory:Array, corpusRows:Array,
  *   escalationRate:number, corpusFile:(string|null), confidence:number
  * }>}
- *   haltReason ∈ "solved" | "stalled" | "loop" | "answerability" | "maxTurns".
+ *   haltReason ∈ "solved" | "stalled" | "loop" | "escalation-noncontractive" |
+ *                "answerability" | "maxTurns".
  *   confidence is the whole-answer score (see _wholeAnswerConfidence), decoupled
  *   from where the loop stopped.
  */
@@ -130,6 +146,10 @@ async function runSpiral(args) {
     maxTurns = 12,
     stallLimit = 3,
     stickyTiers = true,
+    escalationContract = true,
+    failureCache = null,
+    memoryWindow = 4,
+    memoryTextCap = 4000,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -159,6 +179,13 @@ async function runSpiral(args) {
   // Stop-on-stall + loop detection + the sticky cascade rung. `seenStalled` holds
   // state-hashes of candidates that failed to advance — re-proposing one is loop
   // evidence, and never worth paying the verifier for again.
+  // #2869 failure-mode cache: known-failed approaches for this task signature are
+  // injected as avoid-constraints BEFORE the cheap tier proposes (negative space
+  // only), and this run's verified failures are recorded on an unsolved halt.
+  const fcache = failureCache || null; // opt-in: prod call sites pass the real cache
+  const avoid = fcache ? fcache.avoidFor(problem) : [];
+  const stalledForCache = [];
+
   let consecutiveStalls = 0;
   let consecutiveDupTurns = 0;
   let rung = "cheap";
@@ -178,12 +205,15 @@ async function runSpiral(args) {
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const focus = rotateFn(turn, memory);
+    // #2977: the prompt-facing view of memory — recency window + per-step text cap
+    // (deterministic; no scoring variance). The full history stays in `memory`.
+    const memoryView = _recallView(memory, memoryWindow, memoryTextCap);
     onStep({ type: "turn_start", turn, focus, memorySize: memory.length });
 
     // M5 (pre-step): honest-can't halt — if the model can no longer justify an
     // answer, stop rather than bluff. Checked before spending a tier call.
     if (answerability) {
-      const a = await answerability({ problem, memory, y, turn, focus });
+      const a = await answerability({ problem, memory: memoryView, y, turn, focus });
       if (Number.isFinite(a) && a < answerabilityFloor) {
         haltReason = "answerability";
         onStep({ type: "halt", reason: haltReason, turns: turn, solved, answerability: a });
@@ -204,7 +234,17 @@ async function runSpiral(args) {
         onStep({ type: "verify_skipped", turn, reason: "duplicate-candidate" });
         return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _dup: true };
       }
-      return score(await verify(c.text, { problem, memory, before: best }), best);
+      const out = score(await verify(c.text, { problem, memory, before: best }), best);
+      // #2869: a REAL-verified candidate that failed to advance is repeatable error
+      // for this task signature — collected for the failure cache on unsolved halt.
+      if (!out.advanced) {
+        const results = out._results || out.results || [];
+        stalledForCache.push({
+          text: String(c && c.text) || "",
+          failingTests: (Array.isArray(results) ? results : []).filter((t) => !t.passed).map((t) => String(t.name)),
+        });
+      }
+      return out;
     };
 
     const canEscalate = typeof tiers.escalate === "function";
@@ -219,12 +259,12 @@ async function runSpiral(args) {
       tier = "escalated";
       escalations += 1;
       onStep({ type: "escalate", turn, reason: "sticky rung: cheap stalled last turn" });
-      cand = await tiers.escalate({ problem, memory, focus, y, turn });
+      cand = await tiers.escalate({ problem, memory: memoryView, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       v = await evaluate(cand);
       onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
     } else {
-      cand = await tiers.cheap({ problem, memory, focus, y, turn });
+      cand = await tiers.cheap({ problem, memory: memoryView, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
       v = await evaluate(cand);
@@ -238,7 +278,7 @@ async function runSpiral(args) {
         tier = "escalated";
         escalations += 1;
         triedTiers = 2;
-        cand = await tiers.escalate({ problem, memory, focus, y, turn });
+        cand = await tiers.escalate({ problem, memory: memoryView, focus, y, turn, avoid });
         cost += Number(cand && cand.cost) || 0;
         v = await evaluate(cand);
         onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
@@ -261,6 +301,9 @@ async function runSpiral(args) {
       // demonstration on a step the cheap tier could not do. Flagged for the trainer.
       distillTarget: tier === "escalated" && v.advanced,
       verifySkipped: !!v._dup,
+      // #2977: advancing rows carry the FULL candidate text — the distillation
+      // record stays complete even when the prompt view above is truncated.
+      text: v.advanced ? String(cand && cand.text) : undefined,
       ts: new Date(now()).toISOString(),
     };
     corpus.append(row);
@@ -296,6 +339,17 @@ async function runSpiral(args) {
       // next turn at the cheap rung would repeat a proven-futile call.
       if (stickyTiers && tier === "escalated") rung = "escalated";
       onStep({ type: "stall", turn, tier });
+      // Contractive-escalation enforcement (#2867, the ILC ρ<1 condition,
+      // US7345448B2/US8094405B1): a REAL verified escalation that failed to advance
+      // means the expensive tier is non-contractive on this problem right now —
+      // paying frontier rates for a plateau is exactly the runaway spend the
+      // contract forbids. Halt honestly. (A dup-skipped escalation carried no new
+      // information and does not trigger the contract; the loop detector owns it.)
+      if (escalationContract && tier === "escalated" && !v._dup) {
+        haltReason = "escalation-noncontractive";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved, cost, escalations });
+        break;
+      }
       // Stop-on-stall: a run of turns with zero real progress will not be saved by
       // more of the same — halt honestly instead of grinding out the turn cap.
       if (stallLimit > 0 && consecutiveDupTurns >= 2) {
@@ -312,6 +366,14 @@ async function runSpiral(args) {
   }
 
   if (haltReason === "maxTurns") onStep({ type: "halt", reason: haltReason, turns: maxTurns, solved, cost, escalations });
+
+  // #2869: an unsolved halt writes this run's verified failures back to the cache
+  // (repeatable error, pre-subtracted next time). Solved runs record nothing.
+  if (fcache && !solved && stalledForCache.length) {
+    try {
+      fcache.recordFailures({ problem, haltReason, stalledCandidates: stalledForCache });
+    } catch { /* best-effort — never fail the run on a cache write */ }
+  }
 
   const turns = corpusRows.length;
   return {
@@ -347,6 +409,20 @@ function _wholeAnswerConfidence(best, solved) {
   if (best == null) return 0;
   const s = summarize(best);
   return s.total > 0 ? s.passed / s.total : 0;
+}
+
+/**
+ * #2977: the prompt-facing memory view — last `window` committed steps with each
+ * step's candidate text capped at `textCap` chars (`_truncated` = true length).
+ * Deterministic by construction; the caller's full history is never mutated.
+ */
+function _recallView(memory, window, textCap) {
+  const recent = window > 0 ? memory.slice(-window) : memory.slice();
+  return recent.map((s) =>
+    s && typeof s.text === "string" && textCap > 0 && s.text.length > textCap
+      ? { ...s, text: s.text.slice(0, textCap), _truncated: s.text.length }
+      : s,
+  );
 }
 
 /**

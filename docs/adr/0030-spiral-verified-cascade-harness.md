@@ -67,6 +67,10 @@ Build order, de-risked, most value first:
   cheap tier couldn't do = a distillation target). Measurable on SWE-bench today.
 - **Phase 1 — VTD-specialize a 7–14B cheap tier** on the Phase-0 escalation corpus (Verified-Trace
   Distillation). The "own weights" bet, gated on Phase-0 evidence.
+  *[Amended in effect by the operator size envelope, 2026-07-23: the product/cheap tier is
+  **≤3B / ≤4GB / CPU-viable**; 7B+ is escalation-tier only. See
+  [research/2026-07-23-sigma0-llm-design.md](../research/2026-07-23-sigma0-llm-design.md) §2 and
+  ADR-0031. This note records that later operator decision; the ADR's decision text is unchanged.]*
 - **Phase 2 — the from-scratch tiny recursive core** (growing memory + rotational anti-collapse as
   trainable modules). Gated on Phase-1 evidence. The ambitious, highest-risk piece — never built first.
 

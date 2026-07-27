@@ -19,7 +19,7 @@
   // STATUS panels; the control panels (keys, training, auto-pull) are hidden via
   // body.is-guest and their endpoints are admin-gated server-side. So it must not
   // bounce here either.
-  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
+  const PUBLIC = ['/', '/index.html', '/auth.html', '/auth', '/explore.html', '/knowledgecenter.html', '/chat.html', '/dream-chat.html', '/stock-trader.html', '/watch.html', '/options.html', '/orchestration.html', '/pricing.html', '/demo.html', '/contest.html'];
   // Pages that require the "trade" entitlement (kept in sync with routes/pages.js).
   const TRADE_PAGES = ['/kalshi-terminal.html']; // /trading.html retired → redirects to /stock-trader.html (#2488)
   // Operator surfaces hidden from the header tabs + footer links for the guest
@@ -142,7 +142,11 @@
       badge.id = 'nav-tier';
       badge.className = 'nav-tier';
       badge.href = '/pricing.html';
-      profileBtn.parentElement.insertBefore(badge, profileBtn);
+      // Lead the actions cluster (leftmost) — sitting between the icon buttons
+      // broke the group up visually (operator, 2026-07-25). flex order pins it
+      // first even when other buttons are reordered/hidden responsively.
+      badge.style.order = '-2';  // beats .nav-menu-toggle's order:-1 on narrow screens
+      profileBtn.parentElement.insertBefore(badge, profileBtn.parentElement.firstChild);
     }
     badge.textContent = label;
     badge.dataset.tier = kind;
@@ -225,6 +229,13 @@
       // the safe (locked-down) state until the session resolves.
       const isAdminUser = !!(session && session.authenticated && session.role === 'admin');
       document.body.classList.toggle('is-admin', isAdminUser);
+      // Plan classes for tier-gated UI (operator tiering 2026-07-26): Pro+ sees the
+      // Advisor tab / trade terminal; Pilot+ the AI autopilot controls.
+      const _role = String((session && session.role) || 'guest');
+      const _proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(_role);
+      const _pilotPlus = ['pilot','tech_support','admin'].includes(_role);
+      document.body.classList.toggle('is-pro-plus', _proPlus);
+      document.body.classList.toggle('is-pilot-plus', _pilotPlus);
       document.body.classList.toggle('is-guest', !(session && session.authenticated));
       const canTrade = !!(session && session.entitlements && session.entitlements.trade);
       if (!canTrade) hideTradeNav();

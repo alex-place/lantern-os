@@ -1,0 +1,110 @@
+{
+  "date": "2026-07-26",
+  "band": [
+    1,
+    15
+  ],
+  "fill_rule": "bid_high >= P (touch)",
+  "markets": 103,
+  "thin_markets": 11,
+  "points": {
+    "0.25": {
+      "offers": 47,
+      "fills": 24,
+      "fill_pct": 51.1,
+      "avg_fill_price": 7.04,
+      "mean_wait_minutes": 157,
+      "events": 13,
+      "net_c_per_fill": -7.455,
+      "t": -0.91,
+      "actual_yes_pct": 12.5,
+      "actual_ci95": [
+        4.34,
+        31
+      ],
+      "net_c_per_offer": -3.807,
+      "net_c_per_fill_forecastex": -8.455,
+      "degenerate": false
+    },
+    "0.4": {
+      "offers": 48,
+      "fills": 26,
+      "fill_pct": 54.2,
+      "avg_fill_price": 6.23,
+      "mean_wait_minutes": 106,
+      "events": 13,
+      "net_c_per_fill": 3.462,
+      "t": 1.32,
+      "actual_yes_pct": 3.85,
+      "actual_ci95": [
+        0.68,
+        18.89
+      ],
+      "net_c_per_offer": 1.875,
+      "net_c_per_fill_forecastex": 2.462,
+      "degenerate": false
+    },
+    "0.5": {
+      "offers": 50,
+      "fills": 32,
+      "fill_pct": 64,
+      "avg_fill_price": 5.59,
+      "mean_wait_minutes": 125,
+      "events": 15,
+      "net_c_per_fill": 0.339,
+      "t": 0.09,
+      "actual_yes_pct": 6.25,
+      "actual_ci95": [
+        1.73,
+        20.15
+      ],
+      "net_c_per_offer": 0.217,
+      "net_c_per_fill_forecastex": -0.661,
+      "degenerate": false
+    },
+    "0.6": {
+      "offers": 54,
+      "fills": 33,
+      "fill_pct": 61.1,
+      "avg_fill_price": 5.94,
+      "mean_wait_minutes": 71,
+      "events": 16,
+      "net_c_per_fill": -0.307,
+      "t": -0.05,
+      "actual_yes_pct": 3.03,
+      "actual_ci95": [
+        0.54,
+        15.32
+      ],
+      "net_c_per_offer": -0.188,
+      "net_c_per_fill_forecastex": -1.307,
+      "degenerate": false
+    },
+    "0.75": {
+      "offers": 59,
+      "fills": 29,
+      "fill_pct": 49.2,
+      "avg_fill_price": 5.86,
+      "mean_wait_minutes": 140,
+      "events": 15,
+      "net_c_per_fill": 5.8,
+      "t": 7.68,
+      "actual_yes_pct": 0,
+      "actual_ci95": [
+        0,
+        11.7
+      ],
+      "net_c_per_offer": 2.851,
+      "net_c_per_fill_forecastex": 4.8,
+      "degenerate": true
+    }
+  },
+  "limits": [
+    "queue priority ignored (our lot assumed served)",
+    "partial fills ignored",
+    "own market impact ignored",
+    "=> simulated fills are an UPPER bound"
+  ],
+  "degenerate_points": 1,
+  "verdict": "DOES NOT SURVIVE fill simulation (surviving points are degenerate: 0 winners => t is an artifact)"
+}

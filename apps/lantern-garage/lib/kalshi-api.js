@@ -270,6 +270,16 @@ async function placeOrder(o) {
     // could otherwise borrow the weather-edge live allowance for an arbitrary market.
     // Independently verify server-side that the ticker really is a weather market.
     blockers.push(`source_ticker_mismatch (source=kalshi-weather-edge but ticker='${o.ticker}' is not a KXHIGH* weather market)`);
+  } else if (o.source === "kalshi-longshot-probe") {
+    // Defense-in-depth for the FLB probe (#2954/#2956): the probe may ONLY post a
+    // 1-contract resting NO bid at an implied YES ≤ 15¢ (the studied band, maker-side,
+    // near-zero maker fee). Anything else that carries this source label is blocked
+    // server-side regardless of env gates — the label cannot borrow a wider allowance.
+    const lc = Number(o.limitCents);
+    if (o.side !== "no" || o.action !== "buy" || (o.type || "limit") !== "limit"
+        || !Number.isFinite(lc) || lc < 85 || lc > 99 || (o.count || 1) !== 1) {
+      blockers.push("probe_contract_violation (kalshi-longshot-probe may only buy 1 NO limit at 85-99c — implied YES 1-15c)");
+    }
   }
 
   // Explicit-confirm gate: a LIVE fill must carry confirmLive:true, set by the caller

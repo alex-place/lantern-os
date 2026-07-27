@@ -37,18 +37,6 @@ jobs:
           test -f docs/CONVERGENCE-LOOP.md || (echo "docs/CONVERGENCE-LOOP.md missing" && exit 1)
           echo "All required top-level files present"
 
-      - name: Check manifests
-        run: |
-          test -f manifests/FOUNDRY-MATRIX-RAG-DOLLHOUSE.md || (echo "FOUNDRY-MATRIX-RAG-DOLLHOUSE.md missing" && exit 1)
-          test -f manifests/open-issues.md || (echo "open-issues.md missing" && exit 1)
-          test -f config/batch-jobs-enhanced.json || (echo "config/batch-jobs-enhanced.json missing" && exit 1)
-          echo "All required manifests present"
-
-      - name: Check surfaces
-        run: |
-          test -f surfaces/shareholder-index/index.html || (echo "shareholder-index/index.html missing" && exit 1)
-          test -f surfaces/shareholder-index/styles.css || (echo "shareholder-index/styles.css missing" && exit 1)
-          echo "All required surfaces present"
 
       - name: Validate HTML links
         run: |
@@ -56,15 +44,18 @@ jobs:
           from pathlib import Path
           import re
 
-          html_path = Path("surfaces/shareholder-index/index.html")
+          html_path = Path("apps/lantern-garage/public/index.html")
           index = html_path.read_text()
           hrefs = re.findall(r'href=["\']([^"\']+)["\']', index)
 
           missing = []
           for href in hrefs:
-            if href.startswith(("http", "https", "#", "mailto")):
-              continue
-            target = (html_path.parent / href).resolve()
+            if href.startswith(("http", "https", "#", "mailto")) or "?" in href:
+              continue  # external, anchor, or a server ROUTE (query string) — not a file
+            if href.startswith("/"):
+              target = (html_path.parent / href.lstrip("/")).resolve()  # server-absolute -> public/
+            else:
+              target = (html_path.parent / href).resolve()
             if not target.exists():
               missing.append(href)
 
@@ -257,12 +248,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Check cloud mirrors config
-        run: |
-          test -f manifests/cloud-mirrors.json || (echo "cloud-mirrors.json missing" && exit 1)
-          python3 -m json.tool manifests/cloud-mirrors.json > /dev/null || (echo "Invalid JSON" && exit 1)
-          echo "Cloud mirrors config valid"
-
       - name: Check MCP contract
         run: |
           test -f docs/LANTERN-RUNTIME-CICD.md || echo "LANTERN-RUNTIME-CICD.md missing"
@@ -279,16 +264,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Validate convergence batch framework
-        run: |
-          echo "Checking batch framework configuration..."
-          test -f config/batch-jobs-enhanced.json || (echo "Batch config missing" && exit 1)
-
-          # Validate JSON structure
-          python3 -c "import json; json.load(open('config/batch-jobs-enhanced.json'))" || (echo "Invalid batch config JSON" && exit 1)
-
-          echo "Batch framework validated by CI/CD"
-
       - name: Validate CI/CD from convergence perspective
         run: |
           echo "Checking that convergence loop can validate CI/CD..."
@@ -296,13 +271,6 @@ jobs:
           test -f .github/workflows/deploy.yml || (echo "Deploy workflow missing" && exit 1)
           echo "CI/CD workflows validated from batch perspective"
 
-      - name: Test mutual validation loop
-        run: |
-          echo "Testing mutual validation contract:"
-          echo "- Batch framework validates CI/CD: $(test -f .github/workflows/ci.yml && echo 'YES' || echo 'NO')"
-          echo "- CI/CD validates batch framework: $(test -f config/batch-jobs-enhanced.json && echo 'YES' || echo 'NO')"
-          echo ""
-          echo "Mutual validation contract is active"
 
   # ============================================================================
   # SECURITY: Bandit + pip-audit

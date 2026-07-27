@@ -322,8 +322,10 @@ operation). **Research base:** memory staleness is unsolved at the tooling level
 forgetting-curve replay (FOREVER); the memory-update gap (Supersede 2606.27472); the
 surrogate-leash discipline (US8131656B2: trust the cheap check only while re-fit against ground
 truth). **In-repo:** CSF memory + wired recall (+22pp@5 measured); the canonical ledger (M1-clean,
-first replay 2026-07-22: 0 free rises / 48 pairs); serve-from-ledger planned
-([#2859](https://github.com/alex-place/lantern-os/issues/2859)).
+first replay 2026-07-22: 0 free rises / 48 pairs); **serve-from-ledger + answer-stability canary
+LANDED** ([#2859](https://github.com/alex-place/lantern-os/issues/2859) first landing, PR #2864
+merged 2026-07-23: exact-key evidence-receipted serving, drift alarm on unreceipted movement;
+chat wiring still owed).
 **Open:** [#2853](https://github.com/alex-place/lantern-os/issues/2853) ·
 [#2787](https://github.com/alex-place/lantern-os/issues/2787) ledger test.
 
@@ -344,8 +346,11 @@ paraphrase-contraction training (R9 second-round audit risk, [#2861](https://git
 cheapest-test-first, pass terminates; bidirectional tiering US7254641B2: *de*-escalate when easy);
 ILC re-parameterizing the cheap tier (US6686716B1 = the VTD flywheel's servo precedent).
 **In-repo:** the Spiral shipped (ADR-0030; 18/18 MBPP at 6% escalation; strong cheap tier 8.3×
-cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator;
-stop-on-stall + de-escalation quick wins ([backlog](research/2026-07-22-cross-domain-incremental-backlog.md)).
+cheaper, #2800). **Open:** [#2855](https://github.com/alex-place/lantern-os/issues/2855) allocator.
+**Shipped 2026-07-23:** the stop-on-stall/loop-detection, pass-terminates, bidirectional-tiering
++ whole-answer-confidence quick wins landed in the harness (PR #2862, from the
+[backlog](research/2026-07-22-cross-domain-incremental-backlog.md)); the Phase-0 runner gained the
+honest-labeling frontier preflight (PR #2863).
 
 ### VERIFY — the certificate's home (Part I lives here)
 **Certificate objects:** R3/M1 (✓ audited; **first ledger replay 2026-07-22: M1-clean — 1
@@ -355,9 +360,12 @@ cadence necessary) · R8 (anytime-valid e-cert) · the white-box probe as verifi
 measured on-box, 4-bit). **Research base:** hidden-state probing (2606.02628, replicated here) with
 its honest scope limit (2510.09033); agent drift (2601.04170); gates-off snapshot testing as
 frontier practice (Opus 4.6 card). **In-repo:** exec-verify sandbox; the powered honesty eval
-(162 held-out negatives + gates-off arm); the M1 replay instrument. **Open:**
-[#2856](https://github.com/alex-place/lantern-os/issues/2856) · wire M1 as an *enforced* gate ·
-probe survival at 1.58-bit (V3 acceptance test).
+(162 held-out negatives + gates-off arm); the M1 replay instrument; **M1 as an ENFORCED runtime
+gate — LIVE since 2026-07-23** ([#2872](https://github.com/alex-place/lantern-os/issues/2872),
+PR #2881: `lib/m1-gate.js` mirrors the replay instrument on every JS ledger write path;
+clamp-and-receipt, free rises unrecordable). **Open:**
+[#2856](https://github.com/alex-place/lantern-os/issues/2856) ·
+probe survival at 1.58-bit (V3 acceptance test, [#2873](https://github.com/alex-place/lantern-os/issues/2873) — blocked on the ternary artifact existing).
 
 ### CONVERGE — promotion, the ratchet, determinism
 **Certificate objects:** R10 (the oracle objective — coverage s.t. calibrated honesty at bounded
@@ -366,8 +374,10 @@ cost) · the Σ_θ acceptance gate (Part II) · basin determinism as the product
 base:** assembly-by-distillation is the frontier norm (Qwen3 strong-to-weak; DeepSeek-V4
 expert→consolidate); merging is <1% (2511.21437); anytime-valid self-evolution (SEA 2607.00871).
 **In-repo:** the VTD dose-response (−6 → ±0, crossover pending scale); the V1 honest-teacher chain
-(running; verdict → [#2850](https://github.com/alex-place/lantern-os/issues/2850)); the
-escalation-rate-only-falls design. **Open:**
+**ran to verdict 2026-07-23: 🔴 honest negative** ([#2850](https://github.com/alex-place/lantern-os/issues/2850)
+— SFT *raised* confabulation 0.136→0.389 (assoc doubled), golden −0.096, over-abstention flat;
+post-mortem lead: the corpus assembled at anchor fraction 0.31 against the v1.10 ≥0.60 mandate —
+run 2 fixes composition before dose); the escalation-rate-only-falls design. **Open:**
 [#2857](https://github.com/alex-place/lantern-os/issues/2857) unified control law ·
 [#2847](https://github.com/alex-place/lantern-os/issues/2847) V2 dose-response kill-gate.
 

@@ -27,6 +27,15 @@ const http = require('http');
 
 const pa = require('../../lib/portfolio-analytics');
 
+// Advisor tier gate (operator tiering 2026-07-26): the Advisor is a $20 Pro
+// capability. Enforcement follows the product-wide PLAN_ENFORCEMENT flag —
+// unset, behavior is unchanged; set, Free users get an honest 403 upgrade nudge.
+function _advisorAllowed(req) {
+  if (process.env.PLAN_ENFORCEMENT !== '1') return true;
+  try { return require('../../lib/auth-middleware').hasEntitlement(req, 'advisor'); }
+  catch (_e) { return true; }   // gate infra must never break the surface
+}
+
 const OWNED = new Set([
   '/api/trading/portfolio/analysis',
   '/api/trading/portfolio/rebalance',
@@ -67,6 +76,10 @@ function _num(url, name, fallback) {
 
 module.exports = async function portfolioRoutes(req, res, url, ctx) {
   if (!OWNED.has(url.pathname) || req.method !== 'GET') return false;
+  if (!_advisorAllowed(req)) {
+    ctx.sendJson(res, { error: 'pro_required', message: 'The portfolio advisor is a Pro ($20) feature — see /pricing.html' }, 403);
+    return true;
+  }
   const { sendJson, getEffectiveUserId } = ctx;
 
   let d;

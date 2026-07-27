@@ -111,7 +111,7 @@ test("sticky rise: after a fully-stalled turn the next turn starts at the fronti
       escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
     },
     verify: async (text) => parseVerify(text),
-    corpus: sink(), now: clock, maxTurns: 12,
+    corpus: sink(), now: clock, maxTurns: 12, escalationContract: false,
   });
   assert.equal(r.haltReason, "stalled");
   assert.equal(cheapCalls, 1, "cheap tried once (t0); t1+t2 went straight to the frontier");
@@ -149,7 +149,7 @@ test("stickyTiers:false restores cheap-first-every-turn", async () => {
       escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
     },
     verify: async (text) => parseVerify(text),
-    corpus: sink(), now: clock, maxTurns: 12, stickyTiers: false,
+    corpus: sink(), now: clock, maxTurns: 12, stickyTiers: false, escalationContract: false,
   });
   assert.equal(r.haltReason, "stalled");
   assert.equal(cheapCalls, 3, "every turn re-tried cheap first (the legacy shape)");
@@ -192,4 +192,110 @@ test("whole-answer confidence: solved is 1", async () => {
   });
   assert.equal(r.solved, true);
   assert.equal(r.confidence, 1);
+});
+
+test("escalation contract (#2867): a verified non-advancing escalation halts the run immediately", async () => {
+  let cheapCalls = 0;
+  let escCalls = 0;
+  const r = await runSpiral({
+    problem: { id: "s11", prompt: "frontier can't help either" },
+    tiers: {
+      cheap: async () => ({ text: `pass: c${cheapCalls++}`, cost: 0.001 }),
+      escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
+    },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12,
+  });
+  assert.equal(r.haltReason, "escalation-noncontractive", "frontier spend must help or the loop stops");
+  assert.equal(r.turns, 1, "halts on the FIRST non-contractive escalation");
+  assert.equal(escCalls, 1, "exactly one frontier call was paid");
+  assert.equal(r.memory.length, 0);
+});
+
+test("escalation contract: dup-skipped escalations never trigger it (the loop detector owns those)", async () => {
+  const r = await runSpiral({
+    problem: { id: "s12", prompt: "both tiers echo the same wrong code" },
+    tiers: {
+      cheap: async () => ({ text: "pass: same-wrong", cost: 0.001 }),
+      escalate: async () => ({ text: "pass: same-wrong", cost: 0.02 }),
+    },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12,
+  });
+  assert.equal(r.haltReason, "loop", "a no-new-information echo is loop evidence, not a contract breach");
+});
+
+test("failure cache (#2869): avoid-constraints ride into every tiers ctx; unsolved halts record VERIFIED failures only", async () => {
+  const seenAvoid = [];
+  const recorded = [];
+  const stubCache = {
+    avoidFor: () => [{ approachHash: "h1", snippet: "function f(){bad}", failingTests: ["t0"] }],
+    recordFailures: (args) => recorded.push(args),
+  };
+  let i = 0;
+  const r = await runSpiral({
+    problem: { id: "s13", prompt: "recurring task" },
+    tiers: { cheap: async (ctx) => { seenAvoid.push(ctx.avoid); return { text: `pass: v${i++}`, cost: 0.001 }; } },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12, failureCache: stubCache,
+  });
+  assert.equal(r.haltReason, "stalled");
+  assert.ok(seenAvoid.every((a) => Array.isArray(a) && a.length === 1), "avoid list reached every propose call");
+  assert.equal(recorded.length, 1, "one record on the unsolved halt");
+  assert.equal(recorded[0].stalledCandidates.length, 3, "all three REAL-verified stalls recorded");
+  assert.ok(recorded[0].stalledCandidates.every((c) => c.failingTests.length > 0), "failing test names captured");
+});
+
+test("failure cache: solved runs record nothing; no cache configured = no ctx.avoid surprises", async () => {
+  const recorded = [];
+  const stubCache = { avoidFor: () => [], recordFailures: (a) => recorded.push(a) };
+  const r1 = await runSpiral({
+    problem: { id: "s14", prompt: "easy" },
+    tiers: { cheap: async () => ({ text: "pass:a,b", cost: 0.001 }) },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, failureCache: stubCache,
+  });
+  assert.equal(r1.solved, true);
+  assert.equal(recorded.length, 0, "solved → nothing recorded");
+  const ctxs = [];
+  await runSpiral({
+    problem: { id: "s15", prompt: "no cache" },
+    tiers: { cheap: async (ctx) => { ctxs.push(ctx.avoid); return { text: "pass:a,b", cost: 0.001 }; } },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock,
+  });
+  assert.ok(ctxs.every((a) => Array.isArray(a) && a.length === 0), "default is an empty avoid list");
+});
+
+test("memory cap (#2977): prompt view is windowed + text-capped; ratchet history stays complete", async () => {
+  const seenMemories = [];
+  const BIG = "x".repeat(10_000);
+  let t = 0;
+  const r = await runSpiral({
+    problem: { id: "s16", prompt: "long horizon" },
+    tiers: { cheap: async (ctx) => { seenMemories.push(ctx.memory); return { text: `${BIG}/*${t++}*/`, cost: 0.001 }; } },
+    // Every candidate "advances" (never solves) so memory grows each turn.
+    verify: async () => ({ advanced: true, solved: false, fixRate: 0.5, penalizedFixRate: 0.5 }),
+    corpus: sink(), now: clock, maxTurns: 6,
+  });
+  assert.equal(r.memory.length, 6, "the RETURNED ratchet history is complete");
+  assert.ok(r.memory.every((s) => s.text.length > 9000), "full texts preserved internally");
+  const lastView = seenMemories[seenMemories.length - 1];
+  assert.equal(lastView.length, 4, "prompt view capped at the default window of 4");
+  assert.ok(lastView.every((s) => s.text.length <= 4000), "per-step text capped in the view");
+  assert.ok(lastView.every((s) => !s.text || s._truncated === 10_006 || s.text.length <= 4000), "true length receipted");
+  assert.ok(r.corpusRows.filter((x) => x.advanced).every((x) => x.text && x.text.length > 9000),
+    "advancing corpus rows carry the FULL text — the distillation record is complete");
+});
+
+test("memory cap: memoryWindow 0 = uncapped view (legacy); small runs unaffected by defaults", async () => {
+  const seen = [];
+  let t = 0;
+  await runSpiral({
+    problem: { id: "s17", prompt: "uncapped" },
+    tiers: { cheap: async (ctx) => { seen.push(ctx.memory.length); return { text: `v${t++}`, cost: 0.001 }; } },
+    verify: async () => ({ advanced: true, solved: false, fixRate: 0.5, penalizedFixRate: 0.5 }),
+    corpus: sink(), now: clock, maxTurns: 6, memoryWindow: 0,
+  });
+  assert.equal(seen[seen.length - 1], 5, "window 0 passes the whole history");
 });

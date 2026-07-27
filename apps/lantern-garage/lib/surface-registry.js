@@ -30,6 +30,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 // ── CORE — the convergence loop itself ──────────────────────────────────────────
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
+  "watch.html":             "Observe",   // market watch — tracking watchlist/charts/signals (the trader's Observe surface; trading split to stock-trader.html)
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
@@ -59,6 +60,7 @@ const EXTENSION = {
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
+  "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
   "demo.html":                     ["trading", "TRADING_ENABLED"], // public read-only demo-account spectator (#2548)
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
@@ -96,10 +98,8 @@ const EXTENSION = {
 const SUBSYSTEMS = {
   // CORE — background services that ARE a loop stage
   "mcp-server":       { tier: "core", stage: "Act",      entry: "src/mcp_server/server.py",           flag: "LANTERN_MCP_SERVER" },
-  "pr-watcher":       { tier: "core", stage: "Converge", entry: "apps/lantern-garage/lib/pr-watcher.js",    flag: null },
 
   // EXTENSION — optional capabilities beside the loop
-  "discord-bot":      { tier: "extension", module: "community", entry: "src/discord_lounge_bot/bot_v2.py",         flag: "DISCORD_BOT_TOKEN" },
   "news-collector":   { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/news-collector.js",   flag: "TRADING_ENABLED" },
   "kalshi-collector": { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/kalshi-collector.js", flag: "TRADING_ENABLED" },
   "brake-monitor":    { tier: "extension", module: "trading",   entry: "apps/lantern-garage/lib/brake-monitor.js",    flag: "BRAKE_MONITOR" },

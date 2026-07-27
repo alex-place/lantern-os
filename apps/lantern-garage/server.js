@@ -83,7 +83,6 @@ const { refreshAllPcsf } = require("./lib/pcsf-refresh");
 const { getRoutingSnapshot, refreshProviderCache } = require("./lib/provider-cache");
 const { JobQueue } = require("./lib/job-queue");
 const { JobWorker } = require("./lib/job-worker");
-const { PrWatcher } = require("./lib/pr-watcher");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
 const { dataRoot } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
@@ -92,7 +91,7 @@ const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177)
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
 const conversationLogPath = path.join(dataRoot(), "conversations", "garage-conversations.jsonl");
 const flatRagHousePath = path.join(dataRoot(), "rag-house", "flat-rag-house-latest.json");
-const flatRagHouseManifestPath = path.join(repoRoot, "manifests", "FLAT-RAG-HOUSE-LATEST.md");
+const flatRagHouseManifestPath = path.join(dataRoot(), "rag-house", "FLAT-RAG-HOUSE-LATEST.md");
 const operatorNotesPath = path.join(dataRoot(), "operator-notes", "notes.jsonl");
 const cloudMirrorsPath = path.join(repoRoot, "manifests", "cloud-mirrors.json");
 const cloudMirrorUrls = process.env.LANTERN_CLOUD_MIRROR_URLS || "";
@@ -109,29 +108,7 @@ jobWorker.start(2000); // Poll every 2 seconds for new jobs
 // so the Creator video tools enqueue onto the same instance JobWorker polls.
 require("./lib/creator-runtime").setCreatorRuntime({ jobQueue, repoRoot });
 
-// PR Watcher — auto-reviews PRs idle for 3min via unisona.ai fleet, and auto-merges
-// reviewed(APPROVE) + green + conflict-free PRs. Auto-merge is ON by default on the
-// single designated fleet host (PR_WATCHER_ENABLED=1); set PR_WATCHER_AUTOMERGE=0 to
-// review-only. Merge bar: green CI checks + a fleet-review APPROVE verdict, minus the
-// protected-path carve-out (auth/money/CI/secrets still need a human).
-const prWatcher = new PrWatcher({
-  repoRoot, port,
-  idleMs: Number(process.env.PR_WATCHER_IDLE_MS || 3 * 60_000),
-  autoMerge: process.env.PR_WATCHER_AUTOMERGE !== "0",
-  mergeIgnoreChecks: process.env.PR_WATCHER_MERGE_IGNORE_CHECKS
-    ? process.env.PR_WATCHER_MERGE_IGNORE_CHECKS.split(",").map((s) => s.trim()).filter(Boolean)
-    : null,
-  mergeIgnorePatterns: process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS
-    ? process.env.PR_WATCHER_MERGE_IGNORE_PATTERNS.split(",").map((s) => s.trim()).filter(Boolean)
-    : null,
-  // CI must run + go green before auto-merge. Opt out only for CI-less repos.
-  requireChecks: process.env.PR_WATCHER_REQUIRE_CHECKS !== "0",
-  // The assigned-issue convergence gate (needs convergance-record + autowork-verified
-  // labels before a PR closing a human-assigned issue may land) is OFF by default —
-  // green + review-APPROVE is the merge bar. Re-enable with
-  // PR_WATCHER_ASSIGNED_ISSUE_GATE=1.
-  assignedIssueGate: process.env.PR_WATCHER_ASSIGNED_ISSUE_GATE === "1",
-});
+// PR Watcher removed (operator, 2026-07-24) — merges are manual / session-driven now.
 
 // Shared dependency bundle passed to every route module
 const deps = {
@@ -149,7 +126,7 @@ const deps = {
   dreamChatReply, AGENT_PERSONAS, DREAM_DOORS, selectAgent, tokenAudit,
   unifiedAgentGreet, unifiedAgentHealth, unifiedAgentInspect,
   handleStreamChat,
-  jobQueue, jobWorker, prWatcher,
+  jobQueue, jobWorker,
   repoRoot, publicRoot,
   conversationLogPath, flatRagHousePath, flatRagHouseManifestPath,
   operatorNotesPath, cloudMirrorsPath, cloudMirrorUrls,
@@ -382,7 +359,6 @@ const routes = [
   require("./routes/accounts"),        // Staff account-support console (admin/tech_support): multi-auth + password fixes
   require("./routes/personal-cube"),
   require("./routes/grounding"),       // Mesh grounding resolver: /api/grounding/resolve + /api/mesh/ground (gated by MESH_GROUNDING=1)
-  require("./routes/pr-review"),
   require("./routes/auto-merge"),
   require("./routes/creators"),        // creator profiles + intake form
   require("./routes/surfaces"),        // static file catch-all — MUST stay last (returns true for any path)
@@ -515,32 +491,7 @@ server.on("error", (error) => {
   throw error;
 });
 
-// ── Discord Bot (optional child process) ──
-let discordBot = null;
-const discordToken = process.env.DISCORD_BOT_TOKEN;
-const discordGuildId = process.env.LANTERN_DISCORD_GUILD_ID;
-if (discordToken && discordGuildId) {
-  const botScript = path.join(repoRoot, "src", "discord_lounge_bot", "bot_v2.py");
-  if (fs.existsSync(botScript)) {
-    const pythonExe = process.platform === "win32" ? "python" : "python3";
-    discordBot = spawn(pythonExe, [botScript], {
-      stdio: "inherit",
-      cwd: repoRoot,
-      env: { ...process.env, DISCORD_BOT_TOKEN: discordToken, LANTERN_DISCORD_GUILD_ID: discordGuildId },
-    });
-    discordBot.on("error", (err) => {
-      console.error(`[Discord Bot] Failed to start: ${err.message}`);
-    });
-    discordBot.on("exit", (code) => {
-      console.log(`[Discord Bot] exited with code ${code}`);
-    });
-    console.log(`[Discord Bot] Spawning ${botScript}`);
-  } else {
-    console.warn(`[Discord Bot] Script not found: ${botScript}`);
-  }
-} else {
-  console.log("[Discord Bot] Skipped (set DISCORD_BOT_TOKEN + LANTERN_DISCORD_GUILD_ID in .env.local to enable)");
-}
+// Discord bot migrated to alex-place/three-doors (operator, 2026-07-24) — no in-process spawn.
 
 // ── MCP child lifecycle (singleton + no-orphan) ─────────────────────────────
 // This same server.js runs as the stable production server AND from any dev /
@@ -695,9 +646,6 @@ if (enableCloudflare) {
 // Graceful shutdown
 function shutdown(signal) {
   console.log(`\n${signal} received. Shutting down...`);
-  if (discordBot && !discordBot.killed) {
-    discordBot.kill("SIGTERM");
-  }
   // Tree-kill MCP children FIRST (before server.close, which can hang on open
   // SSE) so the python grandchild can't be left orphaned holding 8771.
   for (const child of mcpChildren) killMcpChild(child);
@@ -713,7 +661,7 @@ function shutdown(signal) {
   if (deps.brakeMonitor) {
     deps.brakeMonitor.stop();
   }
-  prWatcher.stop();
+
   server.close(() => {
     process.exit(0);
   });
@@ -724,7 +672,6 @@ process.on("SIGINT", () => shutdown("SIGINT"));
 // Reap child services so a crash never leaves them orphaned holding ports (the
 // documented "children keep squatting ports" 502 failure mode, #2066).
 function reapChildren() {
-  try { if (discordBot && !discordBot.killed) discordBot.kill("SIGTERM"); } catch { /* best-effort */ }
   try { for (const child of mcpChildren) killMcpChild(child); } catch { /* best-effort */ }
   try { if (cloudflaredProcess && !cloudflaredProcess.killed) cloudflaredProcess.kill("SIGTERM"); } catch { /* best-effort */ }
   try { if (deps.kalshiCollector) deps.kalshiCollector.stop(); } catch { /* best-effort */ }
@@ -753,7 +700,7 @@ process.on("uncaughtException", (err) => {
   exiting = true;
   console.error(`[uncaughtException] fatal — reaping children and exiting for restart: ${err && err.stack || err}`);
   reapChildren();
-  try { prWatcher.stop(); } catch { /* best-effort */ }
+
   try { server.close(); } catch { /* best-effort */ }
   // Non-unref'd so it GUARANTEES a non-zero exit (the watchdog treats the dead
   // port as a crash and relaunches) even after server.close() drains the loop;
@@ -1015,16 +962,6 @@ server.listen(port, host, () => {
     }
   })();
 
-  // PR Watcher is opt-in to a SINGLE designated fleet host. Running it on multiple
-  // accounts multiplies auto-review comments (each comment also re-triggers the
-  // others). Enable PR_WATCHER_ENABLED=1 on exactly ONE machine.
-  if (process.env.PR_WATCHER_ENABLED === "1") {
-    // Auto-merge default is ON (green + review-APPROVE); PR_WATCHER_AUTOMERGE=0 for
-    // review-only. Current mode is exposed via prWatcher.getStatus().autoMerge.
-    prWatcher.start();
-  } else {
-    console.log("[PR Watcher] disabled — set PR_WATCHER_ENABLED=1 on ONE fleet host to enable");
-  }
   Promise.resolve(refreshAllPcsf(repoRoot)).catch((e) => console.error("[PCSF] refresh failed:", e.message));
 
   // ── CSF Research Tesseract — auto-pack on startup ──────────────────────────

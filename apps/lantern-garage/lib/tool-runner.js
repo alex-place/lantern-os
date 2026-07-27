@@ -1505,12 +1505,19 @@ const REGISTRY = {
           else if (e.type === "stall") transcript.push(`  turn ${e.turn} [${e.tier}] · no verified advance → de-ratchet`);
           else if (e.type === "halt") transcript.push(`  halt: ${e.reason}`);
         };
-        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify, maxTurns, onStep: line });
+        // #2869: chat spirals use the real failure cache — known-failed approaches
+        // for this task signature are avoided up front; unsolved runs record back.
+        const failureCache = require("./spiral-failure-cache");
+        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify, maxTurns, onStep: line, failureCache });
         const head = r.solved
           ? `Spiral SOLVED in ${r.turns} turn(s)`
           : `Spiral did not solve (${r.haltReason}) after ${r.turns} turn(s)`;
+        // #2868: the confidence shown to the user is the WHOLE-ANSWER score (best
+        // committed candidate's held-out pass fraction) — decoupled from where the
+        // cascade happened to stop, per HP US20120243734A1. Never inferred from tier.
+        const confPct = Math.round((Number(r.confidence) || 0) * 100);
         return [
-          `${head} · escalations ${r.escalations}/${r.turns} (${Math.round(r.escalationRate * 100)}%).`,
+          `${head} · escalations ${r.escalations}/${r.turns} (${Math.round(r.escalationRate * 100)}%) · whole-answer confidence ${confPct}% (test pass fraction, not tier position).`,
           ...transcript,
           r.y ? `\nVerified solution:\n\`\`\`${language}\n${r.y}\n\`\`\`` : "\n(No candidate ever passed the verifier — reported honestly, nothing fabricated.)",
           "\nVerified by real bounded exec tests (Fix-Rate ratchet, ADR-0030); the escalation corpus was appended for later Verified-Trace Distillation.",

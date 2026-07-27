@@ -85,8 +85,8 @@ This repo is designed for agentic-first workflows. Every agent (Claude, Gemini, 
 | [`data/pcsf/agent.pcsf.json`](data/pcsf/agent.pcsf.json) | All agents, their capabilities, route bindings | Don't explore routes/ to understand what exists |
 | `data/pcsf/provider.pcsf.json` (generated at boot — git-ignored) | Provider fallback chain + per-provider config (env-var presence lives in [`.env.example`](.env.example)) | Don't grep for process.env / provider order |
 | [`data/pcsf/narrator.pcsf.json`](data/pcsf/narrator.pcsf.json) | Keyword routing rules. **Note:** it still lists 6 legacy narrators, but only `keystone` is selectable at runtime — [`data/contexts/personas.json`](data/contexts/personas.json) is the source of truth (RP personas removed in #1664) | Don't read dream-chat.js to understand agents |
-| [`manifests/dream-journal-v1-agent-slots.json`](manifests/dream-journal-v1-agent-slots.json) | Queued work items with priority + description | Don't ask "what's left to do" |
-| [`manifests/CONVERGENCE-LOOP-AGENT-FLEET.md`](manifests/CONVERGENCE-LOOP-AGENT-FLEET.md) | 36-slot agent fleet design and receipt contract | Don't re-derive fleet structure |
+| `manifests/dream-journal-v1-agent-slots.json` (archived 2026-07-24) | Queued work items with priority + description | Don't ask "what's left to do" |
+| `manifests/CONVERGENCE-LOOP-AGENT-FLEET.md` (archived 2026-07-24) | 36-slot agent fleet design and receipt contract | Don't re-derive fleet structure |
 
 **Rule: Read the PCSF file first. Only touch source code if the manifest doesn't answer your question.**
 
@@ -636,7 +636,7 @@ python src/convergence_io_engine.py inspect
 | Unified agent connector | [`src/unified_agent_connector.py`](src/unified_agent_connector.py) |
 | MemOS bridge | [`src/convergence_io/memos_bridge.py`](src/convergence_io/memos_bridge.py) |
 | PCSF state files | [`data/pcsf/`](data/pcsf/) |
-| Work queue | [`manifests/dream-journal-v1-agent-slots.json`](manifests/dream-journal-v1-agent-slots.json) |
+| Work queue | `manifests/dream-journal-v1-agent-slots.json` (archived 2026-07-24) |
 | CI pipeline | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 | Startup guide | [`QUICKSTART.md`](QUICKSTART.md) |
 | Contributing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |

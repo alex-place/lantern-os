@@ -1,0 +1,53 @@
+{
+  "params": {
+    "n": 6,
+    "T": 200,
+    "n_healthy": 200,
+    "n_unstable": 50
+  },
+  "kreiss_bound_violations_healthy": 0,
+  "naive_spectral_false_alarms_healthy": 200,
+  "naive_false_alarm_rate": 1.0,
+  "kreiss_false_alarm_rate": 0.0,
+  "max_transient_amplification": 3348227.07,
+  "unstable_detected": 48,
+  "unstable_detection_rate": 0.96,
+  "healthy_examples": [
+    {
+      "rho": 0.9147,
+      "sup_norm": 46.147,
+      "kreiss_bound_enK": 254.305,
+      "kreiss_ok": true,
+      "naive_would_fire": true
+    },
+    {
+      "rho": 0.9265,
+      "sup_norm": 2164.101,
+      "kreiss_bound_enK": 8974.433,
+      "kreiss_ok": true,
+      "naive_would_fire": true
+    },
+    {
+      "rho": 0.8705,
+      "sup_norm": 49.8,
+      "kreiss_bound_enK": 336.23,
+      "kreiss_ok": true,
+      "naive_would_fire": true
+    },
+    {
+      "rho": 0.8345,
+      "sup_norm": 14.152,
+      "kreiss_bound_enK": 106.113,
+      "kreiss_ok": true,
+      "naive_would_fire": true
+    },
+    {
+      "rho": 0.935,
+      "sup_norm": 24.169,
+      "kreiss_bound_enK": 135.392,
+      "kreiss_ok": true,
+      "naive_would_fire": true
+    }
+  ],
+  "verdict": "L3 HOLDS at ensemble scale: across 200 random non-normal operators the Kreiss bound e*n*K(A) is NEVER violated (0 false alarms) despite transients up to 3348227x, while the naive spectral envelope false-alarms on 100% of healthy decays; true instability (rho>1) is caught 48/50 by a fixed healthy-model Kreiss threshold. The nominal-model Kreiss inflation closes the non-normal gap without sacrificing detection -- reproducing the single-case 77x/100%-vs-0% finding at scale."
+}
