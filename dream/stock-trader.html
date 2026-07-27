@@ -4782,6 +4782,25 @@ async function detectGuestMode(){
     // hidden (still body.guest), so nothing here can place an order.
     window.DEMO_ACCT = true;
     document.body.classList.add('demo');
+    // UNMISSABLE banner (user report 2026-07-28: a visitor watched the demo for
+    // days believing it was real — the 4-char DEMO badge is not enough). Sits
+    // above the deck, dismissible per session only.
+    if(!sessionStorage.getItem('demoBannerDismissed')){
+      const bar=document.createElement('div');
+      bar.id='demoBanner'; bar.setAttribute('role','status');
+      bar.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 14px;'
+        +'background:color-mix(in srgb, var(--amber,#f59e0b) 14%, var(--bg1,#0d1117));'
+        +'border-bottom:1px solid var(--amber,#f59e0b);font-size:12.5px;line-height:1.45;color:var(--text0,#e6e6ea)';
+      bar.innerHTML='<b style="white-space:nowrap">SIMULATED PORTFOLIO</b>'
+        +'<span>This is a <b>demo</b> of the Champion strategy — positions are simulated, marked to live market prices. It is not a real account and nothing here is yours. '
+        +'<a href="/auth.html?returnTo=%2Fstock-trader.html" style="color:var(--blue,#58a6ff)">Sign in</a> to trade your own paper account.</span>'
+        +'<button type="button" aria-label="Dismiss" style="margin-left:auto;background:none;border:1px solid var(--border,#30363d);color:inherit;border-radius:6px;padding:2px 9px;cursor:pointer">✕</button>';
+      bar.querySelector('button').onclick=()=>{ bar.remove(); try{sessionStorage.setItem('demoBannerDismissed','1');}catch(e){} };
+      // Above the grid, not inside it — the .layout grid has fixed template rows,
+      // so an extra child would auto-place into an implicit row below the footer.
+      const layout=document.querySelector('.layout');
+      if(layout && layout.parentNode) layout.parentNode.insertBefore(bar, layout);
+    }
     const badge=document.querySelector('.badge-paper');
     if(badge){
       badge.classList.remove('badge-paper'); badge.classList.add('badge-demo');
