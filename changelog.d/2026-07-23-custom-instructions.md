@@ -1,3 +1,0 @@
-### Added
-
-- **Custom instructions for Unisona** (Settings → General → "Instructions for Unisona"): a textarea where you tell the assistant how to behave — tone, format, what you're working on — and it **keeps them in mind across all your chats**. Stored on your profile (`preferences.instructions`, ≤2000 chars) and injected into the chat's system prompt for every real turn, resolved from the SESSION user (never the request body). Skipped for internal one-shot modes (reviews etc.), clipped so a huge paste can't crowd the base prompt, and explicitly subordinate to safety, honesty, and the assistant's core identity. Verified end-to-end live: with the instruction "begin every reply with BANANA" saved, a fresh chat reply started with **"BANANA"** — the assistant honored it.

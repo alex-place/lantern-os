@@ -1,3 +1,0 @@
-### Changed
-
-- docs(skills): de-staled `SKILLS.md` (was 2026-06-20 with a 2026-06-16 internal AGI-benchmark table) — flagged the internal per-stage estimates as stale and pointed to the authoritative eval ledgers + `BENCHMARKS.md` for the current grounded standing (2026-07-20 review: HumanEval-chat 0.83/0.70/0.22, SWE-bench Lite 0/5, LongMemEval multi-recall@5 0.775). Added a `refinement` skill gotcha: chunk the apply into sub-batches of ≤15 issues (each apply is ~4-5s of `gh` calls, so a full backlog blows the 2-minute Bash timeout — observed grooming 27 issues, needed two passes). `docs/BENCHMARKS.md` review-stamped in the same review.
