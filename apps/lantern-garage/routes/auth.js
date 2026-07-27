@@ -124,7 +124,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
   const path = url.pathname;
   const method = req.method;
 
-  console.log(`[AUTH] ${method} ${path}`);
+  // Per-request trace, opt-in (AUTH_DEBUG=1) — an unconditional console.log here
+  // both spams prod logs and trips the SLOP debug-statement gate.
+  if (process.env.AUTH_DEBUG === "1") console.error(`[AUTH] ${method} ${path}`);
 
   // GET /api/auth/session
   if (method === "GET" && path === "/api/auth/session") {
@@ -206,7 +208,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   }
 
   // GET /api/auth/:provider/start
-  const startMatch = method === "GET" && START_RE.exec(path);
+  const startMatch = method === "GET" && path.match(START_RE);
   if (startMatch) {
     const provider = startMatch[1];
     if (!getProvider(provider)) return false; // unknown → fall through to 404
@@ -222,7 +224,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
   }
 
   // GET /api/auth/:provider/callback
-  const cbMatch = method === "GET" && CALLBACK_RE.exec(path);
+  const cbMatch = method === "GET" && path.match(CALLBACK_RE);
   if (cbMatch) {
     const provider = cbMatch[1];
     if (!getProvider(provider)) return false;
@@ -303,6 +305,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
         source: `email_verified:${profile.id}`,
         note: "email address confirmed via verify-email link",
       }).catch(() => {});
+      // First successful verification → welcome email (fire-and-forget). Guarded by
+      // the same pre-update flag, so re-confirmations never re-send it.
+      try { require("../lib/mailer").sendWelcomeEmail(updates.email || profile.email, profile.name).catch(() => {}); } catch (_e) { /* never block the verify */ }
     }
     if (isPost) { res.writeHead(200, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: true, dest })); }
     res.writeHead(302, { Location: `${dest}?verify=1` });
@@ -368,6 +373,9 @@ module.exports = async function authRoutes(req, res, url, deps) {
     setLocalPassword(payload.sub, newPassword);
     consumeToken(payload.jti, payload.exp);              // burn the token — no replay
     destroyUserSessions(AUTH_SESSION_DIR, payload.sub);  // sign out any hijacked session
+    // Security notice to the account's address (fire-and-forget): the industry-
+    // standard "if this wasn't you" alert after any password change.
+    try { const pr = getProfile(payload.sub); if (pr && pr.email) require("../lib/mailer").sendPasswordChangedEmail(pr.email, pr.name).catch(() => {}); } catch (_e) { /* never block the reset */ }
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ ok: true }));
   }
