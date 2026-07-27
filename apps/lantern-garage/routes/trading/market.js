@@ -183,7 +183,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     // populated without a linked broker. Read-only + labeled demo; never touches
     // a real account. Placed first so it short-circuits before any broker call.
     if (url.searchParams.get('demo') === 'champion') {
-      sendJson(res, require('../../lib/champion-demo').positions(), 200);
+      // positionsLive marks the fixture to the live quote feed (user report:
+      // "the same numbers for days" — the baked snapshot never moved). Fail-soft
+      // to the static snapshot inside positionsLive if quotes are down.
+      sendJson(res, await require('../../lib/champion-demo').positionsLive(), 200);
       return true;
     }
     try {
