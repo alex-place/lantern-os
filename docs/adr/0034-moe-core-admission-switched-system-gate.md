@@ -1,7 +1,7 @@
 ---
 adr: 0034
 title: MoE for the Σ₀ core — adopted as soon as feasible; feasibility = the switched-system certification gate
-status: Proposed (recording the operator decision of 2026-07-24; awaiting Alex's formal approval)
+status: Accepted (Alex Place, in-session, 2026-07-24)
 date: 2026-07-24
 deciders: Alex Place (operator direction, in-session 2026-07-24), Claude lane (drafting)
 supersedes: none (amends the MoE stance of research/2026-07-23-sigma0-llm-design.md §3.1 and the serving memo's Option-F rejection)
@@ -12,9 +12,11 @@ superseded-by: none
 
 ## Status
 
-Proposed. The operator direction (in-session, 2026-07-24) is: **"we are using MoE — as soon as
-is feasible."** This ADR records that decision and defines *feasible* precisely, so the
-commitment is real and the safety story stays honest. It does not enable an MoE core today.
+Accepted (Alex Place, in-session, 2026-07-24: "we are using MoE — as soon as is feasible",
+followed by "approve adr 0034 and start the gate tooling"). This ADR records that decision and
+defines *feasible* precisely, so the commitment is real and the safety story stays honest. It
+does not enable an MoE core today; gate tooling construction started the same day
+(`src/sigma0/switched_gate.py`).
 
 ## Context
 

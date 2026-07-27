@@ -97,6 +97,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/eval_ledger.py` | `tests/test_eval_ledger.py` | `python scripts/eval_ledger.py` |
 | `scripts/honesty_ledger.py` | `tests/test_honesty_ledger.py` | `python scripts/honesty_ledger.py` |
 | `scripts/eval_sigma0_adapter.py` | `tests/test_sigma0_eval.py` | `python scripts/eval_sigma0_adapter.py` |
+| `src/sigma0/switched_gate.py` | `tests/test_sigma0_switched_gate.py` | ADR-0034 MoE admission-gate kit (per-mode ρ receipts, ADT dwell-time certificate, serve-time DwellMonitor + router canaries); `python -m pytest tests/test_sigma0_switched_gate.py -q` |
 | `scripts/eval_coding.py` | `scripts/eval_coding_backend_ab.py` | via the A/B harness |
 | `scripts/eval_coding_backend_ab.py` | `apps/lantern-garage/lib/coding-backend/index.js` | `python scripts/eval_coding_backend_ab.py` |
 | `scripts/eval_humaneval_ouro.py` | `scripts/continual_ouro_pipeline.py` | `python scripts/eval_humaneval_ouro.py` |
