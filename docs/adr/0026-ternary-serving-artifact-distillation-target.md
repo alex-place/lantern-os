@@ -156,11 +156,11 @@ no sprawl; operator authority over the gate.
 
 ---
 
-## Amendment A1 (2026-07-27) — **Proposed, awaiting approval**
+## Amendment A1 (2026-07-27) — **Accepted**
 
-> **Status: Proposed.** Drafted by an agent, not self-approved (ADR-0001). The Accepted decision
-> above stands unchanged until signed off. This amendment is additive: it does not alter the
-> format choice, the recipe, or the accept gate.
+> **Status: Accepted** (Alex Place, in-session, 2026-07-27 — "approve the adr", closing #3002).
+> Drafted by an agent per ADR-0001 and approved by the operator. The amendment is additive: it
+> does not alter the format choice, the recipe, or the accept gate.
 
 ### The gap
 
