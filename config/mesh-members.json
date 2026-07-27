@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hub": { "name": "unisona founder fleet" },
+  "_howToJoin": "Joining is git-native: PR yourself into members[] (id = your lane prefix, role = contributor|donor). There is deliberately no registration endpoint — unknown ids are rejected by /api/mesh/heartbeat.",
+  "members": [
+    { "id": "alex", "name": "Alex Place", "role": "contributor" },
+    { "id": "kriskin", "name": "Kriskin", "role": "contributor" },
+    { "id": "mookman11", "name": "Mookman11", "role": "contributor" },
+    { "id": "dj", "name": "DJ (Alex's brother)", "role": "donor" }
+  ]
+}

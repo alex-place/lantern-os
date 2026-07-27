@@ -334,6 +334,8 @@ const routes = [
   require("./routes/cubes"),
   require("./routes/csf"),
   require("./routes/training"),
+  require("./routes/training-jobs"),    // orchestration rework: jobs from GitHub issues (label training-job), read-only
+  require("./routes/mesh"),             // fleet registry + heartbeats (config/mesh-members.json is the roster)
   require("./routes/gpu-training"),
   require("./routes/token-audit"),
   require("./routes/ibkr"),               // per-user IBKR connect/disconnect (ADR-0022)

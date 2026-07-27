@@ -42,7 +42,7 @@ const CORE = {
   "factcheck.html":         "Verify",    // fact-check / grounding gate
   "grounding-diff.html":    "Verify",    // grounding diff inspector
   "drift.html":             "Verify",    // collapse + 42-state canary monitor (verification safety)
-  "orchestration.html":     "Act",       // agent orchestration / dispatch
+  "orchestration.html":     "Act",       // fleet: machine registration + training-job dispatch (issues-only)
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
   "agent-status.html":      "Converge",  // agent observability
@@ -67,7 +67,7 @@ const EXTENSION = {
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
   "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
-  "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
+  "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → settings (broker connections migrated off orchestration, 2026-07-27)
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // account / auth / billing
@@ -80,7 +80,7 @@ const EXTENSION = {
   "pricing.html":                  ["account", null],
   // upgrade-lab.html retired (#2473) — 302s to /pricing.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
-  "settings.html":                 ["account", null], // user settings: General / Account / Billing / Connections (#settings-rework); API keys/connectors live on orchestration.html
+  "settings.html":                 ["account", null], // user settings: General / Account / Billing / Connections / API keys (keys migrated here from orchestration, 2026-07-27)
   // project meta
   "dream-chat.html":               ["meta", null], // legacy alias → chat.html (redirect stub kept for old links, #2751)
   "changelog.html":                ["meta", null],

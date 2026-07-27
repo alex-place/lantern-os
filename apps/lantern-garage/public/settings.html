@@ -380,7 +380,7 @@
 
     const brokerRows = `
       <div class="group-label">Brokerage</div>
-      <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/orchestration.html#broker">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
+      <div class="row"><div class="rl"><div class="k">🔗 Interactive Brokers</div><div class="v">${ibLive ? `Connected · ${esc((ib.body.live && ib.body.live.accountId) || "")}` : ibCreds ? "Saved, not connected" : "Route real-money trades to your own IBKR account."}</div></div><div class="rc">${ibLive ? '<span class="pill ok">Connected</span>' : `<a class="btn" href="/settings.html#connections">${ibCreds ? "Reconnect" : "Connect"}</a>`}</div></div>
       <div class="row"><div class="rl"><div class="k">⚡ Alpaca</div><div class="v">${alConn ? `Connected — paper trading${al.body && al.body.accountNumber ? ` · ${esc(al.body.accountNumber)}` : ""}` : "Paste your Alpaca API keys to trade a paper account."}</div></div><div class="rc">${alConn ? `<button class="btn" id="c-al-off">Disconnect</button>` : `<button class="btn primary" id="c-al-on">Connect</button>`}</div></div>`;
 
     // Active-broker switch — WHICH broker the stock day-trader executes through. Only

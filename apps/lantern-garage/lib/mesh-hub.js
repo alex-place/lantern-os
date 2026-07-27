@@ -72,6 +72,25 @@ function _cleanStringArray(value, maxItems, maxLen = MAX_STRING) {
   return value.slice(0, maxItems).map((v) => _cleanString(v, maxLen)).filter(Boolean);
 }
 
+function _cleanNumber(value, max) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.min(n, max) : null;
+}
+
+/** Sanitize the optional per-machine resources block on a heartbeat. */
+function _cleanResources(value) {
+  if (!value || typeof value !== "object") return null;
+  const r = {
+    gpu: _cleanString(value.gpu, 80) || null,        // e.g. "RTX 4080"
+    vramGb: _cleanNumber(value.vramGb, 1024),
+    ramGb: _cleanNumber(value.ramGb, 4096),
+    cpuCores: _cleanNumber(value.cpuCores, 512),
+    availability: _cleanString(value.availability, 120) || null, // e.g. "weeknights 20:00-06:00 ET"
+    donorOnly: value.donorOnly === true,
+  };
+  return r.gpu || r.vramGb || r.ramGb || r.cpuCores || r.availability || r.donorOnly ? r : null;
+}
+
 /**
  * Validate and record a heartbeat. Returns { ok, error?, heartbeat? }.
  * Only registered members may heartbeat — unknown ids are rejected.
@@ -90,6 +109,9 @@ async function recordHeartbeat(body) {
     agents: _cleanStringArray(body.agents, MAX_AGENTS),
     providers: _cleanStringArray(body.providers, MAX_PROVIDERS),
     note: _cleanString(body.note, MAX_NOTE),
+    // Fleet resources (orchestration rework): what this machine can offer for
+    // dispatched training jobs. All fields optional; numbers clamped, strings capped.
+    resources: _cleanResources(body.resources),
     receivedAt: new Date().toISOString(),
   };
 
@@ -116,6 +138,7 @@ function getMeshStatus() {
       agents: hb ? hb.agents : [],
       providers: hb ? hb.providers : [],
       note: hb ? hb.note : "",
+      resources: hb ? hb.resources || null : null,
     };
   });
   return {

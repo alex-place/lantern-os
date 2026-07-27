@@ -20,217 +20,86 @@
   </script>
   <link rel="stylesheet" href="/css/site.css">
   <style>
-    .orch-main { max-width: 1100px; width: 100%; margin: 0 auto; padding: clamp(14px, 3vh, 26px) 16px 48px; }
-
-    /* slim status line */
-    .orch-status {
-      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-      padding: 10px 16px; background: var(--surface); border: 1px solid var(--border);
-      border-radius: 10px; margin-bottom: 16px; font-size: 0.82rem;
-    }
-    .orch-status .pill { display: flex; align-items: center; gap: 6px; font-weight: 700; }
-    .orch-status .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .orch-status .pill.online .dot { background: var(--green); animation: spulse 2s infinite; }
-    .orch-status .pill.online { color: var(--green); }
-    .orch-status .pill.offline { color: #ef4444; }
-    .orch-status .pill.offline .dot { background: #ef4444; }
-    @keyframes spulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-    .orch-status .sdiv { width: 1px; height: 18px; background: var(--border); }
-    .orch-status .smeta { color: var(--muted); }
-    .orch-status .smeta b { color: var(--text); }
-    .orch-status .stitle { margin-left: auto; color: var(--muted); font-size: 0.76rem; }
-
-    .orch-main .panel { gap: 12px; padding: 16px 18px; cursor: default; margin-bottom: 16px; }
+    .orch-main { max-width: 1000px; width: 100%; margin: 0 auto; padding: clamp(14px, 3vh, 26px) 16px 48px; }
+    .orch-main h2 { font-size: 1.02rem; margin: 0 0 4px; }
+    .orch-main .hint { color: var(--muted); font-size: 0.82rem; margin: 0 0 12px; }
+    .orch-main .panel { display: block; gap: 12px; padding: 16px 18px; cursor: default; margin-bottom: 16px; }
     .orch-main .panel:hover { border-color: var(--border); background: var(--surface); transform: none; box-shadow: var(--shadow); }
-    .orch-main .panel > * { width: 100%; }
-    .panel h2 { margin: 0; font-size: 0.98rem; color: var(--accent); display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 10px; flex-wrap: wrap; }
-    .panel-sub { font-size: 0.78rem; color: var(--muted); margin: -2px 0 8px; line-height: 1.5; }
-    .section-meta { font-size: 0.72rem; color: var(--muted); font-weight: 400; }
-    .band-title { font-size: 0.74rem; text-transform: uppercase; letter-spacing: .1em; color: var(--accent); font-weight: 800; margin: 30px 2px 10px; opacity: .85; }
-    .band-title:first-of-type { margin-top: 6px; }
-    .subhead { font-size: 0.84rem; color: var(--accent); font-weight: 700; margin: 18px 0 6px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-    .btn-secondary {
-      width: auto !important; padding: 7px 13px;
-      background: var(--bg); color: var(--text); border: 1px solid var(--border);
-      border-radius: 8px; font-size: 0.78rem; font-weight: 600; cursor: pointer;
-      transition: border-color .2s, color .2s;
-    }
-    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-    .btn-secondary:disabled { opacity: .55; cursor: not-allowed; }
-    .placeholder { color: var(--muted); font-size: 0.82rem; }
+    /* ── Needs-attention strip ── */
+    .attn { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px;
+      border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+      margin-bottom: 16px; font-size: 0.84rem; }
+    .attn .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+    .attn.warn .dot { background: #f59e0b; }
+    .attn .item { color: var(--muted); }
+    .attn .item b { color: var(--text); }
 
-    .research-controls { display: grid; grid-template-columns: minmax(180px, 1fr) auto auto auto; gap: 8px; align-items: center; }
-    .research-controls input, .research-controls select {
-      min-width: 0; padding: 8px 10px; border: 1px solid var(--border);
-      border-radius: 8px; background: var(--bg); color: var(--text); font-size: 0.8rem;
-    }
-    .research-list { display: flex; flex-direction: column; gap: 8px; }
-    .research-item { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 9px; }
-    .research-head { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
-    .research-title { flex: 1 1 300px; font-size: 0.86rem; font-weight: 650; line-height: 1.4; }
-    .research-badge { padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--accent); font-size: 0.68rem; font-weight: 800; }
-    .research-meta { margin: 6px 0 9px; color: var(--muted); font-size: 0.72rem; }
-    .research-labels { display: inline-flex; gap: 4px; flex-wrap: wrap; }
-    .research-label { padding: 1px 6px; border-radius: 5px; background: var(--surface); border: 1px solid var(--border); }
-    .research-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-    .research-action { padding: 6px 9px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 0.72rem; font-weight: 650; text-decoration: none; cursor: pointer; }
-    .research-action:hover { border-color: var(--accent); color: var(--accent); }
-    .research-action.primary { border-color: var(--accent); color: var(--accent); }
-    .research-state { padding: 12px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 0.8rem; }
-    .research-state.error { border-color: #f87171; color: #f87171; }
-    @media (max-width: 720px) { .research-controls { grid-template-columns: 1fr 1fr; } .research-controls input { grid-column: 1 / -1; } }
+    /* ── Machine form ── */
+    .mgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .mgrid label { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; color: var(--muted); }
+    .mgrid input, .mgrid select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--bg); color: var(--text); font-size: 0.86rem; }
+    .mrow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+    .mrow .check { display: flex; align-items: center; gap: 6px; font-size: 0.84rem; color: var(--text); }
+    .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg);
+      color: var(--text); font-size: 0.86rem; font-weight: 700; cursor: pointer; }
+    .btn.primary { border-color: var(--accent); color: var(--accent); }
+    .btn.primary:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .mstate { font-size: 0.82rem; color: var(--muted); }
+    .mstate.on { color: var(--green); font-weight: 700; }
 
-    /* ── Training control (primary action) ── */
-    .train-start-btn {
-      width: 100%; padding: 13px; border-radius: 10px;
-      background: var(--accent); color: #0a0e17; font-weight: 800; font-size: 0.95rem;
-      border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-      transition: opacity .15s;
-    }
-    .train-start-btn:hover { opacity: .88; }
-    .train-start-btn:disabled { opacity: .55; cursor: not-allowed; }
-    .train-provider-row {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      padding: 9px 12px; background: var(--bg); border: 1px solid var(--border);
-      border-left: 3px solid var(--border); border-radius: 8px; font-size: 0.82rem; margin-bottom: 6px;
-    }
-    .train-provider-row.auto { border-left-color: var(--accent); }
-    .train-provider-row.running { border-left-color: var(--green); }
-    .train-provider-row.failed { border-left-color: #f87171; }
-    .train-prov-name { font-weight: 600; display: flex; align-items: center; gap: 7px; }
-    .train-prov-meta { font-size: 0.72rem; color: var(--muted); }
-    .train-prov-spacer { margin-left: auto; display: flex; align-items: center; gap: 8px; }
-    .train-badge { font-size: 0.64rem; padding: 1px 6px; border-radius: 4px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
-    .tbadge-auto { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
-    .tbadge-manual { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
-    .tbadge-queued { background: color-mix(in srgb, #60a5fa 15%, transparent); color: #60a5fa; }
-    .tbadge-running { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
-    .tbadge-failed { background: color-mix(in srgb, #f87171 15%, transparent); color: #f87171; }
-    .tbadge-idle { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
-    .tbadge-untested { background: transparent; color: var(--muted); border: 1px dashed var(--border); }
-    .tbadge-done { background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
-    .train-updated { font-size: 0.66rem; color: var(--muted); }
-    .train-live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--green); margin-right:5px; animation: livePulse 1.6s ease-in-out infinite; vertical-align:middle; }
-    @keyframes livePulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
-    .train-dispatch-btn {
-      font-size: 0.74rem; font-weight: 700; padding: 5px 12px; border-radius: 7px;
-      border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap;
-    }
-    .train-dispatch-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-    .train-dispatch-btn:disabled { opacity: .5; cursor: not-allowed; }
-    .train-dispatch-result { margin-top: 10px; padding: 10px 12px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); font-size: 0.8rem; display: none; }
-    .train-recent { display: flex; gap: 8px; align-items: center; padding: 5px 9px; border-radius: 6px; background: var(--bg); border: 1px solid var(--border); font-size: 0.76rem; margin-bottom: 4px; }
+    /* ── Fleet list ── */
+    .fleet { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+    .peer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 12px;
+      border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-size: 0.82rem; }
+    .peer .pdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .peer.online .pdot { background: var(--green); }
+    .peer b { color: var(--text); }
+    .peer .pmeta { color: var(--muted); }
+    .peer .ptag { margin-left: auto; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--border); color: var(--muted); }
 
-    /* ── Key entry rows (editable) ── */
-    .key-card { border: 1px solid var(--border); border-radius: 10px; padding: 13px 14px; background: var(--bg); margin-bottom: 8px; }
-    .key-card.set { border-left: 3px solid var(--green); }
-    .key-card.unset { border-left: 3px solid var(--border); }
-    .key-head { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; flex-wrap: wrap; }
-    .key-head strong { font-size: 0.9rem; }
-    .key-badge-set { color: var(--green); font-size: 0.72rem; font-weight: 700; }
-    .key-badge-unset { color: var(--muted); font-size: 0.72rem; }
-    .key-badge-partial { color: #ffaa00; font-size: 0.72rem; font-weight: 700; }
-    .key-blurb { font-size: 0.74rem; color: var(--muted); line-height: 1.45; margin-bottom: 2px; }
-    .key-get { font-size: 0.74rem; color: var(--accent); text-decoration: none; }
-    .key-get:hover { text-decoration: underline; }
-    .key-input-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
-    .key-input-row label { font-size: 0.72rem; color: var(--muted); min-width: 118px; }
-    .key-input-row input {
-      flex: 1; min-width: 0; padding: 7px 9px; border: 1px solid var(--border);
-      border-radius: 7px; background: var(--surface); color: var(--text); font-size: 0.8rem;
-    }
-    .key-input-row input:focus { outline: none; border-color: var(--accent); }
-    .key-save-btn { font-size: 0.76rem; font-weight: 700; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--accent); color: var(--accent); background: transparent; cursor: pointer; white-space: nowrap; }
-    .key-save-btn:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-    .key-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 8px; }
+    /* ── Job cards ── */
+    .job { border: 1px solid var(--border); border-radius: 10px; background: var(--bg);
+      padding: 12px 14px; margin-bottom: 10px; }
+    .job .jhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .job .jhead b { color: var(--text); font-size: 0.9rem; }
+    .job .jhead a { color: var(--muted); font-size: 0.78rem; text-decoration: none; }
+    .job .jhead a:hover { color: var(--accent); }
+    .job .jbadge { margin-left: auto; font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+    .job .jbadge.ok { color: var(--green); border: 1px solid var(--green); }
+    .job .jbadge.bad { color: #ef4444; border: 1px solid #ef4444; }
+    .job dl { display: grid; grid-template-columns: max-content 1fr; gap: 3px 12px; margin: 8px 0 0;
+      font-size: 0.8rem; }
+    .job dt { color: var(--muted); }
+    .job dd { margin: 0; color: var(--text); font-family: var(--mono, monospace); overflow-wrap: anywhere; }
+    .job .jerr { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; font-size: 0.78rem;
+      color: #ef4444; border: 1px solid color-mix(in srgb, #ef4444 40%, transparent); }
+    .job .jrun { margin-top: 10px; }
 
-    /* ── Read-only wired panels (flat) ── */
-    .merit-list { display: flex; flex-direction: column; gap: 6px; }
-    .merit-row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 10px; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
-    .merit-rank { font-weight: 700; color: var(--muted); font-size: 0.8rem; text-align: center; }
-    .merit-name { font-weight: 600; font-size: 0.84rem; }
-    .merit-name .merit-meta { font-weight: 400; color: var(--muted); font-size: 0.72rem; margin-left: 6px; }
-    .merit-score { font-weight: 700; color: var(--accent); font-size: 0.9rem; }
-    .info-box { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; font-size: 0.82rem; line-height: 1.6; }
-    .info-box strong { color: var(--text); }
-    .stat { background: var(--bg); border: 1px solid var(--border); padding: 12px; border-radius: 10px; }
-    .stat-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
-    .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--accent); line-height: 1; }
-    .stat-value.muted { color: var(--text); }
+    /* ── Run log ── */
+    .runlog { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 14px; max-height: 380px; overflow-y: auto; font-family: var(--mono, monospace);
+      font-size: 0.78rem; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .runlog:empty::before { content: "No run yet. Choose a job above and select Run — every step appears here as it happens."; color: var(--muted); font-family: inherit; }
 
-    .refresh-time { font-size: 0.74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 8px; }
+    .empty { color: var(--muted); font-size: 0.84rem; padding: 8px 0; }
 
-    /* ── Team work board ── */
-    .board-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-    .stat.live-stale { opacity: .5; }
-    .stat-sub { font-size: 0.68rem; color: var(--muted); margin-top: 4px; }
-
-    /* ── PR lanes ── */
-    .lane-row { display: grid; grid-template-columns: 84px 1fr auto; align-items: center; gap: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; margin-bottom: 6px; }
-    .lane-row.has-pr { border-left-color: var(--accent); }
-    .lane-prefix { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
-    .lane-title { font-size: 0.82rem; line-height: 1.35; }
-    .lane-title a { color: var(--text); text-decoration: none; }
-    .lane-title a:hover { color: var(--accent); text-decoration: underline; }
-    .lane-empty { font-size: 0.78rem; color: var(--muted); }
-    .ci-badge { font-size: 0.64rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
-    .ci-passing { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
-    .ci-failing { background: color-mix(in srgb, #f87171 16%, transparent); color: #f87171; }
-    .ci-pending { background: color-mix(in srgb, #60a5fa 16%, transparent); color: #60a5fa; }
-    .ci-none    { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
-    .lane-flags { font-size: 0.66rem; color: var(--muted); margin-left: 6px; }
-
-    /* ── Agent slots ── */
-    .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
-    .slot-card { padding: 10px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--border); border-radius: 8px; }
-    .slot-card.working { border-left-color: var(--green); }
-    .slot-card.disabled { opacity: .55; }
-    .slot-name { font-weight: 650; font-size: 0.82rem; display: flex; align-items: center; gap: 6px; }
-    .slot-meta { font-size: 0.7rem; color: var(--muted); margin-top: 3px; }
-    .slot-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
-    .slot-dot.working { background: var(--green); }
-
-    /* ── Recently landed ── */
-    .landed-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: baseline; padding: 9px 12px; background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--green); border-radius: 8px; margin-bottom: 6px; }
-    .landed-title { font-size: 0.82rem; line-height: 1.35; }
-    .landed-title a { color: var(--text); text-decoration: none; }
-    .landed-title a:hover { color: var(--accent); text-decoration: underline; }
-    .landed-meta { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
-    .lane-chip { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); text-transform: uppercase; }
-
-    /* ── Fleet activity log ── */
-    .fleet-log { display: flex; flex-direction: column; gap: 4px; font-size: 0.78rem; }
-    .fleet-step { display: grid; grid-template-columns: 18px 150px 1fr; align-items: baseline; gap: 8px; padding: 5px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; }
-    .fleet-step .fs-icon { text-align: center; }
-    .fleet-step .fs-phase { font-weight: 650; }
-    .fleet-step .fs-detail { color: var(--muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; }
-    .fleet-step.err { border-color: #f87171; }
-    .fleet-step.done-ok { border-left: 3px solid var(--green); }
-    .fleet-final { margin-top: 8px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 0.82rem; }
-    .research-action.delegate { border-color: #a855f7; color: #a855f7; }
-    .research-action.delegate:hover { background: color-mix(in srgb, #a855f7 12%, transparent); }
-
-    /* ── Read-only guest mode ──────────────────────────────────────────────
-       auth-gate.js tags <body> with .is-admin / .is-guest once the session
-       resolves. Admin-only control panels (keys, training) are hidden
-       for everyone EXCEPT admins, so a logged-out / non-admin visitor sees only
-       the read-only fleet status. Hidden by default (no class yet) so secrets
-       never flash before the session check completes. */
+    /* Admin gating (auth-gate.js tags <body>) — controls hidden until session resolves. */
     .admin-only { display: none; }
     body.is-admin .admin-only { display: block; }
+    span.admin-only, button.admin-only { display: none; }
+    body.is-admin span.admin-only { display: inline; }
+    body.is-admin button.admin-only { display: inline-block; }
     .guest-banner { display: none; }
-    body.is-guest .guest-banner {
-      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-      margin: 0 0 14px; padding: 11px 16px; border-radius: 12px;
-      border: 1px solid var(--border);
-      background: color-mix(in srgb, var(--accent) 10%, transparent);
-      color: var(--text); font-size: 0.86rem;
-    }
+    body.is-guest .guest-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      margin: 0 0 14px; padding: 11px 16px; border-radius: 12px; border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text); font-size: 0.86rem; }
     .guest-banner a { color: var(--accent); font-weight: 700; text-decoration: none; }
-    .guest-banner a:hover { text-decoration: underline; }
   </style>
-  <title>Settings — unisona.ai</title>
+  <title>Fleet — unisona.ai</title>
 </head>
 <body>
 
@@ -238,1502 +107,282 @@
 
 <!-- Header injected by the global site-chrome.js component (single source of truth). -->
 
-
 <main class="orch-main" id="main-content">
 
-  <h1 class="visually-hidden">Settings — Control Center</h1>
+  <h1 class="visually-hidden">Fleet — machines and training jobs</h1>
 
-  <!-- ── Read-only guest banner (shown only to logged-out visitors) ── -->
   <div class="guest-banner" role="status">
-    <span>👁️ <strong>Read-only view.</strong> You're seeing live fleet status. Sign in as an admin to control training, keys, and the autonomous fleet.</span>
+    <span>👁️ <strong>Read-only view.</strong> You can see the fleet and the job board. Sign in to register a machine or run jobs.</span>
     <a href="/auth.html?returnTo=%2Forchestration.html" style="margin-left:auto;">Sign in →</a>
   </div>
 
-  <!-- ── Slim status line ── -->
-  <div class="orch-status">
-    <span id="statusPill" class="pill"><span class="dot"></span> Checking…</span>
-    <span class="sdiv"></span>
-    <span class="smeta"><b id="statusAiCount">—</b> AIs connected</span>
-    <span class="sdiv"></span>
-    <span class="smeta">Training: <b id="statusTrain">—</b></span>
-    <span class="stitle">Control Center · <span id="refreshTime">loading…</span></span>
+  <!-- ── Needs-attention strip: the one-line answer to "is anything stuck?" ── -->
+  <div class="attn" id="attnStrip" role="status">
+    <span class="dot"></span>
+    <span class="item">Machines online: <b id="attnOnline">—</b></span>
+    <span class="item">Jobs on the board: <b id="attnJobs">—</b></span>
+    <span class="item">Jobs with format errors: <b id="attnBadJobs">—</b></span>
+    <span class="item" id="attnNote"></span>
   </div>
 
-  <!-- ── Broker connection (IBKR) — per-user, ADR-0022 ── -->
-  <style>
-    #broker .broker-status{display:flex;align-items:center;gap:9px;font-size:.85rem;font-weight:600;margin:2px 0 12px}
-    #broker .bdot{width:9px;height:9px;border-radius:50%;background:var(--text2)}
-    #broker .bdot.on{background:#22c55e;box-shadow:0 0 8px #22c55e}#broker .bdot.off{background:#ef4444}
-    #broker .bdot.wait{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
-    #broker .bsaved-note{margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.76rem;line-height:1.5;border:1px solid rgba(34,197,94,.35);background:rgba(34,197,94,.08);color:#bbf7d0}
-    #broker .broker-gate{margin:0 0 12px;padding:10px 13px;border-radius:9px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.1);color:#fca5a5;font-size:.82rem}
-    #broker .broker-gate a{color:var(--accent)}
-    #broker .bfield{margin-bottom:10px}
-    #broker label{display:block;font-size:.62rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);margin:0 0 4px}
-    #broker input,#broker textarea{width:100%;box-sizing:border-box;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--bg0);color:var(--text0);font-size:.82rem;font-family:inherit}
-    #broker textarea{min-height:78px;font-family:var(--mono);font-size:.72rem;resize:vertical}
-    #broker .brow{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    @media(max-width:640px){#broker .brow{grid-template-columns:1fr}}
-    #broker .bhint{font-size:.68rem;color:var(--text2);margin-top:3px}
-    #broker .bbanner{display:none;margin:0 0 12px;padding:9px 12px;border-radius:8px;font-size:.78rem}
-    #broker .bbanner.show{display:block}#broker .bbanner.err{border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.1);color:#fca5a5}
-    #broker .bbanner.ok{border:1px solid rgba(34,197,94,.45);background:rgba(34,197,94,.1);color:#bbf7d0}
-    #broker .bactions{display:flex;gap:9px;margin-top:12px;flex-wrap:wrap}
-    #broker .bgen{border:1px solid var(--border);border-radius:10px;background:var(--bg0);padding:13px 15px;margin:0 0 14px}
-    #broker .bgen-head{font-size:.9rem;margin-bottom:4px}#broker .bgen-sub{color:var(--text2);font-weight:400;font-size:.72rem}
-    #broker .bgen-p{font-size:.78rem;color:var(--text1);line-height:1.55;margin:0 0 10px}
-    #broker .bgen-msg{margin-left:10px;font-size:.76rem;color:#22c55e}
-    #broker .bgen-files{margin-top:12px;display:flex;flex-direction:column;gap:7px}
-    #broker .bgen-files-h{font-size:.76rem;color:var(--text1);margin-bottom:2px}
-    #broker .bfile-btn{font-family:var(--mono);font-size:.76rem;text-align:left;padding:9px 12px;border-radius:8px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--text0);cursor:pointer;transition:background .15s}
-    #broker .bfile-btn:hover{background:color-mix(in srgb,var(--accent) 20%,transparent)}
-    #broker .bfile-btn.done{border-color:rgba(34,197,94,.5);background:rgba(34,197,94,.12);color:#bbf7d0;cursor:default}
-    #broker .bgen-adv{margin-top:11px}#broker .bgen-adv summary{font-size:.74rem;color:var(--text2);cursor:pointer}
-    #broker .bsteps{margin:12px 0 6px;padding-left:20px;font-size:.8rem;color:var(--text1);line-height:1.65}
-    #broker .bsteps li{margin-bottom:7px}
-    #broker .bfile{font-family:var(--mono);font-size:.72rem;padding:1px 6px;border-radius:5px;background:var(--bg0);border:1px solid var(--border);color:var(--text0);white-space:nowrap}
-    #broker a.bgo{display:inline-block;text-decoration:none;margin:4px 0 2px}
-  </style>
-  <section class="panel" id="broker">
-    <h2>🔗 Broker Connection <span class="section-meta">connect your account</span></h2>
-
-    <!-- Which connected broker EXECUTES trades (per-user switch, ADR-0027). The cards
-         below manage CREDENTIALS; this picks the executor. The non-selected broker
-         always remains the automatic fallback, so switching can't strand an account. -->
-    <style>
-      #broker .bswitch{display:flex;gap:9px;margin:6px 0 4px;flex-wrap:wrap}
-      #broker .bsw{padding:9px 16px;border:1px solid var(--border);border-radius:9px;background:var(--bg0);color:var(--text1);cursor:pointer;font-size:.84rem;transition:border-color .15s,background .15s}
-      #broker .bsw:hover{border-color:var(--accent)}
-      #broker .bsw.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);color:var(--text0);font-weight:700}
-    </style>
-    <div class="bgen" id="brokerSwitchCard">
-      <div class="bgen-head"><strong>🎛 Active broker</strong> <span class="bgen-sub">which account executes your trades — switch any time</span></div>
-      <div class="bswitch" role="radiogroup" aria-label="Active broker">
-        <button type="button" class="bsw" data-broker="auto" title="Follow the server default">Auto</button>
-        <button type="button" class="bsw" data-broker="alpaca" title="Execute on Alpaca">⚡ Alpaca</button>
-        <button type="button" class="bsw" data-broker="ibkr" title="Execute on Interactive Brokers">🔗 IBKR</button>
-      </div>
-      <p class="bhint" id="bswHint">Checking…</p>
+  <!-- ── 1 · This machine ── -->
+  <section class="panel" aria-labelledby="h-machine">
+    <h2 id="h-machine">This machine</h2>
+    <p class="hint">Tell the fleet what this computer can offer. Your entry stays visible while the page
+      keeps checking in (roughly once a minute). To join the roster, add yourself to
+      <code>config/mesh-members.json</code> in the repo — one small pull request, one line.</p>
+    <div class="mgrid">
+      <label>Who you are
+        <select id="mMember"><option value="">Loading roster…</option></select>
+      </label>
+      <label>Machine name
+        <input id="mMachine" placeholder="e.g. desk-4080" maxlength="60">
+      </label>
+      <label>Graphics card
+        <input id="mGpu" placeholder="e.g. RTX 4080 (blank if none)" maxlength="80">
+      </label>
+      <label>Card memory (GB)
+        <input id="mVram" type="number" min="0" max="1024" placeholder="16">
+      </label>
+      <label>System memory (GB)
+        <input id="mRam" type="number" min="0" max="4096" placeholder="32">
+      </label>
+      <label>Hours you're donating
+        <input id="mAvail" placeholder="e.g. weeknights 8pm–6am" maxlength="120">
+      </label>
+    </div>
+    <div class="mrow">
+      <label class="check"><input type="checkbox" id="mDonor"> Donor only (run jobs, not developing)</label>
+      <button class="btn primary" id="mStart" type="button">Start checking in</button>
+      <button class="btn" id="mStop" type="button" disabled>Stop</button>
+      <span class="mstate" id="mState">Not checking in.</span>
     </div>
 
-    <!-- One-click tier (ADR-0027): Alpaca OAuth2 — no keys, paper by default -->
-    <div class="bgen" id="alpacaCard" style="border-color:var(--accent)">
-      <div class="bgen-head"><strong>⚡ Connect Alpaca</strong> <span class="bgen-sub">one click · recommended · paper by default</span></div>
-      <p class="bgen-p">Sign in to Alpaca and approve — that's it. No keys to generate, nothing to paste. unisona never sees your Alpaca password or API keys; it receives a scoped token you can revoke anytime. Commission-free stocks &amp; options. Starts on a <strong>paper</strong> account so you can trade risk-free.</p>
-      <div class="broker-status"><span class="bdot" id="adot"></span><span id="astatusText">Checking…</span></div>
-      <div class="bactions">
-        <a class="btn-primary bgo" id="aconnect" href="/api/broker/alpaca/connect?returnTo=%2Forchestration.html%23broker">⚡ Connect Alpaca (paper)</a>
-        <button type="button" class="btn-secondary" id="adisconnect" hidden>Disconnect</button>
-      </div>
-      <div class="bbanner" id="abanner"></div>
-      <p class="bhint" id="anotconfig" hidden>One-click Alpaca isn't set up on this server yet. Use the Interactive Brokers option below, or ask an admin to register the Alpaca OAuth app.</p>
+    <h2 style="margin-top:18px;">Fleet</h2>
+    <div class="fleet" id="fleetList"><div class="empty">Loading fleet…</div></div>
+  </section>
+
+  <!-- ── 2 · Training jobs (GitHub issues are the only source) ── -->
+  <section class="panel" aria-labelledby="h-jobs">
+    <h2 id="h-jobs">Training jobs</h2>
+    <p class="hint">Jobs come from one place: GitHub issues labeled <code>training-job</code> with a
+      <code>```training-job</code> block naming an approved script. Nothing typed on this page can start
+      a job — if it's not an issue, it doesn't run.
+      <a href="https://github.com/alex-place/lantern-os/issues/new?template=training-job.md&labels=training-job" target="_blank" rel="noopener">File a new job →</a></p>
+    <div id="jobList"><div class="empty">Loading job board…</div></div>
+    <div class="mrow">
+      <button class="btn" id="jobRefresh" type="button">Refresh</button>
     </div>
-
-    <div class="bgen-head" style="margin:18px 0 6px"><strong>Interactive Brokers</strong> <span class="bgen-sub">power tier · your own keys · best execution</span></div>
-    <p class="panel-sub">Prefer IBKR (better fills, margin, full options)? Connect your own IBKR account via self-service OAuth. Keys are stored <strong>encrypted</strong> and never leave the server. Start with a <strong>paper</strong> account (<code>DU…</code>). <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
-    <div class="broker-status"><span class="bdot" id="bdot"></span><span id="bstatusText">Checking…</span></div>
-    <div class="broker-gate" id="bgate" hidden>Trading requires the <strong>Pro ($20/mo)</strong> tier. <a href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener">Upgrade</a> to connect a broker.</div>
-
-    <!-- Step 1: generate keys in the browser (no command line) -->
-    <div class="bgen">
-      <div class="bgen-head"><strong>Step 1 · Get your keys</strong> <span class="bgen-sub">no command line needed</span></div>
-      <p class="bgen-p">Click below — unisona makes your security keys right here in your browser and downloads <strong>3 files</strong>. You'll hand those to IBKR in Step 2; the secret half stays in this page (Step 3 fills it in for you) and never leaves your computer except into unisona.</p>
-      <button type="button" class="btn-primary" id="bgenerate">🔑 Generate my keys</button>
-      <span id="bgenmsg" class="bgen-msg"></span>
-      <div id="bgenfiles" class="bgen-files" hidden></div>
-      <details class="bgen-adv"><summary>Prefer the command line? (advanced)</summary>
-        <p class="bgen-p" style="margin-top:8px">Run these, then paste the two <em>private</em> keys + DH prime yourself:</p>
-        <pre style="white-space:pre-wrap;font-family:var(--mono);font-size:.7rem;background:var(--bg0);border:1px solid var(--border);border-radius:8px;padding:10px">openssl genrsa -out private_signature.pem 2048
-openssl rsa -in private_signature.pem -pubout -out public_signature.pem
-openssl genrsa -out private_encryption.pem 2048
-openssl rsa -in private_encryption.pem -pubout -out public_encryption.pem
-openssl dhparam -out dhparam.pem 2048</pre>
-      </details>
-    </div>
-
-    <!-- Step 2: register the keys on IBKR's site (was missing — only lived in the separate guide) -->
-    <div class="bgen">
-      <div class="bgen-head"><strong>Step 2 · Register with IBKR</strong> <span class="bgen-sub">one-time, on IBKR's website</span></div>
-      <p class="bgen-p">Sign in to Interactive Brokers and open their OAuth page, then register the 3 files from Step 1:</p>
-      <a class="btn-primary bgo" href="https://ndcdyn.interactivebrokers.com/sso/Login?action=OAUTH&amp;RL=1" target="_blank" rel="noopener">↗ Open the IBKR OAuth page</a>
-      <ol class="bsteps">
-        <li>Pick a <strong>Consumer Key</strong> — make up a <strong>9-letter</strong> word, letters only (e.g. <code>UNISONAAB</code>). Write it down; you'll paste it in Step 3.</li>
-        <li>Upload <span class="bfile">public_signature.pem</span> as the <strong>Public Signing Key</strong>.</li>
-        <li>Upload <span class="bfile">public_encryption.pem</span> as the <strong>Public Encryption Key</strong>.</li>
-        <li>Upload <span class="bfile">dhparam.pem</span> as the <strong>Diffie-Hellman Parameters</strong>.</li>
-        <li>Click <strong>Generate Token</strong>. IBKR shows an <strong>Access Token</strong> and an <strong>Access Token Secret</strong> — copy <em>both</em> right away (they disappear if you refresh), then switch <strong>Enable OAuth Access</strong> on.</li>
-      </ol>
-      <p class="bhint">Prefer pictures? Full walkthrough with screenshots: <a href="/ibkr-setup-guide.html" target="_blank" rel="noopener">📖 Setup guide →</a></p>
-    </div>
-
-    <!-- Step 3: paste what IBKR gave you + connect -->
-    <form id="brokerForm">
-      <div class="bgen-head" style="margin-bottom:9px"><strong>Step 3 · Connect</strong> <span class="bgen-sub">paste what IBKR gave you in Step 2</span></div>
-      <div class="bbanner" id="bbanner"></div>
-      <div class="bsaved-note" id="bsavednote" hidden>✓ Your credentials are <strong>saved on file</strong> (encrypted). You don't need to re-enter them — refreshing is safe. Use <strong>Recheck connection</strong> to test again. Fill a field only to <em>replace</em> it.</div>
-      <div class="brow">
-        <div class="bfield"><label>Consumer key</label><input id="consumerKey" autocomplete="off"><div class="bhint">the 9-letter word you made up in Step 2</div></div>
-        <div class="bfield"><label>Account ID</label><input id="accountId" placeholder="DU1234567" autocomplete="off"><div class="bhint">DU… = paper · U… = live</div></div>
-      </div>
-      <div class="brow">
-        <div class="bfield"><label>Access token</label><input id="accessToken" autocomplete="off"><div class="bhint">from IBKR's Generate Token</div></div>
-        <div class="bfield"><label>Access token secret</label><input id="accessTokenSecret" autocomplete="off"><div class="bhint">shown next to the token — copy both</div></div>
-      </div>
-      <!-- The security keys below are FILLED IN AUTOMATICALLY by "Generate my keys" in
-           Step 1 — a normal IBKR setup never needs to touch them, so they're collapsed
-           to keep this a 4-field form instead of a wall of crypto. Still submitted. -->
-      <details class="bgen-adv" id="badvfields" style="margin:4px 0 6px">
-        <summary>Security keys — auto-filled in Step 1, you don't need to touch these</summary>
-        <div class="bfield" style="margin-top:10px"><label>Signature private key (PEM)</label><textarea id="signaturePem" placeholder="auto-filled by Generate my keys" spellcheck="false"></textarea></div>
-        <div class="bfield"><label>Encryption private key (PEM)</label><textarea id="encryptionPem" placeholder="auto-filled by Generate my keys" spellcheck="false"></textarea></div>
-        <div class="brow">
-          <div class="bfield"><label>Diffie-Hellman prime (hex)</label><input id="dhPrime" placeholder="auto-filled" autocomplete="off"></div>
-          <div class="bfield"><label>Realm</label><input id="realm" value="limited_poa" autocomplete="off"></div>
-        </div>
-      </details>
-      <div class="bactions">
-        <button type="submit" class="btn-primary" id="bconnect">Connect &amp; test</button>
-        <button type="button" class="btn-secondary" id="brecheck" hidden>Recheck connection</button>
-        <button type="button" class="btn-secondary" id="bdisconnect" hidden>Disconnect</button>
-      </div>
-    </form>
   </section>
 
-  <p class="band-title">The loop, right now</p>
-
-  <!-- ── Live Work Board (the team loop, real-time truth) ── -->
-  <section class="panel" id="workBoardPanel">
-    <h2>📋 Work Board <span class="section-meta" id="workBoardMeta">live queue + PR truth</span>
-      <button class="btn-secondary" onclick="refreshWorkBoard()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">Real-time state straight from GitHub + the on-disk queue — nothing cached or hand-edited. Open issues are pending work; PR lanes are in review; merged PRs are landed.</p>
-    <div class="board-grid" id="boardStats">
-      <div class="stat"><div class="stat-label">Open Issues</div><div class="stat-value" id="bStatPending">—</div><div class="stat-sub">unclaimed backlog</div></div>
-      <div class="stat"><div class="stat-label">In Progress</div><div class="stat-value muted" id="bStatProgress">—</div><div class="stat-sub" id="bStatProgressSub">in-flight (live)</div></div>
-      <div class="stat"><div class="stat-label">Open PRs</div><div class="stat-value muted" id="bStatPRs">—</div><div class="stat-sub">awaiting review/merge</div></div>
-      <div class="stat"><div class="stat-label">Landed</div><div class="stat-value" id="bStatLanded">—</div><div class="stat-sub">recent merges</div></div>
-      <div class="stat"><div class="stat-label">Active Agents</div><div class="stat-value muted" id="bStatAgents">—</div><div class="stat-sub" id="bStatAgentsSub">of — slots</div></div>
-    </div>
-    <div class="refresh-time"><span id="boardUpdated">—</span></div>
+  <!-- ── 3 · Live run ── -->
+  <section class="panel" aria-labelledby="h-run">
+    <h2 id="h-run">Live run</h2>
+    <p class="hint">When you run a job it executes as autonomous work on this server — planned, executed, and
+      verified by the local models — and every step streams here. Finished work lands as a draft pull request,
+      never straight to master.</p>
+    <div class="runlog" id="runLog" aria-live="polite"></div>
   </section>
-
-  <!-- ── PR Lanes (Verify stage: live CI per agent lane) ── -->
-  <section class="panel" id="prLanesPanel">
-    <h2>🚦 PR Lanes <span class="section-meta" id="prLanesMeta">one open PR per agent lane</span></h2>
-    <p class="panel-sub">Each agent prefix gets one open PR lane (CLAUDE.md monoworkstream rule). CI rollup is live from GitHub checks — green/red here is the real gate.</p>
-    <div id="prLanesBody"><div class="placeholder">Loading PR lanes…</div></div>
-  </section>
-
-  <!-- ── Agent Slots (who's working right now) ── -->
-  <section class="panel" id="agentSlotsPanel">
-    <h2>👥 Agent Slots <span class="section-meta" id="agentSlotsMeta"></span>
-      <button class="btn-secondary" onclick="renderAgentSlots()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">The roster from <code>.claude/agent-slots.json</code>, cross-referenced with the assigned queue — who's actively on an issue vs idle.</p>
-    <div id="agentSlotsBody" class="slot-grid"><div class="placeholder">Loading roster…</div></div>
-  </section>
-
-  <!-- ── Manual Work (slim link → /work.html) ── -->
-  <section class="panel" id="pullWorkLink">
-    <h2>📥 Manual Work <span class="section-meta">pick &amp; hand off issues — Recently Landed lives there too</span>
-      <a class="btn-secondary" href="/work.html" style="margin-left:auto;">Open Work →</a>
-    </h2>
-  </section>
-
-  <p class="band-title">Brain &amp; compute</p>
-
-  <!-- ── Local / Offline Model (the wired-in brain) ── -->
-  <section class="panel">
-    <h2>🧠 Local Model <span class="section-meta" id="localModelMode"></span></h2>
-    <p class="panel-sub">The offline model wired into the coder/agent path — runs fully on this computer, no cloud. <code>OLLAMA_MODEL</code> is the pinned target; it only runs if it's actually being served on the local API.</p>
-    <div id="localModelBody"><div class="placeholder">Checking local model…</div></div>
-  </section>
-
-  <!-- ── Training Control (primary action) ── -->
-  <section class="panel admin-only">
-    <h2>⚡ Training Control <span class="section-meta" id="trainSummary"></span></h2>
-    <p class="panel-sub">Fire a self-improvement run on the free GPU providers. <b>Start</b> fans out to every automatable provider with quota; or dispatch one provider at a time.</p>
-    <button class="train-start-btn" id="startTrainBtn" onclick="startTraining()">▶ Start Training Now — all providers</button>
-    <div id="trainDispatchResult" class="train-dispatch-result"></div>
-    <div id="trainProviders" style="margin-top:12px;"><div class="placeholder">Loading providers…</div></div>
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
-      <button class="btn-secondary" id="gpuPollBtn" onclick="gpuPollAll()">↻ Poll running jobs</button>
-      <button class="btn-secondary" onclick="renderTrainingSection()">⟳ Refresh</button>
-    </div>
-    <div id="trainRecentJobs" style="margin-top:12px;"></div>
-  </section>
-
-  <!-- ── GPU Account Keys (editable) ── -->
-  <section class="panel admin-only">
-    <h2>🖥️ GPU Account Keys <span class="section-meta" id="gpuKeysSummary"></span>
-      <button class="btn-secondary" onclick="renderGpuKeys()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">Connect free GPU accounts so the Start button can dispatch training automatically. Set Hugging Face first — it's the checkpoint parking spot.</p>
-    <div id="gpuKeysList" class="key-grid"><div class="placeholder">Loading accounts…</div></div>
-  </section>
-
-  <!-- ── AI Providers (keys + fallback chains, merged) ── -->
-  <section class="panel admin-only">
-    <h2>🔑 AI Providers <span class="section-meta" id="providerKeysSummary"></span>
-      <button class="btn-secondary" onclick="refreshProviderStatus()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">⟳ Refresh</button>
-    </h2>
-    <p class="panel-sub">Paste an API key to connect a model. Saved to this computer's Windows user account only — never uploaded.</p>
-    <div id="providerKeysList" class="key-grid"><div class="placeholder">Loading…</div></div>
-    <h3 class="subhead">🔗 Fallback chains <span class="section-meta" id="providersSummary"></span></h3>
-    <p class="panel-sub">Each task type tries providers in order — the first connected one wins.</p>
-    <div id="providerChains"><div class="placeholder">Loading…</div></div>
-  </section>
-
-  <p class="band-title">How well it's working</p>
-
-  <!-- ── AI Provider Reliance (+ per-model chat reliability, merged) ── -->
-  <section class="panel">
-    <h2>🤖 AI Provider Reliance <span class="section-meta" id="relianceSummary">who's actually doing the work</span>
-      <span style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn-secondary" id="rel-24h" onclick="setRelianceBand('24h')" style="font-size:0.72rem;padding:4px 9px;">24h</button>
-        <button class="btn-secondary" id="rel-7d" onclick="setRelianceBand('7d')" style="font-size:0.72rem;padding:4px 9px;">7d</button>
-        <button class="btn-secondary" id="rel-30d" onclick="setRelianceBand('30d')" style="font-size:0.72rem;padding:4px 9px;">30d</button>
-        <button class="btn-secondary" id="rel-all" onclick="setRelianceBand('all')" style="border-color:var(--accent);color:var(--accent);font-size:0.72rem;padding:4px 9px;">all</button>
-      </span>
-    </h2>
-    <p class="panel-sub">Share of real AI work (Claude Code engineering turns + chat model calls). Reliance = how much each provider carries; reliability = its success rate. Local is bucketed under one Ollama row.</p>
-    <div id="relianceList"><div class="placeholder">Loading…</div></div>
-    <h3 class="subhead">🏆 Per-model chat reliability <span class="section-meta">success rate · last 14 days</span></h3>
-    <p class="panel-sub">The granular local/cloud models that serve chat — the small sliver above. Ranked by success rate.</p>
-    <div class="merit-list" id="meritList"><div class="placeholder">Loading…</div></div>
-  </section>
-
-  <!-- ── Trust Calibration (read-only) ── -->
-  <section class="panel">
-    <h2>⚖️ Trust Calibration <span class="section-meta" id="calSummary"></span></h2>
-    <p class="panel-sub">How much each agent's confidence has matched verified reality.</p>
-    <div id="calList" style="display:flex;flex-direction:column;gap:6px;"><div class="placeholder">Loading…</div></div>
-    <div style="margin-top:10px;display:flex;gap:12px;flex-wrap:wrap;" id="calGlobal"></div>
-  </section>
-
-  <!-- ── Self-Tests (read-only) ── -->
-  <section class="panel">
-    <h2>🧪 Self-Test History <span class="section-meta" id="ksTestSummary"></span></h2>
-    <div id="ksTestList" style="display:flex;flex-direction:column;gap:8px;"><div class="placeholder">Loading…</div></div>
-  </section>
-
-  <!-- ── Rollover (read-only) ── -->
-  <section class="panel">
-    <h2>🔀 Rollover · Unisona vs Claude <span class="section-meta">landed-work share</span>
-      <span style="margin-left:auto;display:flex;gap:6px;">
-        <button class="btn-secondary" id="band-24h" onclick="setRolloverBand('24h')" style="font-size:0.72rem;padding:4px 9px;">24h</button>
-        <button class="btn-secondary" id="band-7d" onclick="setRolloverBand('7d')" style="font-size:0.72rem;padding:4px 9px;">7d</button>
-        <button class="btn-secondary" id="band-30d" onclick="setRolloverBand('30d')" style="border-color:var(--accent);color:var(--accent);font-size:0.72rem;padding:4px 9px;">30d</button>
-        <button class="btn-secondary" id="band-all" onclick="setRolloverBand('all')" style="font-size:0.72rem;padding:4px 9px;">all</button>
-      </span>
-    </h2>
-    <div id="rolloverBody"><div class="placeholder">Loading…</div></div>
-  </section>
-
-  <!-- ── Research Team · Repo Memory (grounding telemetry) ── -->
-  <section class="panel" id="repoLearnPanel">
-    <h2>🔬 Research Team · Repo Memory <span class="section-meta" id="repoLearnMeta"></span>
-      <button class="btn-secondary" id="repoLearnRunBtn" onclick="runRepoLearn()" style="margin-left:auto;font-size:0.72rem;padding:4px 9px;">▶ Run learning pass</button>
-    </h2>
-    <p class="panel-sub">The fleet's grounding. Every doc + live module is learned into the <strong>one</strong> Convergence Memory as a grounded, evidence-cited record — so delegated agents and chat retrieve real repo facts instead of guessing. This is how "actually remember you" becomes true. Counts are read straight from the memory log; nothing is fabricated.</p>
-    <div class="board-grid" id="repoLearnStats">
-      <div class="stat"><div class="stat-label">Files Learned</div><div class="stat-value" id="rlFiles">—</div><div class="stat-sub">in repo manifest</div></div>
-      <div class="stat"><div class="stat-label">Grounded Memories</div><div class="stat-value muted" id="rlMems">—</div><div class="stat-sub">in Convergence Memory</div></div>
-      <div class="stat"><div class="stat-label">Last Pass</div><div class="stat-value muted" id="rlLast" style="font-size:1.1rem;">—</div><div class="stat-sub" id="rlLangs">—</div></div>
-    </div>
-    <div id="repoLearnResult" class="train-dispatch-result"></div>
-  </section>
-
-  <div class="refresh-time" id="footerTime">
-    <span class="dot online" id="status-dot" title="Server status"></span>
-    <span id="status-label">connecting…</span>
-  </div>
 
 </main>
 
-<footer class="site-footer">
-  <div class="footer-inner">
-    <span class="footer-brand">
-      <span class="mandala-icon spin-slow" aria-hidden="true"></span> unisona.ai
-    </span>
-    <span class="sep">·</span>
-    <a href="/">Home</a>
-    <a href="/chat.html">Chat</a>
-    <a href="/orchestration.html">Settings</a>
-    <span class="sep">·</span>
-    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
-  </div>
-</footer>
-
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
-<script src="/js/orchestration-research.js"></script>
+<script src="/js/auth-gate.js" defer></script>
 <script>
 (function () {
-  const $ = (id) => document.getElementById(id);
-  let _cache = { providerData: null, gpuData: null };
+  "use strict";
+  var HB_KEY = "unisona-fleet-machine";
+  var hbTimer = null;
 
-  async function fetchJson(path, timeoutMs = 10000) {
-    // Boot fires ~17 of these at once; the browser caps ~6 connections per host
-    // so the rest queue. AbortSignal.timeout() counts from the fetch() call — not
-    // from when the request hits the wire — so a request stuck behind slow ones
-    // (PR-lane / gh calls) can time out *while still queued* and abort before it
-    // is ever sent. The one-shot panels (reliance/merit/calibration/keystone/
-    // rollover) have no refresh interval, so that transient abort would leave a
-    // false "data unavailable" state until a manual reload. Retry once on a
-    // thrown error (network / timeout / abort) after a short backoff — by then
-    // the boot burst has drained a connection slot. Non-2xx responses fall
-    // through to `null` without a retry, so we never hammer a genuinely failing
-    // endpoint. Only used for idempotent GETs, so the retry is safe.
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const r = await fetch(path, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
-        return r.ok ? await r.json() : null;
-      } catch {
-        if (attempt === 0) { await new Promise((res) => setTimeout(res, 400)); continue; }
-        return null;
-      }
-    }
-    return null;
-  }
-  function setText(id, val) { const el = $(id); if (el) el.textContent = val; }
-  function setHtml(id, val) { const el = $(id); if (el) el.innerHTML = val; }
-  function escapeHtml(s) {
-    return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  }
-
-  const RESEARCH_HISTORY_KEY = "keystone-research-handoff-history";
-  let _researchItems = [];
-
-  function researchHistory(entry) {
-    try {
-      const current = JSON.parse(localStorage.getItem(RESEARCH_HISTORY_KEY) || "[]");
-      localStorage.setItem(
-        RESEARCH_HISTORY_KEY,
-        JSON.stringify(OrchestrationResearch.appendHistory(current, entry))
-      );
-    } catch { /* local history is optional */ }
-  }
-
-  function fallbackResearchCopy(text, done) {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    try { document.execCommand("copy"); done(); } catch { /* leave button unchanged */ }
-    textarea.remove();
-  }
-
-  function copyResearchText(text, button, entry) {
-    const done = () => {
-      const original = button.textContent;
-      button.textContent = "Copied";
-      setTimeout(() => { button.textContent = original; }, 1400);
-      researchHistory(entry);
-    };
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(done).catch(() => fallbackResearchCopy(text, done));
-    } else {
-      fallbackResearchCopy(text, done);
-    }
-  }
-
-  function renderResearchQueue() {
-    const queue = $("researchQueue");
-    const visible = OrchestrationResearch.filterAndSort(_researchItems, {
-      query: $("researchSearch")?.value,
-      priority: $("researchPriority")?.value,
-      sort: $("researchSort")?.value,
-    });
-    setText("researchSummary", `${visible.length} of ${_researchItems.length} open, unclaimed issues`);
-    if (!visible.length) {
-      queue.innerHTML = '<div class="research-state">No open issues match these filters.</div>';
-      return;
-    }
-    queue.innerHTML = visible.map((item) => {
-      const labels = (item.labels || [])
-        .map((label) => `<span class="research-label">${escapeHtml(label)}</span>`)
-        .join("");
-      const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "unknown";
-      return `<article class="research-item" data-issue="${escapeHtml(item.issueNumber)}">
-        <div class="research-head">
-          <span class="research-badge">${escapeHtml(OrchestrationResearch.priorityLabel(item))}</span>
-          <div class="research-title">#${escapeHtml(item.issueNumber)} ${escapeHtml(item.title)}</div>
-        </div>
-        <div class="research-meta">ready for research · unclaimed · updated ${escapeHtml(updated)}
-          ${labels ? ` · <span class="research-labels">${labels}</span>` : ""}
-        </div>
-        <div class="research-actions">
-          <a class="research-action" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open issue</a>
-          <button class="research-action delegate" type="button" data-delegate="${escapeHtml(item.issueNumber)}" title="Hand this issue to the autonomous fleet — it works it in an isolated worktree and opens a draft PR">🛰️ Delegate to fleet</button>
-          <button class="research-action primary" type="button" data-research="${escapeHtml(item.issueNumber)}">Research in Unisona Chat</button>
-          <button class="research-action" type="button" data-copy-codex="${escapeHtml(item.issueNumber)}">Copy Codex handoff</button>
-          <button class="research-action" type="button" data-copy-claude="${escapeHtml(item.issueNumber)}">Copy Claude Code handoff</button>
-        </div>
-      </article>`;
-    }).join("");
-  }
-
-  async function loadResearchQueue() {
-    const queue = $("researchQueue");
-    queue.innerHTML = '<div class="research-state">Loading open GitHub issues...</div>';
-    try {
-      const response = await fetch("/api/queue/list?status=pending", {
-        cache: "no-store",
-        signal: AbortSignal.timeout(15000),
-      });
-      const data = await response.json();
-      if (!response.ok || data.error) throw new Error(data.message || data.error || `HTTP ${response.status}`);
-      if (data.source !== "github" || !Array.isArray(data.items)) {
-        throw new Error("Queue response did not contain the GitHub issue backlog.");
-      }
-      _researchItems = data.items;
-      renderResearchQueue();
-    } catch (error) {
-      _researchItems = [];
-      setText("researchSummary", "GitHub queue unavailable");
-      queue.innerHTML = `<div class="research-state error">Could not load open GitHub issues: ${escapeHtml(error.message)}. Verify GitHub CLI authentication on this computer, then choose Refresh.</div>`;
-    }
-  }
-
-  function findResearchItem(issueNumber) {
-    return _researchItems.find((item) => String(item.issueNumber) === String(issueNumber));
-  }
-
-  function bindResearchQueue() {
-    ["researchSearch", "researchPriority", "researchSort"].forEach((id) => {
-      $(id)?.addEventListener(id === "researchSearch" ? "input" : "change", renderResearchQueue);
-    });
-    $("researchRefresh")?.addEventListener("click", loadResearchQueue);
-    $("researchQueue")?.addEventListener("click", (event) => {
-      const button = event.target.closest("button");
-      if (!button) return;
-      const issueNumber = button.dataset.delegate || button.dataset.research || button.dataset.copyCodex || button.dataset.copyClaude;
-      const item = findResearchItem(issueNumber);
-      if (!item) return;
-      if (button.dataset.delegate) {
-        delegateToFleet(item, button);
-        return;
-      }
-      if (button.dataset.research) {
-        const prompt = OrchestrationResearch.buildResearchPrompt(item);
-        researchHistory({ issueNumber: item.issueNumber, target: "keystone-chat", timestamp: new Date().toISOString() });
-        window.open(`/chat.html?seed=${encodeURIComponent(prompt)}`, "_blank", "noopener");
-        return;
-      }
-      const target = button.dataset.copyClaude ? "Claude Code" : "Codex";
-      copyResearchText(
-        OrchestrationResearch.buildHandoff(item, target),
-        button,
-        {
-          issueNumber: item.issueNumber,
-          target: target.toLowerCase().replace(/\s+/g, "-"),
-          timestamp: new Date().toISOString(),
-        }
-      );
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
 
-  // ── Slim status line ──────────────────────────────────────────────────────
-  async function updateStatus() {
-    const health = await fetchJson("/api/health");
-    const online = !!(health && health.ok);
-    const pill = $("statusPill");
-    if (pill) {
-      pill.className = online ? "pill online" : "pill offline";
-      pill.innerHTML = `<span class="dot"></span> ${online ? "Online" : "Offline"}`;
-    }
-    const dot = $("status-dot");
-    if (dot) dot.className = online ? "dot online" : "dot";
-    setText("status-label", online ? "server online" : "server unreachable");
-
-    const connected = _cache.providerData
-      ? Object.values(_cache.providerData.providers || {}).filter(p => p.available).length
-      : "—";
-    setText("statusAiCount", connected);
-
-    const recent = _cache.gpuData?.recentJobs || [];
-    const running = recent.find(j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued"));
-    setText("statusTrain", running ? (running.status === "running" ? "running" : "queued") : "idle");
-
-    setText("refreshTime", new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-  }
-
-  // ── Training control ──────────────────────────────────────────────────────
-  const PROVIDER_ICONS = { kaggle: "🏆", colab: "📓", sagemaker: "☁️", paperspace: "📐", lightning: "⚡", modal: "🚀" };
-
-  async function renderTrainingSection() {
-    const data = await fetchJson("/api/gpu-training/status");
-    _cache.gpuData = data;
-    if (!data) { $("trainProviders").innerHTML = '<div class="placeholder">Training status unavailable.</div>'; return; }
-
-    const { providers = [], recentJobs = [] } = data;
-    const automatable = providers.filter(p => p.automatable && p.quota_hours_per_week > 0).length;
-    const running = recentJobs.filter(j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued")).length;
-    const liveDot = running ? '<span class="train-live-dot"></span>' : "";
-    const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    setHtml("trainSummary", `${liveDot}${automatable} provider${automatable !== 1 ? "s" : ""} ready to auto-dispatch`
-      + (running ? ` · ${running} running` : "")
-      + ` <span class="train-updated">· updated ${now}</span>`);
-
-    $("trainProviders").innerHTML = providers.map(p => {
-      const icon = PROVIDER_ICONS[p.provider_id] || "🖥️";
-      const autoTag = p.automatable
-        ? '<span class="train-badge tbadge-auto">Auto</span>'
-        : '<span class="train-badge tbadge-manual">Manual</span>';
-      const quota = p.quota_hours_per_week > 0 ? `${p.quota_hours_per_week}h/wk` : "no free quota";
-
-      const recent = recentJobs.find(j => j.provider === p.provider_id && j.type === "training_dispatch");
-      // Every provider gets a meaningful status — never blank. Active job > provider standing.
-      let statusBadge = "", rowCls = p.automatable ? "auto" : "";
-      const st = recent && recent.status;
-      if (st === "running" || st === "queued") {
-        statusBadge = `<span class="train-badge ${st === "running" ? "tbadge-running" : "tbadge-queued"}">${st}</span>`;
-        if (st === "running") rowCls = "running";
-      } else if (st === "failed") {
-        statusBadge = `<span class="train-badge tbadge-failed">error · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
-        rowCls = "failed";
-      } else if (st === "done") {
-        statusBadge = `<span class="train-badge tbadge-done">done · ${relTime(recent.polledAt || recent.dispatchedAt)}</span>`;
-      } else if (p.state === "exhausted") {
-        statusBadge = `<span class="train-badge tbadge-failed">quota used</span>`;
-      } else if (p.last_dispatch_at) {
-        statusBadge = `<span class="train-badge tbadge-idle">idle · ${relTime(p.last_dispatch_at)}</span>`;
-      } else {
-        statusBadge = `<span class="train-badge tbadge-untested">not tested yet</span>`;
-      }
-
-      const canDispatch = p.quota_hours_per_week > 0 || p.provider_id === "paperspace";
-      const dispatchBtn = canDispatch
-        ? `<button class="train-dispatch-btn" data-dispatch="${p.provider_id}" onclick="gpuDispatch('${p.provider_id}')">${p.automatable ? "Dispatch" : "Get notebook"}</button>`
-        : "";
-
-      return `<div class="train-provider-row ${rowCls}">
-        <span class="train-prov-name">${icon} ${escapeHtml(p.display)} ${autoTag}</span>
-        <span class="train-prov-meta">${quota}</span>
-        <span class="train-prov-spacer">${statusBadge}${dispatchBtn}</span>
-      </div>`;
-    }).join("");
-
-    const history = recentJobs.slice(0, 6);
-    $("trainRecentJobs").innerHTML = history.length ? `
-      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:6px;">Recent runs</div>
-      ${history.map(j => {
-        const icon = PROVIDER_ICONS[j.provider] || "🖥️";
-        const st = j.status;
-        const stColor = (st === "running" || st === "queued") ? "var(--green)" : st === "done" ? "var(--accent)" : st === "failed" ? "#f87171" : "var(--muted)";
-        const time = (j.polledAt || j.dispatchedAt) ? new Date(j.polledAt || j.dispatchedAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : "";
-        const label = j.type === "training_poll" ? `poll · ${st}` : st;
-        return `<div class="train-recent">
-          <span>${icon}</span><span style="font-weight:600;">${escapeHtml(j.provider)}</span>
-          <span style="color:${stColor};">${escapeHtml(label)}</span>
-          ${j.steps ? `<span style="color:var(--muted);">${j.steps} steps</span>` : ""}
-          <span style="margin-left:auto;color:var(--muted);">${escapeHtml(time)}</span>
-        </div>`;
-      }).join("")}` : "";
-
-    updateStatus();
-  }
-
-  // Start — dispatch-all
-  window.startTraining = async function() {
-    const btn = $("startTrainBtn");
-    const resultEl = $("trainDispatchResult");
-    if (btn) { btn.disabled = true; btn.textContent = "Dispatching to all providers…"; }
-    if (resultEl) { resultEl.style.display = "block"; resultEl.innerHTML = '<span class="placeholder">Sending to free GPU providers…</span>'; }
-    try {
-      const r = await fetch("/api/gpu-training/dispatch-all", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ steps: 600 }),
-      });
-      const result = await r.json();
-      const dispatched = result.dispatched || [];
-      const ok = dispatched.filter(d => !d.error);
-      const fail = dispatched.filter(d => d.error);
-      if (resultEl) {
-        resultEl.innerHTML = [
-          ok.length ? `<div style="color:var(--green);margin-bottom:4px;">✓ Dispatched to ${ok.length}: ${ok.map(d => d.provider).join(", ")}</div>` : "",
-          fail.length ? `<div style="color:#f87171;">Issues: ${fail.map(d => `${d.provider}: ${escapeHtml(d.error)}`).join(" · ")}</div>` : "",
-          !dispatched.length ? `<div class="placeholder">${escapeHtml(result.error || "No automatable providers with quota available.")}</div>` : "",
-        ].filter(Boolean).join("");
-      }
-      await renderTrainingSection();
-    } catch (e) {
-      if (resultEl) resultEl.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "▶ Start Training Now — all providers"; }
-    }
-  };
-
-  // Per-provider dispatch
-  window.gpuDispatch = async function(provider) {
-    const btn = document.querySelector(`button[data-dispatch="${provider}"]`);
-    const resultEl = $("trainDispatchResult");
-    const orig = btn ? btn.textContent : "";
-    if (btn) { btn.disabled = true; btn.textContent = "…"; }
-    if (resultEl) { resultEl.style.display = "block"; resultEl.innerHTML = `<span class="placeholder">Dispatching ${escapeHtml(provider)}…</span>`; }
-    try {
-      const r = await fetch("/api/gpu-training/dispatch", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider, steps: 600 }),
-      });
-      const result = await r.json();
-      if (resultEl) {
-        if (result.error) resultEl.innerHTML = `<div style="color:#f87171;">${escapeHtml(provider)}: ${escapeHtml(result.error)}</div>`;
-        else if (result.manual_required) resultEl.innerHTML = `<div style="color:#ffaa00;">${escapeHtml(provider)} is manual — open the notebook and Run All. ${result.notebookUrl ? `<a class="key-get" href="${escapeHtml(result.notebookUrl)}" target="_blank" rel="noopener">open ↗</a>` : ""}</div>`;
-        else resultEl.innerHTML = `<div style="color:var(--green);">✓ ${escapeHtml(provider)} dispatched${result.jobId ? ` · job ${escapeHtml(String(result.jobId))}` : ""}</div>`;
-      }
-      await renderTrainingSection();
-    } catch (e) {
-      if (resultEl) resultEl.innerHTML = `<span style="color:#f87171;">${escapeHtml(e.message)}</span>`;
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = orig; }
-    }
-  };
-
-  // Poll all running jobs
-  window.gpuPollAll = async function({ silent = false } = {}) {
-    const btn = $("gpuPollBtn");
-    if (btn && !silent) { btn.disabled = true; btn.textContent = "Polling…"; }
-    try {
-      const data = await fetchJson("/api/gpu-training/status");
-      const seen = new Set();
-      const toPoll = (data?.recentJobs || []).filter(j => {
-        if (j.type !== "training_dispatch") return false;
-        if (j.status !== "running" && j.status !== "queued") return false;
-        const key = `${j.provider}:${j.jobId}`;
-        if (seen.has(key)) return false;
-        seen.add(key); return true;
-      });
-      if (toPoll.length) {
-        await Promise.allSettled(toPoll.map(j =>
-          fetch("/api/gpu-training/poll", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ provider: j.provider, jobId: j.jobId }),
-          })
-        ));
-      }
-      await renderTrainingSection();
-    } finally {
-      if (btn && !silent) { btn.disabled = false; btn.textContent = "↻ Poll running jobs"; }
-    }
-  };
-
-  // Live tick: when jobs are running, auto-poll them so the panel updates itself;
-  // otherwise just refresh status. Skips hidden tabs to avoid needless polling.
-  async function gpuTick() {
-    if (document.hidden) return;
-    const running = (_cache.gpuData?.recentJobs || []).some(
-      j => j.type === "training_dispatch" && (j.status === "running" || j.status === "queued"));
-    if (running) await gpuPollAll({ silent: true });
-    else await renderTrainingSection();
-  }
-
-  // ── AI Provider Keys (editable) ───────────────────────────────────────────
-  const LLM_PROVIDERS = [
-    { id: "anthropic", icon: "🧠", name: "Claude", key: "ANTHROPIC_API_KEY", get: "https://console.anthropic.com/settings/keys", blurb: "Best-in-class reasoning. The default brain." },
-    { id: "openai", icon: "🔷", name: "OpenAI GPT", key: "OPENAI_API_KEY", get: "https://platform.openai.com/api-keys", blurb: "Fast, widely compatible, strong all-rounder." },
-    { id: "gemini", icon: "✨", name: "Gemini", key: "GEMINI_API_KEY", get: "https://aistudio.google.com/app/apikey", blurb: "Vision/multimodal, generous free tier." },
-    { id: "mistral", icon: "🚀", name: "Mistral", key: "MISTRAL_API_KEY", get: "https://console.mistral.ai/api-keys/", blurb: "Strong coding, long-context, cheap." },
-    { id: "deepseek", icon: "🔍", name: "DeepSeek", key: "DEEPSEEK_API_KEY", get: "https://platform.deepseek.com/api_keys", blurb: "Strong reasoning, very affordable." },
-    { id: "cohere", icon: "🌊", name: "Cohere", key: "COHERE_API_KEY", get: "https://dashboard.cohere.com/api-keys", blurb: "Long-context RAG + summarization." },
-    { id: "perplexity", icon: "🔬", name: "Perplexity", key: "PERPLEXITY_API_KEY", get: "https://www.perplexity.ai/settings/api", blurb: "Search-augmented answers with citations." },
-    { id: "openrouter", icon: "🌐", name: "OpenRouter", key: "OPENROUTER_API_KEY", get: "https://openrouter.ai/settings/keys", blurb: "Gateway to 100+ models, smart routing." },
-    { id: "xai", icon: "𝕏", name: "Grok / xAI", key: "XAI_API_KEY", get: "https://x.ai/api", blurb: "Reasoning + real-time data." },
-  ];
-
-  async function refreshProviderStatus() {
-    const data = await fetchJson("/api/providers/status");
-    _cache.providerData = data;
-    if (data) {
-      const chainEl = $("providerChains");
-      if (chainEl && data.chains) {
-        chainEl.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;">` +
-          Object.entries(data.chains).map(([taskType, chain]) => {
-            const providers = chain.map(c => {
-              const dot = data.providers?.[c.provider]?.available ? "🟢" : "🔴";
-              return `<span style="display:inline-block;padding:2px 6px;border-radius:4px;background:var(--bg);font-size:0.72rem;margin:2px 2px 0 0;">${dot} ${c.provider}</span>`;
-            }).join("");
-            return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:var(--surface);">
-              <div style="font-weight:600;font-size:0.84rem;margin-bottom:5px;text-transform:capitalize;">${taskType}</div>
-              <div style="display:flex;flex-wrap:wrap;gap:2px;">${providers}</div></div>`;
-          }).join("") + `</div>`;
-      }
-      const available = Object.values(data.providers || {}).filter(p => p.available).length;
-      const keys = Object.values(data.providers || {}).filter(p => p.hasKey).length;
-      setText("providersSummary", `${available} available · ${keys} keys set`);
-    }
-    await renderProviderKeys();
-    updateStatus();
-  }
-
-  async function renderProviderKeys() {
-    const el = $("providerKeysList");
-    let data = null;
-    try {
-      const r = await fetch("/api/providers/keys", { cache: "no-store", signal: AbortSignal.timeout(10000) });
-      if (r.ok) data = await r.json();
-    } catch {}
-    if (!data || !Array.isArray(data.keys)) { el.innerHTML = '<div class="placeholder">Couldn\'t load API key status.</div>'; return; }
-    const keyMap = {};
-    data.keys.forEach(k => { keyMap[k.env] = k; });
-    const connected = LLM_PROVIDERS.filter(p => keyMap[p.key]?.set).length;
-    setText("providerKeysSummary", `${connected}/${LLM_PROVIDERS.length} keys set`);
-    el.innerHTML = LLM_PROVIDERS.map(p => {
-      const info = keyMap[p.key] || {};
-      const isSet = info.set;
-      const badge = isSet ? '<span class="key-badge-set">✓ set</span>' : '<span class="key-badge-unset">not set</span>';
-      const placeholder = isSet ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
-      return `<div class="key-card ${isSet ? "set" : "unset"}">
-        <div class="key-head"><span>${p.icon}</span><strong>${p.name}</strong><span style="margin-left:auto;">${badge}</span></div>
-        <div class="key-blurb">${p.blurb}</div>
-        <a class="key-get" href="${p.get}" target="_blank" rel="noopener">Get your key ↗</a>
-        <div class="key-input-row">
-          <input type="password" autocomplete="off" data-provider="${p.id}" placeholder="${placeholder}">
-          <button class="key-save-btn" type="button" data-saveprov="${p.id}">Save</button>
-        </div>
-      </div>`;
-    }).join("");
-    el.querySelectorAll("button[data-saveprov]").forEach(btn => {
-      btn.addEventListener("click", () => saveProviderKey(btn.dataset.saveprov, el, btn));
-    });
-    el.querySelectorAll("input[data-provider]").forEach(inp => {
-      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") el.querySelector(`button[data-saveprov="${inp.dataset.provider}"]`)?.click(); });
-    });
-  }
-
-  async function saveProviderKey(providerId, scope, btn) {
-    const p = LLM_PROVIDERS.find(x => x.id === providerId);
-    if (!p) return;
-    const input = scope.querySelector(`input[data-provider="${providerId}"]`);
-    const value = input ? input.value.trim() : "";
-    if (!value) { input?.focus(); return; }
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "Saving…";
-    try {
-      const r = await fetch("/api/providers/keys", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: p.id, key: p.key, value }),
-      });
-      const result = await r.json();
-      if (result.error) { btn.textContent = "✕ failed"; }
-      else { btn.textContent = result.persisted ? "✓ saved" : "✓ (session)"; await refreshProviderStatus(); }
-    } catch { btn.textContent = "✕ error"; }
-    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
-  }
-
-  // ── GPU Account Keys (editable) ───────────────────────────────────────────
-  const GPU_PROVIDERS = [
-    { id: "huggingface", icon: "🤗", name: "Hugging Face", blurb: "Checkpoint parking spot the model uses to hop between GPUs. Set this first.", get: "https://huggingface.co/settings/tokens", keys: [{ env: "HF_TOKEN", label: "Access token" }, { env: "HF_TRAINING_REPO", label: "Training repo" }] },
-    { id: "kaggle", icon: "🏆", name: "Kaggle", blurb: "30 free GPU hours/week, fully automatic. The workhorse.", get: "https://www.kaggle.com/settings/account", keys: [{ env: "KAGGLE_API_TOKEN", label: "API token" }, { env: "KAGGLE_USERNAME", label: "Username" }, { env: "KAGGLE_KEY", label: "Key" }] },
-    { id: "lightning", icon: "⚡", name: "Lightning AI", blurb: "22 free credits/month. Automatic once connected.", get: "https://lightning.ai/", keys: [{ env: "LIGHTNING_USER_ID", label: "User ID" }, { env: "LIGHTNING_API_KEY", label: "API key" }] },
-    { id: "modal", icon: "🚀", name: "Modal", blurb: "$30/mo free H100/A100 time. Automatic.", get: "https://modal.com/settings/tokens", keys: [{ env: "MODAL_TOKEN_ID", label: "Token ID" }, { env: "MODAL_TOKEN_SECRET", label: "Token secret" }] },
-    { id: "vast", icon: "💹", name: "Vast.ai", blurb: "Cheap rented GPUs (~$0.15–0.40/hr) for overflow.", get: "https://cloud.vast.ai/account/", keys: [{ env: "VAST_AI_API_KEY", label: "API key" }] },
-    { id: "runpod", icon: "🟣", name: "RunPod", blurb: "Cheap on-demand GPUs (~$0.20–0.50/hr).", get: "https://www.runpod.io/console/user/settings", keys: [{ env: "RUNPOD_API_KEY", label: "API key" }] },
-    { id: "paperspace", icon: "📐", name: "Paperspace", blurb: "Needs a PRO plan (~$8/mo) — free GPU tier removed.", get: "https://console.paperspace.com/account/api", keys: [{ env: "PAPERSPACE_API_KEY", label: "API key" }] },
-  ];
-
-  async function renderGpuKeys() {
-    const el = $("gpuKeysList");
-    let data = null;
-    try {
-      const r = await fetch("/api/gpu-training/keys", { cache: "no-store", signal: AbortSignal.timeout(20000) });
-      if (r.ok) data = await r.json();
-    } catch {}
-    if (!data || !Array.isArray(data.keys)) {
-      el.innerHTML = '<div class="placeholder">Couldn\'t load account status — <button class="btn-secondary" type="button" onclick="renderGpuKeys()" style="font-size:0.72rem;padding:3px 8px;">retry</button></div>';
-      return;
-    }
-    const setMap = {};
-    data.keys.forEach(k => { setMap[k.key] = k; });
-    const connected = GPU_PROVIDERS.filter(p =>
-      p.keys.every(k => setMap[k.env]?.set)
-      || (p.id === "kaggle" && (setMap.KAGGLE_API_TOKEN?.set || (setMap.KAGGLE_USERNAME?.set && setMap.KAGGLE_KEY?.set)))
-    ).length;
-    setText("gpuKeysSummary", `${connected}/${GPU_PROVIDERS.length} connected`);
-    el.innerHTML = GPU_PROVIDERS.map(p => {
-      const anySet = p.keys.some(k => setMap[k.env]?.set);
-      const allSet = p.keys.every(k => setMap[k.env]?.set);
-      const cls = allSet ? "set" : "unset";
-      const badge = allSet ? '<span class="key-badge-set">✓ connected</span>' : anySet ? '<span class="key-badge-partial">partly set</span>' : '<span class="key-badge-unset">not connected</span>';
-      const rows = p.keys.map(k => {
-        const info = setMap[k.env] || {};
-        const placeholder = info.set ? `saved · ${escapeHtml(info.masked || "••••")}` : "paste key…";
-        return `<div class="key-input-row">
-          <label>${escapeHtml(k.label)}</label>
-          <input type="password" autocomplete="off" data-keyenv="${k.env}" placeholder="${placeholder}">
-          <button class="key-save-btn" type="button" data-savekey="${k.env}">Save</button>
-        </div>`;
+  // ── Roster + fleet ──────────────────────────────────────────────────────
+  function loadFleet() {
+    fetch("/api/mesh/members").then(function (r) { return r.json(); }).then(function (data) {
+      var members = (data && data.members) || [];
+      var sel = $("mMember");
+      var saved = readSaved();
+      sel.innerHTML = '<option value="">Choose…</option>' + members.map(function (m) {
+        return '<option value="' + esc(m.id) + '"' + (saved && saved.member === m.id ? " selected" : "") + ">" + esc(m.name || m.id) + (m.role === "donor" ? " (donor)" : "") + "</option>";
       }).join("");
-      return `<div class="key-card ${cls}">
-        <div class="key-head"><span>${p.icon}</span><strong>${p.name}</strong><span style="margin-left:auto;">${badge}</span></div>
-        <div class="key-blurb">${p.blurb}</div>
-        <a class="key-get" href="${p.get}" target="_blank" rel="noopener">Get your key ↗</a>
-        ${rows}
-      </div>`;
-    }).join("");
-    el.querySelectorAll("button[data-savekey]").forEach(btn => {
-      btn.addEventListener("click", () => saveGpuKey(btn.dataset.savekey, el, btn));
-    });
-    el.querySelectorAll("input[data-keyenv]").forEach(inp => {
-      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") el.querySelector(`button[data-savekey="${inp.dataset.keyenv}"]`)?.click(); });
-    });
-  }
-
-  async function saveGpuKey(env, scope, btn) {
-    const input = scope.querySelector(`input[data-keyenv="${env}"]`);
-    const value = input ? input.value.trim() : "";
-    if (!value) { input?.focus(); return; }
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = "Saving…";
-    try {
-      const r = await fetch("/api/gpu-training/keys", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ key: env, value }),
-      });
-      const result = await r.json();
-      if (result.error) { btn.textContent = "✕ failed"; }
-      else { btn.textContent = result.persisted ? "✓ saved" : "✓ (session)"; await renderGpuKeys(); renderTrainingSection(); }
-    } catch { btn.textContent = "✕ error"; }
-    finally { setTimeout(() => { btn.disabled = false; btn.textContent = orig; }, 1600); }
-  }
-
-  // ── Read-only wired panels ────────────────────────────────────────────────
-  async function renderLocalModel() {
-    const el = $("localModelBody");
-    const data = await fetchJson("/api/serving/status");
-    const lm = data && data.local_model;
-    if (!lm) { el.innerHTML = '<div class="placeholder">Local model status unavailable.</div>'; setText("localModelMode", ""); return; }
-
-    // Mode badge (fast cached vs deep adaptive)
-    const mode = data.mode || (data.fast_mode_active ? "fast" : "deep");
-    setText("localModelMode", mode === "deep" ? "deep · adaptive Q-exit" : "fast · cached");
-
-    const pinned = lm.pinned || "—";
-    const active = lm.active_model || "—";
-    // The pinned offline model is "live" only if the server is up AND it's actually served.
-    const live = lm.serving && lm.pinned_served;
-    const dotC = live ? "#4ade80" : lm.serving ? "#facc15" : "#ef4444";
-    const stateLabel = !lm.serving ? "local server offline"
-      : lm.pinned_served ? "serving" : "pinned but not served";
-
-    const row = (label, val, extra = "") =>
-      `<div style="display:grid;grid-template-columns:140px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.84rem;">
-        <span style="color:var(--muted);">${label}</span><span>${val}${extra}</span></div>`;
-
-    const served = (lm.served_models || []).map(m => {
-      const isActive = m === active;
-      return `<span style="display:inline-block;padding:2px 8px;margin:2px 4px 2px 0;border:1px solid ${isActive ? "var(--accent)" : "var(--border)"};border-radius:999px;font-size:0.74rem;${isActive ? "font-weight:700;color:var(--accent);" : "color:var(--muted);"}">${escapeHtml(m)}${isActive ? " ◂ active" : ""}</span>`;
-    }).join("") || '<span style="color:var(--muted);font-size:0.78rem;">none</span>';
-
-    const warn = (lm.serving && !lm.pinned_served)
-      ? `<div style="margin-top:10px;padding:8px 12px;border:1px solid #facc15;border-radius:8px;background:rgba(250,204,21,0.08);font-size:0.8rem;line-height:1.5;">
-          ⚠ <b>${escapeHtml(pinned)}</b> is pinned as the offline model but isn't being served, so the path falls through to <b>${escapeHtml(active)}</b>.
-          Start it with <code>OURO_ADAPTER=&lt;adapter&gt; python scripts/ouro_serve.py</code> (serves <code>${escapeHtml(pinned)}</code> on the local API).</div>`
-      : (!lm.serving
-        ? `<div style="margin-top:10px;padding:8px 12px;border:1px solid #ef4444;border-radius:8px;background:rgba(239,68,68,0.08);font-size:0.8rem;line-height:1.5;">
-          ⚠ No local model server reachable at <code>${escapeHtml(lm.base)}</code>. The coder path has no offline brain until one is served.</div>`
-        : "");
-
-    el.innerHTML =
-      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <span style="width:10px;height:10px;border-radius:50%;background:${dotC};display:inline-block;"></span>
-        <span style="font-weight:700;font-size:1.05rem;">${escapeHtml(active)}</span>
-        <span style="font-size:0.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${stateLabel}</span>
-      </div>` +
-      row("Pinned (offline)", `<b>${escapeHtml(pinned)}</b>`, lm.pinned_served ? ' <span style="color:#4ade80;">✓ served</span>' : ' <span style="color:#facc15;">not served</span>') +
-      row("Active now", escapeHtml(active)) +
-      (lm.adapter ? row("Σ₀ adapter", `<code style="font-size:0.76rem;">${escapeHtml(lm.adapter)}</code>`) : "") +
-      row("Endpoint", `<code style="font-size:0.78rem;">${escapeHtml(lm.base)}</code>`) +
-      row("Served models", served) +
-      warn;
-  }
-
-  async function renderMerit() {
-    const el = $("meritList");
-    // Pull a wide slice, then rank for display by success rate (the headline metric).
-    // The endpoint sorts by a cost/latency composite used for routing — not what a
-    // human "who's performing best" panel should lead with.
-    const data = await fetchJson("/api/agent-performance/leaderboard?taskType=all&topN=20&lookbackDays=14");
-    const agents = ((data && data.agents) || []).slice().sort((a, b) => {
-      const sa = a.successRate ?? 0, sb = b.successRate ?? 0;
-      if (sb !== sa) return sb - sa;
-      return (b.totalCalls ?? 0) - (a.totalCalls ?? 0);
-    }).slice(0, 6);
-    if (!agents.length) { el.innerHTML = '<div class="placeholder">No graded runs yet.</div>'; return; }
-    el.innerHTML = agents.map((a, i) => {
-      const name = a.agentId || a.agent || a.provider || a.model || "agent";
-      const calls = a.totalCalls ?? a.n ?? a.calls;
-      const pct = a.successRate != null ? Math.round(a.successRate * 100) : null;
-      const c = pct == null ? "var(--accent)" : pct >= 70 ? "#4ade80" : pct >= 40 ? "#facc15" : "#f87171";
-      const meta = calls != null ? `${calls} call${calls !== 1 ? "s" : ""}` : "";
-      return `<div class="merit-row"><span class="merit-rank">${i + 1}</span>
-        <span class="merit-name">${escapeHtml(String(name))}${meta ? `<span class="merit-meta">${meta}</span>` : ""}</span>
-        <span class="merit-score" style="color:${c};">${pct != null ? pct + "%" : "—"}</span></div>`;
-    }).join("");
-  }
-
-  let _relianceBand = "all";
-  window.setRelianceBand = function(band) {
-    _relianceBand = band;
-    ["24h","7d","30d","all"].forEach(b => {
-      const el = $(`rel-${b}`); if (!el) return;
-      el.style.borderColor = b === band ? "var(--accent)" : "";
-      el.style.color = b === band ? "var(--accent)" : "";
-    });
-    renderReliance();
-  };
-  async function renderReliance() {
-    const el = $("relianceList");
-    const data = await fetchJson(`/api/providers/reliance?band=${_relianceBand}`);
-    if (!data || !Array.isArray(data.providers)) { el.innerHTML = '<div class="placeholder">Reliance data unavailable.</div>'; return; }
-    const rows = data.providers;
-    if (!rows.length) {
-      el.innerHTML = '<div class="placeholder">No AI work recorded in this window yet.</div>';
-      setText("relianceSummary", "");
-      return;
-    }
-    const top = rows[0];
-    setText("relianceSummary", `${top.label} carries ${Math.round(top.share * 100)}% of AI work`);
-    const fmt = n => n >= 1e9 ? (n / 1e9).toFixed(1) + "B" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
-    const pctLabel = s => { const p = s * 100; return p > 0 && p < 1 ? "<1%" : Math.round(p) + "%"; };
-    el.innerHTML = rows.map(r => {
-      const pct = pctLabel(r.share);
-      const barW = Math.max(2, r.share * 100); // keep tiny shares visible
-      const barColor = r.kind === "cloud" ? "var(--accent)" : "#a855f7";
-      const kindBadge = `<span class="train-badge ${r.kind === "cloud" ? "tbadge-auto" : "tbadge-manual"}">${r.kind}</span>`;
-      let reli = "";
-      if (r.successRate != null) {
-        const sp = Math.round(r.successRate * 100);
-        const sc = sp >= 70 ? "#4ade80" : sp >= 40 ? "#facc15" : "#f87171";
-        reli = `<span style="color:${sc};font-weight:700;">${sp}% ok</span>`;
+      var list = $("fleetList");
+      if (!members.length) {
+        list.innerHTML = '<div class="empty">No machines on the roster yet. Add yourself to config/mesh-members.json.</div>';
       } else {
-        reli = `<span style="color:var(--muted);">completed</span>`;
+        list.innerHTML = members.map(function (m) {
+          var r = m.resources || {};
+          var meta = [m.machine, r.gpu, r.vramGb ? r.vramGb + "GB card" : null, r.availability]
+            .filter(Boolean).join(" · ");
+          return '<div class="peer' + (m.online ? " online" : "") + '"><span class="pdot"></span>' +
+            "<b>" + esc(m.name || m.id) + "</b>" +
+            '<span class="pmeta">' + (meta ? esc(meta) : (m.online ? "online" : "not seen yet")) + "</span>" +
+            '<span class="ptag">' + esc(m.role || "contributor") + "</span></div>";
+        }).join("");
       }
-      // outputTokens / sessions are lifetime totals (not band-filtered) — only show on "all".
-      const lifetime = _relianceBand === "all";
-      const tokens = (lifetime && r.outputTokens) ? ` · ${fmt(r.outputTokens)} out tok` : "";
-      const sessions = (lifetime && r.sessions) ? ` · ${r.sessions} sessions` : "";
-      return `<div style="border:1px solid var(--border);border-radius:10px;padding:11px 13px;background:var(--bg);margin-bottom:8px;border-left:3px solid ${barColor};">
-        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:7px;">
-          <strong style="font-size:0.9rem;">${escapeHtml(r.label)}</strong>${kindBadge}
-          <span style="margin-left:auto;font-weight:800;color:${barColor};font-size:1.05rem;">${pct}</span>
-        </div>
-        <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;height:12px;overflow:hidden;margin-bottom:7px;">
-          <div style="width:${barW}%;height:100%;background:${barColor};"></div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:0.74rem;color:var(--muted);align-items:center;">
-          <span><b style="color:var(--text);">${fmt(r.units)}</b> ${r.units === 1 ? "unit" : "units"}</span>
-          ${reli}
-          <span>${escapeHtml(r.source || "")}${tokens}${sessions}</span>
-        </div>
-        ${r.detail ? `<div style="font-size:0.72rem;color:var(--muted);margin-top:5px;">${escapeHtml(r.detail)}</div>` : ""}
-      </div>`;
-    }).join("");
-    if (data.note) el.innerHTML += `<div class="placeholder" style="margin-top:6px;">${escapeHtml(data.note)}</div>`;
-  }
-
-  async function renderCalibration() {
-    const el = $("calList"), gl = $("calGlobal");
-    const data = await fetchJson("/api/convergence/calibration");
-    if (!data || !data.keys) { el.innerHTML = '<div class="placeholder">Trust calibration unavailable.</div>'; return; }
-    const entries = Object.values(data.keys).sort((a, b) => b.trust - a.trust);
-    setText("calSummary", `${data.total_events || 0} verified events`);
-    if (!entries.length) { el.innerHTML = '<div class="placeholder">No calibrated groundings yet — runs accrue trust as convergence events are verified.</div>'; if (gl) gl.innerHTML = ""; return; }
-    el.innerHTML = entries.map(e => {
-      const pct = Math.round((e.trust || 0) * 100);
-      const c = pct >= 80 ? "#4ade80" : pct >= 60 ? "#facc15" : "#f87171";
-      const label = e.key.replace("agent:", "").replace(":", " · ");
-      return `<div style="display:grid;grid-template-columns:140px 1fr 52px 60px;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
-        <span style="font-size:0.82rem;font-weight:600;">${escapeHtml(label)}</span>
-        <div style="background:var(--surface);border-radius:4px;height:10px;overflow:hidden;border:1px solid var(--border);"><div style="width:${pct}%;height:100%;background:${c};"></div></div>
-        <span style="font-weight:700;color:${c};font-size:0.9rem;">${pct}%</span>
-        <span style="font-size:0.72rem;color:var(--muted);">${e.n} check${e.n !== 1 ? "s" : ""}</span></div>`;
-    }).join("");
-    if (gl) {
-      const ece = data.ece != null ? (data.ece * 100).toFixed(1) + "% calibration error" : null;
-      const brier = data.global_brier != null ? data.global_brier.toFixed(3) + " Brier score" : null;
-      gl.innerHTML = [ece, brier].filter(Boolean).map(t => `<span style="font-size:0.74rem;color:var(--muted);padding:4px 10px;border:1px solid var(--border);border-radius:6px;">${t}</span>`).join("");
-    }
-  }
-
-  async function renderKeystoneTests() {
-    const el = $("ksTestList");
-    const data = await fetchJson("/api/convergence/keystone-test/runs");
-    if (!data) { el.innerHTML = '<div class="placeholder">Test history unavailable.</div>'; return; }
-    const runs = (data.runs || []).slice(0, 5);
-    setText("ksTestSummary", runs.length ? `${data.count || runs.length} total run${(data.count || runs.length) !== 1 ? "s" : ""}` : "");
-    if (!runs.length) { el.innerHTML = '<div class="placeholder">No self-tests recorded yet.</div>'; return; }
-    el.innerHTML = runs.map(r => {
-      const ts = r.timestamp ? new Date(r.timestamp).toLocaleString() : "—";
-      const conf = r.convergence?.confidence?.overall;
-      const confPct = conf != null ? Math.round(conf * 100) : null;
-      const c = confPct >= 80 ? "#4ade80" : confPct >= 60 ? "#facc15" : "#f87171";
-      const filed = (r.filed_issues || []).map(n => `<a href="https://github.com/alex-place/lantern-os/issues/${n.replace("#", "")}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;text-decoration:none;">${n}</a>`).join(", ");
-      const hyp = r.convergence?.hypothesis || "";
-      return `<div style="border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;background:var(--bg);">
-        <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-          <span style="font-size:0.72rem;color:var(--muted);">${escapeHtml(ts)}</span>
-          ${confPct != null ? `<span style="font-size:0.72rem;font-weight:700;color:${c};padding:1px 8px;border:1px solid ${c};border-radius:999px;">${confPct}% confident</span>` : ""}
-          ${filed ? `<span style="font-size:0.72rem;">Filed: ${filed}</span>` : ""}
-        </div>
-        ${hyp ? `<div style="font-size:0.82rem;color:var(--text);font-weight:500;">${escapeHtml(hyp)}</div>` : ""}</div>`;
-    }).join("");
-  }
-
-  let _rolloverBand = "30d";
-  window.setRolloverBand = function(band) {
-    _rolloverBand = band;
-    ["24h","7d","30d","all"].forEach(b => {
-      const el = $(`band-${b}`); if (!el) return;
-      el.style.borderColor = b === band ? "var(--accent)" : ""; el.style.color = b === band ? "var(--accent)" : "";
+      $("attnOnline").textContent = String(members.filter(function (m) { return m.online; }).length) + " / " + members.length;
+    }).catch(function () {
+      $("fleetList").innerHTML = '<div class="empty">Fleet status unavailable — is the server up?</div>';
     });
-    renderRollover();
-  };
-  async function renderRollover() {
-    const el = $("rolloverBody"); if (!el) return;
-    const band = _rolloverBand === "all" ? "" : _rolloverBand;
-    const data = await fetchJson(`/api/rollover/status?band=${band}`);
-    if (!data) { el.innerHTML = '<div class="placeholder">Rollover data unavailable.</div>'; return; }
-    const git = data.git || {}, gitTotal = git.total || 0, kernel = data.kernel || {};
-    const pct = n => gitTotal > 0 ? Math.round((n / gitTotal) * 100) : 0;
-    const bar = (n, color) => `<div style="height:14px;border-radius:4px;background:${color};width:${gitTotal > 0 ? Math.max(2, Math.round((n / gitTotal) * 100)) : 0}%;"></div>`;
-    const lastEval = data.lastEval;
-    const evalStr = lastEval ? `<strong>${lastEval.label || lastEval.benchmark || "eval"}</strong>: ${lastEval.accuracy != null ? (lastEval.accuracy * 100).toFixed(0) + "% acc" : ""}` : "No eval runs yet";
-    el.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:14px;">
-        <div class="stat"><div class="stat-label">Mode</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(data.mode || "shadow")}</div></div>
-        <div class="stat"><div class="stat-label">Stage</div><div class="stat-value" style="font-size:1.1rem;">${escapeHtml(data.stage || "pre-stage-1")}</div></div>
-        <div class="stat"><div class="stat-label">PRs merged (${escapeHtml(data.band || "30d")})</div><div class="stat-value">${gitTotal}</div></div>
-        <div class="stat"><div class="stat-label">Kernel runs</div><div class="stat-value ${kernel.landed === 0 ? "muted" : ""}">${kernel.landed ?? 0}</div></div>
-      </div>
-      <div class="info-box" style="margin-bottom:12px;"><strong>Git attribution</strong> — merged PRs by lane (${escapeHtml(data.band || "30d")})
-        ${[
-          { label: "claude/", n: git.claude || 0, color: "#06b6d4" },
-          { label: "auto/ (Unisona)", n: git.keystone || 0, color: "#a855f7" },
-          { label: "gemini/", n: git.gemini || 0, color: "#22c55e" },
-          { label: "codex/", n: git.codex || 0, color: "#f59e0b" },
-          { label: "human", n: git.human || 0, color: "#64748b" },
-        ].map(({ label, n, color }) => `<div style="display:flex;align-items:center;gap:10px;margin:5px 0;font-size:0.8rem;">
-          <span style="width:140px;color:var(--muted);">${escapeHtml(label)}</span>
-          <div style="flex:1;background:var(--bg);border-radius:4px;border:1px solid var(--border);overflow:hidden;">${bar(n, color)}</div>
-          <span style="width:54px;text-align:right;font-weight:600;">${n} <span style="color:var(--muted);font-weight:400;">(${pct(n)}%)</span></span></div>`).join("")}
-      </div>
-      <div class="info-box"><strong>Last eval</strong> — ${evalStr}</div>`;
   }
 
-  // ── Team work board (queue + lanes + slots + landed) ─────────────────────
-  function relTime(iso) {
-    if (!iso) return "";
-    const d = new Date(iso); const s = (Date.now() - d.getTime()) / 1000;
-    if (Number.isNaN(s)) return "";
-    if (s < 60) return "just now";
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-    return `${Math.floor(s / 86400)}d ago`;
+  // ── Heartbeat (this machine) ────────────────────────────────────────────
+  function readSaved() {
+    try { return JSON.parse(localStorage.getItem(HB_KEY) || "null"); } catch (e) { return null; }
   }
-
-  async function renderWorkBoard() {
-    const status = await fetchJson("/api/queue/status", 12000);
-    if (status && status.queue) {
-      setText("bStatPending", status.queue.pending);
-      setText("bStatProgress", status.queue.assigned);
-      const staleAssigned = status.queue.staleAssigned || 0;
-      setText("bStatProgressSub", staleAssigned > 0 ? `in-flight · ${staleAssigned} stale` : "in-flight (live)");
-      const ag = status.agents || {};
-      setText("bStatAgents", ag.activeCount ?? "—");
-      setText("bStatAgentsSub", `of ${ag.totalSlots ?? "—"} slots`);
-      $("boardStats")?.classList.remove("live-stale");
-    } else {
-      ["bStatPending", "bStatProgress", "bStatAgents"].forEach(id => setText(id, "—"));
-      setText("workBoardMeta", "queue unavailable");
-    }
-    setText("boardUpdated", "updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+  function formValues() {
+    return {
+      member: $("mMember").value,
+      machine: $("mMachine").value.trim(),
+      resources: {
+        gpu: $("mGpu").value.trim() || null,
+        vramGb: Number($("mVram").value) || null,
+        ramGb: Number($("mRam").value) || null,
+        availability: $("mAvail").value.trim() || null,
+        donorOnly: $("mDonor").checked,
+      },
+    };
   }
-
-  async function renderPrLanes() {
-    const el = $("prLanesBody");
-    const data = await fetchJson("/api/queue/pr-lanes", 20000);
-    if (!data || data.error) {
-      el.innerHTML = `<div class="research-state error">PR lanes unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}. Check gh auth on this computer.</div>`;
-      setText("prLanesMeta", "gh unavailable");
-      setText("bStatPRs", "—");
-      return;
-    }
-    setText("bStatPRs", data.openCount ?? 0);
-    setText("prLanesMeta", `${data.openCount} open PR${data.openCount === 1 ? "" : "s"} across ${data.lanes.length} lanes`);
-    el.innerHTML = data.lanes.map(lane => {
-      if (!lane.pr) {
-        return `<div class="lane-row"><span class="lane-prefix">${escapeHtml(lane.prefix)}</span><span class="lane-empty">— lane open, no PR —</span><span></span></div>`;
+  function fillForm(v) {
+    if (!v) return;
+    $("mMachine").value = v.machine || "";
+    var r = v.resources || {};
+    $("mGpu").value = r.gpu || "";
+    $("mVram").value = r.vramGb || "";
+    $("mRam").value = r.ramGb || "";
+    $("mAvail").value = r.availability || "";
+    $("mDonor").checked = !!r.donorOnly;
+  }
+  function beat() {
+    var v = formValues();
+    if (!v.member || !v.machine) { setHbState("Pick who you are and name the machine first.", false); return; }
+    fetch("/api/mesh/heartbeat", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v),
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data && data.ok) {
+        localStorage.setItem(HB_KEY, JSON.stringify(v));
+        setHbState("Checking in as " + v.member + " / " + v.machine + " ✓", true);
+        loadFleet();
+      } else {
+        setHbState((data && data.error) || "Check-in rejected.", false);
+        stopBeating();
       }
-      const pr = lane.pr;
-      const ciCls = pr.checks === "passing" ? "ci-passing" : pr.checks === "failing" ? "ci-failing" : pr.checks === "pending" ? "ci-pending" : "ci-none";
-      const ciLabel = pr.checks === "none" ? "no checks" : pr.checks;
-      const flags = [pr.draft ? "draft" : "", pr.mergeable === "CONFLICTING" ? "conflicts" : ""].filter(Boolean).join(" · ");
-      return `<div class="lane-row has-pr">
-        <span class="lane-prefix">${escapeHtml(lane.prefix)}</span>
-        <span class="lane-title"><a href="${escapeHtml(pr.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(pr.number))} ${escapeHtml(pr.title)}</a>${flags ? `<span class="lane-flags">${escapeHtml(flags)}</span>` : ""}</span>
-        <span class="ci-badge ${ciCls}">${escapeHtml(ciLabel)}</span>
-      </div>`;
-    }).join("");
+    }).catch(function () { setHbState("Server unreachable — will retry.", false); });
   }
-
-  async function renderAgentSlots() {
-    const el = $("agentSlotsBody");
-    const data = await fetchJson("/api/queue/agents", 10000);
-    const slots = data?.slots;
-    if (!Array.isArray(slots)) { el.innerHTML = '<div class="placeholder">Roster unavailable.</div>'; setText("agentSlotsMeta", ""); return; }
-    const working = slots.filter(s => s.status === "working").length;
-    setText("agentSlotsMeta", `${working} working · ${slots.length} slots`);
-    if (!slots.length) { el.innerHTML = '<div class="placeholder">No agent slots configured.</div>'; return; }
-    el.innerHTML = slots.map(s => {
-      const cls = s.status === "working" ? "working" : s.status === "disabled" ? "disabled" : "";
-      const work = s.currentWork ? `on #${escapeHtml(String(s.currentWork))}` : s.status;
-      return `<div class="slot-card ${cls}">
-        <div class="slot-name"><span class="slot-dot ${s.status === "working" ? "working" : ""}"></span>${escapeHtml(s.agent || s.id)}</div>
-        <div class="slot-meta">${escapeHtml(s.model || s.id)} · ${escapeHtml(s.tier || "—")} · ${escapeHtml(work)}</div>
-      </div>`;
-    }).join("");
+  function setHbState(msg, on) {
+    var el = $("mState");
+    el.textContent = msg;
+    el.className = "mstate" + (on ? " on" : "");
   }
-
-  // The Recently-Landed panel moved to /work.html; here we only keep the Work Board
-  // "Landed" stat (bStatLanded) fed. The full merge list lives on the Work page.
-  async function renderLanded() {
-    const el = $("landedBody");  // null on this page now — guarded below
-    const data = await fetchJson("/api/queue/recent-merges?limit=15", 20000);
-    if (!data || data.error) {
-      if (el) el.innerHTML = `<div class="research-state error">Recently-landed unavailable: ${escapeHtml(data?.message || "GitHub CLI not reachable")}.</div>`;
-      setText("landedMeta", "gh unavailable");
-      setText("bStatLanded", "—");
-      return;
-    }
-    setText("bStatLanded", data.count ?? 0);
-    setText("landedMeta", `${data.count} recent merge${data.count === 1 ? "" : "s"}`);
-    if (!data.merges.length) { if (el) el.innerHTML = '<div class="placeholder">No merged PRs found.</div>'; return; }
-    if (el) el.innerHTML = data.merges.map(m => `<div class="landed-row">
-      <span class="landed-title"><span class="lane-chip">${escapeHtml(m.lane)}</span> <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer">#${escapeHtml(String(m.number))} ${escapeHtml(m.title)}</a></span>
-      <span class="landed-meta">${escapeHtml(m.author)} · ${escapeHtml(relTime(m.mergedAt))}</span>
-    </div>`).join("");
+  function startBeating() {
+    if (hbTimer) return;
+    beat();
+    hbTimer = setInterval(beat, 60000);
+    $("mStart").disabled = true;
+    $("mStop").disabled = false;
   }
-
-  async function refreshWorkBoard() {
-    await Promise.all([renderWorkBoard(), renderPrLanes(), renderAgentSlots(), renderLanded()]);
+  function stopBeating() {
+    if (hbTimer) { clearInterval(hbTimer); hbTimer = null; }
+    $("mStart").disabled = false;
+    $("mStop").disabled = true;
+    setHbState("Not checking in.", false);
   }
+  $("mStart").addEventListener("click", startBeating);
+  $("mStop").addEventListener("click", stopBeating);
 
-  // ── Fleet delegation (live streamed autonomous run) ───────────────────────
-  const FLEET_STEP_ICON = { start: "⏳", done: "✓", error: "✗" };
-
-  function fleetAppendStep(phase, status, extra) {
-    const log = $("fleetRunLog");
-    if (!log) return;
-    const id = "fstep-" + phase;
-    let row = document.getElementById(id);
-    if (!row) {
-      row = document.createElement("div");
-      row.id = id;
-      row.className = "fleet-step";
-      row.innerHTML = `<span class="fs-icon"></span><span class="fs-phase"></span><span class="fs-detail"></span>`;
-      log.appendChild(row);
-    }
-    row.classList.toggle("err", status === "error");
-    row.classList.toggle("done-ok", status === "done");
-    row.querySelector(".fs-icon").textContent = FLEET_STEP_ICON[status] || "•";
-    row.querySelector(".fs-phase").textContent = phase.replace(/_/g, " ");
-    const detail = extra.title || extra.error || extra.message || extra.branch || extra.files != null ? JSON.stringify(extra).slice(0, 200) : "";
-    row.querySelector(".fs-detail").textContent = detail;
-    log.scrollTop = log.scrollHeight;
-  }
-
-  async function delegateToFleet(item, button) {
-    const panel = $("fleetRunPanel"), log = $("fleetRunLog");
-    panel.hidden = false;
-    setText("fleetRunMeta", `#${item.issueNumber} — ${item.title}`.slice(0, 90));
-    log.innerHTML = "";
-    panel.scrollIntoView({ behavior: "smooth", block: "start" });
-    const origLabel = button.textContent;
-    button.disabled = true; button.textContent = "Delegating…";
-    fleetAppendStep("delegate", "start", { issue: item.issueNumber });
-
-    try {
-      const resp = await fetch("/api/convergence/autonomous-work/stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ issue: item.issueNumber }),
-      });
-      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
-
-      const reader = resp.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const frames = buf.split("\n\n");
-        buf = frames.pop();  // keep partial frame
-        for (const frame of frames) {
-          let event = "message", data = "";
-          for (const line of frame.split("\n")) {
-            if (line.startsWith(":")) continue;            // heartbeat comment
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            else if (line.startsWith("data:")) data += line.slice(5).trim();
-          }
-          if (!data) continue;
-          let payload; try { payload = JSON.parse(data); } catch { continue; }
-          if (event === "step") fleetAppendStep(payload.phase, payload.status, payload);
-          else if (event === "error") fleetAppendStep("error", "error", payload);
-          else if (event === "done") {
-            const ok = payload.ok;
-            const final = document.createElement("div");
-            final.className = "fleet-final";
-            if (ok && payload.prUrl) {
-              final.innerHTML = `<span style="color:var(--green);font-weight:700;">✓ Delegated successfully</span> — draft PR opened: <a href="${escapeHtml(payload.prUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.prUrl)}</a>${payload.testsPassed != null ? ` · tests ${payload.testsPassed ? "passed" : "failed"}` : ""}`;
-              refreshWorkBoard();          // new PR shows up in lanes
-              loadResearchQueue();         // issue may now be claimed
-            } else {
-              final.innerHTML = `<span style="color:#f87171;font-weight:700;">Run stopped</span> at <b>${escapeHtml(payload.stoppedAt || "unknown")}</b>${payload.message ? ` — ${escapeHtml(payload.message)}` : ""}. Nothing was pushed.`;
-            }
-            log.appendChild(final);
-            log.scrollTop = log.scrollHeight;
-          }
-        }
+  // ── Job board (GitHub issues only) ─────────────────────────────────────
+  function loadJobs() {
+    $("jobList").innerHTML = '<div class="empty">Loading job board…</div>';
+    fetch("/api/training-jobs").then(function (r) { return r.json(); }).then(function (data) {
+      if (!data || !data.ok) throw new Error((data && data.error) || "unavailable");
+      var jobs = data.jobs || [];
+      $("attnJobs").textContent = String(jobs.length);
+      var bad = jobs.filter(function (j) { return !j.valid; }).length;
+      $("attnBadJobs").textContent = String(bad);
+      var strip = $("attnStrip");
+      if (bad > 0) { strip.classList.add("warn"); $("attnNote").innerHTML = "<b>" + bad + " job(s) need a format fix</b>"; }
+      else { strip.classList.remove("warn"); $("attnNote").textContent = ""; }
+      if (!jobs.length) {
+        $("jobList").innerHTML = '<div class="empty">The board is clear. File an issue labeled <code>training-job</code> to queue work.</div>';
+        return;
       }
-    } catch (e) {
-      const final = document.createElement("div");
-      final.className = "fleet-final";
-      final.innerHTML = `<span style="color:#f87171;font-weight:700;">Delegation failed:</span> ${escapeHtml(e.message)}`;
-      log.appendChild(final);
-    } finally {
-      button.disabled = false; button.textContent = origLabel;
-    }
+      $("jobList").innerHTML = jobs.map(function (j) {
+        var job = j.job || {};
+        var rows = ["script", "args", "dataset", "vram_gb"].filter(function (k) { return job[k]; })
+          .map(function (k) { return "<dt>" + esc(k) + "</dt><dd>" + esc(job[k]) + "</dd>"; }).join("");
+        return '<article class="job">' +
+          '<div class="jhead"><b>#' + j.issue + " · " + esc(j.title) + "</b>" +
+          '<a href="' + esc(j.url) + '" target="_blank" rel="noopener">view issue ↗</a>' +
+          '<span class="jbadge ' + (j.valid ? "ok" : "bad") + '">' + (j.valid ? "ready" : "needs fix") + "</span></div>" +
+          (rows ? "<dl>" + rows + "</dl>" : "") +
+          (j.errors && j.errors.length ? '<div class="jerr">' + j.errors.map(esc).join("<br>") + "</div>" : "") +
+          (j.valid ? '<div class="jrun"><button class="btn primary admin-only" type="button" data-issue="' + j.issue + '">Run this job</button>' +
+            '<span class="mstate admin-only" style="margin-left:10px;">runs as autonomous work → draft PR</span></div>' : "") +
+          "</article>";
+      }).join("");
+      var buttons = $("jobList").querySelectorAll("button[data-issue]");
+      for (var i = 0; i < buttons.length; i++) {
+        buttons[i].addEventListener("click", function (ev) { runJob(ev.currentTarget.getAttribute("data-issue"), ev.currentTarget); });
+      }
+    }).catch(function (e) {
+      $("jobList").innerHTML = '<div class="empty">Job board unavailable: ' + esc(e.message) + "</div>";
+    });
+  }
+  $("jobRefresh").addEventListener("click", loadJobs);
+
+  // ── Run a job as observable autonomous work (SSE) ──────────────────────
+  function logLine(text) {
+    var el = $("runLog");
+    el.textContent += (el.textContent ? "\n" : "") + text;
+    el.scrollTop = el.scrollHeight;
+  }
+  function runJob(issue, btn) {
+    btn.disabled = true;
+    $("runLog").textContent = "";
+    logLine("▶ Starting job from issue #" + issue + " …");
+    fetch("/api/convergence/autonomous-work/stream", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ issue: Number(issue) }),
+    }).then(function (resp) {
+      if (!resp.ok || !resp.body) throw new Error("run refused (HTTP " + resp.status + ") — admin sign-in required");
+      var reader = resp.body.getReader();
+      var dec = new TextDecoder();
+      var buf = "";
+      function pump() {
+        return reader.read().then(function (chunk) {
+          if (chunk.done) { logLine("■ Stream ended."); btn.disabled = false; return; }
+          buf += dec.decode(chunk.value, { stream: true });
+          var parts = buf.split("\n\n");
+          buf = parts.pop();
+          parts.forEach(function (evt) {
+            var m = evt.match(/^data:\s*(.*)$/m);
+            if (!m) return;
+            try {
+              var d = JSON.parse(m[1]);
+              logLine("[" + (d.phase || d.type || "step") + "] " + (d.status || "") + (d.message ? " — " + d.message : "") + (d.detail ? " — " + d.detail : ""));
+            } catch (e) { logLine(m[1]); }
+          });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (e) {
+      logLine("✗ " + e.message);
+      btn.disabled = false;
+    });
   }
 
-  // ── Research Team: repo memory ─────────────────────────────────────────────
-  async function renderRepoLearn() {
-    const d = await fetchJson("/api/research/repo/status", 8000);
-    if (!d || !d.ok) { setText("repoLearnMeta", "status unavailable"); return; }
-    setText("rlFiles", d.filesKnown ?? 0);
-    setText("rlMems", d.memoriesGrounded ?? 0);
-    setText("rlLast", d.lastLearnedAt ? relTime(d.lastLearnedAt) : "never");
-    const langs = Object.entries(d.byLang || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${v} ${escapeHtml(k)}`).join(" · ");
-    setText("rlLangs", langs || "—");
-    setText("repoLearnMeta", d.filesKnown ? `${d.filesKnown} files grounded in memory` : "no repo learned yet — run a pass");
-  }
-
-  async function runRepoLearn() {
-    const btn = $("repoLearnRunBtn"), out = $("repoLearnResult");
-    if (btn) { btn.disabled = true; btn.textContent = "Learning…"; }
-    if (out) { out.style.display = "block"; out.innerHTML = '<span class="placeholder">Learning the repo into Convergence Memory…</span>'; }
-    try {
-      const r = await fetch("/api/research/repo/learn", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ max: 1000 }),
-      });
-      const data = await r.json();
-      if (!r.ok || !data.ok) throw new Error(data.message || data.error || `HTTP ${r.status}`);
-      if (out) out.innerHTML = `<div style="color:var(--green);">✓ Scanned ${data.scanned} files · +${data.learned} new · ~${data.updated} changed · ${data.unchanged} unchanged${data.capped ? " · (capped — run again for the rest)" : ""} · ${data.took_ms}ms</div>`;
-      renderRepoLearn();
-    } catch (e) {
-      if (out) out.innerHTML = `<span style="color:#f87171;">Learning pass failed: ${escapeHtml(e.message)}</span>`;
-    } finally {
-      if (btn) { btn.disabled = false; btn.textContent = "▶ Run learning pass"; }
-    }
-  }
-
-  // ── globals for onclick ───────────────────────────────────────────────────
-  window.runRepoLearn = runRepoLearn;
-  window.refreshWorkBoard = refreshWorkBoard;
-  window.renderAgentSlots = renderAgentSlots;
-  window.renderLanded = renderLanded;
-  window.renderTrainingSection = renderTrainingSection;
-  window.renderGpuKeys = renderGpuKeys;
-  window.refreshProviderStatus = refreshProviderStatus;
-
-  // ── Boot ──────────────────────────────────────────────────────────────────
-  document.addEventListener("DOMContentLoaded", async () => {
-    // Boot in two phases to avoid connection-slot starvation. The browser caps
-    // ~6 connections/host and AbortSignal.timeout() counts queue time, so when
-    // all ~20 boot fetches raced in one tick the light one-shot analytics panels
-    // (reliance / merit / calibration / self-test / rollover / repo-memory)
-    // aborted *while still queued* behind the gh-backed work-board calls
-    // (PR lanes / recent-merges shell out to `gh` and hold a slot for seconds)
-    // and — having no refresh interval — showed a permanent false "unavailable".
-    //
-    // Phase 1: the light, one-shot panels — run in small concurrency-limited
-    // waves so a cold server's first (uncached) reads can't oversubscribe the
-    // ~6-connection pool and abort each other while queued. These panels have no
-    // refresh interval, so a single starved load left a permanent false
-    // "unavailable"; the batching + 10s timeout keep queued fetches alive.
-    const phase1 = [
-      renderLocalModel, refreshProviderStatus, renderTrainingSection, renderGpuKeys,
-      renderReliance, renderMerit, renderCalibration, renderKeystoneTests,
-      renderRollover, updateStatus, renderRepoLearn,
-    ];
-    for (let i = 0; i < phase1.length; i += 4) {
-      await Promise.allSettled(phase1.slice(i, i + 4).map((fn) => fn()));
-    }
-    // Phase 2: the heavy gh-backed work board (self-heals on its 20s interval).
-    refreshWorkBoard();
-
-    setInterval(refreshWorkBoard, 20000);
-    setInterval(renderRepoLearn, 60000);
-    setInterval(renderLocalModel, 30000);
-    setInterval(gpuTick, 12000);
-    setInterval(refreshProviderStatus, 60000);
-    setInterval(updateStatus, 15000);
-  });
+  // ── Boot ───────────────────────────────────────────────────────────────
+  fillForm(readSaved());
+  loadFleet();
+  loadJobs();
+  setInterval(loadFleet, 90000);
 })();
 </script>
-
-<script>
-// ── One-click Alpaca (ADR-0027) — OAuth2, no keys ──
-(function(){
-  const $=(id)=>document.getElementById(id);
-  const card=$('alpacaCard'); if(!card) return;
-  // Surface the callback result (?alpaca=connected|error&reason=…) as a banner.
-  const qs=new URLSearchParams(location.search);
-  if(qs.get('alpaca')){
-    const b=$('abanner'); const ok=qs.get('alpaca')==='connected';
-    b.textContent = ok ? 'Alpaca connected — your paper account is linked.' : ('Couldn’t connect Alpaca: '+(qs.get('reason')||'unknown')+'. Try again.');
-    b.className='bbanner show '+(ok?'ok':'err');
-  }
-  async function refresh(){
-    let s=null; try{ s=await (await fetch('/api/broker/alpaca/status',{cache:'no-store'})).json(); }catch(_e){}
-    const connected=s&&s.connected;
-    $('adot').className='bdot '+(connected?'on':'');
-    $('astatusText').textContent=connected
-      ? `Connected · ${s.accountNumber||'account'} (${s.env||'paper'})`
-      : (s&&s.configured===false ? 'One-click setup pending' : 'Not connected');
-    $('adisconnect').hidden=!connected;
-    $('aconnect').textContent=connected?'Reconnect Alpaca':'⚡ Connect Alpaca (paper)';
-    if(s&&s.configured===false){ $('anotconfig').hidden=false; $('aconnect').setAttribute('aria-disabled','true'); $('aconnect').style.opacity='.55'; $('aconnect').style.pointerEvents='none'; }
-  }
-  $('adisconnect').addEventListener('click', async ()=>{
-    try{ await fetch('/api/broker/alpaca/disconnect',{method:'POST'}); }catch(_e){}
-    refresh();
-  });
-  refresh();
-})();
-
-// ── Active-broker switch (per-user, ADR-0027) — which connected account EXECUTES ──
-(function(){
-  const $=(id)=>document.getElementById(id);
-  const card=$('brokerSwitchCard'); if(!card) return;
-  const btns=[...card.querySelectorAll('.bsw')];
-  const NAME={alpaca:'Alpaca', ibkr:'IBKR'};
-  function paint(s){
-    btns.forEach(b=>b.classList.toggle('active', b.dataset.broker===s.preference));
-    const eff=NAME[s.effective]||s.effective;
-    const con=s.connected||{};
-    const conTxt=[con.alpaca?'Alpaca ✓':'Alpaca —', con.ibkr?'IBKR ✓':'IBKR —'].join(' · ');
-    $('bswHint').textContent =
-      (s.preference==='auto' ? `Auto → ${eff} executes your trades right now.` : `${eff} executes your trades.`) +
-      ` The other broker stays the automatic fallback. Connected: ${conTxt}`;
-  }
-  async function load(){
-    try{ const s=await (await fetch('/api/broker/preference',{cache:'no-store'})).json(); if(s&&s.preference) paint(s); }
-    catch(_e){ $('bswHint').textContent='Switch unavailable — server unreachable.'; }
-  }
-  btns.forEach(b=>b.addEventListener('click', async ()=>{
-    try{
-      const r=await fetch('/api/broker/preference',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({broker:b.dataset.broker})});
-      const s=await r.json();
-      if(s&&s.ok) load();
-      else $('bswHint').textContent='Could not switch: '+((s&&(s.message||s.error))||('HTTP '+r.status));
-    }catch(e){ $('bswHint').textContent='Could not switch: '+e.message; }
-  }));
-  load();
-})();
-
-// ── Broker connection (IBKR) — per-user (ADR-0022) ──
-(function(){
-  const $=(id)=>document.getElementById(id);
-  const FIELDS=['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime','realm','accountId'];
-  const form=$('brokerForm'); if(!form) return;
-  function banner(m,k){ const b=$('bbanner'); b.textContent=m; b.className='bbanner show '+(k||'ok'); }
-  function setStatus(s){
-    const live=s&&s.live, connected=live&&live.connected, has=s&&s.hasCredentials;
-    const waiting=has&&!connected&&live&&live.reason==='not_activated_or_unauthorized';
-    $('bdot').className='bdot '+(connected?'on':waiting?'wait':has?'off':'');
-    $('bstatusText').textContent=connected
-      ? `Connected · ${s.accountId||(live&&live.accountId)||'account'} (${(live&&live.mode)||s.mode||'?'})`
-      : waiting ? 'Saved · waiting for IBKR to activate — retry later'
-      : has ? 'Saved · not connected — see the message below'
-      : 'Not connected';
-    $('bdisconnect').hidden=!has;
-    $('brecheck').hidden=!has;
-    // Reassure that saved creds aren't lost on refresh: show the note + mark empty
-    // fields as "on file" rather than blank.
-    const note=$('bsavednote'); if(note) note.hidden=!has;
-    if(has){ ['consumerKey','accessToken','accessTokenSecret','signaturePem','encryptionPem','dhPrime'].forEach(f=>{ const el=$(f); if(el&&!el.value) el.placeholder='•••••••• saved — leave blank to keep'; }); }
-  }
-  // Shared: turn a live-probe result into a banner (used by Connect + Recheck).
-  function showLive(live){
-    if(live&&live.connected){ banner('Connected to IBKR — live session verified.','ok'); return; }
-    const txt=(live&&live.reasonText)||'IBKR did not authenticate — check the keys and that your OAuth consumer is active (up to 24h).';
-    banner(txt, (live&&live.reason==='not_activated_or_unauthorized')?'ok':'err');
-  }
-  async function refresh(){
-    try{
-      const sess=await (await fetch('/api/auth/session',{credentials:'include'})).json();
-      const entitled=sess&&(sess.role==='admin'||(sess.entitlements&&sess.entitlements.trade));
-      $('bgate').hidden=!!entitled;
-      form.style.opacity=entitled?'1':'.5'; form.style.pointerEvents=entitled?'auto':'none';
-      if(!entitled){ setStatus({hasCredentials:false}); return; }
-      setStatus(await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json());
-    }catch(e){ setStatus({hasCredentials:false}); }
-  }
-  form.addEventListener('submit',async(e)=>{
-    e.preventDefault(); const body={}; FIELDS.forEach(f=>body[f]=$(f).value.trim());
-    const btn=$('bconnect'); btn.disabled=true; const t=btn.textContent; btn.textContent='Testing…';
-    try{
-      const r=await fetch('/api/trading/ibkr/connect',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-      const d=await r.json();
-      if(!r.ok) banner(({missing_consumerKey:'Consumer key is required',bad_signaturePem:'Signature key must be a PEM private key',bad_encryptionPem:'Encryption key must be a PEM private key',bad_dhPrime:'DH prime must be hex'}[d.error])||('Error: '+(d.error||r.status)),'err');
-      else { showLive(d.live); setStatus({...d.status,live:d.live}); }
-    }catch(_){ banner('Network error — please try again.','err'); }
-    finally{ btn.disabled=false; btn.textContent=t; refresh(); }
-  });
-  // Recheck — re-run the live probe against the stored (encrypted) credentials,
-  // no re-entry needed. Useful while waiting for IBKR to activate the consumer.
-  $('brecheck').addEventListener('click',async()=>{
-    const btn=$('brecheck'); btn.disabled=true; const t=btn.textContent; btn.textContent='Rechecking…';
-    try{
-      const s=await (await fetch('/api/trading/ibkr/connection',{credentials:'include'})).json();
-      if(!s.hasCredentials){ banner('No saved credentials to recheck.','err'); }
-      else { showLive(s.live); }
-      setStatus(s);
-    }catch(_){ banner('Network error — please try again.','err'); }
-    finally{ btn.disabled=false; btn.textContent=t; }
-  });
-  $('bdisconnect').addEventListener('click',async()=>{
-    if(!confirm('Disconnect your IBKR account?')) return;
-    await fetch('/api/trading/ibkr/disconnect',{method:'POST',credentials:'include'});
-    FIELDS.forEach(f=>{ if(f!=='realm') $(f).value=''; }); banner('Disconnected.','ok'); refresh();
-  });
-  // Step 1 — generate keys in-browser, download the 3 IBKR files, auto-fill the rest.
-  const gen=$('bgenerate');
-  if(gen) gen.addEventListener('click',async()=>{
-    const msg=$('bgenmsg'); gen.disabled=true; const t=gen.textContent; gen.textContent='Generating…'; msg.textContent='';
-    try{
-      const k=await window.IbkrKeygen.generate();
-      // Auto-fill the private half into the form (stays in this tab).
-      $('signaturePem').value=k.signPrivatePem; $('encryptionPem').value=k.encPrivatePem; $('dhPrime').value=k.dhPrimeHex;
-      // Browsers block 3 back-to-back auto-downloads — offer explicit buttons the
-      // user clicks (each click is a user gesture, so every file downloads).
-      const files=[['public_signature.pem',k.signPublicPem],['public_encryption.pem',k.encPublicPem],['dhparam.pem',k.dhParamPem]];
-      const box=$('bgenfiles'); box.hidden=false; box.innerHTML='<div class="bgen-files-h">Download all 3, then upload them to IBKR (step 2):</div>';
-      files.forEach(([name,content])=>{
-        const b=document.createElement('button'); b.type='button'; b.className='bfile-btn'; b.textContent='⬇ '+name;
-        b.addEventListener('click',()=>{ window.IbkrKeygen.download(name,content); b.classList.add('done'); b.textContent='✓ '+name+' (downloaded)'; });
-        box.appendChild(b);
-      });
-      msg.style.color='#22c55e'; msg.textContent='✓ Keys made. Download all 3 files below ↓';
-    }catch(e){ msg.style.color='#ef4444'; msg.textContent='Couldn’t generate — '+(e.message||'use the command-line option.'); }
-    finally{ gen.disabled=false; gen.textContent=t; }
-  });
-  refresh();
-})();
-</script>
-<script src="/js/ibkr-keygen.js"></script>
-<script src="/js/auth-gate.js" defer></script>
 </body>
 </html>
