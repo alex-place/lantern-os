@@ -240,9 +240,12 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   // Regular hours: a market SELL closes instantly. Pre/post market: IBKR rejects market
   // orders outside RTH, so use a marketable LIMIT (≈0.2% below the last print, to cross
   // the wider extended-hours spread) with outsideRTH=true so the exit still fills.
+  // acceptWarnings: this is the engine's PRIMARY exit path (take-profit, max-loss,
+  // momentum-died, trailing stop, signal exit). It only ever SELLS an existing long,
+  // so it strictly reduces risk — an IBKR warning must not leave it unfilled.
   const order = (extended && refPrice > 0)
-    ? { ticker: sym, side: 'sell', qty, type: 'limit', limitPrice: Math.round(refPrice * 0.998 * 100) / 100, outsideRth: true }
-    : { ticker: sym, side: 'sell', qty, type: 'market' };
+    ? { ticker: sym, side: 'sell', qty, type: 'limit', limitPrice: Math.round(refPrice * 0.998 * 100) / 100, outsideRth: true, acceptWarnings: true }
+    : { ticker: sym, side: 'sell', qty, type: 'market', acceptWarnings: true };
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   await cancelRestingStops(bridge, userId, sym);
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
@@ -445,7 +448,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
           stop = Math.round(curPx * (1 - Math.max(0.1, c.stopPct) / 100) * 100) / 100;
         }
         if (stop) {
-          const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity }).catch((e) => ({ status: 'error', reason: e.message }));
+          const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity, acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
           (out.reprotected = out.reprotected || []).push({ symbol: sym, qty, stop, status: sr && sr.status });
         }
       }
@@ -529,9 +532,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         // resting order / next fill before re-attempting.
         const exitAt = _exitAt.get(sym) || 0;
         if (exitAt && (now - exitAt) < c.exitReattemptMs) { out.skipped.push({ ...record, why: `exit already fired ${Math.round((now - exitAt) / 60000)}min ago — waiting for it to fill` }); continue; }
+        // acceptWarnings: this sell CLOSES an existing long — a risk-reducing order.
+        // Leaving it on needs_confirmation is strictly worse than clearing the warning
+        // (2026-07-27: every exit that session stalled, one ran on to -18.9%).
         const exOrder = (extended && price > 0)
-          ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true }
-          : { ticker: sym, side: 'sell', qty: held, type: 'market' };
+          ? { ticker: sym, side: 'sell', qty: held, type: 'limit', limitPrice: Math.round(price * 0.998 * 100) / 100, outsideRth: true, acceptWarnings: true }
+          : { ticker: sym, side: 'sell', qty: held, type: 'market', acceptWarnings: true };
         const r = await bridge.placeIBKROrder(userId, exOrder).catch((e) => ({ status: 'error', reason: e.message }));
         await cancelRestingStops(bridge, userId, sym);
         _entryAt.delete(sym); _exitAt.set(sym, now);
@@ -585,7 +591,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (r && r.status === 'placed') {
       const stop = stopPriceFor(price, c.stopPct);
       if (stop) {
-        const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc' }).catch((e) => ({ status: 'error', reason: e.message }));
+        const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
     }
