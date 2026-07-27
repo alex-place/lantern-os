@@ -90,7 +90,7 @@ const noop = () => {};
  * @param {object} args
  *   problem   {object}   REQUIRED. { id, prompt, tests? } — the one problem.
  *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>.
- *                        `ctx` = { problem, memory, focus, y, turn }. `escalate` is
+ *                        `ctx` = { problem, memory, focus, y, turn, avoid }. `escalate` is
  *                        optional; if absent, a cheap stall simply de-ratchets.
  *   verify    {function} REQUIRED. async (candidateText, { problem, memory, before }) =>
  *                        either a Fix-Rate result ({ advanced, solved, ... }) OR a raw
@@ -103,6 +103,10 @@ const noop = () => {};
  *   stickyTiers {boolean} bidirectional rung movement (default true): a fully-stalled
  *                        turn starts the NEXT turn at the frontier rung; any commit
  *                        returns to cheap.
+ *   failureCache {object|null} #2869 failure-mode cache ({avoidFor, recordFailures});
+ *                        opt-in — when set, known-failed approaches for the task
+ *                        signature ride into every tiers ctx as `avoid`, and an
+ *                        unsolved halt records this run's verified failures.
  *   escalationContract {boolean} contractive-escalation enforcement (#2867, default
  *                        true): a verified escalation that fails to advance halts the
  *                        run ("escalation-noncontractive") — every frontier spend must
@@ -136,6 +140,7 @@ async function runSpiral(args) {
     stallLimit = 3,
     stickyTiers = true,
     escalationContract = true,
+    failureCache = null,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -165,6 +170,13 @@ async function runSpiral(args) {
   // Stop-on-stall + loop detection + the sticky cascade rung. `seenStalled` holds
   // state-hashes of candidates that failed to advance — re-proposing one is loop
   // evidence, and never worth paying the verifier for again.
+  // #2869 failure-mode cache: known-failed approaches for this task signature are
+  // injected as avoid-constraints BEFORE the cheap tier proposes (negative space
+  // only), and this run's verified failures are recorded on an unsolved halt.
+  const fcache = failureCache || null; // opt-in: prod call sites pass the real cache
+  const avoid = fcache ? fcache.avoidFor(problem) : [];
+  const stalledForCache = [];
+
   let consecutiveStalls = 0;
   let consecutiveDupTurns = 0;
   let rung = "cheap";
@@ -210,7 +222,17 @@ async function runSpiral(args) {
         onStep({ type: "verify_skipped", turn, reason: "duplicate-candidate" });
         return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _dup: true };
       }
-      return score(await verify(c.text, { problem, memory, before: best }), best);
+      const out = score(await verify(c.text, { problem, memory, before: best }), best);
+      // #2869: a REAL-verified candidate that failed to advance is repeatable error
+      // for this task signature — collected for the failure cache on unsolved halt.
+      if (!out.advanced) {
+        const results = out._results || out.results || [];
+        stalledForCache.push({
+          text: String(c && c.text) || "",
+          failingTests: (Array.isArray(results) ? results : []).filter((t) => !t.passed).map((t) => String(t.name)),
+        });
+      }
+      return out;
     };
 
     const canEscalate = typeof tiers.escalate === "function";
@@ -225,12 +247,12 @@ async function runSpiral(args) {
       tier = "escalated";
       escalations += 1;
       onStep({ type: "escalate", turn, reason: "sticky rung: cheap stalled last turn" });
-      cand = await tiers.escalate({ problem, memory, focus, y, turn });
+      cand = await tiers.escalate({ problem, memory, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       v = await evaluate(cand);
       onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
     } else {
-      cand = await tiers.cheap({ problem, memory, focus, y, turn });
+      cand = await tiers.cheap({ problem, memory, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
       v = await evaluate(cand);
@@ -244,7 +266,7 @@ async function runSpiral(args) {
         tier = "escalated";
         escalations += 1;
         triedTiers = 2;
-        cand = await tiers.escalate({ problem, memory, focus, y, turn });
+        cand = await tiers.escalate({ problem, memory, focus, y, turn, avoid });
         cost += Number(cand && cand.cost) || 0;
         v = await evaluate(cand);
         onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
@@ -329,6 +351,14 @@ async function runSpiral(args) {
   }
 
   if (haltReason === "maxTurns") onStep({ type: "halt", reason: haltReason, turns: maxTurns, solved, cost, escalations });
+
+  // #2869: an unsolved halt writes this run's verified failures back to the cache
+  // (repeatable error, pre-subtracted next time). Solved runs record nothing.
+  if (fcache && !solved && stalledForCache.length) {
+    try {
+      fcache.recordFailures({ problem, haltReason, stalledCandidates: stalledForCache });
+    } catch { /* best-effort — never fail the run on a cache write */ }
+  }
 
   const turns = corpusRows.length;
   return {
