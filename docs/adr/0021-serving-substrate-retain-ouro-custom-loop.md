@@ -122,3 +122,15 @@ Primary sources: vLLM `ouro.py` (PR #27794), Ouro card (huggingface.co/ByteDance
 vLLM #37668 / RFC #33118, SGLang `return_hidden_states`, Qwen3.5 (artificialanalysis.ai),
 arXiv 2606.02628 (mid-layer probe AUROC), Huginn (arXiv 2502.05171), STARS (arXiv 2605.26733).
 Local anchors: `scripts/ouro_serve.py`, `SIGMA0-K1-KERNEL-SPEC.md §0/§1`.
+
+---
+
+## Note (2026-07-27) — why the custom loop is retained matters more than first recorded
+
+This ADR retains the weight-tied recurrent loop + Q-exit as a **serving constraint** (no engine
+serves adaptive depth natively). A product-grounded reading raises it from constraint to
+*rationale*: the loop's early-exit signal is the natural escalation trigger for the Spiral
+([ADR-0030](0030-spiral-verified-cascade-harness.md)), which today has to infer "good enough" from
+output text. Retaining the custom loop is therefore not just a serving cost we accept — it is the
+substrate the differentiating capability is built on. See
+[docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md](../research/2026-07-27-in-house-model-spec-grounded-in-the-product.md).

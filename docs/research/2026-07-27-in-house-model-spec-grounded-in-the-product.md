@@ -168,10 +168,51 @@ home, and a batched cloud copy for everyone else. Same weights, same endpoint.
   ships. ADR-0026's accept gate already covers this; it must include a calibration check, not just
   a quality check.
 
-## 7. The next measurement, not the next build
+## 7. The next measurement, not the next build — **now shipped, and it already bites**
 
-**Instrument the escalation rate on `/api/dream/chat/stream`.** Log, per turn: did this need the
-expensive tier, and would a verifier have caught it. That single number decides whether §2's $78k/mo
-is real, and it is measurable now, on live traffic, with no model work at all.
+**Instrumented 2026-07-27.** `lib/chat-escalation-meter.js`, hooked into the single
+`logConversation` funnel in `lib/stream-chat.js` (one site covers all ~15 provider legs), readable
+at **`GET /api/metrics/escalation`**. Records derived scalars only — tier, sizes, latency, a
+one-way session hash — and never message text, because the trader surface carries positions and
+P&L through this same path. Fail-open: metering cannot break a chat turn. 20 unit tests.
 
-Everything else in this document is downstream of it.
+### The first reading contradicts this document's own headline assumption
+
+Backfilled over the 35 real assistant turns already on disk:
+
+| | value |
+|---|---|
+| realized escalation rate | **0%** (0 of 35 — all cheap tier) |
+| demand signal (turns that *looked* hard) | **2.9%** (1 of 35) |
+| sample adequate? | **no** — the bar is 1,000 turns |
+
+**§2 assumed 20% escalation. The only data we have says the demand is nearer 3%.** At n=35 that is
+not decisive — the 95% interval on 1/35 spans roughly 0–15% — but the point estimate sits an order
+of magnitude below the assumption, and every conclusion in §2 that leaned on 20% must be treated as
+unsupported until re-measured. The $78k/mo escalation premium is, on current evidence, more likely
+to be single-digit thousands.
+
+### Why the 0% is not itself the answer
+
+Realized tier measures **what we chose**, not what was needed. Chat escalation is effectively off
+by default (`lib/router-gate.js` only escalates under `ROUTER_GATE=1`), so a 0% realized rate is
+guaranteed by configuration and says nothing about demand. That trap is why the meter computes the
+router gate in **measure-only mode** on every turn regardless of the flag, and why `summarize()`
+returns `POLICY-BOUND` rather than `BUILD-NEGATIVE` when realized is zero but demand is not — with
+a test pinning exactly that case.
+
+### What this changes about the argument
+
+**The cost case for owning a model is weaker than §2 implied.** What survives is §3: calibrated
+confidence, positions that stay on the box, latency inside the decision, depth on demand. Those are
+capability arguments, not cost arguments, and they do not depend on the escalation rate at all.
+
+That is the honest position: **build it for what it lets traders do, not for what it saves.**
+
+### Still open
+
+- **n ≥ 1,000 turns** before this reading means anything. Needs the server running.
+- **Enable escalation on a slice.** Demand measured by a hand-tuned heuristic gate is a proxy; the
+  real number needs turns that were actually allowed to escalate, with the outcome compared.
+- **Live end-to-end verification of the hook** — unit-tested and handler-tested, but both local
+  servers are down, so no turn has yet flowed through it in production.

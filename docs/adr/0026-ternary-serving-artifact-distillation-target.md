@@ -153,3 +153,50 @@ no sprawl; operator authority over the gate.
 | Σ_θ acceptance gate exists and gates weight updates on fresh holdout | [ADR-0025](0025-rlvr-dreaming-continual-updates-double-gated.md); #2226/#2237; `experiments/sigma_theta_abc/harness.py` | MEASURED | in-repo |
 | Distill-to-≤8GB + D7 retention threshold is the open Phase-2 slot this fills | [ADR-0024](0024-sigma0-frontier-training-program.md) Phase 2 + D7 | HIGH | in-repo ADR |
 | Mid-layer hidden state (probe/surprise monitor) must survive the format | [ADR-0017](0017-surprise-gated-decoding.md); AUROC 0.90–1.00 surviving 4-bit | HIGH | in-repo ADR |
+
+---
+
+## Amendment A1 (2026-07-27) — **Proposed, awaiting approval**
+
+> **Status: Proposed.** Drafted by an agent, not self-approved (ADR-0001). The Accepted decision
+> above stands unchanged until signed off. This amendment is additive: it does not alter the
+> format choice, the recipe, or the accept gate.
+
+### The gap
+
+This ADR is scoped entirely to the **8 GB serving box**, and that scoping is correct — but the
+organisation is now targeting **thousands of users inside two years**, and **an 8 GB box cannot
+serve thousands of concurrent users.** As written, the ternary artifact has exactly one deployment
+shape, and it is the one that does not scale.
+
+### Proposed addition — two deployment shapes, one artifact
+
+| shape | who it serves | why |
+|---|---|---|
+| **local ≤8GB (this ADR, unchanged)** | the trader who wants positions and P&L to stay on their machine | the privacy objection is real and gets *stronger* the more serious the customer; also removes the network leg from a decision made beside a live chart |
+| **batched cloud (new)** | everyone else | throughput; the same weights behind the same `/api/dream/chat/stream` endpoint |
+
+Same weights, same endpoint, same accept gate — this is a packaging and hosting decision, not a
+second model. It rides the tier split already proposed in
+[ADR-0018](0018-web-tier-split-and-cloud-multi-tenancy.md), which is the right home for the
+routing question ("which shape serves this request?").
+
+### One addition to the accept gate
+
+The Σ_θ gate currently accepts on **quality**. For the product case that motivates owning a model
+at all, quality is not sufficient: the thing traders need and cannot buy is a **calibrated
+confidence** — a stated "how sure am I" that tracks being right rather than tracking writing style.
+This repo has already measured that failure once (the gloss trap:
+[[v1-10-white-box-honesty-design]], where a probe scored AUROC 1.0 on glossed text and ≈chance
+de-glossed).
+
+**Proposed: the accept gate must include a calibration check, not only a quality check** — a
+ternary artifact that keeps its benchmark score but loses its calibration has lost the specific
+capability the local shape exists to deliver, and must not pass.
+
+| Claim | Evidence | Confidence | Source |
+|---|---|---|---|
+| An 8GB single box cannot serve thousands of concurrent users | capacity arithmetic; [[bigger-model-does-not-fit-8gb]] measures the single-box ceiling | HIGH | in-repo + inference |
+| Privacy is a real trader objection | `stock-trader.html` surfaces balance, positions, orders and history through the same chat path it sends to a third-party provider | MEASURED (code path) | in-repo |
+| Confidence-as-prose tracks style, not truth | glossed AUROC 1.0 vs de-glossed ≈chance @0.5B | MEASURED | in-repo eval |
+| Scale target: thousands of users within 2 years | operator statement, 2026-07-27 | HIGH | operator |
