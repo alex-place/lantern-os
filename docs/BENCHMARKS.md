@@ -22,6 +22,29 @@ the Σ₀ external-reality rule applied to ourselves: a capability claim is only
 pairs the runs' per-problem detail files on `task_id` and reports the paired mean difference with SEM,
 95% CI, win/loss/tie counts, and an exact sign test (#1966, per arXiv:2411.00640 recs 1+4).
 
+**⚠️ Harness swing — why a vendor table is not a model ranking (added 2026-07-27):** on *agentic* marks
+(SWE-bench, Terminal-Bench, the SWE-* family) the **scaffold is part of the measurement**, and swapping it
+moves scores by more than the gaps most published tables claim. Measured spreads in the wild: **Claude Opus
+4.8 scores 69.2% under Anthropic's own scaffold vs 51.9% on Scale AI's SEAL board — a 17.3-point gap**;
+**Gemini 3.1 Pro shows a 26.4-point** verified-vs-standardized spread; Moonshot reported **Terminal-Bench 88.3**
+for Kimi K3 inside its own Kimi Code harness while Artificial Analysis's independent board led at **84.6**.
+The commonly-cited range is **10–26 points** ([NxCode](https://www.nxcode.io/resources/news/kimi-k3-benchmarks-coding-agent-evaluation-guide-2026),
+[emergent.sh](https://emergent.sh/learn/kimi-k3-benchmark)). Consequences for this registry:
+- **Never rank two models across different harnesses.** A vendor table whose rows each used the vendor's own
+  scaffold is directional evidence about *systems*, not a model-level ranking. Say so when quoting one.
+- **Record the harness with the score.** A row is `(model, harness, harness commit, scaffold settings)` — our
+  `served_checkpoint` + `git_sha` provenance (above) is the same discipline; extend it to any external number
+  we cite, or mark the citation `harness-unknown`.
+- **Reasoning-history handling is a scaffold setting that changes the score.** Kimi K3 is trained with
+  preserved thinking history and Moonshot warns that a harness which fails to send earlier reasoning back
+  makes quality unstable — K3's DeepSWE barely moved (67.5 Kimi Code → 67.3 mini-SWE-agent), but the effect is
+  real enough that the published eval template requires stamping `preserve_thinking`. **Directly relevant to our
+  verified-cascade / spiral work**, which compresses and re-feeds reasoning across escalation rungs: if we
+  truncate or rewrite chain-of-thought between rungs, that is a measurement-affecting change and must be
+  recorded as one, not treated as a free implementation detail.
+- **Prefer boards that run the models themselves.** [vals.ai](https://www.vals.ai/benchmarks/swebench) and
+  Artificial Analysis run a common harness; a vendor blog does not.
+
 ---
 
 ## Status legend

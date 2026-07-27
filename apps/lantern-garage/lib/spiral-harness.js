@@ -252,6 +252,9 @@ async function runSpiral(args) {
     let cand;
     let v;
     let triedTiers = 1;
+    // The failed cheap attempt this turn, iff we escalated mid-turn (null on the
+    // sticky-rung path — no cheap try happened). Persisted on the corpus row.
+    let cheapAttempt = null;
     if (stickyTiers && canEscalate && rung === "escalated") {
       // Bidirectional tiering, the rise direction: the last turn stalled at BOTH
       // rungs, so the cheap try is proven futile right now — start this turn at the
@@ -274,6 +277,17 @@ async function runSpiral(args) {
         // Cheap stalled → escalate THIS step to the frontier, inheriting the full
         // accumulated memory (progress preserved). This is the only time we spend big.
         if (!v._dup) seenStalled.add(_stateHash(cand && cand.text));
+        // Keep the FAILED cheap attempt before the frontier call overwrites it —
+        // this is the contrastive half of a repair pair (RWOPD/ExVerus-style):
+        // without it the corpus can only train on demonstrations, never on deltas.
+        cheapAttempt = {
+          text: String((cand && cand.text) || ""),
+          model: (cand && cand.model) || null,
+          cost: Number(cand && cand.cost) || 0,
+          fixRate: v.fixRate,
+          penalizedFixRate: v.penalizedFixRate,
+          failingAfter: v.failingAfter,
+        };
         onStep({ type: "escalate", turn, from: cand && cand.model, reason: "cheap stalled the verifier" });
         tier = "escalated";
         escalations += 1;
@@ -297,9 +311,22 @@ async function runSpiral(args) {
       fixRate: v.fixRate,
       penalizedFixRate: v.penalizedFixRate,
       cost: Number(cand && cand.cost) || 0,
+      model: (cand && cand.model) || null,
       // The escalated + advancing steps are the VTD distillation targets: a frontier
       // demonstration on a step the cheap tier could not do. Flagged for the trainer.
       distillTarget: tier === "escalated" && v.advanced,
+      // Schema asks from the self-train build (2026-07-27): the failed cheap
+      // attempt (repair-pair half) and per-test verify detail (partial-credit
+      // weights beyond the tier binary — RWOPD-style 1.0/0.6/0.4 tiers need it).
+      cheapAttempt: cheapAttempt || undefined,
+      verifyDetail: {
+        failingAfter: v.failingAfter,
+        fixed: v.fixed,
+        broke: v.broke,
+        fixedTests: v.fixedTests,
+        brokeTests: v.brokeTests,
+        identified: v.identified,
+      },
       verifySkipped: !!v._dup,
       // #2977: advancing rows carry the FULL candidate text — the distillation
       // record stays complete even when the prompt view above is truncated.
