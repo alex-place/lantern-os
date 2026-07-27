@@ -90,7 +90,7 @@ const noop = () => {};
  * @param {object} args
  *   problem   {object}   REQUIRED. { id, prompt, tests? } — the one problem.
  *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>.
- *                        `ctx` = { problem, memory, focus, y, turn, avoid }. `escalate` is
+ *                        `ctx` = { problem, memory: memoryView, focus, y, turn, avoid }. `escalate` is
  *                        optional; if absent, a cheap stall simply de-ratchets.
  *   verify    {function} REQUIRED. async (candidateText, { problem, memory, before }) =>
  *                        either a Fix-Rate result ({ advanced, solved, ... }) OR a raw
@@ -103,6 +103,13 @@ const noop = () => {};
  *   stickyTiers {boolean} bidirectional rung movement (default true): a fully-stalled
  *                        turn starts the NEXT turn at the frontier rung; any commit
  *                        returns to cheap.
+ *   memoryWindow {number} #2977: prompt-facing calls (tiers, answerability) see only
+ *                        the LAST N committed steps (default 4; 0 = uncapped). The
+ *                        internal ratchet history and the returned `memory` stay
+ *                        complete — only the per-turn PROMPT VIEW is windowed, so a
+ *                        long horizon can't saturate the cheap tier's context.
+ *   memoryTextCap {number} #2977: per-step candidate text cap (chars, default 4000)
+ *                        in that prompt view; `_truncated` carries the true length.
  *   failureCache {object|null} #2869 failure-mode cache ({avoidFor, recordFailures});
  *                        opt-in — when set, known-failed approaches for the task
  *                        signature ride into every tiers ctx as `avoid`, and an
@@ -141,6 +148,8 @@ async function runSpiral(args) {
     stickyTiers = true,
     escalationContract = true,
     failureCache = null,
+    memoryWindow = 4,
+    memoryTextCap = 4000,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -196,12 +205,15 @@ async function runSpiral(args) {
 
   for (let turn = 0; turn < maxTurns; turn++) {
     const focus = rotateFn(turn, memory);
+    // #2977: the prompt-facing view of memory — recency window + per-step text cap
+    // (deterministic; no scoring variance). The full history stays in `memory`.
+    const memoryView = _recallView(memory, memoryWindow, memoryTextCap);
     onStep({ type: "turn_start", turn, focus, memorySize: memory.length });
 
     // M5 (pre-step): honest-can't halt — if the model can no longer justify an
     // answer, stop rather than bluff. Checked before spending a tier call.
     if (answerability) {
-      const a = await answerability({ problem, memory, y, turn, focus });
+      const a = await answerability({ problem, memory: memoryView, y, turn, focus });
       if (Number.isFinite(a) && a < answerabilityFloor) {
         haltReason = "answerability";
         onStep({ type: "halt", reason: haltReason, turns: turn, solved, answerability: a });
@@ -247,12 +259,12 @@ async function runSpiral(args) {
       tier = "escalated";
       escalations += 1;
       onStep({ type: "escalate", turn, reason: "sticky rung: cheap stalled last turn" });
-      cand = await tiers.escalate({ problem, memory, focus, y, turn, avoid });
+      cand = await tiers.escalate({ problem, memory: memoryView, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       v = await evaluate(cand);
       onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
     } else {
-      cand = await tiers.cheap({ problem, memory, focus, y, turn, avoid });
+      cand = await tiers.cheap({ problem, memory: memoryView, focus, y, turn, avoid });
       cost += Number(cand && cand.cost) || 0;
       onStep({ type: "cheap_try", turn, model: cand && cand.model, cost });
       v = await evaluate(cand);
@@ -266,7 +278,7 @@ async function runSpiral(args) {
         tier = "escalated";
         escalations += 1;
         triedTiers = 2;
-        cand = await tiers.escalate({ problem, memory, focus, y, turn, avoid });
+        cand = await tiers.escalate({ problem, memory: memoryView, focus, y, turn, avoid });
         cost += Number(cand && cand.cost) || 0;
         v = await evaluate(cand);
         onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
@@ -289,6 +301,9 @@ async function runSpiral(args) {
       // demonstration on a step the cheap tier could not do. Flagged for the trainer.
       distillTarget: tier === "escalated" && v.advanced,
       verifySkipped: !!v._dup,
+      // #2977: advancing rows carry the FULL candidate text — the distillation
+      // record stays complete even when the prompt view above is truncated.
+      text: v.advanced ? String(cand && cand.text) : undefined,
       ts: new Date(now()).toISOString(),
     };
     corpus.append(row);
@@ -394,6 +409,20 @@ function _wholeAnswerConfidence(best, solved) {
   if (best == null) return 0;
   const s = summarize(best);
   return s.total > 0 ? s.passed / s.total : 0;
+}
+
+/**
+ * #2977: the prompt-facing memory view — last `window` committed steps with each
+ * step's candidate text capped at `textCap` chars (`_truncated` = true length).
+ * Deterministic by construction; the caller's full history is never mutated.
+ */
+function _recallView(memory, window, textCap) {
+  const recent = window > 0 ? memory.slice(-window) : memory.slice();
+  return recent.map((s) =>
+    s && typeof s.text === "string" && textCap > 0 && s.text.length > textCap
+      ? { ...s, text: s.text.slice(0, textCap), _truncated: s.text.length }
+      : s,
+  );
 }
 
 /**
