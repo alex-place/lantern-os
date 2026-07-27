@@ -81,3 +81,16 @@ test('the paper options bridge refuses a live auth', () => {
   const src = fs.readFileSync(OX, 'utf8');
   assert.match(src, /paper-only|refused: live auth/i, 'live-auth refusal present in the order path');
 });
+
+test('options tier REFUSES a symbol with no next-session expiry', () => {
+  // The measured trade is close -> next open. Substituting a monthly (SH's nearest
+  // expiry was +24d when this was written) would be a different instrument entirely
+  // -- multi-week theta/vega held for one night -- and would silently corrupt the
+  // sleeve's expectancy. The guard must refuse, with the real reason.
+  const src = fs.readFileSync(OT, 'utf8');
+  assert.match(src, /nextSession/, 'next-session expiry check present');
+  assert.match(src, /no next-session expiry/, 'refusal carries an explicit reason');
+  // The check compares the chain's expiry against the next TRADING day (ET), not a
+  // naive +1 calendar day.
+  assert.match(src, /nextTradingDayET/, 'uses the ET trading-calendar helper');
+});

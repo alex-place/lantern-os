@@ -145,7 +145,16 @@ const EXEC_MAPS = {
 async function optionLadderFor(symbol, spot, ladder) {
   const ox = require('./options-shadow');
   const chain = await ox.listNextExpiryCalls(symbol).catch(() => ({ error: 'chain failed' }));
-  if (!chain || chain.error || !Array.isArray(chain.contracts)) return { expiry: null, legs: [] };
+  if (!chain || chain.error || !Array.isArray(chain.contracts)) return { expiry: null, legs: [], why: (chain && chain.error) || 'no chain' };
+  // The trade being measured is CLOSE → NEXT OPEN. An option whose nearest expiry is
+  // days or weeks out is a DIFFERENT instrument (multi-week theta/vega held for one
+  // night), and silently substituting it would corrupt the sleeve's expectancy. Only
+  // symbols listing a next-session expiry are tradable on this tier — measured
+  // 2026-07-27: SPY/QQQ/IWM list next-day, GLD +1d, SH +24d (monthlies only).
+  const nextSession = ox.nextTradingDayET(_etNow());
+  if (chain.expiry !== nextSession) {
+    return { expiry: chain.expiry, legs: [], why: `no next-session expiry (nearest ${chain.expiry}, need ${nextSession}) — this symbol lists no overnight option` };
+  }
   const strikes = chain.contracts.map((x) => Number(x.strike_price)).filter((x) => x > 0);
   const legs = [];
   for (const depth of ladder) {
@@ -360,8 +369,8 @@ async function tick({ bridge } = {}) {
       // ── OPTIONS tier: the same signal as a next-day OTM call ladder ──────────
       if (c.exec === 'options') {
         const ox = require('./options-shadow');
-        const { expiry, legs: ladder } = await optionLadderFor(s.symbol, px, c.optionLadder);
-        if (!ladder.length) { _append({ phase: 'skip', date: today, symbol: s.symbol, sleeve: s.sleeve, why: 'no option ladder / quotes' }); continue; }
+        const { expiry, legs: ladder, why: ladderWhy } = await optionLadderFor(s.symbol, px, c.optionLadder);
+        if (!ladder.length) { _append({ phase: 'skip', date: today, symbol: s.symbol, sleeve: s.sleeve, exec: 'options', why: ladderWhy || 'no option ladder / quotes' }); continue; }
         for (const l of ladder) {
           let status = 'dry_run';
           if (placeReal) {
@@ -411,4 +420,4 @@ function heldSymbols() {
   } catch (_e) { return new Set(); }
 }
 
-module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, summarize, canArm, minNFor, heldSymbols, tick, status, LEDGER, STATE };
+module.exports = { cfg, uptrendGate, capitulationGate, fadeGate, selectSleeves, optionLadderFor, summarize, canArm, minNFor, heldSymbols, tick, status, LEDGER, STATE };
