@@ -723,9 +723,17 @@
   // Dev/test role picker: render one button per emulatable role. Clicking signs in
   // as the seeded test account with that role via /api/auth/test-login, then lands
   // on returnTo. Only ever rendered when the SERVER reports testMode.
+  // Labels carry BOTH the plan name and the raw role id: this is a dev tool, and the
+  // old plan-only labels made deep_dreamer and founder identical twins ("Pro") while
+  // pilot (absent from the map) fell through as raw lowercase — the picker looked
+  // broken even though every role logged in fine.
   const TEST_ROLE_LABELS = {
-    supporter: "Free", deep_dreamer: "Pro", founder: "Pro",
-    admin: "Admin", tech_support: "Tech Support",
+    supporter: "Free · supporter",
+    deep_dreamer: "Pro · deep_dreamer",
+    founder: "Founder · legacy",
+    pilot: "Pilot · pilot",
+    admin: "Admin",
+    tech_support: "Tech Support",
   };
   function renderTestPanel(session) {
     if (!session || !session.testMode) return;

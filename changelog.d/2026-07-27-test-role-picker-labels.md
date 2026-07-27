@@ -1,0 +1,3 @@
+### Fixed
+
+- auth(test): **the test role picker looked broken — labels, not logins.** The dev-only panel's label map predated the pricing-ladder rename: `deep_dreamer` and `founder` both rendered as identical "Pro" buttons and `pilot` (absent from the map) fell through as raw lowercase, while every role logged in fine server-side (all six verified 200). Labels now carry plan + role id ("Free · supporter", "Pro · deep_dreamer", "Pilot · pilot", "Founder · legacy", "Admin", "Tech Support") — a dev tool should be explicit. Verified live: distinct buttons render, Pilot click → test-login 200 → signed in.
