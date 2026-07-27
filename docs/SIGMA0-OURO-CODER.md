@@ -190,14 +190,18 @@ recursion buys more verified capability per token than generalist breadth.
   tests admit false solves; mutation feedback lifts test discrimination 53%→89.5%,
   arXiv:2501.12862). The escalation corpus is now a **live pipeline** (PR #2995, 2026-07-27,
   MEASURED): `scripts/spiral_build_self_train.py` turns the Spiral's own corpus sink into a
-  replay-balanced, reward-weighted SFT set (v1: 237 exec-verified records — 47 rung-lift @1.0,
-  190 replay @0.4), and the harness now persists the **failed cheap attempt + per-test verify
-  detail** on every escalated turn, unlocking contrastive repair pairs and RWOPD-style
-  partial-credit weights (verdict-weighted teacher-KL on verifier-passing rollouts beat
-  rejection-SFT by +5.4pp at 7B, arXiv:2605.13501 — IMPORTED). One negative result imported
-  as a design rule: distilling the *retry/backtrack behavior itself* transfers at ~5%
-  (Aletheia, arXiv:2601.14290), so the Spiral's control flow stays in the harness and the
-  student trains only on prompt→verified-solution.
+  replay-balanced, reward-weighted SFT set (current: **258 exec-verified records — 52
+  rung-lift @1.0, 206 replay @0.4**), and the harness persists the **failed cheap attempt +
+  per-test verify detail** on every escalated turn. The first schema-v2 batch (40 MBPP
+  problems, 0.5B cheap / 7B escalation, fully local) produced **28 real repair-pair rows** —
+  5 complete (failed attempt + verified fix), 23 attempt-only awaiting rescue — unlocking
+  contrastive pairs and RWOPD-style partial-credit weights (verdict-weighted teacher-KL on
+  verifier-passing rollouts beat rejection-SFT by +5.4pp at 7B, arXiv:2605.13501 — IMPORTED).
+  Known gap, stated honestly: ollama tiers report `cost: 0`, so per-row cost must be injected
+  or priced at analysis time before router-economics claims are made from this corpus. One
+  negative result imported as a design rule: distilling the *retry/backtrack behavior itself*
+  transfers at ~5% (Aletheia, arXiv:2601.14290), so the Spiral's control flow stays in the
+  harness and the student trains only on prompt→verified-solution.
 - **Objectives:** cross-entropy + **JSRR spectral-stability regularizer** (STARS,
   arXiv:2605.26733) + multi-token-prediction auxiliary; then **RL from verifiable rewards**
   where the reward is the executed **Fix-Rate** (fraction of failing tests a step turns
@@ -220,7 +224,9 @@ recursion buys more verified capability per token than generalist breadth.
 This program does not start from zero evidence. Already measured on our hardware and
 codebase (evidence class MEASURED unless noted): execution-verified cascade economics (a
 strong cheap tier escalates ≈0% of steps at 8.3× lower cost; weak-tier + frontier rescue
-88.4% > 84.8%); an internal truth-signal probe clearing the useful bar at the 1.5B tier;
+88.4% > 84.8%; fresh anchor 2026-07-27: a 0.5B cheap tier reaches only 40% cheap-sufficiency
+with 19/40 problems unsolved even after 7B escalation — the cheap-tier capability floor is
+real and measured, not assumed); an internal truth-signal probe clearing the useful bar at the 1.5B tier;
 dose-response curves for distilling verified traces into small models (small aggressive doses
 *hurt*; gentle + retention holds parity — the from-scratch data rules encode these lessons);
 the collapse-prevention operator at 100% over 900 forced-collapse runs (synthetic regime;
@@ -228,6 +234,36 @@ PROVEN anti-freeze theorem in-regime); and the JSRR acceptance gate machine-chec
 known-spectrum cases. The verified-cascade harness itself is retained — **not as the
 product, but as the teacher-and-examiner infrastructure** that generates Σ₀'s hardest
 training data and grades its checkpoints.
+
+## 6.1 Toolchain — develop, maintain, test
+
+The model is one artifact; the program is the toolchain around it. Every tool below **exists
+and has run** (MEASURED unless marked); gaps are named, not implied away.
+
+| Stage | Tool | Status |
+|---|---|---|
+| **Runtime** | `apps/lantern-garage/lib/spiral-harness.js` (the Spiral loop) + `spiral-tiers.js` (tier wiring) + `spiral-fix-rate.js` (the Fix-Rate verifier, pure) | live; 26/26 unit tests |
+| **Corpus generation** | `experiments/spiral_gen_traces.js` — runs the cascade over MBPP/TACO, emits exec-verified traces; the harness sink adds per-turn rows (`cheapAttempt`, `verifyDetail`, `model`) | live; last batch 2026-07-27 |
+| **Dataset build** | `scripts/spiral_build_self_train.py` — replay-balanced, reward-weighted SFT set from the sink; prints schema-gap report | live; 258 records |
+| **Data prep** | `scripts/fetch_mbpp.py`, `scripts/fetch_taco.py` (Apache-lineage problem sets) | live |
+| **Training** | `scripts/train_qlora_qwen_coder.py`, `scripts/train-qlora-peft.py` + `scripts/continual-train.ps1` launcher; local 4080 or Modal L4; env via `scripts/rebuild-train-venv.ps1` (`.venv-train`, cu121) | live; #2729 8-config sweep ran end-to-end |
+| **Serving** | `ouro_serve.py` (`KEYSTONE_SERVE_OURO=1`) local; ollama for tier models | live |
+| **Evaluation** | `scripts/eval_humaneval_ouro.py` / `eval_humaneval_chat.py` (raw model vs whole product), `eval_coding.py` (MBPP), `eval_qwen_coder.py` (held-out lift), SWE-bench via official Docker harness (WSL2) | live; ledger-backed |
+| **Statistics** | `scripts/eval_paired_diff.py` — paired per-problem diff, SEM/CI/sign test; the no-bare-means rule | live |
+| **Provenance** | `data/eval/leaderboard.jsonl` append-only ledger (`git_sha`, `served_checkpoint`, `campaign_id`) + CI gate `eval-leaderboard-gate.yml` — no serving change ships without a fresh row | live, CI-enforced |
+| **Research grounding** | `F:\arxiv-corpus` BM25 index (115,761 papers, `scripts/arxiv_harvest.py` / `arxiv_build_index.py`) — novelty checks and citation audits behind every IMPORTED claim | live; refreshed 2026-07-27 |
+
+**Named gaps (the maintenance backlog, honestly):**
+1. **Cost injection in `spiral-tiers.js`** — ollama tiers emit `cost: 0`; router-economics
+   measurements from the corpus need real or table-priced costs (#2998).
+2. **Multi-seed discipline is partial** — the eval `--seed` arg landed (#2942) but the #2729
+   replay-balance headline is still single-seed; no comparative claim graduates past PREDICTED
+   until the paired multi-seed confirm lands.
+3. **Repair-pair consumer does not exist yet** — the corpus now emits contrastive pairs; the
+   v2 builder that trains on them is #2998 slice 1 (PLANNED).
+4. **No automated corpus-drift check** — nothing yet alerts if the replay/lift ratio or the
+   verifier-pass vs held-out-pass ratio drifts (the verifier-blind-spot instrument); design
+   asked for in the ship-of-theseus program, not built.
 
 ## 7. Evaluation and falsifiers (pre-registered)
 
