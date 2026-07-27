@@ -351,7 +351,16 @@ async function tick({ bridge } = {}) {
     const legs = [];
     for (const s of sleeves) {
       const execSym = execMap[s.symbol] || s.symbol;
-      if ((preHeld[execSym] || 0) > 0) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'symbol already held by another strategy — no commingling' }); continue; }
+      // NO-COMMINGLING applies to SHARE execution only, and only to positions THIS
+      // book opened. Two fixes (2026-07-27, from the first live session):
+      //  • OPTIONS tier: holding QQQ *shares* cannot make a QQQ *call* exit ambiguous
+      //    — different instruments, different symbols at the broker. A share position
+      //    blocked the QQQ capitulation sleeve's whole ladder for no reason.
+      //  • Unrelated/legacy holdings (another strategy's book, stale test positions)
+      //    are not this engine's business: it manages ONLY what it opened, so those
+      //    must not veto a signal. Only a leg still open in OUR OWN state counts.
+      const ownOpen = new Set(((st.open && st.open.legs) || []).map((l) => String(l.symbol).toUpperCase()));
+      if (c.exec !== 'options' && ownOpen.has(execSym)) { _append({ phase: 'skip_held', date: today, symbol: execSym, sleeve: s.sleeve, why: 'this book already holds the symbol from a prior night — not stacking' }); continue; }
       // DIRECTION LOCK: never enter against existing family exposure — e.g. the QQQ
       // capitulation long while the intraday engine holds SQQQ (the same downtrend
       // condition expressed opposite ways), or SH while the account is long SPY/SPXL.

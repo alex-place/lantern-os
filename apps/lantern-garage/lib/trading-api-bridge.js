@@ -140,7 +140,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -169,6 +169,11 @@ class TradingAPIBridge {
       tif: String(timeInForce || defaultTif).toLowerCase() === 'gtc' ? 'GTC' : 'DAY',
       equity: eq,
       outsideRth: !!outsideRth,   // pre/post-market fills (LMT + outsideRTH)
+      // RISK-REDUCING sells clear IBKR's order warnings automatically (2026-07-27:
+      // 13 exits in one session all stalled at needs_confirmation — incl. a max-loss
+      // sell that then ran to -18.9% and a take-profit that gave back its whole gain).
+      // Entries still surface warnings for a human, which is what P0-8 was protecting.
+      acceptWarnings: !!acceptWarnings,
     });
     const reason = r.note || r.error || (r.gate && r.gate.reason) || null;
     if (r.status === 'submitted') this._invalidateUser(userId); // fresh account/positions next read
