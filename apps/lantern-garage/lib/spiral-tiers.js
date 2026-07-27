@@ -160,6 +160,19 @@ function _aliasShim(language, entryPoint) {
   return `\n;try{ if (typeof ${entryPoint} === 'undefined' && typeof ${camel} !== 'undefined') globalThis.${entryPoint} = ${camel}; }catch(e){}\n`;
 }
 
+
+/**
+ * #2999: deterministic visible/held-out split of a test list. The LAST n tests are
+ * held out (stable across runs — no RNG in the serve path); the visible split is
+ * never emptied (a loop with zero selection tests cannot ratchet at all).
+ */
+function splitHoldout(tests, n = 1) {
+  const list = Array.isArray(tests) ? tests : tests ? [{ name: "check", test: tests }] : [];
+  const k = Math.max(0, Math.min(Number(n) || 0, list.length - 1));
+  if (k === 0) return { visible: list, holdout: [] };
+  return { visible: list.slice(0, list.length - k), holdout: list.slice(list.length - k) };
+}
+
 /** A single provider leg (by name) from verify-llm's implemented set, or null. */
 function _legFor(provider) {
   const leg = verifyLLM.buildLegs().find((l) => l.provider === provider) || null;
@@ -257,4 +270,4 @@ function makeTiers({ complete = _defaultComplete, cheapProvider = "ollama", fron
   };
 }
 
-module.exports = { extractCode, makeVerifier, makeTiers, ollamaComplete, resolveLocalModel, _legFor, _defaultComplete };
+module.exports = { extractCode, makeVerifier, makeTiers, splitHoldout, ollamaComplete, resolveLocalModel, _legFor, _defaultComplete };

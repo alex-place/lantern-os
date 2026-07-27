@@ -1508,7 +1508,14 @@ const REGISTRY = {
         // #2869: chat spirals use the real failure cache — known-failed approaches
         // for this task signature are avoided up front; unsolved runs record back.
         const failureCache = require("./spiral-failure-cache");
-        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify, maxTurns, onStep: line, failureCache });
+        // #2999: with >=2 tests, the LAST is held out — selection runs on the visible
+        // split, the returned answer is the holdout-best, and a visible "solved"
+        // that breaks the held-out test does not count.
+        const { splitHoldout } = require("./spiral-tiers");
+        const split = splitHoldout(i.tests, 1);
+        const verifyVisible = split.visible.length ? makeVerifier({ language, tests: split.visible }) : verify;
+        const holdoutVerify = split.holdout.length ? makeVerifier({ language, tests: split.holdout }) : null;
+        const r = await runSpiral({ problem: { id: "chat", prompt: String(i.prompt || "") }, tiers, verify: verifyVisible, maxTurns, onStep: line, failureCache, holdoutVerify });
         const head = r.solved
           ? `Spiral SOLVED in ${r.turns} turn(s)`
           : `Spiral did not solve (${r.haltReason}) after ${r.turns} turn(s)`;
