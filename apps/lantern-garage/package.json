@@ -33,7 +33,7 @@
     "test:coding-router": "node test/coding-router.test.js",
     "test:coding-verifier": "node test/coding-verifier.test.js",
     "test:coding-tool": "node test/coding-tool.test.js",
-    "test:spiral": "node --test test/spiral-fix-rate.test.js test/spiral-harness.test.js test/spiral-tiers.test.js",
+    "test:spiral": "node --test test/spiral-fix-rate.test.js test/spiral-harness.test.js test/spiral-tiers.test.js test/spiral-stall-tiering.test.js test/spiral-env.test.js",
     "test:tenant": "node test/tenant.test.js",
     "test:byok": "node test/user-provider-keys.test.js",
     "test:profile": "node test/deployment-profile.test.js",

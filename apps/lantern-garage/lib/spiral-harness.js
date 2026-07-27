@@ -39,6 +39,24 @@
  *     the next turn starts at the frontier rung (skip the doomed cheap try); any
  *     commit drops back to cheap — de-escalate when the hard part is over.
  *
+ * TWO TIER SHAPES (#2973). A tier may return either:
+ *   - ANSWER-shaped `{ text }` — the original contract: a whole candidate solution, scored
+ *     by the verifier. Right for MBPP/TACO, and what the 204-row VTD corpus was built on.
+ *   - ACTION-shaped `{ action }` — one bash command, run by the injected `env` (see
+ *     lib/spiral-env.js), whose observation feeds the next turn. This is the shape real
+ *     repositories need and the shape frontier open scaffolds use; a whole-answer turn on
+ *     SWE-bench is blind single-shot patching, the configuration that measured 0/5 (#2246).
+ * Both shapes run through the SAME loop: the cascade, ratchet, stall and corpus logic below
+ * are unchanged, because none of them ever cared what a candidate was made of.
+ *
+ * OBSERVATION TURNS. A non-mutating action (`ls`, `grep`, `cat`) is how an agent finds the
+ * bug — it changes nothing, so charging it to the Fix-Rate ratchet would score three greps
+ * as three stalls and halt a run before it began. So: a non-mutating action commits to
+ * memory, costs no verifier spend, never de-ratchets, and never escalates; only a MUTATING
+ * action is a real step that faces the verifier. Mutation is measured from the working tree
+ * by `env`, not guessed from the command text. Exploration is bounded by `observeLimit` so
+ * a model cannot browse forever.
+ *
  * The four core objects map cleanly: Memory = the growing verified memory; Task = the
  * problem; Tool = the tier calls; Convergence Record = each committed verified step.
  * Nothing here is a separate engine — it is the loop, focused.
@@ -89,9 +107,14 @@ const noop = () => {};
  *
  * @param {object} args
  *   problem   {object}   REQUIRED. { id, prompt, tests? } — the one problem.
- *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>.
- *                        `ctx` = { problem, memory: memoryView, focus, y, turn, avoid }. `escalate` is
- *                        optional; if absent, a cheap stall simply de-ratchets.
+ *   tiers     {object}   REQUIRED. { cheap(ctx), escalate(ctx) } → Promise<{ text, cost?, model? }>
+ *                        (answer-shaped) or → Promise<{ action, cost?, model? }> (action-shaped,
+ *                        requires `env`). `ctx` = { problem, memory: memoryView, focus, y, turn,
+ *                        avoid }. `escalate` is optional; if absent, a cheap stall de-ratchets.
+ *   env       {object}   optional { run(action) } → Promise<{ observation, mutated, ... }>.
+ *                        REQUIRED if any tier returns an action. See lib/spiral-env.js.
+ *   observeLimit {number} consecutive non-mutating (observation) turns before halting
+ *                        "observation-limit" (default 8). 0 disables the bound.
  *   verify    {function} REQUIRED. async (candidateText, { problem, memory, before }) =>
  *                        either a Fix-Rate result ({ advanced, solved, ... }) OR a raw
  *                        test-result set (array/counts) which we score with fixRate().
@@ -139,7 +162,7 @@ const noop = () => {};
  *   escalationRate:number, corpusFile:(string|null), confidence:number
  * }>}
  *   haltReason ∈ "solved" | "stalled" | "loop" | "escalation-noncontractive" |
- *                "answerability" | "maxTurns".
+ *                "answerability" | "observation-limit" | "maxTurns".
  *   confidence is the whole-answer score (see _wholeAnswerConfidence), decoupled
  *   from where the loop stopped.
  */
@@ -149,8 +172,10 @@ async function runSpiral(args) {
     tiers,
     verify,
     memory: seed = [],
+    env = null,
     maxTurns = 12,
     stallLimit = 3,
+    observeLimit = 8,
     stickyTiers = true,
     escalationContract = true,
     failureCache = null,
@@ -195,6 +220,12 @@ async function runSpiral(args) {
 
   let consecutiveStalls = 0;
   let consecutiveDupTurns = 0;
+  let consecutiveObservations = 0;
+  let observations = 0;
+  // `escalations` counts every paid frontier call (the cost truth). `stepEscalations`
+  // counts only those spent on a real step — the frontier is allowed to explore too, and
+  // an exploring frontier call must not inflate the rate above 1.
+  let stepEscalations = 0;
   let rung = "cheap";
   const seenStalled = new Set();
   // #2999: best commit as scored on the HELD-OUT split (null until first commit
@@ -239,19 +270,37 @@ async function runSpiral(args) {
     // stall it is without spending an exec run.
     let dupsThisTurn = 0;
     const evaluate = async (c) => {
-      const h = _stateHash(c && c.text);
-      if (seenStalled.has(h) || (y != null && String(c && c.text) === String(y))) {
+      const h = _stateHash(_candidateKey(c));
+      if (seenStalled.has(h) || (y != null && !_isAction(c) && String(c && c.text) === String(y))) {
         dupsThisTurn += 1;
         onStep({ type: "verify_skipped", turn, reason: "duplicate-candidate" });
         return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _dup: true };
       }
-      const out = score(await verify(c.text, { problem, memory, before: best }), best);
+
+      // Action-shaped: the environment runs it and the working tree answers. A command
+      // that changed nothing is exploration, not a step — it short-circuits here without
+      // ever paying the verifier, and the caller treats it as an observation turn.
+      if (_isAction(c)) {
+        if (!env || typeof env.run !== "function") {
+          throw new Error("runSpiral: a tier returned an action but no env was injected");
+        }
+        const ex = await env.run(c.action);
+        c.observation = ex && ex.observation;
+        c.exec = ex;
+        onStep({ type: "act", turn, action: c.action, mutated: !!(ex && ex.mutated), exitCode: ex && ex.exitCode, denied: (ex && ex.denied) || null });
+        if (!ex || !ex.mutated) {
+          return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _observation: true };
+        }
+      }
+
+      const subject = _isAction(c) ? (c.text != null ? c.text : c.action) : c.text;
+      const out = score(await verify(subject, { problem, memory, before: best, observation: c.observation, action: c.action || null, env }), best);
       // #2869: a REAL-verified candidate that failed to advance is repeatable error
       // for this task signature — collected for the failure cache on unsolved halt.
       if (!out.advanced) {
         const results = out._results || out.results || [];
         stalledForCache.push({
-          text: String(c && c.text) || "",
+          text: String(subject || ""),
           failingTests: (Array.isArray(results) ? results : []).filter((t) => !t.passed).map((t) => String(t.name)),
         });
       }
@@ -284,15 +333,17 @@ async function runSpiral(args) {
       v = await evaluate(cand);
       onStep({ type: "verify", turn, tier, advanced: v.advanced, solved: v.solved, fixRate: v.fixRate, penalizedFixRate: v.penalizedFixRate });
 
-      if (!v.advanced && canEscalate) {
+      // An observation is not a stall, so it never buys a frontier call: paying the
+      // rented tier to re-run someone's `ls` is the most wasteful thing this loop could do.
+      if (!v.advanced && !v._observation && canEscalate) {
         // Cheap stalled → escalate THIS step to the frontier, inheriting the full
         // accumulated memory (progress preserved). This is the only time we spend big.
-        if (!v._dup) seenStalled.add(_stateHash(cand && cand.text));
+        if (!v._dup) seenStalled.add(_stateHash(_candidateKey(cand)));
         // Keep the FAILED cheap attempt before the frontier call overwrites it —
         // this is the contrastive half of a repair pair (RWOPD/ExVerus-style):
         // without it the corpus can only train on demonstrations, never on deltas.
         cheapAttempt = {
-          text: String((cand && cand.text) || ""),
+          text: String(_candidateKey(cand) || ""),
           model: (cand && cand.model) || null,
           cost: Number(cand && cand.cost) || 0,
           fixRate: v.fixRate,
@@ -341,20 +392,48 @@ async function runSpiral(args) {
       verifySkipped: !!v._dup,
       // #2977: advancing rows carry the FULL candidate text — the distillation
       // record stays complete even when the prompt view above is truncated.
-      text: v.advanced ? String(cand && cand.text) : undefined,
+      text: v.advanced ? String(_candidateKey(cand)) : undefined,
+      // Action-shaped turns record what was run and what came back. These rows are the
+      // per-step training data the VTD trainer wants: short, execution-labelled, and
+      // already decomposed — which is why the escalation corpus fits an 8GB card even
+      // though a whole SWE-bench episode does not.
+      action: cand && cand.action ? cand.action : null,
+      observation: cand && cand.observation != null ? cand.observation : null,
+      observationOnly: !!v._observation,
       ts: new Date(now()).toISOString(),
     };
     corpus.append(row);
     corpusRows.push(row);
 
+    if (v._observation) {
+      // Exploration: grow what the next turn knows, spend nothing, touch no ratchet.
+      memory.push({ turn, tier, action: cand.action, observation: cand.observation, focus, observationOnly: true });
+      observations += 1;
+      consecutiveObservations += 1;
+      seenStalled.add(_stateHash(_candidateKey(cand)));
+      onStep({ type: "observe", turn, tier, action: cand.action, memorySize: memory.length });
+      if (observeLimit > 0 && consecutiveObservations >= observeLimit) {
+        haltReason = "observation-limit";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved, cost, escalations });
+        break;
+      }
+      continue;
+    }
+
+    consecutiveObservations = 0;
+    if (tier === "escalated") stepEscalations += 1;
+
     if (v.advanced) {
       // Commit the verified, (in Phase 2) decorrelated step → grow the radius (M1).
       const step = { turn, tier, text: cand.text, focus, results: v._results || v.results || null, fixRate: v.fixRate, solved: !!v.solved };
+      if (cand.action) { step.action = cand.action; step.observation = cand.observation; }
       // Preserve the raw results so the next turn's ratchet baseline is this best.
       if (!step.results && Array.isArray(v.fixedTests)) step.results = null;
       memory.push(step);
       best = _bestResults(best, v, cand);
-      y = cand.text;
+      // `y` is the best ANSWER so far. An action-shaped turn mutates the repo rather than
+      // producing an answer string, so it must not blank out a good `y` with undefined.
+      if (cand.text != null) y = cand.text;
       // De-escalation (the fall direction): the hard step cleared, so the next turn
       // probes the cheap rung again — a long session drifts back to the cheap tier.
       rung = "cheap";
@@ -395,7 +474,7 @@ async function runSpiral(args) {
     } else {
       // Neither tried rung advanced — de-ratchet (rotate focus / ground externally
       // next turn), never freeze. Nothing commits to memory (the ratchet holds).
-      if (!v._dup) seenStalled.add(_stateHash(cand && cand.text));
+      if (!v._dup) seenStalled.add(_stateHash(_candidateKey(cand)));
       consecutiveStalls += 1;
       consecutiveDupTurns = dupsThisTurn >= triedTiers ? consecutiveDupTurns + 1 : 0;
       // Rise: the frontier was tried this turn and still no advance — starting the
@@ -439,12 +518,18 @@ async function runSpiral(args) {
   }
 
   const turns = corpusRows.length;
+  // Escalation rate is the ONE governing number of ADR-0030 (it is designed to only fall),
+  // so its denominator must be steps that could have escalated. Observation turns never
+  // can — counting them would let a chatty explorer fake a falling escalation rate.
+  const stepTurns = turns - observations;
   return {
     solved,
     haltReason,
     turns,
+    observations,
     escalations,
-    escalationRate: turns ? escalations / turns : 0,
+    stepEscalations,
+    escalationRate: stepTurns > 0 ? stepEscalations / stepTurns : 0,
     cost,
     memory,
     corpusRows,
@@ -457,6 +542,19 @@ async function runSpiral(args) {
     holdout: holdoutVerify ? (bestHoldout ? { frac: bestHoldout.frac, turn: bestHoldout.turn } : { frac: null, turn: null }) : null,
     confidence: holdoutVerify && bestHoldout ? (solved ? 1 : bestHoldout.frac) : _wholeAnswerConfidence(best, solved),
   };
+}
+
+/** True when a tier returned an ACTION (one bash command) rather than an ANSWER. */
+function _isAction(c) {
+  return !!(c && typeof c.action === "string" && c.action.trim());
+}
+
+/**
+ * Identity of a candidate for the loop detector. Namespaced so an action and an answer
+ * that happen to be the same string are never confused for one another.
+ */
+function _candidateKey(c) {
+  return _isAction(c) ? `act:${c.action}` : `ans:${c && c.text}`;
 }
 
 // Cheap content hash for the stop-on-stall loop detector: two proposals with the
@@ -505,4 +603,4 @@ function _bestResults(prevBest, v, cand) {
   return prevBest;
 }
 
-module.exports = { runSpiral, DEFAULT_FOCI };
+module.exports = { runSpiral, DEFAULT_FOCI, _isAction, _candidateKey };
