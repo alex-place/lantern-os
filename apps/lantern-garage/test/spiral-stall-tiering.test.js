@@ -266,3 +266,36 @@ test("failure cache: solved runs record nothing; no cache configured = no ctx.av
   });
   assert.ok(ctxs.every((a) => Array.isArray(a) && a.length === 0), "default is an empty avoid list");
 });
+
+test("memory cap (#2977): prompt view is windowed + text-capped; ratchet history stays complete", async () => {
+  const seenMemories = [];
+  const BIG = "x".repeat(10_000);
+  let t = 0;
+  const r = await runSpiral({
+    problem: { id: "s16", prompt: "long horizon" },
+    tiers: { cheap: async (ctx) => { seenMemories.push(ctx.memory); return { text: `${BIG}/*${t++}*/`, cost: 0.001 }; } },
+    // Every candidate "advances" (never solves) so memory grows each turn.
+    verify: async () => ({ advanced: true, solved: false, fixRate: 0.5, penalizedFixRate: 0.5 }),
+    corpus: sink(), now: clock, maxTurns: 6,
+  });
+  assert.equal(r.memory.length, 6, "the RETURNED ratchet history is complete");
+  assert.ok(r.memory.every((s) => s.text.length > 9000), "full texts preserved internally");
+  const lastView = seenMemories[seenMemories.length - 1];
+  assert.equal(lastView.length, 4, "prompt view capped at the default window of 4");
+  assert.ok(lastView.every((s) => s.text.length <= 4000), "per-step text capped in the view");
+  assert.ok(lastView.every((s) => !s.text || s._truncated === 10_006 || s.text.length <= 4000), "true length receipted");
+  assert.ok(r.corpusRows.filter((x) => x.advanced).every((x) => x.text && x.text.length > 9000),
+    "advancing corpus rows carry the FULL text — the distillation record is complete");
+});
+
+test("memory cap: memoryWindow 0 = uncapped view (legacy); small runs unaffected by defaults", async () => {
+  const seen = [];
+  let t = 0;
+  await runSpiral({
+    problem: { id: "s17", prompt: "uncapped" },
+    tiers: { cheap: async (ctx) => { seen.push(ctx.memory.length); return { text: `v${t++}`, cost: 0.001 }; } },
+    verify: async () => ({ advanced: true, solved: false, fixRate: 0.5, penalizedFixRate: 0.5 }),
+    corpus: sink(), now: clock, maxTurns: 6, memoryWindow: 0,
+  });
+  assert.equal(seen[seen.length - 1], 5, "window 0 passes the whole history");
+});
