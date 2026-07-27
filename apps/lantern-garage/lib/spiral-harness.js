@@ -284,17 +284,23 @@ async function runSpiral(args) {
         if (!env || typeof env.run !== "function") {
           throw new Error("runSpiral: a tier returned an action but no env was injected");
         }
-        const ex = await env.run(c.action);
+        if (_isEdit(c) && typeof env.applyEdits !== "function") {
+          throw new Error("runSpiral: a tier returned an edit but env has no applyEdits");
+        }
+        const ex = _isEdit(c) ? await env.applyEdits(c.edit) : await env.run(c.action);
         c.observation = ex && ex.observation;
         c.exec = ex;
-        onStep({ type: "act", turn, action: c.action, mutated: !!(ex && ex.mutated), exitCode: ex && ex.exitCode, denied: (ex && ex.denied) || null });
+        onStep({ type: "act", turn, kind: _isEdit(c) ? "edit" : "command", action: c.action || null, files: (ex && ex.files) || null, mutated: !!(ex && ex.mutated), exitCode: ex && ex.exitCode, denied: (ex && ex.denied) || null });
         if (!ex || !ex.mutated) {
           return { advanced: false, solved: false, fixRate: 0, penalizedFixRate: 0, _observation: true };
         }
       }
 
-      const subject = _isAction(c) ? (c.text != null ? c.text : c.action) : c.text;
-      const out = score(await verify(subject, { problem, memory, before: best, observation: c.observation, action: c.action || null, env }), best);
+      const subject = _isAction(c) ? (c.text != null ? c.text : c.action || c.edit) : c.text;
+      const out = score(
+        await verify(subject, { problem, memory, before: best, observation: c.observation, action: c.action || null, edit: c.edit || null, files: (c.exec && c.exec.files) || null, env }),
+        best,
+      );
       // #2869: a REAL-verified candidate that failed to advance is repeatable error
       // for this task signature — collected for the failure cache on unsolved halt.
       if (!out.advanced) {
@@ -398,6 +404,8 @@ async function runSpiral(args) {
       // already decomposed — which is why the escalation corpus fits an 8GB card even
       // though a whole SWE-bench episode does not.
       action: cand && cand.action ? cand.action : null,
+      edit: cand && cand.edit ? cand.edit : null,
+      files: (cand && cand.exec && cand.exec.files) || null,
       observation: cand && cand.observation != null ? cand.observation : null,
       observationOnly: !!v._observation,
       ts: new Date(now()).toISOString(),
@@ -407,7 +415,7 @@ async function runSpiral(args) {
 
     if (v._observation) {
       // Exploration: grow what the next turn knows, spend nothing, touch no ratchet.
-      memory.push({ turn, tier, action: cand.action, observation: cand.observation, focus, observationOnly: true });
+      memory.push({ turn, tier, action: cand.action || null, edit: cand.edit || null, files: (cand.exec && cand.exec.files) || null, observation: cand.observation, focus, observationOnly: true });
       observations += 1;
       consecutiveObservations += 1;
       seenStalled.add(_stateHash(_candidateKey(cand)));
@@ -426,7 +434,12 @@ async function runSpiral(args) {
     if (v.advanced) {
       // Commit the verified, (in Phase 2) decorrelated step → grow the radius (M1).
       const step = { turn, tier, text: cand.text, focus, results: v._results || v.results || null, fixRate: v.fixRate, solved: !!v.solved };
-      if (cand.action) { step.action = cand.action; step.observation = cand.observation; }
+      if (_isAction(cand)) {
+        step.action = cand.action || null;
+        step.edit = cand.edit || null;
+        step.files = (cand.exec && cand.exec.files) || null;
+        step.observation = cand.observation;
+      }
       // Preserve the raw results so the next turn's ratchet baseline is this best.
       if (!step.results && Array.isArray(v.fixedTests)) step.results = null;
       memory.push(step);
@@ -544,17 +557,28 @@ async function runSpiral(args) {
   };
 }
 
-/** True when a tier returned an ACTION (one bash command) rather than an ANSWER. */
-function _isAction(c) {
-  return !!(c && typeof c.action === "string" && c.action.trim());
+/** True when a tier returned SEARCH/REPLACE blocks (#2975) rather than a shell command. */
+function _isEdit(c) {
+  return !!(c && typeof c.edit === "string" && c.edit.trim());
 }
 
 /**
- * Identity of a candidate for the loop detector. Namespaced so an action and an answer
- * that happen to be the same string are never confused for one another.
+ * True when a tier returned an ACTION — something the environment performs — rather than
+ * an ANSWER. Two forms: a bash command (`action`) or an edit payload (`edit`). Both mutate
+ * the world through `env` and are scored by what the tree does, not by what they say.
+ */
+function _isAction(c) {
+  return _isEdit(c) || !!(c && typeof c.action === "string" && c.action.trim());
+}
+
+/**
+ * Identity of a candidate for the loop detector. Namespaced so an action, an edit and an
+ * answer that happen to be the same string are never confused for one another.
  */
 function _candidateKey(c) {
-  return _isAction(c) ? `act:${c.action}` : `ans:${c && c.text}`;
+  if (_isEdit(c)) return `edit:${c.edit}`;
+  if (_isAction(c)) return `act:${c.action}`;
+  return `ans:${c && c.text}`;
 }
 
 // Cheap content hash for the stop-on-stall loop detector: two proposals with the
@@ -603,4 +627,4 @@ function _bestResults(prevBest, v, cand) {
   return prevBest;
 }
 
-module.exports = { runSpiral, DEFAULT_FOCI, _isAction, _candidateKey };
+module.exports = { runSpiral, DEFAULT_FOCI, _isAction, _isEdit, _candidateKey };
