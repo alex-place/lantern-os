@@ -223,6 +223,9 @@ function _prompt(ctx, tier, language) {
     // tasks (models wrote uncalled functions that print nothing → guaranteed stdout mismatch).
     `You are the ${tier} tier of a verified spiral solving ONE problem. Reply with ONLY the implementation as a single ${language} code block — no prose. Follow the problem's I/O contract exactly: if it names a function, define EXACTLY that name (do not rename or camelCase it); if it asks for a program, write a complete program that actually runs.`,
     ctx.problem.prompt,
+    // #2869: negative space from the failure cache — approaches that already
+    // verifiably failed this task signature. Guidance only; the verifier judges.
+    ctx.avoid && ctx.avoid.length ? "\n" + require("./spiral-failure-cache").renderAvoid(ctx.avoid) : "",
     ctx.y ? `\nCurrent best attempt (improve it; KEEP whatever already passes):\n${ctx.y}` : "",
     failing ? `\nFocus "${ctx.focus}". Still-failing tests:\n${failing}` : `\nFocus: ${ctx.focus}.`,
   ]

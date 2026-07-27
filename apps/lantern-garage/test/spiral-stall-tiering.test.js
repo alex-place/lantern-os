@@ -224,3 +224,45 @@ test("escalation contract: dup-skipped escalations never trigger it (the loop de
   });
   assert.equal(r.haltReason, "loop", "a no-new-information echo is loop evidence, not a contract breach");
 });
+
+test("failure cache (#2869): avoid-constraints ride into every tiers ctx; unsolved halts record VERIFIED failures only", async () => {
+  const seenAvoid = [];
+  const recorded = [];
+  const stubCache = {
+    avoidFor: () => [{ approachHash: "h1", snippet: "function f(){bad}", failingTests: ["t0"] }],
+    recordFailures: (args) => recorded.push(args),
+  };
+  let i = 0;
+  const r = await runSpiral({
+    problem: { id: "s13", prompt: "recurring task" },
+    tiers: { cheap: async (ctx) => { seenAvoid.push(ctx.avoid); return { text: `pass: v${i++}`, cost: 0.001 }; } },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12, failureCache: stubCache,
+  });
+  assert.equal(r.haltReason, "stalled");
+  assert.ok(seenAvoid.every((a) => Array.isArray(a) && a.length === 1), "avoid list reached every propose call");
+  assert.equal(recorded.length, 1, "one record on the unsolved halt");
+  assert.equal(recorded[0].stalledCandidates.length, 3, "all three REAL-verified stalls recorded");
+  assert.ok(recorded[0].stalledCandidates.every((c) => c.failingTests.length > 0), "failing test names captured");
+});
+
+test("failure cache: solved runs record nothing; no cache configured = no ctx.avoid surprises", async () => {
+  const recorded = [];
+  const stubCache = { avoidFor: () => [], recordFailures: (a) => recorded.push(a) };
+  const r1 = await runSpiral({
+    problem: { id: "s14", prompt: "easy" },
+    tiers: { cheap: async () => ({ text: "pass:a,b", cost: 0.001 }) },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, failureCache: stubCache,
+  });
+  assert.equal(r1.solved, true);
+  assert.equal(recorded.length, 0, "solved → nothing recorded");
+  const ctxs = [];
+  await runSpiral({
+    problem: { id: "s15", prompt: "no cache" },
+    tiers: { cheap: async (ctx) => { ctxs.push(ctx.avoid); return { text: "pass:a,b", cost: 0.001 }; } },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock,
+  });
+  assert.ok(ctxs.every((a) => Array.isArray(a) && a.length === 0), "default is an empty avoid list");
+});
