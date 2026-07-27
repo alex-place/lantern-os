@@ -73,6 +73,14 @@ test("cheap stalls → escalate rescues, and the escalated commit is a distillat
   assert.equal(corpus.rows[0].tier, "escalated");
   assert.equal(corpus.rows[0].distillTarget, true, "escalated + advancing = a VTD distillation target");
   assert.ok(r.cost >= 0.02, "the frontier call is billed");
+  // Repair-pair + partial-credit fields (self-train build schema asks, 2026-07-27):
+  const row = corpus.rows[0];
+  assert.equal(row.model, "frontier", "row records the model that produced the committed text");
+  assert.ok(row.cheapAttempt, "escalated row keeps the FAILED cheap attempt");
+  assert.equal(row.cheapAttempt.model, "cheap");
+  assert.equal(row.cheapAttempt.text, "pass:", "the failed candidate text is the contrastive half");
+  assert.ok(row.verifyDetail, "row carries per-test verify detail");
+  assert.equal(row.verifyDetail.failingAfter, 0, "solved → nothing failing after");
 });
 
 test("escalation INHERITS accumulated progress (memory carries prior commits)", async () => {

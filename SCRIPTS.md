@@ -133,6 +133,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/fetch_taco.py` | registered here — VTD Phase-1 scale corpus (TACO-verified, Apache lineage; stdio problems); feeds `experiments/spiral_gen_traces.js` | `.venv-train python scripts/fetch_taco.py --difficulty EASY` |
 | `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
 | `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
+| `scripts/spiral_build_self_train.py` | registered here — builds the replay-balanced, reward-weighted SFT set from the spiral escalation corpus (`data/eval/spiral/*.jsonl` → `self-train/`); consumes the `spiral-harness.js` sink | `python scripts/spiral_build_self_train.py` (`--dry-run` for report only) |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` | via launcher |
 | `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` | via launcher |
