@@ -439,9 +439,22 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
       /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''));
+    // ACCUMULATION CAP. A stop that never transmits (IBKR parks it 'Inactive' when an
+    // order warning goes unconfirmed) is not protection, so hasStop() correctly ignores
+    // it — but then this pass retries every scan forever: 2026-07-27 left 972 inert
+    // stop attempts, ~33 per symbol. Retry a bounded number of times, then stop adding
+    // and let the ledger show the failure instead of burying it under duplicates.
+    const REPROTECT_MAX_ATTEMPTS = 3;
+    const attemptsFor = (sym) => (_openOrders || []).filter((o) =>
+      String(o.symbol || '').toUpperCase() === sym &&
+      /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')).length;
     for (const [sym, p] of Object.entries(heldPos)) {
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
+      if (qty > 0 && !hasStop(sym) && attemptsFor(sym) >= REPROTECT_MAX_ATTEMPTS) {
+        (out.skipped = out.skipped || []).push({ symbol: sym, why: `re-protect capped: ${attemptsFor(sym)} prior stop order(s) exist but none is working (check for unconfirmed/Inactive orders)` });
+        continue;
+      }
       if (qty > 0 && !hasStop(sym)) {
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
         const curPx = Number(p.current_price) || 0;
