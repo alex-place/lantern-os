@@ -55,3 +55,17 @@ test('a BUY stop is not protection for a long', () => {
   const hasStop = buildHasStop([{ symbol: 'TSLA', side: 'buy', type: 'stop', status: 'open' }]);
   assert.strictEqual(hasStop('TSLA'), false);
 });
+
+test('an INACTIVE stop is not protection (IBKR never transmitted it)', () => {
+  // 2026-07-27: 972 orders sat at IBKR status 'Inactive' — submitted, never
+  // transmitted because an order warning went unconfirmed. They cannot fill and
+  // cannot even be cancelled ("Order is inactive"), so they must never be mistaken
+  // for a working stop. The /orders normalizer also stopped calling them 'open'.
+  const hasStop = buildHasStop([STOP('Inactive')]);
+  assert.strictEqual(hasStop('TSLA'), false, 'an Inactive stop must NOT count as protection');
+});
+
+test('re-protect retries are capped so inert attempts cannot pile up', () => {
+  assert.match(SRC, /REPROTECT_MAX_ATTEMPTS/, 'a retry cap must exist');
+  assert.match(SRC, /re-protect capped/, 'the cap is reported, not silent');
+});

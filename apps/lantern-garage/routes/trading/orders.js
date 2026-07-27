@@ -83,7 +83,13 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           const x = String(s || '').toLowerCase();
           if (/fill/.test(x)) return 'filled';
           if (/cancel/.test(x)) return 'canceled';
-          if (/submit|presubmit|pending|inactive/.test(x)) return 'open';
+          // 'Inactive' is NOT working: IBKR parks an order there when it was never
+          // transmitted (e.g. it hit the order-warning gate and nothing confirmed it).
+          // Mapping it to 'open' made 972 inert orders look like live resting orders —
+          // it fooled a human reviewer into reporting a 25x oversell exposure that did
+          // not exist, and it is unactionable (cancel returns 'Order is inactive').
+          if (/inactive/.test(x)) return 'inactive';
+          if (/submit|presubmit|pending/.test(x)) return 'open';
           return x || 'unknown';
         };
         const tstr = (t) => { const n = Number(t); return n > 1e11 ? new Date(n).toISOString() : (t || ''); };
