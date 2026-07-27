@@ -1,13 +1,14 @@
 ---
 author: Alex Place, with the unisona.ai agent lanes
 created: 2026-06-19
-updated: 2026-07-23
-status: Public whitepaper — SUPERSEDED IN PART (operator decision, 2026-07-23, later same day):
-  the model is a DISTILLED ≤3B looped student, not a from-scratch pretrain. §5's from-scratch
+updated: 2026-07-27
+status: >-
+  Public whitepaper — SUPERSEDED IN PART (operator decision, 2026-07-23, later same day).
+  The model is a DISTILLED ≤3B looped student, not a from-scratch pretrain. §5's from-scratch
   costing is retained as reference/contingency only. Everything verifier-, serving-, stability-,
   and honesty-shaped in this paper carries over to the distilled program unchanged.
-  Prior revisions of this page (the retrofit-era lineage SSOT) are preserved in git history;
-  internal engineering twins: research/2026-07-23-sigma0-llm-design.md (design of record),
+  Prior revisions of this page (the retrofit-era lineage SSOT) are preserved in git history.
+  Internal engineering twins — research/2026-07-23-sigma0-llm-design.md (design of record),
   research/2026-07-23-sigma0-rc1-model-spec.md (baseline harness), SIGMA0-COLLAPSE-CERTIFICATE.md.
 ---
 
@@ -165,7 +166,7 @@ prove or disprove an edge before you act.*
 | Attention | GQA + QK-Norm baseline; **static 3:1 hybrid linear-attention variant** (Gated-DeltaNet class) for long-context/CPU | the 2026 mainstream (Qwen3.5 promoted the hybrid to flagship); *static* layer patterns are certifiable by our stability machinery — unlike input-routed MoE |
 | Positional | RoPE + NoPE mix on the sliding pattern | current small-model best practice (SmolLM3, Cohere-class recipes) |
 | **Excluded: MoE** | no mixture-of-experts in v1 | routed recurrent loops are *switched systems* our certificate does not yet cover; a named admission gate (dwell-time certification) must exist first — deferred, not rejected |
-| Auxiliary objective | multi-token prediction head | native self-speculative serving (draft-free speedup on CPU) |
+| Auxiliary objective | multi-token prediction head | native self-speculative serving (draft-free speedup on CPU). IMPORTED confirmation at frontier scale: Kimi K3 pre-trains an MTP layer and fine-tunes it into its EAGLE-3 draft, optimizing the **negative log acceptance rate directly** (L_LK = −log Σ min(p,q)) rather than a KL surrogate (K3 tech report §4.1, 2026-07-27) — the same optimize-the-deployed-metric discipline as our Fix-Rate reward; adopt the LK loss when the draft path is built |
 | Precision | bf16 from-scratch run → **quantization-aware ternary W1.58A8** (BitNet-class) as the serving artifact | the only published route to 7B-class capability in ~2GB with CPU-native kernels; probe-survival is the acceptance test |
 | Tokenizer | own ~64k BPE trained on the specialist corpus | from-scratch means the whole stack (nanochat/CS336 pattern) |
 | Context | 8k at pretrain → 32k staged extension | task window for verified coding work |
@@ -187,7 +188,16 @@ recursion buys more verified capability per token than generalist breadth.
   small students (the Quality-Utility Paradox, arXiv:2606.16152 — independently confirming
   our own measured negative). Test suites used in training are **mutation-hardened** (weak
   tests admit false solves; mutation feedback lifts test discrimination 53%→89.5%,
-  arXiv:2501.12862).
+  arXiv:2501.12862). The escalation corpus is now a **live pipeline** (PR #2995, 2026-07-27,
+  MEASURED): `scripts/spiral_build_self_train.py` turns the Spiral's own corpus sink into a
+  replay-balanced, reward-weighted SFT set (v1: 237 exec-verified records — 47 rung-lift @1.0,
+  190 replay @0.4), and the harness now persists the **failed cheap attempt + per-test verify
+  detail** on every escalated turn, unlocking contrastive repair pairs and RWOPD-style
+  partial-credit weights (verdict-weighted teacher-KL on verifier-passing rollouts beat
+  rejection-SFT by +5.4pp at 7B, arXiv:2605.13501 — IMPORTED). One negative result imported
+  as a design rule: distilling the *retry/backtrack behavior itself* transfers at ~5%
+  (Aletheia, arXiv:2601.14290), so the Spiral's control flow stays in the harness and the
+  student trains only on prompt→verified-solution.
 - **Objectives:** cross-entropy + **JSRR spectral-stability regularizer** (STARS,
   arXiv:2605.26733) + multi-token-prediction auxiliary; then **RL from verifiable rewards**
   where the reward is the executed **Fix-Rate** (fraction of failing tests a step turns
@@ -222,7 +232,12 @@ training data and grades its checkpoints.
 ## 7. Evaluation and falsifiers (pre-registered)
 
 Headline metric: **verified pass@1 per dollar on reference consumer hardware**, with
-precision-of-claimed-solve reported alongside. Registered runs: HumanEval-164 under the
+precision-of-claimed-solve reported alongside. All comparative rows obey the **harness-swing
+rule** (docs/BENCHMARKS.md, 2026-07-27): on agentic marks the scaffold moves scores by 10–26
+points (IMPORTED — measured vendor-vs-neutral spreads), so no cross-harness ranking is ever
+quoted, and the harness + reasoning-history/compaction policy is stamped on every row as a
+measurement-affecting setting (frontier confirmation: Kimi K3's template *only* supports
+preserved thinking — a compaction change puts the model out-of-distribution by construction). Registered runs: HumanEval-164 under the
 verified protocol (held-out scoring); MBPP held-out; ARC-AGI-2 *budgeted* track (the
 cost-efficiency band, ~$0.20/task class — explicitly not the $10–$200 frontier cluster);
 depth-stability sweeps (accuracy and ρ trajectory vs. loop depth). Kill criteria: if
