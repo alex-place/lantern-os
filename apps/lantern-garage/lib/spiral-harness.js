@@ -349,7 +349,7 @@ async function runSpiral(args) {
         // this is the contrastive half of a repair pair (RWOPD/ExVerus-style):
         // without it the corpus can only train on demonstrations, never on deltas.
         cheapAttempt = {
-          text: String(_candidateKey(cand) || ""),
+          text: String((cand && (cand.text != null ? cand.text : cand.action || cand.edit)) || ""),
           model: (cand && cand.model) || null,
           cost: Number(cand && cand.cost) || 0,
           fixRate: v.fixRate,
@@ -398,7 +398,7 @@ async function runSpiral(args) {
       verifySkipped: !!v._dup,
       // #2977: advancing rows carry the FULL candidate text — the distillation
       // record stays complete even when the prompt view above is truncated.
-      text: v.advanced ? String(_candidateKey(cand)) : undefined,
+      text: v.advanced ? String((cand && (cand.text != null ? cand.text : cand.action || cand.edit)) || "") : undefined,
       // Action-shaped turns record what was run and what came back. These rows are the
       // per-step training data the VTD trainer wants: short, execution-labelled, and
       // already decomposed — which is why the escalation corpus fits an 8GB card even
