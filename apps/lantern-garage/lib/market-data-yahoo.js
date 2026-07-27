@@ -48,7 +48,7 @@ const CRYPTO_BASES = new Set([
 ]);
 
 function cryptoBase(ticker) {
-  const m = /^([A-Z]{2,6})USD$/.exec(String(ticker || '').toUpperCase());
+  const m = String(ticker || '').toUpperCase().match(/^([A-Z]{2,6})USD$/);
   return m && CRYPTO_BASES.has(m[1]) ? m[1] : null;
 }
 function isCrypto(ticker) {
@@ -86,6 +86,42 @@ function httpsGetJson(url) {
       req.destroy(new Error('Yahoo request timeout'));
     });
   });
+}
+
+/**
+ * The most recent traded print INCLUDING pre-market / after-hours.
+ *
+ * `meta.regularMarketPrice` freezes at the 16:00 close, so during extended hours the
+ * quoted price disagreed with the chart — the bars already carry pre/post prints
+ * (includePrePost=true) while the price field did not (measured 2026-07-27 17:46 ET:
+ * last bar 739.47 vs regularMarketPrice 739.09 on SPY). Prefer Yahoo's explicit
+ * post/pre fields when present, else the last non-null close from the intraday
+ * series, else the regular close. Returns { price, session }.
+ */
+function latestPrint(result) {
+  const meta = (result && result.meta) || {};
+  const reg = Number(meta.regularMarketPrice) || 0;
+  const post = Number(meta.postMarketPrice) || 0;
+  const pre = Number(meta.preMarketPrice) || 0;
+  if (post > 0) return { price: post, session: 'post' };
+  if (pre > 0) return { price: pre, session: 'pre' };
+  // Fall back to the series: Yahoo often leaves post/preMarketPrice null even when
+  // extended-hours BARS exist, so the last bar is the only honest latest print.
+  try {
+    const ts = result.timestamp || [];
+    const q = (result.indicators && result.indicators.quote && result.indicators.quote[0]) || {};
+    const closes = q.close || [];
+    const regEnd = Number(meta.currentTradingPeriod && meta.currentTradingPeriod.regular && meta.currentTradingPeriod.regular.end) || 0;
+    for (let i = closes.length - 1; i >= 0; i--) {
+      const c = Number(closes[i]);
+      if (Number.isFinite(c) && c > 0) {
+        const extended = regEnd > 0 && Number(ts[i]) > regEnd;
+        if (!extended && reg > 0) return { price: reg, session: 'regular' };
+        return { price: c, session: extended ? 'extended' : 'regular' };
+      }
+    }
+  } catch (_e) { /* fall through to the regular close */ }
+  return { price: reg, session: 'regular' };
 }
 
 async function fetchChart(ticker, interval, range) {
@@ -253,12 +289,19 @@ async function getQuotes(tickers) {
       // Range '1d' (not '5d') so chartPreviousClose is YESTERDAY's close → a true DAY %
       // change. With '5d', chartPreviousClose was the close ~5 sessions back, so the
       // watchlist showed a multi-day move (AAPL "+7.42%") mislabeled as the day's %.
-      const result = await fetchChart(ticker, '1d', '1d');
+      // 5m intraday (not 1d): includePrePost only adds pre/after-hours bars to an
+      // INTRADAY series, and Yahoo leaves meta.post/preMarketPrice null — so a daily
+      // interval can never see an extended-hours print. 5m keeps the payload small
+      // while still tracking extended moves within 5 minutes; chartPreviousClose
+      // still resolves to yesterday's close on range=1d, so the day % stays correct.
+      const result = await fetchChart(ticker, '5m', '1d');
       const meta = result.meta || {};
-      const price = Number(meta.regularMarketPrice) || 0;
+      // Latest print INCLUDING pre/after-hours — the chart already draws those bars,
+      // so the price beside it must not stay frozen at the 16:00 close.
+      const { price, session } = latestPrint(result);
       const prev = Number(meta.chartPreviousClose || meta.previousClose) || 0;
       const chg = prev > 0 ? ((price - prev) / prev) * 100 : 0;
-      return { ticker, price: round(price, 4), chg_pct: round(chg, 2), is_crypto: isCrypto(ticker) };
+      return { ticker, price: round(price, 4), chg_pct: round(chg, 2), session, is_crypto: isCrypto(ticker) };
     } catch (e) {
       return { ticker, price: 0, chg_pct: 0, is_crypto: isCrypto(ticker) };
     }
