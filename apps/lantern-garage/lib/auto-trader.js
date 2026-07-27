@@ -427,10 +427,18 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
   try {
+    // Status vocabulary: this guard originally matched only IBKR's NATIVE words
+    // (PreSubmitted/Submitted/Pending), but the normalized order shape the bridge and
+    // Alpaca return says 'open' / 'accepted' / 'new'. So hasStop() never matched, the
+    // engine believed every long was naked, and it added ANOTHER GTC stop every scan:
+    // measured 2026-07-27 — 488 resting stop-sells, ~33 per symbol, 95,561 shares
+    // against 3,772 held (a 25x oversell that would have gone short on any gap down).
+    // Also accept an orderType/type field on either key, since the normalized shape
+    // uses `type`.
     const hasStop = (sym) => (_openOrders || []).some((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
-      /stp|stop/i.test(o.orderType || '') && /sell/i.test(o.side || '') &&
-      /submit|pending|presubmit/i.test(o.status || ''));
+      /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
+      /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''));
     for (const [sym, p] of Object.entries(heldPos)) {
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
