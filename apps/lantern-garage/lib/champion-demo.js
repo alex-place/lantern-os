@@ -64,29 +64,48 @@ function rng(seed) {
   };
 }
 
-/** Simulated positions + account. Marked paper + demo; never a real broker. */
-function positions() {
+/**
+ * Simulated positions + account. Marked paper + demo; never a real broker.
+ *
+ * MARKED TO LIVE QUOTES (user report 2026-07-28: "the same numbers for days"):
+ * the holdings/quantities/cost bases stay the deterministic fixture, but
+ * current prices come from the keyless quote feed, so the demo book moves with
+ * the actual market — exactly like a real account whose owner stopped trading.
+ * `quotesBySym` maps SYM → { price, chg_pct }; symbols the feed missed fall
+ * back to the baked snapshot price (stale but never blank), and the account
+ * reports which mode it's in via `marked_to_market`.
+ */
+function positions(quotesBySym = null) {
+  let liveCount = 0;
   const positions = HOLDINGS.map((h) => {
+    const q = quotesBySym && quotesBySym[h.symbol];
+    const live = q && Number(q.price) > 0 ? Number(q.price) : null;
+    if (live) liveCount++;
+    const px = live || h.price;
+    const dayPct = live && Number.isFinite(Number(q.chg_pct)) ? Number(q.chg_pct) : h.day;
+    // Quantities derive from the BAKED snapshot so the book composition is
+    // stable; only the marks move.
     const targetMv = INVESTED * h.weight;
     const qty = Math.max(1, Math.round(targetMv / h.price));
-    const marketValue = qty * h.price;
-    const avg = h.price / (1 + h.gain);                 // cost basis implied by the gain
-    const unrealized = (h.price - avg) * qty;
+    const marketValue = qty * px;
+    const avg = h.price / (1 + h.gain);                 // cost basis implied by the snapshot gain
+    const unrealized = (px - avg) * qty;
     return {
       symbol: h.symbol,
       qty,
       side: 'long',
       avg_entry_price: Math.round(avg * 100) / 100,
-      current_price: h.price,
+      current_price: Math.round(px * 100) / 100,
       market_value: Math.round(marketValue * 100) / 100,
       unrealized_pl: Math.round(unrealized * 100) / 100,
-      pnl_pct: Math.round(h.gain * 10000) / 100,
+      pnl_pct: avg > 0 ? Math.round(((px - avg) / avg) * 10000) / 100 : 0,
+      day_pct: Math.round(dayPct * 100) / 100,
     };
   });
   const invested = positions.reduce((s, p) => s + p.market_value, 0);
   const unrealized = positions.reduce((s, p) => s + p.unrealized_pl, 0);
   // Day P&L = Σ qty × price × dayChg%.
-  const dayPnl = HOLDINGS.reduce((s, h, i) => s + positions[i].qty * h.price * (h.day / 100), 0);
+  const dayPnl = positions.reduce((s, p) => s + p.market_value * (p.day_pct / 100), 0);
   const equity = Math.round((invested + CASH_BUFFER) * 100) / 100;
   const account = {
     account_id: 'CHAMPION-DEMO',
@@ -100,9 +119,29 @@ function positions() {
     mode: 'demo',                          // a simulated showroom account, not paper/live
     source: 'champion-demo',
     demo: true,
+    simulated: true,                       // explicit flag the UI banner keys off
+    marked_to_market: liveCount > 0,       // false → serving the stale baked snapshot
+    live_quotes: liveCount,
     paid_in: PAID_IN,
   };
-  return { positions, account, demo: true, source: 'champion-demo' };
+  return { positions, account, demo: true, simulated: true, source: 'champion-demo' };
+}
+
+/**
+ * positions() marked to the live keyless quote feed. Fail-soft: any feed error
+ * returns the baked snapshot (marked_to_market:false) — the demo must render
+ * even when quotes are down, it just stops claiming to be live.
+ */
+async function positionsLive() {
+  try {
+    const yahoo = require('./market-data-yahoo');
+    const quotes = await yahoo.getQuotes(HOLDINGS.map((h) => h.symbol));
+    const bySym = {};
+    for (const q of quotes || []) if (q && q.ticker) bySym[q.ticker] = q;
+    return positions(bySym);
+  } catch (_e) {
+    return positions(null);
+  }
 }
 
 /** Simulated equity curve for a range (1D/1W/1M/3M/YTD/1Y/ALL). */
@@ -143,4 +182,4 @@ function history(range = '1D') {
   };
 }
 
-module.exports = { positions, history, EQUITY, HOLDINGS };
+module.exports = { positions, positionsLive, history, EQUITY, HOLDINGS };
