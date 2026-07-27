@@ -111,7 +111,7 @@ test("sticky rise: after a fully-stalled turn the next turn starts at the fronti
       escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
     },
     verify: async (text) => parseVerify(text),
-    corpus: sink(), now: clock, maxTurns: 12,
+    corpus: sink(), now: clock, maxTurns: 12, escalationContract: false,
   });
   assert.equal(r.haltReason, "stalled");
   assert.equal(cheapCalls, 1, "cheap tried once (t0); t1+t2 went straight to the frontier");
@@ -149,7 +149,7 @@ test("stickyTiers:false restores cheap-first-every-turn", async () => {
       escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
     },
     verify: async (text) => parseVerify(text),
-    corpus: sink(), now: clock, maxTurns: 12, stickyTiers: false,
+    corpus: sink(), now: clock, maxTurns: 12, stickyTiers: false, escalationContract: false,
   });
   assert.equal(r.haltReason, "stalled");
   assert.equal(cheapCalls, 3, "every turn re-tried cheap first (the legacy shape)");
@@ -192,4 +192,35 @@ test("whole-answer confidence: solved is 1", async () => {
   });
   assert.equal(r.solved, true);
   assert.equal(r.confidence, 1);
+});
+
+test("escalation contract (#2867): a verified non-advancing escalation halts the run immediately", async () => {
+  let cheapCalls = 0;
+  let escCalls = 0;
+  const r = await runSpiral({
+    problem: { id: "s11", prompt: "frontier can't help either" },
+    tiers: {
+      cheap: async () => ({ text: `pass: c${cheapCalls++}`, cost: 0.001 }),
+      escalate: async () => ({ text: `pass: e${escCalls++}`, cost: 0.02 }),
+    },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12,
+  });
+  assert.equal(r.haltReason, "escalation-noncontractive", "frontier spend must help or the loop stops");
+  assert.equal(r.turns, 1, "halts on the FIRST non-contractive escalation");
+  assert.equal(escCalls, 1, "exactly one frontier call was paid");
+  assert.equal(r.memory.length, 0);
+});
+
+test("escalation contract: dup-skipped escalations never trigger it (the loop detector owns those)", async () => {
+  const r = await runSpiral({
+    problem: { id: "s12", prompt: "both tiers echo the same wrong code" },
+    tiers: {
+      cheap: async () => ({ text: "pass: same-wrong", cost: 0.001 }),
+      escalate: async () => ({ text: "pass: same-wrong", cost: 0.02 }),
+    },
+    verify: async (text) => parseVerify(text),
+    corpus: sink(), now: clock, maxTurns: 12,
+  });
+  assert.equal(r.haltReason, "loop", "a no-new-information echo is loop evidence, not a contract breach");
 });

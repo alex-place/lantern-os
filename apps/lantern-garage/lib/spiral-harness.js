@@ -103,6 +103,10 @@ const noop = () => {};
  *   stickyTiers {boolean} bidirectional rung movement (default true): a fully-stalled
  *                        turn starts the NEXT turn at the frontier rung; any commit
  *                        returns to cheap.
+ *   escalationContract {boolean} contractive-escalation enforcement (#2867, default
+ *                        true): a verified escalation that fails to advance halts the
+ *                        run ("escalation-noncontractive") — every frontier spend must
+ *                        measurably help or the loop stops honestly.
  *   answerability {function} optional async (ctx) => number ∈ [0,1]; halt "honest can't"
  *                        when it declines below `answerabilityFloor` (M5).
  *   answerabilityFloor {number} default 0.15.
@@ -117,7 +121,8 @@ const noop = () => {};
  *   cost:number, y:(string|null), memory:Array, corpusRows:Array,
  *   escalationRate:number, corpusFile:(string|null), confidence:number
  * }>}
- *   haltReason ∈ "solved" | "stalled" | "loop" | "answerability" | "maxTurns".
+ *   haltReason ∈ "solved" | "stalled" | "loop" | "escalation-noncontractive" |
+ *                "answerability" | "maxTurns".
  *   confidence is the whole-answer score (see _wholeAnswerConfidence), decoupled
  *   from where the loop stopped.
  */
@@ -130,6 +135,7 @@ async function runSpiral(args) {
     maxTurns = 12,
     stallLimit = 3,
     stickyTiers = true,
+    escalationContract = true,
     answerability = null,
     answerabilityFloor = 0.15,
     rotate = null,
@@ -296,6 +302,17 @@ async function runSpiral(args) {
       // next turn at the cheap rung would repeat a proven-futile call.
       if (stickyTiers && tier === "escalated") rung = "escalated";
       onStep({ type: "stall", turn, tier });
+      // Contractive-escalation enforcement (#2867, the ILC ρ<1 condition,
+      // US7345448B2/US8094405B1): a REAL verified escalation that failed to advance
+      // means the expensive tier is non-contractive on this problem right now —
+      // paying frontier rates for a plateau is exactly the runaway spend the
+      // contract forbids. Halt honestly. (A dup-skipped escalation carried no new
+      // information and does not trigger the contract; the loop detector owns it.)
+      if (escalationContract && tier === "escalated" && !v._dup) {
+        haltReason = "escalation-noncontractive";
+        onStep({ type: "halt", reason: haltReason, turns: turn + 1, solved, cost, escalations });
+        break;
+      }
       // Stop-on-stall: a run of turns with zero real progress will not be saved by
       // more of the same — halt honestly instead of grinding out the turn cap.
       if (stallLimit > 0 && consecutiveDupTurns >= 2) {
