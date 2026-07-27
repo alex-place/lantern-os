@@ -57,6 +57,7 @@ function _serverKeys() {
 // keys. No dedicated account → null → the engine plans but refuses to trade.
 const SIGMA_USER = 'sigma-trader';
 const CHAMPION_USER = 'champion-book';   // investor identity — dedicated account only
+const OVERNIGHT_USER = 'overnight-book'; // overnight sleeve book — dedicated account only
 function _sigmaKeys() {
   const id = process.env.SIGMA_ALPACA_API_KEY_ID || '';
   const secret = process.env.SIGMA_ALPACA_API_SECRET_KEY || '';
@@ -87,6 +88,26 @@ function _authFor(userId) {
         headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret } };
     }
     return null;   // no dedicated account — do NOT borrow the traders' account
+  }
+  // Overnight book → its OWN account only (operator rule 2026-07-27: the intraday
+  // day-trader and the overnight sleeve book must not share a book, so each engine's
+  // P&L is INDEPENDENTLY measurable — entangled equity makes "did the overnight book
+  // make money?" unanswerable. Same no-borrowing contract as Sigma/Champion.
+  if (userId === OVERNIGHT_USER) {
+    const own = store.load(OVERNIGHT_USER);
+    if (own && own.access_token) {
+      const env = own.env === 'live' ? 'live' : 'paper';
+      return { host: HOSTS[env], env, source: 'overnight-oauth', accountLabel: own.account_number || null,
+        headers: { Authorization: `Bearer ${own.access_token}` } };
+    }
+    const id = process.env.OVERNIGHT_ALPACA_API_KEY_ID || '';
+    const secret = process.env.OVERNIGHT_ALPACA_API_SECRET_KEY || '';
+    if (id && secret) {
+      const env = process.env.OVERNIGHT_ALPACA_ENV === 'live' ? 'live' : 'paper';
+      return { host: HOSTS[env], env, source: 'overnight-keys', accountLabel: null,
+        headers: { 'APCA-API-KEY-ID': id, 'APCA-API-SECRET-KEY': secret } };
+    }
+    return null;   // no dedicated account — do NOT borrow the day-trader's
   }
   // Sigma Trader → its OWN account only (never the shared server keys).
   if (userId === SIGMA_USER) {
@@ -378,4 +399,4 @@ async function getPortfolioHistory(userId, range = '1D') {
   };
 }
 
-module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };
+module.exports = { available, getAccount, getPositions, getOpenOrders, getAllOrders, getDayPnl, getPortfolioHistory, placeOrder, cancelOrder, cancelOpenOrders, listAssets, _authFor, SIGMA_USER, CHAMPION_USER, OVERNIGHT_USER, overnightAvailable: () => !!_authFor(OVERNIGHT_USER), sigmaAvailable: () => !!_authFor(SIGMA_USER), championAvailable: () => !!_authFor(CHAMPION_USER) };

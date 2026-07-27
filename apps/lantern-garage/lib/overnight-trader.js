@@ -63,7 +63,17 @@ function cfg() {
       bear_rally_fade: n('OVERNIGHT_EDGE_MIN_N_FADE', 330),
     },
     allocPct: n('OVERNIGHT_ALLOC_PCT', 30),             // % of equity deployed across tonight's sleeves
-    userId: process.env.OVERNIGHT_USER || process.env.TRADER_AUTO_USER || 'local-owner',
+    // OWN ACCOUNT (operator rule 2026-07-27). The intraday day-trader and this book
+    // must not share a book: entangled equity makes each engine's P&L unattributable,
+    // and measurement is the whole point while the sleeves earn their edge. Defaults
+    // to the dedicated 'overnight-book' identity (OVERNIGHT_ALPACA_* keys, no
+    // fallback to the day-trader's account — same contract as Sigma/Champion).
+    // OVERNIGHT_USER still pins a specific identity for testing/back-compat.
+    userId: process.env.OVERNIGHT_USER || require('./alpaca-adapter').OVERNIGHT_USER,
+    // Which broker runs this book: 'alpaca' (default — API keys never expire, so the
+    // 09:31 exit can't be orphaned by a dead session) or 'ibkr' (needs a live CPAPI
+    // gateway session; an expired one would strand an open overnight leg).
+    broker: process.env.OVERNIGHT_BROKER === 'ibkr' ? 'ibkr' : 'alpaca',
   };
 }
 
@@ -195,7 +205,7 @@ async function tick({ bridge } = {}) {
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
     const { brokerFacadeFor } = require('./broker-facade');
     const yahoo = require('./market-data-yahoo');
-    const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
+    const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
     // Today's OPEN per held symbol — the est. exit print for EVERY leg (armed or dry),
     // so the ledger measures each sleeve's live expectancy and feeds the edge gate.
     const openBySym = {};
@@ -254,7 +264,7 @@ async function tick({ bridge } = {}) {
     if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, why: 'no sleeve gate passed' }); return; }
 
     const { brokerFacadeFor } = require('./broker-facade');
-    const resolved = await brokerFacadeFor(c.userId, bridge).catch(() => null);
+    const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
     const account = resolved ? await resolved.facade.getIBKRAccount(c.userId).catch(() => null) : null;
     const equity = (account && Number(account.equity)) || 0;
     const baseDry = !c.armed || !resolved || !(equity > 0);
@@ -319,7 +329,7 @@ function status() {
   const c = cfg();
   let last = [];
   try { last = fs.readFileSync(LEDGER, 'utf8').trim().split('\n').slice(-12).map((l) => JSON.parse(l)); } catch (_e) { /* */ }
-  return { enabled: c.enabled, armed: c.armed, exec: c.exec, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
+  return { enabled: c.enabled, armed: c.armed, exec: c.exec, broker: c.broker, account: c.userId, edgeGate: c.edgeGate, edgeMinN: c.edgeMinN, allocPct: c.allocPct, userId: c.userId,
     edge: summarize(_readLedger(), { minN: c.edgeMinN }), state: _readState(), recent: last };
 }
 
