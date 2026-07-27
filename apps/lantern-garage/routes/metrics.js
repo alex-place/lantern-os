@@ -24,6 +24,26 @@ module.exports = async function metricsRoutes(req, res, url, deps) {
     return true;
   }
 
+  // GET /api/metrics/escalation — how often a live chat turn needs the expensive tier.
+  // This is the number the in-house-model decision rests on: at our measured turn shape the
+  // cheap tier is nearly free at 10k users, so the escalation premium IS the cost curve
+  // (docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md). The coding path
+  // already reports its own rate via keystone-escalation.readRolloverShare(); this is the chat
+  // equivalent. ?days=N windows the sample; ?turnsPerUserPerDay=N adjusts the projection.
+  if (url.pathname === "/api/metrics/escalation" && req.method === "GET") {
+    try {
+      const meter = require("../lib/chat-escalation-meter");
+      const days = Math.max(0, Number(url.searchParams.get("days")) || 0);
+      const tpu = Math.max(1, Number(url.searchParams.get("turnsPerUserPerDay")) || 15);
+      const stats = meter.summarize(meter.readRows(repoRoot), {
+        sinceTs: days ? Date.now() - days * 86400000 : 0,
+        turnsPerUserPerDay: tpu,
+      });
+      sendJson(res, { ok: true, windowDays: days || null, ...stats }, 200);
+    } catch (err) { sendJson(res, { ok: false, error: err.message }, 500); }
+    return true;
+  }
+
   if (url.pathname === "/api/metrics/outcomes" && req.method === "GET") {
     try {
       const metrics = computeOutcomeMetrics(repoRoot);

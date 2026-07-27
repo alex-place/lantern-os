@@ -1,0 +1,91 @@
+{
+  "date": "2026-07-25",
+  "claim_attacked": "SIGMA0-OURO-CODER.md sec.3: 'the Spiral is an anytime algorithm, its answer only improves with more of it'",
+  "shipped_gap": "lib/spiral-harness.js has NO holdout; fixRate scores the same tests it optimises",
+  "curves": {
+    "visible_2": {
+      "turn1": 0.5499,
+      "peak": 0.5499,
+      "peak_turn": 1,
+      "final": 0.5146,
+      "peak_minus_final_pp": 3.53
+    },
+    "visible_5": {
+      "turn1": 0.5504,
+      "peak": 0.5504,
+      "peak_turn": 1,
+      "final": 0.5156,
+      "peak_minus_final_pp": 3.48
+    },
+    "visible_10": {
+      "turn1": 0.5472,
+      "peak": 0.5472,
+      "peak_turn": 1,
+      "final": 0.5188,
+      "peak_minus_final_pp": 2.84
+    },
+    "visible_25": {
+      "turn1": 0.5487,
+      "peak": 0.5487,
+      "peak_turn": 1,
+      "final": 0.5292,
+      "peak_minus_final_pp": 1.95
+    },
+    "visible_60": {
+      "turn1": 0.55,
+      "peak": 0.55,
+      "peak_turn": 1,
+      "final": 0.5496,
+      "peak_minus_final_pp": 0.04
+    },
+    "visible_150": {
+      "turn1": 0.5516,
+      "peak": 0.5809,
+      "peak_turn": 60,
+      "final": 0.5809,
+      "peak_minus_final_pp": 0.0
+    },
+    "visible_2_heldout40": {
+      "peak": 0.551,
+      "final": 0.5364,
+      "peak_minus_final_pp": 1.46
+    },
+    "visible_5_heldout40": {
+      "peak": 0.5501,
+      "final": 0.5369,
+      "peak_minus_final_pp": 1.32
+    },
+    "visible_10_heldout40": {
+      "peak": 0.5502,
+      "final": 0.5407,
+      "peak_minus_final_pp": 0.96
+    }
+  },
+  "gates": {
+    "S1_non_monotone_small_suite": {
+      "PASS": true,
+      "drop_pp_at_2_tests": 3.53,
+      "drop_pp_at_5_tests": 3.48
+    },
+    "S2_shrinks_as_suite_grows": {
+      "PASS": true,
+      "drops_by_suite_size": {
+        "2": 3.53,
+        "5": 3.48,
+        "10": 2.84,
+        "25": 1.95,
+        "60": 0.04,
+        "150": 0.0
+      }
+    },
+    "S3_holdout_defense_works": {
+      "PASS": true,
+      "drops_with_holdout": {
+        "2": 1.46,
+        "5": 1.32,
+        "10": 0.96
+      }
+    },
+    "VERDICT": "COUNTEREXAMPLE CONFIRMED \u2014 more budget makes the returned answer worse when the verifier is a small finite suite; the doc's held-out defense fixes it but is NOT SHIPPED"
+  }
+}

@@ -368,7 +368,46 @@ async function handleStreamChat(req, url, res) {
   // request body), so a logged-in user's turns are stored under their profile and
   // read back on any device. Guests (null) fall back to device-local sessionId.
   const userId = getEffectiveUserId(req);
-  const logConversation = (entry) => appendConversationEntry({ ...entry, sessionId, userId });
+  // Escalation meter: every provider leg logs its finished reply through this one funnel,
+  // so metering here covers all of them (and any added later) instead of ~15 call sites.
+  // Records DERIVED SCALARS ONLY — tier, sizes, latency — never message text; the trader
+  // surface carries positions and P&L through this same path. Best-effort by construction:
+  // `record()` swallows its own errors, and the try/catch guards the require itself.
+  // Whole-turn latency (handler entry → reply logged), deliberately INCLUDING tool calls:
+  // that is what the user actually waits, and the trader rail sits inside a live decision.
+  // Distinct from the `_turnStart` further down, which is dispatch-only for the leaderboard.
+  const _meterTurnStart = Date.now();
+  const logConversation = (entry) => {
+    try {
+      if (entry && entry.role === "lantern" && entry.meta) {
+        // DEMAND vs POLICY. The tier that served the turn measures what we *chose*; with the
+        // router gate off (its default) chat almost never escalates, so realized tier alone
+        // would read 0% and be mistaken for "no turn ever needed the big model". So compute
+        // the gate here in MEASURE-ONLY mode — always, whatever ROUTER_GATE is set to, and
+        // without touching routing — to record how many turns *looked* hard. It is pure token
+        // statistics (no network), and it runs once per turn at the end.
+        let gateEscalate = null;
+        try {
+          const { gateDecision } = require("./router-gate");
+          const prior = (Array.isArray(history) ? history : [])
+            .map((h) => ({ role: h.role || "user", text: String(h.content || h.text || "") }))
+            .filter((t) => t.text && t.text !== message)
+            .slice(-3);
+          gateEscalate = !!gateDecision([...prior, { role: "user", text: message }]).escalate;
+        } catch (_g) { /* demand signal is optional; the tier reading stands without it */ }
+        require("./chat-escalation-meter").record({
+          provider: entry.meta.provider, model: entry.meta.model,
+          surface: entry.surface || surfaceMode,
+          replyChars: typeof entry.text === "string" ? entry.text.length : null,
+          promptChars: typeof message === "string" ? message.length : null,
+          latencyMs: Date.now() - _meterTurnStart,
+          gateEscalate,
+          sessionId,
+        }, repoRoot);
+      }
+    } catch (_e) { /* metering must never break a chat turn */ }
+    return appendConversationEntry({ ...entry, sessionId, userId });
+  };
 
   // Handle bang commands
   let cmd = parseBangCommand(message);

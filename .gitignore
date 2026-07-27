@@ -89,6 +89,9 @@ src/csf_rust/target/
 # ─── Runtime state ────────────────────────────────────────────────────────────
 data/pcsf/*.json
 data/metrics/three-doors-events.jsonl
+# Chat escalation meter (lib/chat-escalation-meter.js). Per-turn runtime measurement —
+# derived scalars only, no message text — but still live traffic data, not source.
+data/metrics/chat-escalation.jsonl
 
 # Tool-execution logs (observability output of lib/tool-logger.js). Runtime-only.
 data/tool-logs/

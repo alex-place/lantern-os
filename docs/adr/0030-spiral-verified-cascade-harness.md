@@ -126,3 +126,36 @@ It is `extension over addition` per ADR-0002/0013.
 | Tiny-recursive wins are largely memorization → verifier must be external | arcprize.org/blog/hrm-analysis; TRM 2510.04871; HRM 2506.21734 | High | external |
 | Constraint-aware cheap-tier picker + outcome router exist to wire the tiers | [local-model-registry.js](../../apps/lantern-garage/lib/local-model-registry.js) (#2814); [coding-backend/router.js](../../apps/lantern-garage/lib/coding-backend/router.js) | High | in-repo |
 | Tiny-recursive arch unproven for code/language (Phase-2 risk) | TRM/HRM demonstrated on ARC/Sudoku/Maze only | High | external |
+
+---
+
+## Note (2026-07-27) — concrete content for the gated Phase 1, and one shipped gap
+
+**The gap, first.** The design describes a verified halt that includes **held-out checks**. The
+shipped `lib/spiral-harness.js` and `lib/spiral-fix-rate.js` implement **no holdout** — candidates
+are scored against the same tests they are optimised against. Documented at
+[SIGMA0-OURO-CODER.md §3](../SIGMA0-OURO-CODER.md). Measured consequence
+([`experiments/spiral_anytime_counterexample.py`](../../experiments/spiral_anytime_counterexample.py)):
+harmless for a competent proposer — the anytime property holds — but with a proposer that has no
+real skill on the task, true correctness peaks early then declines (−3.1pp/60 turns at 5 visible
+tests). We have measured ourselves in that regime (SWE-bench single-shot 0/5), so the holdout is
+worth shipping.
+
+**Proposed Phase-1 content: fuse the two loops.** Today the Spiral (outer: propose → verify →
+escalate) calls the model, which runs its own recurrent-depth loop (inner: same weights applied
+repeatedly, learned early exit — [ADR-0021](0021-serving-substrate-retain-ouro-custom-loop.md)) as
+an opaque box. The outer loop must therefore judge "was that good enough?" from output *text*,
+the weakest signal available and the same weakness behind the gloss trap.
+
+Train the model so its **early-exit signal is the Spiral's escalation trigger**. The model stops
+when it is done and reports from the inside when it cannot get there, instead of emitting
+confident prose for a text-level verifier to second-guess. Depth becomes a measured dial rather
+than a fixed price.
+
+This is one build that delivers three things the product needs: calibrated confidence, depth on
+demand, and an escalation decision that is cheap to make. Rationale and the product grounding:
+[docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md](../research/2026-07-27-in-house-model-spec-grounded-in-the-product.md).
+
+**Gate unchanged.** Phase 1 remains gated on Phase-0 evidence, and now additionally on the
+escalation-rate measurement (`GET /api/metrics/escalation`) reaching n ≥ 1,000 turns. First
+reading is 0/35 realized, 2.9% demand — well short of the bar and not yet evidence either way.

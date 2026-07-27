@@ -120,6 +120,29 @@ answer**:
    answer only improves with more of it); or **honest halt** — "I cannot verify this" — which
    fires only when the loop *and* escalation *and* budget are all spent.
 
+> **Implementation status — the held-out half of step 5 is NOT shipped.** As of 2026-07-27,
+> `lib/spiral-harness.js` and `lib/spiral-fix-rate.js` contain no holdout: grep for
+> `holdout|held-out|hidden|unseen|split` returns nothing. Candidates are scored with `fixRate()`
+> against **the same tests they are optimised against**, and the loop ratchets on best-so-far.
+> The design above is correct and §2 is right that "held-out checks are mandatory" — the code
+> just does not implement them yet. Treat the verified-halt condition as *aspirational* until it
+> does.
+>
+> **How much this matters, measured rather than asserted.**
+> [`experiments/spiral_anytime_counterexample.py`](../experiments/spiral_anytime_counterexample.py)
+> attacked the anytime claim in this step and **the attack failed** — with a proposer of any real
+> skill (≥30% of edits genuinely correct) more budget keeps helping, exactly as claimed, even with
+> only 5 visible tests. The claim stands for a competent model, and the counterexample was
+> withdrawn.
+>
+> But it holds in one regime: a proposer with **no** genuine skill on the task, whose accepted
+> edits pass the visible tests by luck while breaking unseen behaviour. True correctness then
+> peaks early and declines (−3.1pp over 60 turns at 5 visible tests). That regime is not
+> hypothetical for us — this repo measured **SWE-bench single-shot 0/5**. So the honest statement
+> is *"the Spiral is anytime where the model is competent, and inverts where it is out of its
+> depth"* — which is an argument **for** shipping the holdout, since detecting out-of-depth is
+> precisely what a holdout does.
+
 The critical property, and the reason the verifier is non-negotiable: **the verifier is what
 tells the loop it has arrived.** Remove it and "try again until it knows" degrades into "try
 again until it is *sure*" — a spiral that converges on a confident wrong fixed point, the

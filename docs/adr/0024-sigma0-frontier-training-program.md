@@ -176,3 +176,61 @@ D1 tiers and cluster shape; dense-recurrent vs MoE-UT (D2); the exact objective 
 | Learned halting weak | MoEUT ACT ablation (arXiv:2405.16039) + in-repo Q-exit nulls | High (MEASURED both) | external + in-repo |
 | Certificate quantities usable as training-time spec | JSRR ρ(J)<1 gate + machine-checked ROA (#1991); grounding-deadline §3.1 (PR #2157); STARS arXiv:2605.26733; dwell-time arXiv:2405.03560; barrier certificates arXiv:2605.02526. ~~ρ_obs≈0.88~~ retracted by #2029 (true ρ(J)≈8–11, expansive) — gate is a training TARGET, not a current property | Medium-High | in-repo + external |
 | Alignment-faking risk at frontier scale (§7.2) | arXiv:2412.14093 | High | external paper |
+
+---
+
+## Amendment A1 (2026-07-27) — **Proposed, awaiting approval**
+
+> **Status: Proposed.** Per ADR-0001 an agent drafts and never self-approves. This amendment does
+> not change the Accepted decision above until an authorized approver signs it off. It is recorded
+> here rather than in a new ADR because it narrows *this* program's scope; nothing else changes.
+
+### What prompted it
+
+[docs/research/2026-07-27-in-house-model-spec-grounded-in-the-product.md](../research/2026-07-27-in-house-model-spec-grounded-in-the-product.md)
+measured the workload the product actually serves and found two things that bear directly on the
+Phase-1 objective:
+
+1. **Cost is not the reason to own a model.** At the measured turn shape (~3.3k tokens in, ~121
+   out, history capped at 10 turns), serving 10,000 users' ordinary chat on the cheap tier costs
+   ~$5.9k/month — trivial against $20 Pro. The cheap tier already answers the common path in
+   production (`gemini-2.5-flash`, `gpt-4.1-mini`). The whole cost curve is the **escalation
+   premium**: one frontier turn costs ~37–67× a cheap one.
+2. **The team cannot pretrain a frontier model.** The organisation is ~6 people. "Train frontier →
+   distill" is the right *shape* and the wrong *first step* at this size.
+
+### The proposed narrowing
+
+**Phase 1 changes from "pretrain a frontier model" to "post-train a strong open base into a
+verifier."** Knowledge, writing quality and long context stay rented — that is the standing call
+([[agi-convergence-blueprint-rent-capability-own-grounding]]: 6 of 7 capabilities rented, only
+Verify genuinely ours) and it is reaffirmed, not weakened, here.
+
+Rationale, in the order that matters:
+
+- **Verify is the only capability we own.** It is also the only task where we own the training
+  data: every verified trace the Spiral has run is a labelled example, and the trading surfaces
+  generate ground truth on a schedule the market sets for free.
+- **It is what the escalation tier actually is.** The expensive turns are the ones where the
+  answer has to be *right* — a judging problem, not a knowing problem.
+- **It is buildable at our size.** Post-training a specialist on owned data is a 6-person project.
+  Pretraining is not.
+
+Phase 2 (distill to the ≤8GB artifact) and D7 are untouched; [ADR-0026](0026-ternary-serving-artifact-distillation-target.md)
+still names the format, and its own Amendment A1 adds the deployment shape.
+
+### What would falsify this amendment
+
+The escalation rate. If it is high, owning the escalation tier is worth serious money; if it is
+near zero, this whole program is worth less than shipping features. **That number is now
+instrumented** — `lib/chat-escalation-meter.js`, `GET /api/metrics/escalation` — and the first
+reading is *not* encouraging for the build case (below). This amendment should be re-examined,
+not assumed, once n ≥ 1,000 turns.
+
+| Claim | Evidence | Confidence | Source |
+|---|---|---|---|
+| Cheap tier serves the real traffic today | `data/conversations/garage-conversations.jsonl` — 18 gemini-2.5-flash, 17 gpt-4.1-mini of 35 replies | MEASURED | in-repo log |
+| Measured turn shape: ~3.3k in / ~121 out, history 10 | same log; `ROUTER_PROMPT` 438 tok in `lib/stream-chat.js` | MEASURED | in-repo |
+| Frontier turn costs 37–67× a cheap turn | `lib/chat-escalation-meter.js` TIERS, public list prices 2026-07 | HIGH | external pricing |
+| Realized chat escalation 0/35; demand signal 1/35 (2.9%) | backfill over the conversation log via `router-gate.gateDecision` | MEASURED but **n=35, far below the 1,000 bar** | in-repo |
+| Org size ~6 people | operator statement, 2026-07-27 | HIGH | operator |
