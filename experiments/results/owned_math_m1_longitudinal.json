@@ -1,19 +1,19 @@
 {
   "source": "data\\convergence\\records.jsonl",
-  "n_records": 1200,
+  "n_records": 1389,
   "malformed_lines": 0,
-  "n_distinct_hypotheses": 914,
-  "n_series_ge2": 47,
-  "n_genuine_series": 46,
+  "n_distinct_hypotheses": 981,
+  "n_series_ge2": 77,
+  "n_genuine_series": 76,
   "n_placeholder_buckets": 1,
-  "genuine_series_with_numeric_conf": 46,
-  "genuine_series_with_conf_variation": 0,
-  "confidence_growth_steps_examined": 0,
+  "genuine_series_with_numeric_conf": 76,
+  "genuine_series_with_conf_variation": 1,
+  "confidence_growth_steps_examined": 1,
   "no_free_confidence_violations": 0,
   "violations": [],
   "placeholder_buckets": {
     "model interaction": {
-      "n_records": 187,
+      "n_records": 212,
       "distinct_confidences": [
         0.3,
         0.6
@@ -22,5 +22,5 @@
     }
   },
   "eps": 0.01,
-  "verdict": "UNDER-POWERED: 0 confidence-growth steps across 46 genuine series -- the ledger records hypotheses one-shot (no re-assessment with rising confidence), so the longitudinal test cannot fire. It confirms the STATIC clamp holds but does not stress the trajectory claim. To gain power the ledger needs a stable per-hypothesis id linking re-assessments (and to stop bucketing unrelated records under placeholder hypothesis text)."
+  "verdict": "PASS (weak): 1 growth steps examined across genuine series, all accompanied by evidence influx; 0 free-confidence violations."
 }
