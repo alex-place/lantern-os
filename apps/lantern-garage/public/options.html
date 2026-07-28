@@ -92,8 +92,21 @@
     table.opt td { padding: 2px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.5; }
     table.opt tbody tr:hover td { background: var(--bg2); }
     td.strikeCol, th.strikeCol { text-align: center !important; font-weight: 700; background: var(--bg2); }
-    tr.itm-c td.cside { background: color-mix(in srgb, var(--green) 7%, transparent); }
-    tr.itm-p td.pside { background: color-mix(in srgb, var(--red) 7%, transparent); }
+    tr.itm-c td.cside { background: color-mix(in srgb, var(--green) 13%, transparent); }
+    tr.itm-p td.pside { background: color-mix(in srgb, var(--red) 13%, transparent); }
+    /* Volume: bright numeric + saturated bar (TradingView-style vibrancy). */
+    td.cside .volnum { color: var(--green); font-weight: 600; }
+    td.pside .volnum { color: var(--red); font-weight: 600; }
+    td .volbar { opacity: .95; height: 5px; border-radius: 1px; }
+    td.cside .volbar { background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 55%, transparent)); }
+    td.pside .volbar { background: linear-gradient(90deg, var(--red), color-mix(in srgb, var(--red) 55%, transparent)); }
+    th.strikeCol { color: var(--text1) !important; }
+    td.ivcell { color: var(--text1); }
+    /* Spot pill — the TV-style centered symbol/price chip on the spot divider. */
+    .spotpill { display: inline-flex; align-items: center; gap: 7px; padding: 2px 12px;
+      background: var(--bg2); border: 1px solid var(--blue); border-radius: 999px;
+      font-family: var(--mono); font-size: 11.5px; color: var(--text1); }
+    .spotpill b { color: var(--text0); font-size: 12px; }
     tr.spotrow td { border-top: 1px dashed var(--blue); border-bottom: 1px dashed var(--blue); padding: 2px 6px; text-align: center; color: var(--blue); font-weight: 700; font-size: 10.5px; letter-spacing: .04em; }
     /* Expiry disclosure row: a rotating caret makes it obvious these expand. */
     .expHead { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 7px 10px;
@@ -315,7 +328,10 @@ async function loadAll(){
     const d = await (await fetch('/api/trading/options/chain?symbol='+encodeURIComponent(sym))).json();
     if (!d.available) { CHAIN=null; $('chainBody').innerHTML = '<span class="muted">Chain unavailable — '+esc(d.reason||'no data source')+'</span>'; return; }
     CHAIN = groupChain(d);
-    VOL_EXP = CHAIN.expiries[0] ? CHAIN.expiries[0].exp : null;
+    // Default to the nearest expiry that actually carries IV (after hours the
+    // 0-DTE expiry has none → the smile canvas rendered 'Not enough IV data').
+    const _hasIV = (e) => { for (const r of e.rows.values()) { if ((r.call&&r.call.implied_volatility>0)||(r.put&&r.put.implied_volatility>0)) return true; } return false; };
+    VOL_EXP = (CHAIN.expiries.find(_hasIV) || CHAIN.expiries[0] || {exp:null}).exp;
     $('spot').textContent = CHAIN.spot ? num(CHAIN.spot) : '';
     $('meta').textContent = `${sym} · ${d.count||0} contracts · ${CHAIN.expiries.length} expirations · ${d.source||''}${d.cached?' (cached)':''}`;
     renderChain(); renderVolChips(); renderVolume();
@@ -347,7 +363,7 @@ function renderChain(){
     let rowsHtml = ''; let spotDone = false;
     for (const k of ks) {
       if (!spotDone && CHAIN.spot && k > CHAIN.spot) {
-        rowsHtml += `<tr class="spotrow"><td colspan="13">${esc($('sym').value.toUpperCase())} ${num(CHAIN.spot)}</td></tr>`;
+        rowsHtml += `<tr class="spotrow"><td colspan="13"><span class="spotpill">${esc($('sym').value.toUpperCase())} <b>${num(CHAIN.spot)}</b> USD</span></td></tr>`;
         spotDone = true;
       }
       const r = e.rows.get(k); const c = r.call||{}, p = r.put||{};
@@ -355,9 +371,9 @@ function renderChain(){
       const side = (o, sideCls) => { const pick = o.contract ? ` onclick="setTicket('${esc(o.contract)}',${o.bid||0},${o.ask||0})" style="cursor:pointer" title="Click to load into the manual ticket"` : '';
         return `<td class="${sideCls}"${pick}>${num(o.last)}</td><td class="${sideCls}"${pick}>${num(o.bid)}</td><td class="${sideCls}"${pick}>${num(o.ask)}</td>`
         + `<td class="${sideCls}"${pick}>${o.delta!=null?num(o.delta,2):'—'}</td>`
-        + `<td class="${sideCls}"${pick}>${fmtVol(o.volume)}<span class="volbar" style="width:${Math.round(28*(o.volume||0)/maxV)}px"></span></td>`; };
+        + `<td class="${sideCls}"${pick}><span class="volnum">${fmtVol(o.volume)}</span><span class="volbar" style="width:${Math.round(34*(o.volume||0)/maxV)}px"></span></td>`; };
       rowsHtml += `<tr class="${cls}">${side(c,'cside')}`
-        + `<td class="strikeCol">${num(k, k%1?2:0)}</td><td class="strikeCol" style="font-weight:400">${c.implied_volatility!=null?num(c.implied_volatility*100,1)+'%':(p.implied_volatility!=null?num(p.implied_volatility*100,1)+'%':'—')}</td>`
+        + `<td class="strikeCol">${num(k, k%1?2:0)}</td><td class="strikeCol ivcell" style="font-weight:400">${c.implied_volatility!=null?num(c.implied_volatility*100,1)+'%':(p.implied_volatility!=null?num(p.implied_volatility*100,1)+'%':'—')}</td>`
         + `${side(p,'pside')}<td>${fmtVol(p.open_interest)}</td></tr>`;
     }
     parts.push(`<details${open?' open':''}><summary class="expHead"><span class="caret">▶</span><b>${esc(fmtExp(e.exp))}</b><span class="dte">${e.dte} DTE</span><span class="cnt">${ks.length} strikes</span></summary>
@@ -401,7 +417,16 @@ function drawIV(){
   for (let i=0;i<=6;i++){ const k=kMin+(kMax-kMin)*i/6; ctx.fillText(k.toFixed(0), X(k)-10, H-8); }
   if (CHAIN.spot>=kMin && CHAIN.spot<=kMax){ ctx.save(); ctx.setLineDash([5,4]); ctx.strokeStyle=muted; ctx.lineWidth=1;
     ctx.beginPath(); ctx.moveTo(X(CHAIN.spot),T); ctx.lineTo(X(CHAIN.spot),H-B); ctx.stroke(); ctx.restore(); }
-  ctx.strokeStyle=accent; ctx.lineWidth=2; ctx.beginPath();
+  // Gradient fill under the smile + a thicker, full-opacity line (vibrancy pass —
+  // the thin 2px line on a dark bg read as faint).
+  const grad = ctx.createLinearGradient(0, T, 0, H-B);
+  grad.addColorStop(0, 'rgba(74,158,255,.28)');
+  grad.addColorStop(1, 'rgba(74,158,255,0)');
+  ctx.beginPath();
+  pts.forEach((p,i)=>{ const x=X(p.k), y=Y(p.iv); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.lineTo(X(pts[pts.length-1].k), H-B); ctx.lineTo(X(pts[0].k), H-B); ctx.closePath();
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.strokeStyle=accent; ctx.lineWidth=2.5; ctx.lineJoin='round'; ctx.beginPath();
   pts.forEach((p,i)=>{ const x=X(p.k), y=Y(p.iv); i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
   ctx.stroke();
 }
@@ -415,11 +440,26 @@ function renderVolume(){
   const strikes = [...strikeSet].sort((a,b)=>a-b);
   if (!strikes.length) { $('volumeBody').innerHTML='<span class="muted">No contracts.</span>'; return; }
   let h = `<table class="opt hm"><tr><th style="text-align:left">Strike</th>${exps.map(e=>`<th colspan="2">${esc(fmtExpShort(e.exp))}<div class="muted" style="font-size:9px">${e.dte}d · C / P</div></th>`).join('')}</tr>`;
+  // HEATMAP backgrounds (TradingView-style): each cell's tint scales with its
+  // share of the table max — hot strikes visibly glow instead of being a wall of
+  // same-weight numbers. sqrt scaling keeps mid-size cells visible next to the max.
+  let maxV = 0;
+  for (const e of exps) for (const k of strikes) {
+    const r = e.rows.get(k) || {};
+    maxV = Math.max(maxV, (r.call&&r.call.volume)||0, (r.put&&r.put.volume)||0);
+  }
+  const heat = (v, rgb) => {
+    if (!v || !maxV) return '';
+    const t = Math.sqrt(v / maxV);
+    return ` style="background:rgba(${rgb},${(0.06 + 0.5*t).toFixed(2)})${t>0.55?';color:#fff;font-weight:600':''}"`;
+  };
   for (const k of strikes) {
-    h += `<tr><td style="text-align:left;font-weight:700">${num(k, k%1?2:0)}${CHAIN.spot&&Math.abs(k-CHAIN.spot)<0.5?' ◂':''}</td>`;
+    const atm = CHAIN.spot && Math.abs(k-CHAIN.spot) < (CHAIN.spot*0.0015);
+    h += `<tr><td style="text-align:left;font-weight:700${atm?';color:var(--blue)':''}">${num(k, k%1?2:0)}${atm?' ◂':''}</td>`;
     for (const e of exps) {
       const r = e.rows.get(k) || {};
-      h += `<td class="cc">${r.call&&r.call.volume?fmtVol(r.call.volume):'–'}</td><td class="pp">${r.put&&r.put.volume?fmtVol(r.put.volume):'–'}</td>`;
+      const cv=(r.call&&r.call.volume)||0, pv=(r.put&&r.put.volume)||0;
+      h += `<td class="cc"${heat(cv,'0,212,170')}>${cv?fmtVol(cv):'–'}</td><td class="pp"${heat(pv,'255,95,109')}>${pv?fmtVol(pv):'–'}</td>`;
     }
     h += '</tr>';
   }
