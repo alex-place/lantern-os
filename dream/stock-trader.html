@@ -52,6 +52,19 @@
     --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
     --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
   }
+
+  /* De-boxing pass (#3049): the terminal read as a grid of hard same-weight
+     rectangles. Soften radii and borders, add faint elevation so surfaces have
+     depth order, and give the BUY/SELL strip breathing room. Pure skin — no
+     layout metrics change. */
+  .card{border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
+  .card:hover{box-shadow:0 4px 18px rgba(0,0,0,.3)}
+  .chart-ctrl,.wl-add-btn,.wl-sort{border-radius:7px}
+  .btn-buy,.btn-sell{border-radius:8px;padding-top:7px;padding-bottom:7px}
+  .tp-tab{border-radius:6px 6px 0 0}
+  .hstat{border-radius:7px}
+  .trade-lock .tl-card{border-radius:16px}
+  .footer,.sidebar{border-color:color-mix(in srgb, var(--border) 80%, transparent)}
   /* A handful of surfaces/borders in this terminal are hardcoded dark
      (rgba(15,18,28,…) / white-translucent borders). Remap them for light mode
      so cards, panels and dividers stay legible (#1577). */
@@ -206,7 +219,7 @@
   .hstat .l{color:var(--text2);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em}
   .hstat .v{color:var(--text0)}
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
-  .badge{font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
+  .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
@@ -230,14 +243,14 @@
   .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   /* #2439: watchlist sort control */
   .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
-  .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+  .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
   .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:6px 26px 6px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
+  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:10px 26px 10px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -294,7 +307,7 @@
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
+  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
   /* #2433: hover lift — the deck responds to the pointer like the site's chips do. */
   .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover);transform:translateY(-2px)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
