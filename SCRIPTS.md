@@ -134,6 +134,7 @@ The registry of external marks lives in [docs/BENCHMARKS.md](docs/BENCHMARKS.md)
 | `scripts/train_qlora_qwen_coder.py` | registered here — VTD Phase-1 tiny-coder QLoRA trainer (ADR-0030) | `.venv-train python scripts/train_qlora_qwen_coder.py` |
 | `scripts/eval_qwen_coder.py` | registered here — VTD Phase-1 held-out lift eval (ADR-0030) | `.venv-train python scripts/eval_qwen_coder.py` |
 | `scripts/spiral_build_self_train.py` | registered here — builds the replay-balanced, reward-weighted SFT set from the spiral escalation corpus (`data/eval/spiral/*.jsonl` → `self-train/`); consumes the `spiral-harness.js` sink | `python scripts/spiral_build_self_train.py` (`--dry-run` for report only) |
+| `scripts/spiral_oracle_ceiling.py` | registered here (#2998 slice 3) — replays `data/eval/cascade/*.jsonl` to measure the oracle-router ceiling (rented-frontier calls a perfect router would save) before building a learned router | `python scripts/spiral_oracle_ceiling.py` |
 | `scripts/convert-pairs-to-alpaca.py` | `scripts/continual-train.ps1` | via launcher |
 | `scripts/convert_fc_dataset.py` | `scripts/retrain-combined.ps1` | via launcher |
 | `scripts/extract-session-pairs.py` | `scripts/continual-train.ps1` | via launcher |
