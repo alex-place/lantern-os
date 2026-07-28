@@ -66,6 +66,7 @@ const CHAT_MODEL_OPTIONS = {
   ],
   gemini: [
     { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash (fast)" },
+    { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite (cheapest)" },
     { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro (deep)" },
   ],
   xai: [
