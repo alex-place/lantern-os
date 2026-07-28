@@ -1199,8 +1199,10 @@ function sigBadge(d){
     return `<div class="conf-badge ${dirCls}" title="${dir} signals like this resolved ${Math.round(hit*100)}% of the time over ${n} settled trades.">`
       + `${icon} ${cc}%<span class="cb-hit">hit ${Math.round(hit*100)}% · n=${n}</span>${cat}</div>`;
   }
-  return `<div class="conf-badge uncal" title="Raw model confidence — not yet backed by a settled-trade hit-rate for this signal type. Shown, not acted on.">`
-    + `${icon} <span class="cb-model">model ${conf}%</span><span class="cb-uncal">uncalibrated</span>${cat}</div>`;
+  // Uncalibrated → show NOTHING (operator, 2026-07-28). The neutral "model 47%
+  // · uncalibrated" chip still read as a signal at a glance; until a signal type
+  // carries a settled-trade hit-rate (n>=20), the honest render is silence.
+  return '';
 }
 
 // ── Live market-regime classification ───────────────────────────────────────
