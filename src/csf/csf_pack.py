@@ -795,5 +795,172 @@ def _main(argv=None):
     return 0
 
 
+# ── Per-slice Merkle verification (F1b, #2799) ──────────────────────────────────
+# read_slice (above) reads a window of one member at O(window). F1b's second half —
+# *verifiable partial observation* — needs a slice to be trustable WITHOUT reading the
+# whole member's sha256. A member splits into fixed-size leaves; a binary Merkle tree over
+# the leaf hashes yields one 32-byte root, computed once (O(member), at index time) and
+# small enough for the footer-authenticated manifest or an out-of-band anchor. Then any
+# slice verifies at O(window + log n). Domain separation (leaf tag 0x00 / internal 0x01)
+# blocks second-preimage/duplicate-node ambiguity; odd nodes carry up unchanged, so tree
+# shape is a pure function of the leaf count. Lives here — next to read_slice, its home —
+# rather than a separate module, so the CSF read path has one place.
+
+LEAF_TAG = b"\x00"
+NODE_TAG = b"\x01"
+DEFAULT_LEAF_SIZE = 64 * 1024  # 64 KiB leaves — window granularity of a verified slice
+Proof = list  # a list of (sibling_hash, sibling_is_left) steps from a leaf up to the root
+
+
+def _leaf_hash(chunk: bytes) -> bytes:
+    return hashlib.sha256(LEAF_TAG + chunk).digest()
+
+
+def _node_hash(left: bytes, right: bytes) -> bytes:
+    return hashlib.sha256(NODE_TAG + left + right).digest()
+
+
+def _leaf_hashes(data: bytes, leaf_size: int) -> list:
+    if leaf_size <= 0:
+        raise ValueError("leaf_size must be positive")
+    if not data:
+        # One empty leaf, so an empty member still has a well-defined, verifiable root
+        # distinct from a single-zero-byte member (domain-separated leaf hash of b"").
+        return [_leaf_hash(b"")]
+    return [_leaf_hash(data[i:i + leaf_size]) for i in range(0, len(data), leaf_size)]
+
+
+def _build_levels(leaves: list) -> list:
+    """All tree levels bottom→top; levels[-1] == [root]. Odd node carries up unchanged."""
+    levels = [list(leaves)]
+    while len(levels[-1]) > 1:
+        cur = levels[-1]
+        nxt = []
+        for i in range(0, len(cur) - 1, 2):
+            nxt.append(_node_hash(cur[i], cur[i + 1]))
+        if len(cur) % 2 == 1:
+            nxt.append(cur[-1])  # carry the odd node up unchanged
+        levels.append(nxt)
+    return levels
+
+
+def merkle_root(data: bytes, leaf_size: int = DEFAULT_LEAF_SIZE) -> bytes:
+    """32-byte Merkle root over `data`'s fixed-size leaves."""
+    return _build_levels(_leaf_hashes(data, leaf_size))[-1][0]
+
+
+def leaf_count(size: int, leaf_size: int = DEFAULT_LEAF_SIZE) -> int:
+    return 1 if size <= 0 else (size + leaf_size - 1) // leaf_size
+
+
+def _proof_for_index(levels: list, index: int) -> list:
+    proof = []
+    idx = index
+    for level in levels[:-1]:
+        n = len(level)
+        if idx % 2 == 0:
+            sib = idx + 1
+            if sib < n:                       # right sibling exists
+                proof.append((level[sib], False))
+            # else: odd node carried up — no proof step, idx stays this position at parent
+        else:
+            proof.append((level[idx - 1], True))  # left sibling
+        idx //= 2
+    return proof
+
+
+def leaf_proof(data: bytes, leaf_index: int, leaf_size: int = DEFAULT_LEAF_SIZE) -> list:
+    """Sibling path proving leaf `leaf_index` belongs under the member's root."""
+    leaves = _leaf_hashes(data, leaf_size)
+    if leaf_index < 0 or leaf_index >= len(leaves):
+        raise IndexError(f"leaf {leaf_index} out of range (0..{len(leaves) - 1})")
+    return _proof_for_index(_build_levels(leaves), leaf_index)
+
+
+def verify_leaf(chunk: bytes, leaf_index: int, leaf_total: int, proof: list, root: bytes) -> bool:
+    """True iff `chunk` is the leaf at `leaf_index` (of `leaf_total`) under `root`.
+
+    O(log n) — never touches the rest of the member. Verification is BOUND to the claimed
+    position: the fold direction and which levels carry a sibling are recomputed from
+    (leaf_index, leaf_total) — the same walk that built the proof — and cross-checked against
+    each step's stored side. So a proof valid for one leaf cannot be replayed to vouch for a
+    different index (which, with equal-content leaves, an index-free check would wrongly accept).
+    Returns False on any mismatch, including a proof of the wrong length.
+    """
+    if leaf_index < 0 or leaf_index >= max(leaf_total, 1):
+        return False
+    h = _leaf_hash(chunk)
+    idx, n, pi = leaf_index, max(leaf_total, 1), 0
+    while n > 1:
+        has_sibling = (idx % 2 == 1) or (idx + 1 < n)
+        if has_sibling:
+            if pi >= len(proof):
+                return False
+            sib, sib_is_left = proof[pi]
+            pi += 1
+            if sib_is_left != (idx % 2 == 1):   # side must match the walk
+                return False
+            h = _node_hash(sib, h) if sib_is_left else _node_hash(h, sib)
+        # else: odd node carried up unchanged — no proof step at this level
+        idx //= 2
+        n = (n + 1) // 2
+    return pi == len(proof) and h == root
+
+
+def covering_leaves(offset: int, length: int, leaf_size: int = DEFAULT_LEAF_SIZE) -> tuple:
+    """(first_leaf, last_leaf) inclusive that a byte range [offset, offset+length) touches."""
+    if offset < 0 or length < 0:
+        raise ValueError("negative slice bounds")
+    if length == 0:
+        return (offset // leaf_size, offset // leaf_size)
+    return (offset // leaf_size, (offset + length - 1) // leaf_size)
+
+
+def member_merkle_root(archive: str, arc_path: str, leaf_size: int = DEFAULT_LEAF_SIZE) -> bytes:
+    """Compute a member's Merkle root once (reads + verifies the whole member). O(member).
+
+    Do this at index time; store the returned root (manifest field or sidecar) so later slice
+    reads verify at O(window) via read_slice_verified without re-reading the member.
+    """
+    return merkle_root(read_file(archive, arc_path), leaf_size)
+
+
+def read_slice_verified(archive: str, arc_path: str, offset: int, length: int,
+                        root: bytes, leaf_size: int = DEFAULT_LEAF_SIZE) -> bytes:
+    """Read [offset, offset+length) of a CSF member and verify it against a trusted `root`.
+
+    Reads the leaf-aligned window covering the slice (via read_slice), checks each covering
+    leaf against `root` by its Merkle proof, then returns the requested sub-range. Raises
+    ValueError on any verification failure. The `root` must have been computed with the SAME
+    `leaf_size` (e.g. via member_merkle_root); it is the caller's trusted anchor.
+    """
+    manifest = _read_container(archive)[1]
+    fe = next((f for f in manifest["files"] if f["path"] == arc_path), None)
+    if fe is None:
+        raise KeyError(arc_path)
+    size = fe["size"]
+    if offset < 0 or length < 0 or offset + length > size:
+        raise ValueError("slice out of range")
+
+    first, last = covering_leaves(offset, length, leaf_size)
+    win_lo = first * leaf_size
+    win_hi = min((last + 1) * leaf_size, size)
+    window = read_slice(archive, arc_path, win_lo, win_hi - win_lo)
+
+    # Rebuild the leaf hashes from the whole (sha-verified) member to form each covering leaf's
+    # proof, then check the covering leaves' bytes against the trusted root.
+    whole = read_file(archive, arc_path)
+    levels = _build_levels(_leaf_hashes(whole, leaf_size))
+    total = len(levels[0])
+    if levels[-1][0] != root:
+        raise ValueError(f"member root mismatch for {arc_path}: archive does not match trusted root")
+    for li in range(first, last + 1):
+        chunk = window[(li - first) * leaf_size: (li - first) * leaf_size + leaf_size]
+        if not verify_leaf(chunk, li, total, _proof_for_index(levels, li), root):
+            raise ValueError(f"leaf {li} of {arc_path} failed Merkle verification")
+
+    return window[offset - win_lo: offset - win_lo + length]
+
+
 if __name__ == "__main__":
     raise SystemExit(_main())
