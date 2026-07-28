@@ -31,6 +31,15 @@ function smtpConfigured() {
 function resendConfigured() {
   return !!process.env.RESEND_API_KEY;
 }
+
+// Is ANY real mail provider configured? Resend OR SMTP. The email-verification
+// gate MUST key on this, not on smtpConfigured() alone — otherwise configuring
+// Resend (the intended prod provider) leaves signups on the no-mailer auto-admit
+// path and no confirmation email is ever sent, i.e. "the emails aren't wired"
+// even though Resend works. (#3021)
+function mailerConfigured() {
+  return resendConfigured() || smtpConfigured();
+}
 function sendViaResend({ to, subject, html, text }) {
   const https = require("https");
   const payload = JSON.stringify({
@@ -202,6 +211,7 @@ module.exports = {
   sendMail,
   smtpConfigured,
   resendConfigured,
+  mailerConfigured,
   mailerStatus,
   sendVerificationEmail,
   sendPasswordResetEmail,

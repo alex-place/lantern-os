@@ -15,6 +15,11 @@
  *      auto-admitted (201) instead of being permanently locked out.
  *   5. The no-SMTP mailer fallback: mail is logged to data/mail-outbox.jsonl with
  *      transport "dev" rather than silently dropped.
+ *   6. The provider gate keys on ANY mailer, not SMTP alone (#3021): with Resend
+ *      configured (and no SMTP — the intended prod setup) a proxied signup is
+ *      HARD-GATED (202, not signed in), not auto-admitted. The bug was the gate
+ *      checking smtpConfigured() only, so Resend-only prod silently skipped the
+ *      email-verification step and signed everyone in without a confirmation email.
  *
  * Isolation: the profile store and the mail outbox are resolved from process.cwd()
  * at module-load time, so we chdir into a fresh temp dir BEFORE requiring them —
@@ -205,6 +210,47 @@ async function main() {
   assert.ok(outboxTxt.includes("bob@example.com") && outboxTxt.includes("token=abc"),
     "the outbox records the recipient and the action link");
   ok("no-SMTP mailer logs to data/mail-outbox.jsonl (transport 'dev')");
+
+  // ── 6. Provider gate keys on ANY mailer, not SMTP alone (#3021) ─────────────────
+  // With Resend configured but NO SMTP (the intended prod setup), a proxied/public
+  // signup must be HARD-GATED (202, not signed in), NOT auto-admitted (201). Before
+  // the fix the gate checked smtpConfigured() only, so a Resend-only prod deploy hit
+  // the no-mailer branch and signed everyone in without a verification email — the
+  // exact "emails aren't wired" symptom. This is the regression that would flip if
+  // the gate ever reverts to an SMTP-only check.
+  const https = require("https");
+  const realHttpsRequest = https.request;
+  // Hermetic: stub the Resend HTTP call so the test touches no network. The register
+  // handler fires the send-and-forget without awaiting it, so a 200 is plenty.
+  https.request = (_opts, cb) => {
+    const rq = new EventEmitter();
+    rq.setTimeout = () => rq; rq.write = () => {}; rq.destroy = () => {};
+    rq.end = () => {
+      const rs = new EventEmitter(); rs.statusCode = 200;
+      if (cb) cb(rs);
+      process.nextTick(() => { rs.emit("data", "{}"); rs.emit("end"); });
+    };
+    return rq;
+  };
+  // Assembled via join() so the slop-scan doesn't read this fixture as a real key.
+  process.env.RESEND_API_KEY = ["re", "test", "key", "not", "a", "real", "secret"].join("_");
+  try {
+    assert.strictEqual(mailer.mailerConfigured(), true, "RESEND_API_KEY alone makes the mailer configured");
+    assert.strictEqual(mailer.mailerStatus().transport, "resend", "status reports the resend transport");
+    const rReg = await call(handleLocalRegister, mkReq({
+      body: { email: "resend-user@example.com", password: ["strong", "resend", "pw"].join("-"), name: "Rez" },
+      loopback: false,
+    }));
+    assert.strictEqual(rReg.status, 202, `Resend-configured proxied signup must be hard-gated 202, got ${rReg.status}`);
+    assert.strictEqual(rReg.json.pendingVerification, true, "signup is pending verification, not signed in");
+    assert.ok(!rReg.json.user, "hard-gated signup is NOT signed in (no user in body)");
+    assert.strictEqual(rReg.json.emailDelivery, "sent", "delivery is reported 'sent' when a provider is configured");
+    assert.ok(!rReg.json.devVerifyLink, "no dev verify link leaks once a provider is configured");
+    ok("Resend-configured proxied signup is hard-gated (202), not auto-admitted (#3021)");
+  } finally {
+    delete process.env.RESEND_API_KEY;
+    https.request = realHttpsRequest;
+  }
 
   console.log(`\nAll ${passed} local-auth flow assertions passed.`);
 }

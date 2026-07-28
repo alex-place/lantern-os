@@ -30,7 +30,7 @@ const _pathAuth = require("path");
 // Session store dir (mirrors server.js) — a password reset invalidates the account's live
 // sessions so a hijacked session can't survive the remediation (#2614).
 const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
-const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("../lib/mailer");
+const { sendVerificationEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
 const { isLoopback, clientIp } = require("../lib/request-auth");
 const { canonicalOrigin } = require("../lib/base-url");
 
@@ -331,7 +331,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
         // Dev-only self-service: no mail server + direct loopback hit → return the
         // link so the operator can confirm locally. Never on proxied/public traffic
         // or when SMTP is configured (mirrors local-auth.devVerifyLink).
-        if (!smtpConfigured() && isLoopback(req)) respBody.devVerifyLink = link;
+        if (!mailerConfigured() && isLoopback(req)) respBody.devVerifyLink = link;
       }
     }
     res.writeHead(200, { "Content-Type": "application/json" });
