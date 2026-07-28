@@ -271,7 +271,7 @@
   .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
      Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
-  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:10px 12px 12px;border-top:1px solid var(--border);background:var(--bg1)}
   .wl-info.show{display:block}
   /* Drag handle to resize the symbol-info panel — only visible while the panel is shown. */
   .wl-resize{display:none;position:relative;flex:0 0 auto;height:11px;cursor:ns-resize;background:var(--bg1);touch-action:none}
@@ -279,18 +279,18 @@
   .wl-resize:hover::before{background:var(--tv-text-secondary)}
   .sidebar:has(.wl-info.show) .wl-resize{display:block}
   body.resizing-wlinfo{user-select:none;cursor:ns-resize}
-  .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
-  .wi-name{font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .wi-px{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px}
+  .wi-sym{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text0);display:inline}
+  .wi-name{font-size:10.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wi-px{font-family:var(--mono);font-size:13px;font-weight:700;margin-top:6px}
   .wi-meta{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
   .wi-meta b{color:var(--text1);font-weight:600}
   /* #1711: expanded info — Technicals / Returns / Key stats sections */
-  .wi-sect{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
-  .wi-tech{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text1)}
+  .wi-sect{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:9px 0 5px;border-top:1px solid color-mix(in srgb, var(--border) 70%, transparent);padding-top:7px}
+  .wi-tech{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text1)}
   .wi-tech.up{color:var(--green)} .wi-tech.dn{color:var(--red)}
-  .wi-rets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .wi-ret{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:5px 4px;text-align:center}
-  .wi-ret-v{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)}
+  .wi-rets{display:grid;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:5px}
+  .wi-ret{background:var(--bg2);border:1px solid color-mix(in srgb, var(--border) 70%, transparent);border-radius:6px;padding:6px 4px;text-align:center;min-width:0}
+  .wi-ret-v{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--text2)}
   .wi-ret.up .wi-ret-v{color:var(--green)} .wi-ret.dn .wi-ret-v{color:var(--red)}
   .wi-ret-l{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:1px}
   .wl-add{display:flex;padding:8px 12px;border-bottom:1px solid var(--border)}
