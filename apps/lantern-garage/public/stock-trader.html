@@ -83,7 +83,7 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:var(--sidebar-w,210px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w,264px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
      initColumnResizers() and the chosen widths persist. #trader-cols */
@@ -249,7 +249,11 @@
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
   .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
-  .wl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
+  /* Two aligned columns, not space-between: left holds symbol/change, right holds
+     price/signal, so every row forms a real column instead of drifting with each
+     value's width. */
+  .wl-row{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:8px}
+  .wl-right{display:flex;align-items:center;gap:6px;justify-content:flex-end}
   .wl-price{font-family:var(--mono);font-size:9.5px;color:var(--text1)}
   .wl-chg{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
@@ -523,7 +527,7 @@
      Priority: chart controls + sign-in/chat > stats > cross-links. The toolbar's
      horizontal scroll stays as the last resort, not the first. ── */
   @media (max-width:1024px){
-    .layout{grid-template-columns:var(--sidebar-w,170px) 1fr}   /* narrower watchlist on tablets */
+    .layout{grid-template-columns:var(--sidebar-w,210px) 1fr}   /* narrower watchlist on tablets */
     .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
     .header{gap:8px;padding:0 10px}
   }
@@ -941,7 +945,6 @@
 <!-- Sidebar -->
 <div class="sidebar" role="complementary" aria-label="AI tradelist">
   <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
-  <div style="padding:6px 10px 4px;font-size:10.5px;line-height:1.45;color:var(--text2,#8b8b95);border-bottom:1px solid var(--border,#22242e)" title="The autopilot enters ONLY symbols on this list. Your watchlist (Watch page) is tracking-only; manual buy/sell works on any symbol via search.">🤖 AI tradelist — the autopilot trades <b>only</b> these</div>
   <div class="wl-add">
     <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
     <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
@@ -2860,7 +2863,11 @@ function adaptLogoBg(img){
     img.classList.toggle('on-light', dark);
   }catch(e){ /* tainted or decode error → leave dark badge */ }
 }
-const _wlPx = (p)=> p>100 ? p.toLocaleString() : (p!=null ? p.toFixed(4) : '—');
+// One decimal convention so the price column actually lines up. Mixed 4dp/locale
+// formatting put $171 beside $84.2250 and $675.805 — a ragged column. Sub-$1
+// names still need 4dp to say anything at all.
+const _wlPx = (p)=> p==null ? '—' : (p < 1 ? p.toFixed(4)
+  : p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
 
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
@@ -2873,7 +2880,7 @@ function renderWatchlist(){
       ${tickerLogoHtml(t.ticker)}
       <div class="wl-content">
         <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
-        <div class="wl-row"><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>${sigTxt}<button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button></div>
+        <div class="wl-row"><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span><span class="wl-right">${sigTxt}<button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button></span></div>
       </div>
     </div>`;
   }).join('');
@@ -4585,7 +4592,7 @@ function initWlInfoResize(){
 // throttled) as you drag. Arrow keys nudge the focused divider. #trader-cols
 function initColumnResizers(){
   const root = document.documentElement;
-  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:160, max:420, def:210 };
+  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:180, max:460, def:264 };
   const TICKET  = { cssVar:'--ticket-w',  key:'trader.ticketW',  min:300, max:560, def:340 };
   [SIDEBAR, TICKET].forEach(c=>{ const v=parseInt(localStorage.getItem(c.key)||'',10); if(v>0) root.style.setProperty(c.cssVar, Math.max(c.min,Math.min(c.max,v))+'px'); });
   let raf=0;
