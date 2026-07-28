@@ -138,7 +138,7 @@
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
-  #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
+  #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
   .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{position:relative;grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
