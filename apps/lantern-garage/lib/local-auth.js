@@ -20,7 +20,7 @@ const {
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
-const { sendVerificationEmail, sendPasswordResetEmail, smtpConfigured } = require("./mailer");
+const { sendVerificationEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
 const { isLoopback, clientIp } = require("./request-auth");
 const { canonicalOrigin } = require("./base-url");
 const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
@@ -44,7 +44,7 @@ function sendSignupVerification(req, profile) {
   try {
     const link = verifyLinkFor(req, profile);
     sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
-    return { delivery: smtpConfigured() ? "sent" : "logged", link };
+    return { delivery: mailerConfigured() ? "sent" : "logged", link };
   } catch (_) {
     return { delivery: "logged", link: null }; // best-effort
   }
@@ -57,7 +57,7 @@ function sendSignupVerification(req, profile) {
 // NEVER receive it — the link only ever surfaces where it already goes to the
 // local server log.
 function devVerifyLink(req, profile) {
-  if (smtpConfigured() || !isLoopback(req)) return null;
+  if (mailerConfigured() || !isLoopback(req)) return null;
   return verifyLinkFor(req, profile);
 }
 
@@ -69,8 +69,8 @@ function warnNoMailerAdmit() {
   if (_warnedNoMailerAdmit) return;
   _warnedNoMailerAdmit = true;
   console.warn(
-    "[auth] SMTP is not configured — admitting local signups without email verification " +
-    "(#2065). Set SMTP_* to require confirmed emails."
+    "[auth] no mail provider is configured — admitting local signups without email " +
+    "verification (#2065). Set RESEND_API_KEY (or SMTP_*) to require confirmed emails."
   );
 }
 
@@ -224,7 +224,7 @@ async function handleLocalRegister(req, res) {
   // the address, so don't pretend to — mark it verified and sign the user in.
   // Loopback requests are exempt: the operator keeps the real confirm-email flow
   // (and dev link) so it stays testable locally.
-  if (!smtpConfigured() && !isLoopback(req)) {
+  if (!mailerConfigured() && !isLoopback(req)) {
     warnNoMailerAdmit();
     // ASSUMED, not proven: with no mailer we can't confirm the address is the
     // registrant's. Mark it so email-ownership-gated actions (claiming a Stripe
@@ -276,7 +276,7 @@ async function handleLocalLogin(req, res) {
     // a mailer-less deploy — a real (proxied/public) user could never clear the
     // gate, so admit them rather than lock them out forever. Loopback stays gated
     // so the operator keeps the testable confirm-email flow.
-    if (!smtpConfigured() && !isLoopback(req)) {
+    if (!mailerConfigured() && !isLoopback(req)) {
       warnNoMailerAdmit();
       updateProfile(profile.id, { emailVerified: true, emailAssumed: true }); // assumed, not proven (#2606)
       return _establish(req, res, { ...profile, emailVerified: true }, 200);
