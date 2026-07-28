@@ -87,9 +87,9 @@
     #chainBody details { border-bottom: 1px solid var(--border); }
     #chainBody details:last-child { border-bottom: 0; }
     .scrollx { overflow-x: auto; }
-    table.opt { width: 100%; border-collapse: collapse; font-size: 11.5px; font-family: var(--mono); }
-    table.opt th { color: var(--text2); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: right; position: sticky; top: 0; background: var(--bg1); }
-    table.opt td { padding: 2px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.5; }
+    table.opt { width: 100%; border-collapse: collapse; font-size: 15px; font-family: var(--mono); }
+    table.opt th { color: var(--text2); font-weight: 500; font-size: 12.5px; text-transform: uppercase; letter-spacing: .05em; padding: 6px 9px; border-bottom: 1px solid var(--border); text-align: right; position: sticky; top: 0; background: var(--bg1); }
+    table.opt td { padding: 4px 9px; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.55; }
     table.opt tbody tr:hover td { background: var(--bg2); }
     td.strikeCol, th.strikeCol { text-align: center !important; font-weight: 700; background: var(--bg2); }
     tr.itm-c td.cside { background: color-mix(in srgb, var(--green) 13%, transparent); }
@@ -97,19 +97,19 @@
     /* Volume: bright numeric + saturated bar (TradingView-style vibrancy). */
     td.cside .volnum { color: var(--green); font-weight: 600; }
     td.pside .volnum { color: var(--red); font-weight: 600; }
-    td .volbar { opacity: .95; height: 5px; border-radius: 1px; }
+    td .volbar { opacity: .95; height: 7px; border-radius: 2px; }
     td.cside .volbar { background: linear-gradient(90deg, var(--green), color-mix(in srgb, var(--green) 55%, transparent)); }
     td.pside .volbar { background: linear-gradient(90deg, var(--red), color-mix(in srgb, var(--red) 55%, transparent)); }
     th.strikeCol { color: var(--text1) !important; }
     td.ivcell { color: var(--text1); }
     /* Spot pill — the TV-style centered symbol/price chip on the spot divider. */
-    .spotpill { display: inline-flex; align-items: center; gap: 7px; padding: 2px 12px;
+    .spotpill { display: inline-flex; align-items: center; gap: 8px; padding: 3px 14px;
       background: var(--bg2); border: 1px solid var(--blue); border-radius: 999px;
-      font-family: var(--mono); font-size: 11.5px; color: var(--text1); }
-    .spotpill b { color: var(--text0); font-size: 12px; }
+      font-family: var(--mono); font-size: 13px; color: var(--text1); }
+    .spotpill b { color: var(--text0); font-size: 14px; }
     tr.spotrow td { border-top: 1px dashed var(--blue); border-bottom: 1px dashed var(--blue); padding: 2px 6px; text-align: center; color: var(--blue); font-weight: 700; font-size: 10.5px; letter-spacing: .04em; }
     /* Expiry disclosure row: a rotating caret makes it obvious these expand. */
-    .expHead { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 7px 10px;
+    .expHead { display: flex; align-items: center; gap: 9px; cursor: pointer; padding: 10px 12px;
       user-select: none; list-style: none; font-family: var(--mono); }
     .expHead::-webkit-details-marker { display: none; }   /* replaced by our own caret */
     .expHead:hover { background: var(--bg2); }
@@ -117,10 +117,10 @@
       transition: transform .15s; }
     details[open] > .expHead .caret { transform: rotate(90deg); }
     details[open] > .expHead { background: var(--bg2); }
-    .expHead b { font-size: 12px; font-weight: 600; color: var(--text0); letter-spacing: .01em; }
-    .dte { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px;
+    .expHead b { font-size: 14.5px; font-weight: 600; color: var(--text0); letter-spacing: .01em; }
+    .dte { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px;
       background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue); }
-    .expHead .cnt { color: var(--text2); font-size: 10.5px; margin-left: auto; }
+    .expHead .cnt { color: var(--text2); font-size: 12px; margin-left: auto; }
     /* Calls read green, puts read red — subtle tints that keep the theme intact. */
     .volbar { display: inline-block; height: 8px; background: var(--blue); opacity: .55; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
     td.cside .volbar { background: var(--green); }
