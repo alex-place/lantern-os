@@ -421,6 +421,34 @@ async function placeManual(){
   }catch(e){ st.textContent = 'Failed — ' + e.message; }
 }
 
+// TIERING (operator decision 2026-07-28): options ANALYSIS is free — the chain,
+// IV smile, volume and advisory strategies are read-only market data, the same
+// deal as the Watch page. Only PLACING a paper option order is Pro. So instead
+// of a dead "Place paper order" button that 302s to a login for a Free user,
+// swap the ticket for an honest upgrade line and leave every analysis tab working.
+async function applyOptionsTier(){
+  try{
+    const s = await (await fetch('/api/auth/session')).json();
+    if (s && s.authRequired === false) return;                 // operator box — leave as is
+    const proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(String(s && s.role));
+    if (proPlus) return;
+    const card = document.getElementById('manualTicket') || document.querySelector('#tab-chain .card:last-of-type');
+    const row = document.querySelector('#mtContract') && document.querySelector('#mtContract').closest('.chips');
+    if (row) row.style.display = 'none';
+    const note = document.createElement('div');
+    note.className = 'muted';
+    note.style.cssText = 'margin-top:10px;padding:10px 12px;border:1px solid var(--border);border-radius:10px';
+    note.innerHTML = 'Reading the chain, the IV smile, volume and strategy proposals is <b>free</b>. '
+      + 'Placing a paper options order is part of <b>$20 Pro</b> — '
+      + '<a href="/pricing.html" style="color:var(--accent)">see plans</a>'
+      + (s && s.authenticated ? '' : ' · <a href="/auth.html?returnTo=%2Foptions.html" style="color:var(--accent)">sign in</a>');
+    const st = document.getElementById('mtStatus');
+    if (st && st.parentNode) st.parentNode.insertBefore(note, st);
+    else if (card) card.appendChild(note);
+  }catch(_e){ /* session unreachable → leave the page fully usable */ }
+}
+applyOptionsTier();
+
 // Restore the remembered strike filter + tab, then load.
 for (const el of document.querySelectorAll('#strikeFilter .chip')) el.classList.toggle('active', Number(el.dataset.n)===N_STRIKES);
 try { const t = localStorage.getItem('options.tab'); if (['chain','vol','volume','strat'].includes(t)) showTab(t); } catch (e) {}
