@@ -558,3 +558,12 @@ experiments/results/kalshi_mlb_paths.jsonl
 data/equities/
 data/kalshi/settled-single/
 data/kalshi/candles-1m/
+
+# Runtime trading ledgers/state — engine-owned, never committed. Keeping them
+# ignored also keeps `git stash -u` / clean sweeps from destroying live state
+# (2026-07-28: a sweep mid-entry-window erased overnight-state.json and the
+# engine re-entered its option ladder — a real double-fill on the paper account).
+data/lantern-garage/trading/*.jsonl
+data/lantern-garage/trading/*-state.json
+apps/lantern-garage/data/lantern-garage/trading/*.jsonl
+apps/lantern-garage/data/lantern-garage/trading/*-state.json
