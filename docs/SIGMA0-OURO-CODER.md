@@ -94,12 +94,13 @@ more verified-correct answers per dollar per day** — locally, privately, offli
    spectral-radius acceptance gate (ρ(J) < 1), with a proven anti-freeze operator armed
    under a bounded budget. (Machinery: our Collapse Certificate — theorems proven in-regime
    and machine-checked; scope stated there honestly.)
-4. **Persistence first; abstention is the earned floor.** The Spiral does not answer once —
-   it retries until the verifier confirms an answer, escalating a stuck step rather than
-   quitting (§3). A trained abstention head (supervised by verifier outcomes) makes "I cannot
-   verify this" a real output, but it fires *only* after the loop, escalation, and budget are
-   exhausted — which is exactly what makes it trustworthy when it does. Precision-of-claimed-
-   solve ≈ 1.0 is a headline metric, not a footnote.
+4. **Persistence first; effectively-false-until-true is the floor.** The Spiral does not answer
+   once — it retries until the verifier confirms an answer, escalating a stuck step rather than
+   quitting (§3). A stable-but-unverified answer does not *abstain*: it keeps experimenting to
+   verify, and only once the loop, escalation, and budget are all exhausted does it settle as
+   **grounded=False** — treated as false-until-proven, never asserted as true — which is exactly
+   what keeps the claimed-solve set trustworthy. Precision-of-claimed-solve ≈ 1.0 is a headline
+   metric, not a footnote.
 5. **Small enough to own.** ≤4GB, CPU-viable, offline-first. If it needs a datacenter, it
    has failed the mission.
 
@@ -117,8 +118,9 @@ answer**:
    re-verify. It borrows a bigger brain for one step; it does not restart.
 5. **Halt** on one of three: **verified** (the answer passed, including held-out checks — the
    goal); **budget exhausted** (you set the dial — the Spiral is an *anytime* algorithm, its
-   answer only improves with more of it); or **honest halt** — "I cannot verify this" — which
-   fires only when the loop *and* escalation *and* budget are all spent.
+   answer only improves with more of it); or **effectively-false-until-true** — the answer is
+   still unverified after the loop *and* escalation *and* budget are all spent, so it settles
+   grounded=False rather than abstaining, having exhausted every means of verifying it.
 
 > **Implementation status — the held-out half of step 5 is NOT shipped.** As of 2026-07-27,
 > `lib/spiral-harness.js` and `lib/spiral-fix-rate.js` contain no holdout: grep for
@@ -259,7 +261,7 @@ fallback, and the measurement stands either way.
 | Against | Their strength | Σ₀'s differentiation |
 |---|---|---|
 | Frontier cloud models | breadth, peak capability | verified answers/$ locally; privacy; offline; honesty contract |
-| Small open dense models (Qwen/Phi/Gemma class) | strong single-shot baselines | looping + verifier amplification + stability/abstention machinery around a comparable parameter budget |
+| Small open dense models (Qwen/Phi/Gemma class) | strong single-shot baselines | looping + verifier amplification + stability/grounding machinery around a comparable parameter budget |
 | Looped research models (Ouro/HRM/TRM) | the same depth bet, at research maturity | external-verifier halt (vs. learned/memorizing halt), stability-gated serving, a product envelope, and full training-provenance discipline |
 | Diffusion code models (Mercury class) | raw parallel throughput | orthogonal; a candidate future proposer inside the same verified protocol |
 
