@@ -15,6 +15,7 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 
 const { parseEdits, applyEdits, locate, EDIT_FORMAT_HELP } = require("../lib/spiral-edit");
 const { makeSweRotation, SWE_FOCI, focusGuidance } = require("../lib/spiral-swe-focus");
@@ -29,6 +30,16 @@ function tmpDir(files = { "a.py": "def f():\n    return 1\n" }) {
     fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
     fs.writeFileSync(path.join(dir, name), body);
   }
+  // Make it an ISOLATED git repo with the seed files committed. spiral-env measures
+  // `mutated` from git, and real SWE-bench instances ARE git checkouts — so a tracked,
+  // then-edited file is the path under test. Without its own .git the temp dir inherits
+  // an ancestor repo (e.g. the dev home dir on Windows, where os.tmpdir() sits under a
+  // git-tracked home), whose status ignores the temp path — a real edit then reads as
+  // unmutated and the verifier is skipped, so `solved` never fires (#2975).
+  const git = (...a) => spawnSync("git", ["-C", dir, "-c", "user.email=t@t", "-c", "user.name=t", ...a], { encoding: "utf8", windowsHide: true });
+  git("init", "-q");
+  git("add", "-A");
+  git("commit", "-qm", "seed");
   return dir;
 }
 const block = (file, search, replace) =>
