@@ -83,7 +83,7 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:var(--sidebar-w,264px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w,296px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
      initColumnResizers() and the chosen widths persist. #trader-cols */
@@ -201,12 +201,12 @@
   .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
-  .hstat{font-family:var(--mono);font-size:11px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
+  .hstat{font-family:var(--mono);font-size:12px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
     padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg0)}
   .hstat .l{color:var(--text2);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em}
   .hstat .v{color:var(--text0)}
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
-  .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
+  .badge{font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
@@ -230,15 +230,14 @@
   .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   /* #2439: watchlist sort control */
   .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
-  .nav-link{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+  .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
   .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{padding:5px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.25;display:flex;align-items:center;gap:8px}
-  .wl-content{flex:1;min-width:0}
+  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:6px 26px 6px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -248,16 +247,15 @@
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
-  .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
+  .wl-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis}
   /* Two aligned columns, not space-between: left holds symbol/change, right holds
      price/signal, so every row forms a real column instead of drifting with each
      value's width. */
-  .wl-row{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:8px}
   .wl-right{display:flex;align-items:center;gap:6px;justify-content:flex-end}
-  .wl-price{font-family:var(--mono);font-size:9.5px;color:var(--text1)}
-  .wl-chg{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap}
+  .wl-price{font-family:var(--mono);font-size:12px;color:var(--text0);text-align:right;font-variant-numeric:tabular-nums}
+  .wl-chg{font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
-  .wl-signal{font-family:var(--mono);font-size:10px}
+  .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
      Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
   .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
@@ -286,7 +284,7 @@
   /* #1709: single full-width "Add symbol" button → opens the search popup */
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{font-family:var(--mono);font-size:11px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
+  .wl-remove{position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -527,7 +525,7 @@
      Priority: chart controls + sign-in/chat > stats > cross-links. The toolbar's
      horizontal scroll stays as the last resort, not the first. ── */
   @media (max-width:1024px){
-    .layout{grid-template-columns:var(--sidebar-w,210px) 1fr}   /* narrower watchlist on tablets */
+    .layout{grid-template-columns:var(--sidebar-w,296px) 1fr}   /* narrower watchlist on tablets */
     .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
     .header{gap:8px;padding:0 10px}
   }
@@ -2875,13 +2873,14 @@ function renderWatchlist(){
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
-    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span></span>';
+    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span class="wl-signal"></span>';
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
-      <div class="wl-content">
-        <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
-        <div class="wl-row"><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span><span class="wl-right">${sigTxt}<button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button></span></div>
-      </div>
+      <span class="wl-sym">${t.ticker}</span>
+      <span class="wl-price">$${_wlPx(t.price)}</span>
+      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
+      ${sigTxt}
+      <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
   }).join('');
   if(activeTicker) renderSymbolInfo(activeTicker);
@@ -4592,7 +4591,7 @@ function initWlInfoResize(){
 // throttled) as you drag. Arrow keys nudge the focused divider. #trader-cols
 function initColumnResizers(){
   const root = document.documentElement;
-  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:180, max:460, def:264 };
+  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:248, max:460, def:296 };
   const TICKET  = { cssVar:'--ticket-w',  key:'trader.ticketW',  min:300, max:560, def:340 };
   [SIDEBAR, TICKET].forEach(c=>{ const v=parseInt(localStorage.getItem(c.key)||'',10); if(v>0) root.style.setProperty(c.cssVar, Math.max(c.min,Math.min(c.max,v))+'px'); });
   let raf=0;
