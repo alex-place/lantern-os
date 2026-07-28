@@ -2426,13 +2426,30 @@ async function handleStreamChat(req, url, res) {
           ];
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           const geminiTransport = require("./gemini-transport").geminiTransport;
+          // #3065 per-step memory: the initial system prompt carries memory retrieved once on
+          // the user message. As the tool loop runs, the turn's real information need clarifies
+          // (which searches/lookups it makes), so we re-query CSF against that evolving context
+          // between steps and inject any NEW relevant memory ADDITIVELY (never replacing the
+          // initial block — so it cannot regress the base case). Mutable + memoized; the delta
+          // stays small (arXiv:2602.17046). Only active on the native tool loop (CHAT_TOOL_EXEC).
+          let _stepSystem = systemPrompt;
+          const _seenMem = new Set();
           const adapter = geminiAdapter(contents, MAX_TOOL_ITERS, async () => geminiToolTurn({
             transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
             model: geminiModelName, contents, tools,
-            systemInstruction: systemPrompt, generationConfig,
+            systemInstruction: _stepSystem, generationConfig,
             onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+          const onBeforeTurn = async ({ calls }) => {
+            const q = (calls || []).map((c) => `${c.name} ${JSON.stringify(c.input || {})}`).join(" ").slice(0, 400);
+            if (!q) return;
+            let fresh = ""; try { fresh = await formatCSFContextForPromptAsync(q); } catch { fresh = ""; }
+            if (fresh && !_seenMem.has(fresh)) {
+              _seenMem.add(fresh);
+              _stepSystem = `${systemPrompt}\n\nUpdated long-term memory (relevant to the current step):\n${String(fresh).slice(0, 1200)}`;
+            }
+          };
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");

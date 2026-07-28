@@ -224,7 +224,7 @@ function geminiToolTurn({ transport, model, contents, tools, systemInstruction, 
 //   pushToolResults(outcomes),               // outcomes: [{call, out, ok}] → append the provider tool-result turn
 // }
 // runTool(name, input): Promise<outcome>     // provided by the caller (closes over operator/userId)
-async function runToolLoop(adapter, { sse, res, runTool }) {
+async function runToolLoop(adapter, { sse, res, runTool, onBeforeTurn }) {
   let toolCalls = 0;
   for (let iter = 0; iter < adapter.maxIters; iter++) {
     const turn = await adapter.turn();
@@ -244,6 +244,11 @@ async function runToolLoop(adapter, { sse, res, runTool }) {
       return { call: c, out, ok: !!r.ok };
     }));
     adapter.pushToolResults(outcomes);
+    // #3065 per-step context seam: after each tool round, let the caller refresh per-step
+    // context (e.g. re-query CSF memory against the calls just made) BEFORE the next model
+    // turn — so later steps get context relevant to what the turn actually became. Passes the
+    // just-completed calls/outcomes. Best-effort: a refresh error must never break the loop.
+    if (onBeforeTurn) { try { await onBeforeTurn({ iter, calls, outcomes }); } catch { /* refresh best-effort */ } }
   }
   return { toolCalls };
 }
