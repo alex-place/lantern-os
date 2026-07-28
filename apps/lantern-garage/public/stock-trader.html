@@ -2008,13 +2008,17 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const z=zones[i]; if(!z.mid) continue;
     const sup  = z.type==='SUPPORT';
     const today= z.tier==='today'||z.tier==='weekly';
-    const op   = Math.max(0.07, Math.min(0.75, (z.strength||40)/100*0.9));
+    // #3050: fills capped LOW — at the old ceiling (0.75) a strong zone was a
+    // near-solid slab that buried the candles inside it. Strength still maps to
+    // opacity, but as background context (0.05-0.20); the always-on edge line
+    // below carries the precise level.
+    const op   = Math.max(0.05, Math.min(0.20, (z.strength||40)/100*0.24));
     const zTop = Math.min(rMax, z.top    || z.mid*1.001);
     const zBot = Math.max(rMin, z.bottom || z.mid*0.999);
     if(zTop<=rMin||zBot>=rMax) continue;
     const bgColor  = sup ? `rgba(0,212,170,${op})` : `rgba(255,95,109,${op})`;
-    const bdColor  = z.triggered_entry ? '#f5a623' : (today ? (sup?'rgba(0,212,170,.6)':'rgba(255,95,109,.6)') : 'transparent');
-    const bdWidth  = (today||z.triggered_entry) ? '1px' : '0';
+    const bdColor  = z.triggered_entry ? '#f5a623' : (sup?`rgba(0,212,170,${today?'.65':'.35'})`:`rgba(255,95,109,${today?'.65':'.35'})`);
+    const bdWidth  = '1px';   // every zone keeps a visible edge now that fills are faint
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
