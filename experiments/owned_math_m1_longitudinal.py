@@ -97,34 +97,48 @@ def _norm_hypothesis(r):
     return re.sub(r"\s+", " ", str(h).strip().lower())[:160]
 
 
+# Evidence-field values that explicitly mean "no external support was found". A record can
+# carry a NON-empty `evidence`/`source` string that literally says there is none — e.g.
+# evidence="no match found", source="none" — and scoring those as support made a legitimate
+# ungrounded→grounded confidence rise read as a free-confidence violation: the same claim went
+# 0.6 ("no match found", sources []) → 0.85 ("codebase: PROVIDERS.md, SCRIPTS.md", sources [1])
+# 11 days apart, which is evidence being ADDED, exactly what M1 permits (#2786).
+_NULL_EVIDENCE = {"", "none", "no match found", "no matches", "no evidence", "not found", "n/a", "unknown"}
+
+
+def _is_real_support(v):
+    """A scalar support field counts unless it's absent or a null-evidence sentinel."""
+    return 0 if str(v).strip().lower() in _NULL_EVIDENCE else 1
+
+
+def _support_count(v):
+    """Support magnitude of a field: list → count of non-sentinel entries; str → 0/1;
+    absent/None → 0. Used per-field so growth in ANY field registers as influx."""
+    if isinstance(v, (list, tuple)):
+        return sum(_is_real_support(x) for x in v)
+    if isinstance(v, str):
+        return _is_real_support(v)
+    return 1 if v else 0
+
+
 def _evidence_signature(r):
     """A hashable signature of the external-evidence support attached to a record.
 
-    Growth of this signature between two records = evidence influx. We fold in
-    every field the ledger uses to record support so a rename doesn't silently
-    read as 'no evidence'."""
-    ev = (
-        r.get("evidence_ids")
-        or r.get("evidence")
-        or r.get("applied_evidence")
-        or r.get("sources")
-        or []
+    Growth of this signature between two records = evidence influx. Each support field is
+    its OWN dimension — NOT an `or`-chain that stops at the first present field — so grounding
+    added to a field the previous record left empty (sources []→["codebase: …"]) always
+    registers. Null-evidence sentinels ("no match found", source "none", …) score 0, so an
+    ungrounded→grounded rise reads as evidence added, not free confidence (#2786)."""
+    return (
+        _support_count(r.get("evidence_ids")),
+        _support_count(r.get("evidence")),
+        _support_count(r.get("applied_evidence")),
+        _support_count(r.get("sources")),
+        _is_real_support(r.get("source")),
+        _support_count(r.get("grounding_signals")),
+        int(bool(r.get("verified"))),
+        int(str(r.get("result", "")).lower() == "grounded"),
     )
-    if isinstance(ev, str):
-        ev_key = 1 if ev.strip() else 0
-    else:
-        try:
-            ev_key = len(ev)
-        except TypeError:
-            ev_key = 1 if ev else 0
-    gs = r.get("grounding_signals") or []
-    try:
-        gs_key = len(gs)
-    except TypeError:
-        gs_key = 1 if gs else 0
-    verified = bool(r.get("verified"))
-    grounded = str(r.get("result", "")).lower() == "grounded"
-    return (ev_key, gs_key, int(verified), int(grounded))
 
 
 def _evidence_added(prev, nxt):
