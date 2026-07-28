@@ -2971,7 +2971,7 @@ function focusTicker(t){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
     // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
-    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
+    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
   openFullscreenChart(t);
 }
@@ -3005,7 +3005,7 @@ function selectChart(t, ev){
   renderSymbolInfo(t);                      // detail panel follows the selection
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                       // order ticket follows the selection
-    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
+    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
 }
 
@@ -3345,7 +3345,7 @@ document.addEventListener('mouseup', function(e){
     setOrderSymbol(drag.dataTicker);
     // Phone: a chart tap just retargets the (closed) ticket — don't pop the bottom
     // sheet over the chart. The BUY/SELL buttons open it explicitly.
-    if(!isNarrowTrader()) openOrderPanel();
+    // a chart tap retargets only — BUY/SELL opens the ticket
   }
 });
 
@@ -4737,7 +4737,7 @@ function startDashboard(){
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && !otUserClosed && !isNarrowTrader() && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+    if(!window.GUEST && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); } // no auto-open on load — the deck keeps full width until the user reaches for a trade
   }, 1600);
   // Restore the saved chart-grid layout (#1628), limiting the options to single/double
   // on phones.
