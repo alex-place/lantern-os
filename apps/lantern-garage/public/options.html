@@ -27,7 +27,7 @@
       --border:#d6dbe4;--text0:#1a1d24;--text1:#4a5160;--text2:#828b9c;
     }
     body { background: var(--bg0); color: var(--text0); font-family: var(--sans); }
-    .opt-shell { max-width: 1240px; margin: 0 auto; padding: 16px 14px 56px; }
+    .opt-shell { max-width: 1400px; margin: 0 auto; padding: 12px 12px 40px; }
     /* Terminal header row: logo + tabs + symbol, mirroring .header on the trader. */
     .opt-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
       background: var(--bg1); border: 1px solid var(--border); border-radius: 10px;
@@ -67,25 +67,41 @@
       color: var(--text2); white-space: nowrap; }
     .tab:hover { color: var(--text1); }
     .tab.active { color: var(--text0); border-bottom-color: var(--blue); background: none; }
-    .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 9px 0; align-items: center; }
+    .chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 0 0 8px; align-items: center; }
     .chip { font-family: var(--mono); padding: 4px 10px; border-radius: 3px; font-size: 11px;
       cursor: pointer; border: 1px solid var(--border); background: var(--bg2); color: var(--text1);
       font-variant-numeric: tabular-nums; }
     .chip:hover { background: var(--bg3); color: var(--text0); }
     .chip.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+    /* Expiry sections are a continuous LIST (TradingView-style), not a stack of
+       floating cards — one border, rows flush against each other. */
     .card { background: var(--bg1); border: 1px solid var(--border); border-radius: 10px;
       padding: 12px 14px; margin-bottom: 12px; }
+    #chainBody { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg1); }
+    #chainBody details { border-bottom: 1px solid var(--border); }
+    #chainBody details:last-child { border-bottom: 0; }
     .scrollx { overflow-x: auto; }
-    table.opt { width: 100%; border-collapse: collapse; font-size: 12px; }
-    table.opt th { color: var(--text2); font-weight: 600; font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; padding: 5px 7px; border-bottom: 1px solid var(--border); text-align: right; }
-    table.opt td { padding: 4px 7px; border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    table.opt { width: 100%; border-collapse: collapse; font-size: 11.5px; font-family: var(--mono); }
+    table.opt th { color: var(--text2); font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .05em; padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: right; position: sticky; top: 0; background: var(--bg1); }
+    table.opt td { padding: 2px 6px; border-bottom: 1px solid color-mix(in srgb, var(--border) 40%, transparent); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1.5; }
+    table.opt tbody tr:hover td { background: var(--bg2); }
     td.strikeCol, th.strikeCol { text-align: center !important; font-weight: 700; background: var(--bg2); }
     tr.itm-c td.cside { background: color-mix(in srgb, var(--green) 7%, transparent); }
     tr.itm-p td.pside { background: color-mix(in srgb, var(--red) 7%, transparent); }
-    tr.spotrow td { border-top: 2px dashed var(--blue); padding: 3px 7px; text-align: center; color: var(--blue); font-weight: 700; font-size: 11.5px; }
-    .expHead { display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 8px 4px; user-select: none; }
-    .expHead b { font-size: 13.5px; }
-    .dte { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue); }
+    tr.spotrow td { border-top: 1px dashed var(--blue); border-bottom: 1px dashed var(--blue); padding: 2px 6px; text-align: center; color: var(--blue); font-weight: 700; font-size: 10.5px; letter-spacing: .04em; }
+    /* Expiry disclosure row: a rotating caret makes it obvious these expand. */
+    .expHead { display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 7px 10px;
+      user-select: none; list-style: none; font-family: var(--mono); }
+    .expHead::-webkit-details-marker { display: none; }   /* replaced by our own caret */
+    .expHead:hover { background: var(--bg2); }
+    .expHead .caret { display: inline-block; width: 9px; color: var(--text2); font-size: 10px;
+      transition: transform .15s; }
+    details[open] > .expHead .caret { transform: rotate(90deg); }
+    details[open] > .expHead { background: var(--bg2); }
+    .expHead b { font-size: 12px; font-weight: 600; color: var(--text0); letter-spacing: .01em; }
+    .dte { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 3px;
+      background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue); }
+    .expHead .cnt { color: var(--text2); font-size: 10.5px; margin-left: auto; }
     /* Calls read green, puts read red — subtle tints that keep the theme intact. */
     .volbar { display: inline-block; height: 8px; background: var(--blue); opacity: .55; border-radius: 2px; vertical-align: middle; margin-left: 6px; }
     td.cside .volbar { background: var(--green); }
@@ -117,7 +133,7 @@
 
 <main class="opt-shell">
   <div class="opt-head">
-    <h1 title="Unisona Options — chain, volatility and volume analysis">Unisona<span style="color:var(--text0)">Options</span></h1>
+    <h1 title="Unisona Trader — watch, trade, options">Unisona<span style="color:var(--text0)">Trader</span></h1>
     <div class="page-tabs" role="navigation" aria-label="Trading pages">
       <a class="pt" href="/watch.html">Watch</a><a class="pt" href="/stock-trader.html">Trade</a><a class="pt on" href="/options.html" aria-current="page">Options</a>
     </div>
@@ -129,7 +145,7 @@
     <span class="spot" id="spot"></span>
     <span class="muted" id="meta"></span>
   </div>
-  <p class="muted" style="margin:0 0 4px">Live chain (free feed, ~15&nbsp;min cache). Viewing and analysis only — nothing here places orders.</p>
+  <p class="muted" style="margin:0 0 8px;font-size:11px">Live chain (free feed, ~15&nbsp;min cache). Viewing and analysis only — nothing here places orders.</p>
 
   <div class="tabs" role="tablist">
     <button class="tab active" data-tab="chain" onclick="showTab('chain')">Chain</button>
@@ -207,6 +223,24 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num = (x, d=2) => (x==null || isNaN(x)) ? '—' : Number(x).toFixed(d);
 const fmtVol = (v) => v==null ? '—' : v>=1000 ? (v/1000).toFixed(1)+'K' : String(v);
+// "2026-07-29" → "July 29" (the year only when it isn't this one). A full ISO date
+// on every expiry row is noise — the DTE badge beside it already carries the
+// "how far out" signal, so the date only needs to identify the day.
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function fmtExp(iso){
+  const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(iso||'');
+  const [, y, mo, d] = m;
+  const label = `${MONTHS[Number(mo)-1]} ${Number(d)}`;
+  return Number(y) === new Date().getFullYear() ? label : `${label} ${y}`;
+}
+// Compact variant for the volatility chips + volume column heads, where a full
+// month name is too wide to keep the grid dense.
+function fmtExpShort(iso){
+  const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(iso||'');
+  return `${MONTHS[Number(m[2])-1].slice(0,3)} ${Number(m[3])}`;
+}
 
 let CHAIN = null;   // { spot, expiries: [{exp, dte, rows: Map(strike → {call, put})}] }
 let N_STRIKES = 6;  // per side of spot; 0 = all
@@ -285,8 +319,21 @@ async function loadAll(){
 function renderChain(){
   if (!CHAIN) return;
   const parts = [];
+  // Open the nearest expiry that actually CARRIES quotes/greeks, not blindly the
+  // first. After hours the 0-DTE expiry comes back with empty IV and delta
+  // columns, so defaulting to it opened the page on a wall of dashes that read
+  // as a broken page rather than an expired contract. Falls back to index 0.
+  const hasData = (e) => {
+    for (const r of e.rows.values()) {
+      const c = r.call, p = r.put;
+      if ((c && (c.implied_volatility > 0 || c.delta != null)) ||
+          (p && (p.implied_volatility > 0 || p.delta != null))) return true;
+    }
+    return false;
+  };
+  const openIdx = Math.max(0, CHAIN.expiries.findIndex(hasData));
   CHAIN.expiries.forEach((e, i) => {
-    const open = i===0 ? ' open' : '';
+    const open = i===openIdx ? ' open' : '';
     const ks = strikesFor(e.rows, CHAIN.spot);
     const maxV = Math.max(1, ...ks.flatMap(k=>{const r=e.rows.get(k);return [r.call&&r.call.volume||0, r.put&&r.put.volume||0];}));
     let rowsHtml = ''; let spotDone = false;
@@ -305,7 +352,7 @@ function renderChain(){
         + `<td class="strikeCol">${num(k, k%1?2:0)}</td><td class="strikeCol" style="font-weight:400">${c.implied_volatility!=null?num(c.implied_volatility*100,1)+'%':(p.implied_volatility!=null?num(p.implied_volatility*100,1)+'%':'—')}</td>`
         + `${side(p,'pside')}<td>${fmtVol(p.open_interest)}</td></tr>`;
     }
-    parts.push(`<details class="card"${open?' open':''}><summary class="expHead"><b>${esc(e.exp)}</b><span class="dte">${e.dte} DTE</span><span class="muted">${ks.length} strikes</span></summary>
+    parts.push(`<details${open?' open':''}><summary class="expHead"><span class="caret">▶</span><b>${esc(fmtExp(e.exp))}</b><span class="dte">${e.dte} DTE</span><span class="cnt">${ks.length} strikes</span></summary>
       <div class="scrollx"><table class="opt">
       <tr><th colspan="5" class="chead" style="text-align:left">Calls</th><th class="strikeCol">Strike</th><th class="strikeCol">IV</th><th colspan="5" class="phead">Puts</th><th></th></tr>
       <tr><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th class="strikeCol"></th><th class="strikeCol"></th><th>Last</th><th>Bid</th><th>Ask</th><th>Δ</th><th>Vol</th><th>OI(P)</th></tr>
@@ -318,7 +365,7 @@ function renderChain(){
 function renderVolChips(){
   if (!CHAIN) return;
   $('volExpChips').innerHTML = CHAIN.expiries.map(e =>
-    `<button class="chip${e.exp===VOL_EXP?' active':''}" onclick="VOL_EXP='${e.exp}';renderVolChips();drawIV()">${esc(e.exp.slice(5))} <span class="muted">${e.dte}d</span></button>`).join('');
+    `<button class="chip${e.exp===VOL_EXP?' active':''}" onclick="VOL_EXP='${e.exp}';renderVolChips();drawIV()">${esc(fmtExpShort(e.exp))} <span class="muted">${e.dte}d</span></button>`).join('');
 }
 function drawIV(){
   const cv = $('ivCanvas'); const ctx = cv.getContext('2d');
@@ -359,7 +406,7 @@ function renderVolume(){
   for (const e of exps) for (const k of strikesFor(e.rows, CHAIN.spot)) strikeSet.add(k);
   const strikes = [...strikeSet].sort((a,b)=>a-b);
   if (!strikes.length) { $('volumeBody').innerHTML='<span class="muted">No contracts.</span>'; return; }
-  let h = `<table class="opt hm"><tr><th style="text-align:left">Strike</th>${exps.map(e=>`<th colspan="2">${esc(e.exp.slice(5))}<div class="muted" style="font-size:9px">${e.dte}d · C / P</div></th>`).join('')}</tr>`;
+  let h = `<table class="opt hm"><tr><th style="text-align:left">Strike</th>${exps.map(e=>`<th colspan="2">${esc(fmtExpShort(e.exp))}<div class="muted" style="font-size:9px">${e.dte}d · C / P</div></th>`).join('')}</tr>`;
   for (const k of strikes) {
     h += `<tr><td style="text-align:left;font-weight:700">${num(k, k%1?2:0)}${CHAIN.spot&&Math.abs(k-CHAIN.spot)<0.5?' ◂':''}</td>`;
     for (const e of exps) {
