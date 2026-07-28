@@ -158,6 +158,14 @@ const PUBLIC_TRADING_READS = new Set([
   "/api/trading/logo",              // brand-logo proxy
   "/api/trading/news/recent",       // public news feed
   "/api/trading/demo-feed",         // sanitized demo-account spectator feed (#2548)
+  // Options ANALYSIS is market data, exactly like the Watch page's charts/news:
+  // the chain, the IV smile and the volume view are read-only views of public
+  // quotes. Gating them behind Pro left a logged-out visitor staring at "Chain
+  // unavailable — no data source" on a page we link them to (reported on
+  // unisona.ai). PLACING an options order stays Pro — that route is a POST
+  // (/api/trading/options/order) and this allowlist is GET-only.
+  "/api/trading/options/chain",     // read-only chain snapshot (free quote feed)
+  "/api/trading/options/strategies", // deterministic advisory proposals — no orders
 ]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue
