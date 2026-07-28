@@ -271,7 +271,7 @@
   .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
      Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
-  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:10px 12px 12px;border-top:1px solid var(--border);background:var(--bg1)}
   .wl-info.show{display:block}
   /* Drag handle to resize the symbol-info panel — only visible while the panel is shown. */
   .wl-resize{display:none;position:relative;flex:0 0 auto;height:11px;cursor:ns-resize;background:var(--bg1);touch-action:none}
@@ -279,18 +279,18 @@
   .wl-resize:hover::before{background:var(--tv-text-secondary)}
   .sidebar:has(.wl-info.show) .wl-resize{display:block}
   body.resizing-wlinfo{user-select:none;cursor:ns-resize}
-  .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
-  .wi-name{font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .wi-px{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px}
+  .wi-sym{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text0);display:inline}
+  .wi-name{font-size:10.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wi-px{font-family:var(--mono);font-size:13px;font-weight:700;margin-top:6px}
   .wi-meta{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
   .wi-meta b{color:var(--text1);font-weight:600}
   /* #1711: expanded info — Technicals / Returns / Key stats sections */
-  .wi-sect{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
-  .wi-tech{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text1)}
+  .wi-sect{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:9px 0 5px;border-top:1px solid color-mix(in srgb, var(--border) 70%, transparent);padding-top:7px}
+  .wi-tech{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text1)}
   .wi-tech.up{color:var(--green)} .wi-tech.dn{color:var(--red)}
-  .wi-rets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .wi-ret{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:5px 4px;text-align:center}
-  .wi-ret-v{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)}
+  .wi-rets{display:grid;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:5px}
+  .wi-ret{background:var(--bg2);border:1px solid color-mix(in srgb, var(--border) 70%, transparent);border-radius:6px;padding:6px 4px;text-align:center;min-width:0}
+  .wi-ret-v{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--text2)}
   .wi-ret.up .wi-ret-v{color:var(--green)} .wi-ret.dn .wi-ret-v{color:var(--red)}
   .wi-ret-l{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:1px}
   .wl-add{display:flex;padding:8px 12px;border-bottom:1px solid var(--border)}
@@ -2008,13 +2008,17 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const z=zones[i]; if(!z.mid) continue;
     const sup  = z.type==='SUPPORT';
     const today= z.tier==='today'||z.tier==='weekly';
-    const op   = Math.max(0.07, Math.min(0.75, (z.strength||40)/100*0.9));
+    // #3050: fills capped LOW — at the old ceiling (0.75) a strong zone was a
+    // near-solid slab that buried the candles inside it. Strength still maps to
+    // opacity, but as background context (0.05-0.20); the always-on edge line
+    // below carries the precise level.
+    const op   = Math.max(0.05, Math.min(0.20, (z.strength||40)/100*0.24));
     const zTop = Math.min(rMax, z.top    || z.mid*1.001);
     const zBot = Math.max(rMin, z.bottom || z.mid*0.999);
     if(zTop<=rMin||zBot>=rMax) continue;
     const bgColor  = sup ? `rgba(0,212,170,${op})` : `rgba(255,95,109,${op})`;
-    const bdColor  = z.triggered_entry ? '#f5a623' : (today ? (sup?'rgba(0,212,170,.6)':'rgba(255,95,109,.6)') : 'transparent');
-    const bdWidth  = (today||z.triggered_entry) ? '1px' : '0';
+    const bdColor  = z.triggered_entry ? '#f5a623' : (sup?`rgba(0,212,170,${today?'.65':'.35'})`:`rgba(255,95,109,${today?'.65':'.35'})`);
+    const bdWidth  = '1px';   // every zone keeps a visible edge now that fills are faint
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
