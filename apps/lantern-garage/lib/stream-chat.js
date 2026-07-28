@@ -89,6 +89,39 @@ const CODING_PATCH_DIRECTIVE =
 function codingPatchDirective(isCodingIntent, routeIntent) {
   return (isCodingIntent || CODING_INTENTS.has(routeIntent)) ? CODING_PATCH_DIRECTIVE : "";
 }
+
+// ── prepareStep seam (#3065) ────────────────────────────────────────────────
+// The chat harness historically built ONE system prompt before the provider dispatch loop,
+// so the model could never be told which model was actually about to answer (root cause of
+// #3064). Every mature agentic harness rebuilds per-step context instead: Vercel AI SDK
+// `prepareStep`, LangGraph `pre_model_hook`, Goose per-invocation PromptManager, smolagents
+// `write_memory_to_messages`. arXiv:2602.17046 ("Dynamic System Instructions and Tool
+// Exposure") shows the efficient shape — inject only a MINIMAL per-step fragment on top of a
+// stable, cacheable base rather than re-ingesting bulk instructions each step. So we keep the
+// base (prompt-cached on Anthropic) and prepend one short serving-model line per attempt.
+const _PROVIDER_VENDOR = {
+  gemini: "a Google Gemini model",
+  anthropic: "an Anthropic Claude model",
+  openai: "an OpenAI GPT model",
+  xai: "an xAI Grok model",
+  cohere: "a Cohere model",
+  ollama: "a locally-served open model",
+  "keystone-ft": "unisona.ai's local fine-tuned model",
+};
+function servingModelLine(provider, model) {
+  const vendor = _PROVIDER_VENDOR[provider] || "the selected model";
+  const id = model ? "`" + model + "`" : "the local model";
+  return "SERVING MODEL — THIS TURN: " + id + " (" + vendor + "). This is the actual model "
+    + "generating this reply right now. If the user asks which model, LLM, or engine is "
+    + "answering, tell them plainly: " + id + ". This does not change that unisona.ai (the "
+    + "product) is model-agnostic and was not built by any single vendor — it only names the "
+    + "model handling this one turn.";
+}
+// Recompose the per-attempt system prompt from the stable base. The seam where future
+// per-step context (fresh memory retrieval, message-window trimming) can be injected too.
+function prepareStep(baseSystemPrompt, ctx) {
+  return servingModelLine(ctx.provider, ctx.model) + "\n\n" + baseSystemPrompt;
+}
 const { emitClaimDraft } = require("./claim-drafter");
 
 const repoRoot = path.resolve(__dirname, "../../../");
@@ -1424,12 +1457,13 @@ async function handleStreamChat(req, url, res) {
   // (debug + router).
   const KEYSTONE_IDENTITY =
     "You are unisona.ai — the assistant of a local-first, model-agnostic " +
-    "reasoning system. You are part of unisona.ai; you were NOT built by Google, OpenAI, " +
-    "Anthropic, xAI, or any other company, and you must never claim otherwise. unisona.ai " +
-    "routes each turn across a chain of interchangeable models, so the specific model serving " +
-    "any given turn varies. If asked which model or company powers you, answer consistently: " +
-    "you are unisona.ai, which selects from several interchangeable " +
-    "providers per turn — do not name a specific vendor as your maker or invent a model name. " +
+    "reasoning system. unisona.ai (the PRODUCT) was NOT built by Google, OpenAI, Anthropic, " +
+    "xAI, or any other company; never claim any of them created unisona.ai. unisona.ai is " +
+    "model-agnostic — it can route a turn through any of several interchangeable models. Being " +
+    "HONEST about which model is serving the current turn is expected: the serving model for " +
+    "this turn is stated below (SERVING MODEL — THIS TURN), and if the user asks which model, " +
+    "LLM, or engine is answering, tell them plainly. Naming the serving model does not " +
+    "contradict unisona.ai being model-agnostic or not built by any single vendor. " +
     // #2802 identity floor: the product is the primary source about itself. The general
     // web-search rule ("search when unsure about a project's current status") sent the model
     // to the web about its OWN identity, and it hedged stale external sources against these
@@ -1448,6 +1482,9 @@ async function handleStreamChat(req, url, res) {
 
   // Coding-change patch directive (#2218 SWE-bench leak) — see codingPatchDirective().
   systemPrompt += codingPatchDirective(isCodingIntent, routeIntent);
+  // #3065 prepareStep seam: freeze the stable base. The dispatch loop recomposes the
+  // per-attempt prompt from it (prepending the actual serving-model line) each iteration.
+  const _stepBasePrompt = systemPrompt;
 
 
   const sendToken = (token) => sse.sendToken(res, token);
@@ -2401,6 +2438,11 @@ async function handleStreamChat(req, url, res) {
     fullReply = "";   // fresh per provider — never carry a failed attempt's partial text
     canaryTrace.reset(); // #2791: trajectory restarts with the fresh attempt
     surprise.reset(); // #1678: nor a failed attempt's captured logprobs
+    // #3065 prepareStep seam: recompose the system prompt for THIS provider attempt so the
+    // model is told the ACTUAL serving model (provider+resolved id) and can identify itself
+    // honestly (#3064). modelFor(_p) returns the pinned model for a pinned provider, else the
+    // provider default — so the injected id always matches what actually answers.
+    systemPrompt = prepareStep(_stepBasePrompt, { provider: _p, model: modelFor(_p) });
 
   // Provider: Gemini (streaming)
   const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
