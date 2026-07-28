@@ -4546,7 +4546,30 @@ function initChartDrag(){
   });
 }
 
+// Arrived here because the trading terminal is Pro-only (?from=trader). Say so
+// once, softly, with the way forward — a silent redirect would just feel broken.
+function _noteRedirectedFromTrader(){
+  try{
+    if(new URLSearchParams(location.search).get('from') !== 'trader') return;
+    if(sessionStorage.getItem('fromTraderNoteSeen')) return;
+    const bar=document.createElement('div');
+    bar.id='fromTraderNote'; bar.setAttribute('role','status');
+    bar.style.cssText='display:flex;align-items:center;gap:10px;padding:9px 14px;'
+      +'background:color-mix(in srgb, var(--blue,#58a6ff) 12%, var(--bg1,#0d1117));'
+      +'border-bottom:1px solid var(--blue,#58a6ff);font-size:12.5px;line-height:1.45;color:var(--text0,#e6e6ea)';
+    bar.innerHTML='<b style="white-space:nowrap">You’re on Watch</b>'
+      +'<span>Charts, your watchlist, news and signals are <b>free</b>. The trading terminal — placing orders and editing the AI tradelist — is part of <b>$20 Pro</b>. '
+      +'<a href="/pricing.html" style="color:var(--blue,#58a6ff)">See plans</a> · '
+      +'<a href="/stock-trader.html?stay=1" style="color:var(--text2,#8b8b95)">peek at the terminal</a></span>'
+      +'<button type="button" aria-label="Dismiss" style="margin-left:auto;background:none;border:1px solid var(--border,#30363d);color:inherit;border-radius:6px;padding:2px 9px;cursor:pointer">✕</button>';
+    bar.querySelector('button').onclick=()=>{ bar.remove(); try{sessionStorage.setItem('fromTraderNoteSeen','1');}catch(e){} };
+    const layout=document.querySelector('.layout');
+    if(layout && layout.parentNode) layout.parentNode.insertBefore(bar, layout);
+  }catch(_e){ /* a banner must never break the page */ }
+}
+
 function startDashboard(){
+  _noteRedirectedFromTrader();
   _restoreBarsCache();          // preload cached bars so the first chart render paints instantly
   // Reflect the remembered timeframe in the selectors (chartTimeframe was restored
   // from localStorage at init).

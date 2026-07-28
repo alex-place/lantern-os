@@ -4687,7 +4687,20 @@ async function applyTierGate(){
     const s = await (await fetch('/api/auth/session')).json();
     if (s && s.authRequired === false) return;              // auth funnel off → operator box
     const proPlus = ['deep_dreamer','founder','pilot','tech_support','admin'].includes(String(s && s.role));
-    if (!proPlus) { const el = document.getElementById('tradeLock'); if (el) el.style.display='flex'; }
+    if (proPlus) return;
+    // Free/guest: SEND THEM SOMEWHERE THEY CAN USE, don't wall them in.
+    // Landing a Free user on a dead page behind a modal is a hostile first
+    // experience — the nav "Trader" link is the main entry point, so they hit a
+    // paywall before seeing anything work. Watch is the free product (charts,
+    // watchlist, news, signals): go there, and say why, with the upgrade path.
+    // ?stay=1 escapes the redirect so the CTA is still reachable deliberately
+    // (e.g. from pricing), and we never bounce a page opened from Watch itself.
+    const params = new URLSearchParams(location.search);
+    if (params.get('stay') === '1') {
+      const el = document.getElementById('tradeLock'); if (el) el.style.display='flex';
+      return;
+    }
+    location.replace('/watch.html?from=trader');
   }catch(_e){ /* session unreachable → leave the page usable */ }
 }
 
