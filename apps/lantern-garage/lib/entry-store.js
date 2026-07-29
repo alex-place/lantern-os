@@ -212,16 +212,30 @@ function addAnalysisRun(repoRoot, entryId, run) {
 
 // Record the last analysis failure on the entry so a reopened project can show
 // what went wrong (cleared on the next successful run).
+// Persist a structured analysis failure (stage + reason) so the dashboard can show exactly
+// what went wrong instead of a silent hang, AND append a failed run to the analysisRuns audit
+// trail — so a failure is visible in run history next to the successful runs addAnalysisRun
+// records. (The audit-trail half had been dead code since a duplicate declaration shadowed
+// the richer implementation; restored deliberately.)
 function recordAnalysisError(repoRoot, entryId, err) {
   const entry = getEntry(repoRoot, entryId);
   if (!entry) return null;
+  const at = (err && err.at) || new Date().toISOString();
+  const analysisRuns = [...(entry.analysisRuns || []), {
+    jobId: (err && err.jobId) || null,
+    status: "failed",
+    stage: (err && err.stage) || null,
+    error: (err && err.error) || "unknown error",
+    finishedAt: at,
+  }].slice(-20);   // same cap as addAnalysisRun
   return updateEntry(repoRoot, entryId, {
     analysisError: {
       stage: (err && err.stage) || "unknown",
       error: (err && err.error) || "unknown error",
-      at: (err && err.at) || new Date().toISOString(),
+      at,
       jobId: (err && err.jobId) || null,
     },
+    analysisRuns,
     status: "failed",
   });
 }
