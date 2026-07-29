@@ -296,7 +296,10 @@ function _thumbMarkdown(entry) {
 const REGISTRY = {
   Read: {
     policy: "read", desc: "Read a file from the filesystem (repo-relative).",
-    schema: { type: "object", properties: { file_path: { type: "string" }, limit: { type: "integer" } }, required: ["file_path"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to the file, e.g. apps/lantern-garage/server.js" },
+      limit: { type: "integer", description: "How many lines to return from the top of the file. Default 80, maximum 400." },
+    }, required: ["file_path"] },
     run(i) {
       const p = _safe(i.file_path);
       if (!fs.statSync(p).isFile()) return `[not a file: ${i.file_path}]`;
@@ -306,7 +309,7 @@ const REGISTRY = {
   },
   LS: {
     policy: "read", desc: "List the entries of a directory (repo-relative).",
-    schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+    schema: { type: "object", properties: { path: { type: "string", description: "Repo-relative directory to list, e.g. apps/lantern-garage/lib" } }, required: ["path"] },
     run(i) {
       const p = _safe(i.path || ".");
       if (!fs.statSync(p).isDirectory()) return `[not a directory: ${i.path}]`;
@@ -316,7 +319,10 @@ const REGISTRY = {
   },
   Glob: {
     policy: "read", desc: "Find files matching a glob pattern (e.g. **/*.js).",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Glob such as **/*.js — matched against each repo-relative path AND its bare filename. Searches subdirectories." },
+      path: { type: "string", description: "Repo-relative directory to search from. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = _globToRe(i.pattern || "*");
       const hits = [];
@@ -334,7 +340,10 @@ const REGISTRY = {
   },
   Grep: {
     policy: "read", desc: "Search file contents for a regular expression.",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Regular expression. Always case-insensitive." },
+      path: { type: "string", description: "Repo-relative file OR directory. A directory scans only the files directly inside it — it does NOT recurse, so use Glob first to locate files in nested folders. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = new RegExp(String(i.pattern || ""), "i");
       const out = [];
@@ -347,22 +356,29 @@ const REGISTRY = {
   },
   Bash: {
     policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   PowerShell: {
     policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   Write: {
     policy: "mutating", desc: "Write a file (repo-relative), overwriting it. Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, content: { type: "string" } }, required: ["file_path", "content"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to write. Parent directories must already exist." },
+      content: { type: "string", description: "Full new file contents — this REPLACES the whole file, so include everything you want kept." },
+    }, required: ["file_path", "content"] },
     run(i) { const p = _safe(i.file_path); fs.writeFileSync(p, String(i.content == null ? "" : i.content), "utf8"); return `wrote ${i.file_path} (${String(i.content || "").length} bytes)`; },
   },
   Edit: {
     policy: "mutating", desc: "Replace an exact unique string in a file (repo-relative). Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } }, required: ["file_path", "old_string", "new_string"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to edit." },
+      old_string: { type: "string", description: "Exact text to replace, including indentation. Must occur EXACTLY once in the file — the edit is rejected if it is missing or ambiguous, so include surrounding lines to make it unique." },
+      new_string: { type: "string", description: "Replacement text." },
+    }, required: ["file_path", "old_string", "new_string"] },
     run(i) {
       const p = _safe(i.file_path);
       const src = fs.readFileSync(p, "utf8");
@@ -402,11 +418,22 @@ const REGISTRY = {
       const results = payload.results || [];
       if (!results.length) return `[no results for: ${query}]`;
       const lines = [`web_search("${query}") — ${results.length} result(s)${payload.source && payload.source !== "mcp" ? ` (${payload.source} fallback)` : ""}:\n`];
+      // Surface every field the source actually gave us, each on its own labelled line, so
+      // the model can cite a real publisher and date and can render an image when one
+      // exists — instead of receiving title+snippet and answering "per USA Today" with no
+      // link. Fields are only emitted when present, so a thin source stays compact.
       results.forEach((r, idx) => {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);
+        if (r.published) lines.push(`    published: ${r.published}`);
+        if (r.publisher || r.source) lines.push(`    publisher: ${r.publisher || r.source}`);
+        // Google News links are opaque redirects; the publisher's own domain is the
+        // citable one, so give it to the model explicitly.
+        if (r.publisherUrl) lines.push(`    publisher_url: ${r.publisherUrl}`);
+        if (r.image) lines.push(`    image: ${r.image}`);
         if (r.snippet) lines.push(`    snippet: ${r.snippet}`);
       });
+      lines.push(`\nCite sources as Markdown links. When a result has an image, you may show it with ![title](image). Use publisher_url when the url is a redirect.`);
       return lines.join("\n");
     },
   },
@@ -877,7 +904,7 @@ const REGISTRY = {
   workspace_read: {
     policy: "read",
     desc: "Read a file from the user workspace (~/.keystone/workspace/). Use for user-owned artifacts: resumes, exports, generated docs.",
-    schema: { type: "object", properties: { file_path: { type: "string" } }, required: ["file_path"] },
+    schema: { type: "object", properties: { file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/), e.g. notes/todo.md" } }, required: ["file_path"] },
     run(i) {
       const p = _safeWs(i.file_path);
       if (!fs.existsSync(p)) throw _codedError(`workspace file not found: ${i.file_path}`, "not_found");
@@ -890,7 +917,10 @@ const REGISTRY = {
     desc: "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
     schema: {
       type: "object",
-      properties: { file_path: { type: "string" }, content: { type: "string" } },
+      properties: {
+        file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/). Missing parent directories are created." },
+        content: { type: "string", description: "Full file contents — replaces the whole file." },
+      },
       required: ["file_path", "content"],
     },
     run(i) {
@@ -904,7 +934,7 @@ const REGISTRY = {
   workspace_list: {
     policy: "read",
     desc: "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
-    schema: { type: "object", properties: { path: { type: "string" } } },
+    schema: { type: "object", properties: { path: { type: "string", description: "Sub-directory of the user workspace to list. Defaults to the workspace root." } } },
     run(i) {
       _ensureWorkspace();
       const dir = _safeWs(i.path || ".");
@@ -921,7 +951,7 @@ const REGISTRY = {
       type: "object",
       properties: {
         filename: { type: "string", description: "Workspace-relative path, e.g. 'resume-2026.md'" },
-        content: { type: "string" },
+        content: { type: "string", description: "Document body. Markdown headings, lists and tables are converted to real formatting." },
         format: { type: "string", enum: ["markdown", "text"], description: "File format hint (default: markdown)" },
       },
       required: ["filename", "content"],
@@ -1146,7 +1176,7 @@ const REGISTRY = {
 
   creator_job_status: {
     policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
-    schema: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
+    schema: { type: "object", properties: { jobId: { type: "string", description: "Job id returned when the creator job was submitted." } }, required: ["jobId"] },
     run(i) {
       const { jobQueue, repoRoot } = _creatorCtx();
       const job = jobQueue.getJob((i.jobId || "").trim());
@@ -1759,6 +1789,119 @@ function _validateArgs(schema, input) {
   return errs.length ? errs.join("; ") : null;
 }
 
+// ── Tool-call argument REPAIR (#3068) ────────────────────────────────────────
+// _validateArgs (#2753) rejects a malformed call, which costs the model a whole step to
+// discover a mistake that is usually mechanical and unambiguous: args sent as a JSON
+// STRING, a number sent as "5", a key cased/snake-cased differently than the schema, a
+// single value where an array is wanted. The AI SDK's answer (experimental_repairToolCall)
+// re-prompts the model; that is a second round-trip for a fix we can make deterministically.
+// So: repair what is UNAMBIGUOUS, re-validate, and only reject what we genuinely cannot fix.
+// Every repair is reported (never silent) so it stays observable in the tool log.
+
+// "max_results" / "maxResults" / "Max-Results" → "maxresults" for schema-key matching.
+function _normKey(k) { return String(k).toLowerCase().replace(/[_\-\s]/g, ""); }
+
+function _coerceScalar(want, v) {
+  const t = Array.isArray(v) ? "array" : typeof v;
+  if (want === "string" && (t === "number" || t === "boolean")) return String(v);
+  if ((want === "number" || want === "integer") && t === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+    const n = Number(v);
+    if (want === "integer") return Number.isInteger(n) ? n : Math.trunc(n);
+    return n;
+  }
+  if (want === "boolean" && t === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  // A JSON string where an object/array is wanted — the single most common wire mistake.
+  if ((want === "array" || want === "object") && t === "string") {
+    try {
+      const parsed = JSON.parse(v);
+      const pt = Array.isArray(parsed) ? "array" : typeof parsed;
+      if (pt === want) return parsed;
+    } catch { /* not JSON — fall through */ }
+  }
+  // A lone value where a list is wanted.
+  if (want === "array" && (t === "string" || t === "number" || t === "boolean")) return [v];
+  return undefined;   // no unambiguous repair
+}
+
+/**
+ * Best-effort, deterministic repair of tool-call arguments against a JSON schema.
+ * Returns { input, repairs[] } — `input` unchanged and `repairs` empty when nothing applied.
+ * Never throws; never guesses semantics (unknown keys and ambiguous cases are left alone).
+ */
+function _repairArgs(schema, rawInput) {
+  const repairs = [];
+  let input = rawInput;
+
+  // (a) The whole argument blob arrived as a JSON string.
+  if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        input = parsed;
+        repairs.push("parsed JSON-string arguments");
+      }
+    } catch { /* leave it — validation will report */ }
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { input: rawInput, repairs: [] };
+  if (!schema || schema.type !== "object") return { input, repairs };
+
+  const props = schema.properties || {};
+  const propKeys = Object.keys(props);
+  if (!propKeys.length) return { input, repairs };
+
+  // (b) Args wrapped in a redundant envelope: {input:{…}} / {args:{…}} / {arguments:{…}},
+  // but only when the wrapper's contents actually look like this tool's arguments.
+  const inKeys = Object.keys(input);
+  if (inKeys.length === 1 && ["input", "args", "arguments", "parameters", "params"].includes(_normKey(inKeys[0]))) {
+    const inner = input[inKeys[0]];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)
+        && Object.keys(inner).some((k) => propKeys.some((p) => _normKey(p) === _normKey(k)))) {
+      input = inner;
+      repairs.push(`unwrapped '${inKeys[0]}' envelope`);
+    }
+  }
+
+  const out = { ...input };
+
+  // (c) Key casing / snake-vs-camel mismatches → the schema's exact key. Skipped whenever
+  // it would be ambiguous (two input keys normalizing onto one schema key, or the correct
+  // key already present).
+  for (const k of Object.keys(out)) {
+    if (props[k]) continue;                                   // already exact
+    const matches = propKeys.filter((p) => _normKey(p) === _normKey(k));
+    if (matches.length !== 1) continue;                       // no match, or ambiguous
+    const target = matches[0];
+    if (out[target] !== undefined) continue;                  // don't clobber a real value
+    const collisions = Object.keys(out).filter((o) => _normKey(o) === _normKey(k));
+    if (collisions.length !== 1) continue;                    // two aliases for one key
+    out[target] = out[k];
+    delete out[k];
+    repairs.push(`renamed '${k}' → '${target}'`);
+  }
+
+  // (d) Type coercions for values that are unambiguously the right thing in the wrong shape.
+  for (const [k, v] of Object.entries(out)) {
+    const want = props[k] && props[k].type;
+    if (!want || v === undefined || v === null) continue;
+    const t = Array.isArray(v) ? "array" : typeof v;
+    const already = want === "integer" ? (t === "number" && Number.isInteger(v))
+      : want === "object" ? (t === "object" && !Array.isArray(v))
+      : t === want;
+    if (already) continue;
+    const fixed = _coerceScalar(want, v);
+    if (fixed !== undefined) {
+      out[k] = fixed;
+      repairs.push(`coerced '${k}' to ${want}`);
+    }
+  }
+
+  return { input: out, repairs };
+}
+
 // Is `name` gated for this run? (#2777) The gate set is the union of the env
 // CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
 // case-insensitive. Used to enforce per-faculty measurement validity in capability
@@ -1842,7 +1985,23 @@ async function runTool(name, input, ctx = {}) {
 
   // Validate arguments against the tool's own schema (#2753) — reject with a coded,
   // model-facing error rather than running the tool with silently-dropped args.
-  const argErr = _validateArgs(entry.schema, input);
+  // #3068: before rejecting, try a deterministic repair of the mechanical mistakes
+  // (JSON-string args, "5" for 5, key casing, scalar-for-array). A repair is only accepted
+  // when it makes the call actually VALID, and what was changed is reported in the log —
+  // so this fixes wasted steps without ever silently changing what the model asked for.
+  let argErr = _validateArgs(entry.schema, input);
+  if (argErr) {
+    const { input: repaired, repairs } = _repairArgs(entry.schema, input);
+    if (repairs.length) {
+      const afterErr = _validateArgs(entry.schema, repaired);
+      if (!afterErr) {
+        input = repaired;
+        argErr = null;
+        console.warn(`[ToolRunner] repaired arguments for '${name}': ${repairs.join(", ")}`);
+        try { ctx && typeof ctx.onArgRepair === "function" && ctx.onArgRepair(name, repairs); } catch { /* observer must not break the call */ }
+      }
+    }
+  }
   if (argErr) {
     const result = _outcome("unavailable", name, {
       reason_code: "invalid_arguments",
@@ -2059,4 +2218,7 @@ module.exports = {
   TOOL_NAMES,
   CAPABILITY_SCHEMA_VERSION,
   RECEIPT_SCHEMA_VERSION,
+  // Exposed for unit testing the pre-execution arg guard (#2753 validate / #3068 repair).
+  _validateArgs,
+  _repairArgs,
 };

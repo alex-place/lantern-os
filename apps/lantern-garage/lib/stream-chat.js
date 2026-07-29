@@ -10,7 +10,7 @@ const path = require("path");
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
-const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS } = require("./provider-models");
+const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS, escalatedModelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getEffectiveUserId } = require("./session-identity");
@@ -88,6 +88,22 @@ const CODING_PATCH_DIRECTIVE =
 // (SWE-bench, an API caller) won't always self-classify as coding.
 function codingPatchDirective(isCodingIntent, routeIntent) {
   return (isCodingIntent || CODING_INTENTS.has(routeIntent)) ? CODING_PATCH_DIRECTIVE : "";
+}
+
+// ── Native tool execution: ON by default ─────────────────────────────────────
+// This was opt-in (CHAT_TOOL_EXEC=1) while the loop was not yet trustworthy: it could spin
+// without a step cap, a mechanically-malformed tool call burned a whole step, and search
+// handed the model HTML noise to "ground" on. Those are fixed (#3066 stop conditions +
+// step cap, #3068 argument repair, and the _stripTags snippet fix), so the default flips:
+// without it the assistant is a single-turn LLM wrapper that cannot look anything up, which
+// is the single biggest gap between this chat and a real agentic assistant.
+//
+// Kill switch preserved: CHAT_TOOL_EXEC=0 (or "false"/"off") restores the old single-shot
+// path, so a bad deploy is one env var away from the previous behavior.
+function toolExecEnabled() {
+  const v = String(process.env.CHAT_TOOL_EXEC ?? "").trim().toLowerCase();
+  if (v === "") return true;                       // default ON
+  return !["0", "false", "off", "no"].includes(v);
 }
 const { emitClaimDraft } = require("./claim-drafter");
 
@@ -300,7 +316,18 @@ async function handleStreamChat(req, url, res) {
   const _modelPin = (parsed.requestedModel && _pinnedInternal && isAllowedModel(_pinnedInternal, parsed.requestedModel))
     ? { provider: _pinnedInternal, model: parsed.requestedModel }
     : null;
-  const modelFor = (p) => (_modelPin && p === _modelPin.provider) ? _modelPin.model : defaultModelFor(p);
+  // Resolution order for the model that actually runs:
+  //   1. the user's explicit pin (the model picker) — always wins, never second-guessed;
+  //   2. difficulty escalation — a reasoning/design/debug turn gets the provider's DEEP model
+  //      instead of its cheap default (Auto previously pinned every turn to the cheap tier,
+  //      capping quality on exactly the questions that needed the most from the model);
+  //   3. the provider default.
+  // `isCodingIntent` is declared later in this handler but every modelFor() call happens in
+  // the dispatch loop far below it, so reading it lazily here is safe.
+  const modelFor = (p) => {
+    if (_modelPin && p === _modelPin.provider) return _modelPin.model;
+    return escalatedModelFor(p, message, { codingIntent: isCodingIntent });
+  };
 
   // Remember-stage hook (#1429): a declarative personal-fact statement ("my kid's shoe size
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
@@ -2180,7 +2207,7 @@ async function handleStreamChat(req, url, res) {
         // with. The big unisona.ai router prompt dilutes it (the adapter then defaults to
         // its Bash habit); the clean preamble matches the training distribution so it
         // reliably emits a SAFE <tool_call>. Gated with execution so it toggles as a unit.
-        const sysForOllama = process.env.CHAT_TOOL_EXEC === "1"
+        const sysForOllama = toolExecEnabled()
           ? require("./stream-chat/mcp-tools").augment(require("./tool-runner"))
               .renderToolPreamble({ operator: require("./request-auth").isOperatorRequest(req) })
           : systemPrompt;
@@ -2250,12 +2277,12 @@ async function handleStreamChat(req, url, res) {
         if (fullReply) {
           // ── Tool-aware chat: the local Σ₀ FC adapter may answer with a <tool_call>.
           // Always emit a `tool` event so the UI fills the card; OPTIONALLY execute a tool
-          // (gated by CHAT_TOOL_EXEC=1, off by default) and let the model ground a follow-up
+          // (on by default; CHAT_TOOL_EXEC=0 disables) and let the model ground a follow-up
           // answer on the real result. runTool enforces the per-tool policy (read-only runs;
           // shell/mutating need operator — same policy as the rest of the app).
           try {
             const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
-            const execEnabled = process.env.CHAT_TOOL_EXEC === "1";
+            const execEnabled = toolExecEnabled();
             let tc = toolRunner.parseToolCall(fullReply);
             if (tc && !execEnabled) {
               // Execution disabled — still surface the intended call so the UI card fills.
@@ -2407,11 +2434,11 @@ async function handleStreamChat(req, url, res) {
   // Reachable via the AI-Studio key OR a Vertex wire (ADC, funded) — so a Vertex-only
   // config (no GEMINI_API_KEY) still routes gemini instead of skipping it entirely.
   if (_p === "gemini" && (geminiKey || require("./gemini-transport").useVertex())) {
-    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Gemini function-calling
+    // ── Native tool-use loop (on by default; CHAT_TOOL_EXEC=0 disables) — Gemini function-calling
     // over the same registry/executor. When active we use our functionDeclarations
     // (which include web_search) instead of the googleSearch builtin. Off by default →
     // the grounded single-shot path below is unchanged.
-    if (process.env.CHAT_TOOL_EXEC === "1") {
+    if (toolExecEnabled()) {
       try {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
@@ -2426,13 +2453,48 @@ async function handleStreamChat(req, url, res) {
           ];
           const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 12;  // #2755 raised + configurable
           const geminiTransport = require("./gemini-transport").geminiTransport;
+          // #3065 per-step memory: the initial system prompt carries memory retrieved once on
+          // the user message. As the tool loop runs, the turn's real information need clarifies
+          // (which searches/lookups it makes), so we re-query CSF against that evolving context
+          // between steps and inject any NEW relevant memory ADDITIVELY (never replacing the
+          // initial block — so it cannot regress the base case). Mutable + memoized; the delta
+          // stays small (arXiv:2602.17046). Only active on the native tool loop (CHAT_TOOL_EXEC).
+          let _stepSystem = systemPrompt;
+          const _seenMem = new Set();
           const adapter = geminiAdapter(contents, MAX_TOOL_ITERS, async () => geminiToolTurn({
             transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
             model: geminiModelName, contents, tools,
-            systemInstruction: systemPrompt, generationConfig,
+            systemInstruction: _stepSystem, generationConfig,
             onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+          const onBeforeTurn = async ({ calls }) => {
+            const q = (calls || []).map((c) => `${c.name} ${JSON.stringify(c.input || {})}`).join(" ").slice(0, 400);
+            if (!q) return;
+            let fresh = ""; try { fresh = await formatCSFContextForPromptAsync(q); } catch { fresh = ""; }
+            if (fresh && !_seenMem.has(fresh)) {
+              _seenMem.add(fresh);
+              _stepSystem = `${systemPrompt}\n\nUpdated long-term memory (relevant to the current step):\n${String(fresh).slice(0, 1200)}`;
+            }
+          };
+          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
+          // #3066: the loop hit its step cap with the model still calling tools, so it never
+          // produced a final answer — the user would get an EMPTY bubble. Run one last
+          // tool-free turn that forces it to answer from what it already gathered.
+          if (stopReason === "max_steps" && !fullReply.trim()) {
+            contents.push({ role: "user", parts: [{ text: "You have reached the tool-use limit for this turn. Do NOT call any more tools. Answer now using only what you already gathered above, and say plainly what you could not determine." }] });
+            try {
+              await geminiToolTurn({
+                transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
+                model: geminiModelName, contents, tools: undefined,
+                systemInstruction: _stepSystem, generationConfig,
+                onToken: (t) => { fullReply += t; sendToken(t); },
+              });
+            } catch { /* fall through to the honest notice below */ }
+            if (!fullReply.trim()) {
+              const notice = "I hit this turn's tool-use limit before I could finish. Here's what I can say: I wasn't able to complete the lookup — try narrowing the question, or ask me to continue.";
+              fullReply = notice; sendToken(notice);
+            }
+          }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");
@@ -2606,13 +2668,13 @@ async function handleStreamChat(req, url, res) {
         claudeModel = process.env.ANTHROPIC_MODEL || claudeModel;
       }
 
-      // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) ───────────────────
+      // ── Native tool-use loop (on by default; CHAT_TOOL_EXEC=0 disables) ───────────────────
       // Gives unisona.ai real agency: the model can call repo tools (Read/Grep/Glob/LS
       // for everyone; +Bash/PowerShell/Write/Edit for operators) and answer from the
       // results instead of guessing. Same registry + executor as the local model's
       // free-text path (lib/tool-runner), via the reliable native tool_use protocol.
       // Off by default → the single-shot path below is byte-identical for normal chat.
-      if (process.env.CHAT_TOOL_EXEC === "1") {
+      if (toolExecEnabled()) {
         try {
           const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
           const { isOperatorRequest } = require("./request-auth");
@@ -2814,10 +2876,10 @@ async function handleStreamChat(req, url, res) {
   // Provider: OpenAI (streaming)
   const openaiKey = process.env.OPENAI_API_KEY;
   if (_p === "openai" && openaiKey) {
-    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — same registry/executor
+    // ── Native tool-use loop (on by default; CHAT_TOOL_EXEC=0 disables) — same registry/executor
     // as the Claude and local paths, via OpenAI function-calling. Off by default →
     // the single-shot path below is byte-identical for normal chat.
-    if (process.env.CHAT_TOOL_EXEC === "1") {
+    if (toolExecEnabled()) {
       try {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
@@ -2952,9 +3014,9 @@ async function handleStreamChat(req, url, res) {
   // Provider: Grok / xAI (streaming — OpenAI-compatible)
   const xaiKey = process.env.XAI_API_KEY;
   if (_p === "xai" && xaiKey) {
-    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — xAI/Grok is OpenAI-
+    // ── Native tool-use loop (on by default; CHAT_TOOL_EXEC=0 disables) — xAI/Grok is OpenAI-
     // compatible, so it reuses the same turn helper + registry/executor.
-    if (process.env.CHAT_TOOL_EXEC === "1") {
+    if (toolExecEnabled()) {
       try {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
@@ -3072,9 +3134,9 @@ async function handleStreamChat(req, url, res) {
   if (_p === "cohere" && cohereKey) {
     const COHERE_HOST = "api.cohere.ai";
     const COHERE_PATH = "/compatibility/v1/chat/completions";
-    // ── Native tool-use loop (opt-in via CHAT_TOOL_EXEC=1) — Cohere compat is
+    // ── Native tool-use loop (on by default; CHAT_TOOL_EXEC=0 disables) — Cohere compat is
     // OpenAI-shaped, so it reuses the same turn helper + registry/executor.
-    if (process.env.CHAT_TOOL_EXEC === "1") {
+    if (toolExecEnabled()) {
       try {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
@@ -3323,4 +3385,4 @@ async function handleStreamChat(req, url, res) {
   await streamLocalFallback(fallbackReason);
 }
 
-module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder, stripModelArtifacts, codingPatchDirective, CODING_PATCH_DIRECTIVE };
+module.exports = { handleStreamChat, extractDoors, doorsOrFallback, buildBrainOrder, stripModelArtifacts, codingPatchDirective, CODING_PATCH_DIRECTIVE, toolExecEnabled };

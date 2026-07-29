@@ -74,6 +74,59 @@ const CHAT_MODEL_OPTIONS = {
   ],
 };
 
+// ── Difficulty-based model escalation (within a provider) ────────────────────
+// Auto mode resolved every turn to the provider's DEFAULT model — the cheap/fast tier
+// (gemini-2.5-flash, gpt-4.1-mini, claude-haiku, grok-3-mini). That is right for the bulk of
+// chat, but it also silently capped quality on the turns that most need reasoning: a hard
+// design/proof/tradeoff question got Flash. router-gate.js escalates the PROVIDER chain
+// (and only behind ROUTER_GATE=1); nothing ever escalated the model tier WITHIN a provider.
+//
+// The deep model for each provider, drawn from the same verified allowlist above so
+// escalation can never route to an id the health check doesn't cover.
+const DEEP_MODELS = {
+  gemini: "gemini-2.5-pro",
+  anthropic: "claude-sonnet-4-6",
+  openai: "gpt-4.1",
+  xai: "grok-3",
+};
+
+// Deliberately conservative: escalation costs real money (a frontier turn is ~67x a cheap
+// one — see the escalation-meter rationale), so this fires on turns that plainly ask for
+// reasoning, not on anything merely long. Lookups, greetings and simple factual questions
+// stay on the cheap tier, which is where the measured workload says they belong.
+const _DEEP_INTENT = /\b(analy[sz]e|analysis|reason|prove|proof|derive|design|architect(?:ure)?|trade-?offs?|compare|comparison|evaluate|assess|critique|refactor|debug|diagnose|root cause|why (?:does|do|is|are|did)|explain why|implications?|strategy|plan out|step by step|think (?:hard|deeply|carefully)|pros and cons)\b/i;
+const _MULTI_PART = /\b(and then|after that|also (?:explain|compare|analy)|first.*then|multiple|several (?:options|approaches))\b/i;
+
+/**
+ * Should this turn use the provider's deep model instead of its default?
+ * Pure + side-effect free so it is testable and cheap to call per dispatch attempt.
+ */
+function isDeepTurn(message, opts = {}) {
+  const text = String(message || "");
+  if (!text.trim()) return false;
+  if (opts.codingIntent) return true;          // code changes are the classic deep turn
+  if (_DEEP_INTENT.test(text)) return true;
+  // A long, multi-part request is doing more than one thing and benefits from the deep tier.
+  if (text.length > 400 && _MULTI_PART.test(text)) return true;
+  return false;
+}
+
+/**
+ * The model to actually run for *provider* on this turn. Escalates to the deep tier for a
+ * hard turn; otherwise the normal default (env override included). A deep model is only
+ * returned when one is defined for the provider AND escalation is enabled.
+ * KEYSTONE_MODEL_ESCALATION=0 pins every turn to the default tier.
+ */
+function escalatedModelFor(provider, message, opts = {}) {
+  const off = ["0", "false", "off", "no"].includes(String(process.env.KEYSTONE_MODEL_ESCALATION ?? "").trim().toLowerCase());
+  if (off) return modelFor(provider);
+  // An env-pinned model is an explicit operator choice — never override it.
+  if (ENV_VAR[provider] && process.env[ENV_VAR[provider]]) return modelFor(provider);
+  const deep = DEEP_MODELS[provider];
+  if (!deep || !isDeepTurn(message, opts)) return modelFor(provider);
+  return deep;
+}
+
 /** True when *model* is a UI-pinnable choice for *provider* (or its effective default). */
 function isAllowedModel(provider, model) {
   if (!provider || !model) return false;
@@ -81,4 +134,4 @@ function isAllowedModel(provider, model) {
   return (CHAT_MODEL_OPTIONS[provider] || []).some((m) => m.id === model);
 }
 
-module.exports = { DEFAULTS, ENV_VAR, modelFor, CHAT_MODEL_OPTIONS, isAllowedModel, GEMINI_FALLBACK_MODELS };
+module.exports = { DEFAULTS, ENV_VAR, modelFor, CHAT_MODEL_OPTIONS, isAllowedModel, GEMINI_FALLBACK_MODELS, DEEP_MODELS, isDeepTurn, escalatedModelFor };

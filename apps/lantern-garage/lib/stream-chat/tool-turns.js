@@ -224,19 +224,53 @@ function geminiToolTurn({ transport, model, contents, tools, systemInstruction, 
 //   pushToolResults(outcomes),               // outcomes: [{call, out, ok}] → append the provider tool-result turn
 // }
 // runTool(name, input): Promise<outcome>     // provided by the caller (closes over operator/userId)
-async function runToolLoop(adapter, { sse, res, runTool }) {
+// Stable signature for a call, used to detect a model repeating itself (#3066).
+function _callKey(c) {
+  let input = "";
+  try { input = JSON.stringify(c.input || {}); } catch { input = String(c.input || ""); }
+  return `${c.name}:${input}`;
+}
+
+async function runToolLoop(adapter, { sse, res, runTool, onBeforeTurn }) {
   let toolCalls = 0;
+  // Hardening for a default-on loop (#3066): report WHY the loop ended instead of returning
+  // an indistinguishable "done". "final" = the model answered; "max_steps" = we cut it off.
+  let stopReason = "final";
+  const seenCalls = new Map();   // callKey → times issued, for repeat detection
   for (let iter = 0; iter < adapter.maxIters; iter++) {
     const turn = await adapter.turn();
     const calls = adapter.toolCalls(turn) || [];
-    if (!calls.length) break;                 // final answer already streamed
+    if (!calls.length) { stopReason = "final"; break; }   // final answer already streamed
     adapter.pushAssistant(turn);
     toolCalls += calls.length;
     // #2752 — run this turn's tool calls concurrently. Promise.all preserves call
     // order, so the tool-result messages stay aligned with the model's calls.
     const outcomes = await Promise.all(calls.map(async (c) => {
       sse.writeData(res, { type: "tool", phase: "call", name: c.name, input: c.input });
-      const r = await runTool(c.name, c.input);
+      // #3066 repeat guard: re-running an IDENTICAL call cannot produce new information —
+      // it just burns an iteration (and real latency/quota) while the model loops. Feed the
+      // repeat back as a corrective note so it either varies the call or answers.
+      const key = _callKey(c);
+      const priorCount = seenCalls.get(key) || 0;
+      seenCalls.set(key, priorCount + 1);
+      if (priorCount > 0) {
+        const out = `NOTE: you already called \`${c.name}\` with these exact arguments earlier in this turn `
+          + `and have the result above. Do NOT repeat it — either call it with DIFFERENT arguments, `
+          + `use a different tool, or answer the user with what you already have.`;
+        sse.writeData(res, { type: "tool", phase: "result", name: c.name, ok: false,
+          reason_code: "duplicate_call", preview: "(duplicate call — skipped)" });
+        return { call: c, out, ok: false, duplicate: true };
+      }
+      // #3066: a tool that THROWS must not kill the turn. Before this, one rejecting tool
+      // rejected Promise.all and the user lost the whole reply; now the error becomes a
+      // normal tool result the model can react to (retry differently / answer without it).
+      let r;
+      try {
+        r = await runTool(c.name, c.input);
+      } catch (err) {
+        r = { ok: false, reason: "tool_threw", error: (err && err.message) || String(err) };
+      }
+      r = r || { ok: false, reason: "tool_no_result", error: "tool returned nothing" };
       const out = String(r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`).slice(0, 6000);
       sse.writeData(res, { type: "tool", phase: "result", name: c.name,
         ok: !!r.ok, status: r.status, reason_code: r.reason_code, receipt: r.receipt,
@@ -244,8 +278,15 @@ async function runToolLoop(adapter, { sse, res, runTool }) {
       return { call: c, out, ok: !!r.ok };
     }));
     adapter.pushToolResults(outcomes);
+    // #3065 per-step context seam: after each tool round, let the caller refresh per-step
+    // context (e.g. re-query CSF memory against the calls just made) BEFORE the next model
+    // turn — so later steps get context relevant to what the turn actually became. Passes the
+    // just-completed calls/outcomes. Best-effort: a refresh error must never break the loop.
+    if (onBeforeTurn) { try { await onBeforeTurn({ iter, calls, outcomes }); } catch { /* refresh best-effort */ } }
+    // Exhausted the cap with the model still wanting tools — it never got to answer.
+    if (iter === adapter.maxIters - 1) stopReason = "max_steps";
   }
-  return { toolCalls };
+  return { toolCalls, stopReason };
 }
 
 // Adapters — `convo`/`messages`/`contents` are mutated in place (the turn helper reads
