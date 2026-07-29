@@ -10,7 +10,7 @@ const path = require("path");
 const { llmAgent } = require("./insecure-tls");
 
 const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyResponse, isVerifyEnabled } = require("./dream-chat");
-const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS } = require("./provider-models");
+const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS, escalatedModelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
 const { getEffectiveUserId } = require("./session-identity");
@@ -316,7 +316,18 @@ async function handleStreamChat(req, url, res) {
   const _modelPin = (parsed.requestedModel && _pinnedInternal && isAllowedModel(_pinnedInternal, parsed.requestedModel))
     ? { provider: _pinnedInternal, model: parsed.requestedModel }
     : null;
-  const modelFor = (p) => (_modelPin && p === _modelPin.provider) ? _modelPin.model : defaultModelFor(p);
+  // Resolution order for the model that actually runs:
+  //   1. the user's explicit pin (the model picker) — always wins, never second-guessed;
+  //   2. difficulty escalation — a reasoning/design/debug turn gets the provider's DEEP model
+  //      instead of its cheap default (Auto previously pinned every turn to the cheap tier,
+  //      capping quality on exactly the questions that needed the most from the model);
+  //   3. the provider default.
+  // `isCodingIntent` is declared later in this handler but every modelFor() call happens in
+  // the dispatch loop far below it, so reading it lazily here is safe.
+  const modelFor = (p) => {
+    if (_modelPin && p === _modelPin.provider) return _modelPin.model;
+    return escalatedModelFor(p, message, { codingIntent: isCodingIntent });
+  };
 
   // Remember-stage hook (#1429): a declarative personal-fact statement ("my kid's shoe size
   // is 7") gets persisted into the ONE canonical CSF memory, same pattern as recordConvergance
