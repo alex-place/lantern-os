@@ -1985,17 +1985,15 @@ document.getElementById('input').addEventListener('input', e => {
   // dropdown value → { label, bucket } where bucket is the /api/providers/status key.
   // keystone-ft is a local fine-tune served through ollama, so it shares that bucket
   // (and is only offered when a matching tag is actually being served).
+  // Mirrors the home page's PROVIDER_CATALOG (public/index.html) so the two model pickers
+  // stay consistent: local-first order (on-device models lead), same curated provider set.
   const CATALOG = [
-    { value: 'claude',      label: 'Claude',      bucket: 'anthropic'  },
-    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'     },
-    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'     },
-    { value: 'grok',        label: 'Grok',        bucket: 'xai'        },
-    { value: 'deepseek',    label: 'DeepSeek',    bucket: 'deepseek'   },
-    { value: 'mistral',     label: 'Mistral',     bucket: 'mistral'    },
-    { value: 'perplexity',  label: 'Perplexity',  bucket: 'perplexity' },
-    { value: 'cohere',      label: 'Cohere',      bucket: 'cohere'     },
-    { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
-    { value: 'keystone-ft', label: 'unisona.ai FT', bucket: 'ollama', local: true },
+    { value: 'ollama',      label: 'Local Σ₀',   bucket: 'ollama', local: true },
+    { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama', local: true },
+    { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
+    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
+    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
+    { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
   ];
 
   function applyRequestedProvider() {
