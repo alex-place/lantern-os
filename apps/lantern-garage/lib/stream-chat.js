@@ -2449,7 +2449,25 @@ async function handleStreamChat(req, url, res) {
               _stepSystem = `${systemPrompt}\n\nUpdated long-term memory (relevant to the current step):\n${String(fresh).slice(0, 1200)}`;
             }
           };
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
+          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
+          // #3066: the loop hit its step cap with the model still calling tools, so it never
+          // produced a final answer — the user would get an EMPTY bubble. Run one last
+          // tool-free turn that forces it to answer from what it already gathered.
+          if (stopReason === "max_steps" && !fullReply.trim()) {
+            contents.push({ role: "user", parts: [{ text: "You have reached the tool-use limit for this turn. Do NOT call any more tools. Answer now using only what you already gathered above, and say plainly what you could not determine." }] });
+            try {
+              await geminiToolTurn({
+                transport: await geminiTransport({ model: geminiModelName, apiKey: geminiKey }),
+                model: geminiModelName, contents, tools: undefined,
+                systemInstruction: _stepSystem, generationConfig,
+                onToken: (t) => { fullReply += t; sendToken(t); },
+              });
+            } catch { /* fall through to the honest notice below */ }
+            if (!fullReply.trim()) {
+              const notice = "I hit this turn's tool-use limit before I could finish. Here's what I can say: I wasn't able to complete the lookup — try narrowing the question, or ask me to continue.";
+              fullReply = notice; sendToken(notice);
+            }
+          }
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "gemini", model: geminiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("gemini");
