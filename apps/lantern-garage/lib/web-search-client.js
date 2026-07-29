@@ -156,7 +156,18 @@ function _decodeEntities(s) {
     .replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&#39;/g, "'")
     .replace(/&#x2F;/g, "/").replace(/&nbsp;/g, " ");
 }
-function _stripTags(s) { return _decodeEntities(String(s || "").replace(/<[^>]*>/g, "")).replace(/\s+/g, " ").trim(); }
+// Strip markup from a snippet. ORDER MATTERS: decode entities FIRST, then remove tags.
+// This used to strip-then-decode, which silently failed on any feed that entity-encodes its
+// HTML (Google News encodes descriptions as `&lt;a href=…&gt;`): the tag regex saw no literal
+// `<`, removed nothing, and the decode step then RE-CREATED live markup. Snippets reached the
+// model as ~400 chars of `<a href="…base64…">` + `<font>` noise wrapping a headline it already
+// had in `title` — i.e. almost no usable content, which is how a grounded search turn still
+// produced a vague, made-up answer. Decoding first means encoded and literal markup both get
+// stripped; the trailing decode handles ordinary text entities (&amp;, &#39;) left behind.
+function _stripTags(s) {
+  const decoded = _decodeEntities(String(s || ""));
+  return _decodeEntities(decoded.replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
+}
 
 // Wikimedia/DDG-friendly User-Agent. Wikimedia's User-Agent policy
 // (https://meta.wikimedia.org/wiki/User-Agent_policy) requires a descriptive
@@ -364,7 +375,12 @@ function _parseNewsRss(xml, maxResults = 5) {
     if (!url || seen.has(url)) continue;
     seen.add(url);
     const meta = [pubDate, source].filter(Boolean).join(" · ");
-    const snippet = (meta ? `${meta} — ` : "") + (desc || title);
+    // Google News' <description> is just the headline (+ source) again, so once the markup
+    // is stripped it merely repeats `title`. Drop it when it adds nothing, rather than
+    // spending the model's context on the same sentence twice.
+    const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    const descAddsInfo = desc && !norm(title).includes(norm(desc)) && !norm(desc).includes(norm(title));
+    const snippet = [meta, descAddsInfo ? desc : ""].filter(Boolean).join(" — ") || title;
     results.push({ title: title || url, url, snippet, published: pubDate || null, source: source || null });
   }
   return results;
@@ -376,7 +392,10 @@ function _parseNewsRss(xml, maxResults = 5) {
 // with events framing. "current node version" / "how to" stay false so ordinary
 // factual grounding is unchanged.
 const _NEWS_WORDS = /\b(news|headlines?|breaking|geopolitic\w*|election|elections|ceasefire|sanctions?|invasion|conflict|war|outbreak|earthquake|hurricane|wildfire|shooting|protests?)\b/i;
-const _RECENCY_WORDS = /\b(latest|recent(?:ly)?|today|tonight|this week|this morning|right now|happening|current events?|breaking)\b/i;
+// Recent-PAST markers matter as much as "today": "who won the game last night" and "what
+// happened yesterday" want dated articles, but neither matched before, so they fell through
+// to the encyclopedic chain and got a reference page about the team/topic instead.
+const _RECENCY_WORDS = /\b(latest|recent(?:ly)?|today|tonight|yesterday|last night|this week|last week|this weekend|past (?:few )?days?|this morning|right now|happening|current events?|breaking)\b/i;
 function _isNewsQuery(query) {
   const q = String(query || "");
   if (!q.trim()) return false;
