@@ -1759,6 +1759,119 @@ function _validateArgs(schema, input) {
   return errs.length ? errs.join("; ") : null;
 }
 
+// ── Tool-call argument REPAIR (#3068) ────────────────────────────────────────
+// _validateArgs (#2753) rejects a malformed call, which costs the model a whole step to
+// discover a mistake that is usually mechanical and unambiguous: args sent as a JSON
+// STRING, a number sent as "5", a key cased/snake-cased differently than the schema, a
+// single value where an array is wanted. The AI SDK's answer (experimental_repairToolCall)
+// re-prompts the model; that is a second round-trip for a fix we can make deterministically.
+// So: repair what is UNAMBIGUOUS, re-validate, and only reject what we genuinely cannot fix.
+// Every repair is reported (never silent) so it stays observable in the tool log.
+
+// "max_results" / "maxResults" / "Max-Results" → "maxresults" for schema-key matching.
+function _normKey(k) { return String(k).toLowerCase().replace(/[_\-\s]/g, ""); }
+
+function _coerceScalar(want, v) {
+  const t = Array.isArray(v) ? "array" : typeof v;
+  if (want === "string" && (t === "number" || t === "boolean")) return String(v);
+  if ((want === "number" || want === "integer") && t === "string" && v.trim() !== "" && Number.isFinite(Number(v))) {
+    const n = Number(v);
+    if (want === "integer") return Number.isInteger(n) ? n : Math.trunc(n);
+    return n;
+  }
+  if (want === "boolean" && t === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true") return true;
+    if (s === "false") return false;
+  }
+  // A JSON string where an object/array is wanted — the single most common wire mistake.
+  if ((want === "array" || want === "object") && t === "string") {
+    try {
+      const parsed = JSON.parse(v);
+      const pt = Array.isArray(parsed) ? "array" : typeof parsed;
+      if (pt === want) return parsed;
+    } catch { /* not JSON — fall through */ }
+  }
+  // A lone value where a list is wanted.
+  if (want === "array" && (t === "string" || t === "number" || t === "boolean")) return [v];
+  return undefined;   // no unambiguous repair
+}
+
+/**
+ * Best-effort, deterministic repair of tool-call arguments against a JSON schema.
+ * Returns { input, repairs[] } — `input` unchanged and `repairs` empty when nothing applied.
+ * Never throws; never guesses semantics (unknown keys and ambiguous cases are left alone).
+ */
+function _repairArgs(schema, rawInput) {
+  const repairs = [];
+  let input = rawInput;
+
+  // (a) The whole argument blob arrived as a JSON string.
+  if (typeof input === "string") {
+    try {
+      const parsed = JSON.parse(input);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        input = parsed;
+        repairs.push("parsed JSON-string arguments");
+      }
+    } catch { /* leave it — validation will report */ }
+  }
+  if (!input || typeof input !== "object" || Array.isArray(input)) return { input: rawInput, repairs: [] };
+  if (!schema || schema.type !== "object") return { input, repairs };
+
+  const props = schema.properties || {};
+  const propKeys = Object.keys(props);
+  if (!propKeys.length) return { input, repairs };
+
+  // (b) Args wrapped in a redundant envelope: {input:{…}} / {args:{…}} / {arguments:{…}},
+  // but only when the wrapper's contents actually look like this tool's arguments.
+  const inKeys = Object.keys(input);
+  if (inKeys.length === 1 && ["input", "args", "arguments", "parameters", "params"].includes(_normKey(inKeys[0]))) {
+    const inner = input[inKeys[0]];
+    if (inner && typeof inner === "object" && !Array.isArray(inner)
+        && Object.keys(inner).some((k) => propKeys.some((p) => _normKey(p) === _normKey(k)))) {
+      input = inner;
+      repairs.push(`unwrapped '${inKeys[0]}' envelope`);
+    }
+  }
+
+  const out = { ...input };
+
+  // (c) Key casing / snake-vs-camel mismatches → the schema's exact key. Skipped whenever
+  // it would be ambiguous (two input keys normalizing onto one schema key, or the correct
+  // key already present).
+  for (const k of Object.keys(out)) {
+    if (props[k]) continue;                                   // already exact
+    const matches = propKeys.filter((p) => _normKey(p) === _normKey(k));
+    if (matches.length !== 1) continue;                       // no match, or ambiguous
+    const target = matches[0];
+    if (out[target] !== undefined) continue;                  // don't clobber a real value
+    const collisions = Object.keys(out).filter((o) => _normKey(o) === _normKey(k));
+    if (collisions.length !== 1) continue;                    // two aliases for one key
+    out[target] = out[k];
+    delete out[k];
+    repairs.push(`renamed '${k}' → '${target}'`);
+  }
+
+  // (d) Type coercions for values that are unambiguously the right thing in the wrong shape.
+  for (const [k, v] of Object.entries(out)) {
+    const want = props[k] && props[k].type;
+    if (!want || v === undefined || v === null) continue;
+    const t = Array.isArray(v) ? "array" : typeof v;
+    const already = want === "integer" ? (t === "number" && Number.isInteger(v))
+      : want === "object" ? (t === "object" && !Array.isArray(v))
+      : t === want;
+    if (already) continue;
+    const fixed = _coerceScalar(want, v);
+    if (fixed !== undefined) {
+      out[k] = fixed;
+      repairs.push(`coerced '${k}' to ${want}`);
+    }
+  }
+
+  return { input: out, repairs };
+}
+
 // Is `name` gated for this run? (#2777) The gate set is the union of the env
 // CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
 // case-insensitive. Used to enforce per-faculty measurement validity in capability
@@ -1842,7 +1955,23 @@ async function runTool(name, input, ctx = {}) {
 
   // Validate arguments against the tool's own schema (#2753) — reject with a coded,
   // model-facing error rather than running the tool with silently-dropped args.
-  const argErr = _validateArgs(entry.schema, input);
+  // #3068: before rejecting, try a deterministic repair of the mechanical mistakes
+  // (JSON-string args, "5" for 5, key casing, scalar-for-array). A repair is only accepted
+  // when it makes the call actually VALID, and what was changed is reported in the log —
+  // so this fixes wasted steps without ever silently changing what the model asked for.
+  let argErr = _validateArgs(entry.schema, input);
+  if (argErr) {
+    const { input: repaired, repairs } = _repairArgs(entry.schema, input);
+    if (repairs.length) {
+      const afterErr = _validateArgs(entry.schema, repaired);
+      if (!afterErr) {
+        input = repaired;
+        argErr = null;
+        console.warn(`[ToolRunner] repaired arguments for '${name}': ${repairs.join(", ")}`);
+        try { ctx && typeof ctx.onArgRepair === "function" && ctx.onArgRepair(name, repairs); } catch { /* observer must not break the call */ }
+      }
+    }
+  }
   if (argErr) {
     const result = _outcome("unavailable", name, {
       reason_code: "invalid_arguments",
@@ -2059,4 +2188,7 @@ module.exports = {
   TOOL_NAMES,
   CAPABILITY_SCHEMA_VERSION,
   RECEIPT_SCHEMA_VERSION,
+  // Exposed for unit testing the pre-execution arg guard (#2753 validate / #3068 repair).
+  _validateArgs,
+  _repairArgs,
 };
