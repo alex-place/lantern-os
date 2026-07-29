@@ -511,7 +511,9 @@
   if (!select || !picker || !btn || !menu || !label) return;
 
   const EMOJI = { '': '✦', auto: '✦', claude: '◆', openai: '✺', gemini: '✧', grok: '𝕏', deepseek: '🐋', mistral: '🌬', perplexity: '❖', cohere: '⌘', ollama: '🜁', 'keystone-ft': '⬡' };
-  const emojiFor = (v) => EMOJI[v] ?? '◈';
+  // Values may be a bare provider ('gemini') OR a pinned sub-model ('gemini::gemini-2.5-pro');
+  // key the emoji off the provider bucket before the '::'.
+  const emojiFor = (v) => EMOJI[String(v).split('::')[0]] ?? '◈';
 
   function syncLabel() {
     const opt = select.selectedOptions[0] || select.options[0];
