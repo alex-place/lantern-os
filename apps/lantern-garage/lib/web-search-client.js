@@ -224,23 +224,39 @@ async function webSearchDirect(query, maxResults = 5, timeoutMs = DIRECT_TIMEOUT
             const j = JSON.parse(data);
             const results = [];
             const seen = new Set();
-            const push = (title, url, snippet) => {
+            // DuckDuckGo returns an image and a named source alongside the text, but both
+            // were being dropped — so a result the model could have illustrated and
+            // attributed arrived as bare text. Image paths come back site-relative
+            // ("/i/xxx.png"); make them absolute so the URL is actually usable.
+            const absImg = (u) => {
+              const s = String(u || "").trim();
+              if (!s) return null;
+              if (/^https?:\/\//i.test(s)) return s;
+              return "https://duckduckgo.com" + (s.startsWith("/") ? s : "/" + s);
+            };
+            const push = (title, url, snippet, extra = {}) => {
               title = _stripTags(title); url = String(url || "").trim();
               if (!url || seen.has(url) || results.length >= maxResults) return;
               seen.add(url);
-              results.push({ title: title || url, url, snippet: _stripTags(snippet || title) });
+              const row = { title: title || url, url, snippet: _stripTags(snippet || title) };
+              if (extra.image) row.image = extra.image;
+              if (extra.publisher) row.publisher = _stripTags(extra.publisher);
+              results.push(row);
             };
             // 1) Topic abstract (e.g. the Wikipedia summary) — the strongest single result.
-            if (j.AbstractText && j.AbstractURL) push(j.Heading || j.AbstractSource || j.AbstractText, j.AbstractURL, j.AbstractText);
+            if (j.AbstractText && j.AbstractURL) {
+              push(j.Heading || j.AbstractSource || j.AbstractText, j.AbstractURL, j.AbstractText,
+                { image: absImg(j.Image), publisher: j.AbstractSource });
+            }
             // 2) Direct external results (rare but high quality).
-            for (const r of (j.Results || [])) push(r.Text, r.FirstURL, r.Text);
+            for (const r of (j.Results || [])) push(r.Text, r.FirstURL, r.Text, { image: absImg(r.Icon && r.Icon.URL) });
             // 3) Related topics — flatten one level of grouping.
             const flat = [];
             for (const t of (j.RelatedTopics || [])) {
               if (t && Array.isArray(t.Topics)) flat.push(...t.Topics);
               else if (t) flat.push(t);
             }
-            for (const t of flat) if (t.FirstURL && t.Text) push(t.Text.split(" - ")[0], t.FirstURL, t.Text);
+            for (const t of flat) if (t.FirstURL && t.Text) push(t.Text.split(" - ")[0], t.FirstURL, t.Text, { image: absImg(t.Icon && t.Icon.URL) });
             if (!results.length) { resolve({ success: false, error: "no instant-answer results (direct)", source: "direct" }); return; }
             resolve({ success: true, results, source: "direct" });
           } catch (e) {
@@ -372,6 +388,10 @@ function _parseNewsRss(xml, maxResults = 5) {
     const pubDate = _stripTags(_cdata(_rssPick(block, "pubDate")));
     const source = _stripTags(_cdata(_rssPick(block, "source")));
     const desc = _stripTags(_cdata(_rssPick(block, "description")));
+    // Google News' <link> is an opaque base64 redirect (news.google.com/rss/articles/CBMi…),
+    // so the model has no real domain to cite — it ends up saying "per USA Today" with no
+    // usable link. The publisher's actual site IS available as the <source> url attribute.
+    const publisherUrl = _decodeEntities(((block.match(/<source\b[^>]*\burl\s*=\s*"([^"]+)"/i) || [])[1] || "")).trim();
     if (!url || seen.has(url)) continue;
     seen.add(url);
     const meta = [pubDate, source].filter(Boolean).join(" · ");
@@ -381,7 +401,13 @@ function _parseNewsRss(xml, maxResults = 5) {
     const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
     const descAddsInfo = desc && !norm(title).includes(norm(desc)) && !norm(desc).includes(norm(title));
     const snippet = [meta, descAddsInfo ? desc : ""].filter(Boolean).join(" — ") || title;
-    results.push({ title: title || url, url, snippet, published: pubDate || null, source: source || null });
+    results.push({
+      title: title || url, url, snippet,
+      published: pubDate || null,
+      source: source || null,
+      publisher: source || null,
+      publisherUrl: publisherUrl || null,
+    });
   }
   return results;
 }

@@ -402,11 +402,22 @@ const REGISTRY = {
       const results = payload.results || [];
       if (!results.length) return `[no results for: ${query}]`;
       const lines = [`web_search("${query}") — ${results.length} result(s)${payload.source && payload.source !== "mcp" ? ` (${payload.source} fallback)` : ""}:\n`];
+      // Surface every field the source actually gave us, each on its own labelled line, so
+      // the model can cite a real publisher and date and can render an image when one
+      // exists — instead of receiving title+snippet and answering "per USA Today" with no
+      // link. Fields are only emitted when present, so a thin source stays compact.
       results.forEach((r, idx) => {
         lines.push(`[${idx + 1}] ${r.title || "(untitled)"}`);
         lines.push(`    url: ${r.url || ""}`);
+        if (r.published) lines.push(`    published: ${r.published}`);
+        if (r.publisher || r.source) lines.push(`    publisher: ${r.publisher || r.source}`);
+        // Google News links are opaque redirects; the publisher's own domain is the
+        // citable one, so give it to the model explicitly.
+        if (r.publisherUrl) lines.push(`    publisher_url: ${r.publisherUrl}`);
+        if (r.image) lines.push(`    image: ${r.image}`);
         if (r.snippet) lines.push(`    snippet: ${r.snippet}`);
       });
+      lines.push(`\nCite sources as Markdown links. When a result has an image, you may show it with ![title](image). Use publisher_url when the url is a redirect.`);
       return lines.join("\n");
     },
   },

@@ -72,6 +72,33 @@ describe("news snippets reaching the model", () => {
   });
 });
 
+describe("citable metadata (so the model can attribute, not just assert)", () => {
+  const results = _parseNewsRss(RSS, 5);
+
+  test("the publisher's REAL domain is captured from the <source url> attribute", () => {
+    // <link> is an opaque base64 Google redirect, so without this the model has no citable
+    // domain and ends up writing "per Space" with no link.
+    expect(results[0].publisherUrl).toBe("https://space.com");
+    expect(results[0].publisher).toBe("Space");
+  });
+
+  test("the redirect link is still preserved as the result url", () => {
+    expect(results[0].url).toMatch(/^https:\/\/news\.google\.com\/rss\/articles\//);
+  });
+
+  test("a missing source url degrades to null rather than a broken link", () => {
+    const noSrc = `<rss><channel><item>
+      <title>No source attr</title>
+      <link>https://example.com/a</link>
+      <pubDate>Wed, 29 Jul 2026 10:00:00 GMT</pubDate>
+      <description>Body text.</description>
+    </item></channel></rss>`;
+    const r = _parseNewsRss(noSrc, 1)[0];
+    expect(r.publisherUrl).toBeNull();
+    expect(r.url).toBe("https://example.com/a");
+  });
+});
+
 describe("freshness routing (_isNewsQuery)", () => {
   test.each([
     "latest news about NASA",
