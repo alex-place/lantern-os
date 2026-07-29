@@ -296,7 +296,10 @@ function _thumbMarkdown(entry) {
 const REGISTRY = {
   Read: {
     policy: "read", desc: "Read a file from the filesystem (repo-relative).",
-    schema: { type: "object", properties: { file_path: { type: "string" }, limit: { type: "integer" } }, required: ["file_path"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to the file, e.g. apps/lantern-garage/server.js" },
+      limit: { type: "integer", description: "How many lines to return from the top of the file. Default 80, maximum 400." },
+    }, required: ["file_path"] },
     run(i) {
       const p = _safe(i.file_path);
       if (!fs.statSync(p).isFile()) return `[not a file: ${i.file_path}]`;
@@ -306,7 +309,7 @@ const REGISTRY = {
   },
   LS: {
     policy: "read", desc: "List the entries of a directory (repo-relative).",
-    schema: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+    schema: { type: "object", properties: { path: { type: "string", description: "Repo-relative directory to list, e.g. apps/lantern-garage/lib" } }, required: ["path"] },
     run(i) {
       const p = _safe(i.path || ".");
       if (!fs.statSync(p).isDirectory()) return `[not a directory: ${i.path}]`;
@@ -316,7 +319,10 @@ const REGISTRY = {
   },
   Glob: {
     policy: "read", desc: "Find files matching a glob pattern (e.g. **/*.js).",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Glob such as **/*.js — matched against each repo-relative path AND its bare filename. Searches subdirectories." },
+      path: { type: "string", description: "Repo-relative directory to search from. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = _globToRe(i.pattern || "*");
       const hits = [];
@@ -334,7 +340,10 @@ const REGISTRY = {
   },
   Grep: {
     policy: "read", desc: "Search file contents for a regular expression.",
-    schema: { type: "object", properties: { pattern: { type: "string" }, path: { type: "string" } }, required: ["pattern"] },
+    schema: { type: "object", properties: {
+      pattern: { type: "string", description: "Regular expression. Always case-insensitive." },
+      path: { type: "string", description: "Repo-relative file OR directory. A directory scans only the files directly inside it — it does NOT recurse, so use Glob first to locate files in nested folders. Defaults to the repo root." },
+    }, required: ["pattern"] },
     run(i) {
       const re = new RegExp(String(i.pattern || ""), "i");
       const out = [];
@@ -347,22 +356,29 @@ const REGISTRY = {
   },
   Bash: {
     policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   PowerShell: {
     policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
-    schema: { type: "object", properties: { command: { type: "string" } }, required: ["command"] },
+    schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   Write: {
     policy: "mutating", desc: "Write a file (repo-relative), overwriting it. Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, content: { type: "string" } }, required: ["file_path", "content"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to write. Parent directories must already exist." },
+      content: { type: "string", description: "Full new file contents — this REPLACES the whole file, so include everything you want kept." },
+    }, required: ["file_path", "content"] },
     run(i) { const p = _safe(i.file_path); fs.writeFileSync(p, String(i.content == null ? "" : i.content), "utf8"); return `wrote ${i.file_path} (${String(i.content || "").length} bytes)`; },
   },
   Edit: {
     policy: "mutating", desc: "Replace an exact unique string in a file (repo-relative). Operator only.",
-    schema: { type: "object", properties: { file_path: { type: "string" }, old_string: { type: "string" }, new_string: { type: "string" } }, required: ["file_path", "old_string", "new_string"] },
+    schema: { type: "object", properties: {
+      file_path: { type: "string", description: "Repo-relative path to edit." },
+      old_string: { type: "string", description: "Exact text to replace, including indentation. Must occur EXACTLY once in the file — the edit is rejected if it is missing or ambiguous, so include surrounding lines to make it unique." },
+      new_string: { type: "string", description: "Replacement text." },
+    }, required: ["file_path", "old_string", "new_string"] },
     run(i) {
       const p = _safe(i.file_path);
       const src = fs.readFileSync(p, "utf8");
@@ -888,7 +904,7 @@ const REGISTRY = {
   workspace_read: {
     policy: "read",
     desc: "Read a file from the user workspace (~/.keystone/workspace/). Use for user-owned artifacts: resumes, exports, generated docs.",
-    schema: { type: "object", properties: { file_path: { type: "string" } }, required: ["file_path"] },
+    schema: { type: "object", properties: { file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/), e.g. notes/todo.md" } }, required: ["file_path"] },
     run(i) {
       const p = _safeWs(i.file_path);
       if (!fs.existsSync(p)) throw _codedError(`workspace file not found: ${i.file_path}`, "not_found");
@@ -901,7 +917,10 @@ const REGISTRY = {
     desc: "Write a file to the user workspace (~/.keystone/workspace/). Creates intermediate directories. Never writes to the repo.",
     schema: {
       type: "object",
-      properties: { file_path: { type: "string" }, content: { type: "string" } },
+      properties: {
+        file_path: { type: "string", description: "Path relative to the user workspace root (~/.keystone/workspace/). Missing parent directories are created." },
+        content: { type: "string", description: "Full file contents — replaces the whole file." },
+      },
       required: ["file_path", "content"],
     },
     run(i) {
@@ -915,7 +934,7 @@ const REGISTRY = {
   workspace_list: {
     policy: "read",
     desc: "List files in the user workspace (~/.keystone/workspace/) under an optional subdirectory.",
-    schema: { type: "object", properties: { path: { type: "string" } } },
+    schema: { type: "object", properties: { path: { type: "string", description: "Sub-directory of the user workspace to list. Defaults to the workspace root." } } },
     run(i) {
       _ensureWorkspace();
       const dir = _safeWs(i.path || ".");
@@ -932,7 +951,7 @@ const REGISTRY = {
       type: "object",
       properties: {
         filename: { type: "string", description: "Workspace-relative path, e.g. 'resume-2026.md'" },
-        content: { type: "string" },
+        content: { type: "string", description: "Document body. Markdown headings, lists and tables are converted to real formatting." },
         format: { type: "string", enum: ["markdown", "text"], description: "File format hint (default: markdown)" },
       },
       required: ["filename", "content"],
@@ -1157,7 +1176,7 @@ const REGISTRY = {
 
   creator_job_status: {
     policy: "read", desc: "Check a Creator analysis/render job by jobId. Returns status, progress, and (when complete) highlight count + the project thumbnail (markdown image — relay it so it renders inline).",
-    schema: { type: "object", properties: { jobId: { type: "string" } }, required: ["jobId"] },
+    schema: { type: "object", properties: { jobId: { type: "string", description: "Job id returned when the creator job was submitted." } }, required: ["jobId"] },
     run(i) {
       const { jobQueue, repoRoot } = _creatorCtx();
       const job = jobQueue.getJob((i.jobId || "").trim());
