@@ -274,6 +274,10 @@ async function runToolLoop(adapter, { sse, res, runTool, onBeforeTurn }) {
       const out = String(r.ok ? r.result : `ERROR(${r.reason || "error"}): ${r.error}`).slice(0, 6000);
       sse.writeData(res, { type: "tool", phase: "result", name: c.name,
         ok: !!r.ok, status: r.status, reason_code: r.reason_code, receipt: r.receipt,
+        // #3070 — a gated call comes back unexecuted with an approval challenge. Forward it
+        // so the UI can render an approve control; the token is arg-bound, so echoing it back
+        // authorises this exact call and nothing else.
+        ...(r.approval ? { approval: r.approval } : {}),
         preview: out.slice(0, 240) });
       return { call: c, out, ok: !!r.ok };
     }));
