@@ -246,6 +246,7 @@
   .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:10px;font-weight:700;border-color:rgba(255,255,255,.08)}
+  .wl-logo.mono{display:flex;align-items:center;justify-content:center;padding:0;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35)}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
@@ -2696,11 +2697,18 @@ let _otArmed=false, _otArmTimer=null;
 // ── Watchlist sidebar ─────────────────────────────────────────────────────────
 const _symNames = {};   // ticker → "Company Name · EXCHANGE", lazily fetched (#1631)
 const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
-// Brand logo for a ticker (FMP) with a symbol-initials placeholder fallback.
+// Monogram badge — replaces fetched brand logos (operator, 2026-07-28): the ETF
+// universe all shares a handful of issuer marks (SPDR/Direxion squares shrunk
+// inside a circle at poor resolution), so rows read samey and blurry. A
+// deterministic per-symbol gradient monogram is vector-crisp at any size and
+// gives every ticker its own color identity. Hue = hash of the symbol, so it is
+// stable across sessions and pages with no network fetch at all.
+function tickerBadgeHue(t){ let h=0; const s=String(t||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h%360; }
 function tickerLogoHtml(ticker){
-  const ph = `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
-  if(_wlIsCrypto(ticker)) return ph;
-  return `<img class="wl-logo${_logoBg[ticker]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${ticker}" src="/api/trading/logo?symbol=${encodeURIComponent(ticker)}" alt="" onload="window.adaptLogoBg&&adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph}&quot;">`;
+  const t=String(ticker||'').toUpperCase();
+  const label=_wlIsCrypto(t)?t.replace(/USD$/,'').slice(0,3):t.slice(0,4);
+  const h=tickerBadgeHue(t);
+  return `<span class="wl-logo mono" style="background:linear-gradient(135deg,hsl(${h},62%,46%),hsl(${(h+42)%360},68%,30%))${label.length>3?';font-size:7px;letter-spacing:0':''}">${label}</span>`;
 }
 // Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
