@@ -412,6 +412,109 @@ function _parseNewsRss(xml, maxResults = 5) {
   return results;
 }
 
+// ── og:image enrichment for news results ─────────────────────────────────────
+// Google News' RSS carries no media:/enclosure element, so news results have no image of
+// their own — the article page does, in its og:image meta tag. Fetching it costs one extra
+// request per result, so this is deliberately bounded: only the top few results, in
+// parallel, with a short timeout, and the connection is dropped as soon as </head> is seen
+// (og:image lives in the head — no reason to download a whole article page). Entirely
+// best-effort: any failure just means that result has no image, never a failed search.
+// Tune with SEARCH_OG_IMAGE_LIMIT (0 disables).
+const OG_IMAGE_LIMIT = () => {
+  const v = Number(process.env.SEARCH_OG_IMAGE_LIMIT);
+  return Number.isFinite(v) && v >= 0 ? v : 3;
+};
+const OG_FETCH_TIMEOUT_MS = 2500;
+const OG_MAX_BYTES = 96 * 1024;
+
+// Never let a search result URL point the fetcher at the local network (SSRF): these URLs
+// come from an external feed, so treat them as untrusted input.
+function _isPrivateHostname(h) {
+  const host = String(h || "").toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal")) return true;
+  const m = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (!m) return false;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 0 || a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168) || (a === 169 && b === 254);
+}
+
+function _fetchOgImage(url, redirectsLeft = 3) {
+  return new Promise((resolve) => {
+    let u;
+    try { u = new URL(url); } catch { return resolve(null); }
+    if (u.protocol !== "https:" && u.protocol !== "http:") return resolve(null);
+    if (_isPrivateHostname(u.hostname)) return resolve(null);
+    // One-shot settle: several paths (end / close / our own destroy / timeout) can fire.
+    let settled = false;
+    const settle = (v) => { if (!settled) { settled = true; resolve(v); } };
+    let finish = () => settle(null);   // replaced once a 200 response starts streaming
+    const mod = u.protocol === "https:" ? require("https") : require("http");
+    const req = mod.request(
+      {
+        hostname: u.hostname,
+        port: u.port || undefined,
+        path: (u.pathname || "/") + (u.search || ""),
+        method: "GET",
+        headers: { "User-Agent": GROUNDING_UA, "Accept": "text/html,application/xhtml+xml" },
+        timeout: OG_FETCH_TIMEOUT_MS,
+      },
+      (res) => {
+        // Google News links are redirects to the publisher — follow them to reach the page
+        // that actually has the og:image.
+        const loc = res.headers && res.headers.location;
+        if (res.statusCode >= 300 && res.statusCode < 400 && loc && redirectsLeft > 0) {
+          res.resume();
+          let next;
+          try { next = new URL(loc, u).toString(); } catch { return resolve(null); }
+          return resolve(_fetchOgImage(next, redirectsLeft - 1));
+        }
+        if (res.statusCode !== 200) { res.resume(); return resolve(null); }
+        let html = "";
+        let aborted = false;
+        res.on("data", (c) => {
+          html += c;
+          // Stop as soon as the head is complete or the cap is hit — never pull a full page.
+          if (!aborted && (html.length > OG_MAX_BYTES || /<\/head>/i.test(html))) {
+            aborted = true;
+            req.destroy();
+          }
+        });
+        // Parse whatever we collected. Also the handler for our OWN abort: destroying the
+        // request emits an error on it, so a naive `error -> resolve(null)` would race this
+        // and throw away a perfectly good <head> we had already read.
+        finish = () => {
+          const m = html.match(/<meta[^>]+(?:property|name)\s*=\s*["'](?:og:image(?::secure_url)?|twitter:image)["'][^>]*>/i);
+          if (!m) return settle(null);
+          const c = m[0].match(/content\s*=\s*["']([^"']+)["']/i);
+          if (!c) return settle(null);
+          let img;
+          try { img = new URL(_decodeEntities(c[1]).trim(), u).toString(); } catch { return settle(null); }
+          settle(/^https?:\/\//i.test(img) ? img : null);
+        };
+        res.on("end", finish);
+        res.on("close", finish);     // fires when we destroy early on </head>
+        res.on("error", finish);
+      }
+    );
+    req.on("error", () => finish());          // includes our own destroy()
+    req.on("timeout", () => { req.destroy(); finish(); });
+    req.end();
+  });
+}
+
+/** Attach og:image to the first `limit` results that lack one. Mutates and returns results. */
+async function _enrichWithOgImages(results, limit = OG_IMAGE_LIMIT()) {
+  if (!Array.isArray(results) || !results.length || limit <= 0) return results;
+  const targets = results.filter((r) => r && r.url && !r.image).slice(0, limit);
+  if (!targets.length) return results;
+  await Promise.all(targets.map(async (r) => {
+    const img = await _fetchOgImage(r.url);
+    if (img) r.image = img;
+  }));
+  return results;
+}
+
 // Does this query want fresh news rather than a reference page? Deliberately tighter
 // than needsGrounding(): an explicit news word (news/headlines/breaking/geopolitical/
 // election/war/…) OR a recency word (latest/recent/today/this week/right now) paired
@@ -505,6 +608,11 @@ async function _webSearchUncached(query, maxResults, opts) {
   if (isNews) {
     try {
       let r = await newsImpl(query, maxResults);
+      // NOT og:image-enriched, deliberately. Measured: a Google News <link> is an opaque
+      // base64 token that 302s to a Google JS interstitial — not the publisher's article —
+      // so there is no og:image to read, and the token no longer decodes to the real URL.
+      // Enriching here would spend one wasted request per result (~1.5s) for zero images.
+      // Per-article news images need a source that returns them (a keyed news API).
       if (r.success) return r;
       if (_isRateLimited(r.error) && backoffMs > 0) {
         await new Promise((res) => setTimeout(res, backoffMs));
@@ -527,11 +635,14 @@ async function _webSearchUncached(query, maxResults, opts) {
   for (const fb of fallbackImpls) {
     try {
       let r = await fb(query, maxResults);
-      if (r.success) return r;
+      // These sources DO hand back real article/page URLs (en.wikipedia.org/…, publisher
+      // sites), so og:image is actually fetchable here — bounded + parallel + best-effort,
+      // and skipped for any result that already carries an image from the API itself.
+      if (r.success) return { ...r, results: await _enrichWithOgImages(r.results, opts.ogImageLimit) };
       if (_isRateLimited(r.error) && backoffMs > 0) {
         await new Promise((res) => setTimeout(res, backoffMs));
         r = await fb(query, maxResults);
-        if (r.success) return r;
+        if (r.success) return { ...r, results: await _enrichWithOgImages(r.results, opts.ogImageLimit) };
       }
       lastErr = r.error || lastErr;
     } catch (e) { lastErr = e.message || lastErr; }
@@ -570,6 +681,9 @@ module.exports = {
   _parseNewsRss,
   _isNewsQuery,
   _httpFallbackError,
+  _fetchOgImage,
+  _enrichWithOgImages,
+  _isPrivateHostname,
   _cacheKey,
   _clearSearchCache,
   _isRateLimited,

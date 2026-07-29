@@ -13,7 +13,7 @@
  *
  * Run with: npx jest test/web-search-snippet-quality.test.js
  */
-const { _parseNewsRss, _isNewsQuery } = require("../lib/web-search-client");
+const { _parseNewsRss, _isNewsQuery, _isPrivateHostname, _enrichWithOgImages } = require("../lib/web-search-client");
 
 // Shaped exactly like a real Google News RSS item: entity-encoded HTML in <description>,
 // a base64 redirect <link>, and a description that just repeats the headline.
@@ -96,6 +96,35 @@ describe("citable metadata (so the model can attribute, not just assert)", () =>
     const r = _parseNewsRss(noSrc, 1)[0];
     expect(r.publisherUrl).toBeNull();
     expect(r.url).toBe("https://example.com/a");
+  });
+});
+
+describe("og:image enrichment guards", () => {
+  // Result URLs come from an external feed, so the fetcher must never be pointed at the
+  // local network. (The live fetch path itself is exercised against real article pages;
+  // it can't be tested against a local server precisely BECAUSE of this guard.)
+  test.each(["localhost", "127.0.0.1", "10.0.0.5", "172.16.0.1", "192.168.1.1", "169.254.169.254", "0.0.0.0"])(
+    "refuses private/loopback host: %s", (h) => expect(_isPrivateHostname(h)).toBe(true));
+
+  test.each(["space.com", "en.wikipedia.org", "8.8.8.8"])(
+    "allows public host: %s", (h) => expect(_isPrivateHostname(h)).toBe(false));
+
+  test("limit 0 disables enrichment entirely (no requests attempted)", async () => {
+    const rows = [{ url: "https://example.com/a" }];
+    await _enrichWithOgImages(rows, 0);
+    expect(rows[0].image).toBeUndefined();
+  });
+
+  test("results that already carry an image are skipped", async () => {
+    const rows = [{ url: "https://example.com/a", image: "https://cdn/x.png" }];
+    await _enrichWithOgImages(rows, 3);
+    expect(rows[0].image).toBe("https://cdn/x.png");   // untouched, no refetch
+  });
+
+  test("empty / malformed input never throws", async () => {
+    await expect(_enrichWithOgImages([], 3)).resolves.toEqual([]);
+    await expect(_enrichWithOgImages(null, 3)).resolves.toBeNull();
+    await expect(_enrichWithOgImages([{}, null], 0)).resolves.toBeTruthy();
   });
 });
 
