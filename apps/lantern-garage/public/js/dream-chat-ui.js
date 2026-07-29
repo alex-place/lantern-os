@@ -1308,9 +1308,15 @@ async function sendMessage(opts = {}) {
   };
   const toolResults = [];  // <tool_call> events arrive mid-stream; re-applied after the final render (which rebuilds the cards empty)
   const nativeToolCalls = [];  // cloud-model (Claude/OpenAI/Gemini) tool *calls* — they emit no <tool_call> text, so we synthesize the cards at finalize
-  const requestedProvider = document.getElementById('provider-select')?.value || '';
-  // The #1127 model pin (`requestedModel` from #model-select) was removed (#2476):
-  // its markup was cut, so the value was always '' and no model was ever sent.
+  // The model picker's value is either a bare provider ('gemini') or a pinned
+  // sub-model ('gemini::gemini-2.5-pro'). Split into the provider bucket + optional
+  // model id; the server honours `model` only when it's on the provider-models
+  // allowlist (isAllowedModel), so a stray/retired id can never hijack routing
+  // (#1127 pin re-wired after the Gemini sub-picker was restored).
+  const _pickerValue = document.getElementById('provider-select')?.value || '';
+  const _pinSep = _pickerValue.indexOf('::');
+  const requestedProvider = _pinSep === -1 ? _pickerValue : _pickerValue.slice(0, _pinSep);
+  const requestedModel = _pinSep === -1 ? '' : _pickerValue.slice(_pinSep + 2);
 
   try {
     const provider = requestedProvider;
@@ -1330,6 +1336,9 @@ async function sendMessage(opts = {}) {
         message: text,
         user: 'dream-chat',
         provider,
+        // Pinned sub-model (e.g. gemini-2.5-pro); empty ⇒ provider default / Auto.
+        // Server gates it against the provider-models allowlist before honouring.
+        model: requestedModel || undefined,
         attachments: sentAttachments,
         history: history.slice(-10),
         personalContext: sanitizePersonalContext(personalContext || {}),
@@ -1976,17 +1985,15 @@ document.getElementById('input').addEventListener('input', e => {
   // dropdown value → { label, bucket } where bucket is the /api/providers/status key.
   // keystone-ft is a local fine-tune served through ollama, so it shares that bucket
   // (and is only offered when a matching tag is actually being served).
+  // Mirrors the home page's PROVIDER_CATALOG (public/index.html) so the two model pickers
+  // stay consistent: local-first order (on-device models lead), same curated provider set.
   const CATALOG = [
-    { value: 'claude',      label: 'Claude',      bucket: 'anthropic'  },
-    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'     },
-    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'     },
-    { value: 'grok',        label: 'Grok',        bucket: 'xai'        },
-    { value: 'deepseek',    label: 'DeepSeek',    bucket: 'deepseek'   },
-    { value: 'mistral',     label: 'Mistral',     bucket: 'mistral'    },
-    { value: 'perplexity',  label: 'Perplexity',  bucket: 'perplexity' },
-    { value: 'cohere',      label: 'Cohere',      bucket: 'cohere'     },
-    { value: 'ollama',      label: 'Local Σ₀',    bucket: 'ollama', local: true },
-    { value: 'keystone-ft', label: 'unisona.ai FT', bucket: 'ollama', local: true },
+    { value: 'ollama',      label: 'Local Σ₀',   bucket: 'ollama', local: true },
+    { value: 'keystone-ft', label: 'Unisona FT', bucket: 'ollama', local: true },
+    { value: 'claude',      label: 'Claude',      bucket: 'anthropic' },
+    { value: 'openai',      label: 'ChatGPT',     bucket: 'openai'    },
+    { value: 'gemini',      label: 'Gemini',      bucket: 'gemini'    },
+    { value: 'grok',        label: 'Grok',        bucket: 'xai'       },
   ];
 
   function applyRequestedProvider() {
@@ -2017,8 +2024,18 @@ document.getElementById('input').addEventListener('input', e => {
     return null;
   }
 
+  // Per-provider pinnable model list for the sub-options (#1127). Best-effort: if the
+  // endpoint is down we still render provider-level rows (no sub-models), never nothing.
+  async function fetchModels() {
+    try {
+      const r = await fetch('/api/providers/models', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
+      if (r.ok) return (await r.json()).providers || null;
+    } catch { /* models endpoint down — skip sub-models */ }
+    return null;
+  }
+
   async function build() {
-    const providers = await fetchStatus();
+    const [providers, models] = await Promise.all([fetchStatus(), fetchModels()]);
     select.innerHTML = '<option value="">Auto (pick best)</option>';
     for (const entry of CATALOG) {
       const p = providers && providers[entry.bucket];
@@ -2044,6 +2061,22 @@ document.getElementById('input').addEventListener('input', e => {
       const model = p && p.model;
       if (model && model !== 'auto') o.title = model; // concrete model id on hover
       select.appendChild(o);
+      // Gemini sub-models (#1127 re-wire): list each pinnable Gemini model beneath the
+      // provider row so a turn can be routed to a specific id. Value = "gemini::<id>";
+      // the send path splits it and the server allowlist (isAllowedModel) gates it.
+      // Scoped to Gemini per the request — drop the `=== 'gemini'` guard to extend to
+      // every provider the /api/providers/models endpoint returns options for.
+      const sub = entry.value === 'gemini' && models && models[entry.value];
+      if (sub && Array.isArray(sub.options) && sub.options.length) {
+        o.textContent = label + ' (Auto)';
+        for (const m of sub.options) {
+          const so = document.createElement('option');
+          so.value = entry.value + '::' + m.id;
+          so.textContent = m.label || m.id;
+          so.title = m.id;
+          select.appendChild(so);
+        }
+      }
     }
     applyRequestedProvider();
     if (typeof window.gateProviderOptions === 'function') window.gateProviderOptions();
