@@ -434,6 +434,7 @@
   .sym-logo{width:28px;height:28px;border-radius:50%;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);flex:0 0 auto}
   .sym-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .sym-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:11px;font-weight:700}
+  .sym-logo.mono{display:flex;align-items:center;justify-content:center;padding:0;color:#fff;font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);object-fit:none}
   .sym-sym{font-family:var(--mono);font-weight:700;font-size:14px;color:var(--text0);min-width:62px}
   .sym-name{flex:1;color:var(--text1);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sym-ex{font-family:var(--mono);font-size:11px;color:var(--text2);letter-spacing:.05em}
@@ -2454,9 +2455,12 @@ function renderSymResults(){
   el.innerHTML=_symRows.map((a,i)=>{
     const cr=a.class==='crypto';
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-    const ph=`<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
-    const logo = cr ? ph
-      : `<img class="sym-logo${_logoBg[a.symbol]==='l'?' on-light':''}" crossorigin="anonymous" data-sym="${esc(a.symbol)}" src="/api/trading/logo?symbol=${encodeURIComponent(a.symbol)}" alt="" onload="window.adaptLogoBg&&adaptLogoBg(this)" onerror="this.outerHTML=&quot;${ph.replace(/"/g,'&quot;')}&quot;">`;
+    // Same monogram badges as the sidebar (operator, 2026-07-28): one visual
+    // language everywhere, crisp at any DPI, no fetch — and crypto rows get a
+    // real badge instead of the flat gray placeholder.
+    const label = cr ? esc(a.symbol).replace(/USD$/,'').slice(0,3) : esc(a.symbol).slice(0,4);
+    const hue = tickerBadgeHue(a.symbol);
+    const logo = `<div class="sym-logo mono" style="background:linear-gradient(135deg,hsl(${hue},62%,46%),hsl(${(hue+42)%360},68%,30%))${label.length>3?';font-size:7px;letter-spacing:0':''}">${label}</div>`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
