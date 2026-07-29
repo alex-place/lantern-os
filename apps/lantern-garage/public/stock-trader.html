@@ -257,6 +257,9 @@
   .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:10px;font-weight:700;border-color:rgba(255,255,255,.08)}
+  .tb-badge{width:24px;height:24px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
+  .tb-badge svg{width:15px;height:15px;display:block}
+  .tb-badge.tb-glyph{font-size:12px;font-weight:600;text-shadow:none}
   .wl-logo.mono{display:flex;align-items:center;justify-content:center;padding:0;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35)}
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
@@ -2455,12 +2458,8 @@ function renderSymResults(){
   el.innerHTML=_symRows.map((a,i)=>{
     const cr=a.class==='crypto';
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
-    // Same monogram badges as the sidebar (operator, 2026-07-28): one visual
-    // language everywhere, crisp at any DPI, no fetch — and crypto rows get a
-    // real badge instead of the flat gray placeholder.
-    const label = cr ? esc(a.symbol).replace(/USD$/,'').slice(0,3) : esc(a.symbol).slice(0,4);
-    const hue = tickerBadgeHue(a.symbol);
-    const logo = `<div class="sym-logo mono" style="background:linear-gradient(135deg,hsl(${hue},62%,46%),hsl(${(hue+42)%360},68%,30%))${label.length>3?';font-size:7px;letter-spacing:0':''}">${label}</div>`;
+    // Shared badge library: issuer glyphs / crypto signs / monogram fallback.
+    const logo = window.tickerBadgeHtml ? tickerBadgeHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
@@ -2861,14 +2860,11 @@ const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
 // deterministic per-symbol gradient monogram is vector-crisp at any size and
 // gives every ticker its own color identity. Hue = hash of the symbol, so it is
 // stable across sessions and pages with no network fetch at all.
-function tickerBadgeHue(t){ let h=0; const s=String(t||''); for(let i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; return h%360; }
 function tickerLogoHtml(ticker){
-  const t=String(ticker||'').toUpperCase();
-  const label=_wlIsCrypto(t)?t.replace(/USD$/,'').slice(0,3):t.slice(0,4);
-  const h=tickerBadgeHue(t);
-  return `<span class="wl-logo mono" style="background:linear-gradient(135deg,hsl(${h},62%,46%),hsl(${(h+42)%360},68%,30%))${label.length>3?';font-size:7px;letter-spacing:0':''}">${label}</span>`;
-}
-// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
+  // Delegates to the shared badge library (/js/ticker-badges.js): designed
+  // issuer/asset-class glyphs, monogram fallback. One source of truth.
+  return window.tickerBadgeHtml ? tickerBadgeHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
+}// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
 // everything else keeps the dark badge so colour logos pop. Cached in localStorage.
 // The inline onload callers guard with `window.adaptLogoBg&&` — the issue reporter's
@@ -5156,6 +5152,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   window.setMobileView = setMobileView;
 </script>
 <script src="/js/theme-toggle.js" defer></script>
+<script src="/js/ticker-badges.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script src="/js/auth-gate.js" defer></script>
 </body>
