@@ -199,6 +199,11 @@ function renderApprovalPrompt(slot, evt) {
   slot.style.display = 'block';
   slot.style.opacity = '1';
 
+  // Tool cards are collapsed <details> by default. An approval the user has to go hunting
+  // for is an approval they never give — and the turn silently stalls. Force this one open.
+  const details = slot.closest('details');
+  if (details) details.open = true;
+
   const wrap = document.createElement('div');
   wrap.style.cssText = 'border:1px solid #fbbf24;border-radius:10px;padding:9px 11px;background:rgba(251,191,36,.08)';
 
