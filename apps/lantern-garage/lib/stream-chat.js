@@ -2518,7 +2518,7 @@ async function handleStreamChat(req, url, res) {
               _stepSystem = `${systemPrompt}\n\nUpdated long-term memory (relevant to the current step):\n${String(fresh).slice(0, 1200)}`;
             }
           };
-          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
+          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
           // #3066: the loop hit its step cap with the model still calling tools, so it never
           // produced a final answer — the user would get an EMPTY bubble. Run one last
           // tool-free turn that forces it to answer from what it already gathered.
@@ -2753,7 +2753,7 @@ async function handleStreamChat(req, url, res) {
               mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
               onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
             }));
-            const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+            const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
             const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
             await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName } }).catch(() => {});
             recordProviderSuccess("anthropic");
@@ -2936,7 +2936,7 @@ async function handleStreamChat(req, url, res) {
             host: "api.openai.com", apiKey: openaiKey, model: openaiModelName,
             messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "openai", model: openaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("openai");
@@ -3073,7 +3073,7 @@ async function handleStreamChat(req, url, res) {
             host: "api.x.ai", apiKey: xaiKey, model: xaiModelName,
             messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("xai");
@@ -3192,7 +3192,7 @@ async function handleStreamChat(req, url, res) {
             host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
             messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req) }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("cohere");

@@ -355,16 +355,19 @@ const REGISTRY = {
     },
   },
   Bash: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "shell", desc: "Run an allowlisted shell command (git/tests/file-reads). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead; only allowlisted repo commands run here.",
     schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   PowerShell: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "shell", desc: "Run an allowlisted command (same allowlist as Bash). Operator only. NOT for authoring or executing code the user asked you to write — put that code directly in your reply instead.",
     schema: { type: "object", properties: { command: { type: "string", description: "A single allowlisted command (git / npm test / file reads). Not a shell script: pipes and chained commands are rejected." } }, required: ["command"] },
     run(i) { return _runShell(i.command); },
   },
   Write: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "mutating", desc: "Write a file (repo-relative), overwriting it. Operator only.",
     schema: { type: "object", properties: {
       file_path: { type: "string", description: "Repo-relative path to write. Parent directories must already exist." },
@@ -373,6 +376,7 @@ const REGISTRY = {
     run(i) { const p = _safe(i.file_path); fs.writeFileSync(p, String(i.content == null ? "" : i.content), "utf8"); return `wrote ${i.file_path} (${String(i.content || "").length} bytes)`; },
   },
   Edit: {
+    needsApproval: true,   // #3070 — mutates the repo / runs commands
     policy: "mutating", desc: "Replace an exact unique string in a file (repo-relative). Operator only.",
     schema: { type: "object", properties: {
       file_path: { type: "string", description: "Repo-relative path to edit." },
@@ -476,6 +480,7 @@ const REGISTRY = {
   // The assistant PROPOSES; a human APPROVES via the approvals surface — the model
   // never applies a repo change itself. Operator-only (policy: mutating).
   propose_coding_change: {
+    needsApproval: true,   // #3070 — mutates repository code
     policy: "mutating",
     desc:
       "Propose a change to a repository's EXISTING code using the accountable coding backend. Use only when the user asked for a repo change — never to write example/new code the user just wants to see (answer that directly in your reply). Routes to the best-measured local backend, runs it WITHOUT applying (HELD for approval), verifies the proposed diff, and returns a receipt + verification verdict + a pending id. The change is NOT applied — a human approves it via the approvals surface. Operator only.",
@@ -562,6 +567,7 @@ const REGISTRY = {
   // this tool natively, and the returned Markdown image auto-embeds in chat. Never fabricates
   // a URL — returns a clear error the model must relay if generation is unavailable.
   generate_image: {
+    needsApproval: true,   // #3070 — spends real API credit
     policy: "read",
     guest_safe: true,
     desc: "Generate an image from a text description and return a Markdown image link that renders inline in the chat. Use this whenever the user asks you to draw, paint, sketch, illustrate, or generate a picture/image of something — decide on your own initiative, don't wait to be told to 'use a tool'. Pass the subject to depict as `prompt`. On success you MUST include the returned ![...](url) Markdown in your reply so the user actually sees the image. If it reports generation is unavailable, tell the user plainly — never invent an image URL.",
@@ -973,6 +979,7 @@ const REGISTRY = {
   // forbidden. Probes the endpoint before running; returns a blocked receipt
   // if unavailable. OPERATOR policy (shell execution).
   local_eval_keystone_run: {
+    needsApproval: true,   // #3070 — runs the eval harness
     policy: "shell",
     desc: "Run the unisona.ai eval harness (eval_keystone.py) against a local Ollama endpoint. Returns a structured receipt with accuracy and latency. Endpoint must be loopback-only.",
     schema: {
@@ -1721,6 +1728,10 @@ function _outcome(status, tool, details = {}) {
     policy: details.policy || null,
     ...(details.result !== undefined ? { result: details.result } : {}),
     ...(details.error ? { error: details.error } : {}),
+    // #3070 — the approval challenge for a gated call: { token, tool, input }. Explicitly
+    // whitelisted (this builder deliberately drops unknown fields) so the UI can render an
+    // approve control and echo the token back on the next turn.
+    ...(details.approval ? { approval: details.approval } : {}),
     receipt: {
       schema_version: RECEIPT_SCHEMA_VERSION,
       tool,
@@ -1902,6 +1913,81 @@ function _repairArgs(schema, rawInput) {
   return { input: out, repairs };
 }
 
+// ── Human-in-the-loop approval for side-effectful tools (#3070) ──────────────
+// Tool execution is ON by default now, so the model can reach for a repo-mutating, shell or
+// money-spending tool without anyone having said yes to that specific action. Operator-gating
+// answers "who may use this tool at all"; it does NOT answer "did a human agree to THIS call".
+// Vercel v6 (needsApproval), assistant-ui and Jan all pause the loop for exactly that.
+//
+// Shape chosen to fit an SSE stream, which is one-directional and cannot block mid-turn for
+// input: a gated call is NOT executed. It returns a coded `approval_required` outcome that
+// carries a token, the model reports what it wants to do, and the UI renders an approve
+// control. Re-sending the turn with that token in `approvals` executes it. Nothing is held
+// open, and a refused/ignored approval simply never runs.
+//
+// The token binds tool name AND arguments, so approving "Write to notes.md" can never be
+// replayed to authorise "Write to server.js".
+function approvalToken(name, input) {
+  const canonical = JSON.stringify(input === undefined ? {} : input, Object.keys(input || {}).sort());
+  // require("crypto") explicitly: the bare global `crypto` in modern Node is WebCrypto,
+  // which has no createHash(). "\u0000" is an explicit domain separator so a tool name
+  // and an argument blob can never concatenate into the same string as a different pair.
+  return require("crypto").createHash("sha256")
+    .update(String(name) + "\u0000" + canonical).digest("hex").slice(0, 16);
+}
+
+function _grantedTokens(ctx) {
+  const g = ctx && ctx.approvals;
+  if (!g) return [];
+  if (Array.isArray(g)) return g.map(String);
+  if (g instanceof Set) return [...g].map(String);
+  if (typeof g === "string") return g.split(/[,\s]+/).filter(Boolean);
+  return [];
+}
+
+// NOTE: there is deliberately ONE approval path — the pending store below. An earlier
+// version also matched a token directly against freshly-computed args, which quietly made
+// approvals reusable: identical args re-derive the same token every turn, so that path could
+// never be consumed. Everything now goes through the consumable store.
+
+// Pending gated calls, keyed by token. A model asked to retry a call rarely reproduces
+// byte-identical arguments (it rephrases a prompt, reorders a sentence), so a purely
+// arg-bound token would almost never match on the approving turn — the user would click
+// Approve and be asked again. Worse, matching loosely would let the model swap in different
+// arguments after a human had already said yes.
+//
+// So the approved call is remembered here and REPLAYED verbatim: the user authorises exactly
+// the call they were shown, and that is exactly what runs, whatever the model re-emits.
+// In-memory only (approvals must not outlive the process), TTL-bounded and size-capped.
+const _PENDING_APPROVALS = new Map();
+const _APPROVAL_TTL_MS = 15 * 60 * 1000;
+const _APPROVAL_MAX = 200;
+
+function _rememberPending(token, name, input) {
+  const now = Date.now();
+  for (const [k, v] of _PENDING_APPROVALS) if (now - v.at > _APPROVAL_TTL_MS) _PENDING_APPROVALS.delete(k);
+  if (_PENDING_APPROVALS.size >= _APPROVAL_MAX) _PENDING_APPROVALS.delete(_PENDING_APPROVALS.keys().next().value);
+  _PENDING_APPROVALS.set(token, { tool: name, input, at: now });
+}
+
+/**
+ * The approved arguments for *name*, if the caller holds a live token for it.
+ * ONE-SHOT: the entry is consumed, so one approval authorises one execution. Without that,
+ * a token echoed on every subsequent turn would let the same side-effectful call re-run
+ * indefinitely off a single click.
+ */
+function _approvedInputFor(name, ctx) {
+  for (const t of _grantedTokens(ctx)) {
+    const e = _PENDING_APPROVALS.get(t);
+    // Same tool only — a token for generate_image can never authorise a Write.
+    if (e && e.tool === name && Date.now() - e.at <= _APPROVAL_TTL_MS) {
+      _PENDING_APPROVALS.delete(t);
+      return e.input;
+    }
+  }
+  return undefined;
+}
+
 // Is `name` gated for this run? (#2777) The gate set is the union of the env
 // CHAT_EVAL_GATED_TOOLS (comma/space-separated) and ctx.gatedTools (array or set),
 // case-insensitive. Used to enforce per-faculty measurement validity in capability
@@ -2010,6 +2096,31 @@ async function runTool(name, input, ctx = {}) {
     });
     await _logToolExecution(name, input, "unavailable", "invalid_arguments", startTime, ctx);
     return result;
+  }
+
+  // Human-in-the-loop gate (#3070). Deliberately AFTER argument repair/validation, so the
+  // token is computed over the exact arguments that would run — a human approves the real
+  // call, not a malformed version of it that repair would later rewrite.
+  if (entry.needsApproval) {
+    // Holding a live token for this tool means the user already approved a call the model is
+    // now retrying (usually with rephrased arguments). Replay the APPROVED arguments — what
+    // the human saw is what runs — rather than asking again or trusting the new ones.
+    const approvedInput = _approvedInputFor(name, ctx);   // one-shot: consumes the approval
+    if (approvedInput !== undefined) {
+      input = approvedInput;
+    } else {
+      const token = approvalToken(name, input);
+      _rememberPending(token, name, input);
+      const result = _outcome("unavailable", name, {
+        reason_code: "approval_required",
+        policy: entry.policy,
+        approval: { token, tool: name, input },
+        error: `'${name}' needs the user's approval before it runs. Nothing has been executed. `
+          + `Tell the user exactly what you intend to do and ask them to approve it.`,
+      });
+      await _logToolExecution(name, input, "unavailable", "approval_required", startTime, ctx);
+      return result;
+    }
   }
 
   try {
@@ -2220,5 +2331,6 @@ module.exports = {
   RECEIPT_SCHEMA_VERSION,
   // Exposed for unit testing the pre-execution arg guard (#2753 validate / #3068 repair).
   _validateArgs,
+  approvalToken,
   _repairArgs,
 };
