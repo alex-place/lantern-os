@@ -158,6 +158,9 @@ const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
+const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
+const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
+const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 
 // An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
@@ -414,11 +417,34 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (!(Number(heldQty[sym]) > 0)) {
       // Position gone → exit resolved. Drop its state.
       _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
+      _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
     } else {
-      // Position still held but the last exit was terminal-non-fill (error/dry_run):
-      // clear the freeze so a genuine later exit can retry.
+      // Position still held but the last exit was terminal-non-fill (error/dry_run).
+      // Clearing the freeze lets a genuine later exit retry — but an exit that keeps
+      // failing for a STRUCTURAL reason must not retry forever: on 2026-07-30 a
+      // 0.8-share SOXS remnant (IBKR cannot trade fractional) re-decided every ~9
+      // minutes for 5.5 hours, producing 39 identical error rows and drowning the
+      // day's real activity. After MAX_EXIT_FAILURES consecutive terminal failures
+      // the symbol is declared unclosable: frozen from re-firing, logged ONCE, and
+      // released automatically the moment the position leaves the book (the branch
+      // above) or grows back to a tradable size.
+      const st = String(_exitStatus.get(sym) || '');
+      if (/error/i.test(st)) {
+        const n = (_exitFailures.get(sym) || 0) + 1;
+        _exitFailures.set(sym, n);
+        if (n >= MAX_EXIT_FAILURES) {
+          workingSells.add(sym);                 // stop both exit paths re-deciding
+          if (!_unclosable.has(sym)) {
+            _unclosable.add(sym);
+            logTrade({ event: 'exit_frozen', symbol: sym, qty: heldQty[sym],
+              reason: `exit failed ${n}x consecutively — treating as unclosable, no further attempts`,
+              status: 'frozen' });
+          }
+          continue;                              // keep the freeze; don't clear state
+        }
+      }
       _exitStatus.delete(sym);
     }
   }
