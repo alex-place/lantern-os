@@ -219,7 +219,48 @@ def _gen_sha256_ctr(spec: dict) -> bytes:
     return bytes(out[:n])
 
 
-_GENERATORS = {"zeros": _gen_zeros, "repeat": _gen_repeat, "sha256-ctr": _gen_sha256_ctr}
+# Park-Miller minstd LCG — the classic reproducible-"random" stream used to seed scientific
+# simulations. A registered scientific generator (F1c, #2799): version-pinned, deterministic
+# forever (integer arithmetic, no float/PRNG drift), and slice-addressable via jump-ahead
+# x_k = (a^k · x_0) mod m. Packed as uint32 little-endian.
+_LCG_A = 16807
+_LCG_M = 2147483647  # 2**31 - 1
+
+
+def _lcg_seed(spec: dict) -> int:
+    s = int(spec["seed"]) % _LCG_M
+    return s if s != 0 else 1  # 0 is the LCG's fixed point — forbid it
+
+
+def _gen_lcg(spec: dict) -> bytes:
+    n = int(spec["size"])
+    x = _lcg_seed(spec)
+    out = bytearray()
+    for _ in range((n + 3) // 4):
+        x = (_LCG_A * x) % _LCG_M
+        out += x.to_bytes(4, "little")
+    return bytes(out[:n])
+
+
+_GENERATORS = {"zeros": _gen_zeros, "repeat": _gen_repeat, "sha256-ctr": _gen_sha256_ctr,
+               "lcg": _gen_lcg}
+
+# Version pins for the generator registry (F1c). A generative member records the version it was
+# built under; if a kind's implementation ever changes its output, bump the version here — old
+# archives (pinned to the prior version) are then REFUSED with a clear drift error instead of
+# silently regenerating wrong bytes. Enforced by the golden-hash test (tests/csf) + the footer
+# sha256. Legacy specs with no `version` are grandfathered (they predate the pin).
+_GEN_VERSIONS = {"zeros": 1, "repeat": 1, "sha256-ctr": 1, "lcg": 1}
+
+
+def _check_gen_version(gen: dict) -> None:
+    """Raise if a generative member's pinned version can't be reproduced by the current registry."""
+    kind = gen.get("kind")
+    v = gen.get("version")
+    if v is not None and v != _GEN_VERSIONS.get(kind):
+        raise ValueError(
+            f"generator {kind!r} spec pinned to version {v}, registry serves "
+            f"{_GEN_VERSIONS.get(kind)} — regeneration would drift; refusing (F1c)")
 
 
 def _gen_slice(gen: dict, offset: int, length: int) -> bytes:
@@ -231,6 +272,7 @@ def _gen_slice(gen: dict, offset: int, length: int) -> bytes:
     spot-checks are the F1b ladder's next rung, not required for soundness here.)
     """
     kind = gen.get("kind")
+    _check_gen_version(gen)
     total = int(gen.get("size", 0))
     if offset < 0 or length < 0 or offset + length > total:
         raise ValueError("slice out of range")
@@ -252,6 +294,18 @@ def _gen_slice(gen: dict, offset: int, length: int) -> bytes:
             out += hashlib.sha256(seed + i.to_bytes(8, "big")).digest()
         lo = offset - first * 32
         return bytes(out[lo:lo + length])
+    if kind == "lcg":
+        # jump-ahead to the first covering uint32: x_k = (a^k · x_0) mod m, then iterate the window
+        s = _lcg_seed(gen)
+        first = offset // 4
+        last = (offset + length - 1) // 4
+        x = (pow(_LCG_A, first + 1, _LCG_M) * s) % _LCG_M
+        out = bytearray()
+        for _ in range(first, last + 1):
+            out += x.to_bytes(4, "little")
+            x = (_LCG_A * x) % _LCG_M
+        lo = offset - first * 4
+        return bytes(out[lo:lo + length])
     # unknown kinds (future registry growth): fall back to full materialization
     return materialize_generator(gen)[offset:offset + length]
 
@@ -262,6 +316,7 @@ def materialize_generator(gen: dict) -> bytes:
     fn = _GENERATORS.get(kind)
     if fn is None:
         raise ValueError(f"unknown generator kind: {kind!r}")
+    _check_gen_version(gen)
     if int(gen.get("size", 0)) > _GEN_MAX_BYTES:
         raise ValueError("generator size exceeds materialization guard")
     return fn(gen)
@@ -373,6 +428,11 @@ def _write_archive(items, out_path: str, compress: bool, extra_meta: dict | None
             dict_bytes = dict_data.as_bytes()
 
     def _gen_entry(arc: str, gen: dict) -> dict:
+        # F1c: pin the generator to its current registry version so a future output-changing
+        # revision is REFUSED on read (clear drift error) rather than silently regenerating wrong
+        # bytes. Version-pinned by construction; specs that predate the pin stay grandfathered.
+        if gen.get("version") is None and gen.get("kind") in _GEN_VERSIONS:
+            gen = {**gen, "version": _GEN_VERSIONS[gen["kind"]]}
         raw = materialize_generator(gen)   # materialized once at pack time to hash
         entry = {
             "path": arc, "size": len(raw),
