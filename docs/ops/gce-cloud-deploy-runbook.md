@@ -89,11 +89,62 @@ guaranteed 404 and this box had no working chat fallback at all.
 | `google.conf` | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | `providers.conf` | `PATREON_CLIENT_ID`, `PATREON_CLIENT_SECRET`, `PATREON_CAMPAIGN_ID` |
 | `discord.conf` | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` |
+| `mail.conf` | `RESEND_API_KEY`, `MAIL_FROM`, `PUBLIC_BASE_URL` — see [Transactional email](#transactional-email-resend) |
 
 Values were copied from the operator's `lantern-os-stable/.env.local`. `SESSION_SECRET`
 is required because the app fail-closes when bound beyond loopback without one.
 
 After editing any drop-in: `sudo systemctl daemon-reload && sudo systemctl restart lantern.service`.
+
+## Transactional email (Resend)
+
+Signup confirmation and password-reset mail goes out via **Resend's HTTPS API**, not SMTP —
+cloud hosts (GCE included) throttle SMTP egress, which is a classic silent cause of
+"the confirmation email never arrived". `lib/mailer.js` picks Resend whenever
+`RESEND_API_KEY` is set, falls back to SMTP, and finally to a dev outbox.
+
+**The dev fallback is the failure mode to watch for.** With no provider configured the
+mailer does not error — it appends to `data/mail-outbox.jsonl` and the signup path
+*auto-admits accounts without proving email ownership* (#2065). A prod box with no
+`mail.conf` therefore looks healthy while silently sending nothing.
+
+```bash
+sudo tee /etc/systemd/system/lantern.service.d/mail.conf >/dev/null <<EOF
+[Service]
+Environment="RESEND_API_KEY=re_..."
+Environment="MAIL_FROM=unisona.ai <no-reply@unisona.ai>"
+Environment="PUBLIC_BASE_URL=https://unisona.ai"
+EOF
+sudo chmod 600 /etc/systemd/system/lantern.service.d/mail.conf
+sudo systemctl daemon-reload && sudo systemctl restart lantern.service
+```
+
+- **`MAIL_FROM` must be on a domain verified in the Resend dashboard.** Check with
+  `curl -H "Authorization: Bearer $RESEND_API_KEY" https://api.resend.com/domains` — the
+  domain needs `"status":"verified"` and `"sending":"enabled"`. `unisona.ai` was verified
+  2026-07-28. An unverified sender fails the send, not the signup, so it surfaces only in
+  the journal.
+- **`PUBLIC_BASE_URL` is required here, not optional.** Without it `lib/base-url.js` builds
+  verification and password-reset links from the request `Host` header, which is spoofable —
+  a forged Host points a genuine confirmation email at an attacker's domain (#2604). It
+  belongs in prod only; loopback dev is handled natively and setting it locally would aim
+  dev links at production.
+
+### Verifying
+
+`scripts/test-email.mjs` reads `.env`/`.env.local` and will **not** see the systemd
+environment, so it reports `dev` on this box and is not a valid prod check. Test the app
+instead — a real signup at `https://unisona.ai/auth.html` with an address you can read:
+
+```bash
+sudo journalctl -u lantern.service -n 50 --no-pager | grep -i mailer
+```
+
+A correctly configured box logs nothing there; a broken key or unverified sender logs
+`[mailer] resend send failed to …` with Resend's reason (never the key). The signup
+response itself is the other tell: `202 pendingVerification` with `"emailDelivery":"sent"`
+and no `devVerifyLink` means the hard gate is active (#3021), whereas `201` means the box
+fell through to the no-mailer auto-admit path.
 
 ### OAuth redirect URIs (register on each provider)
 
@@ -193,7 +244,7 @@ If the VM is lost, recreate it: create an `e2-medium` Debian-12 instance with
 `--service-account=843848914143-compute@developer.gserviceaccount.com --scopes=cloud-platform`,
 a startup script that installs Node 20 + git, clones `master`
 (`GIT_LFS_SKIP_SMUDGE=1`), `npm install`, and installs `lantern.service`. Then:
-grant `roles/aiplatform.user` to the SA, recreate the four env drop-ins, install **both**
+grant `roles/aiplatform.user` to the SA, recreate the five env drop-ins, install **both**
 cloudflared connectors — `cloudflared` for tunnel `lantern-cloud` (credentials from the
 operator's `~/.cloudflared/`) and `cloudflared-unisona` for the `ff492ab2…` unisona.ai
 tunnel (see [the cutover section](#unisonaai-tunnel-cutover-2026-07-10)) — and
