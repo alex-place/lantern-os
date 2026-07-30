@@ -278,7 +278,27 @@ async function tick({ bridge } = {}) {
   }
 
   // EXIT WINDOW (09:31–09:50 ET): flatten last night's legs at ≈the open.
-  if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
+  //
+  // CATCH-UP TO 15:55 (2026-07-29 post-mortem): this used to be the ONLY exit
+  // path, gated to a 20-minute window. The process was down across that window,
+  // nothing ran, and a 10-leg 0-DTE call ladder EXPIRED WORTHLESS — a −$2,006
+  // total loss on a position that was never given an exit. The server was back
+  // by 15:38 ET, still inside the session, so a late exit would have sold them.
+  // A missed window must degrade to a worse fill, never to no exit at all: any
+  // tick that finds a position from a PRIOR date now exits it for the rest of
+  // the session, flagged `late` so the ledger separates catch-ups from clean
+  // 09:31 exits and the measured expectancy isn't quietly polluted by them.
+  const staleOpen = !!(st.open && st.open.date !== today);
+  const inExitWindow = hm >= 931 && hm <= 950;
+  const inCatchUp = hm > 950 && hm <= 1555;      // rest of the session, before the close
+  if (staleOpen && (inExitWindow || inCatchUp)) {
+    const lateExit = !inExitWindow;
+    if (lateExit) {
+      _appendOnce('late_' + today, {
+        phase: 'late_exit_start', date: today, opened: st.open.date, hm,
+        why: 'position survived past the 09:31-09:50 window (engine down or stalled) — exiting now rather than letting it ride/expire',
+      });
+    }
     const { brokerFacadeFor } = require('./broker-facade');
     const yahoo = require('./market-data-yahoo');
     const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
@@ -310,7 +330,7 @@ async function tick({ bridge } = {}) {
             : { error: 'no bid — leg left to expire worthless' };
           status = r && r.order_id ? 'placed' : `error:${(r && r.error) || 'unknown'}`;
         }
-        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_bid: bid, pl_pct_est: pl, status, dry: !leg.placed, late: lateExit });
         continue;
       }
       const exitRef = openBySym[leg.symbol] || null;
@@ -319,9 +339,9 @@ async function tick({ bridge } = {}) {
         const sellQty = Math.min(leg.qty, heldQty[leg.symbol] || 0);
         if (sellQty > 0) {
           const r = await resolved.facade.placeIBKROrder(c.userId, { ticker: leg.symbol, side: 'sell', qty: sellQty, type: 'market' }).catch((e) => ({ status: 'error', reason: e.message }));
-          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: sellQty, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false });
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: sellQty, exit_ref_open: exitRef, pl_pct_est: pl, status: r && r.status, dry: false, late: lateExit });
         } else {
-          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: 0, exit_ref_open: exitRef, pl_pct_est: pl, status: 'already_flat', dry: false });
+          _append({ phase: 'exit', date: st.open.date, ...leg, sold_qty: 0, exit_ref_open: exitRef, pl_pct_est: pl, status: 'already_flat', dry: false, late: lateExit });
         }
         // Cancel any resting protective SELL-STOP on this symbol (the intraday
         // re-protect pass attaches one to every naked long). An orphaned GTC stop on
@@ -337,7 +357,7 @@ async function tick({ bridge } = {}) {
           }
         } catch (_e) { /* fail-soft */ }
       } else {
-        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true });
+        _append({ phase: 'exit', date: st.open.date, ...leg, exit_ref_open: exitRef, pl_pct_est: pl, dry: true, late: lateExit });
       }
     }
     st.open = null; _writeState(st);
