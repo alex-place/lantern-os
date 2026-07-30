@@ -189,6 +189,21 @@ function _append(rec) {
   try { fs.mkdirSync(path.dirname(LEDGER), { recursive: true }); fs.appendFileSync(LEDGER, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n'); }
   catch (_e) { /* ledger must never break the tick */ }
 }
+// One heartbeat row per ET day: proof the scheduler reached the engine at all.
+// Cheap (deduped by date) and the difference between "declined" and "never ran".
+function _heartbeat(state) {
+  try {
+    const { today } = _etParts();
+    _appendOnce('hb_' + today + '_' + state, { phase: 'heartbeat', date: today, state });
+  } catch (_e) { /* never break the tick */ }
+}
+// Append a row at most once per key for the life of the process.
+const _seenKeys = new Set();
+function _appendOnce(key, rec) {
+  if (_seenKeys.has(key)) return;
+  _seenKeys.add(key);
+  _append(rec);
+}
 function _readState() { try { return JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (_e) { return {}; } }
 function _writeState(st) { try { fs.mkdirSync(path.dirname(STATE), { recursive: true }); fs.writeFileSync(STATE, JSON.stringify(st)); } catch (_e) { /* */ } }
 function _etNow() { return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' })); }
@@ -235,9 +250,32 @@ function _readLedger() {
 /** One scheduler tick — called from the autoscan loop (fail-soft). */
 async function tick({ bridge } = {}) {
   const c = cfg();
-  if (!c.enabled || !bridge) return;
+  if (!c.enabled || !bridge) {
+    // Even a disabled/bridge-less tick is worth one line per day: silence is
+    // indistinguishable from a dead scheduler (2026-07-29: the process died
+    // before the exit window and the position expired worthless — nobody knew
+    // until the next morning).
+    _heartbeat(!c.enabled ? 'disabled' : 'no_bridge');
+    return;
+  }
   const { dow, hm, today } = _etParts();
   const st = _readState();
+  _heartbeat('alive');
+
+  // WINDOW EVALUATED — the entry window must ALWAYS record its verdict. It
+  // previously logged only when it entered or when a gate failed, so a window
+  // that never ran and a window that correctly declined looked identical in the
+  // ledger (operator, 2026-07-30: an entry window produced no row at all).
+  if (dow >= 1 && dow <= 4 && hm >= 1545 && hm <= 1559) {
+    const already = st.lastEnterDate === today;
+    const holding = !!st.open;
+    if (already || holding) {
+      _appendOnce('window_' + today, {
+        phase: 'window', date: today, entered: already, holding,
+        why: already ? 'already entered today' : 'still holding a prior night — no new entry',
+      });
+    }
+  }
 
   // EXIT WINDOW (09:31–09:50 ET): flatten last night's legs at ≈the open.
   if (hm >= 931 && hm <= 950 && st.open && st.open.date !== today) {
@@ -316,7 +354,7 @@ async function tick({ bridge } = {}) {
     }
     const sleeves = selectSleeves(closesBySym);
     st.lastEnterDate = today;
-    if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, why: 'no sleeve gate passed' }); return; }
+    if (!sleeves.length) { _writeState(st); _append({ phase: 'skip', date: today, exec: c.exec, why: 'no sleeve gate passed — no symbol met an uptrend/capitulation/fade condition' }); return; }
 
     const { brokerFacadeFor } = require('./broker-facade');
     const resolved = await brokerFacadeFor(c.userId, c.broker === 'ibkr' ? bridge : null).catch(() => null);
