@@ -266,14 +266,44 @@ function _post(host, p, body, headers) {
 }
 /** Place ONE paper option order (marketable limit). Returns {order_id}|{error}.
  *  Refuses anything but the paper trading host — this bridge never touches live. */
-async function placePaperOrder({ contract, side, qty, limit }) {
+async function placePaperOrder({ contract, side, qty, limit, tif }) {
   const auth = _auth();
   if (!auth) return { error: 'no alpaca auth' };
   if (auth.env === 'live') return { error: 'refused: live auth — the options bridge is paper-only' };
-  const body = { symbol: contract, qty: String(qty), side, type: 'limit', time_in_force: 'day', limit_price: String(limit) };
+  // tif: 'day' (default) for immediate entries/exits; 'gtc' for a RESTING
+  // protective exit that must outlive the process (verified accepted by the
+  // Alpaca options API on a far-dated contract, 2026-07-30).
+  const timeInForce = String(tif || 'day').toLowerCase() === 'gtc' ? 'gtc' : 'day';
+  const body = { symbol: contract, qty: String(qty), side, type: 'limit', time_in_force: timeInForce, limit_price: String(limit) };
   const r = await _post('paper-api.alpaca.markets', '/v2/orders', body, auth.headers);
   if (!r.ok) return { error: `order ${r.status}: ${(r.json && (r.json.message || r.json.error)) || ''}`.trim() };
   return { order_id: r.json && r.json.id, status: r.json && r.json.status };
+}
+/** Cancel one resting paper order. Returns { ok } | { error }. Used to retire a
+ *  protective exit BEFORE the primary exit sells — a resting sell that survives
+ *  its position would go naked short on the next fill. */
+async function cancelPaperOrder(orderId) {
+  const auth = _auth();
+  if (!auth) return { error: 'no alpaca auth' };
+  if (auth.env === 'live') return { error: 'refused: live auth — paper-only' };
+  if (!orderId) return { error: 'no order id' };
+  const r = await _del('paper-api.alpaca.markets', '/v2/orders/' + encodeURIComponent(orderId), auth.headers);
+  // 404 = already gone (filled/expired/canceled) — that is a successful outcome
+  // for our purposes: nothing is resting any more.
+  if (r.status === 404) return { ok: true, alreadyGone: true };
+  if (!r.ok && r.status !== 204) return { error: `cancel ${r.status}` };
+  return { ok: true };
+}
+function _del(host, p, headers) {
+  return new Promise((resolve) => {
+    const req = https.request({ host, path: p, method: 'DELETE', headers }, (res) => {
+      let d = ''; res.on('data', (c) => (d += c));
+      res.on('end', () => resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode }));
+    });
+    req.on('error', () => resolve({ ok: false, status: 0 }));
+    req.setTimeout(9000, () => { req.destroy(); resolve({ ok: false, status: 0 }); });
+    req.end();
+  });
 }
 /** Best-effort fill lookup for a paper order id → {filled_avg_price, status}|null. */
 async function paperOrderFill(orderId) {
@@ -457,6 +487,6 @@ function status() {
   return { ...cfg(), minNights: MIN_N, state: _readState(), measured: summarize(rows), lastRows: rows.slice(-5) };
 }
 
-module.exports = { cfg, gates, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, placePaperOrder, paperOrderFill, LEDGER, MIN_N,
+module.exports = { cfg, gates, cancelPaperOrder, pickStrike, pickPenny, parseOcc, summarize, nextTradingDayET, probe, tick, status, placePaperOrder, paperOrderFill, LEDGER, MIN_N,
   // options EXECUTION ADAPTER surface — the overnight book's 4th exec tier calls these
   listNextExpiryCalls, chainQuotes, quoteOption };
