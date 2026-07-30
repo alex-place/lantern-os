@@ -4728,8 +4728,15 @@ async function applyTierGate(){
     // watchlist, news, signals): go there, and say why, with the upgrade path.
     // ?stay=1 escapes the redirect so the CTA is still reachable deliberately
     // (e.g. from pricing), and we never bounce a page opened from Watch itself.
+    // Show the WHY, don't just teleport (operator 2026-07-30: "it just dosent
+    // let me open it" — the silent bounce reads as a broken page). Only the
+    // global nav auto-redirects to Watch, and even then it lands with a banner.
+    // Any DELIBERATE arrival — the in-page Trade tab (?stay=1), a pricing link,
+    // a direct URL with a referrer from this app — gets the explanatory CTA.
     const params = new URLSearchParams(location.search);
-    if (params.get('stay') === '1') {
+    const deliberate = params.get('stay') === '1' ||
+      (document.referrer && /\/(watch|options|pricing)\.html/.test(document.referrer));
+    if (deliberate) {
       const el = document.getElementById('tradeLock'); if (el) el.style.display='flex';
       return;
     }
