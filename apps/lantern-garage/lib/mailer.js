@@ -196,49 +196,25 @@ async function _sendMailInner({ to, subject, html, text, link }) {
 }
 
 // ── Templates ────────────────────────────────────────────────────────────────
-const BRAND = "unisona.ai";
-function shell(title, bodyHtml) {
-  return `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0f172a">
-    <h2 style="color:#06b6d4;margin:0 0 16px">${BRAND}</h2>
-    <h3 style="margin:0 0 12px">${title}</h3>
-    ${bodyHtml}
-    <p style="color:#94a3b8;font-size:12px;margin-top:24px">If you didn't request this, you can ignore this email.</p>
-  </div>`;
-}
-function button(href, label) {
-  return `<p style="margin:20px 0"><a href="${href}" style="background:#06b6d4;color:#fff;text-decoration:none;padding:11px 20px;border-radius:10px;font-weight:600;display:inline-block">${label}</a></p>
-    <p style="color:#64748b;font-size:12px;word-break:break-all">Or paste this link: ${href}</p>`;
-}
+// Markup lives in lib/email-presets.js (#3093). Each sender below declares a preset
+// KIND plus data; none of them compose HTML. That is what keeps escaping, the
+// footer's claim, and the visual shell from drifting apart across 12 send sites.
+const { buildEmail, mayReceiveAd, BRAND, SITE } = require("./email-presets");
 
-// Signup confirmation is a typed CODE, not a clicked link — the user may read mail on
-// a phone and be signing up on a desktop, and a code crosses that gap where a link
-// can't. The email-CHANGE flow below still uses a link (see sendVerificationEmail).
-// `link` is deliberately absent: sendMail()'s dev fallback logs whatever it is given,
-// and there is no link to log here — the code itself goes to the outbox instead.
 async function sendVerificationCodeEmail(to, name, code) {
-  const spaced = String(code).split("").join(" "); // easier to read/transcribe
-  return sendMail({
-    to,
-    link: `code: ${code}`, // what the dev outbox records when no provider is configured
-    subject: `Your ${BRAND} confirmation code: ${code}`,
-    text: `Hi ${name || "there"}, your ${BRAND} confirmation code is ${code}. It expires in 15 minutes.`,
-    html: shell("Confirm your email",
-      `<p>Hi ${name || "there"}, enter this code to finish setting up your ${BRAND} account:</p>
-       <p style="margin:24px 0"><span style="display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:14px 22px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:6px;color:#0f172a">${spaced}</span></p>
-       <p style="color:#64748b;font-size:13px">This code expires in 15 minutes and can only be used once. We'll never ask you for it by phone, email, or chat.</p>`),
-  });
+  return sendMail(buildEmail({ kind: "code", to, name, code }));
 }
 
 // Payload builder split out from the sender so a caller that needs a BOUNDED wait
 // (#3094) can reuse the exact same template instead of re-authoring the markup.
 function verificationEmailPayload(to, name, link) {
-  return {
-    to, link,
+  return buildEmail({
+    kind: "button", to, name,
+    title: "Confirm your email",
     subject: `Confirm your email for ${BRAND}`,
-    text: `Hi ${name || "there"}, confirm your email: ${link}`,
-    html: shell("Confirm your email",
-      `<p>Hi ${name || "there"}, please confirm this email address to finish securing your ${BRAND} account.</p>${button(link, "Confirm email")}`),
-  };
+    body: `please confirm this email address to finish securing your ${BRAND} account.`,
+    cta: { href: link, label: "Confirm email" },
+  });
 }
 
 async function sendVerificationEmail(to, name, link) {
@@ -246,45 +222,67 @@ async function sendVerificationEmail(to, name, link) {
 }
 
 async function sendPasswordResetEmail(to, name, link) {
-  return sendMail({
-    to, link,
+  return sendMail(buildEmail({
+    kind: "button", to, name,
+    title: "Reset your password",
     subject: `Reset your ${BRAND} password`,
-    text: `Reset your password: ${link}`,
-    html: shell("Reset your password",
-      `<p>Hi ${name || "there"}, use the button below to set a new password. This link expires in 1 hour.</p>${button(link, "Reset password")}`),
-  });
+    body: "use the button below to set a new password. This link expires in 1 hour.",
+    cta: { href: link, label: "Reset password" },
+  }));
 }
 
+// `info`, not `message`: this is a security notice about something that already
+// happened, so its footer must tell the user to act if it wasn't them — the exact
+// opposite of the "you can ignore this" line every email used to carry.
 async function sendNewSignInEmail(to, name, provider) {
-  return sendMail({
-    to,
+  return sendMail(buildEmail({
+    kind: "info", to, name,
+    title: "New sign-in method added",
     subject: `New sign-in method added to your ${BRAND} account`,
-    text: `A new sign-in method (${provider}) was added to your account.`,
-    html: shell("New sign-in method added",
-      `<p>Hi ${name || "there"}, <strong>${provider}</strong> was just connected to your ${BRAND} account. If this was you, no action is needed.</p>`),
-  });
+    body: `${provider} was just connected to your ${BRAND} account. If this was you, no action is needed.`,
+  }));
 }
 
 async function sendWelcomeEmail(to, name) {
-  return sendMail({
-    to,
+  return sendMail(buildEmail({
+    kind: "message", to, name,
+    title: "You're in",
     subject: `Welcome to ${BRAND}`,
-    text: `Hi ${name || "there"}, your email is confirmed — welcome aboard. Start at https://unisona.ai`,
-    html: shell("You're in",
-      `<p>Hi ${name || "there"}, your email is confirmed and your ${BRAND} account is ready.</p>
-       <p>Start with the chat, watch the markets, or connect a paper-trading broker.</p>${button("https://unisona.ai", "Open " + BRAND)}`),
-  });
+    body: [
+      `your email is confirmed and your ${BRAND} account is ready.`,
+      "Start with the chat, watch the markets, or connect a paper-trading broker.",
+    ],
+    cta: { href: SITE, label: `Open ${BRAND}` },
+  }));
 }
 
 async function sendPasswordChangedEmail(to, name) {
-  return sendMail({
-    to,
+  return sendMail(buildEmail({
+    kind: "info", to, name,
+    title: "Password changed",
     subject: `Your ${BRAND} password was changed`,
-    text: `Hi ${name || "there"}, your password was just changed. If this wasn't you, reset it immediately.`,
-    html: shell("Password changed",
-      `<p>Hi ${name || "there"}, your ${BRAND} password was just changed.</p>
-       <p><strong>If this wasn't you</strong>, reset your password immediately and consider signing in with Google instead.</p>${button("https://unisona.ai/auth.html", "Review your account")}`),
-  });
+    body: [
+      `your ${BRAND} password was just changed.`,
+      "If this wasn't you, reset your password immediately and consider signing in with Google instead.",
+    ],
+    cta: { href: `${SITE}/auth.html`, label: "Review your account" },
+  }));
+}
+
+/**
+ * Marketing / product-announcement email. Unlike everything above this is NOT
+ * transactional: it is refused unless the recipient's profile still allows product
+ * updates, and buildEmail() itself refuses without a working unsubscribe URL.
+ * Returns { ok:false, skipped:"opted_out" } rather than throwing, so a campaign
+ * loop can skip opted-out users without special-casing.
+ */
+async function sendAdEmail(profile, { title, subject, body, cta, unsubscribeUrl }) {
+  if (!mayReceiveAd(profile)) return { ok: false, skipped: "opted_out", transport: null };
+  return sendMail(buildEmail({
+    kind: "ad", to: profile.email, name: profile.name,
+    title, subject, body, cta,
+    unsubscribeUrl: unsubscribeUrl || `${SITE}/settings.html`,
+  }));
 }
 
 module.exports = {
@@ -301,4 +299,5 @@ module.exports = {
   sendNewSignInEmail,
   sendWelcomeEmail,
   sendPasswordChangedEmail,
+  sendAdEmail,
 };
