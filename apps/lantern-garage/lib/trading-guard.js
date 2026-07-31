@@ -9,7 +9,11 @@
  * Gates (ALL must pass to place a real order):
  *   1. No global halt file: data/kalshi/LIVE-KILL-SWITCH or data/kalshi/TRADING-PAUSED.
  *   2. TRADER_LIVE=1              — master arm switch (default unset/0 = dry run).
- *   3. qty ≤ MAX_ORDER_QTY (default 100) and notional ≤ MAX_ORDER_NOTIONAL ($2000).
+ *   3. notional ≤ the per-position cap (TRADER_MAX_POSITION_PCT of equity, default
+ *      5%; falls back to the flat MAX_ORDER_NOTIONAL, $2000, when equity is unknown)
+ *      and qty ≤ MAX_ORDER_QTY — a share-count SANITY ceiling (default 100000), not
+ *      the real limit. Notional governs; a fractional-share book legitimately places
+ *      four-figure share counts on cheap names.
  *   4. Account mode is 'paper', OR mode 'live' AND TRADER_ALLOW_LIVE_ACCOUNT=1
  *      — placing real-money orders on a LIVE account needs a second opt-in.
  */

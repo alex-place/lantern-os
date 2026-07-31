@@ -45,11 +45,19 @@ test("unknown account mode is refused even when armed", () => {
   assert.match(g.reason, /unknown/i);
 });
 
-test("qty cap blocks oversized orders", () => {
+// MAX_ORDER_QTY is a share-count SANITY ceiling (default 100000), not the real
+// limit — notional governs, and a fractional-share book legitimately places
+// four-figure share counts on cheap names. So: a big-but-sane qty under the
+// notional cap must PASS, and only an absurd one trips the ceiling.
+test("qty cap is a sanity ceiling, not the real limit", () => {
   process.env.TRADER_LIVE = "1";
-  const g = orderGate({ mode: "paper", qty: 101, price: 1 });
-  assert.strictEqual(g.allowed, false);
-  assert.match(g.reason, /MAX_ORDER_QTY/);
+  const ok = orderGate({ mode: "paper", qty: 101, price: 1 });   // $101 notional
+  assert.strictEqual(ok.allowed, true, "a sane share count under the notional cap must not be blocked by qty");
+
+  process.env.MAX_ORDER_QTY = "100";
+  const capped = orderGate({ mode: "paper", qty: 101, price: 1 });
+  assert.strictEqual(capped.allowed, false);
+  assert.match(capped.reason, /MAX_ORDER_QTY/);
 });
 
 test("notional cap blocks expensive orders", () => {
