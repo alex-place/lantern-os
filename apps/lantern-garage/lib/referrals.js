@@ -49,7 +49,12 @@ function b32(buf) {
  * verified — so a deliberately-slow password hash (bcrypt/scrypt) would be the
  * WRONG primitive. HMAC-SHA256 with a server secret is the correct construction
  * for an unforgeable, verifiable share code. CodeQL's js/insufficient-password-hash
- * mis-classifies the session-derived userId as a password; suppressed accordingly.
+ * mis-classifies the session-derived userId as a password.
+ *
+ * NOTE: the trailing codeql[...] comment below does NOT suppress the alert — this
+ * repo's code-scanning setup ignores inline suppression (verified on PR #3101: the
+ * annotated line was re-flagged). It stays as documentation for the next reader; the
+ * alert itself has to be dismissed in the Security tab / API. See #3098.
  */
 function codeFor(userId) {
   const uid = String(userId || "").trim();
