@@ -7,10 +7,22 @@
   where `setx` puts it), validates its shape, installs it on the GCE box as a
   systemd drop-in, restarts the app, and verifies billing came up configured.
 
-  The key is streamed over the SSH connection's STDIN. It is never placed in a
+  The key is transferred with `gcloud compute scp`. It is never placed in a
   command line on either side: argv is world-readable through `ps` and /proc, so
   a key passed that way leaks to every local user on the VM for the life of the
-  process. It is also never echoed, and never written to a temp file here.
+  process. It is also never echoed.
+
+  Transport note: piping the key over `gcloud compute ssh --command`'s STDIN does
+  NOT work on Windows. `gcloud` here is a PowerShell wrapper (gcloud.ps1) which
+  does not forward stdin to ssh -- it answers a prompt with "y", and that single
+  character is what lands in the file. That silently produced a drop-in
+  containing `y` and an app that still reported billing unconfigured. scp is the
+  reliable path.
+
+  The key therefore touches a local temp file briefly. It is created with an ACL
+  restricted to the current user, overwritten with zeros before deletion, and the
+  deletion is verified. That is a smaller exposure than argv, which is readable
+  by every user on the box for the life of the process.
 
   Secrets live in /etc/systemd/system/lantern.service.d/ by convention -- outside
   the git checkout, so the release deploy's `git checkout -f <tag>` cannot touch
@@ -99,16 +111,39 @@ Write-Host "Target : $Vm ($Zone) -> $DropIn"
 
 if (-not $PSCmdlet.ShouldProcess("$Vm ($Zone)", "install STRIPE_SECRET_KEY and restart lantern.service")) { return }
 
-# --- Install. The drop-in body goes over STDIN, so the key never enters argv.
-# umask 077 means the file is 0600 from birth, never briefly world-readable.
+# --- Install via scp (see the transport note in the header) -----------------
 $dropInBody = "[Service]`nEnvironment=`"STRIPE_SECRET_KEY=$key`"`n"
-$install = "sudo install -d -m 755 /etc/systemd/system/lantern.service.d && " +
-           "sudo sh -c 'umask 077; cat > $DropIn' && " +
-           "sudo chown root:root $DropIn && sudo chmod 600 $DropIn && " +
-           "sudo systemctl daemon-reload && sudo systemctl restart lantern.service && echo INSTALLED"
+$tmp = Join-Path $env:TEMP ("stripe-" + [guid]::NewGuid().ToString('N') + ".conf")
+$remoteTmp = "/tmp/stripe-$([guid]::NewGuid().ToString('N')).conf"
+$result = $null
 
-$result = Invoke-Remote -Command $install -StdIn $dropInBody
-Remove-Variable key, dropInBody -ErrorAction SilentlyContinue
+try {
+    Set-Content -Path $tmp -Value $dropInBody -NoNewline -Encoding ascii
+    # Full control for this user only: no inheritance (so other local users cannot
+    # read it) but F rather than R,W, because R,W alone blocks our own delete.
+    & icacls $tmp /inheritance:r /grant:r "$($env:USERNAME):(F)" | Out-Null
+
+    $scp = @('compute', 'scp', $tmp, "${Vm}:$remoteTmp", "--zone=$Zone", "--project=$Project")
+    $null = & gcloud @scp 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "scp of the drop-in failed (exit $LASTEXITCODE)." }
+
+    # install(1) sets owner/mode atomically; shred the staged copy either way.
+    $install = "sudo install -d -m 755 /etc/systemd/system/lantern.service.d && " +
+               "sudo install -o root -g root -m 600 $remoteTmp $DropIn; rc=`$?; " +
+               "shred -u $remoteTmp 2>/dev/null || rm -f $remoteTmp; " +
+               "test `$rc -eq 0 && sudo systemctl daemon-reload && " +
+               "sudo systemctl restart lantern.service && echo INSTALLED"
+    $result = Invoke-Remote -Command $install
+}
+finally {
+    if (Test-Path $tmp) {
+        # Overwrite before unlinking so the bytes are not left in free space.
+        try { [IO.File]::WriteAllBytes($tmp, (New-Object byte[] 4096)) } catch { }
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+        if (Test-Path $tmp) { Write-Warning "Could not delete the temp file $tmp -- remove it by hand." }
+    }
+    Remove-Variable key, dropInBody -ErrorAction SilentlyContinue
+}
 
 if ($result -notmatch 'INSTALLED') {
     Write-Error "Install did not confirm. Remote output:`n$result"
