@@ -22,7 +22,10 @@ function b64url(buf) {
 }
 
 function sign(payloadB64) {
-  return crypto.createHmac("sha256", secret()).update(payloadB64).digest("base64url");
+  // A MAC over a token payload, not a stored password. The security here is the ~300-bit
+  // secret key plus a short TTL, not hash slowness; a KDF would add latency and buy
+  // nothing, because there is no low-entropy value for an attacker to enumerate.
+  return crypto.createHmac("sha256", secret()).update(payloadB64).digest("base64url"); // codeql[js/insufficient-password-hash]
 }
 
 const TTL = {

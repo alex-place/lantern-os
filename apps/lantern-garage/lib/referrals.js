@@ -22,12 +22,18 @@
 const crypto = require("crypto");
 const path = require("path");
 const fs = require("fs");
+const { resolveSessionSecret } = require("./session-secret");
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..");
 const DEFAULT_FILE = path.join(repoRoot, "data", "traction", "events.jsonl");
 
 function secret() {
-  return process.env.REFERRAL_SECRET || process.env.SESSION_SECRET || "unisona-referral-dev-secret";
+  // An explicit REFERRAL_SECRET wins (lets referral codes survive a session-secret
+  // rotation); otherwise defer to the fail-closed session secret. NOT a literal
+  // fallback: this file's own contract is an "unforgeable" share code, and a constant
+  // published in this repo makes every user's code computable by anyone — enough to
+  // misattribute signups to an account you don't own. Same class as #2619.
+  return process.env.REFERRAL_SECRET || resolveSessionSecret();
 }
 
 // base32-ish, url-safe, no padding — short enough to share, long enough not to guess.
@@ -43,13 +49,17 @@ function b32(buf) {
  * verified — so a deliberately-slow password hash (bcrypt/scrypt) would be the
  * WRONG primitive. HMAC-SHA256 with a server secret is the correct construction
  * for an unforgeable, verifiable share code. CodeQL's js/insufficient-password-hash
- * mis-classifies the session-derived userId as a password; suppressed accordingly.
+ * mis-classifies the session-derived userId as a password.
+ *
+ * NOTE: the trailing codeql[...] comment below does NOT suppress the alert — this
+ * repo's code-scanning setup ignores inline suppression (verified on PR #3101: the
+ * annotated line was re-flagged). It stays as documentation for the next reader; the
+ * alert itself has to be dismissed in the Security tab / API. See #3098.
  */
 function codeFor(userId) {
   const uid = String(userId || "").trim();
   if (!uid) return null;
-  // codeql[js/insufficient-password-hash] — MAC over a public id, not a stored password (see above).
-  const mac = crypto.createHmac("sha256", secret()).update("ref:" + uid).digest();
+  const mac = crypto.createHmac("sha256", secret()).update("ref:" + uid).digest(); // codeql[js/insufficient-password-hash]
   return b32(mac);
 }
 
