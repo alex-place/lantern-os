@@ -16,18 +16,26 @@ const oauth = require("../lib/indeed-oauth");
 const tokens = require("../lib/indeed-token-store");
 const { getEffectiveUserId } = require("../lib/session-identity");
 const { isOperatorRequest } = require("../lib/request-auth");
+const { resolveSessionSecret } = require("../lib/session-secret");
 
 const COOKIE = "lantern_indeed_oauth";
-function _secret() { return process.env.SESSION_SECRET || "lantern-indeed-oauth-secret"; }
+// Sign the OAuth state cookie with the SAME fail-closed secret as the session, never a
+// hardcoded literal (#2619 — the fix lib/oauth-core.js already carries). The previous
+// `process.env.SESSION_SECRET || "lantern-indeed-oauth-secret"` fell back to a constant
+// that is public in this repo, so on any deploy without SESSION_SECRET the OAuth state
+// cookie was signed with a key an attacker can read here — i.e. forgeable, which is
+// exactly what signing the state is meant to prevent. resolveSessionSecret throws
+// beyond loopback instead of falling back.
+function _secret() { return resolveSessionSecret(); }
 function _sign(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto.createHmac("sha256", _secret()).update(data).digest("base64url");
+  const sig = crypto.createHmac("sha256", _secret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   return `${data}.${sig}`;
 }
 function _verify(token) {
   if (!token || !token.includes(".")) return null;
   const [data, sig] = token.split(".");
-  const expect = crypto.createHmac("sha256", _secret()).update(data).digest("base64url");
+  const expect = crypto.createHmac("sha256", _secret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   const a = Buffer.from(sig), b = Buffer.from(expect);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try { const p = JSON.parse(Buffer.from(data, "base64url").toString("utf8")); return p && p.exp && Date.now() <= p.exp ? p : null; } catch { return null; }

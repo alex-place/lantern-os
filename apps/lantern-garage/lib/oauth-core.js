@@ -56,13 +56,14 @@ function _oauthSecret() {
 }
 function signOauth(payload) {
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url");
+  // MAC over the OAuth state payload, not a stored password — see sign() in auth-tokens.js.
+  const sig = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   return `${data}.${sig}`;
 }
 function verifyOauth(token) {
   if (!token || !token.includes(".")) return null;
   const [data, sig] = token.split(".");
-  const expect = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url");
+  const expect = crypto.createHmac("sha256", _oauthSecret()).update(data).digest("base64url"); // codeql[js/insufficient-password-hash]
   const a = Buffer.from(sig), b = Buffer.from(expect);
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
   try {

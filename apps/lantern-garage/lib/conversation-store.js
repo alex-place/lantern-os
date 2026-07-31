@@ -31,7 +31,9 @@ function safeUserId(userId) {
   const s = String(userId).trim();
   if (!s) return null;
   if (/^[A-Za-z0-9_-]{1,80}$/.test(s)) return s;
-  return "u_" + crypto.createHash("sha256").update(s).digest("hex").slice(0, 32);
+  // Path sanitisation, not authentication: this turns an arbitrary id into a filesystem-
+  // safe token. Nothing is verified against the digest, so preimage cost is irrelevant.
+  return "u_" + crypto.createHash("sha256").update(s).digest("hex").slice(0, 32); // codeql[js/insufficient-password-hash]
 }
 
 /** Absolute path to the conversation log for a user (per-profile), or the shared

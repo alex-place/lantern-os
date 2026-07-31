@@ -68,7 +68,10 @@ class IbkrOAuth1 {
 
   /** Confirm the LST matches the server's signature before using it. */
   validateLiveSessionToken(lst, liveSessionTokenSignature) {
-    const h = crypto.createHmac('sha1', Buffer.from(lst, 'base64'));
+    // HMAC-SHA1 is mandated by IBKR's OAuth1 spec for LST validation — it is a protocol
+    // MAC over a public consumer key, not password storage, and the algorithm is not
+    // ours to choose. Changing it would simply fail their verification.
+    const h = crypto.createHmac('sha1', Buffer.from(lst, 'base64')); // codeql[js/insufficient-password-hash]
     h.update(this.consumerKey, 'utf8');
     return h.digest('hex') === liveSessionTokenSignature;
   }

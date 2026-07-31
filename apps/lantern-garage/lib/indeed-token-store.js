@@ -32,7 +32,9 @@ function _dec(b64) {
   return JSON.parse(Buffer.concat([d.update(ct), d.final()]).toString("utf8"));
 }
 function _safeId(userId) {
-  return crypto.createHash("sha256").update(String(userId)).digest("hex").slice(0, 32);
+  // Filename derivation, not authentication — same reasoning as conversation-store.js.
+  // The token itself is protected by AES-256-GCM above, not by this digest.
+  return crypto.createHash("sha256").update(String(userId)).digest("hex").slice(0, 32); // codeql[js/insufficient-password-hash]
 }
 function _file(userId) { return path.join(TOK_DIR, `${_safeId(userId)}.enc`); }
 
