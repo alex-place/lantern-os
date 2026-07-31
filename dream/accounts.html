@@ -535,8 +535,13 @@
       if (!res.ok) { toast(res.data.error === 'weak_password' ? 'Password too short (min 8)' : (res.data.error || 'Failed to set password')); return; }
       replaceAccount(res.data.account);
       closeSetPw();
+      // Three outcomes, not two (#3094): a bounded wait can return before the provider
+      // answers. "still sending" must NOT read as success — the operator uses this to
+      // decide whether to relay the password by hand.
       const emailedMsg = email
-        ? (res.data.emailed ? (res.data.smtp ? ' · emailed to user' : ' · email logged (no SMTP in dev)') : ' · email failed')
+        ? (res.data.emailed ? (res.data.smtp ? ' · emailed to user' : ' · email logged (no SMTP in dev)')
+          : res.data.emailPending ? ' · still sending — check the server log to confirm'
+          : ' · email failed')
         : '';
       if (res.data.tempPassword) showPassword(res.data.tempPassword, emailedMsg);
       else toast('Password set' + emailedMsg);
