@@ -53,7 +53,12 @@ const CAPABILITIES = {
   // who connects their OWN brokerage account trades their own money on their own
   // venue. Requires a connected broker, which lib/auth-middleware enforces — the
   // plan alone does not grant it. Pro still buys the terminal extras below.
-  live_trading:       { minPlan: "free", label: "Trading via your own connected broker", entitlement: "trade" },
+  // minPlan RESTORED to "pro" (operator, 2026-07-31). It was moved to "free" in #3111,
+  // a navigation PR, which left test/plan-matrix.test.js red on master ("trade→Pro" and
+  // "Free denied Pro caps"). It also blocked turning PLAN_ENFORCEMENT on: hasEntitlement
+  // under enforcement only ever GRANTS, so a free-tier `trade` would have handed every
+  // Free user broker trading the moment the flag flipped. Keeping the clearer label.
+  live_trading:       { minPlan: "pro", label: "Trading via your own connected broker", entitlement: "trade" },
   // ── Pro adds ($20) ──────────────────────────────────────────────────────────
   trade_terminal:     { minPlan: "pro", label: "Trading terminal (manual orders + AI tradelist)" },
   advisor:            { minPlan: "pro", label: "Portfolio advisor (risk/rebalance/planner)" },
