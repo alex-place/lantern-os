@@ -709,8 +709,35 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       const pl = s.plan || {};
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
     }
+    // ── An entry that did NOT place must be narrated and must back off ────────────
+    // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
+    // through IBKR's margin/size/price warnings on a BUY). A warned entry therefore
+    // returns needs_confirmation with the order ALREADY POSTed and parked at IBKR —
+    // which is what shows there as `inactive`. Two consequences, both fixed here:
+    //
+    //   1. The reason was DISCARDED. The bridge computes r.reason from IBKR's own
+    //      warning text, but nothing logged it unless the order placed. So 408 parked
+    //      orders on 2026-07-31 told us nothing about WHICH warning fired. Every
+    //      non-placed entry now lands an `entry_blocked` row carrying that text.
+    //   2. The re-entry cooldown armed only on 'placed'/'dry_run', so a warned symbol
+    //      re-fired every 60s scan indefinitely — 7 symbols became 408 orders in one
+    //      session (QQQ alone 151). Arming it on any terminal outcome brakes that to
+    //      one attempt per cooldown for as long as the entry stays blocked.
+    //
+    // Observability + a brake ONLY. No warning is confirmed, so this does not make any
+    // entry more likely to reach the market than it already was.
+    if (r && r.status !== 'placed' && r.status !== 'dry_run') {
+      const why = r.reason || r.error || r.note || r.status || 'unknown';
+      logTrade({
+        event: 'entry_blocked', symbol: sym, side: 'long', qty,
+        entry: price, notional: Math.round(qty * price),
+        status: r.status || 'unknown', reason: String(why).slice(0, 400),
+      });
+      console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
+    }
     out.executed.push(exec);
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
+    else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
