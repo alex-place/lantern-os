@@ -21,6 +21,7 @@
 const {
   isConfigured, isLiveKey, roleForPrice, accessForStatus, tierToRole, priceIdForRole,
   pickLinkableSubscription, alreadyProcessed, markProcessed, HANDLED_EVENTS,
+  lineItemForRole, canCheckout,
 } = require("../lib/stripe-billing");
 const {
   getProfile, applyStripeState, getProfileByStripeCustomer, getProfileByEmail, verifiedEmailOf,
@@ -338,9 +339,9 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     sendJson(res, {
       configured: isConfigured(),
       tiers: {
-        member: !!priceIdForRole("supporter"),
-        pro: !!priceIdForRole("deep_dreamer"),
-        pilot: !!priceIdForRole("pilot"),
+        member: canCheckout("supporter"),
+        pro: canCheckout("deep_dreamer"),
+        pilot: canCheckout("pilot"),
       },
       subscribed,                                  // has a live Stripe subscription
       stripeStatus: (prof && prof.stripeStatus) || null,
@@ -360,8 +361,10 @@ module.exports = async function billingRoutes(req, res, url, deps) {
 
     const role = tierToRole(body.tier || body.role);
     if (!role) { sendJson(res, { error: "unknown_tier", detail: String(body.tier || body.role || "") }, 400); return true; }
-    const price = priceIdForRole(role);
-    if (!price) { sendJson(res, { error: "price_not_configured", detail: `set STRIPE_PRICE_${role.toUpperCase()}` }, 503); return true; }
+    // Prefer a configured Price id; fall back to an inline price built from the
+    // canonical AMOUNT_CENTS ladder so a deploy needs only STRIPE_SECRET_KEY.
+    const lineItem = lineItemForRole(role);
+    if (!lineItem) { sendJson(res, { error: "price_not_configured", detail: `no Price id and no known amount for ${role}` }, 503); return true; }
 
     const profile = getProfile(userId);
     // Guard against a SECOND concurrent subscription: a user with a live Stripe sub who
@@ -393,7 +396,7 @@ module.exports = async function billingRoutes(req, res, url, deps) {
     try {
       const session = await stripe().checkout.sessions.create({
         mode: "subscription",
-        line_items: [{ price, quantity: 1 }],
+        line_items: [lineItem],
         client_reference_id: userId,
         // Reuse the stored customer so a returning buyer doesn't get a duplicate.
         ...(profile && profile.stripeCustomerId ? { customer: profile.stripeCustomerId } : (profile && profile.email ? { customer_email: profile.email } : {})),

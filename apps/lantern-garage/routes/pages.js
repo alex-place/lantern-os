@@ -8,31 +8,6 @@ const fs = require("fs");
 const { requireAuth, requireRole, requireEntitlement, hasEntitlement, meetsRole, isAdmin, isStaff } = require("../lib/auth-middleware");
 const { isPageDisabled } = require("../lib/feature-flags");
 const { getSessionUser } = require("../lib/session-identity");
-const { parseCookies, isOperatorRequest } = require("../lib/request-auth");
-
-// The public "front door" — the home page. A brand-new visitor must make an entry
-// choice (sign in as a USER, or "Continue without an account" as a GUEST) before
-// the site opens. Both the apex and the explicit index path count as home so the
-// gate can't be sidestepped by requesting /index.html directly.
-const HOME_PATHS = new Set(["/", "/index.html"]);
-
-/**
- * Has this request already entered as a user OR a guest? True when:
- *   • an authenticated session exists (a signed-in user, incl. test-auth), OR
- *   • the guest-choice cookie is present (they clicked "Continue without an
- *     account" on /auth.html — the ln_guest=1 marker set there), OR
- *   • it is a trusted local/operator request (the desktop app + the local operator
- *     dashboard reach Node over an un-proxied loopback socket; external tunnelled
- *     visitors carry proxy headers and never qualify — see lib/request-auth).
- * A visitor with none of these is an unknown first-timer → bounce to /auth.html to
- * choose. Kept in lock-step with the client first-visit gate in js/auth-gate.js.
- */
-function hasEnteredAsUserOrGuest(req) {
-  if (getSessionUser(req)?.id) return true;
-  if (parseCookies(req).ln_guest === "1") return true;
-  if (isOperatorRequest(req)) return true;
-  return false;
-}
 
 // Public pages — no auth required
 const PUBLIC_PAGES = {
@@ -54,12 +29,10 @@ const PUBLIC_PAGES = {
   "/contest.html":        "contest.html",
   "/knowledgecenter.html":"knowledgecenter.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
-  "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
   // Primary interface: the chat must be reachable without a Patreon login so the
   // "no account needed" promise holds (#739). chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
   "/chat.html":     "chat.html",
-  "/dream-chat.html": "dream-chat.html", // legacy path → serves the redirect stub to /chat.html
   // The stock trader is served to everyone: entitled users get the full terminal,
   // guests get the same page in read-only "guest mode" (trading actions hidden
   // client-side; the trade-gated data endpoints stay blocked server-side by
@@ -67,10 +40,6 @@ const PUBLIC_PAGES = {
   "/stock-trader.html":   "stock-trader.html",
   "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
   "/options.html":        "options.html",   // options trader (shadow) + chain — advisory, no orders placeable
-  // Public read-only spectator view of the demo (paper) account (#2548): a
-  // logged-out visitor can watch it trade live. No order controls exist on the
-  // page and its feed endpoint is a sanitized public read (PUBLIC_TRADING_READS).
-  "/demo.html":           "demo.html",
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
@@ -103,6 +72,20 @@ const PROTECTED_PAGES = {
 // redirect is not a public surface — it must not inflate the Σ₀ surface count).
 const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
+  // Legacy chat path (#2751). Previously served a stub dream-chat.html; the stub
+  // is gone and the 302 carries the old links instead — exactly the pattern this
+  // block documents (a redirect is not a public surface). #3109.
+  "/dream-chat.html": "/chat.html",
+  // Retired orphan surfaces (#3109). These had no inbound nav path; proof.html
+  // was additionally advertised in sitemap.xml, so it may hold search-index
+  // links — 302 home rather than 404 anyone who follows one.
+  "/proof.html": "/",
+  "/demo.html": "/stock-trader.html",       // public demo-account spectator → the live trader
+  "/kalshi-screener.html": "/kalshi-terminal.html",
+  "/rag-house.html": "/knowledgecenter.html", // RAG document house → the docs surface
+  "/agent-leaderboard.html": "/orchestration.html", // agent observability → fleet view
+  "/agent-status.html": "/orchestration.html",
+  "/systems.html": "/system-health.html",   // renamed for clarity (#3109)
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
   "/api-keys-settings.html": "/orchestration.html", // API keys now live on the operator page (settings.html reworked to user General/Account/Billing/Connections)
@@ -189,15 +172,12 @@ module.exports = async function pagesRoute(req, res, url, deps) {
     return true;
   }
 
-  // Front-door gate: the home page redirects an unknown visitor to /auth.html so
-  // they choose an entry — sign in (user) or "Continue without an account" (guest).
-  // Only the home path is gated (the rest of PUBLIC_PAGES stays openly reachable);
-  // a chosen guest / signed-in user / local operator passes straight through.
-  if (HOME_PATHS.has(pathname) && !hasEnteredAsUserOrGuest(req)) {
-    res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(pathname) });
-    res.end();
-    return true;
-  }
+  // Front-door gate REMOVED (operator decision, 2026-07-31): a first-time visitor
+  // is assumed a GUEST and served the page, rather than being bounced to
+  // /auth.html to make an entry choice. Landing an unknown visitor on a login
+  // screen taxes the "no account needed" promise (#739) on the very first click.
+  // Signing in is still available from the nav; protected pages below still
+  // redirect, and the trade/money APIs remain closed to sessionless callers.
 
   // Public — serve directly
   if (PUBLIC_PAGES[pathname]) {

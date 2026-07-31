@@ -14,12 +14,12 @@ const REPORT_DIR = './reports';
 
 const ALL_PAGES = [
   '/',
-  '/agent-leaderboard.html',
-  '/agent-status.html',
+  
+  
   '/changelog.html',
   '/courtney.html',
   '/create.html',
-  '/dream-chat.html',
+  
   '/dream-journal/',
   '/entry.html',
   '/flourishing.html',
@@ -28,14 +28,14 @@ const ALL_PAGES = [
   '/observer-mesh-cube.html',
   '/outreach.html',
   '/pricing.html',
-  '/proof.html',
-  '/rag-house.html',
+  
+  
   '/settings/providers.html',
   '/trader-dashboard.html',
   '/trading.html',
   '/trading-news.html',
   '/upgrade-lab.html',
-  '/wish-door.html',
+  '/wish-door.html'
 ];
 
 class FinalQAAudit {

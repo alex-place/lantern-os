@@ -1,0 +1,339 @@
+{
+  "generatedBy": "scripts/build-nav-map.mjs",
+  "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
+  "root": "index.html",
+  "totals": {
+    "pages": 29,
+    "reachable": 18,
+    "orphaned": 11,
+    "inSitemap": 13
+  },
+  "graph": {
+    "accounts.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "admin-flags.html": [
+      "auth.html",
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "auth.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "terms.html"
+    ],
+    "changelog.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "chat.html": [
+      "explore.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "contest.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "create.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "entry.html": [
+      "create.html"
+    ],
+    "explore.html": [
+      "chat.html",
+      "fallout-radio.html",
+      "kalshi-terminal.html",
+      "knowledgecenter.html",
+      "orchestration.html",
+      "settings.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "fallout-radio.html": [
+      "explore.html"
+    ],
+    "faq.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "pricing.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "ibkr-setup-guide.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "index.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "orchestration.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "kalshi-terminal.html": [
+      "chat.html",
+      "create.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "knowledgecenter.html": [
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "faq.html",
+      "stock-trader.html",
+      "whats-new.html",
+      "work.html"
+    ],
+    "metrics.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "options.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "watch.html",
+      "work.html"
+    ],
+    "orchestration.html": [
+      "chat.html",
+      "explore.html",
+      "ibkr-setup-guide.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "pricing.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "reset-password.html": [],
+    "settings.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "stock-trader.html": [
+      "chat.html",
+      "explore.html",
+      "kalshi-terminal.html",
+      "knowledgecenter.html",
+      "options.html",
+      "pricing.html",
+      "watch.html",
+      "work.html"
+    ],
+    "system-health.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "terms.html": [
+      "auth.html"
+    ],
+    "watch.html": [
+      "chat.html",
+      "explore.html",
+      "kalshi-terminal.html",
+      "knowledgecenter.html",
+      "options.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "welcome.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "settings.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "whats-new.html": [
+      "changelog.html",
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "wide-search.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "work.html": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "orchestration.html",
+      "stock-trader.html"
+    ]
+  },
+  "depth": {
+    "index.html": 0,
+    "chat.html": 1,
+    "explore.html": 1,
+    "knowledgecenter.html": 1,
+    "orchestration.html": 1,
+    "stock-trader.html": 1,
+    "work.html": 1,
+    "fallout-radio.html": 2,
+    "kalshi-terminal.html": 2,
+    "settings.html": 2,
+    "changelog.html": 2,
+    "faq.html": 2,
+    "whats-new.html": 2,
+    "ibkr-setup-guide.html": 2,
+    "options.html": 2,
+    "pricing.html": 2,
+    "watch.html": 2,
+    "create.html": 3
+  },
+  "byDepth": {
+    "0": [
+      "index.html"
+    ],
+    "1": [
+      "chat.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "orchestration.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "2": [
+      "changelog.html",
+      "fallout-radio.html",
+      "faq.html",
+      "ibkr-setup-guide.html",
+      "kalshi-terminal.html",
+      "options.html",
+      "pricing.html",
+      "settings.html",
+      "watch.html",
+      "whats-new.html"
+    ],
+    "3": [
+      "create.html"
+    ]
+  },
+  "reachable": [
+    "changelog.html",
+    "chat.html",
+    "create.html",
+    "explore.html",
+    "fallout-radio.html",
+    "faq.html",
+    "ibkr-setup-guide.html",
+    "index.html",
+    "kalshi-terminal.html",
+    "knowledgecenter.html",
+    "options.html",
+    "orchestration.html",
+    "pricing.html",
+    "settings.html",
+    "stock-trader.html",
+    "watch.html",
+    "whats-new.html",
+    "work.html"
+  ],
+  "orphaned": [
+    "accounts.html",
+    "admin-flags.html",
+    "auth.html",
+    "contest.html",
+    "entry.html",
+    "metrics.html",
+    "reset-password.html",
+    "system-health.html",
+    "terms.html",
+    "welcome.html",
+    "wide-search.html"
+  ],
+  "sitemap": [
+    "index.html",
+    "changelog.html",
+    "chat.html",
+    "create.html",
+    "explore.html",
+    "faq.html",
+    "kalshi-terminal.html",
+    "knowledgecenter.html",
+    "pricing.html",
+    "stock-trader.html",
+    "terms.html",
+    "welcome.html",
+    "whats-new.html"
+  ],
+  "reachableNotInSitemap": [
+    "fallout-radio.html",
+    "ibkr-setup-guide.html",
+    "options.html",
+    "orchestration.html",
+    "settings.html",
+    "watch.html",
+    "work.html"
+  ],
+  "inSitemapNotReachable": [
+    "terms.html",
+    "welcome.html"
+  ],
+  "knowledgeCenterPath": [
+    "index.html",
+    "knowledgecenter.html"
+  ],
+  "excludedEdges": [
+    {
+      "from": "chat.html",
+      "to": "knowledgecenter.html"
+    }
+  ],
+  "sharedNavTargets": [
+    "chat.html",
+    "stock-trader.html",
+    "work.html",
+    "explore.html",
+    "knowledgecenter.html"
+  ]
+}

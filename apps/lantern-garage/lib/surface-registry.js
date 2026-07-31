@@ -35,21 +35,20 @@ const CORE = {
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
-  "rag-house.html":         "Remember",  // RAG document house
   "wide-search.html":       "Remember",  // cross-archive search
-  "proof.html":             "Verify",    // claims / evidence / proof surface
-  "calibration.html":       "Verify",    // grounding calibration
-  "factcheck.html":         "Verify",    // fact-check / grounding gate
-  "grounding-diff.html":    "Verify",    // grounding diff inspector
-  "drift.html":             "Verify",    // collapse + 42-state canary monitor (verification safety)
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
-  "agent-status.html":      "Converge",  // agent observability
-  "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
-  "metrics.html":           "Converge",  // convergence metrics
-  "systems.html":           "Converge",  // systems-health observability
-  "replay.html":            "Converge",  // git-bisect over past convergence records
+  // Verify, not Converge. This page is the External Reality Rule applied to
+  // ourselves — its own copy says so — reporting verified-patch rate, honesty
+  // rate and provenance as [claim, evidence, confidence]. Converge is still
+  // served by system-health.html, which is where convergence/health actually
+  // lives. Re-tagged when #3109 retired the five orphaned Verify pages (proof,
+  // calibration, factcheck, grounding-diff, drift): verification is a FUNCTION
+  // the product performs, not a page a user visits, and this is the surface that
+  // performs it.
+  "metrics.html":           "Verify",    // outcome metrics: claim → evidence → confidence
+  "system-health.html":           "Converge",  // systems-health observability
 };
 
 // ── EXTENSION — optional capabilities beside the loop ────────────────────────────
@@ -58,16 +57,13 @@ const EXTENSION = {
   // trading terminal cluster
   // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
-  "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
-  "demo.html":                     ["trading", "TRADING_ENABLED"], // public read-only demo-account spectator (#2548)
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
   "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
-  "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // account / auth / billing
@@ -82,7 +78,6 @@ const EXTENSION = {
   // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "settings.html":                 ["account", null], // user settings: General / Account / Billing / Connections (#settings-rework); API keys/connectors live on orchestration.html
   // project meta
-  "dream-chat.html":               ["meta", null], // legacy alias → chat.html (redirect stub kept for old links, #2751)
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
   "faq.html":                      ["meta", null],
@@ -116,7 +111,18 @@ const SUBSYSTEMS = {
 //      exceeds this cap the contract test FAILS: either add core value, or raise the cap
 //      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
 //      instead of letting it accrete silently).
-const MAX_EXTENSION_RATIO = 1.05; // 21:20 = 1.05 — accounts.html (staff console) + terms.html (legally-required ToS+EULA shell surface), both always-on account module.
+// 17:12 = 1.42. Re-baselined by #3109, which retired 13 ORPHANED surfaces — pages
+// with no inbound nav path from anywhere on the site. Seven of those were CORE
+// (proof, calibration, factcheck, grounding-diff, drift, replay, rag-house) and
+// only four were extensions, so deleting dead weight pushed the ratio UP even
+// though the absolute surface count fell 42 → 29.
+//
+// The cap exists to stop extensions outgrowing the loop. That is not what
+// happened here: the extension count barely moved, the core count fell because
+// unreachable core pages were removed. Raising the cap records that as a
+// deliberate re-baseline rather than letting a cleanup read as sprawl. Tighten it
+// again if core surfaces are added back.
+const MAX_EXTENSION_RATIO = 1.45;
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always

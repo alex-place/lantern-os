@@ -20,18 +20,17 @@ const TEST_PASSWORD = 'test-account-1234';
 
 test.describe('auth: guest experience', () => {
   test('home page shows a Sign in affordance for a guest', async ({ page }) => {
-    // First visit, no entry choice recorded: the first-visit gate (auth-gate.js)
-    // sends an undecided guest to /auth.html ONCE to decide — signed-out-and-asked,
-    // never silently signed in.
+    // A first-time visitor is assumed a GUEST and served the page (2026-07-31).
+    // The old first-visit gate bounced an undecided visitor to /auth.html once to
+    // make an entry choice; that gate is gone from both routes/pages.js and
+    // js/auth-gate.js, so landing on / must NOT redirect.
     await page.goto('/');
-    await page.waitForURL(/\/auth\.html/);
-    const guestBtn = page.locator('#continue-guest');
-    await expect(guestBtn).toBeVisible();
-    // "Continue without an account" records ln_guest and returns home…
-    await guestBtn.click();
-    await page.waitForURL((url) => !url.pathname.startsWith('/auth'));
-    // …where site-chrome's #profile-btn is repurposed by auth-gate into a Sign in
-    // link (class nav-signin) rather than hidden — the guest is never stranded.
+    await page.waitForLoadState('networkidle');
+    expect(new URL(page.url()).pathname, 'a first-time visitor must not be bounced to auth')
+      .not.toMatch(/^\/auth/);
+    // The affordance is what actually matters and is unchanged: site-chrome's
+    // #profile-btn is repurposed by auth-gate into a Sign in link (class
+    // nav-signin) rather than hidden — the guest is never stranded.
     const signin = page.locator('#profile-btn.nav-signin, a.nav-signin');
     await expect(signin.first()).toBeVisible();
     const href = await signin.first().getAttribute('href');

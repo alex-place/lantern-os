@@ -25,6 +25,12 @@
     { href: "/stock-trader.html", label: "Trader" },
     { href: "/work.html", label: "Work" },
     { href: "/explore.html", label: "Explore" },
+    // #3107: the Knowledge Center had no depth-1 entry — its only real inbound
+    // nav link was the quick-links footer of explore.html, leaving the docs
+    // surface two clicks deep and effectively undiscoverable from the home page.
+    // Labelled "Docs" rather than "Knowledge Center" to fit the nav bar; the
+    // page itself keeps its full name.
+    { href: "/knowledgecenter.html", label: "Docs" },
   ];
 
   function navHtml() {

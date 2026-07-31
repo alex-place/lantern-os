@@ -26,7 +26,6 @@ const { tenancyProfile } = require("./tenant");
 const HOSTED_SURFACES = new Set([
   "index.html", // landing / home
   "chat.html", // chat — the product
-  "dream-chat.html", // legacy path → serves the redirect stub to /chat.html
   "explore.html", // explore — loop demo (logged-out) / own memory (logged-in)
   "faq.html", // help / FAQ / getting-started (+ "download the desktop app")
   "auth.html", // login
@@ -50,7 +49,7 @@ function isCloud() {
 
 /**
  * Is a top-level public/*.html surface served under the current profile?
- * @param {string} surfaceFile bare filename, e.g. "dream-chat.html"
+ * @param {string} surfaceFile bare filename, e.g. "chat.html"
  */
 function isSurfaceAllowed(surfaceFile) {
   if (!isCloud()) return true; // local / desktop serves everything
