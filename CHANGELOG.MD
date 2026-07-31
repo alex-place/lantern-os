@@ -1,3 +1,197 @@
+## [1.14.0] - 2026-07-31
+
+### Added
+- **TradingView-style designed ticker badges** (`public/js/ticker-badges.js`, shared
+  by the Trader/Watch sidebars and the symbol-search popup). Instead of one
+  monogram treatment for everything: hand-drawn SVG issuer marks for the fund
+  families in the traded universe (Direxion X, ProShares arrow, SPDR S, Invesco
+  peak, iShares dot-i, VanEck V, Select-Sector shield), real currency glyphs for
+  crypto (₿ Ξ ◎ Ð ✕ Ł), an index squiggle for ^symbols, and the deterministic
+  gradient monogram as the fallback for single stocks. Vector-crisp at any DPI,
+  zero network fetches, one visual language on every surface.
+- **Broker-side resting take-profit on every overnight option leg.** The engine's exit
+  lived entirely in this process, so a dead process meant a position with *no* exit —
+  on 2026-07-29 a 0-DTE ladder expired worthless (−$2,006). Each entry now also rests a
+  **GTC sell limit at +50%** (`OVERNIGHT_PROTECT_TARGET_PCT`, 0 disables) on the broker,
+  which survives the process entirely. It's a safety net, not the strategy: the 09:31
+  window remains the primary exit.
+  - **Naked-short guard:** a resting sell that outlives its long would go short on its
+    next fill, so the exit retires the protective order *first* and **refuses to sell**
+    if the cancel fails — the leg is retained in state and retried next tick rather than
+    risking two sells against one long.
+  - A protective order that filled while the engine was away is booked as the real exit
+    (`protective_fill`); a 404 on cancel is treated as success (nothing is resting).
+  - GTC support on Alpaca options was verified empirically before building on it.
+
+### Fixed
+- **Exits on fractional positions no longer loop forever (first armed session
+  finding).** IBKR CPAPI rejects fractional share orders: a 838.8-share SOXS
+  take-profit was decided 4× and broker-canceled every time (28 canceled orders)
+  while +44% ran to +50% unrealized. The bridge now floors IBKR order quantities
+  to whole shares and reports the <1-share dust in the order reason; a dust-only
+  position errors clearly instead of looping. 3 tests.
+- **Runtime trading ledgers/state are now gitignored** (`data/**/trading`
+  `*.jsonl` + `*-state.json`, both roots) — a dev-checkout sweep erased
+  `overnight-state.json` mid-entry-window and the engine re-entered its option
+  ladder (a real double fill on the paper account). Ignored files survive
+  `git stash -u`/clean sweeps.
+- **Trader sidebar: the symbol-info panel docks to the bottom of the list** instead
+  of the sidebar floor — a short watchlist left a dead dark gap between the last
+  ticker and the details panel. (`#wlList` no longer flex-grows; the ~11px between
+  them is the resize grabber.)
+- **S/R zone overlays no longer bury the candles (#3050).** Zone fills were
+  scaling opacity up to 0.75 — a strong zone rendered as a near-solid slab over
+  the price action. Fills now cap at 0.20 (strength still maps to intensity,
+  0.05–0.20), and **every** zone keeps a 1px edge line (stronger for
+  today/weekly tiers, amber when entry-triggered) so the precise level stays
+  readable while the band recedes to context.
+- **The overnight engine can no longer fail silently.** A tick that does nothing now
+  says so: one deduped heartbeat row per ET day (including when it's disabled or has
+  no broker bridge), and the 15:45 entry window always records a verdict — entered,
+  skipped-with-reason, already-entered, or still-holding. On 2026-07-30 the window
+  produced *no row at all*, making "correctly declined a no-signal night" and "the
+  scheduler never ran" indistinguishable in the ledger — the same ambiguity that hid
+  the 2026-07-29 outage until the position expired worthless.
+- **Exits stop retrying a position that can't be closed.** After 3 consecutive
+  terminal failures a symbol is declared unclosable: frozen from both exit paths,
+  logged once as `exit_frozen`, and released automatically when the position leaves
+  the book. A 0.8-share SOXS remnant (IBKR rejects fractional orders) had been
+  re-deciding every ~9 minutes for 5.5 hours — 39 identical error rows that drowned
+  the day's real activity.
+- **A missed exit window can no longer strand an overnight position.** The 09:31–09:50
+  ET window was the *only* exit path: on 2026-07-29 the engine was down across it, a
+  10-leg 0-DTE call ladder was never sold, and it expired worthless (−$2,006 total
+  loss). The server was back at 15:38 ET — still inside the session — so a late exit
+  would have sold them. Any tick that now finds a position from a prior date exits it
+  for the rest of the session (to 15:55 ET), flagged `late` so catch-ups stay
+  separable from clean 09:31 fills and don't quietly pollute measured expectancy.
+  A missed window degrades to a worse fill, never to no exit.
+- **The trader page no longer bounces you with no explanation.** The Free/guest
+  redirect to Watch fired on *every* arrival — including clicking the in-page
+  **Trade** tab, which teleported you straight back to Watch and read as a broken
+  page. Only the global nav auto-redirects now; any deliberate arrival (the
+  in-page Trade tab, a pricing link, or a referrer from within the app) shows the
+  upgrade card that explains why.
+
+### Changed
+- **The "▲ LONG model 47% · uncalibrated" chip is gone from the chart cards**
+  (trader + watch). Even rendered neutral, it read as a signal at a glance. A
+  directional badge now appears only once that signal type is CALIBRATED — a
+  settled-trade hit-rate over n≥20 — otherwise the card shows nothing.
+- **Free users are routed to Watch instead of walled into the trader.** Clicking the
+  nav's "Trader" as a guest/Free user landed on a dead terminal behind a Pro modal —
+  a paywall before seeing anything work. They now land on `/watch.html?from=trader`
+  with a one-time banner explaining that charts/watchlist/news/signals are free and
+  what $20 Pro adds. `?stay=1` still opens the terminal preview deliberately.
+- **Options analysis is free; only placing an order is Pro.** The chain, IV smile,
+  volume view and advisory strategy proposals are read-only market data (same deal as
+  the Watch page) and are now public reads — a logged-out visitor saw "Chain
+  unavailable — no data source" on a page we link them to. `POST
+  /api/trading/options/order` stays gated, and the manual ticket is replaced with an
+  honest upgrade line for Free users rather than a button that fails.
+- **The order ticket opens only when you reach for a trade.** It previously
+  auto-opened on page load, on every symbol click, and on chart taps — consuming
+  ~30% of the viewport (and burying the ☰ menu) before any trading intent. Now
+  only the explicit affordances open it (BUY/SELL buttons, B/S keys); selecting
+  symbols retargets an already-open ticket without forcing it open. The deck
+  gets the full width on load.
+- **Options page joins the terminal header family**: the same VIX-regime and
+  session (OPEN/CLOSED) pills the trader header shows, fed by the same
+  market-status endpoint, refreshed every 60s.
+- **Watchlist/tradelist ticker badges are now vector monograms** instead of fetched
+  brand logos. The ETF universe shares a handful of issuer marks (SPDR/Direxion
+  squares shrunk inside a circle at poor resolution), so rows read samey and
+  blurry. Each symbol now gets a deterministic gradient badge (hue hashed from the
+  ticker — stable across sessions and pages) with the ticker monogram in white:
+  crisp at any DPI, every row visually distinct, and zero logo network fetches.
+  Applies to the Trader and Watch sidebars.
+- **Options chain reads like a chain, not a stack of cards.** Expiry sections now
+  carry a rotating ▶/▼ caret so it's obvious they expand; dates render as
+  "July 29" instead of `2026-07-28` (short `Jul 29` in the volatility chips and
+  volume column heads); the sections form one continuous bordered list with denser
+  rows, sticky column headers and row hover; and the page opens on the nearest
+  expiry that actually **has quotes** rather than blindly the first — after hours
+  the 0-DTE expiry returns empty IV/delta columns, so the page used to open on a
+  wall of dashes that read as broken.
+- **One wordmark across the trading pages.** Watch / Trade / Options all show
+  **UnisonaTrader** instead of renaming itself per page; the in-page tabs already
+  say which of the three you're on.
+- **Options chain zoomed ~30-35% (#3052).** Table text 11.5px → 15px with
+  padding/line-height scaled to match (rows ~35px), column headers 10 → 12.5px,
+  expiry rows and DTE badges scaled up, spot pill and volume bars grown to
+  match — comfortably readable without giving up the continuous-list density.
+- **The Options page now matches the trading terminal, not the marketing site.** It
+  adopts `stock-trader.html`'s design tokens (`--bg0..3`, `--text0..2`, `--green/--red/
+  --blue`, and the `--sans`/`--display`/`--mono` stacks) instead of the index/site
+  palette: a compact terminal header bar with the `UnisonaOptions` wordmark, mono
+  Watch/Trade/Options nav pills, underline data tabs in place of rounded pills, and
+  3px-radius controls at terminal type sizes. Light theme is carried over with the
+  trader's light remap, so the ☀/🌙 toggle still works.
+- **Options page vibrancy pass (TradingView-benchmarked).** Chain: saturated ITM
+  bands (13%), bright green/red volume numerals with gradient bars, a blue-bordered
+  spot pill (`SPY 746.00 USD`) on the divider, visible IV column. Volume tab is a
+  real **heatmap** — each cell's background scales with its share of the table max
+  (sqrt-scaled, white text on hot cells), ATM strikes marked in blue. Volatility:
+  thicker full-opacity smile with a gradient fill, and it now defaults to the
+  nearest expiry that actually carries IV (the 0-DTE default rendered "Not enough
+  IV data" after hours).
+- **Symbol-search popup uses the same monogram badges as the sidebar** — one visual
+  language across every ticker surface, crisp at any DPI, no logo fetches; crypto
+  rows get a real colored badge instead of the flat gray placeholder.
+- **Trader de-boxing polish (#3049).** Watchlist rows get real breathing room
+  (10px vertical padding, was 6px); cards soften to 14px radii with faint
+  elevation (and a touch more on hover); header pills, chart controls, badges,
+  BUY/SELL and footer tabs round from 3px to 6-8px so the page stops reading as
+  a grid of hard same-weight rectangles. Pure skin — no layout metrics changed.
+- **Trader sidebar: one row per symbol, aligned and readable.** Each watchlist/
+  tradelist entry is now a single grid row — logo · symbol · price · day% ·
+  signal — with every cell the same 12px mono (was a two-line stack mixing
+  9.5/10/10.5/11px, whose space-between rows never formed columns). The remove ×
+  overlays on hover instead of eating a column. Default sidebar width raised to
+  296px (min 248) so the row actually fits — persisted narrower widths clamp up
+  on load. Header stats/badges/nav-links raised to the 12px floor the rest of
+  the app (chat.html) uses, per the WCAG AA guidance in docs/ACCESSIBILITY.md.
+- **Trader watchlist rows line up.** Each row is now a two-column grid (symbol/change
+  left, price/signal right) instead of two `space-between` flex rows, so prices,
+  changes and signals form real columns rather than drifting with each value's width.
+  Prices also use one decimal convention — the old formatter mixed 4dp under $100 with
+  locale formatting above it, putting `$171` beside `$84.2250` and `$675.805`.
+- **Wider default sidebar** (210 → 264px desktop, 170 → 210px tablet; drag range
+  180–460px) — the two-line rows were cramped at the old width.
+- **Removed the "AI tradelist — the autopilot trades only these" banner** from the top
+  of the sidebar; the sidebar's own label already says it.
+- **Sidebar symbol-info panel matches the terminal (#3051).** The bottom-left
+  details panel blends into the sidebar (same surface, no darker sub-box), its
+  type scale now matches the list's density (symbol 12.5px, price 13px,
+  technicals 12.5px), section labels follow the terminal's label convention, and
+  the RETURNS tiles switch to an auto-fit grid — all five flow to the panel
+  width with no clipped orphan row.
+- Chat model picker now lists the full verified Gemini 2.5 lineup (Flash, Flash-Lite, Pro) and routes a pinned model end-to-end
+- Chat now tells you which model is serving each turn (prepareStep per-step context seam); the identity prompt no longer refuses to name the model
+- Chat's native tool loop now re-queries long-term memory against the evolving tool context between steps (per-step memory refresh), so later steps get memory relevant to what the turn became
+- Chat model picker now matches the home page: local-first order and the same curated provider set (DeepSeek/Mistral/Perplexity/Cohere no longer listed in chat)
+- Chat's tool loop no longer dies when a tool throws, skips duplicate tool calls instead of re-running them, and always answers even when it hits the tool-use limit
+- Chat repairs mechanically-malformed tool calls (JSON-string args, wrong key casing, stringified numbers) instead of wasting a step rejecting them
+- Web search snippets no longer arrive as raw HTML noise, so grounded answers cite the actual top story instead of a plausible-sounding invention
+- Chat can now search the web and use its tools by default, instead of only answering from memory
+- Web search answers now come with clickable source links, publication dates, publisher names and images where available
+- Search results now pull article images from the page itself where the source doesn't supply one
+- Every chat tool parameter is now documented, so the assistant stops guessing argument formats and misusing tools
+- Hard questions now automatically get the stronger model, while everyday chat stays on the fast one
+- Chat now asks before it runs anything that changes files, runs commands, or spends credit
+- **Knowledge Center is back in the primary nav** as **Docs** (#3107). It had drifted to click-depth 2, reachable only via the quick-links footer on Explore — one deleted link from being fully orphaned. Promoting it also pulled FAQ, Changelog, and What's New up a level.
+- **New sitemap/navigability test suite** — `npm run test:sitemap` (and `test:sitemap:headed` for a watchable browser run). Walks the site by real clicks, verifies every sitemap URL serves, and ratchets the orphaned-page count so reachability can improve but not regress. See `docs/SITEMAP-NAV-MAP.md` for the click-graph flowchart.
+- **Retired 13 orphaned pages** (#3109) — `ibkr-connect`, `kalshi-screener`, `proof`, `demo`, `dream-chat`, `rag-house`, `drift`, `calibration`, `replay`, `factcheck`, `agent-status`, `agent-leaderboard`, `grounding-diff`. Each retired path keeps a server-side 302 so old bookmarks and indexed links don't 404. Site is now 29 pages / 11 orphans, down from 42 / 24.
+- **Renamed** `systems.html` → `system-health.html` (old path 302s).
+- **Fixed a silently-broken CI gate** — `cicd-gates.js` Gate 12 had been reading the 8-line `dream-chat.html` redirect stub since #2751, so its chat-UI content assertions were checking a file that contained none of them. Now reads `chat.html`.
+- **First-time visitors are now guests** — landing on the site no longer bounces an unknown visitor to `/auth.html` to make an entry choice. Removed both the server-side home gate and the client-side first-visit gate (the latter applied to *every* page, which is why public surfaces like the trader and contest bounced too). Protected pages still redirect; the trade/money APIs stay closed to sessionless callers.
+- **Own-broker trading is a Free-tier capability** — a signed-in user who connects their own brokerage account can place orders without paying for Pro. Pro still buys the terminal extras, Pilot the autonomous trader. Guests cannot trade under any circumstances.
+- **Sign-in page consistency + a11y** — the email and password fields had no `<label>` at all (placeholder-only, failing WCAG 3.3.2 / 1.3.1); they now carry real labels, a described-by password hint, and an `aria-live` validation region. The "Create an account" / "Forgot password?" controls were `<a href="#" role="button">` and are now real buttons (Space-key activation, no `#` history entry). The wordmark used a `system-ui`-first font stack that rendered in a different face from the rest of the site on Windows — it now uses the same display stack as the home-page hero.
+- **Pricing page always offers a way to pay** — when Stripe is unconfigured the checkout buttons stay hidden, which previously left a priced tier with no action at all. A Patreon fallback now renders in that case and retires itself as soon as Stripe checkout is live for that tier.
+- **Pricing copy matches enforcement** — own-broker trading moved to the Free tier, so Free now lists it and Pro lists the terminal extras (AI tradelist, advisor, alerts) rather than claiming broker connect.
+- **Stripe checkout needs only the API key** — `/api/billing/checkout` previously hard-required a per-tier Price id and returned `price_not_configured` (503) without one, so an otherwise-working Stripe deploy showed no buy button. It now falls back to an inline price built from the canonical `AMOUNT_CENTS` ladder ($20 Pro / $200 Pilot, monthly, USD). Setting `STRIPE_PRICE_*` still takes precedence and keeps dashboard reporting grouped under one Product per tier.
+- **`metrics.html` re-tagged Verify** (was Converge) — it is the External Reality Rule applied to ourselves (verified-patch rate, honesty rate, provenance as claim/evidence/confidence), which is the Verify stage; Converge is served by `system-health.html`. Verification is a function the product performs, not a page a user visits, so the five retired Verify pages did not need replacing. Sprawl cap re-baselined to 1.45 to record that the ratio moved because dead *core* surfaces were removed, not because extensions grew.
+
 ## [1.13.3] - 2026-07-28
 
 ### Fixed
