@@ -35,21 +35,12 @@ const CORE = {
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
   "knowledgecenter.html":   "Remember",  // grounding knowledge base
-  "rag-house.html":         "Remember",  // RAG document house
   "wide-search.html":       "Remember",  // cross-archive search
-  "proof.html":             "Verify",    // claims / evidence / proof surface
-  "calibration.html":       "Verify",    // grounding calibration
-  "factcheck.html":         "Verify",    // fact-check / grounding gate
-  "grounding-diff.html":    "Verify",    // grounding diff inspector
-  "drift.html":             "Verify",    // collapse + 42-state canary monitor (verification safety)
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
-  "agent-status.html":      "Converge",  // agent observability
-  "agent-leaderboard.html": "Converge",  // agent convergence leaderboard
   "metrics.html":           "Converge",  // convergence metrics
-  "systems.html":           "Converge",  // systems-health observability
-  "replay.html":            "Converge",  // git-bisect over past convergence records
+  "system-health.html":           "Converge",  // systems-health observability
 };
 
 // ── EXTENSION — optional capabilities beside the loop ────────────────────────────
@@ -58,16 +49,13 @@ const EXTENSION = {
   // trading terminal cluster
   // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
-  "kalshi-screener.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
   "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
-  "demo.html":                     ["trading", "TRADING_ENABLED"], // public read-only demo-account spectator (#2548)
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
   "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
-  "ibkr-connect.html":             ["trading", "TRADING_ENABLED"], // legacy redirect stub → orchestration#broker
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // account / auth / billing
@@ -82,7 +70,6 @@ const EXTENSION = {
   // api-keys-settings.html retired → 302s to /settings.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "settings.html":                 ["account", null], // user settings: General / Account / Billing / Connections (#settings-rework); API keys/connectors live on orchestration.html
   // project meta
-  "dream-chat.html":               ["meta", null], // legacy alias → chat.html (redirect stub kept for old links, #2751)
   "changelog.html":                ["meta", null],
   "whats-new.html":                ["meta", null],
   "faq.html":                      ["meta", null],

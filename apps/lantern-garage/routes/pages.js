@@ -54,12 +54,10 @@ const PUBLIC_PAGES = {
   "/contest.html":        "contest.html",
   "/knowledgecenter.html":"knowledgecenter.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
-  "/ibkr-connect.html":   "ibkr-connect.html",       // redirect → /orchestration.html#broker
   // Primary interface: the chat must be reachable without a Patreon login so the
   // "no account needed" promise holds (#739). chat.html handles the guest
   // session client-side (defaults to { authenticated:false, role:"guest" }).
   "/chat.html":     "chat.html",
-  "/dream-chat.html": "dream-chat.html", // legacy path → serves the redirect stub to /chat.html
   // The stock trader is served to everyone: entitled users get the full terminal,
   // guests get the same page in read-only "guest mode" (trading actions hidden
   // client-side; the trade-gated data endpoints stay blocked server-side by
@@ -67,10 +65,6 @@ const PUBLIC_PAGES = {
   "/stock-trader.html":   "stock-trader.html",
   "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
   "/options.html":        "options.html",   // options trader (shadow) + chain — advisory, no orders placeable
-  // Public read-only spectator view of the demo (paper) account (#2548): a
-  // logged-out visitor can watch it trade live. No order controls exist on the
-  // page and its feed endpoint is a sanitized public read (PUBLIC_TRADING_READS).
-  "/demo.html":           "demo.html",
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
   // panels only; the control endpoints are admin-gated in server.js
   // (orchestrationControlGuard) and the sensitive panels are hidden client-side
@@ -103,6 +97,20 @@ const PROTECTED_PAGES = {
 // redirect is not a public surface — it must not inflate the Σ₀ surface count).
 const REDIRECTS = {
   "/ibkr-connect.html": "/orchestration.html#broker", // broker connect folded into Settings → Broker (#ADR-0022)
+  // Legacy chat path (#2751). Previously served a stub dream-chat.html; the stub
+  // is gone and the 302 carries the old links instead — exactly the pattern this
+  // block documents (a redirect is not a public surface). #3109.
+  "/dream-chat.html": "/chat.html",
+  // Retired orphan surfaces (#3109). These had no inbound nav path; proof.html
+  // was additionally advertised in sitemap.xml, so it may hold search-index
+  // links — 302 home rather than 404 anyone who follows one.
+  "/proof.html": "/",
+  "/demo.html": "/stock-trader.html",       // public demo-account spectator → the live trader
+  "/kalshi-screener.html": "/kalshi-terminal.html",
+  "/rag-house.html": "/knowledgecenter.html", // RAG document house → the docs surface
+  "/agent-leaderboard.html": "/orchestration.html", // agent observability → fleet view
+  "/agent-status.html": "/orchestration.html",
+  "/systems.html": "/system-health.html",   // renamed for clarity (#3109)
   "/trading.html": "/stock-trader.html", // legacy dashboard retired → live stock trader (#2488)
   "/upgrade-lab.html": "/pricing.html",  // orphaned off-brand upgrade workbench retired → pricing (#2473)
   "/api-keys-settings.html": "/orchestration.html", // API keys now live on the operator page (settings.html reworked to user General/Account/Billing/Connections)

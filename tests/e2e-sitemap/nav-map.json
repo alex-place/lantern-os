@@ -3,10 +3,10 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 42,
+    "pages": 29,
     "reachable": 18,
-    "orphaned": 24,
-    "inSitemap": 14
+    "orphaned": 11,
+    "inSitemap": 13
   },
   "graph": {
     "accounts.html": [
@@ -24,28 +24,11 @@
       "stock-trader.html",
       "work.html"
     ],
-    "agent-leaderboard.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "agent-status.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
     "auth.html": [
       "chat.html",
       "explore.html",
       "knowledgecenter.html",
       "terms.html"
-    ],
-    "calibration.html": [
-      "create.html"
     ],
     "changelog.html": [
       "chat.html",
@@ -73,24 +56,6 @@
       "stock-trader.html",
       "work.html"
     ],
-    "demo.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "pricing.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "dream-chat.html": [
-      "chat.html"
-    ],
-    "drift.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
     "entry.html": [
       "create.html"
     ],
@@ -101,13 +66,6 @@
       "knowledgecenter.html",
       "orchestration.html",
       "settings.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "factcheck.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -122,14 +80,6 @@
       "stock-trader.html",
       "work.html"
     ],
-    "grounding-diff.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "ibkr-connect.html": [],
     "ibkr-setup-guide.html": [
       "chat.html",
       "explore.html",
@@ -142,14 +92,6 @@
       "explore.html",
       "knowledgecenter.html",
       "orchestration.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "kalshi-screener.html": [
-      "chat.html",
-      "explore.html",
-      "kalshi-terminal.html",
-      "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -200,28 +142,6 @@
       "stock-trader.html",
       "work.html"
     ],
-    "proof.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "pricing.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "rag-house.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
-    "replay.html": [
-      "chat.html",
-      "explore.html",
-      "knowledgecenter.html",
-      "stock-trader.html",
-      "work.html"
-    ],
     "reset-password.html": [],
     "settings.html": [
       "chat.html",
@@ -240,7 +160,7 @@
       "watch.html",
       "work.html"
     ],
-    "systems.html": [
+    "system-health.html": [
       "chat.html",
       "explore.html",
       "knowledgecenter.html",
@@ -361,25 +281,12 @@
   "orphaned": [
     "accounts.html",
     "admin-flags.html",
-    "agent-leaderboard.html",
-    "agent-status.html",
     "auth.html",
-    "calibration.html",
     "contest.html",
-    "demo.html",
-    "dream-chat.html",
-    "drift.html",
     "entry.html",
-    "factcheck.html",
-    "grounding-diff.html",
-    "ibkr-connect.html",
-    "kalshi-screener.html",
     "metrics.html",
-    "proof.html",
-    "rag-house.html",
-    "replay.html",
     "reset-password.html",
-    "systems.html",
+    "system-health.html",
     "terms.html",
     "welcome.html",
     "wide-search.html"
@@ -394,7 +301,6 @@
     "kalshi-terminal.html",
     "knowledgecenter.html",
     "pricing.html",
-    "proof.html",
     "stock-trader.html",
     "terms.html",
     "welcome.html",
@@ -410,7 +316,6 @@
     "work.html"
   ],
   "inSitemapNotReachable": [
-    "proof.html",
     "terms.html",
     "welcome.html"
   ],

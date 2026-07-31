@@ -191,9 +191,13 @@ if (streamChatJs) {
 
 // ── Gate 12: Chat settings drawer in UI ──────────────────────────────────
 console.log("\n=== Gate 12 — Chat UX settings drawer ===");
-const chatHtmlPath = path.join(ROOT, "apps", "lantern-garage", "public", "dream-chat.html");
+// Reads chat.html, not dream-chat.html. #2751 renamed the surface and left an
+// 8-line redirect stub behind; this gate kept reading the stub, so every content
+// assertion below was checking a file that contains none of these markers. The
+// stub was retired in #3109 — pointing at the real page restores the gate.
+const chatHtmlPath = path.join(ROOT, "apps", "lantern-garage", "public", "chat.html");
 const chatHtml = fs.existsSync(chatHtmlPath) ? fs.readFileSync(chatHtmlPath, "utf8") : null;
-assert("dream-chat.html exists", !!chatHtml);
+assert("chat.html exists", !!chatHtml);
 if (chatHtml) {
   assert("settings-drawer defined", chatHtml.includes("settings-drawer"));
   assert("provider-card defined", chatHtml.includes("provider-card"));

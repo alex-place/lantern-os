@@ -28,9 +28,11 @@ const navMap = require('./nav-map.json');
  * fail on regression. When a fix lands, regenerate the map and tighten these.
  */
 const BASELINE = {
-  maxOrphans: 24,
+  // Tightened after the #3109 retirement pass: 13 orphaned surfaces deleted
+  // (42 pages -> 29, 24 orphans -> 11) and systems.html renamed system-health.html.
+  maxOrphans: 11,
   minReachable: 18,
-  maxInSitemapNotReachable: 3,
+  maxInSitemapNotReachable: 2,
   // #3107 fixed: Knowledge Center now has a depth-1 nav entry ("Docs"). Locked
   // at 1 so it cannot silently slip back behind another page.
   maxKnowledgeCenterDepth: 1,
@@ -132,6 +134,38 @@ test.describe('sitemap — navigability as a user experiences it', () => {
       stranded.length,
       `pages advertised to crawlers but unreachable by clicking: ${stranded.join(', ')}`,
     ).toBeLessThanOrEqual(BASELINE.maxInSitemapNotReachable);
+  });
+
+  /**
+   * #3109 retired 13 orphaned surfaces. Deleting a page that once had inbound
+   * links (bookmarks, search index, old chat messages) would 404 anyone who
+   * follows one, so each retired path got a server-side 302 instead — the
+   * pattern routes/pages.js REDIRECTS already documents. This proves the
+   * redirects exist and land somewhere real, not that the files are gone.
+   */
+  const RETIRED = {
+    '/dream-chat.html': 'chat.html',
+    '/proof.html': 'index.html',
+    '/demo.html': 'stock-trader.html',
+    '/kalshi-screener.html': 'kalshi-terminal.html',
+    '/rag-house.html': 'knowledgecenter.html',
+    '/agent-leaderboard.html': 'orchestration.html',
+    '/agent-status.html': 'orchestration.html',
+    '/systems.html': 'system-health.html',
+    '/ibkr-connect.html': 'orchestration.html',
+  };
+
+  test('retired surfaces redirect instead of 404', async ({ page }) => {
+    const broken = [];
+    for (const [from, expected] of Object.entries(RETIRED)) {
+      const response = await page.goto(from); // auditing redirect behaviour, not a user path
+      const status = response ? response.status() : 0;
+      const landed = pageName(page.url());
+      if (status >= 400 || landed !== expected) {
+        broken.push(`${from} -> ${landed} (${status})`);
+      }
+    }
+    expect(broken, `retired paths must 302 to a live page: ${broken.join(', ')}`).toEqual([]);
   });
 
   test('orphaned-page count has not regressed', async () => {

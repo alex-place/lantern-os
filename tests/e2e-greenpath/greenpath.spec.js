@@ -208,7 +208,7 @@ function journeyFor(n) {
 
     // ── s5: chat about the trade in the real UI; the reply must recall it ──────
     step('s5', async () => {
-      await page.goto('/dream-chat.html');
+      await page.goto('/chat.html');
       const first = await sendChat(page,
         `I just placed a paper trade on the Kalshi paper ledger: bought 1 YES contract of ` +
         `${ticker()} at 5 cents. Please acknowledge you noted it.`);
