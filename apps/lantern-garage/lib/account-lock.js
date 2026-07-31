@@ -37,9 +37,17 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+// The lock must be visible to EVERY process on the box, so it cannot live inside a
+// checkout. The first cut resolved it relative to __dirname, which gave
+//   dev    -> C:\dev\lantern-os-dev\data\lantern-garage\trading\locks
+//   stable -> C:\dev\lantern-os-stable\data\lantern-garage\trading\locks
+// Two separate directories: neither server could ever see the other's lock, so the
+// module would have silently failed to prevent the exact collision it exists for.
+// Default to a machine-wide (per-user) directory instead; TRADER_LOCK_DIR overrides
+// it, and both servers set it explicitly so the shared path is visible in config.
 const LOCK_DIR = process.env.TRADER_LOCK_DIR
   ? path.resolve(process.env.TRADER_LOCK_DIR)
-  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'locks');
+  : path.join(os.tmpdir(), 'unisona-account-locks');
 
 // A holder that hasn't heartbeat in this long is presumed dead. Must comfortably
 // exceed the scan interval (60s) so a slow-but-alive scan is never evicted.
