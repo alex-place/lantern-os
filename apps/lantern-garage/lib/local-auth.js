@@ -20,33 +20,29 @@ const {
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
-const { sendVerificationEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
+const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
+const { issueCode } = require("./verify-codes");
 const { isLoopback, clientIp } = require("./request-auth");
 const { canonicalOrigin } = require("./base-url");
 const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-auth");
 
-/** Build a fresh email-confirmation link (mints a verify_email token). Uses the
- *  canonical origin, NOT the spoofable Host header, so a forged Host can't point
- *  a genuine confirmation email at an attacker's domain (#2604). */
-function verifyLinkFor(req, profile) {
-  // Mint the token for the profile's CURRENT email (#2624) so a stale link can't verify
-  // a different address if the email changes before it's clicked.
-  const token = createToken("verify_email", profile.id, profile.email || null);
-  return `${canonicalOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-}
-
-// Fire-and-forget: email the new account a confirmation link (dev fallback logs
-// it). Never blocks or fails registration. Returns { delivery, link } where
-// delivery is "sent" (SMTP configured) or "logged" (link only went to the server
-// log/outbox). The link is returned so a loopback dev caller can complete the
-// flow without a mail server (see devVerifyLink below).
-function sendSignupVerification(req, profile) {
+// Fire-and-forget: email the new account a 6-digit confirmation CODE (dev fallback
+// logs it). Never blocks or fails registration. Returns { delivery, code } where
+// delivery is "sent" (a mail provider is configured) or "logged" (the code only went
+// to the server log/outbox). The code is returned so a loopback dev caller can
+// complete the flow without a mail server (see devVerifyCode below).
+//
+// Signup no longer mints a verify_email LINK — the spoofable-origin concern that
+// shaped verifyLinkFor (#2604) simply doesn't exist for a code, since there is no
+// URL for a forged Host to point anywhere. The email-CHANGE flow in routes/profiles.js
+// still uses signed links and still builds them from the canonical origin.
+async function sendSignupVerification(req, profile) {
   try {
-    const link = verifyLinkFor(req, profile);
-    sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
-    return { delivery: mailerConfigured() ? "sent" : "logged", link };
+    const code = await issueCode(profile.id, profile.email || null);
+    sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
+    return { delivery: mailerConfigured() ? "sent" : "logged", code };
   } catch (_) {
-    return { delivery: "logged", link: null }; // best-effort
+    return { delivery: "logged", code: null }; // best-effort
   }
 }
 
@@ -56,9 +52,14 @@ function sendSignupVerification(req, profile) {
 // email-gate flow. Proxied/public traffic and any SMTP-configured deployment
 // NEVER receive it — the link only ever surfaces where it already goes to the
 // local server log.
-function devVerifyLink(req, profile) {
+// Dev-only self-service: when NO mail provider is configured AND the request is a
+// direct, un-proxied loopback hit (the operator's own machine), hand the confirmation
+// code straight back so local testing can complete the email gate without a mailer.
+// Takes an ALREADY-ISSUED code rather than minting one — issuing supersedes the
+// previous code, so minting a second here would invalidate the one just emailed.
+function devVerifyCode(req, code) {
   if (mailerConfigured() || !isLoopback(req)) return null;
-  return verifyLinkFor(req, profile);
+  return code || null;
 }
 
 // One-time operator warning: on a mailer-less deploy we admit local signups
@@ -235,12 +236,12 @@ async function handleLocalRegister(req, res) {
     return _establish(req, res, { ...result.profile, emailVerified: true }, 201);
   }
 
-  const { delivery } = sendSignupVerification(req, result.profile); // confirmation email
+  const { delivery, code } = await sendSignupVerification(req, result.profile); // confirmation email
   // Hard email gate: the account is created but NOT signed in. It cannot log in
-  // until the confirmation link is clicked (see handleLocalLogin).
+  // until the emailed code is entered (see handleLocalLogin).
   const body = { ok: true, pendingVerification: true, email, emailDelivery: delivery };
-  const devLink = devVerifyLink(req, result.profile);
-  if (devLink) body.devVerifyLink = devLink; // loopback + no-SMTP only
+  const devCode = devVerifyCode(req, code);
+  if (devCode) body.devVerifyCode = devCode; // loopback + no-mailer only
   return _json(res, 202, body);
 }
 
@@ -281,10 +282,12 @@ async function handleLocalLogin(req, res) {
       updateProfile(profile.id, { emailVerified: true, emailAssumed: true }); // assumed, not proven (#2606)
       return _establish(req, res, { ...profile, emailVerified: true }, 200);
     }
-    const body = { error: "email_unverified", email };
-    const devLink = devVerifyLink(req, profile);
-    if (devLink) body.devVerifyLink = devLink; // loopback + no-SMTP only
-    return _json(res, 403, body);
+    // Deliberately does NOT mint a code here, unlike the old dev-link behaviour.
+    // Issuing supersedes the outstanding code, so a blocked login attempt would
+    // silently invalidate the code the user is holding from their email — turning
+    // "I mistyped my password" into "my code stopped working". Getting a new code is
+    // an explicit action (POST /api/auth/resend-verification).
+    return _json(res, 403, { error: "email_unverified", email });
   }
   return _establish(req, res, profile, 200);
 }

@@ -134,20 +134,30 @@ async function main() {
   assert.strictEqual(reg.status, 202, `register should be 202 pending, got ${reg.status}`);
   assert.strictEqual(reg.json.pendingVerification, true);
   assert.ok(!reg.json.user, "register must NOT sign the user in (hard email gate)");
-  assert.ok(reg.json.devVerifyLink, "loopback + no-SMTP register returns a dev verify link");
-  ok("register (loopback, no SMTP) → 202 pendingVerification + devVerifyLink, not signed in");
+  assert.ok(/^\d{6}$/.test(reg.json.devVerifyCode || ""), "loopback + no-mailer register returns a 6-digit dev code");
+  assert.ok(!reg.json.devVerifyLink, "signup no longer issues a confirmation LINK");
+  ok("register (loopback, no mailer) → 202 pendingVerification + devVerifyCode, not signed in");
 
   const preLogin = await call(handleLocalLogin, mkReq({ body: { email, password }, loopback: true }));
   assert.strictEqual(preLogin.status, 403, `pre-verify login should be 403, got ${preLogin.status}`);
   assert.strictEqual(preLogin.json.error, "email_unverified");
   ok("login before verification → 403 email_unverified (hard gate closed)");
 
-  // Drive the REAL verify-email route with the emailed link's token.
-  const verifyUrl = new URL(reg.json.devVerifyLink);
-  const vres = await call(authRoutes, mkReq({ method: "GET", loopback: true }), verifyUrl);
-  assert.strictEqual(vres.status, 302, `verify-email should 302, got ${vres.status}`);
-  assert.ok(/verify=1/.test(vres.headers.Location || ""), `expected verify=1 redirect, got ${vres.headers.Location}`);
-  ok("verify-email route confirms the address (302 ?verify=1)");
+  // A wrong code must NOT open the gate — the whole security case for a 6-digit
+  // secret rests on guesses being counted and bounded.
+  const wrongUrl = new URL("http://127.0.0.1/api/auth/verify-code");
+  const wrong = await call(authRoutes, mkReq({ method: "POST", body: { email, code: reg.json.devVerifyCode === "000000" ? "111111" : "000000" }, loopback: true }), wrongUrl);
+  assert.ok(wrong.status === 400 || wrong.status === 429, `wrong code should be rejected, got ${wrong.status}`);
+  const stillBlocked = await call(handleLocalLogin, mkReq({ body: { email, password }, loopback: true }));
+  assert.strictEqual(stillBlocked.status, 403, "a wrong code must leave the gate closed");
+  ok("wrong code → rejected, gate stays closed");
+
+  // Drive the REAL verify-code route with the emailed code.
+  const verifyUrl = new URL("http://127.0.0.1/api/auth/verify-code");
+  const vres = await call(authRoutes, mkReq({ method: "POST", body: { email, code: reg.json.devVerifyCode }, loopback: true }), verifyUrl);
+  assert.strictEqual(vres.status, 200, `verify-code should 200, got ${vres.status}`);
+  assert.ok(vres.json && vres.json.ok, "verify-code reports ok");
+  ok("verify-code route confirms the address (200 ok)");
 
   const postLogin = await call(handleLocalLogin, mkReq({ body: { email, password }, loopback: true }));
   assert.strictEqual(postLogin.status, 200, `post-verify login should be 200, got ${postLogin.status}`);
@@ -199,16 +209,16 @@ async function main() {
   }));
   assert.strictEqual(pubReg.status, 201, `proxied no-SMTP signup should auto-admit 201, got ${pubReg.status}`);
   assert.ok(pubReg.json.user, "auto-admitted signup is signed in");
-  assert.ok(!pubReg.json.devVerifyLink, "never leak a dev verify link on a proxied request");
-  ok("proxied + no-SMTP register → 201 auto-admit (no permanent lockout, no link leak)");
+  assert.ok(!pubReg.json.devVerifyCode, "never leak a dev verify code on a proxied request");
+  ok("proxied + no-SMTP register → 201 auto-admit (no permanent lockout, no code leak)");
 
   // ── 5. Mailer no-SMTP fallback writes to the outbox with transport 'dev' ────────
-  const mres = await mailer.sendVerificationEmail("bob@example.com", "Bob", "https://x/verify?token=abc");
+  const mres = await mailer.sendVerificationCodeEmail("bob@example.com", "Bob", "123456");
   assert.strictEqual(mres.transport, "dev", "no-SMTP mail falls back to dev transport");
   const outbox = path.join(process.cwd(), "data", "mail-outbox.jsonl");
   const outboxTxt = fs.readFileSync(outbox, "utf8");
-  assert.ok(outboxTxt.includes("bob@example.com") && outboxTxt.includes("token=abc"),
-    "the outbox records the recipient and the action link");
+  assert.ok(outboxTxt.includes("bob@example.com") && outboxTxt.includes("123456"),
+    "the outbox records the recipient and the confirmation code");
   ok("no-SMTP mailer logs to data/mail-outbox.jsonl (transport 'dev')");
 
   // ── 6. Provider gate keys on ANY mailer, not SMTP alone (#3021) ─────────────────
@@ -245,7 +255,7 @@ async function main() {
     assert.strictEqual(rReg.json.pendingVerification, true, "signup is pending verification, not signed in");
     assert.ok(!rReg.json.user, "hard-gated signup is NOT signed in (no user in body)");
     assert.strictEqual(rReg.json.emailDelivery, "sent", "delivery is reported 'sent' when a provider is configured");
-    assert.ok(!rReg.json.devVerifyLink, "no dev verify link leaks once a provider is configured");
+    assert.ok(!rReg.json.devVerifyCode, "no dev verify code leaks once a provider is configured");
     ok("Resend-configured proxied signup is hard-gated (202), not auto-admitted (#3021)");
   } finally {
     delete process.env.RESEND_API_KEY;

@@ -100,16 +100,25 @@ function journeyFor(n) {
       const regBody = await reg.json();
       expect(regBody.pendingVerification).toBe(true);
 
-      // Hard email gate: the confirm link must be consumed before login works. On
-      // loopback with no SMTP the page surfaces the dev link; anywhere else this
-      // fails — the gate host must run without SMTP configured (see the doc).
-      const devLink = page.locator('#verify-dev-link');
-      await expect(devLink, 'dev verify link missing — SMTP is configured on this host; ' +
-        'unset SMTP_*/.env.local for the greenpath run (docs/GREENPATH-GATE.md)').toBeVisible();
-      await Promise.all([
-        page.waitForURL(/verify=1/),
-        devLink.click(),
+      // Hard email gate: the emailed CODE must be entered before login works. On
+      // loopback with no mail provider the page surfaces the dev code; anywhere else
+      // this fails — the gate host must run without a mailer configured (see the doc).
+      const devCode = page.locator('#verify-dev-code');
+      await expect(devCode, 'dev verify code missing — a mail provider is configured on this ' +
+        'host; unset RESEND_API_KEY/SMTP_* in .env.local for the greenpath run ' +
+        '(docs/GREENPATH-GATE.md)').toBeVisible();
+      const code = (await devCode.locator('strong').textContent() || '').trim();
+      expect(code, 'dev code should be 6 digits').toMatch(/^\d{6}$/);
+      // Typing the 6th digit auto-submits, so wait on the verify-code response rather
+      // than a navigation — confirming a code never leaves the page.
+      // Type into the segmented row exactly as a user would — focus box 1 and let
+      // auto-advance carry the rest. fill() would only populate a single box.
+      await page.locator('#verify-code-boxes .code-box').first().focus();
+      const [confirmed] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('/api/auth/verify-code')),
+        page.keyboard.type(code),
       ]);
+      expect(confirmed.status(), 'the emailed code should confirm the address').toBe(200);
 
       // Now the real email+password login, typed into the form.
       await page.locator('#local-email').fill(email());
