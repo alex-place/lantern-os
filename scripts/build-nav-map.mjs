@@ -36,11 +36,17 @@ const NON_NAV_EDGES = [{ from: 'chat.html', to: 'knowledgecenter.html' }];
 const isExcluded = (from, to) =>
   NON_NAV_EDGES.some((e) => e.from === from && e.to === to);
 
-/** Strip <script>/<style> bodies so hrefs inside JS strings don't count as nav. */
+/**
+ * Strip <script>/<style> bodies so hrefs inside JS strings don't count as nav.
+ *
+ * The closing patterns allow whitespace before ">" (`</script >` is valid HTML and
+ * browsers honour it). Without that the regex under-matches and leaks script text
+ * into the link scan — CodeQL's js/bad-tag-filter flags exactly this shape.
+ */
 function stripCode(html) {
   return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ');
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, ' ');
 }
 
 /**
