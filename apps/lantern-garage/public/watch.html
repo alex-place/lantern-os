@@ -53,6 +53,18 @@
     --tv-text-primary:#1a1d24;--tv-text-secondary:#4a5160;
     --tv-grid:rgba(0,0,0,.08);--tv-axis:rgba(0,0,0,.55);
   }
+
+  /* De-boxing pass (#3049): the terminal read as a grid of hard same-weight
+     rectangles. Soften radii and borders, add faint elevation so surfaces have
+     depth order, and give the BUY/SELL strip breathing room. Pure skin — no
+     layout metrics change. */
+  .card{border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
+  .card:hover{box-shadow:0 4px 18px rgba(0,0,0,.3)}
+  .chart-ctrl,.wl-add-btn,.wl-sort{border-radius:7px}
+  .btn-buy,.btn-sell{border-radius:8px;padding-top:7px;padding-bottom:7px}
+  .tp-tab{border-radius:6px 6px 0 0}
+  .hstat{border-radius:7px}
+  .footer,.sidebar{border-color:color-mix(in srgb, var(--border) 80%, transparent)}
   /* A handful of surfaces/borders in this terminal are hardcoded dark
      (rgba(15,18,28,…) / white-translucent borders). Remap them for light mode
      so cards, panels and dividers stay legible (#1577). */
@@ -84,7 +96,7 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:var(--sidebar-w,210px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:var(--sidebar-w,296px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
      initColumnResizers() and the chosen widths persist. #trader-cols */
@@ -139,7 +151,7 @@
   /* Sidebar spans the full content height (rows 2–3) so the watchlist + info panel
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
-  #wlList{flex:1 1 auto;overflow-y:auto;min-height:0;padding:8px 0}
+  #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
   .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
   .footer{position:relative;grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
@@ -202,12 +214,12 @@
   .logo span{color:var(--text1);font-weight:400}
   /* #2431: stats are single-line inline pills (`VIX 17.33 CALM`), not stacked
      label-over-value pairs — halves the toolbar's height footprint. */
-  .hstat{font-family:var(--mono);font-size:11px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
+  .hstat{font-family:var(--mono);font-size:12px;display:flex;flex-direction:row;align-items:center;gap:5px;min-width:0;
     padding:3px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg0)}
   .hstat .l{color:var(--text2);font-size:9.5px;text-transform:uppercase;letter-spacing:.09em}
   .hstat .v{color:var(--text0)}
   .hstat .pos{color:var(--green)}.hstat .neg{color:var(--red)}
-  .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:3px;letter-spacing:.1em}
+  .badge{font-family:var(--mono);font-size:12px;padding:3px 8px;border-radius:6px;letter-spacing:.1em}
   .badge-paper{background:rgba(245,166,35,.15);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
   .badge-demo{background:rgba(74,158,255,.15);color:var(--blue);border:1px solid rgba(74,158,255,.3)}
   .pulse{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s ease-in-out infinite;margin-left:auto}
@@ -231,15 +243,14 @@
   .alert-toast{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:1400;background:var(--bg1);border:1px solid var(--amber);color:var(--text0);font-family:var(--mono);font-size:13px;padding:10px 16px;border-radius:9px;box-shadow:0 10px 30px rgba(0,0,0,.5)}
   /* #2439: watchlist sort control */
   .wl-sort{flex:0 0 auto;margin-left:6px;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:11px;border-radius:4px;padding:0 4px;cursor:pointer}
-  .nav-link{font-family:var(--mono);font-size:11px;padding:6px 12px;border-radius:3px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
+  .nav-link{font-family:var(--mono);font-size:12px;padding:6px 12px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);color:var(--text1);text-decoration:none;cursor:pointer;transition:background .15s,color .15s}
   .nav-link:hover{color:var(--accent);background:var(--bg3);border-color:var(--accent)}
   .ovn-toggle{cursor:pointer}
   .ovn-toggle.ovn-on{background:rgba(0,212,170,.22);border-color:var(--green);color:var(--green)}
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{padding:5px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.25;display:flex;align-items:center;gap:8px}
-  .wl-content{flex:1;min-width:0}
+  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:10px 26px 10px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
@@ -253,15 +264,18 @@
   .wl-item:hover,.wl-item.active{background:var(--bg2)}
   .wl-item.active{box-shadow:inset 3px 0 0 var(--accent)}   /* accent selection cue (matches site .active) */
   .wl-item.active{box-shadow:inset 2px 0 0 var(--blue)}
-  .wl-sym{font-family:var(--mono);font-size:10.5px;font-weight:600;color:var(--text0)}
-  .wl-row{display:flex;justify-content:space-between;align-items:center;gap:6px}
-  .wl-price{font-family:var(--mono);font-size:9.5px;color:var(--text1)}
-  .wl-chg{font-family:var(--mono);font-size:11px;font-weight:600;white-space:nowrap}
+  .wl-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0);overflow:hidden;text-overflow:ellipsis}
+  /* Two aligned columns, not space-between: left holds symbol/change, right holds
+     price/signal, so every row forms a real column instead of drifting with each
+     value's width. */
+  .wl-right{display:flex;align-items:center;gap:6px;justify-content:flex-end}
+  .wl-price{font-family:var(--mono);font-size:12px;color:var(--text0);text-align:right;font-variant-numeric:tabular-nums}
+  .wl-chg{font-family:var(--mono);font-size:12px;font-weight:600;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
   .up{color:var(--green)}.dn{color:var(--red)}.flat{color:var(--text2)}
-  .wl-signal{font-family:var(--mono);font-size:10px}
+  .wl-signal{font-family:var(--mono);font-size:11.5px;text-align:right;font-variant-numeric:tabular-nums}
   /* Selected-symbol info panel (#1631) — name, exchange, day stats, regime/signal.
      Height is user-resizable via the .wl-resize grabber above it (desktop + mobile). */
-  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:9px 12px 12px;border-top:1px solid var(--border);background:var(--bg2)}
+  .wl-info{display:none;flex:0 0 auto;height:var(--wlinfo-h,42%);min-height:96px;max-height:80%;overflow-y:auto;padding:10px 12px 12px;border-top:1px solid var(--border);background:var(--bg1)}
   .wl-info.show{display:block}
   /* Drag handle to resize the symbol-info panel — only visible while the panel is shown. */
   .wl-resize{display:none;position:relative;flex:0 0 auto;height:11px;cursor:ns-resize;background:var(--bg1);touch-action:none}
@@ -269,25 +283,25 @@
   .wl-resize:hover::before{background:var(--tv-text-secondary)}
   .sidebar:has(.wl-info.show) .wl-resize{display:block}
   body.resizing-wlinfo{user-select:none;cursor:ns-resize}
-  .wi-sym{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text0)}
-  .wi-name{font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .wi-px{font-family:var(--mono);font-size:14px;font-weight:600;margin-top:5px}
+  .wi-sym{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text0);display:inline}
+  .wi-name{font-size:10.5px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wi-px{font-family:var(--mono);font-size:13px;font-weight:700;margin-top:6px}
   .wi-meta{font-family:var(--mono);font-size:11px;color:var(--text2);margin-top:4px;display:flex;flex-wrap:wrap;gap:3px 12px}
   .wi-meta b{color:var(--text1);font-weight:600}
   /* #1711: expanded info — Technicals / Returns / Key stats sections */
-  .wi-sect{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--text2);margin:10px 0 5px;border-top:1px solid var(--border);padding-top:8px}
-  .wi-tech{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--text1)}
+  .wi-sect{font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--text2);margin:9px 0 5px;border-top:1px solid color-mix(in srgb, var(--border) 70%, transparent);padding-top:7px}
+  .wi-tech{font-family:var(--mono);font-size:12.5px;font-weight:700;color:var(--text1)}
   .wi-tech.up{color:var(--green)} .wi-tech.dn{color:var(--red)}
-  .wi-rets{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
-  .wi-ret{background:var(--bg0);border:1px solid var(--border);border-radius:4px;padding:5px 4px;text-align:center}
-  .wi-ret-v{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--text2)}
+  .wi-rets{display:grid;grid-template-columns:repeat(auto-fit,minmax(54px,1fr));gap:5px}
+  .wi-ret{background:var(--bg2);border:1px solid color-mix(in srgb, var(--border) 70%, transparent);border-radius:6px;padding:6px 4px;text-align:center;min-width:0}
+  .wi-ret-v{font-family:var(--mono);font-size:11.5px;font-weight:700;color:var(--text2)}
   .wi-ret.up .wi-ret-v{color:var(--green)} .wi-ret.dn .wi-ret-v{color:var(--red)}
   .wi-ret-l{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:1px}
   .wl-add{display:flex;padding:8px 12px;border-bottom:1px solid var(--border)}
   /* #1709: single full-width "Add symbol" button → opens the search popup */
   .wl-add-btn{flex:1;background:var(--bg2);border:1px solid var(--border);color:var(--text1);font-family:var(--mono);font-size:12px;padding:7px 8px;border-radius:4px;cursor:pointer;letter-spacing:.03em}
   .wl-add-btn:hover{color:var(--text0);background:var(--bg3);border-color:var(--blue)}
-  .wl-remove{font-family:var(--mono);font-size:11px;color:var(--text2);cursor:pointer;padding:0 4px;background:none;border:0;line-height:1}
+  .wl-remove{position:absolute;right:5px;top:50%;transform:translateY(-50%);opacity:0;background:none;border:none;color:var(--text2);font-size:13px;line-height:1;padding:2px 4px;cursor:pointer;transition:opacity .12s} .wl-item:hover .wl-remove,.wl-item:focus-within .wl-remove{opacity:1}
   .wl-remove:hover{color:var(--red)}
   /* ── Ticker cards grid ── */
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
@@ -297,7 +311,7 @@
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.95);border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
+  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
   /* #2433: hover lift — the deck responds to the pointer like the site's chips do. */
   .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover);transform:translateY(-2px)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
@@ -531,7 +545,7 @@
      Priority: chart controls + sign-in/chat > stats > cross-links. The toolbar's
      horizontal scroll stays as the last resort, not the first. ── */
   @media (max-width:1024px){
-    .layout{grid-template-columns:var(--sidebar-w,170px) 1fr}   /* narrower watchlist on tablets */
+    .layout{grid-template-columns:var(--sidebar-w,296px) 1fr}   /* narrower watchlist on tablets */
     .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(280px,100%),1fr));gap:10px}
     .header{gap:8px;padding:0 10px}
   }
@@ -1866,13 +1880,17 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const z=zones[i]; if(!z.mid) continue;
     const sup  = z.type==='SUPPORT';
     const today= z.tier==='today'||z.tier==='weekly';
-    const op   = Math.max(0.07, Math.min(0.75, (z.strength||40)/100*0.9));
+    // #3050: fills capped LOW — at the old ceiling (0.75) a strong zone was a
+    // near-solid slab that buried the candles inside it. Strength still maps to
+    // opacity, but as background context (0.05-0.20); the always-on edge line
+    // below carries the precise level.
+    const op   = Math.max(0.05, Math.min(0.20, (z.strength||40)/100*0.24));
     const zTop = Math.min(rMax, z.top    || z.mid*1.001);
     const zBot = Math.max(rMin, z.bottom || z.mid*0.999);
     if(zTop<=rMin||zBot>=rMax) continue;
     const bgColor  = sup ? `rgba(0,212,170,${op})` : `rgba(255,95,109,${op})`;
-    const bdColor  = z.triggered_entry ? '#f5a623' : (today ? (sup?'rgba(0,212,170,.6)':'rgba(255,95,109,.6)') : 'transparent');
-    const bdWidth  = (today||z.triggered_entry) ? '1px' : '0';
+    const bdColor  = z.triggered_entry ? '#f5a623' : (sup?`rgba(0,212,170,${today?'.65':'.35'})`:`rgba(255,95,109,${today?'.65':'.35'})`);
+    const bdWidth  = '1px';   // every zone keeps a visible edge now that fills are faint
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
@@ -2734,7 +2752,11 @@ function adaptLogoBg(img){
     img.classList.toggle('on-light', dark);
   }catch(e){ /* tainted or decode error → leave dark badge */ }
 }
-const _wlPx = (p)=> p>100 ? p.toLocaleString() : (p!=null ? p.toFixed(4) : '—');
+// One decimal convention so the price column actually lines up. Mixed 4dp/locale
+// formatting put $171 beside $84.2250 and $675.805 — a ragged column. Sub-$1
+// names still need 4dp to say anything at all.
+const _wlPx = (p)=> p==null ? '—' : (p < 1 ? p.toFixed(4)
+  : p.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}));
 
 function renderWatchlist(){
   document.getElementById('wlList').innerHTML = _sortedWlPrices().map(t=>{
@@ -2742,13 +2764,14 @@ function renderWatchlist(){
     const sig= d.last_signal||{};
     const dir= d.direction||sig.direction||'';
     const cl = t.chg_pct>0?'up':t.chg_pct<0?'dn':'flat';
-    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span></span>';
+    const sigTxt = dir ? `<span class="wl-signal" style="color:${dir==='BULLISH'?'var(--green)':dir==='BEARISH'?'var(--red)':'var(--text2)'}">${dir==='BULLISH'?'▲':dir==='BEARISH'?'▼':'·'}${d.confidence||sig.confidence||0}%</span>` : '<span class="wl-signal"></span>';
     return `<div class="wl-item${activeTicker===t.ticker?' active':''}" role="button" tabindex="0" draggable="true" data-wl-ticker="${t.ticker}" aria-label="View ${t.ticker} chart"${activeTicker===t.ticker?' aria-current="true"':''} onclick="focusTicker('${t.ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();focusTicker('${t.ticker}')}">
       ${tickerLogoHtml(t.ticker)}
-      <div class="wl-content">
-        <div class="wl-row"><span class="wl-sym">${t.ticker}</span><span class="wl-price">$${_wlPx(t.price)}</span></div>
-        <div class="wl-row"><span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>${sigTxt}<button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button></div>
-      </div>
+      <span class="wl-sym">${t.ticker}</span>
+      <span class="wl-price">$${_wlPx(t.price)}</span>
+      <span class="wl-chg ${cl}">${t.chg_pct>=0?'+':''}${t.chg_pct}%</span>
+      ${sigTxt}
+      <button class="wl-remove" aria-label="Remove ${t.ticker} from watchlist" onclick="removeWatchlistTicker('${t.ticker}',event)">×</button>
     </div>`;
   }).join('');
   if(activeTicker) renderSymbolInfo(activeTicker);
@@ -2840,7 +2863,7 @@ function focusTicker(t){
     setOrderSymbol(t);                    // #1695: order panel follows the selected symbol
     // Desktop: keep the docked panel open unless the user dismissed it (Esc). Phone:
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
-    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
+    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
   openFullscreenChart(t);
 }
@@ -2874,7 +2897,7 @@ function selectChart(t, ev){
   renderSymbolInfo(t);                      // detail panel follows the selection
   if(!document.body.classList.contains('guest')){
     setOrderSymbol(t);                       // order ticket follows the selection
-    if(!otUserClosed && !isNarrowTrader()) openOrderPanel();
+    // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
 }
 
@@ -3214,7 +3237,7 @@ document.addEventListener('mouseup', function(e){
     setOrderSymbol(drag.dataTicker);
     // Phone: a chart tap just retargets the (closed) ticket — don't pop the bottom
     // sheet over the chart. The BUY/SELL buttons open it explicitly.
-    if(!isNarrowTrader()) openOrderPanel();
+    // a chart tap retargets only — BUY/SELL opens the ticket
   }
 });
 
@@ -4241,12 +4264,14 @@ async function loadPortfolio(){
     const a  = d.account||{};
     const dayPnl = computeDayPnl(d.positions||[]);
     if(dayPnl != null) a.pnl_today = dayPnl;   // reconcile Day P&L with the visible day moves
-    document.getElementById('hEquity').textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
+    const _he=document.getElementById('hEquity'); if(_he) _he.textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
     const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
-    if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }          // unavailable → honest dash, not +$0
-    else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
-    document.getElementById('hPos').textContent = (d.positions||[]).length;
+    if (pe) {
+      if (pnl == null) { pe.textContent = '—'; pe.className = 'v'; }        // unavailable → honest dash, not +$0
+      else { pe.textContent = (pnl>=0?'+':'−')+'$'+fmt(Math.abs(pnl),0); pe.className = 'v '+(pnl>=0?'pos':'neg'); }
+    }
+    const _hp=document.getElementById('hPos'); if(_hp) _hp.textContent = (d.positions||[]).length;
     s0Status.equity = a.equity; s0Status.pnl = pnl || 0; s0Status.positions = (d.positions||[]).length;
     renderSigma0Signals();
     renderTpSummary(a);                     // #1712
@@ -4459,7 +4484,7 @@ function initWlInfoResize(){
 // throttled) as you drag. Arrow keys nudge the focused divider. #trader-cols
 function initColumnResizers(){
   const root = document.documentElement;
-  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:160, max:420, def:210 };
+  const SIDEBAR = { cssVar:'--sidebar-w', key:'trader.sidebarW', min:248, max:460, def:296 };
   const TICKET  = { cssVar:'--ticket-w',  key:'trader.ticketW',  min:300, max:560, def:340 };
   [SIDEBAR, TICKET].forEach(c=>{ const v=parseInt(localStorage.getItem(c.key)||'',10); if(v>0) root.style.setProperty(c.cssVar, Math.max(c.min,Math.min(c.max,v))+'px'); });
   let raf=0;
@@ -4607,7 +4632,7 @@ function startDashboard(){
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && !otUserClosed && !isNarrowTrader() && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); openOrderPanel(); }
+    if(!window.GUEST && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); } // no auto-open on load — the deck keeps full width until the user reaches for a trade
   }, 1600);
   // Restore the saved chart-grid layout (#1628), limiting the options to single/double
   // on phones.
