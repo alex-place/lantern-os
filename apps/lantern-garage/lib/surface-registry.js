@@ -39,7 +39,15 @@ const CORE = {
   "orchestration.html":     "Act",       // agent orchestration / dispatch
   "work.html":              "Act",       // autowork queue
   "admin-flags.html":       "Act",       // the boundary control itself (feature flags)
-  "metrics.html":           "Converge",  // convergence metrics
+  // Verify, not Converge. This page is the External Reality Rule applied to
+  // ourselves — its own copy says so — reporting verified-patch rate, honesty
+  // rate and provenance as [claim, evidence, confidence]. Converge is still
+  // served by system-health.html, which is where convergence/health actually
+  // lives. Re-tagged when #3109 retired the five orphaned Verify pages (proof,
+  // calibration, factcheck, grounding-diff, drift): verification is a FUNCTION
+  // the product performs, not a page a user visits, and this is the surface that
+  // performs it.
+  "metrics.html":           "Verify",    // outcome metrics: claim → evidence → confidence
   "system-health.html":           "Converge",  // systems-health observability
 };
 
@@ -103,7 +111,18 @@ const SUBSYSTEMS = {
 //      exceeds this cap the contract test FAILS: either add core value, or raise the cap
 //      deliberately (a one-line, reviewable edit that makes "we chose more sprawl" explicit
 //      instead of letting it accrete silently).
-const MAX_EXTENSION_RATIO = 1.05; // 21:20 = 1.05 — accounts.html (staff console) + terms.html (legally-required ToS+EULA shell surface), both always-on account module.
+// 17:12 = 1.42. Re-baselined by #3109, which retired 13 ORPHANED surfaces — pages
+// with no inbound nav path from anywhere on the site. Seven of those were CORE
+// (proof, calibration, factcheck, grounding-diff, drift, replay, rag-house) and
+// only four were extensions, so deleting dead weight pushed the ratio UP even
+// though the absolute surface count fell 42 → 29.
+//
+// The cap exists to stop extensions outgrowing the loop. That is not what
+// happened here: the extension count barely moved, the core count fell because
+// unreachable core pages were removed. Raising the cap records that as a
+// deliberate re-baseline rather than letting a cleanup read as sprawl. Tighten it
+// again if core surfaces are added back.
+const MAX_EXTENSION_RATIO = 1.45;
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always
