@@ -49,10 +49,12 @@ The gate runs against a real server boot (`tests/playwright-greenpath.config.ts`
 starts it on port 4323 with trading routes live and collectors off). For all
 steps to be green the host needs:
 
-1. **No SMTP for the gate server.** s1 depends on the loopback no-SMTP
-   `devVerifyLink` flow. The config force-blanks `SMTP_HOST/USER/PASS`, **but a
-   repo-root `.env.local` overrides env at boot** — run the gate from a checkout
-   whose `.env.local` does not configure SMTP (the failure message names this).
+1. **No mail provider for the gate server.** s1 depends on the loopback no-mailer
+   `devVerifyCode` flow. The config force-blanks `RESEND_API_KEY` and
+   `SMTP_HOST/USER/PASS` — both are required, since `mailerConfigured()` is
+   Resend **or** SMTP — **but a repo-root `.env.local` overrides env at boot**, so
+   run the gate from a checkout whose `.env.local` configures neither (the failure
+   message names this).
 2. **A working LLM provider key** in the host env (chat, s5).
 3. **Alpaca paper access** (s7): either operator server keys
    (`ALPACA_API_KEY_ID`/`ALPACA_API_SECRET_KEY`, `ALPACA_ENV=paper`) or the OAuth

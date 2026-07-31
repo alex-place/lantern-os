@@ -30,7 +30,8 @@ const _pathAuth = require("path");
 // Session store dir (mirrors server.js) — a password reset invalidates the account's live
 // sessions so a hijacked session can't survive the remediation (#2614).
 const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
-const { sendVerificationEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
+const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
+const { issueCode, checkCode } = require("../lib/verify-codes");
 const { isLoopback, clientIp } = require("../lib/request-auth");
 const { canonicalOrigin } = require("../lib/base-url");
 
@@ -314,6 +315,60 @@ module.exports = async function authRoutes(req, res, url, deps) {
     return res.end();
   }
 
+  // POST /api/auth/verify-code { email, code } — confirm a SIGNUP with the 6-digit
+  // code from the email. The link route above still serves the email-CHANGE flow.
+  //
+  // Deliberately does NOT reveal whether the account exists: an unknown address and a
+  // wrong code both return the same 400 invalid_code, so this can't be used to
+  // enumerate registered emails (the same property the 202-on-existing-email signup
+  // response protects, #2617).
+  if (method === "POST" && path === "/api/auth/verify-code") {
+    if (emailEndpointThrottled(req)) { res.writeHead(429, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "too_many_attempts" })); }
+    const b = (await readJsonBody(req)) || {};
+    const email = String(b.email || "").trim().toLowerCase();
+    const code = String(b.code || "").trim();
+    const bad = (reason, status) => {
+      res.writeHead(status || 400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: reason }));
+    };
+    if (!EMAIL_RE.test(email) || !/^\d+$/.test(code)) return bad("invalid_code");
+
+    const profile = getProfileByEmail(email);
+    if (!profile) return bad("invalid_code"); // same shape as a wrong code — no enumeration
+    if (profile.emailVerified === true) {
+      // Benign already-confirmed state; mirrors the link route's `already` response.
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ ok: true, already: true, dest: "/auth.html" }));
+    }
+
+    const result = checkCode(profile.id, code);
+    if (!result.ok) {
+      // `locked` and `expired` are surfaced distinctly ONLY because the user already
+      // proved they hold this address by having a code at all — and because "request a
+      // new code" is otherwise undiscoverable. Neither reveals account existence, since
+      // an unknown email never reaches this branch.
+      if (result.reason === "locked") return bad("code_locked", 429);
+      if (result.reason === "expired" || result.reason === "none") return bad("code_expired", 410);
+      return bad("invalid_code");
+    }
+
+    const wasVerified = profile.emailVerified === true;
+    updateProfile(profile.id, { emailVerified: true, emailAssumed: false });
+    if (!wasVerified) {
+      recordTractionEvent({
+        kind: "signup",
+        actor: profile.email || profile.id,
+        verified: true,
+        confidence: "high",
+        source: `email_verified:${profile.id}`,
+        note: "email address confirmed via verification code",
+      }).catch(() => {});
+      try { require("../lib/mailer").sendWelcomeEmail(profile.email, profile.name).catch(() => {}); } catch (_e) { /* never block the verify */ }
+    }
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ ok: true, dest: "/auth.html" }));
+  }
+
   // POST /api/auth/resend-verification { email } — re-send the signup confirmation
   // link. Always 200 (no account enumeration); sends only for an existing account
   // whose email is still unconfirmed.
@@ -325,13 +380,14 @@ module.exports = async function authRoutes(req, res, url, deps) {
     if (EMAIL_RE.test(email)) {
       const profile = getProfileByEmail(email);
       if (profile && profile.emailVerified !== true) {
-        const token = createToken("verify_email", profile.id, profile.email);
-        const link = `${originOf(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-        sendVerificationEmail(profile.email, profile.name, link).catch(() => {});
+        // Issuing supersedes any outstanding code, which is the point of a resend:
+        // it also clears a code that was locked out by wrong guesses.
+        const code = issueCode(profile.id, profile.email);
+        sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
         // Dev-only self-service: no mail server + direct loopback hit → return the
-        // link so the operator can confirm locally. Never on proxied/public traffic
-        // or when SMTP is configured (mirrors local-auth.devVerifyLink).
-        if (!mailerConfigured() && isLoopback(req)) respBody.devVerifyLink = link;
+        // code so the operator can confirm locally. Never on proxied/public traffic
+        // or when a provider is configured (mirrors local-auth.devVerifyCode).
+        if (!mailerConfigured() && isLoopback(req)) respBody.devVerifyCode = code;
       }
     }
     res.writeHead(200, { "Content-Type": "application/json" });

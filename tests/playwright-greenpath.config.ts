@@ -10,10 +10,11 @@ import { defineConfig, devices } from '@playwright/test';
  *   GREENPATH_ACCOUNTS=2 npm run test:greenpath   # smoke run with fewer accounts
  *
  * Environment notes (details in docs/GREENPATH-GATE.md):
- *   - SMTP_* is force-blanked so signup uses the loopback devVerifyLink flow
- *     (the hard email gate stays exercised: register → confirm link → login).
+ *   - RESEND_API_KEY + SMTP_* are force-blanked so signup uses the loopback
+ *     devVerifyCode flow (the hard email gate stays exercised: register →
+ *     enter emailed code → login).
  *     CAVEAT: a repo-root .env.local sets env with override:true at server boot,
- *     so a checkout whose .env.local configures SMTP will break step 1 — run the
+ *     so a checkout whose .env.local configures a mailer will break step 1 — run the
  *     gate from a checkout without SMTP in .env.local.
  *   - Chat (step 5) needs a working LLM provider key in the host env.
  *   - Broker status (step 7) needs Alpaca paper server keys or an OAuth app.
@@ -64,8 +65,11 @@ export default defineConfig({
       // Free → Pro purchase via POST /api/accounts/role) and account cleanup. The
       // journey itself signs up + logs in as real local accounts.
       LANTERN_TEST_AUTH_TOKEN: TOKEN,
-      // Force the loopback no-SMTP signup path (devVerifyLink) even if the shell
-      // env carries SMTP creds. smtpConfigured() needs all three non-empty.
+      // Force the loopback no-mailer signup path (devVerifyCode) even if the shell
+      // env carries provider creds. mailerConfigured() is resend OR smtp, so BOTH
+      // must be blanked — blanking SMTP alone leaves Resend live and the dev code
+      // is (correctly) never returned, which fails s1 with a confusing "code missing".
+      RESEND_API_KEY: '',
       SMTP_HOST: '',
       SMTP_USER: '',
       SMTP_PASS: '',

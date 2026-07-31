@@ -173,6 +173,52 @@
       outline: none; border-color: var(--accent);
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
     }
+    /* Confirmation-code boxes — one per digit. Lives outside .local-form (it's its
+       own screen), so it needs the themed treatment explicitly, or it renders as bare
+       white boxes on the dark card. */
+    #verify-code-boxes {
+      display: flex; gap: clamp(6px, 2vw, 10px);
+      justify-content: center; margin: 4px 0 2px;
+    }
+    .code-box {
+      /* Square-ish and fluid: six boxes + gaps must fit a 320px phone without
+         overflowing the card, hence the clamp rather than a fixed width. */
+      width: clamp(38px, 13.5%, 52px);
+      aspect-ratio: 1 / 1.15;
+      box-sizing: border-box; padding: 0; text-align: center;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: var(--bg); color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 24px; /* ≥16px so iOS doesn't zoom on focus */
+      font-weight: 700;
+      transition: border-color .15s, box-shadow .15s, background .15s;
+      -moz-appearance: textfield;
+    }
+    .code-box::-webkit-outer-spin-button,
+    .code-box::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .code-box:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
+    }
+    /* A filled box reads as "done" without shouting — subtle, so the focused box
+       stays the loudest thing on the row. */
+    .code-box.filled { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+    /* Shake + red on a rejected code: the failure is at the row, where the user is
+       looking, not only in the banner above. */
+    #verify-code-boxes.invalid .code-box {
+      border-color: color-mix(in srgb, #ef4444 60%, var(--border));
+    }
+    #verify-code-boxes.invalid { animation: code-shake .38s ease-in-out; }
+    @keyframes code-shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(5px); }
+      60% { transform: translateX(-3px); }
+      80% { transform: translateX(2px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #verify-code-boxes.invalid { animation: none; }
+    }
     .btn-local {
       border: none; border-radius: 12px; padding: 9px 20px; font-size: 15px;
       font-weight: 700; cursor: pointer; color: #fff;
@@ -318,18 +364,31 @@
     <!-- ── Confirm-email view — replaces the whole sign-in view until the address
          is confirmed. "Takes away all this stuff" and shows one clear next step. -->
     <div id="verify-view" hidden>
-      <h2>Confirm your email</h2>
+      <h2>Enter your code</h2>
       <p class="sub">
-        Please confirm your email before signing in. We sent a confirmation link to
-        <strong id="verify-email-addr"></strong>. Open it, then come back here to sign in.
+        We sent a 6-digit confirmation code to <strong id="verify-email-addr"></strong>.
+        Enter it below to finish setting up your account. The code expires in 15 minutes.
       </p>
       <div class="auth-notice" id="verify-notice" role="status"></div>
-      <!-- Dev-only: shown only when the server (loopback + no mail server) returns a
-           confirmation link, so local testing can complete the flow without email. -->
-      <a id="verify-dev-link" class="btn-ghost" href="#" hidden style="margin-bottom:8px; color:var(--accent)">🔧 Dev: open confirmation link (no mail server)</a>
-      <div class="auth-actions" style="margin-top:4px">
-        <button type="button" class="btn-local" id="verify-continue">I've confirmed my email — sign in</button>
-        <button type="button" class="btn-ghost" id="verify-resend">Resend confirmation</button>
+      <!-- Dev-only: shown only when the server (loopback + no mail provider) returns a
+           confirmation code, so local testing can complete the flow without email. -->
+      <p id="verify-dev-code" hidden style="margin-bottom:8px; color:var(--accent); font-family:ui-monospace,monospace">🔧 Dev code (no mail server): <strong></strong></p>
+      <!-- Six single-character boxes rather than one field: each digit is separately
+           legible, so a transcription slip is visible at a glance. inputmode/
+           autocomplete let phones show a numeric pad and offer the code from the
+           one-time-code autofill heuristics; autocomplete sits on the FIRST box only,
+           since browsers fill it there and the paste handler fans the rest out. -->
+      <div id="verify-code-boxes" role="group" aria-label="6-digit confirmation code">
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="1" aria-label="Digit 1 of 6" />
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="1" aria-label="Digit 2 of 6" />
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="1" aria-label="Digit 3 of 6" />
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="1" aria-label="Digit 4 of 6" />
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="1" aria-label="Digit 5 of 6" />
+        <input class="code-box" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]*" maxlength="1" aria-label="Digit 6 of 6" />
+      </div>
+      <div class="auth-actions" style="margin-top:10px">
+        <button type="button" class="btn-local" id="verify-submit">Confirm email</button>
+        <button type="button" class="btn-ghost" id="verify-resend">Send a new code</button>
         <button type="button" class="btn-ghost" id="verify-back">← Back</button>
       </div>
     </div><!-- /#verify-view -->
@@ -479,7 +538,7 @@
       // Email-confirmation result (verify-email redirects here when signed out).
       const v = q.get("verify");
       if (v === "1") showNotice("Email confirmed ✓ — you can sign in now.");
-      else if (v === "invalid") showError("That confirmation link is invalid or has expired. Sign in and we can resend it.");
+      else if (v === "invalid") showError("That confirmation link is invalid or has expired. Sign in and we can send you a new code.");
       const err = q.get("error");
       if (!err) return;
       const provider = q.get("provider");
@@ -497,7 +556,7 @@
         body: JSON.stringify({ email }),
       });
     } catch (_) {}
-    showNotice("Confirmation email re-sent to <strong>" + _safeEmail(email) + "</strong>. Check your inbox.");
+    showNotice("A new confirmation code was sent to <strong>" + _safeEmail(email) + "</strong>. Check your inbox.");
   }
 
   // ── Local email + password ──
@@ -544,36 +603,112 @@
   // is confirmed. Reached after a fresh signup (pendingVerification) or when a
   // login is blocked because the email is still unconfirmed.
   let verifyEmail = "";
-  let verifyDevLink = "";
-  // opts: { delivery: "sent"|"logged", devLink?: string, reason?: "unverified" }
+  // opts: { delivery: "sent"|"logged", devCode?: string, reason?: "unverified" }
   function showVerifyScreen(email, opts) {
     opts = opts || {};
     verifyEmail = email;
-    verifyDevLink = opts.devLink || "";
     document.getElementById("verify-email-addr").textContent = email;
     const vn = document.getElementById("verify-notice");
     let msg = "";
     if (opts.reason === "unverified") {
       // Login was blocked because the address still isn't confirmed — say so,
       // rather than silently bouncing back to the same screen.
-      msg = "This email isn't confirmed yet. Open the confirmation link we sent (check your spam), then sign in — or resend it below.";
+      msg = "This email isn't confirmed yet. Enter the code we sent (check your spam), or send a new one below.";
     } else if (opts.delivery === "logged") {
-      msg = "No mail server is configured here, so the confirmation link was written to the server log.";
+      msg = "No mail server is configured here, so the confirmation code was written to the server log.";
     }
     if (msg) { vn.textContent = msg; vn.classList.add("show"); }
     else { vn.textContent = ""; vn.classList.remove("show"); }
-    // Dev-only self-service confirm link (server returns it on loopback + no SMTP).
-    setDevLink(verifyDevLink);
+    // Dev-only self-service code (server returns it on loopback + no mail provider).
+    setDevCode(opts.devCode || "");
     // Clear any stale sign-in banners, then hide the whole sign-in view.
     document.getElementById("auth-error").classList.remove("show");
     hideNotice();
     document.getElementById("signin-view").hidden = true;
     document.getElementById("verify-view").hidden = false;
+    clearCodeBoxes();
   }
-  function setDevLink(href) {
-    const dl = document.getElementById("verify-dev-link");
-    if (href) { dl.href = href; dl.hidden = false; }
-    else { dl.hidden = true; dl.removeAttribute("href"); }
+
+  // ── Segmented code entry ───────────────────────────────────────────────────────
+  const codeBoxes = () => Array.from(document.querySelectorAll("#verify-code-boxes .code-box"));
+  const readCode = () => codeBoxes().map((b) => b.value).join("");
+  function paintBoxes() {
+    codeBoxes().forEach((b) => b.classList.toggle("filled", !!b.value));
+  }
+  function clearCodeBoxes(focus) {
+    const boxes = codeBoxes();
+    boxes.forEach((b) => { b.value = ""; });
+    document.getElementById("verify-code-boxes").classList.remove("invalid");
+    paintBoxes();
+    if (focus !== false && boxes[0]) boxes[0].focus();
+  }
+  function markCodeInvalid() {
+    const row = document.getElementById("verify-code-boxes");
+    row.classList.add("invalid");
+    // Drop the class after the animation so a later failure re-triggers it.
+    setTimeout(() => row.classList.remove("invalid"), 450);
+  }
+  /** Distribute a pasted/autofilled string across the boxes, then submit if complete. */
+  function fillCodeFrom(text, startIndex) {
+    const digits = String(text || "").replace(/\D/g, "");
+    if (!digits) return;
+    const boxes = codeBoxes();
+    let i = startIndex || 0;
+    for (const d of digits) {
+      if (i >= boxes.length) break;
+      boxes[i].value = d;
+      i++;
+    }
+    paintBoxes();
+    boxes[Math.min(i, boxes.length - 1)].focus();
+    if (readCode().length === boxes.length) submitVerifyCode();
+  }
+  function setDevCode(code) {
+    const dc = document.getElementById("verify-dev-code");
+    if (code) { dc.querySelector("strong").textContent = code; dc.hidden = false; }
+    else { dc.hidden = true; }
+  }
+
+  // Submit the typed code. Distinguishes the three failure modes the server reports,
+  // because "wrong code" and "this code is dead, get a new one" need different actions
+  // from the user — a generic error would leave them retyping into a locked code.
+  let verifySubmitting = false;
+  async function submitVerifyCode() {
+    // The last digit auto-submits, but Enter and the button can fire too — guard so a
+    // double-trigger can't spend two of the five attempts on one code.
+    if (verifySubmitting) return;
+    const vn = document.getElementById("verify-notice");
+    const code = readCode().replace(/\D/g, "");
+    const say = (m) => { vn.textContent = m; vn.classList.add("show"); };
+    if (code.length !== 6) return say("Enter the 6-digit code from your email.");
+    verifySubmitting = true;
+    const btn = document.getElementById("verify-submit");
+    btn.disabled = true;
+    try {
+      const r = await fetch("/api/auth/verify-code", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: verifyEmail, code }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok && data.ok) {
+        showSigninScreen();
+        showNotice("Email confirmed — you can sign in now.");
+        return;
+      }
+      if (data.error === "code_locked") say("Too many incorrect attempts. Use “Send a new code” to get a fresh one.");
+      else if (data.error === "code_expired") say("That code has expired. Use “Send a new code” to get a fresh one.");
+      else if (data.error === "too_many_attempts") say("Too many attempts — wait a moment and try again.");
+      else say("That code isn't right. Check the email and try again.");
+      markCodeInvalid();
+      clearCodeBoxes();
+    } catch (_) {
+      say("Couldn't reach the server. Check your connection and try again.");
+    } finally {
+      btn.disabled = false;
+      verifySubmitting = false;
+    }
   }
   function showSigninScreen() {
     document.getElementById("verify-view").hidden = true;
@@ -642,7 +777,7 @@
         // "check your email" notice with a resend link instead.
         if (data.pendingVerification) {
           // Swap the whole card for the dedicated "confirm your email" screen.
-          showVerifyScreen(email, { delivery: data.emailDelivery, devLink: data.devVerifyLink });
+          showVerifyScreen(email, { delivery: data.emailDelivery, devCode: data.devVerifyCode });
           return;
         }
         // Signed in — confirm with a success banner, then continue to the app.
@@ -661,7 +796,7 @@
       // Unconfirmed email → sign-in blocked. Show the dedicated confirm screen
       // with a clear reason (and the dev confirm link when the server supplies it).
       if (data.error === "email_unverified") {
-        showVerifyScreen(email, { reason: "unverified", devLink: data.devVerifyLink });
+        showVerifyScreen(email, { reason: "unverified", devCode: data.devVerifyCode });
         return;
       }
       const map = {
@@ -809,18 +944,45 @@
     // ── Confirm-email screen controls ──
     // Go back to the previous (sign-in) screen without confirming.
     document.getElementById("verify-back").addEventListener("click", showSigninScreen);
-    // "I've confirmed" — the user clicked the emailed link (usually in another tab)
-    // and is ready to sign in. Return them to the login screen, pre-filled.
-    document.getElementById("verify-continue").addEventListener("click", () => {
-      showSigninScreen();
-      setLocalMode("login");
-      if (verifyEmail) document.getElementById("local-email").value = verifyEmail;
-      document.getElementById("local-error").textContent = "";
-      hideNotice();
-      showNotice("If your email is confirmed, sign in below to continue.");
-      document.getElementById("local-password").focus();
+    document.getElementById("verify-submit").addEventListener("click", submitVerifyCode);
+    // Per-box behaviour: type to advance, backspace to retreat, arrows to move, paste
+    // to fill the row. A complete row auto-submits — a typed code has no reason to need
+    // a second deliberate click once it's complete.
+    codeBoxes().forEach((box, idx) => {
+      box.addEventListener("input", () => {
+        // A box can receive more than one character (autofill, IME, fast typing), so
+        // treat any multi-char value as a fill starting at this box.
+        const digits = (box.value || "").replace(/\D/g, "");
+        if (digits.length > 1) { box.value = ""; return fillCodeFrom(digits, idx); }
+        box.value = digits;
+        paintBoxes();
+        if (digits && idx < 5) codeBoxes()[idx + 1].focus();
+        if (readCode().length === 6) submitVerifyCode();
+      });
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); return submitVerifyCode(); }
+        if (e.key === "Backspace" && !box.value && idx > 0) {
+          // Empty box + backspace: step back and clear that one, so holding backspace
+          // walks the row instead of stalling.
+          e.preventDefault();
+          const prev = codeBoxes()[idx - 1];
+          prev.value = "";
+          paintBoxes();
+          prev.focus();
+        }
+        if (e.key === "ArrowLeft" && idx > 0) { e.preventDefault(); codeBoxes()[idx - 1].focus(); }
+        if (e.key === "ArrowRight" && idx < 5) { e.preventDefault(); codeBoxes()[idx + 1].focus(); }
+      });
+      box.addEventListener("paste", (e) => {
+        // Pasting the whole code into any box fills the row from that box onward,
+        // rather than dropping five of the six digits.
+        e.preventDefault();
+        fillCodeFrom((e.clipboardData || window.clipboardData).getData("text"), idx);
+      });
+      box.addEventListener("focus", () => box.select());
     });
-    // Re-send the confirmation link, reporting back in the verify screen's own banner.
+    // Re-send: issues a NEW code (superseding the old one), reporting back in the
+    // verify screen's own banner.
     document.getElementById("verify-resend").addEventListener("click", async () => {
       const vn = document.getElementById("verify-notice");
       let data = {};
@@ -832,10 +994,11 @@
         });
         data = await r.json().catch(() => ({}));
       } catch (_) {}
-      vn.textContent = "Confirmation email re-sent to " + verifyEmail + ". Check your inbox (and spam).";
+      vn.textContent = "A new code was sent to " + verifyEmail + ". Check your inbox (and spam). The previous code no longer works.";
       vn.classList.add("show");
-      // Dev (loopback + no mail server): the resend hands back a fresh link.
-      if (data.devVerifyLink) { verifyDevLink = data.devVerifyLink; setDevLink(verifyDevLink); }
+      clearCodeBoxes();
+      // Dev (loopback + no mail server): the resend hands back the fresh code.
+      if (data.devVerifyCode) setDevCode(data.devVerifyCode);
     });
 
     checkSession();

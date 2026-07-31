@@ -155,6 +155,25 @@ function button(href, label) {
     <p style="color:#64748b;font-size:12px;word-break:break-all">Or paste this link: ${href}</p>`;
 }
 
+// Signup confirmation is a typed CODE, not a clicked link — the user may read mail on
+// a phone and be signing up on a desktop, and a code crosses that gap where a link
+// can't. The email-CHANGE flow below still uses a link (see sendVerificationEmail).
+// `link` is deliberately absent: sendMail()'s dev fallback logs whatever it is given,
+// and there is no link to log here — the code itself goes to the outbox instead.
+async function sendVerificationCodeEmail(to, name, code) {
+  const spaced = String(code).split("").join(" "); // easier to read/transcribe
+  return sendMail({
+    to,
+    link: `code: ${code}`, // what the dev outbox records when no provider is configured
+    subject: `Your ${BRAND} confirmation code: ${code}`,
+    text: `Hi ${name || "there"}, your ${BRAND} confirmation code is ${code}. It expires in 15 minutes.`,
+    html: shell("Confirm your email",
+      `<p>Hi ${name || "there"}, enter this code to finish setting up your ${BRAND} account:</p>
+       <p style="margin:24px 0"><span style="display:inline-block;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:10px;padding:14px 22px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:6px;color:#0f172a">${spaced}</span></p>
+       <p style="color:#64748b;font-size:13px">This code expires in 15 minutes and can only be used once. We'll never ask you for it by phone, email, or chat.</p>`),
+  });
+}
+
 async function sendVerificationEmail(to, name, link) {
   return sendMail({
     to, link,
@@ -214,6 +233,7 @@ module.exports = {
   mailerConfigured,
   mailerStatus,
   sendVerificationEmail,
+  sendVerificationCodeEmail,
   sendPasswordResetEmail,
   sendNewSignInEmail,
   sendWelcomeEmail,
