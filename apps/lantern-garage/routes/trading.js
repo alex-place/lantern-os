@@ -70,6 +70,8 @@ function _isUsExtendedHours() {
   return (mins >= 240 && mins < 570) || (mins >= 960 && mins < 1200); // 04:00–09:30 | 16:00–20:00
 }
 const { runAutoTrade } = require('../lib/auto-trader');   // autonomous Act-stage executor
+const accountLock = require('../lib/account-lock');       // one account, one managing process
+const _lockNoticed = new Set();                          // accounts we've already logged a stand-down for
 const _autoBridge = new TradingAPIBridge();               // shared: keeps the LST cache warm across scans
 let _autoscanStopped = false;
 // Champion is a SLOW allocation book — it must not rebalance every autoscan tick like
@@ -157,6 +159,22 @@ async function _autoscanTick() {
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
         _seenAccts.add(resolved.accountId);
+        // CROSS-PROCESS ACCOUNT LOCK (lib/account-lock.js). _seenAccts only dedupes
+        // within THIS process; on 2026-07-31 the stable and dev servers both drove
+        // IBKR DUR193395 with separate cooldown state and double-submitted. One
+        // account is managed by one process — the other stands down for this tick.
+        // Covers BOTH strategies below (champion rebalance and the day-trader), since
+        // either would place orders on this account. Fails OPEN if the lock is
+        // unreadable: an unmanaged position is worse than a duplicate order.
+        const _lock = accountLock.acquire(resolved.accountId);
+        if (!_lock.acquired) {
+          if (!_lockNoticed.has(resolved.accountId)) {          // log the change, not every tick
+            _lockNoticed.add(resolved.accountId);
+            console.info(`[Trading] account ${resolved.accountId} managed by another process — standing down (${_lock.reason})`);
+          }
+          continue;
+        }
+        _lockNoticed.delete(resolved.accountId);
         // ACTIVE-TRADER switch (Phase 2): one account, one strategy. A 'champion' user
         // has the day-trader PAUSED — instead we run the Champion allocation book on
         // their own account (throttled; DRY unless SIGMA_ARM=1, same governance as the
