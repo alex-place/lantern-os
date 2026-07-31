@@ -47,7 +47,7 @@ const { profileHasAdminOverride } = require("../lib/auth-providers");
 const { higherRole, isStaffRole, ROLE_HIERARCHY } = require("../lib/role-hierarchy");
 const { isStaff, isAdmin } = require("../lib/auth-middleware");
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
-const { sendMail, smtpConfigured } = require("../lib/mailer");
+const { sendMailBounded, smtpConfigured } = require("../lib/mailer");
 
 const AUDIT_LOG = path.join(process.cwd(), "data", "profiles", "account-admin-audit.jsonl");
 // Read-only archive of deleted accounts — a durable snapshot appended before the
@@ -288,7 +288,7 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
     }
     if (!pw) pw = tempPassword();
     setLocalPassword(target.id, pw);
-    let emailed = false, emailTransport = null;
+    let emailed = false, emailPending = false, emailTransport = null;
     if (body.email === true) {
       if (!target.email) { sendJson(res, { error: "no_email_on_account" }, 400); return true; }
       const html =
@@ -297,14 +297,19 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
         `<p>Hi ${target.name || "there"}, an administrator set a new password for your unisona.ai account.</p>` +
         `<p>Temporary password: <code style="background:#f1f5f9;padding:4px 8px;border-radius:6px;font-size:15px">${pw}</code></p>` +
         `<p><strong>Please sign in and change it right away.</strong></p></div>`;
-      const r = await sendMail({ to: target.email, subject: "Your unisona.ai password was reset", html, text: `Your new temporary password: ${pw}. Please sign in and change it.` });
+      // Bounded wait (#3094): the password is ALREADY set above, so a slow provider
+      // must not hang the admin's form. `emailed` stays strictly true-on-confirmed —
+      // a pending send reports emailPending, never a fabricated success, because the
+      // operator uses this to decide whether to relay the password by hand.
+      const r = await sendMailBounded({ to: target.email, subject: "Your unisona.ai password was reset", html, text: `Your new temporary password: ${pw}. Please sign in and change it.` });
       emailed = !!(r && r.ok);
+      emailPending = !!(r && r.pending);
       emailTransport = r && r.transport;
     }
     audit(req, "set_password", target.id, { generated, emailed });
     // Return the plaintext ONLY when generated (operator needs to relay it); when the
     // operator typed it, they already have it.
-    sendJson(res, { ok: true, tempPassword: generated ? pw : undefined, emailed, emailTransport, smtp: smtpConfigured(), account: toAccountView(getProfile(target.id)) });
+    sendJson(res, { ok: true, tempPassword: generated ? pw : undefined, emailed, emailPending, emailTransport, smtp: smtpConfigured(), account: toAccountView(getProfile(target.id)) });
     return true;
   }
 
