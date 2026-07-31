@@ -59,6 +59,12 @@ Both validate the key's shape, write `0600` root-owned, `daemon-reload` + restar
 Neither ever puts the key in a command line -- argv is readable by any local user via
 `ps`/`/proc` -- and neither echoes it.
 
+> **Don't pipe secrets through `gcloud compute ssh --command` on Windows.** `gcloud`
+> there is a PowerShell wrapper that does not forward stdin to ssh; it answers a
+> prompt with `y`, and that single character is what lands in the file. It looks
+> like it worked (`echo INSTALLED` still fires) and the app stays unconfigured.
+> `Push-StripeKey.ps1` uses `gcloud compute scp` for this reason.
+
 ## Notes
 
 - The `git checkout -f <tag>` discards any live hotfix drift in the checkout — by
