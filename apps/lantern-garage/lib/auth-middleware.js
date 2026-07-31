@@ -170,6 +170,23 @@ function protectStaticPage(requiredRole = "supporter") {
  *   - otherwise → only if the user's profile has entitlements[key] === true.
  * Returns a boolean and never writes to the response.
  */
+/**
+ * Has this user connected their own brokerage account?
+ *
+ * True when per-user broker credentials exist on disk for them — today that is
+ * Alpaca (OAuth token or BYOK key pair, both via lib/alpaca-credentials). Lazy
+ * require + try/catch on the same principle as the plan matrix below: a storage
+ * problem must never widen access, so any failure resolves to "not connected".
+ */
+function brokerConnected(userId) {
+  if (!userId) return false;
+  try {
+    return !!require("./alpaca-credentials").has(userId);
+  } catch {
+    return false;
+  }
+}
+
 function hasEntitlement(req, key) {
   const session = getSessionUser(req);
   if (!session?.id) return false;
@@ -207,6 +224,18 @@ function hasEntitlement(req, key) {
   // to a specific lower-tier account).
   if ((key === "trade" || key === "pro") && roleLevel(role) >= roleLevel("deep_dreamer")) return true;
   if (key === "ai_trader" && roleLevel(role) >= roleLevel("pilot")) return true;
+
+  // Own-broker trading is a FREE-tier capability (operator decision, 2026-07-31).
+  // A signed-in user who has connected their OWN brokerage account with their OWN
+  // credentials is trading their own money on their own venue — we are the client,
+  // not the counterparty, so there is nothing to gate behind a plan. Pro still buys
+  // the terminal extras (AI tradelist, advisor, alerts) and Pilot the autonomous
+  // trader; this only unlocks placing orders through a broker you connected.
+  //
+  // Deliberately NOT reachable by an anonymous visitor: the `session?.id` check at
+  // the top of this function already returned false for a sessionless caller, so a
+  // guest can never satisfy this branch no matter what is stored on disk.
+  if (key === "trade" && brokerConnected(session.id)) return true;
 
   const profile = getProfile(session.id);
   return !!(profile && profile.entitlements && profile.entitlements[key] === true);

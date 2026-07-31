@@ -49,8 +49,12 @@ const CAPABILITIES = {
   paper_account:      { minPlan: "free", label: "Paper trading account" },
   personalized_charts:{ minPlan: "free", label: "Personalized charts + watchlist" },
   demo_view:          { minPlan: "free", label: "Live demo account view" },
+  // Own-broker trading is Free (operator decision, 2026-07-31): a signed-in user
+  // who connects their OWN brokerage account trades their own money on their own
+  // venue. Requires a connected broker, which lib/auth-middleware enforces — the
+  // plan alone does not grant it. Pro still buys the terminal extras below.
+  live_trading:       { minPlan: "free", label: "Trading via your own connected broker", entitlement: "trade" },
   // ── Pro adds ($20) ──────────────────────────────────────────────────────────
-  live_trading:       { minPlan: "pro", label: "Real-money trading via own broker", entitlement: "trade" },
   trade_terminal:     { minPlan: "pro", label: "Trading terminal (manual orders + AI tradelist)" },
   advisor:            { minPlan: "pro", label: "Portfolio advisor (risk/rebalance/planner)" },
   options_manual:     { minPlan: "pro", label: "Manual paper options orders" },

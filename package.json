@@ -19,6 +19,7 @@
     "test:ui": "node tests/ui-test.js",
     "navmap": "node scripts/build-nav-map.mjs",
     "test:auth": "playwright test --config tests/playwright-auth.config.ts",
+    "test:access": "playwright test --config tests/playwright-access.config.ts",
     "test:sitemap": "node scripts/run-sitemap-e2e.mjs",
     "test:sitemap:headed": "node scripts/run-sitemap-e2e.mjs --headed",
     "test:greenpath": "playwright test --config tests/playwright-greenpath.config.ts",
