@@ -41,15 +41,16 @@ const bridge = {
   getIBKROpenOrders: async () => [],
 };
 
-function rows() {
-  if (!fs.existsSync(LOG)) return [];
-  return fs.readFileSync(LOG, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
+/** Read the JSONL rows a run appended (empty when nothing was written). */
+function readRows(p) {
+  if (!fs.existsSync(p)) return [];
+  return fs.readFileSync(p, "utf8").split(/\r?\n/).filter(Boolean).map((l) => JSON.parse(l));
 }
 
 test("a position that vanished from the book is logged as a loss", async () => {
   await runAutoTrade({ signals: [] }, { bridge, userId: "t" });
 
-  const exits = rows().filter((r) => r.event === "exit");
+  const exits = readRows(LOG).filter((r) => r.event === "exit");
   assert.strictEqual(exits.length, 1, "the vanished position must produce exactly one exit row");
   const e = exits[0];
   assert.strictEqual(e.symbol, "NVDA");
@@ -61,7 +62,7 @@ test("a position that vanished from the book is logged as a loss", async () => {
 
 test("it does not re-log on the next scan", async () => {
   await runAutoTrade({ signals: [] }, { bridge, userId: "t" });
-  const exits = rows().filter((r) => r.event === "exit");
+  const exits = readRows(LOG).filter((r) => r.event === "exit");
   assert.strictEqual(exits.length, 1, "44 duplicate rows for one position is the bug we just fixed");
 });
 
@@ -73,4 +74,25 @@ test("the scorecard now shows the loss instead of a perfect record", () => {
   assert.strictEqual(s.all.totalRealized, -1000);
   // Reconstructed rows are NOT broker-confirmed fills, so they stay out of `confirmed`.
   assert.strictEqual(s.confirmed.trades, 0, "an estimate must never be passed off as booked cash");
+});
+
+test("an unconfirmed exit of our own is NOT reconstructed on top of", async () => {
+  // A signal_exit logged as needs_confirmation is already a ledger row. Guarding only
+  // on CONFIRMED statuses reconstructed a SECOND row for the same SHOP position —
+  // one close, two rows, both counted. Seen live on 2026-07-31.
+  const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), "ext-close-dup-"));
+  const LOG2 = path.join(dir2, "trades.jsonl");
+  const STATE2 = path.join(dir2, "state.json");
+  fs.writeFileSync(STATE2, JSON.stringify({
+    lastPos: { SHOP: { qty: 100, entry: 125, mark: 124, ts: Date.now() } },
+    exitStatus: { SHOP: "needs_confirmation" },
+  }));
+  process.env.TRADER_TRADES_LOG = LOG2;
+  process.env.TRADER_STATE_FILE = STATE2;
+  delete require.cache[require.resolve("../lib/auto-trader")];
+  const { runAutoTrade: run2 } = require("../lib/auto-trader");
+
+  await run2({ signals: [] }, { bridge, userId: "t" });
+  const recon = readRows(LOG2).filter((r) => r.status === "reconstructed");
+  assert.strictEqual(recon.length, 0, "we already logged this exit — do not add a second row");
 });

@@ -11,6 +11,18 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
+// This suite drives the REAL runAutoTrade with stub brokers, so its SHOP/TSLA/SPY
+// fixtures were being appended to the operator's live autopilot-trades.jsonl and its
+// _saveState calls to the live trader-state.json — running the tests in a live
+// checkout silently injected fake trades into the ledger the scorecard reads (4 rows
+// landed in both the dev and stable ledgers on 2026-07-31 this way). Redirect both
+// paths to a temp dir BEFORE requiring the module, which resolves them at load.
+const _tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-trader-test-'));
+process.env.TRADER_TRADES_LOG = path.join(_tmp, 'trades.jsonl');
+process.env.TRADER_STATE_FILE = path.join(_tmp, 'state.json');
 
 const at = require('../lib/auto-trader');
 

@@ -172,9 +172,6 @@ const _exitStatus = new Map();  // sym -> broker status of the last exit order (
 // without an autopilot exit of our own, this is the only record of what we held and
 // where it was marked. Persisted, so an overnight stop-out is still landed at boot.
 const _lastPos = new Map();
-// A broker status meaning our own exit actually went through — used to avoid
-// double-logging a symbol the external-close sweep also sees leave the book.
-const CONFIRMED_EXIT = /^(placed|filled|submitted)$/i;
 function _round2(n) { return Math.round(n * 100) / 100; }
 
 // An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
@@ -439,8 +436,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (exclude.has(sym)) { _lastPos.delete(sym); continue; }  // another engine owns it
     const snap = _lastPos.get(sym) || {};
     _lastPos.delete(sym);
-    // Our own exit already produced a row — don't double-count it.
-    if (CONFIRMED_EXIT.test(String(_exitStatus.get(sym) || ''))) continue;
+    // Our own exit already produced a row — don't double-count it. This must catch
+    // EVERY status, not just the confirmed ones: an exit logged as
+    // needs_confirmation/dry_run is still a row in the ledger, and reconstructing on
+    // top of it produced two rows for one SHOP position. The presence of a status at
+    // all means we decided (and logged) an exit for this symbol.
+    if (_exitStatus.has(sym)) continue;
     const entry = Number(snap.entry);
     const mark = Number(snap.mark);
     const qty = Number(snap.qty);
