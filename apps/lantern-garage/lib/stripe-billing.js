@@ -57,6 +57,43 @@ function tierToRole(tier) {
 /** The Stripe Price id to charge for a given role (from env). */
 function priceIdForRole(role) { return tierPrices()[role] || ""; }
 
+// Display names for ad-hoc prices, matching the tier names on pricing.html.
+const TIER_NAME = { supporter: "Member", deep_dreamer: "Pro", pilot: "Pilot" };
+
+/**
+ * The Checkout line item for a tier.
+ *
+ * Prefers a configured Price id. Falls back to an inline `price_data` built from
+ * AMOUNT_CENTS — the same ladder roleForPrice already trusts — so a deploy needs
+ * only STRIPE_SECRET_KEY to take payments. Without this, checkout 503'd with
+ * "price_not_configured" and the pricing page rendered no buy button at all.
+ *
+ * Trade-off worth knowing: an inline price makes Stripe create the Product/Price
+ * on the fly, so each tier's revenue is not grouped under one dashboard Product.
+ * Setting STRIPE_PRICE_* keeps reporting tidy and takes precedence whenever set.
+ *
+ * Returns null when the role has no configured price AND no known amount, so the
+ * caller can still refuse rather than invent a charge.
+ */
+function lineItemForRole(role) {
+  const price = priceIdForRole(role);
+  if (price) return { price, quantity: 1 };
+  const unit_amount = AMOUNT_CENTS[role];
+  if (!Number.isFinite(unit_amount)) return null;
+  return {
+    quantity: 1,
+    price_data: {
+      currency: "usd",
+      unit_amount,
+      recurring: { interval: "month" },
+      product_data: { name: `unisona.ai ${TIER_NAME[role] || role}` },
+    },
+  };
+}
+
+/** Can this tier be bought on this deploy — by Price id or by amount fallback? */
+function canCheckout(role) { return !!lineItemForRole(role); }
+
 /**
  * Map a Stripe Price object → a WHITELISTED role, or null if it can't be resolved safely.
  * Resolution order (most-trusted first):
@@ -205,5 +242,5 @@ function pickLinkableSubscription(subs) {
 module.exports = {
   isConfigured, isLiveKey, tierToRole, priceIdForRole, roleForPrice, accessForStatus,
   effectiveRole, pickLinkableSubscription, alreadyProcessed, markProcessed, ledgerPath,
-  HANDLED_EVENTS, PURCHASABLE, AMOUNT_CENTS, tierPrices,
+  HANDLED_EVENTS, PURCHASABLE, AMOUNT_CENTS, tierPrices, lineItemForRole, canCheckout,
 };

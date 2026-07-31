@@ -55,6 +55,10 @@ export default defineConfig({
       LANTERN_MCP_SERVER: 'false',
       LANTERN_CLOUDFLARE_TUNNEL: 'false',
       TRADING_ENABLED: '1',
+      // Passed through so a run can exercise the billing UI with a Stripe TEST
+      // key. /api/billing/config makes no network call, so a dummy value is
+      // enough to prove the buy buttons render.
+      ...(process.env.STRIPE_SECRET_KEY ? { STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY } : {}),
     },
   },
 });
