@@ -36,9 +36,9 @@ const { TEST_ID, testAuthEnabled, isDirect: testIsDirect } = require("./test-aut
 // shaped verifyLinkFor (#2604) simply doesn't exist for a code, since there is no
 // URL for a forged Host to point anywhere. The email-CHANGE flow in routes/profiles.js
 // still uses signed links and still builds them from the canonical origin.
-function sendSignupVerification(req, profile) {
+async function sendSignupVerification(req, profile) {
   try {
-    const code = issueCode(profile.id, profile.email || null);
+    const code = await issueCode(profile.id, profile.email || null);
     sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
     return { delivery: mailerConfigured() ? "sent" : "logged", code };
   } catch (_) {
@@ -236,7 +236,7 @@ async function handleLocalRegister(req, res) {
     return _establish(req, res, { ...result.profile, emailVerified: true }, 201);
   }
 
-  const { delivery, code } = sendSignupVerification(req, result.profile); // confirmation email
+  const { delivery, code } = await sendSignupVerification(req, result.profile); // confirmation email
   // Hard email gate: the account is created but NOT signed in. It cannot log in
   // until the emailed code is entered (see handleLocalLogin).
   const body = { ok: true, pendingVerification: true, email, emailDelivery: delivery };

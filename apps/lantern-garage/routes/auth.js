@@ -341,7 +341,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
       return res.end(JSON.stringify({ ok: true, already: true, dest: "/auth.html" }));
     }
 
-    const result = checkCode(profile.id, code);
+    const result = await checkCode(profile.id, code);
     if (!result.ok) {
       // `locked` and `expired` are surfaced distinctly ONLY because the user already
       // proved they hold this address by having a code at all — and because "request a
@@ -382,7 +382,7 @@ module.exports = async function authRoutes(req, res, url, deps) {
       if (profile && profile.emailVerified !== true) {
         // Issuing supersedes any outstanding code, which is the point of a resend:
         // it also clears a code that was locked out by wrong guesses.
-        const code = issueCode(profile.id, profile.email);
+        const code = await issueCode(profile.id, profile.email);
         sendVerificationCodeEmail(profile.email, profile.name, code).catch(() => {});
         // Dev-only self-service: no mail server + direct loopback hit → return the
         // code so the operator can confirm locally. Never on proxied/public traffic

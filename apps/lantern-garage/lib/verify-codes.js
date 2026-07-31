@@ -7,8 +7,9 @@
  * one-in-a-million and would be brute-forceable in seconds if it were only bounded
  * by its TTL. So a code is:
  *
- *   - stored server-side, HMAC-hashed, never in plaintext (a leaked store must not
- *     hand out working codes)
+ *   - stored server-side, salted-scrypt-hashed, never in plaintext (a leaked store
+ *     must not hand out working codes, and must not be cheaply enumerable either —
+ *     10^6 candidates fall instantly to a fast hash)
  *   - single-use, and invalidated by issuing a newer one for the same profile
  *   - capped at MAX_ATTEMPTS wrong guesses, after which it is dead and the user must
  *     request a new one — this, not the TTL, is what makes 10^6 safe
@@ -24,24 +25,36 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { resolveSessionSecret } = require("./session-secret");
-
 const TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 5;
 const CODE_DIGITS = 6;
-
-function secret() {
-  // Namespaced so a code hash can never collide with an action token or session cookie.
-  return "verifycode:" + resolveSessionSecret();
-}
 
 function storePath() {
   return path.resolve(process.cwd(), "data", "auth", "verify-codes.jsonl");
 }
 
-/** HMAC the code, bound to the profile id so a code is only valid for its own account. */
-function hashCode(profileId, code) {
-  return crypto.createHmac("sha256", secret()).update(`${profileId}:${code}`).digest("base64url");
+// scrypt, not a bare HMAC. A keyed HMAC is unforgeable without the secret, but a
+// 6-digit code is only 10^6 candidates: an attacker holding BOTH the store and
+// SESSION_SECRET could enumerate every code instantly. scrypt makes that enumeration
+// cost real time even in that worst case, and costs one hash per verify otherwise.
+// Parameters match lib/user-profiles.hashPassword so there's one cost story in the repo.
+const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 32 };
+
+/**
+ * Hash a code, bound to the profile id so a code is only valid for its own account.
+ *
+ * Async on purpose: scrypt costs ~45ms, and scryptSync would block the single event
+ * loop for that long on every issue and every guess. The per-IP throttle bounds one
+ * caller, not a distributed one, so a synchronous hash here is a throughput hole.
+ * crypto.scrypt runs on the libuv threadpool instead.
+ */
+function hashCode(profileId, code, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(
+      `${profileId}:${code}`, salt, SCRYPT.keylen, { N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p },
+      (err, buf) => (err ? reject(err) : resolve(buf.toString("base64url"))),
+    );
+  });
 }
 
 let _records = null; // Map<profileId, record>
@@ -80,13 +93,15 @@ function _persist(rec) {
  * supersedes any outstanding code for the same profile (so "resend" invalidates the
  * previous email, and a stale code can't be banked).
  */
-function issueCode(profileId, email = null) {
+async function issueCode(profileId, email = null) {
   // randomInt is uniform over the range; `% 1000000` on random bytes would not be.
   const code = String(crypto.randomInt(0, 10 ** CODE_DIGITS)).padStart(CODE_DIGITS, "0");
+  const salt = crypto.randomBytes(16).toString("base64url");
   _persist({
     sub: String(profileId),
     email: email || null,
-    hash: hashCode(profileId, code),
+    salt,
+    hash: await hashCode(profileId, code, salt),
     exp: Date.now() + TTL_MS,
     attempts: 0,
     consumed: false,
@@ -103,14 +118,14 @@ function issueCode(profileId, email = null) {
  * unauthenticated users beyond what the UI needs, and must not reveal whether the
  * profile exists.
  */
-function checkCode(profileId, code) {
+async function checkCode(profileId, code) {
   const rec = _load().get(String(profileId));
   if (!rec) return { ok: false, reason: "none" };
   if (Date.now() > rec.exp) return { ok: false, reason: "expired" };
   if (rec.consumed) return { ok: false, reason: "used" };
   if (rec.attempts >= MAX_ATTEMPTS) return { ok: false, reason: "locked" };
 
-  const given = Buffer.from(hashCode(profileId, String(code || "")));
+  const given = Buffer.from(await hashCode(profileId, String(code || ""), rec.salt));
   const want = Buffer.from(rec.hash);
   const match = given.length === want.length && crypto.timingSafeEqual(given, want);
 
