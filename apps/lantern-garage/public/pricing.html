@@ -136,6 +136,8 @@
           <li>Signed-in workspace with saved operator notes</li>
           <li>RAG intake queue visibility</li>
           <li>Chat with local context</li>
+          <li><strong>Trade your own broker account</strong> — connect Alpaca and place orders</li>
+          <li>Paper-trading account + contest entry</li>
         </ul>
         <div class="tier-actions">
           <a class="btn-ghost" href="/auth.html?returnTo=%2Fpricing.html">Sign In</a>
@@ -146,16 +148,17 @@
       <article class="tier-card featured">
         <div class="tier-head"><h2>Pro</h2><span class="pill queued">Most popular</span></div>
         <p class="tier-price">$20<span> / month</span></p>
-        <p class="tier-blurb">The real thing — trade and create with your own accounts.</p>
+        <p class="tier-blurb">Sharper tools on top of your own accounts.</p>
         <ul class="tier-features">
           <li>Everything in Free</li>
-          <li>Live trading terminal + broker connect (IBKR / Alpaca)</li>
+          <li>Trading terminal — AI tradelist, portfolio advisor, price alerts</li>
           <li>Creator Suite — video → shorts pipeline</li>
           <li>Image, vision &amp; document generation</li>
           <li>Wide multi-model research + persistent memory</li>
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pro" hidden>Subscribe to Pro</button>
+          <a class="btn-ghost billing-fallback" data-tier="pro" href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">Subscribe via Patreon</a>
         </div>
         <p class="tier-note">Billed securely by Stripe. Cancel anytime.</p>
       </article>
@@ -173,6 +176,7 @@
         </ul>
         <div class="tier-actions">
           <button type="button" class="btn-primary stripe-cta" data-tier="pilot" hidden>Subscribe to Pilot</button>
+          <a class="btn-ghost billing-fallback" data-tier="pilot" href="https://www.patreon.com/c/UnisonaAI" target="_blank" rel="noopener noreferrer">Subscribe via Patreon</a>
         </div>
         <p class="tier-note">Billed monthly by Stripe. Invoice available.</p>
       </article>
@@ -229,7 +233,10 @@
     fetch('/api/billing/config', { credentials: 'same-origin' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (cfg) {
-        if (!cfg || !cfg.configured) return; // Stripe off → buttons stay hidden (no upgrade path shown)
+        // Stripe off → keep the Patreon fallback visible. Previously this returned
+        // early and left the tier with NO action at all, so a priced plan rendered
+        // with no way to buy it.
+        if (!cfg || !cfg.configured) return;
         if (cfg.subscribed) {
           // Already subscribed → don't offer a second checkout (double-billing); show Manage.
           var m = document.getElementById('manage-sub'); if (m) m.hidden = false;
@@ -240,7 +247,13 @@
         var l = document.getElementById('link-sub'); if (l) l.hidden = false;
         document.querySelectorAll('.stripe-cta').forEach(function (btn) {
           var tier = btn.getAttribute('data-tier');
-          if (cfg.tiers && cfg.tiers[tier]) btn.hidden = false; // price configured for this tier
+          if (cfg.tiers && cfg.tiers[tier]) {
+            btn.hidden = false; // price configured for this tier
+            // Card checkout is live for this tier → retire the Patreon fallback so
+            // the card shows one primary action, not two competing ones.
+            var fb = document.querySelector('.billing-fallback[data-tier="' + tier + '"]');
+            if (fb) fb.hidden = true;
+          }
         });
       })
       .catch(function () { /* config probe failed → leave upgrade buttons hidden */ });
