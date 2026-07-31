@@ -39,14 +39,34 @@ const isExcluded = (from, to) =>
 /**
  * Strip <script>/<style> bodies so hrefs inside JS strings don't count as nav.
  *
- * The closing patterns allow whitespace before ">" (`</script >` is valid HTML and
- * browsers honour it). Without that the regex under-matches and leaks script text
- * into the link scan — CodeQL's js/bad-tag-filter flags exactly this shape.
+ * Scanned rather than regex-matched. A regex of the shape
+ * `/<script\b[^>]*>[\s\S]*?<\/script>/` is what CodeQL's js/bad-tag-filter warns
+ * about: the variants it misses (`</script >`, odd casing) make it UNDER-match,
+ * which here would leak script bodies into the link scan and invent nav edges
+ * that no user can click. Walking the string handles those cases directly, and
+ * an unclosed tag drops the remainder rather than silently keeping it.
  */
 function stripCode(html) {
-  return html
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, ' ')
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, ' ');
+  for (const tag of ['script', 'style']) {
+    let out = '';
+    let rest = html;
+    for (;;) {
+      const lower = rest.toLowerCase();
+      const open = lower.indexOf(`<${tag}`);
+      // Must be a real tag boundary, not a prefix like <scriptish>.
+      if (open === -1 || !/[\s>/]/.test(rest[open + tag.length + 1] || '')) { out += rest; break; }
+      const bodyStart = rest.indexOf('>', open);
+      if (bodyStart === -1) { out += rest.slice(0, open); break; } // malformed → drop the tail
+      const close = lower.indexOf(`</${tag}`, bodyStart);
+      out += `${rest.slice(0, open)} `;
+      if (close === -1) break; // unclosed → everything after it is code
+      const closeEnd = rest.indexOf('>', close);
+      if (closeEnd === -1) break;
+      rest = rest.slice(closeEnd + 1);
+    }
+    html = out;
+  }
+  return html;
 }
 
 /**
