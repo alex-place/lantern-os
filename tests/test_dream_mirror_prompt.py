@@ -5,17 +5,21 @@ dream entry, not a hardcoded placeholder string.
 Two layers:
   * `CognitiveJournal.get_entry(id)` resolves a real entry by id (stdlib only — runs
     in CI).
-  * the Flask route composes a content-derived prompt and 404s an unknown id
-    (guarded by importorskip("flask") since the CI Python env has no flask).
+
+The Flask-route layer this file also covered was removed: src/hff-api/ was deleted
+in its entirety as dead code with zero external wiring (#2539, "repo-slim removal
+wave 2"), and no /mirror endpoint was reimplemented in the Node server. Those two
+tests loaded src/hff-api/routes/dream_journal.py by path, so they failed with
+FileNotFoundError on every clone — invisible until the pytest collection abort was
+fixed (#3102). They are deleted rather than repointed because there is no longer a
+route to point them at.
 
 Run: python -m pytest tests/test_dream_mirror_prompt.py -q
 """
-import importlib.util
 import json
 import sys
 from pathlib import Path
 
-import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SKILL_DIR = REPO / "skills" / "dream_journal"
@@ -49,50 +53,3 @@ def test_get_entry_resolves_by_id(tmp_path, monkeypatch):
     assert found["tags"] == entry["tags"]
     # unknown id → None (not a crash, not the wrong entry)
     assert journal.get_entry("no-such-id") is None
-
-
-def test_mirror_route_uses_real_dream_content(tmp_path, monkeypatch):
-    pytest.importorskip("flask")
-    from flask import Flask
-
-    journal, entry = _seed_journal(tmp_path, monkeypatch)
-
-    # Load the hyphenated-dir route module by file path.
-    route_path = REPO / "src" / "hff-api" / "routes" / "dream_journal.py"
-    spec = importlib.util.spec_from_file_location("dream_journal_route", route_path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-
-    # Force the route to use our seeded temp journal.
-    monkeypatch.setattr(mod, "_get_journal", lambda: journal)
-
-    app = Flask(__name__)
-    app.register_blueprint(mod.dream_bp)
-    client = app.test_client()
-
-    # Known id → 200, and the prompt is derived from the real dream (not the old
-    # fixed placeholder string).
-    resp = client.get("/api/dreams/mirror/dream-xyz-1")
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["dream_id"] == "dream-xyz-1"
-    assert "burning city" in body["prompt"]          # narrative echoed back
-    assert "flight" in body["prompt"]                 # a recorded symbol
-    assert "fear" in body["prompt"]                   # a recorded emotion
-    assert body["prompt"] != "Reflect on the symbols and emotions in this dream. What patterns recur?"
-
-    # Unknown id → 404 (no silent placeholder).
-    missing = client.get("/api/dreams/mirror/nope")
-    assert missing.status_code == 404
-    assert missing.get_json()["error"] == "dream_not_found"
-
-
-def test_build_mirror_prompt_handles_empty_content(tmp_path, monkeypatch):
-    pytest.importorskip("flask")
-    route_path = REPO / "src" / "hff-api" / "routes" / "dream_journal.py"
-    spec = importlib.util.spec_from_file_location("dream_journal_route2", route_path)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    prompt = mod._build_mirror_prompt({"content": "", "tags": [], "emotions": []})
-    assert "no recorded narrative" in prompt
-    assert prompt  # never empty
