@@ -37,6 +37,28 @@ sudo systemctl enable --now lantern-release-deploy.timer
 To force a deploy now: `sudo systemctl start lantern-release-deploy.service`, then
 `journalctl -u lantern-release-deploy.service -n 30`.
 
+## Setting a secret (e.g. the Stripe key)
+
+Env/secrets are systemd drop-ins in `/etc/systemd/system/lantern.service.d/`, outside
+the checkout, so `git checkout -f <tag>` can't touch them. Set once; survives releases.
+
+From your workstation, pulling the key out of your own environment:
+
+```powershell
+.\ops\gce\Push-StripeKey.ps1            # -WhatIf to preview, -Remove to undo
+```
+
+Or on the VM itself, pasting it at a prompt:
+
+```bash
+sudo bash ops/gce/set-stripe-key.sh       # --env-file, --file PATH, --remove
+```
+
+Both validate the key's shape, write `0600` root-owned, `daemon-reload` + restart
+`lantern.service`, and then verify `/api/billing/config` reports `configured:true`.
+Neither ever puts the key in a command line -- argv is readable by any local user via
+`ps`/`/proc` -- and neither echoes it.
+
 ## Notes
 
 - The `git checkout -f <tag>` discards any live hotfix drift in the checkout — by
