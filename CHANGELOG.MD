@@ -1,3 +1,9 @@
+## [1.14.1] - 2026-07-31
+
+### Changed
+- **The trading scorecard now counts losses.** The autopilot was reporting a 100% win rate over 51 trades — the log was wrong, not the report. Three defects all pointed the same way: an exit row was only written when the autopilot *decided* to exit, so profit-taking was logged but a stop-out (which fills at the broker, where the position simply vanishes) was dropped silently; an exit decision that didn't actually flatten a position re-fired each scan, re-booking the same unrealized P&L as realized over and over; and rejected or cancelled attempts were counted as trades. The autopilot now snapshots every held long each scan, sweeps for positions that left the book without a confirmed exit of our own, and logs them as `closed_externally` with the P&L clearly marked an estimate — a labelled estimate beats a silently dropped loss. Duplicate rows collapse to their last decision, and unfilled attempts are reported as `failedAttempts` rather than hidden. Rescored against the real ledgers, a "1384 trades, 90.9% win" book resolves to 102 trades at 59.8% with a 2.11 profit factor.
+- **Watch page matches the trader.** `watch.html` was forked from the trading terminal before the visual polish pass and never caught up, so the same page read two ways depending on the tab. Ported the de-boxed skin, the 296px sidebar with resize bounds, the one-row watchlist grid with aligned tabular columns, the docked symbol-info panel, and the S/R zone fill cap so overlays no longer bury the candles. Watch stays tracking-only — no buy/sell, no order ticket.
+
 ## [1.14.0] - 2026-07-31
 
 ### Added
