@@ -104,7 +104,62 @@ const OUTBOX = path.join(process.cwd(), "data", "mail-outbox.jsonl");
  * Send an email. Returns { ok, transport: 'smtp'|'dev', link? }.
  * Never throws to the caller for a delivery failure — logs and reports ok:false.
  */
+// A send that takes longer than this is worth a log line — it's the early warning for
+// the failure mode #3094 is about: a provider slowdown turning an interactive form into
+// a hang. Measured baseline on a healthy box is ~250ms median (150–338ms, n=5).
+const SLOW_SEND_MS = Number(process.env.MAIL_SLOW_MS || 3000);
+
+// How long an INTERACTIVE request may wait for a send before answering "pending".
+// Not the same as the 15s provider timeout: that bounds the send, this bounds the
+// user's wait. ~10x the measured median, so the fast path still returns a real verdict.
+const INTERACTIVE_WAIT_MS = Number(process.env.MAIL_INTERACTIVE_WAIT_MS || 2500);
+
+/**
+ * Send, but never hold an interactive response longer than `waitMs`.
+ *
+ * Three of the twelve send sites await delivery because they report the outcome back to
+ * the user (an admin needs to know the password email went out). Awaiting the raw send
+ * meant those endpoints inherited the 15s provider timeout, so a Resend stall turned a
+ * 250ms request into a 15-second hang on a form (#3094).
+ *
+ * On timeout the send is NOT cancelled — it keeps running and its real outcome is
+ * logged. The caller just stops waiting and gets { pending: true }, so the honest answer
+ * is "we haven't heard back yet", never a fabricated success.
+ */
+async function sendMailBounded(opts, waitMs = INTERACTIVE_WAIT_MS) {
+  const PENDING = Symbol("pending");
+  let timer = null;
+  const inflight = sendMail(opts);
+  // Attach a handler now so a late rejection can never surface as an unhandled rejection
+  // after we've stopped awaiting it.
+  inflight.catch(() => {});
+  const winner = await Promise.race([
+    inflight,
+    new Promise((resolve) => { timer = setTimeout(() => resolve(PENDING), waitMs); }),
+  ]);
+  if (timer) clearTimeout(timer);
+  if (winner !== PENDING) return { ...winner, pending: false };
+
+  console.warn(`[mailer] send to ${opts && opts.to} exceeded ${waitMs}ms — responding pending; the send continues`);
+  inflight.then((r) => {
+    console.info(`[mailer] late send to ${opts && opts.to} settled: ok=${r.ok} transport=${r.transport}${r.error ? " error=" + r.error : ""}`);
+  }).catch(() => {});
+  return { ok: null, pending: true, transport: mailerStatus().transport, waitedMs: waitMs };
+}
+
 async function sendMail({ to, subject, html, text, link }) {
+  const startedAt = Date.now();
+  const done = (result) => {
+    const ms = Date.now() - startedAt;
+    // Latency is otherwise only visible under a benchmark; surface the slow ones in the
+    // same log an operator already reads for delivery failures.
+    if (ms >= SLOW_SEND_MS) console.warn(`[mailer] slow send to ${to}: ${ms}ms (transport ${result.transport})`);
+    return { ...result, ms };
+  };
+  return done(await _sendMailInner({ to, subject, html, text, link }));
+}
+
+async function _sendMailInner({ to, subject, html, text, link }) {
   // Provider chain: Resend (HTTP) → SMTP → dev outbox. On a provider failure the
   // result is reported honestly (ok:false + reason) — never silently swallowed.
   if (resendConfigured()) {
@@ -174,14 +229,20 @@ async function sendVerificationCodeEmail(to, name, code) {
   });
 }
 
-async function sendVerificationEmail(to, name, link) {
-  return sendMail({
+// Payload builder split out from the sender so a caller that needs a BOUNDED wait
+// (#3094) can reuse the exact same template instead of re-authoring the markup.
+function verificationEmailPayload(to, name, link) {
+  return {
     to, link,
     subject: `Confirm your email for ${BRAND}`,
     text: `Hi ${name || "there"}, confirm your email: ${link}`,
     html: shell("Confirm your email",
       `<p>Hi ${name || "there"}, please confirm this email address to finish securing your ${BRAND} account.</p>${button(link, "Confirm email")}`),
-  });
+  };
+}
+
+async function sendVerificationEmail(to, name, link) {
+  return sendMail(verificationEmailPayload(to, name, link));
 }
 
 async function sendPasswordResetEmail(to, name, link) {
@@ -228,11 +289,13 @@ async function sendPasswordChangedEmail(to, name) {
 
 module.exports = {
   sendMail,
+  sendMailBounded,
   smtpConfigured,
   resendConfigured,
   mailerConfigured,
   mailerStatus,
   sendVerificationEmail,
+  verificationEmailPayload,
   sendVerificationCodeEmail,
   sendPasswordResetEmail,
   sendNewSignInEmail,

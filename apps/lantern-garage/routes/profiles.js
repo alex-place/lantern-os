@@ -20,7 +20,7 @@ const {
 } = require("../lib/user-profiles");
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
 const { createToken } = require("../lib/auth-tokens");
-const { sendVerificationEmail } = require("../lib/mailer");
+const { sendMailBounded, verificationEmailPayload } = require("../lib/mailer");
 const { canonicalOrigin } = require("../lib/base-url");
 
 const ACCOUNT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -221,9 +221,12 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     updateProfile(userId, { pendingEmail: email });
     const token = createToken("verify_email", userId, email);
     const link = `${accountOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-    const r = await sendVerificationEmail(email, profile.name, link);
+    // Bounded wait (#3094): the pending-email state is already persisted above, so a
+    // slow provider must not hold this form. `delivery: "pending"` means the send is
+    // still in flight — the address change is unaffected either way.
+    const r = await sendMailBounded(verificationEmailPayload(email, profile.name, link));
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ ok: true, pending: email, delivery: r.transport }));
+    return res.end(JSON.stringify({ ok: true, pending: email, delivery: r.pending ? "pending" : r.transport }));
   }
 
   // POST /api/profiles/me/resend-verification — re-send the confirmation email to
@@ -237,9 +240,10 @@ module.exports = async function profileRoutes(req, res, url, deps) {
     if (!target) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ error: "no_email" })); }
     const token = createToken("verify_email", userId, profile.pendingEmail || null);
     const link = `${accountOrigin(req)}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
-    const r = await sendVerificationEmail(target, profile.name, link);
+    // Bounded wait (#3094) — same reasoning as change-email above.
+    const r = await sendMailBounded(verificationEmailPayload(target, profile.name, link));
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(JSON.stringify({ ok: true, sentTo: target, delivery: r.transport }));
+    return res.end(JSON.stringify({ ok: true, sentTo: target, delivery: r.pending ? "pending" : r.transport }));
   }
 
   // GET /api/profiles/:userId — Get any user's public profile (admin-only)
