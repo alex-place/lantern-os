@@ -118,6 +118,11 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const $ = (id) => document.getElementById(id);
   let profile = null;
+  // The SESSION role, which is what the server actually gates /api/accounts on
+  // (auth-middleware.isStaff → effectiveRole). The stored profile.role can diverge
+  // from it, so gating staff UI on the profile would show tooling to someone the
+  // server will refuse — or hide it from someone it would allow.
+  let sessionRole = null;
 
   async function api(url, opts) {
     try { const r = await fetch(url, Object.assign({ credentials: "same-origin", cache: "no-store" }, opts || {})); const body = await r.json().catch(() => null); return { ok: r.ok, status: r.status, body }; }
@@ -160,7 +165,12 @@
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
 
   async function load() {
-    profile = (await api("/api/profiles/me")).body || null;
+    const [prof, sess] = await Promise.all([
+      api("/api/profiles/me"),
+      api("/api/auth/session"),
+    ]);
+    profile = prof.body || null;
+    sessionRole = (sess.body && sess.body.role) || null;
     renderGeneral(); renderAccount(); renderBilling(); renderConnections();
   }
   function needSignIn(el, what) {
@@ -233,6 +243,22 @@
     if (profile.provider) ids.add(profile.provider);
     const banner = (!verified && profile.email) || pending
       ? `<div class="banner">${pending ? `Confirm <strong>${esc(pending)}</strong> to finish changing your email. ` : `Please confirm your email <strong>${esc(profile.email || "")}</strong>. `}<a href="#" id="a-resend">Resend link</a></div>` : "";
+    // Staff tooling was reachable only by typing the URL (#3095). URL-obscurity is not
+    // an access control — the server gates every /api/accounts route on isStaff — it
+    // just made the console hard to find for the people entitled to use it. Rendered
+    // from the session role, so a non-staff account never sees the markup at all.
+    function staffToolsHtml(role) {
+      const STAFF = ['admin', 'tech_support'];
+      if (!STAFF.includes(String(role || ''))) return '';
+      const rows = [
+        ['/accounts.html', 'Account Support', 'View and repair accounts, roles, and sign-in issues.'],
+        ...(role === 'admin' ? [['/admin-flags.html', 'Feature flags & nav', 'Toggle features and page visibility.']] : []),
+      ].map(([href, k, v]) =>
+        `<div class="row"><div class="rl"><div class="k">${k}</div><div class="v">${v}</div></div>` +
+        `<div class="rc"><a class="btn" href="${href}">Open</a></div></div>`).join('');
+      return `<div class="group-label">Staff tools</div>${rows}`;
+    }
+
     const provRows = Object.keys(PROV).map((p) => {
       const on = ids.has(p);
       return `<div class="row"><div class="rl"><div class="k">${PROV[p].emoji} ${PROV[p].label}</div></div><div class="rc">${on ? `<span class="pill ok">Connected</span>` : `<button class="btn" data-connect="${p}">Connect</button>`}</div></div>`;
@@ -247,7 +273,8 @@
       <div class="group-label">Sign-in methods</div>${provRows}
       <div class="group-label">Session</div>
       <div class="row"><div class="rl"><div class="k">Sign out</div><div class="v">End your session on this device.</div></div><div class="rc"><button class="btn" id="a-logout">Sign out</button></div></div>
-      <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>`;
+      <div class="row"><div class="rl"><div class="k" style="color:var(--red)">Delete account</div><div class="v">Permanently remove your account and data.</div></div><div class="rc"><button class="btn danger" id="a-delete">Delete…</button></div></div>
+      ${staffToolsHtml(sessionRole)}`;
     const r = $("a-resend"); if (r) r.onclick = async (e) => { e.preventDefault(); await api("/api/profiles/me/resend-verification", { method: "POST" }); e.target.textContent = "Sent ✓"; };
     $("a-email").onclick = () => openModal({
       title: "Change email", sub: "We'll email a confirmation link to the new address — the change applies once you click it.",

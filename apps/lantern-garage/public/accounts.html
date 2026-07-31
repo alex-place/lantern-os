@@ -95,6 +95,13 @@
     select.role-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
     select.role-select:disabled { opacity: 0.55; cursor: not-allowed; }
     select.role-select.saving { border-color: var(--accent); }
+    /* Comp marker under the role picker — deliberately quiet, but always present when
+       the tier was granted rather than bought. */
+    .grant-note {
+      margin-top: 4px; font-size: 0.68rem; color: var(--muted);
+      border-left: 2px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+      padding-left: 6px; cursor: help;
+    }
 
     /* Password cell */
     .pw-state { font-size: 0.8rem; color: var(--muted); }
@@ -280,6 +287,9 @@
 
   <script>
     const $ = (s) => document.querySelector(s);
+    // Roles that carry a purchasable plan — granting one by hand is a comp and needs
+    // a recorded reason (mirrors PAID_ROLES in routes/accounts.js).
+    const PAID_ROLES = ['deep_dreamer', 'pilot'];
     const ROLE_LABELS = {
       guest: 'Free', supporter: 'Free', deep_dreamer: 'Pro ($20)',
       founder: 'Pro ($20)', pilot: 'Pilot ($200)', tech_support: 'Tech Support', admin: 'Admin',
@@ -340,7 +350,14 @@
       const extra = VIEWER.assignableRoles.includes(acc.role) ? '' :
         `<option value="${esc(acc.role)}" selected>${esc(ROLE_LABELS[acc.role] || acc.role)}</option>`;
       const lockAdmin = (acc.role === 'admin' && !VIEWER.canGrantAdmin) ? ' disabled' : '';
-      return `<select class="role-select" data-id="${esc(acc.id)}" data-prev="${esc(acc.role)}"${lockAdmin}>${extra}${opts}</select>`;
+      // A comp is shown inline: without it, a hand-granted Pro is visually identical to
+      // a paying subscriber, which is exactly the confusion the provenance record exists
+      // to prevent.
+      const g = acc.manualGrant;
+      const grantNote = g
+        ? `<div class="grant-note" title="${esc(g.reason || '')}">comped by ${esc(g.by || 'staff')} · ${esc((g.at || '').slice(0, 10))}</div>`
+        : '';
+      return `<select class="role-select" data-id="${esc(acc.id)}" data-prev="${esc(acc.role)}"${lockAdmin}>${extra}${opts}</select>${grantNote}`;
     }
 
     function issuesCell(acc) {
@@ -426,11 +443,22 @@
       if (!sel) return;
       const id = sel.dataset.id, role = sel.value, prev = sel.dataset.prev;
       if (role === prev) return;
+      // Granting a paid tier by hand is a comp: the server requires a reason and
+      // records it on the account, so ask before sending rather than bouncing off a
+      // 400. Cancelling reverts the dropdown — no silent half-action.
+      let reason = '';
+      if (PAID_ROLES.includes(role)) {
+        reason = (prompt(
+          `Grant ${ROLE_LABELS[role] || role} to this account without a payment?\n\n` +
+          'Why? (recorded on the account so a later billing sync can tell a comp from a lapsed subscription)'
+        ) || '').trim();
+        if (!reason) { sel.value = prev; return; }
+      }
       sel.classList.add('saving'); sel.disabled = true;
-      const res = await api('POST', '/api/accounts/role', { id, role });
+      const res = await api('POST', '/api/accounts/role', { id, role, reason });
       sel.classList.remove('saving'); sel.disabled = false;
       if (res.ok) { replaceAccount(res.data.account); toast(`Role → ${ROLE_LABELS[role] || role}`); }
-      else { sel.value = prev; toast(res.data.error || 'Could not change role'); }
+      else { sel.value = prev; toast(res.data.detail || res.data.error || 'Could not change role'); }
     });
 
     $('#rows').addEventListener('click', async (e) => {
