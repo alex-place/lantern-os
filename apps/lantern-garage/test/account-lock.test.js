@@ -111,3 +111,24 @@ test("a missing account id is not lockable and does not block", () => {
   assert.strictEqual(r.acquired, true);
   assert.strictEqual(lock.holder(null), null);
 });
+
+test("the DEFAULT lock dir is machine-wide, NOT inside a checkout", () => {
+  // Regression: resolving the dir relative to __dirname gave each worktree its own
+  //   dev    -> C:\dev\lantern-os-dev\data\lantern-garage\trading\locks
+  //   stable -> C:\dev\lantern-os-stable\data\lantern-garage\trading\locks
+  // so neither server could see the other's lock and the collision it exists to stop
+  // would have gone right on happening, silently.
+  const saved = process.env.TRADER_LOCK_DIR;
+  try {
+    delete process.env.TRADER_LOCK_DIR;
+    delete require.cache[require.resolve("../lib/account-lock")];
+    const fresh = require("../lib/account-lock");
+    assert.strictEqual(fresh.LOCK_DIR, path.join(os.tmpdir(), "unisona-account-locks"));
+    // Must not sit under the repo, or two checkouts diverge again.
+    assert.ok(!/lantern-garage/.test(fresh.LOCK_DIR), "lock dir must not live in a checkout");
+    assert.ok(!fresh.LOCK_DIR.startsWith(path.resolve(__dirname, "..")), "lock dir must be outside the app tree");
+  } finally {
+    if (saved === undefined) delete process.env.TRADER_LOCK_DIR; else process.env.TRADER_LOCK_DIR = saved;
+    delete require.cache[require.resolve("../lib/account-lock")];
+  }
+});
