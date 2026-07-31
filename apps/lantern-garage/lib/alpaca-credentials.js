@@ -16,6 +16,7 @@
  */
 
 const crypto = require('crypto');
+const { resolveSessionSecret } = require('./session-secret');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,8 +29,11 @@ const DIR = process.env.ALPACA_CRED_DIR
 
 function _key() {
   // Reuse the IBKR/session secret chain so operators configure one key, not three.
-  const secret = process.env.ALPACA_CRED_KEY || process.env.IBKR_CRED_KEY || process.env.SESSION_SECRET
-    || 'lantern-local-dev-secret-change-in-prod';
+  // The literal tail is gone: it is published in this repo, so a deploy without any of
+  // these env vars encrypted brokerage credentials under a key anyone can read (#3101
+  // class). resolveSessionSecret fails closed beyond loopback and returns that same dev
+  // default on loopback, so existing dev-encrypted files still decrypt.
+  const secret = process.env.ALPACA_CRED_KEY || process.env.IBKR_CRED_KEY || resolveSessionSecret();
   return crypto.scryptSync(secret, 'alpaca-cred-v1', 32);
 }
 function _encrypt(obj) {

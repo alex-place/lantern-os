@@ -8,13 +8,22 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { resolveSessionSecret } = require("./session-secret");
 
 const DIR = process.env.KEYSTONE_INDEED_DIR
   || path.join(__dirname, "..", "..", "..", "data", "indeed");
 const TOK_DIR = path.join(DIR, "tokens");
 
 function _key() {
-  const secret = process.env.SESSION_SECRET || "lantern-indeed-token-key";
+  // At-rest key for stored Indeed OAuth tokens. Same defect as ibkr-credentials.js:
+  // the old literal is public in this repo, so a deploy without SESSION_SECRET
+  // encrypted tokens under a key anyone can read. resolveSessionSecret fails closed.
+  //
+  // NOT migration-safe, unlike the IBKR one: the removed literal differs from the dev
+  // default, so a dev box that had no SESSION_SECRET can no longer decrypt tokens it
+  // stored earlier — _dec throws and the user reconnects Indeed. Prod sets
+  // SESSION_SECRET, so its key is unchanged.
+  const secret = resolveSessionSecret();
   return crypto.createHash("sha256").update(String(secret)).digest(); // 32 bytes
 }
 function _enc(obj) {
