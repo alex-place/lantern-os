@@ -4,10 +4,27 @@ Operational record of the live single-tenant cloud deployment of `master` on Goo
 Compute Engine, fronted by Cloudflare. This is the first concrete instance of the
 [ADR-0018](../adr/0018-web-tier-split-and-cloud-multi-tenancy.md) GCE origin decision.
 
-> **Status: manual deploy, no CI/CD.** The VM is a one-time `git clone`; merges to
-> `master` do **not** reach it automatically. Update it with the steps in
-> [Updating the running app](#updating-the-running-app). Provider secrets live in
-> systemd drop-ins on the box, never in the repo.
+> **Status: release-gated self-update.** The VM does **not** track `master` — merges
+> alone never reach it. It moves when a **GitHub Release is published**: a
+> `systemd` timer polls `releases/latest` every 15 minutes, checks out the new tag,
+> reinstalls deps and restarts `lantern.service`. So shipping a change to prod
+> means cutting a release (`/release`), not merging. See
+> [`ops/gce/README.md`](../../ops/gce/README.md) for the mechanism and
+> [Updating the running app](#updating-the-running-app) for the manual override.
+>
+> Provider secrets live in systemd drop-ins on the box, never in the repo, and are
+> untouched by the tag checkout.
+>
+> Verified on the box 2026-07-31: `lantern-release-deploy.timer` is `enabled` +
+> `active` (15-minute cadence), and a forced run rolled prod v1.14.0 → v1.14.1.
+> (This block previously read "manual deploy, no CI/CD … one-time git clone",
+> which contradicted `ops/gce/README.md` and is what #3119 flagged.)
+
+**Force a deploy now** instead of waiting for the timer:
+
+```bash
+gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48   --command="sudo systemctl start lantern-release-deploy.service"
+```
 
 ## What's running
 
