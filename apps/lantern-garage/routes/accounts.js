@@ -8,7 +8,7 @@
  * are privilege- or lockout-sensitive).
  *
  *   GET  /api/accounts                  → { accounts[], archived[], viewer }
- *   POST /api/accounts/role             → { id, role }              set a role
+ *   POST /api/accounts/role             → { id, role, reason? }     set a role (reason REQUIRED to grant a paid tier)
  *   POST /api/accounts/reconcile        → { id }                    re-apply owner/admin override monotonically
  *   POST /api/accounts/update           → { id, name?, email? }     edit name / email (email change ⇒ admin)
  *   POST /api/accounts/set-password     → { id, password?, email? } set a password, optionally email the user
@@ -60,6 +60,11 @@ const MIN_PASSWORD = 8;
 // Roles an operator may assign from the console. `founder` is a legacy alias and is
 // intentionally omitted from the picker (deep_dreamer is its canonical name).
 const ASSIGNABLE_ROLES = ["guest", "supporter", "deep_dreamer", "pilot", "tech_support", "admin"];
+
+// Roles that carry a PURCHASABLE plan (see lib/plan-matrix ROLE_TO_PLAN). Granting one
+// by hand is a comp and must be justified + recorded; staff roles are not comps, and
+// guest/supporter sit at the Free floor so they need no explanation.
+const PAID_ROLES = ["deep_dreamer", "pilot"];
 
 function actorOf(req) {
   return getSessionUserId(req) || "local-owner";
@@ -135,6 +140,10 @@ function toAccountView(p) {
     archived: p.deleted === true,
     archivedAt: p.deletedAt || null,
     createdAt: (p.metadata && p.metadata.createdAt) || null,
+    // Provenance for a hand-granted paid tier (#3095) — null for purchased or free
+    // accounts. Surfaced so an operator can tell a comp from a paid subscription at a
+    // glance, which is the whole point of recording it.
+    manualGrant: p.manualGrant || null,
   };
   view.providers = providersOf({ ...p, hasPassword });
   view.issues = issuesOf({ ...p, hasPassword }, view.providers);
@@ -204,14 +213,34 @@ module.exports = async function accountsRoutes(req, res, url, deps) {
       sendJson(res, { error: "admin_role_requires_admin", detail: "Only an admin can grant or change the admin role." }, 403);
       return true;
     }
+    // A staff-granted paid tier must be DISTINGUISHABLE from a purchased one (#3095).
+    // Without provenance, a comp is indistinguishable from a Stripe/Patreon upgrade
+    // after the fact — so a later billing reconcile can't tell "this user never paid,
+    // leave them alone" from "this user's subscription lapsed, downgrade them", and
+    // silently revokes a comp the operator meant to keep.
+    const reason = String(body.reason || "").trim().slice(0, 200);
+    const becomesPaid = PAID_ROLES.includes(role);
+    if (becomesPaid && !reason) {
+      // Required, not optional: an unexplained comp is exactly the record that is
+      // useless six months later when someone asks why this account is free.
+      sendJson(res, { error: "reason_required", detail: "Granting a paid tier by hand needs a reason (it is recorded on the account)." }, 400);
+      return true;
+    }
     const updated = setUserRole(target.id, role);
+    // Stamp or clear the grant. Dropping back to a non-paid role clears it, so a
+    // revoked comp doesn't leave a stale record claiming the account is comped.
+    updateProfile(target.id, {
+      manualGrant: becomesPaid
+        ? { role, reason, by: actorOf(req), at: new Date().toISOString() }
+        : null,
+    });
     // Invalidate the target's live sessions so a revoked/downgraded role takes effect
     // now — otherwise a demoted admin keeps isAdmin/isStaff until their session expires
     // (disk-persisted across restarts), the exact gap #2627 flags. They re-auth into the
     // new role. A no-op when they have no active session.
     const killedSessions = destroyUserSessions(SESSION_DIR, target.id);
-    audit(req, "set_role", target.id, { from: target.role, to: role, sessionsInvalidated: killedSessions });
-    sendJson(res, { ok: true, account: toAccountView(updated), sessionsInvalidated: killedSessions });
+    audit(req, "set_role", target.id, { from: target.role, to: role, reason: reason || null, sessionsInvalidated: killedSessions });
+    sendJson(res, { ok: true, account: toAccountView(getProfile(target.id)), sessionsInvalidated: killedSessions });
     return true;
   }
 
