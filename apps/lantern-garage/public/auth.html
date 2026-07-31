@@ -693,8 +693,16 @@
       });
       const data = await r.json().catch(() => ({}));
       if (r.ok && data.ok) {
+        // Drop the user into LOGIN mode with the address prefilled. Without this the
+        // card returns still in "Create account" mode holding the signup fields, so
+        // the next thing they see invites them to register the account they just
+        // confirmed. (The old link flow did this from its "I've confirmed" button.)
         showSigninScreen();
+        setLocalMode("login");
+        if (verifyEmail) document.getElementById("local-email").value = verifyEmail;
+        document.getElementById("local-error").textContent = "";
         showNotice("Email confirmed — you can sign in now.");
+        document.getElementById("local-password").focus();
         return;
       }
       if (data.error === "code_locked") say("Too many incorrect attempts. Use “Send a new code” to get a fresh one.");
