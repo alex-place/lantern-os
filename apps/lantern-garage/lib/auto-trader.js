@@ -9,7 +9,11 @@ const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
 // MEASURE the autopilot's realized edge (win-rate / P&L) against the backtest,
 // instead of eyeballing it. Resolved relative to this module so it's found
 // regardless of the server's cwd (same reason as the credential store).
-const TRADES_LOG = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+// TRADER_TRADES_LOG / TRADER_STATE_FILE override the paths so a test can exercise the
+// real append + reconciliation without writing into the operator's live ledger.
+const TRADES_LOG = process.env.TRADER_TRADES_LOG
+  ? path.resolve(process.env.TRADER_TRADES_LOG)
+  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
 function logTrade(rec) {
   try {
     fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
@@ -162,6 +166,16 @@ const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
+// sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
+// This is what makes an EXTERNAL close (a resting protective stop filling, a manual
+// flatten, another engine) reconstructable: when the position vanishes from the book
+// without an autopilot exit of our own, this is the only record of what we held and
+// where it was marked. Persisted, so an overnight stop-out is still landed at boot.
+const _lastPos = new Map();
+// A broker status meaning our own exit actually went through — used to avoid
+// double-logging a symbol the external-close sweep also sees leave the book.
+const CONFIRMED_EXIT = /^(placed|filled|submitted)$/i;
+function _round2(n) { return Math.round(n * 100) / 100; }
 
 // An exit whose broker result is non-terminal: the order is resting, queued, or awaiting
 // manual confirmation and has NOT reduced the position. While one is outstanding for a
@@ -179,7 +193,9 @@ function _isExitInFlight(status) {
 // so the trailing stop silently measures from a lower peak and lets a winner give
 // back a full leg before firing (the SOXS "+35% peak → gave back $3k, no exit" bug —
 // the box had been restarted repeatedly). Snapshot to disk each scan; reload at boot.
-const STATE_FILE = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
+const STATE_FILE = process.env.TRADER_STATE_FILE
+  ? path.resolve(process.env.TRADER_STATE_FILE)
+  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
 function _saveState() {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
@@ -190,6 +206,7 @@ function _saveState() {
       exitStatus: Object.fromEntries(_exitStatus),
       lastOrderAt: Object.fromEntries(_lastOrderAt),
       dirStreak: Object.fromEntries(_dirStreak),
+      lastPos: Object.fromEntries(_lastPos),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -203,6 +220,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.exitStatus || {})) _exitStatus.set(k, v);
     for (const [k, v] of Object.entries(o.lastOrderAt || {})) _lastOrderAt.set(k, v);
     for (const [k, v] of Object.entries(o.dirStreak || {})) _dirStreak.set(k, v);
+    for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -391,6 +409,50 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+  // Snapshot every long we can still see, so a position that VANISHES before the next
+  // scan can be reconstructed into the ledger (see the external-close sweep below).
+  for (const [k, p] of Object.entries(heldPos)) {
+    if (!(Number(heldQty[k]) > 0)) continue;
+    _lastPos.set(k, {
+      qty: Number(p.qty) || 0,
+      entry: p.avg_entry_price ?? p.avg_fill_price ?? null,
+      mark: p.current_price ?? null,
+      ts: now,
+    });
+  }
+
+  // ── External-close sweep: THE LOSS PATH ────────────────────────────────────────
+  // Only a symbol the autopilot itself decided to exit was ever reconciled below, so
+  // a position closed by anything ELSE left no ledger row at all. The dominant such
+  // path is the resting protective STOP filling — i.e. every stop-out, i.e. the
+  // losses. Wins exit by an autopilot decision and get logged; losses exit at the
+  // broker and did not. That asymmetry is why the scorecard read 100% win rate.
+  //
+  // So: any symbol we last saw held that is now off the book, with no CONFIRMED exit
+  // of our own, is logged as a reconstructed exit. The P&L is computed from the last
+  // observed mark, NOT a broker fill (the facade exposes no fills API) — so the row
+  // is marked status:'reconstructed' + estimated:true and is deliberately excluded
+  // from the scorecard's `confirmed` view. An estimate that is labelled beats a loss
+  // that is silently dropped.
+  for (const sym of [..._lastPos.keys()]) {
+    if (Number(heldQty[sym]) > 0) continue;           // still held → nothing to reconcile
+    if (exclude.has(sym)) { _lastPos.delete(sym); continue; }  // another engine owns it
+    const snap = _lastPos.get(sym) || {};
+    _lastPos.delete(sym);
+    // Our own exit already produced a row — don't double-count it.
+    if (CONFIRMED_EXIT.test(String(_exitStatus.get(sym) || ''))) continue;
+    const entry = Number(snap.entry);
+    const mark = Number(snap.mark);
+    const qty = Number(snap.qty);
+    if (!(qty > 0) || !Number.isFinite(entry) || !Number.isFinite(mark)) continue;  // can't value it → don't invent a number
+    const pnl = _round2((mark - entry) * qty);
+    logTrade({
+      event: 'exit', symbol: sym, qty, entry, exit: mark,
+      pnl, pnl_pct: entry > 0 ? ((mark - entry) / entry) * 100 : null,
+      reason: 'closed_externally (position left the book with no autopilot exit — protective stop, manual close, or another engine)',
+      status: 'reconstructed', estimated: true,
+    });
+  }
 
   // Fetch the account's working orders ONCE. Two uses: (1) re-protect naked longs, and
   // (2) the OVERSELL GUARD — a Set of symbols that already have a resting NON-stop SELL
@@ -655,6 +717,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _saveState(); }
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
