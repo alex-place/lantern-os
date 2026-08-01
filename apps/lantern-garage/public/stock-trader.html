@@ -3116,35 +3116,9 @@ function selectChart(t, ev){
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
 
-  // Track clicks for double-click detection
-  const now = Date.now();
-  if(!_chartClickTracker) _chartClickTracker = {};
-  if(!_chartClickTracker[t]) _chartClickTracker[t] = [];
-
-  // Remove clicks older than 350ms
-  _chartClickTracker[t] = _chartClickTracker[t].filter(time => now - time < 350);
-  _chartClickTracker[t].push(now);
-
-  // If 2 clicks within 350ms on the same chart, reset zoom instead of opening fullscreen
-  if(_chartClickTracker[t].length >= 2){
-    const card = document.getElementById('card-'+t);
-    if(card){
-      const ladderEl = card.querySelector('.zone-ladder');
-      if(ladderEl){
-        const target = _ladderTarget(ladderEl);
-        if(target){
-          const { viewKey } = target;
-          const view = chartView[viewKey];
-          if(view){
-            if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-            view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-            view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
-          }
-          renderTicker(t);
-        }
-      }
-    }
-    _chartClickTracker[t] = []; // Reset click tracker
+  // Check if this is a double-click (skip fullscreen if so)
+  if(window._skipFullscreen === t){
+    window._skipFullscreen = null;
     return;
   }
 
@@ -3540,6 +3514,56 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
+
+// Track clicks to detect double-clicks and prevent fullscreen
+const _clickTracker = {};
+function attachDoubleClickSkip(){
+  document.addEventListener('mousedown', function(e){
+    const ladder = e.target.closest('.zone-ladder');
+    if(!ladder) return;
+
+    const target = _ladderTarget(ladder);
+    if(!target) return;
+
+    const { dataTicker } = target;
+    const now = Date.now();
+
+    if(!_clickTracker[dataTicker]) _clickTracker[dataTicker] = { count: 0, time: 0 };
+
+    // If last click was within 300ms, this is a double-click
+    if(now - _clickTracker[dataTicker].time < 300){
+      _clickTracker[dataTicker].count++;
+      _clickTracker[dataTicker].time = now;
+
+      // On second click (double-click), set flag and reset zoom
+      if(_clickTracker[dataTicker].count === 2){
+        window._skipFullscreen = dataTicker;
+
+        const card = document.getElementById('card-'+dataTicker);
+        if(card){
+          const ladderEl = card.querySelector('.zone-ladder');
+          if(ladderEl){
+            const tgt = _ladderTarget(ladderEl);
+            if(tgt){
+              const { viewKey } = tgt;
+              const view = chartView[viewKey];
+              if(view){
+                if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+                view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+                view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+              }
+              renderTicker(dataTicker);
+            }
+          }
+        }
+      }
+    } else {
+      _clickTracker[dataTicker].count = 1;
+      _clickTracker[dataTicker].time = now;
+    }
+  }, true);
+}
+setTimeout(attachDoubleClickSkip, 500);
 
 // Attach click handlers to all canvas elements for axis resets
 function attachAxisClickHandlers(){
