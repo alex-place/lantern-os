@@ -307,11 +307,11 @@
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
      viewport height instead of a fixed 352px, so charts stay usable on tablets,
      portrait screens, and desktops with the chat rail open. */
-  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;grid-auto-rows:clamp(260px,38vh,400px)}
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;grid-auto-rows:auto}
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
+  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer;aspect-ratio:1/1}
   /* #2433: hover lift — the deck responds to the pointer like the site's chips do. */
   .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover);transform:translateY(-2px)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
@@ -332,7 +332,7 @@
      space below, and no chart bleeding under the footer. Rows/cols set in JS. */
   .main.main-fixed{overflow:hidden}
   .cards-grid.grid-fixed{height:100%;gap:8px}
-  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1}
+  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1;aspect-ratio:auto}
   .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
   /* Drag-to-reorder chart slots (multi-chart layouts) */
   .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
@@ -879,7 +879,7 @@
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
-  <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
+  <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
     <option value="0">⊞ All</option>
@@ -1051,7 +1051,7 @@
 </div>
 
 <!-- Fullscreen ticker chart -->
-<div class="fs-bg hidden" id="fsBg" onclick="if(event.target===this)closeFullscreenChart()">
+<div class="fs-bg hidden" id="fsBg" onclick="if(event.target===this)setSlotCount(0)">
   <div class="fs-chart">
     <div class="fs-header">
       <span class="fs-ticker" id="fsTicker">—</span>
@@ -1088,7 +1088,7 @@
         <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')" title="Open a buy order ticket for this symbol (paper trade)">BUY</button>
         <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')" title="Open a sell order ticket for this symbol (paper trade)">SELL</button>
       </div>
-      <span class="fs-close" onclick="closeFullscreenChart()">✕ Close</span>
+      <span class="fs-close" onclick="setSlotCount(0)">✕ Close</span>
     </div>
     <div class="fs-body">
       <div class="zone-ladder" id="ladder-fs">
@@ -1271,6 +1271,26 @@ const TICK_SIZE = 0.01;
 // height reserved for time labels. Shared by renderChart() and the
 // wheel/drag handlers so hit-testing matches what's actually drawn.
 const AXIS_W = 52, AXIS_H = 16;
+// Price axis consistency (#3141): every chart renders EXACTLY this many
+// gridline intervals. The rendered range is snapped outward to clean 1/2/5
+// step boundaries (see _snapPriceRange), so labels always land on
+// .00/.10/.20/.50-style values and the count never varies chart-to-chart
+// or while zooming.
+const PRICE_AXIS_INTERVALS = 6;
+function _snapPriceRange(min, max){
+  const K = PRICE_AXIS_INTERVALS, R = max - min;
+  if(!(R > 0) || !isFinite(R)) return [min, max];
+  let mag = Math.pow(10, Math.floor(Math.log10(R/K)));
+  for(let guard = 0; guard < 12; guard++, mag *= 10){
+    for(const L of [1, 2, 5]){
+      const step = L * mag;
+      if(step * K < R) continue;                       // window too small to cover
+      const lo = Math.floor(min/step) * step;
+      if(lo + K*step >= max - step*1e-9) return [lo, lo + K*step];
+    }
+  }
+  return [min, max];
+}
 const MIN_VISIBLE_BARS = 10;
 
 // TradingView-style chart colors (canvas can't read CSS custom properties,
@@ -1485,9 +1505,11 @@ function niceTicks(min, max, targetCount){
   const rawStep = range / Math.max(1, targetCount);
   const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const norm = rawStep / mag;
-  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  // 1/2/5 ladder only (no 2.5 rung): every label lands on a clean
+  // .00/.10/.20/.50-style value, never .25/.75.
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
   const ticks = [];
-  for(let v = Math.ceil(min/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
+  for(let v = Math.ceil((min - step*1e-6)/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
   return { ticks, step };
 }
 // Decimals needed to render `step` exactly (2.5→1, 0.25→2, 5→0), capped at 6.
@@ -1608,16 +1630,14 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: nice-number gridlines across the plot + labels in the right
-  // gutter. Tick count scales with plot height (~one per 38px) so even the small
-  // cards get 3-5 gridlines, and the fullscreen / price-zoomed chart get more —
-  // the count naturally grows/shrinks as the price scale is zoomed. Labels show
-  // at least cents (2 dp), e.g. 380.50 / 381.00, and more decimals only when the
-  // step is sub-cent.
+  // Price axis, TradingView-style: fit nice 1/2/5-ladder ticks inside the
+  // visible range (labels only ever land on clean .00/.10/.20/.50 values).
+  // The DEFAULT auto-fit range is pre-snapped to step boundaries upstream
+  // (_snapPriceRange), so every chart enters with the same 7 labels; once
+  // the user zooms, ticks re-fit naturally and the count may vary.
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const priceTargetTicks = Math.max(4, Math.min(16, Math.round(ph / 30)));
-  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, priceTargetTicks);
+  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, PRICE_AXIS_INTERVALS);
   const priceDec = Math.max(2, decimalsFor(priceStep));
   for(const price of priceTicks){
     if(price < rMin || price > rMax) continue;
@@ -1996,6 +2016,11 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     }
     const pad = (hi - lo) * 0.08 || hi * 0.001;   // breathing room top/bottom
     rMin = lo - pad; rMax = hi + pad;
+    // Default (auto-fit) view only: snap the range outward to clean 1/2/5
+    // step boundaries so every chart ENTERS with the same 7 evenly-spaced
+    // labels (#3141). Zoomed/panned ranges are left alone — the axis then
+    // re-fits ticks TradingView-style.
+    [rMin, rMax] = _snapPriceRange(rMin, rMax);
   }
   const rng = rMax - rMin; if(rng<=0) return;
   view.lastRMin = rMin; view.lastRMax = rMax;
@@ -2029,9 +2054,6 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
-    html += `<div style="position:absolute;right:0;width:62px;top:${pct(z.mid)};transform:translateY(-50%);
-      font-family:var(--mono);font-size:10px;line-height:1.3;padding:1px 3px;white-space:nowrap;
-      color:${sup?'rgba(0,212,170,.85)':'rgba(255,95,109,.85)'}">${sup?'S':'R'} ${z.strength||'?'} · ${z.touches||'?'}T</div>`;
   }
   } // end patternPrefs.zones (S/R bands)
 
@@ -2186,16 +2208,12 @@ function buildCard(ticker, d){
   if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
 
   let watchHtml = '';
-  if(state==='watching'){
-    const near = (d.zones||[])[0];
-    if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-  }
 
   const badge = regimeBadgeInfo(ticker, state);
   const emph = emphasisAttrs(dir, conf);
 
   return `
-<div class="card state-${state}${activeTicker===ticker?' active':''}" id="card-${ticker}" data-ticker="${ticker}" onclick="selectChart('${ticker}', event)">
+<div class="card state-${state}" id="card-${ticker}" data-ticker="${ticker}" onclick="selectChart('${ticker}', event)">
   <div class="card-header">
     <div style="display:flex;align-items:center;gap:8px">
       ${slotCount ? `<span class="drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder ${ticker}">⠿</span>` : ''}<span class="card-ticker" role="button" tabindex="0" aria-label="Change symbol, currently ${ticker}" onclick="editSlot('${ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editSlot('${ticker}')}" title="Click to change symbol">${ticker}</span><span id="pnl-${ticker}">${pnlHtml}</span>
@@ -2206,7 +2224,7 @@ function buildCard(ticker, d){
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
-  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}${watchHtml}</div>
+  <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
@@ -2261,12 +2279,7 @@ function updateCardMeta(ticker, d){
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
     const confHtml = sigBadge(d);
-    let watchHtml = '';
-    if(state==='watching'){
-      const near = (d.zones||[])[0];
-      if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-    }
-    metaEl.innerHTML = confHtml + patternChipHtml(sig) + watchHtml;
+    metaEl.innerHTML = confHtml;
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
@@ -2364,9 +2377,11 @@ function buildLayoutOptions(){
   // Migrate phones off a persisted "All" (slotCount 0) — that option is retired
   // there, and existing users would otherwise land on a value the select no
   // longer offers. Default to 1 full-size chart.
-  if(phone && !slotCount) setSlotCount(1);
-  if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
-  else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
+  // DISABLED: Prevent automatic fullscreen zoom on narrow screens
+  // if(phone && !slotCount) setSlotCount(1);
+  // DISABLED: Prevent automatic layout changes that trigger fullscreen zoom
+  // if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
+  // else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
   sel.value = String(slotCount);
 }
 
@@ -2418,22 +2433,135 @@ function onSymSearchInput(){ clearTimeout(_symDebounce); _symDebounce=setTimeout
 // Popular symbols shown when the search box is empty (the backend returns nothing
 // for an empty query), so the "Add symbol" popup shows clickable tickers on open
 // instead of "No matching symbols". Filtered by the active class chip. #sym-defaults
+// Curated browsable universe for the symbol-search popup. Shown on an EMPTY
+// query so the popup opens on something useful and scrollable — the server's
+// empty-query fallback returns arbitrary tickers (HVMCW, HVIIU...), which is
+// unbrowsable. Typing still queries the broker's full asset universe.
 const SYM_POPULAR = [
-  { symbol:'SPY',   name:'SPDR S&P 500 ETF',      class:'us_equity', exchange:'NYSEArca'  },
-  { symbol:'QQQ',   name:'Invesco QQQ Trust',     class:'us_equity', exchange:'NasdaqGM'  },
-  { symbol:'AAPL',  name:'Apple Inc.',            class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'NVDA',  name:'NVIDIA Corporation',    class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'TSLA',  name:'Tesla, Inc.',           class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'MSFT',  name:'Microsoft Corporation', class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'AMZN',  name:'Amazon.com, Inc.',      class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'META',  name:'Meta Platforms, Inc.',  class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'GOOGL', name:'Alphabet Inc.',         class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'AMD',   name:'Advanced Micro Devices',class:'us_equity', exchange:'NasdaqGS'  },
-  { symbol:'BTCUSD',name:'Bitcoin',               class:'crypto',    exchange:'CRYPTO'    },
-  { symbol:'ETHUSD',name:'Ethereum',              class:'crypto',    exchange:'CRYPTO'    },
-  { symbol:'SOLUSD',name:'Solana',                class:'crypto',    exchange:'CRYPTO'    },
-  { symbol:'XRPUSD',name:'XRP',                   class:'crypto',    exchange:'CRYPTO'    },
-  { symbol:'DOGEUSD',name:'Dogecoin',             class:'crypto',    exchange:'CRYPTO'    },
+  { symbol:'AAPL', name:'Apple Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'MSFT', name:'Microsoft Corporation', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'NVDA', name:'NVIDIA Corporation', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'AMZN', name:'Amazon.com, Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'GOOGL', name:'Alphabet Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'META', name:'Meta Platforms, Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'TSLA', name:'Tesla, Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'AVGO', name:'Broadcom Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'AMD', name:'Advanced Micro Devices', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'NFLX', name:'Netflix, Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'COST', name:'Costco Wholesale', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'ADBE', name:'Adobe Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'INTC', name:'Intel Corporation', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'CSCO', name:'Cisco Systems', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'QCOM', name:'QUALCOMM', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'TXN', name:'Texas Instruments', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'AMAT', name:'Applied Materials', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'MU', name:'Micron Technology', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'PLTR', name:'Palantir Technologies', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'SHOP', name:'Shopify Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'ASML', name:'ASML Holding', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'ARM', name:'Arm Holdings', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'SMCI', name:'Super Micro Computer', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'MRVL', name:'Marvell Technology', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'PANW', name:'Palo Alto Networks', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'CRWD', name:'CrowdStrike Holdings', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'SNOW', name:'Snowflake Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'UBER', name:'Uber Technologies', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'ABNB', name:'Airbnb, Inc.', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'COIN', name:'Coinbase Global', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'MSTR', name:'MicroStrategy', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'SOFI', name:'SoFi Technologies', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'RIVN', name:'Rivian Automotive', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'LCID', name:'Lucid Group', class:'us_equity', exchange:'NasdaqGS' },
+  { symbol:'JPM', name:'JPMorgan Chase', class:'us_equity', exchange:'NYSE' },
+  { symbol:'BAC', name:'Bank of America', class:'us_equity', exchange:'NYSE' },
+  { symbol:'WFC', name:'Wells Fargo', class:'us_equity', exchange:'NYSE' },
+  { symbol:'GS', name:'Goldman Sachs', class:'us_equity', exchange:'NYSE' },
+  { symbol:'MS', name:'Morgan Stanley', class:'us_equity', exchange:'NYSE' },
+  { symbol:'V', name:'Visa Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'MA', name:'Mastercard', class:'us_equity', exchange:'NYSE' },
+  { symbol:'UNH', name:'UnitedHealth Group', class:'us_equity', exchange:'NYSE' },
+  { symbol:'JNJ', name:'Johnson and Johnson', class:'us_equity', exchange:'NYSE' },
+  { symbol:'LLY', name:'Eli Lilly', class:'us_equity', exchange:'NYSE' },
+  { symbol:'PFE', name:'Pfizer Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'MRK', name:'Merck and Co.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'ABBV', name:'AbbVie Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'XOM', name:'Exxon Mobil', class:'us_equity', exchange:'NYSE' },
+  { symbol:'CVX', name:'Chevron Corporation', class:'us_equity', exchange:'NYSE' },
+  { symbol:'WMT', name:'Walmart Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'HD', name:'Home Depot', class:'us_equity', exchange:'NYSE' },
+  { symbol:'PG', name:'Procter and Gamble', class:'us_equity', exchange:'NYSE' },
+  { symbol:'KO', name:'Coca-Cola Company', class:'us_equity', exchange:'NYSE' },
+  { symbol:'PEP', name:'PepsiCo, Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'MCD', name:'McDonalds Corporation', class:'us_equity', exchange:'NYSE' },
+  { symbol:'NKE', name:'NIKE, Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'DIS', name:'Walt Disney Company', class:'us_equity', exchange:'NYSE' },
+  { symbol:'BA', name:'Boeing Company', class:'us_equity', exchange:'NYSE' },
+  { symbol:'CAT', name:'Caterpillar Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'GE', name:'GE Aerospace', class:'us_equity', exchange:'NYSE' },
+  { symbol:'F', name:'Ford Motor Company', class:'us_equity', exchange:'NYSE' },
+  { symbol:'GM', name:'General Motors', class:'us_equity', exchange:'NYSE' },
+  { symbol:'T', name:'AT and T Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'VZ', name:'Verizon Communications', class:'us_equity', exchange:'NYSE' },
+  { symbol:'PYPL', name:'PayPal Holdings', class:'us_equity', exchange:'NYSE' },
+  { symbol:'C', name:'Citigroup Inc.', class:'us_equity', exchange:'NYSE' },
+  { symbol:'SPY', name:'SPDR S&P 500 ETF', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'QQQ', name:'Invesco QQQ Trust', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'IWM', name:'iShares Russell 2000 ETF', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'DIA', name:'SPDR Dow Jones Industrial', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'VOO', name:'Vanguard S&P 500 ETF', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'VTI', name:'Vanguard Total Stock Market', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'GLD', name:'SPDR Gold Shares', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SLV', name:'iShares Silver Trust', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'TLT', name:'iShares 20+ Year Treasury', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'IEF', name:'iShares 7-10 Year Treasury', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'HYG', name:'iShares High Yield Corp', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'EFA', name:'iShares MSCI EAFE ETF', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'EEM', name:'iShares MSCI Emerging Mkts', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SMH', name:'VanEck Semiconductor ETF', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'SOXX', name:'iShares Semiconductor ETF', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'XLK', name:'Technology Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLF', name:'Financial Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLE', name:'Energy Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLV', name:'Health Care Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLI', name:'Industrial Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLY', name:'Consumer Discretionary Sel', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLP', name:'Consumer Staples Select', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLU', name:'Utilities Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLB', name:'Materials Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLRE', name:'Real Estate Select Sector', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XLC', name:'Communication Svcs Select', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SPMO', name:'Invesco S&P 500 Momentum', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'XMMO', name:'Invesco S&P MidCap Momentum', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'ARKK', name:'ARK Innovation ETF', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'VXX', name:'iPath Series B VIX Futures', class:'us_equity', exchange:'BATS' },
+  { symbol:'TQQQ', name:'ProShares UltraPro QQQ', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'SQQQ', name:'ProShares UltraPro Short QQQ', class:'us_equity', exchange:'NasdaqGM' },
+  { symbol:'SOXL', name:'Direxion Semis Bull 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SOXS', name:'Direxion Semis Bear 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SPXL', name:'Direxion S&P 500 Bull 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SPXS', name:'Direxion S&P 500 Bear 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'TNA', name:'Direxion Small Cap Bull 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'TZA', name:'Direxion Small Cap Bear 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SSO', name:'ProShares Ultra S&P500', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SDS', name:'ProShares UltraShort S&P500', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'QLD', name:'ProShares Ultra QQQ', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'SH', name:'ProShares Short S&P500', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'UPRO', name:'ProShares UltraPro S&P500', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'LABU', name:'Direxion Biotech Bull 3X', class:'us_equity', exchange:'NYSEArca' },
+  { symbol:'BTCUSD', name:'Bitcoin', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'ETHUSD', name:'Ethereum', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'SOLUSD', name:'Solana', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'XRPUSD', name:'XRP', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'DOGEUSD', name:'Dogecoin', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'LTCUSD', name:'Litecoin', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'ADAUSD', name:'Cardano', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'AVAXUSD', name:'Avalanche', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'LINKUSD', name:'Chainlink', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'DOTUSD', name:'Polkadot', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'UNIUSD', name:'Uniswap', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'AAVEUSD', name:'Aave', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'BCHUSD', name:'Bitcoin Cash', class:'crypto', exchange:'CRYPTO' },
+  { symbol:'SHIBUSD', name:'Shiba Inu', class:'crypto', exchange:'CRYPTO' },
 ];
 async function runSymSearch(q){
   const query = (q||'').trim();
@@ -2441,12 +2569,12 @@ async function runSymSearch(q){
   // Empty box → curated popular list (filtered by class chip), so the popup is
   // never blank / "No matching symbols" on open.
   if(!query){
-    _symRows = SYM_POPULAR.filter(a => !_symClass || a.class===_symClass).slice(0,40);
+    _symRows = SYM_POPULAR.filter(a => !_symClass || a.class===_symClass);   // full set — the list scrolls
     _symSel = 0; renderSymResults();
     return;
   }
   try{
-    const url='/api/trading/symbols/search?limit=40&q='+encodeURIComponent(query)+(_symClass?'&class='+_symClass:'');
+    const url='/api/trading/symbols/search?limit=120&q='+encodeURIComponent(query)+(_symClass?'&class='+_symClass:'');
     const r=await fetch(url); const d=await r.json();
     if(ep!==_symEpoch) return;
     _symRows=d.results||[]; _symSel=0; renderSymResults();
@@ -3000,7 +3128,6 @@ function focusTicker(t){
     // don't auto-open — it's a bottom sheet that would cover the chart we're about to show.
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
-  openFullscreenChart(t);
 }
 
 // Click a chart in the grid to FOCUS it (#focus-chart): mark that card selected
@@ -3009,24 +3136,20 @@ function focusTicker(t){
 // the watchlist click / expand control do). Desktop-oriented; harmless on mobile
 // (single chart, order panel stays closed via the isNarrowTrader guard).
 function selectChart(t, ev){
+  // DISABLED: All click-based fullscreen removed per #3141 - do nothing
+  return;
+  /*
   if(!t) return;
   // Clicks that land on a control inside the card (buy/sell, change-symbol, drag
   // handle) do their own thing — never focus or fullscreen from those.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
-  // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
-  // right below it (focusTicker does all of that) — no two-tap dance.
-  if(isNarrowTrader()){ focusTicker(t); return; }
-  const card = document.getElementById('card-'+t);
-  // Second click on the ALREADY-focused chart → open it fullscreen.
-  if(card && activeTicker === t && card.classList.contains('active')){
-    openFullscreenChart(t);
-    return;
-  }
-  // First click → focus it in the grid (darker grey) + point the peripherals at it.
+  // Click → focus it in the grid (darker grey) + point the peripherals at it.
+  // (removed fullscreen behavior entirely per #3141)
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}
   document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
+  const card = document.getElementById('card-'+t);
   if(card) card.classList.add('active');
   renderWatchlist();                       // sidebar highlight follows the selection
   renderSymbolInfo(t);                      // detail panel follows the selection
@@ -3034,45 +3157,23 @@ function selectChart(t, ev){
     setOrderSymbol(t);                       // order ticket follows the selection
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
+  */
 }
 
 // ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
 // Inline zoom: instead of a full-screen popup, expand the chart into the grid as a
 // single tall chart (reusing the 1-slot layout, #1628). A "← Back to grid" button
 // restores the previous layout.
-let _preZoomSlot = null;
-function openFullscreenChart(t){
-  if(_preZoomSlot===null) _preZoomSlot = slotCount;   // remember layout to restore
-  fullscreenTicker = t;
-  chartSlots = [t]; slotCount = 1;
-  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value='1';
-  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='';
-  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
-  try{ document.querySelector('.main').scrollTop = 0; }catch(e){}
-}
+// Fullscreen zoom feature completely removed per #3141
 
-function closeFullscreenChart(){
-  fullscreenTicker = null;
-  slotCount = (_preZoomSlot!=null ? _preZoomSlot : 0); _preZoomSlot = null;
-  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value=String(slotCount);
-  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='none';
-  document.getElementById('fsBg').classList.add('hidden');   // legacy popup (now unused)
-  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
-}
-
-function renderFullscreenChart(){
-  if(!fullscreenTicker) return;
-  const price = getCurrentPrice(fullscreenTicker);
-  document.getElementById('fsPrice').textContent = price ? '$'+fmt(price, price>=100?2:4) : '—';
-  renderZoneLadder(fullscreenTicker, zonesData[fullscreenTicker]||{}, price,
-    document.getElementById('chart-fs'), document.getElementById('overlay-fs'));
-}
+// Fullscreen chart rendering disabled per #3141
+function renderFullscreenChart(){}  // no-op
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(_drawTool || _drawPending){ setDrawTool(''); return; }   // #2444: Esc disarms drawing first
   if(!document.getElementById('otBg').classList.contains('hidden')) closeOrderTicket();
-  else closeFullscreenChart();
+  // Fullscreen zoom removed per #3141
 });
 
 // ── Keyboard-first trading (#2438) ───────────────────────────────────────────
@@ -3406,25 +3507,52 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
+
+
+// Axis reset (#3141): DOUBLE-click an axis strip to reset that axis.
+//  - time axis (bottom strip)  → reset the pan/x position back to live
+//  - price axis (right strip)  → reset the y-range back to auto-fit
+// Delegated at the document level so it survives card rebuilds (the grid
+// re-creates canvases on every layout/order change).
 document.addEventListener('dblclick', function(e){
-  const ladder = e.target.closest('.zone-ladder');
+  const canvas = e.target.closest && e.target.closest('canvas.chart-canvas');
+  if(!canvas) return;
+  const ladder = canvas.closest('.zone-ladder');
   if(!ladder) return;
   const target = _ladderTarget(ladder);
   if(!target) return;
-  const { dataTicker, viewKey, canvas } = target;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX-rect.left, y = e.clientY-rect.top;
-  if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
-  e.preventDefault();
+
+  const { dataTicker, viewKey } = target;
   const view = chartView[viewKey];
-  if(view){
+  if(!view) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const pw = rect.width  - AXIS_W;   // price axis = right AXIS_W px
+  const ph = rect.height - AXIS_H;   // time axis  = bottom AXIS_H px
+
+  // Double-click on the time axis (bottom strip) → reset x pan + zoom (clear
+  // the live values AND the animation goals, or zoomTick chases the old goal).
+  if(y > ph && x <= pw){
+    e.stopPropagation(); e.preventDefault();
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-    view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+    view.barOffset = 0; view.visibleBars = null;
+    view.gOff = null;   view.gVis = null;
+    renderTicker(dataTicker);
+    return;
   }
-  renderTicker(dataTicker);
-});
+
+  // Double-click on the price axis (right strip) → reset y-range to auto-fit
+  if(x > pw && y <= ph){
+    e.stopPropagation(); e.preventDefault();
+    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+    view.yMin = null;  view.yMax = null;
+    view.gYMin = null; view.gYMax = null;
+    renderTicker(dataTicker);
+    return;
+  }
+}, true);
 
 // ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
 // sidebar + cards. /api/trading/watchlist-prices returns the UNION (watchlists +
@@ -4795,7 +4923,11 @@ function startDashboard(){
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); } // no auto-open on load — the deck keeps full width until the user reaches for a trade
+    if(!window.GUEST && wlPrices.length){
+      setOrderSymbol(activeTicker || wlPrices[0].ticker);
+      // Open the order panel by default for desktop (not on narrow/mobile views)
+      if(!isNarrowTrader()) { openOrderPanel(); }
+    }
   }, 1600);
   // Restore the saved chart-grid layout (#1628), limiting the options to single/double
   // on phones.
@@ -4991,12 +5123,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
   // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
-    // Header diet (operator, 2026-07-25): layout + timeframe + range stay inline
-    // (the most-used controls); chart type, patterns, and draw live in the ☰ at
-    // every width alongside the other secondary toggles.
-    {sel:'#chartTypeSelect',           narrowOnly:false},
-    {sel:'#patternsToggle',            narrowOnly:false},
-    {sel:'#drawToolSel',               narrowOnly:false},
+    // Chart type, patterns, and draw live INLINE in the toolbar on desktop
+    // (operator, 2026-08-01) and collapse into the ☰ only when the toolbar is
+    // too tight; layout + timeframe + range stay inline at every width.
+    {sel:'#chartTypeSelect',           narrowOnly:true},
+    {sel:'#patternsToggle',            narrowOnly:true},
+    {sel:'#drawToolSel',               narrowOnly:true},
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
