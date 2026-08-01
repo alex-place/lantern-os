@@ -69,11 +69,62 @@ test('default: falls back to Alpaca when IBKR is unavailable (original behavior)
   assert.strictEqual(r.broker, 'alpaca');
 });
 
-test('neither broker connected → null (caller skips the user)', async () => {
+// #2546 changed this contract deliberately. It used to return null so the caller skipped the
+// user — which meant a signed-in user who owned no brokerage account had a dead trader. Now:
+//   - an EXPLICIT demo choice short-circuits to the read-only simulated champion book;
+//   - explicit paper mode with no broker connected falls back to the user's own house
+//     practice ledger;
+//   - nothing connected and no choice made → read-only demo, so the trader is never dead;
+//   - null is reserved for the owner identity and for HOUSE_PAPER_FALLBACK=0.
+test('an EXPLICIT demo choice short-circuits, even with brokers connected', async () => {
   process.env.BROKER_PREFER = 'alpaca';
+  const uid = 'u-demo-' + Date.now();
+  require('../lib/trading-account-mode').set(uid, 'demo');
+  const { brokerFacadeFor } = loadFacadeWith(aliveAlpaca);   // even with Alpaca ALIVE
+  const r = await brokerFacadeFor(uid, aliveIbkr);
+  assert.strictEqual(r.broker, 'demo', 'demo must not read the user\'s real account');
+  assert.strictEqual(r.readOnly, true);
+  const placed = await r.facade.placeIBKROrder('u1', { symbol: 'SPY', side: 'buy', qty: 1 });
+  assert.strictEqual(placed.status, 'rejected');
+});
+
+test('paper mode, neither broker connected → the user\'s own house practice account', async () => {
+  process.env.BROKER_PREFER = 'alpaca';
+  const uid = 'u-paper-' + Date.now();
+  require('../lib/trading-account-mode').set(uid, 'paper');
   const { brokerFacadeFor } = loadFacadeWith(deadAlpaca);
-  const r = await brokerFacadeFor('u1', deadIbkr);
-  assert.strictEqual(r, null);
+  const r = await brokerFacadeFor(uid, deadIbkr);
+  assert.strictEqual(r.broker, 'house');
+  assert.strictEqual(r.practice, true);
+  require('fs').rmSync(require('../lib/house-paper-broker')._file(uid), { force: true });
+});
+
+test('REGRESSION: never having chosen a mode does NOT hijack a connected account', async () => {
+  // The trap caught while building this: making demo the blanket default put every EXISTING
+  // user with a linked broker into the simulated book. "Never chose" != "chose demo".
+  process.env.BROKER_PREFER = 'alpaca';
+  const { brokerFacadeFor } = loadFacadeWith(aliveAlpaca);
+  const r = await brokerFacadeFor('u-never-chose-' + Date.now(), deadIbkr);
+  assert.strictEqual(r.broker, 'alpaca', 'a connected broker must still win');
+});
+
+test('nothing connected and no choice made → read-only demo, not a dead trader', async () => {
+  process.env.BROKER_PREFER = 'alpaca';
+  const uid = 'u-nothing-' + Date.now();
+  process.env.HOUSE_PAPER_FALLBACK = '0';        // isolate: no house rung
+  const { brokerFacadeFor } = loadFacadeWith(deadAlpaca);
+  const r = await brokerFacadeFor(uid, deadIbkr);
+  assert.strictEqual(r.broker, 'demo');
+  assert.strictEqual(r.readOnly, true);
+  delete process.env.HOUSE_PAPER_FALLBACK;
+});
+
+test('HOUSE_PAPER_FALLBACK=0 restores the old null for the owner identity', async () => {
+  process.env.BROKER_PREFER = 'alpaca';
+  process.env.HOUSE_PAPER_FALLBACK = '0';
+  const { brokerFacadeFor } = loadFacadeWith(deadAlpaca);
+  assert.strictEqual(await brokerFacadeFor(null, deadIbkr), null);
+  delete process.env.HOUSE_PAPER_FALLBACK;
 });
 
 test('preferredBroker(): env parsing — only "alpaca" flips it', () => {
