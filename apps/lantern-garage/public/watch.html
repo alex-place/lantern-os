@@ -2323,7 +2323,7 @@ function renderSymResults(){
     const cr=a.class==='crypto';
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     // Shared badge library: issuer glyphs / crypto signs / monogram fallback.
-    const logo = window.tickerBadgeHtml ? tickerBadgeHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
+    const logo = window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
@@ -2727,7 +2727,7 @@ const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
 function tickerLogoHtml(ticker){
   // Delegates to the shared badge library (/js/ticker-badges.js): designed
   // issuer/asset-class glyphs, monogram fallback. One source of truth.
-  return window.tickerBadgeHtml ? tickerBadgeHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
+  return window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
 }// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
 // everything else keeps the dark badge so colour logos pop. Cached in localStorage.
