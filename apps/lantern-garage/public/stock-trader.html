@@ -3152,12 +3152,8 @@ function openFullscreenChart(t){
 }
 
 function closeFullscreenChart(){
-  fullscreenTicker = null;
-  slotCount = (_preZoomSlot!=null ? _preZoomSlot : 0); _preZoomSlot = null;
-  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value=String(slotCount);
-  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='none';
-  document.getElementById('fsBg').classList.add('hidden');   // legacy popup (now unused)
-  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
+  // Fullscreen zoom disabled per #3141 - do nothing
+  return;
 }
 
 function renderFullscreenChart(){
