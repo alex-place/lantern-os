@@ -11,6 +11,7 @@
   "graph": {
     "accounts.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -19,6 +20,7 @@
     "admin-flags.html": [
       "auth.html",
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -26,24 +28,26 @@
     ],
     "auth.html": [
       "chat.html",
-      "explore.html",
       "knowledgecenter.html",
       "terms.html"
     ],
     "changelog.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "chat.html": [
+      "create.html",
       "explore.html",
       "stock-trader.html",
       "work.html"
     ],
     "contest.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -61,6 +65,7 @@
     ],
     "explore.html": [
       "chat.html",
+      "create.html",
       "fallout-radio.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
@@ -74,6 +79,7 @@
     ],
     "faq.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "pricing.html",
@@ -82,6 +88,7 @@
     ],
     "ibkr-setup-guide.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -89,9 +96,9 @@
     ],
     "index.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
-      "orchestration.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -106,6 +113,7 @@
     "knowledgecenter.html": [
       "changelog.html",
       "chat.html",
+      "create.html",
       "explore.html",
       "faq.html",
       "stock-trader.html",
@@ -114,6 +122,7 @@
     ],
     "metrics.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -121,6 +130,7 @@
     ],
     "options.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -129,6 +139,7 @@
     ],
     "orchestration.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "ibkr-setup-guide.html",
       "knowledgecenter.html",
@@ -137,6 +148,7 @@
     ],
     "pricing.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -145,6 +157,7 @@
     "reset-password.html": [],
     "settings.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -152,6 +165,7 @@
     ],
     "stock-trader.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
@@ -162,6 +176,7 @@
     ],
     "system-health.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -172,6 +187,7 @@
     ],
     "watch.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
@@ -181,6 +197,7 @@
     ],
     "welcome.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "settings.html",
@@ -190,6 +207,7 @@
     "whats-new.html": [
       "changelog.html",
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -197,6 +215,7 @@
     ],
     "wide-search.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -204,6 +223,7 @@
     ],
     "work.html": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "orchestration.html",
@@ -213,22 +233,22 @@
   "depth": {
     "index.html": 0,
     "chat.html": 1,
+    "create.html": 1,
     "explore.html": 1,
     "knowledgecenter.html": 1,
-    "orchestration.html": 1,
     "stock-trader.html": 1,
     "work.html": 1,
     "fallout-radio.html": 2,
     "kalshi-terminal.html": 2,
+    "orchestration.html": 2,
     "settings.html": 2,
     "changelog.html": 2,
     "faq.html": 2,
     "whats-new.html": 2,
-    "ibkr-setup-guide.html": 2,
     "options.html": 2,
     "pricing.html": 2,
     "watch.html": 2,
-    "create.html": 3
+    "ibkr-setup-guide.html": 3
   },
   "byDepth": {
     "0": [
@@ -236,9 +256,9 @@
     ],
     "1": [
       "chat.html",
+      "create.html",
       "explore.html",
       "knowledgecenter.html",
-      "orchestration.html",
       "stock-trader.html",
       "work.html"
     ],
@@ -246,16 +266,16 @@
       "changelog.html",
       "fallout-radio.html",
       "faq.html",
-      "ibkr-setup-guide.html",
       "kalshi-terminal.html",
       "options.html",
+      "orchestration.html",
       "pricing.html",
       "settings.html",
       "watch.html",
       "whats-new.html"
     ],
     "3": [
-      "create.html"
+      "ibkr-setup-guide.html"
     ]
   },
   "reachable": [
@@ -333,7 +353,8 @@
     "chat.html",
     "stock-trader.html",
     "work.html",
-    "explore.html",
-    "knowledgecenter.html"
+    "knowledgecenter.html",
+    "create.html",
+    "explore.html"
   ]
 }

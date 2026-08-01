@@ -75,16 +75,26 @@ function stripCode(html) {
  * would understate reachability badly — every page carrying the script really
  * does render those links, and a browser can click them.
  *
- * Returns the NAV_LINKS hrefs so buildGraph can attribute them to each page
- * that loads site-chrome.js.
+ * The shared footer is injected the same way, and carries FOOTER_EXTRA_LINKS on
+ * top of NAV_LINKS — surfaces that are click-reachable but don't sit in the top
+ * nav. Both arrays count, for the same reason.
+ *
+ * Returns the hrefs so buildGraph can attribute them to each page that loads
+ * site-chrome.js.
  */
 function sharedNavTargets() {
   const file = path.join(PUBLIC_DIR, 'js', 'site-chrome.js');
   if (!fs.existsSync(file)) return [];
   const src = fs.readFileSync(file, 'utf8');
-  const block = src.match(/NAV_LINKS\s*=\s*\[([\s\S]*?)\]/);
-  if (!block) return [];
-  return [...block[1].matchAll(/href:\s*"\/?([a-zA-Z0-9_-]+\.html)"/g)].map((m) => m[1]);
+  const targets = [];
+  for (const name of ['NAV_LINKS', 'FOOTER_EXTRA_LINKS']) {
+    const block = src.match(new RegExp(name + '\\s*=\\s*\\[([\\s\\S]*?)\\]'));
+    if (!block) continue;
+    targets.push(
+      ...[...block[1].matchAll(/href:\s*"\/?([a-zA-Z0-9_-]+\.html)"/g)].map((m) => m[1]),
+    );
+  }
+  return [...new Set(targets)];
 }
 
 const SHARED_NAV = sharedNavTargets();
