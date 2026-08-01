@@ -3403,21 +3403,23 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click behavior: on chart = reset zoom/pan; outside chart on panel = zoom into 1-chart mode
+// Double-click behavior: inside chart canvas = reset zoom/pan; outside chart but on panel = zoom to fullscreen
 document.addEventListener('dblclick', function(e){
   const card = e.target.closest('.card');
   if(!card) return;
   const ladder = e.target.closest('.zone-ladder');
-  const target = _ladderTarget(ladder || card.querySelector('.zone-ladder'));
+  if(!ladder) return;
+  const target = _ladderTarget(ladder);
   if(!target) return;
   const { dataTicker, viewKey, canvas } = target;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  const insideCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
 
-  if(ladder){
+  e.preventDefault();
+
+  if(insideCanvas){
     // Double-click inside the chart canvas: reset zoom/pan
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX-rect.left, y = e.clientY-rect.top;
-    if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
-    e.preventDefault();
     const view = chartView[viewKey];
     if(view){
       if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
@@ -3426,8 +3428,7 @@ document.addEventListener('dblclick', function(e){
     }
     renderTicker(dataTicker);
   } else {
-    // Double-click outside the chart but on the card: zoom into single-chart (fullscreen) mode
-    e.preventDefault();
+    // Double-click outside the chart but on the card: zoom into fullscreen mode
     openFullscreenChart(dataTicker);
   }
 });
@@ -3435,35 +3436,42 @@ document.addEventListener('dblclick', function(e){
 // Click on time axis (bottom) to reset timeframe to default
 // Click on price axis (right) to reset price range to default
 document.addEventListener('click', function(e){
+  // Check if click is in a zone-ladder, but avoid bubbled clicks from canvas
+  if(e.target.tagName === 'CANVAS') return; // Ignore canvas clicks
+
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
-  const rect = ladder.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-  const canvas = ladder.querySelector('.chart-canvas');
-  if(!canvas) return;
+
   const target = _ladderTarget(ladder);
   if(!target) return;
-  const { dataTicker, viewKey } = target;
+
+  const { dataTicker, viewKey, canvas } = target;
   const view = chartView[viewKey];
   if(!view) return;
 
-  // Click on time axis (bottom 16px of ladder)
-  if(y > rect.height - 16 && y <= rect.height){
-    e.preventDefault();
+  const rect = ladder.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  // Click on time axis (bottom 20px of ladder area)
+  if(y > rect.height - 20){
+    e.stopPropagation();
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
     view.barOffset = 0;
     renderTicker(dataTicker);
+    return;
   }
-  // Click on price axis (right 52px of ladder)
-  else if(x > rect.width - 52){
-    e.preventDefault();
+
+  // Click on price axis (right 60px of ladder area)
+  if(x > rect.width - 60){
+    e.stopPropagation();
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
     view.yMin = null; view.yMax = null;
     view.gYMin = null; view.gYMax = null;
     renderTicker(dataTicker);
+    return;
   }
-});
+}, true);
 
 // ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
 // sidebar + cards. /api/trading/watchlist-prices returns the UNION (watchlists +
