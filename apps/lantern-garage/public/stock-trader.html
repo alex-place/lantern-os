@@ -307,11 +307,11 @@
   /* #2435: columns never exceed the pane (min(340px,100%)) and rows scale with the
      viewport height instead of a fixed 352px, so charts stay usable on tablets,
      portrait screens, and desktops with the chat rail open. */
-  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;grid-auto-rows:clamp(260px,38vh,400px)}
+  .cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px;grid-auto-rows:auto}
   /* Every card is a flex column of the SAME height (grid-auto-rows); the chart
      flexes to fill, so watching/quiet/breakout cards no longer render at
      different heights with shorter charts. */
-  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer}
+  .card{background:rgba(15,18,28,.92);border:1px solid rgba(255,255,255,.05);border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);overflow:hidden;transition:border-color .15s,background .15s,transform .15s,box-shadow .15s;display:flex;flex-direction:column;min-height:0;cursor:pointer;aspect-ratio:1/1}
   /* #2433: hover lift — the deck responds to the pointer like the site's chips do. */
   .card:hover{border-color:color-mix(in srgb, var(--accent) 45%, var(--border));box-shadow:var(--shadow-hover);transform:translateY(-2px)}
   /* Focused/selected chart (#focus-chart): a slightly darker grey with a clearer
@@ -2029,9 +2029,6 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     html += `<div style="position:absolute;left:0;right:64px;top:${pct(zTop)};height:${hpct(zTop,zBot)};
       background:${bgColor};border-top:${bdWidth} solid ${bdColor};border-bottom:${bdWidth} solid ${bdColor};
       box-sizing:border-box;min-height:3px;"></div>`;
-    html += `<div style="position:absolute;right:0;width:62px;top:${pct(z.mid)};transform:translateY(-50%);
-      font-family:var(--mono);font-size:10px;line-height:1.3;padding:1px 3px;white-space:nowrap;
-      color:${sup?'rgba(0,212,170,.85)':'rgba(255,95,109,.85)'}">${sup?'S':'R'} ${z.strength||'?'} · ${z.touches||'?'}T</div>`;
   }
   } // end patternPrefs.zones (S/R bands)
 
@@ -2459,7 +2456,7 @@ function renderSymResults(){
     const cr=a.class==='crypto';
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     // Shared badge library: issuer glyphs / crypto signs / monogram fallback.
-    const logo = window.tickerBadgeHtml ? tickerBadgeHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
+    const logo = window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
@@ -2863,7 +2860,7 @@ const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
 function tickerLogoHtml(ticker){
   // Delegates to the shared badge library (/js/ticker-badges.js): designed
   // issuer/asset-class glyphs, monogram fallback. One source of truth.
-  return window.tickerBadgeHtml ? tickerBadgeHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
+  return window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
 }// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
 // everything else keeps the dark badge so colour logos pop. Cached in localStorage.
@@ -3406,24 +3403,66 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
+// Double-click behavior: on chart = reset zoom/pan; outside chart on panel = zoom into 1-chart mode
 document.addEventListener('dblclick', function(e){
+  const card = e.target.closest('.card');
+  if(!card) return;
   const ladder = e.target.closest('.zone-ladder');
-  if(!ladder) return;
-  const target = _ladderTarget(ladder);
+  const target = _ladderTarget(ladder || card.querySelector('.zone-ladder'));
   if(!target) return;
   const { dataTicker, viewKey, canvas } = target;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX-rect.left, y = e.clientY-rect.top;
-  if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
-  e.preventDefault();
-  const view = chartView[viewKey];
-  if(view){
-    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-    view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+
+  if(ladder){
+    // Double-click inside the chart canvas: reset zoom/pan
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX-rect.left, y = e.clientY-rect.top;
+    if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
+    e.preventDefault();
+    const view = chartView[viewKey];
+    if(view){
+      if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+      view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+      view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+    }
+    renderTicker(dataTicker);
+  } else {
+    // Double-click outside the chart but on the card: zoom into single-chart (fullscreen) mode
+    e.preventDefault();
+    openFullscreenChart(dataTicker);
   }
-  renderTicker(dataTicker);
+});
+
+// Click on time axis (bottom) to reset timeframe to default
+// Click on price axis (right) to reset price range to default
+document.addEventListener('click', function(e){
+  const ladder = e.target.closest('.zone-ladder');
+  if(!ladder) return;
+  const rect = ladder.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const canvas = ladder.querySelector('.chart-canvas');
+  if(!canvas) return;
+  const target = _ladderTarget(ladder);
+  if(!target) return;
+  const { dataTicker, viewKey } = target;
+  const view = chartView[viewKey];
+  if(!view) return;
+
+  // Click on time axis (bottom 16px of ladder)
+  if(y > rect.height - 16 && y <= rect.height){
+    e.preventDefault();
+    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+    view.barOffset = 0;
+    renderTicker(dataTicker);
+  }
+  // Click on price axis (right 52px of ladder)
+  else if(x > rect.width - 52){
+    e.preventDefault();
+    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+    view.yMin = null; view.yMax = null;
+    view.gYMin = null; view.gYMax = null;
+    renderTicker(dataTicker);
+  }
 });
 
 // ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
@@ -4771,7 +4810,11 @@ function startDashboard(){
       renderSymbolInfo(activeTicker);
       renderWatchlist();
     }
-    if(!window.GUEST && wlPrices.length){ setOrderSymbol(activeTicker || wlPrices[0].ticker); } // no auto-open on load — the deck keeps full width until the user reaches for a trade
+    if(!window.GUEST && wlPrices.length){
+      setOrderSymbol(activeTicker || wlPrices[0].ticker);
+      // Open the order panel by default for desktop (not on narrow/mobile views)
+      if(!isNarrowTrader()) { openOrderPanel(); }
+    }
   }, 1600);
   // Restore the saved chart-grid layout (#1628), limiting the options to single/double
   // on phones.
