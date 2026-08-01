@@ -183,8 +183,17 @@
     if (badge) return badge;
     const t = String(symbol || '').toUpperCase();
     const fb = String(tickerBadgeHtml(t, Object.assign({}, meta, { force: true })) || '').replace(/"/g, '&quot;');
-    return '<img class="tb-badge tb-img" src="/api/trading/logo?symbol=' + encodeURIComponent(t) +
-      '" alt="" loading="lazy" onerror="this.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;">';
+    // Normalize the wildly inconsistent source art (full-bleed glyphs, baked-in
+    // square backgrounds, transparent dark marks with zero contrast on the dark
+    // theme): every logo renders at the SAME scale inside the SAME white disc —
+    // uniform zoom, guaranteed contrast, the disc crops any source square.
+    // The disc is the .tb-badge span (page CSS sizes it), so the inner %
+    // resolves against the badge itself, never the surrounding row.
+    return '<span class="tb-badge tb-img" style="background:#fff;border-radius:50%;display:inline-flex;' +
+      'align-items:center;justify-content:center;overflow:hidden">' +
+      '<img src="/api/trading/logo?symbol=' + encodeURIComponent(t) + '" alt="" loading="lazy" ' +
+      'style="width:78%;height:78%;object-fit:contain" ' +
+      'onerror="this.parentNode.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;"></span>';
   }
 
   window.tickerBadgeOrLogoHtml = tickerBadgeOrLogoHtml;
