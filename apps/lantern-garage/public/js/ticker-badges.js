@@ -102,6 +102,7 @@
     DOGE: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
     XRP: 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png',
     LTC: 'https://assets.coingecko.com/coins/images/2/large/litecoin.png',
+    ADA: 'https://assets.coingecko.com/coins/images/975/large/cardano.png',
   };
   // Crypto currency glyphs — the recognized signs, not letters.
   const CRYPTO = {
@@ -111,6 +112,7 @@
     DOGE: { ch: 'Ð', bg: 'linear-gradient(135deg,#c2a633,#8a7420)' },
     XRP: { ch: '✕', bg: 'linear-gradient(135deg,#23292f,#4b5563)' },
     LTC: { ch: 'Ł', bg: 'linear-gradient(135deg,#345d9d,#1e3a68)' },
+    ADA: { ch: '₳', bg: 'linear-gradient(135deg,#0d5ec8,#083a80)' },
   };
 
   function svgBadge(bg, inner, cls) {
@@ -145,9 +147,11 @@
         '<svg viewBox="0 0 24 24" aria-hidden="true">' + centerText(c.ch, 15) + '</svg></span>';
       const src = CRYPTO_LOGO[base];
       if (!src || m.noImage) return glyph;
-      const fb = glyph.replace(/"/g, '&quot;');
+      // Hidden-sibling fallback (same pattern as the stock logos): onerror
+      // toggles visibility instead of injecting escaped HTML.
+      const fb = glyph.replace('style="', 'style="display:none;');
       return '<img class="tb-badge tb-img" src="' + src + '" alt="" loading="lazy" ' +
-        'onerror="this.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;">';
+        'onerror="this.style.display=\'none\';var s=this.nextElementSibling;if(s)s.style.display=\'inline-flex\'">' + fb;
     }
     // 2. tracked index / commodity / sector fund → number or symbol badge
     const tr = TRACKS[t];
@@ -182,18 +186,23 @@
     const badge = tickerBadgeHtml(symbol, meta);
     if (badge) return badge;
     const t = String(symbol || '').toUpperCase();
-    const fb = String(tickerBadgeHtml(t, Object.assign({}, meta, { force: true })) || '').replace(/"/g, '&quot;');
     // Normalize the wildly inconsistent source art (full-bleed glyphs, baked-in
     // square backgrounds, transparent dark marks with zero contrast on the dark
     // theme): every logo renders at the SAME scale inside the SAME white disc —
     // uniform zoom, guaranteed contrast, the disc crops any source square.
     // The disc is the .tb-badge span (page CSS sizes it), so the inner %
     // resolves against the badge itself, never the surrounding row.
+    // Fallback: the colored monogram badge is rendered ALONGSIDE, hidden, and
+    // onerror just swaps visibility — no HTML-in-attribute escaping (the old
+    // outerHTML=&quot;…&quot; injection parsed into mangled markup on 404s).
+    const fb = String(tickerBadgeHtml(t, Object.assign({}, meta, { force: true })) || '')
+      .replace('style="', 'style="display:none;');
     return '<span class="tb-badge tb-img" style="background:#fff;border-radius:50%;display:inline-flex;' +
       'align-items:center;justify-content:center;overflow:hidden">' +
       '<img src="/api/trading/logo?symbol=' + encodeURIComponent(t) + '" alt="" loading="lazy" ' +
       'style="width:78%;height:78%;object-fit:contain" ' +
-      'onerror="this.parentNode.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;"></span>';
+      'onerror="this.parentNode.style.display=\'none\';var s=this.parentNode.nextElementSibling;if(s)s.style.display=\'inline-flex\'">' +
+      '</span>' + fb;
   }
 
   window.tickerBadgeOrLogoHtml = tickerBadgeOrLogoHtml;
