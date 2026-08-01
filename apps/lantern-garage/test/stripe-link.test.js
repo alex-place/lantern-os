@@ -14,8 +14,10 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// user-profiles resolves data/profiles from process.cwd() at require time — chdir first.
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-link-")));
+// user-profiles resolves data/profiles from dataRoot() at require time (#3088) — isolate it.
+const _tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-link-"));
+process.chdir(_tmpRoot);
+process.env.UNISONA_STATE_DIR = _tmpRoot;
 const { verifiedEmailOf } = require(path.join(__dirname, "..", "lib", "user-profiles"));
 const { pickLinkableSubscription } = require(path.join(__dirname, "..", "lib", "stripe-billing"));
 

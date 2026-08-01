@@ -85,7 +85,7 @@ const { JobQueue } = require("./lib/job-queue");
 const { JobWorker } = require("./lib/job-worker");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
-const { dataRoot } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
+const { dataRoot, dataPath } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
 const publicRoot = path.join(__dirname, "public");
 const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
@@ -391,7 +391,7 @@ try {
 const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
-  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
+  store: new FileSessionStore({ dir: dataPath("sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -399,11 +399,21 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
-    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
-    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
-    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
-    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
+    // Secure tracks the ACTUAL connection, not a PORT guess (#3010). The old
+    // `!!process.env.PORT` forced Secure whenever PORT was set — but a launcher that
+    // injects PORT on a plain-http localhost box (the preview tool, autostart, etc.) is
+    // NOT https, so express-session saved the session yet silently dropped Set-Cookie
+    // and every sign-in stayed guest with no error.
+    //
+    // Production stays hard-Secure regardless, so #2618's fail-closed rule holds
+    // unconditionally rather than depending on a proxy header being present. Everywhere
+    // else "auto" (with proxy:true above) makes the cookie Secure exactly when the
+    // request is: https behind Railway's TLS via X-Forwarded-Proto, plain on loopback.
+    //
+    // The remaining edge — a prod proxy that strips X-Forwarded-Proto — was left as a
+    // follow-up when this landed via #3128; establishSession now closes it, refusing to
+    // report a sign-in whose cookie cannot be delivered instead of returning ok:true.
+    secure: process.env.NODE_ENV === "production" ? true : "auto",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },
@@ -718,6 +728,10 @@ process.on("uncaughtException", (err) => {
 
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
+  // Print the resolved data root (#3088): a CLI script and the server used to pick
+  // different roots depending on cwd, so a `setUserRole` could "succeed" against a
+  // store this process never reads. One line here makes that visible instead of silent.
+  console.info(`[data] root: ${dataRoot()}`);
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.

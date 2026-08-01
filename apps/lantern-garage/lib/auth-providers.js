@@ -22,19 +22,53 @@ const { roleLevel } = require("./role-hierarchy");
 // other identities explicitly ("local:you@email.com"). Keeping the stored key
 // provider-qualified prevents a bare id from cross-granting admin to a
 // same-numbered id on a different provider.
-const ADMIN_OVERRIDES = new Set(
-  String(process.env.LANTERN_ADMIN_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((entry) => (entry.includes(":") ? entry : `google:${entry}`))
-);
+const _ADMIN_ID_ENTRIES = String(process.env.LANTERN_ADMIN_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+// A local identity is keyed by the LOWERCASED email, so normalize local entries to
+// match case-insensitively — "local:You@Example.com" would otherwise silently never
+// match the stored "local:you@example.com" (#3087).
+function _normalizeOverride(entry) {
+  const qualified = entry.includes(":") ? entry : `google:${entry}`;
+  const idx = qualified.indexOf(":");
+  const provider = qualified.slice(0, idx).toLowerCase();
+  const id = qualified.slice(idx + 1);
+  return `${provider}:${provider === "local" ? id.toLowerCase() : id}`;
+}
+const ADMIN_OVERRIDES = new Set(_ADMIN_ID_ENTRIES.map(_normalizeOverride));
+
+// The providers an override key can actually match (see isAdminOverride callers +
+// profileHasAdminOverride). An entry qualified with anything else can never match, and a bare
+// entry becomes google:<id> — surprising if you meant your local email account (#3087).
+const _KNOWN_OVERRIDE_PROVIDERS = new Set(["google", "patreon", "discord", "local"]);
+for (const entry of _ADMIN_ID_ENTRIES) {
+  if (!entry.includes(":")) {
+    // Bare → google:<id>. If it looks like an email it was almost certainly meant to be a
+    // local account, which this will NOT match — the exact silent no-op #3087 describes.
+    if (entry.includes("@")) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" is bare, so it is read as a GOOGLE id ` +
+          `("google:${entry}") and will NOT elevate an email/password account. Use ` +
+          `"local:${entry.toLowerCase()}" for a local login.`
+      );
+    }
+  } else {
+    const prov = entry.slice(0, entry.indexOf(":")).toLowerCase();
+    if (!_KNOWN_OVERRIDE_PROVIDERS.has(prov)) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" names provider "${prov}", which no login ` +
+          `path checks — it can never grant admin. Known: ${[..._KNOWN_OVERRIDE_PROVIDERS].join(", ")}.`
+      );
+    }
+  }
+}
 
 function isAdminOverride(provider, providerId) {
   // Strict provider-qualified match. Bare LANTERN_ADMIN_IDS entries were already
   // normalized to "google:<id>" at load, so a bare owner id can't cross-grant admin
   // to a same-numbered id on a different provider.
-  return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
+  return ADMIN_OVERRIDES.has(_normalizeOverride(`${provider}:${providerId}`));
 }
 
 // Operational guard: no OAuth tier grants admin — it comes ONLY from an admin

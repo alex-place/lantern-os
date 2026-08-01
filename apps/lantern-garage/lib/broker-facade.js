@@ -54,6 +54,33 @@ function preferredBroker(userId, req) {
  * @returns {Promise<{broker:string, facade:object}|null>}
  */
 async function brokerFacadeFor(userId, ibkrBridge) {
+  // ── DEMO rung (#2546) ────────────────────────────────────────────────────────────────
+  // An EXPLICIT demo choice short-circuits before any broker is touched: demo is a showroom,
+  // so it must not read the user's linked account at all. A user who has never chosen a mode
+  // is NOT treated as demo here — that would replace an existing user's real connected
+  // account with a simulated fixture. They fall through the normal chain, and only land on
+  // demo below if nothing at all is connected (see demoFacade at the end).
+  const accountMode = require('./trading-account-mode');
+  const demoFacade = () => {
+    const demo = require('./champion-demo');
+    const snap = demo.positions();
+    // Read-only is structural, not conventional: there is no working write path here, so a
+    // caller that forgets to check the mode still cannot place an order in demo.
+    const reject = async () => accountMode.assertCanPlaceOrder(accountMode.DEMO);
+    return {
+      broker: 'demo', accountId: snap.account.account_id, demo: true, readOnly: true,
+      facade: {
+        getIBKRAccount: async () => snap.account,
+        getIBKRPositions: async () => demo.positions().positions,
+        getIBKROpenOrders: async () => [],          // a fixture has no working orders
+        getIBKRDayPnl: async () => ({ dailyPnl: snap.account.pnl_today, unrealizedPnl: snap.account.unrealized, realizedPnl: 0 }),
+        placeIBKROrder: reject,
+        cancelIBKROrder: reject,
+      },
+    };
+  };
+  if (accountMode.getExplicit(userId) === accountMode.DEMO) return demoFacade();
+
   const tryIbkr = async () => {
     if (!ibkrBridge) return null;
     const acct = await ibkrBridge.getIBKRAccount(userId).catch(() => null);
@@ -79,12 +106,46 @@ async function brokerFacadeFor(userId, ibkrBridge) {
     };
     return { broker: 'alpaca', accountId: acct.account_id, facade };
   };
+  // Last resort: the user's OWN house practice account (#2546). A brand-new signed-in user
+  // owns no brokerage account, so both attempts above return null and the caller used to skip
+  // them entirely — the trader was dead on arrival until they went and opened an Alpaca
+  // account. This gives them a personal, per-user practice ledger to trade immediately, and
+  // BYOK Alpaca (POST /api/broker/alpaca/connect-keys) remains the destination: the moment
+  // they connect their own paper account, tryAlpaca resolves first and this is never reached.
+  //
+  // Deliberately NOT offered to the null/owner identity — on a single-user box the owner's
+  // shared server keys are a real Alpaca paper account and shadowing it with a simulation
+  // would be a downgrade. HOUSE_PAPER_FALLBACK=0 disables this entirely.
+  const tryHouse = async () => {
+    if (userId == null || userId === '' || userId === 'local-owner') return null;
+    if (process.env.HOUSE_PAPER_FALLBACK === '0') return null;
+    const house = require('./house-paper-broker');
+    house.ensureAccount(userId);                 // idempotent — never resets an existing ledger
+    const acct = await house.getAccount(userId).catch(() => null);
+    if (!acct) return null;
+    const facade = {
+      getIBKRAccount: (uid) => house.getAccount(uid),
+      getIBKRPositions: async (uid) => ((await house.getPositions(uid)) || { positions: [] }).positions,
+      getIBKROpenOrders: (uid) => house.getOpenOrders(uid),
+      getIBKRDayPnl: (uid) => house.getDayPnl(uid),
+      placeIBKROrder: (uid, o) => house.placeOrder(uid, o),
+      cancelIBKROrder: (uid, id) => house.cancelOrder(uid, id),
+    };
+    return { broker: 'house', accountId: acct.account_id, facade, practice: true };
+  };
+
   const order = preferredBroker(userId) === 'alpaca' ? [tryAlpaca, tryIbkr] : [tryIbkr, tryAlpaca];
   for (const attempt of order) {
     const resolved = await attempt();
     if (resolved) return resolved;
   }
-  return null;
+  // Nothing connected. An explicit `paper` choice means the user asked to practice, so give
+  // them their own house ledger to trade. Anyone else (no choice made) gets the read-only
+  // demo book — a populated dashboard beats an empty one, and it can place no orders.
+  const house = await tryHouse();
+  if (house) return house;
+  if (userId != null && userId !== '' && userId !== 'local-owner') return demoFacade();
+  return null;   // owner identity with nothing configured — unchanged
 }
 
 module.exports = { brokerFacadeFor, preferredBroker };

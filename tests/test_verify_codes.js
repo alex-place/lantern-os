@@ -30,6 +30,9 @@ const assert = require("assert");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-verify-codes-"));
 const origCwd = process.cwd();
 process.chdir(tmp);
+// The data root is resolved from the module tree, not the cwd (#3088) — isolate the
+// store with UNISONA_STATE_DIR, set BEFORE any lib require reads it.
+process.env.UNISONA_STATE_DIR = tmp;
 process.env.SESSION_SECRET = ["unit", "test", "strong", "secret", "not", "dev", "default"].join("-");
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");

@@ -55,6 +55,20 @@ function getWatchlist(userId) {
   if (list) return _clean(list);
   return setWatchlist(userId, _seed()); // first access → seed + persist
 }
+/**
+ * Seed this user's watchlist AT ACCOUNT CREATION rather than waiting for their first page
+ * load (#2546). Functionally the list is identical either way — getWatchlist() already seeds
+ * on first access — but seeding early puts the user's symbols into allTickers() before they
+ * ever visit, so the price/bar collectors have already warmed data for them and the first
+ * visit shows populated quotes instead of an empty grid filling in.
+ *
+ * Idempotent: an existing list is never overwritten, so this is safe to call on every login.
+ */
+function ensureSeeded(userId) {
+  if (_readList(_file(userId))) return { seeded: false };
+  return { seeded: true, tickers: setWatchlist(userId, _seed()) };
+}
+
 function addTicker(userId, sym) {
   const s = String(sym).toUpperCase().trim();
   const list = getWatchlist(userId);

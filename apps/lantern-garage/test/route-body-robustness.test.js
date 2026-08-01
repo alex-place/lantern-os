@@ -12,7 +12,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-routebody-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-routebody-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store via
+// UNISONA_STATE_DIR so this test never writes into the real repo data/ tree.
+process.env.UNISONA_STATE_DIR = _tmpDataRoot;
 
 const authRoutes = require("../routes/auth");
 const profileRoutes = require("../routes/profiles");

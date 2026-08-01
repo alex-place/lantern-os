@@ -38,6 +38,7 @@ const { EventEmitter } = require("events");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-auth-flow-"));
 const origCwd = process.cwd();
 process.chdir(tmp);
+process.env.UNISONA_STATE_DIR = tmp; // #3088: user-profiles roots at dataRoot(), not cwd
 // A strong (non-default) secret so tokens mint/verify regardless of PORT/NODE_ENV.
 // Built via join() rather than a quoted literal so the repo slop-scan doesn't
 // mistake this test fixture for a committed credential.

@@ -24,13 +24,14 @@
 
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("../lib/app-paths");
 const crypto = require("crypto");
 const { destroyUserSessions } = require("../lib/session-file-store");
 
 // Where the session store persists its files (mirrors server.js). A privileged role
 // change invalidates the target's live sessions here so revoked access takes effect
 // immediately, not at the next natural logout (#2627).
-const SESSION_DIR = path.join(__dirname, "..", "..", "..", "data", "sessions");
+const SESSION_DIR = dataPath("sessions");
 
 const {
   listProfiles,
@@ -49,10 +50,10 @@ const { isStaff, isAdmin } = require("../lib/auth-middleware");
 const { getSessionUser, getSessionUserId } = require("../lib/session-identity");
 const { sendMailBounded, smtpConfigured } = require("../lib/mailer");
 
-const AUDIT_LOG = path.join(process.cwd(), "data", "profiles", "account-admin-audit.jsonl");
+const AUDIT_LOG = dataPath("profiles", "account-admin-audit.jsonl");
 // Read-only archive of deleted accounts — a durable snapshot appended before the
 // profile is tombstoned, so a "delete" is recoverable/auditable, never data loss.
-const ARCHIVE_LOG = path.join(process.cwd(), "data", "profiles", "archive.jsonl");
+const ARCHIVE_LOG = dataPath("profiles", "archive.jsonl");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
