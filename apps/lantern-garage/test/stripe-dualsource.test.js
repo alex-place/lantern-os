@@ -15,11 +15,10 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-"));
-process.chdir(_tmpDataRoot);
-// The data root is module-anchored, not cwd-derived (#3088) — isolate the store via
-// UNISONA_STATE_DIR so this test never writes into the real repo data/ tree.
-process.env.UNISONA_STATE_DIR = _tmpDataRoot;
+// user-profiles resolves data/profiles from dataRoot() at require time (#3088) — isolate it.
+const _tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-"));
+process.chdir(_tmpRoot);
+process.env.UNISONA_STATE_DIR = _tmpRoot;
 const profiles = require(path.join(__dirname, "..", "lib", "user-profiles"));
 
 let failures = 0;

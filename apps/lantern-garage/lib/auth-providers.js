@@ -22,43 +22,45 @@ const { roleLevel } = require("./role-hierarchy");
 // other identities explicitly ("local:you@email.com"). Keeping the stored key
 // provider-qualified prevents a bare id from cross-granting admin to a
 // same-numbered id on a different provider.
-// Identity prefixes an override entry can actually match. "local" is the email+password
-// path (providerId = the lowercased email); patreon/discord are retired as sign-in
-// methods but remain as denormalized mirrors on older stored profiles.
-const KNOWN_OVERRIDE_PROVIDERS = new Set(["google", "local", "patreon", "discord"]);
-
-const _rawOverrides = String(process.env.LANTERN_ADMIN_IDS || "")
+const _ADMIN_ID_ENTRIES = String(process.env.LANTERN_ADMIN_IDS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-
+// A local identity is keyed by the LOWERCASED email, so normalize local entries to
+// match case-insensitively — "local:You@Example.com" would otherwise silently never
+// match the stored "local:you@example.com" (#3087).
 function _normalizeOverride(entry) {
   const qualified = entry.includes(":") ? entry : `google:${entry}`;
   const idx = qualified.indexOf(":");
   const provider = qualified.slice(0, idx).toLowerCase();
   const id = qualified.slice(idx + 1);
-  // A local identity is keyed by the lowercased email, so match case-insensitively —
-  // otherwise "local:You@Example.com" silently never matches (#3087).
   return `${provider}:${provider === "local" ? id.toLowerCase() : id}`;
 }
+const ADMIN_OVERRIDES = new Set(_ADMIN_ID_ENTRIES.map(_normalizeOverride));
 
-const ADMIN_OVERRIDES = new Set(_rawOverrides.map(_normalizeOverride));
-
-// An entry naming a provider we never issue identities for can never grant admin. That
-// used to fail silently — including the easy mistake of a BARE id, which is normalized
-// to google: and so matches nothing on an email/password-only deploy (#3087).
-for (const entry of _rawOverrides) {
-  const provider = _normalizeOverride(entry).split(":")[0];
-  if (!KNOWN_OVERRIDE_PROVIDERS.has(provider)) {
-    console.warn(
-      `[auth] LANTERN_ADMIN_IDS entry "${entry}" names unknown provider "${provider}" — ` +
-        `it can never match. Use one of: ${[...KNOWN_OVERRIDE_PROVIDERS].join(", ")}.`
-    );
-  } else if (!entry.includes(":")) {
-    console.warn(
-      `[auth] LANTERN_ADMIN_IDS entry "${entry}" is unqualified and was read as ` +
-        `"google:${entry}". For an email/password account use "local:you@email.com".`
-    );
+// The providers an override key can actually match (see isAdminOverride callers +
+// profileHasAdminOverride). An entry qualified with anything else can never match, and a bare
+// entry becomes google:<id> — surprising if you meant your local email account (#3087).
+const _KNOWN_OVERRIDE_PROVIDERS = new Set(["google", "patreon", "discord", "local"]);
+for (const entry of _ADMIN_ID_ENTRIES) {
+  if (!entry.includes(":")) {
+    // Bare → google:<id>. If it looks like an email it was almost certainly meant to be a
+    // local account, which this will NOT match — the exact silent no-op #3087 describes.
+    if (entry.includes("@")) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" is bare, so it is read as a GOOGLE id ` +
+          `("google:${entry}") and will NOT elevate an email/password account. Use ` +
+          `"local:${entry.toLowerCase()}" for a local login.`
+      );
+    }
+  } else {
+    const prov = entry.slice(0, entry.indexOf(":")).toLowerCase();
+    if (!_KNOWN_OVERRIDE_PROVIDERS.has(prov)) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" names provider "${prov}", which no login ` +
+          `path checks — it can never grant admin. Known: ${[..._KNOWN_OVERRIDE_PROVIDERS].join(", ")}.`
+      );
+    }
   }
 }
 

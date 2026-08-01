@@ -15,9 +15,7 @@ const path = require("path");
 // Isolate profile storage in a fresh temp dir.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-ent-"));
 process.chdir(tmp);
-// The data root is resolved from the module tree, not the cwd (#3088) — isolate the
-// store with UNISONA_STATE_DIR, set BEFORE any lib require reads it.
-process.env.UNISONA_STATE_DIR = tmp;
+process.env.UNISONA_STATE_DIR = tmp; // #3088: user-profiles roots at dataRoot(), not cwd
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");
 const profiles = require(path.join(LIB, "user-profiles"));

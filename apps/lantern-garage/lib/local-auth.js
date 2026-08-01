@@ -161,14 +161,18 @@ function _json(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 function _establish(req, res, profile, status) {
-  // Admin override travels with the ACCOUNT, exactly as on the OAuth path
-  // (oauth-core.js) — an email/password login must honour LANTERN_ADMIN_IDS too.
-  // Without this, `local:you@email.com` was accepted, stored, and never applied, so a
-  // deploy with no working Google OAuth had NO path to admin via the documented env
-  // var (#3087). Only ever elevates; never demotes.
+  // Apply the LANTERN_ADMIN_IDS override on the LOCAL path too (#3087). The OAuth flow
+  // elevates via profileHasAdminOverride, but this path passed profile.role straight
+  // through, so a correctly-qualified `local:you@email.com` entry silently never took
+  // effect and an email/password box had NO working route to admin. Only ever elevates.
+  //
+  // PERSIST it, not just the session (extends #3128): gates that read the stored profile
+  // rather than the session — routes/accounts, the entitlement checks — would otherwise
+  // still see `guest` for an account the login just treated as admin.
   if (profileHasAdminOverride(profile) && profile.role !== "admin") {
-    profile = updateProfile(profile.id, { role: "admin" }) || profile;
+    profile = updateProfile(profile.id, { role: "admin" }) || { ...profile, role: "admin" };
   }
+  const role = profile.role;
   establishSession(
     req,
     {
@@ -176,7 +180,7 @@ function _establish(req, res, profile, status) {
       name: profile.name,
       email: profile.email,
       emailVerified: profile.emailVerified === true,
-      role: profile.role,
+      role,
       tier: profile.tier,
       provider: "local",
     },

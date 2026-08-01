@@ -399,11 +399,17 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
-    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
-    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
-    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
-    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
+    // Secure tracks the ACTUAL connection, not a PORT guess (#3010). The old
+    // `!!process.env.PORT` forced Secure whenever PORT was set — but a launcher that injects
+    // PORT on a plain-http localhost box (the preview tool, autostart, etc.) is NOT https, so
+    // express-session saved the session yet silently dropped Set-Cookie and every sign-in
+    // stayed guest with no error. With `"auto"` + `proxy:true` the cookie is Secure exactly
+    // when the request is: behind Railway's TLS the forwarded `X-Forwarded-Proto: https` still
+    // makes it Secure (so #2618's "insecure cookie in prod" fix holds), and on local http it
+    // is sent non-Secure so login actually persists. (A prod proxy that strips X-Forwarded-Proto
+    // would downgrade the cookie rather than drop it — a narrower, louder failure than the
+    // silent guest state; a fail-closed guard on that edge is left as a follow-up.)
+    secure: "auto",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },

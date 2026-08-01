@@ -8,11 +8,9 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-profsec-"));
-process.chdir(_tmpDataRoot);
-// The data root is module-anchored, not cwd-derived (#3088) — isolate the store via
-// UNISONA_STATE_DIR so this test never writes into the real repo data/ tree.
-process.env.UNISONA_STATE_DIR = _tmpDataRoot;
+const _tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-profsec-"));
+process.chdir(_tmpRoot);
+process.env.UNISONA_STATE_DIR = _tmpRoot; // #3088: user-profiles roots at dataRoot(), not cwd
 const p = require(path.join(__dirname, "..", "lib", "user-profiles"));
 
 let failures = 0;
