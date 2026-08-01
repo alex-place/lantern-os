@@ -27,7 +27,11 @@ def test_landing_page_is_clean_sales_page() -> None:
     # The GitHub link ships in the SHARED footer, not the landing markup: the Patreon
     # link went first (1be9d49f), then the footer itself became global via
     # js/site-chrome.js (#3146). Assert it where it actually lives.
-    assert "github.com" in read("apps/lantern-garage/public/js/site-chrome.js")
+    #
+    # Matched on the repo path rather than the host: a bare "github.com" substring test
+    # trips CodeQL's incomplete-url-substring-sanitization rule, and the repo path is the
+    # more specific assertion anyway.
+    assert "alex-place/lantern-os" in read("apps/lantern-garage/public/js/site-chrome.js")
     # No old inline journal UI
     assert 'id="entryForm"' not in html
     assert 'id="micBtn"' not in html
