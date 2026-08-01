@@ -400,16 +400,20 @@ const sessionMiddleware = session({
   cookie: {
     httpOnly: true,
     // Secure tracks the ACTUAL connection, not a PORT guess (#3010). The old
-    // `!!process.env.PORT` forced Secure whenever PORT was set — but a launcher that injects
-    // PORT on a plain-http localhost box (the preview tool, autostart, etc.) is NOT https, so
-    // express-session saved the session yet silently dropped Set-Cookie and every sign-in
-    // stayed guest with no error. With `"auto"` + `proxy:true` the cookie is Secure exactly
-    // when the request is: behind Railway's TLS the forwarded `X-Forwarded-Proto: https` still
-    // makes it Secure (so #2618's "insecure cookie in prod" fix holds), and on local http it
-    // is sent non-Secure so login actually persists. (A prod proxy that strips X-Forwarded-Proto
-    // would downgrade the cookie rather than drop it — a narrower, louder failure than the
-    // silent guest state; a fail-closed guard on that edge is left as a follow-up.)
-    secure: "auto",
+    // `!!process.env.PORT` forced Secure whenever PORT was set — but a launcher that
+    // injects PORT on a plain-http localhost box (the preview tool, autostart, etc.) is
+    // NOT https, so express-session saved the session yet silently dropped Set-Cookie
+    // and every sign-in stayed guest with no error.
+    //
+    // Production stays hard-Secure regardless, so #2618's fail-closed rule holds
+    // unconditionally rather than depending on a proxy header being present. Everywhere
+    // else "auto" (with proxy:true above) makes the cookie Secure exactly when the
+    // request is: https behind Railway's TLS via X-Forwarded-Proto, plain on loopback.
+    //
+    // The remaining edge — a prod proxy that strips X-Forwarded-Proto — was left as a
+    // follow-up when this landed via #3128; establishSession now closes it, refusing to
+    // report a sign-in whose cookie cannot be delivered instead of returning ok:true.
+    secure: process.env.NODE_ENV === "production" ? true : "auto",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },

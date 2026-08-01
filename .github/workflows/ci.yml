@@ -137,6 +137,7 @@ jobs:
           node tests/test_verify_codes.js
           node tests/test_trade_entitlement.js
           node tests/test_pdf_route_entitlement.js
+          node tests/test_secure_cookie_guard.js
           node apps/lantern-garage/test/user-provider-keys.test.js
 
       - name: Start server

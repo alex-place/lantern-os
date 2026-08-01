@@ -185,7 +185,9 @@ function _establish(req, res, profile, status) {
       provider: "local",
     },
     (err) => {
-      if (err) return _json(res, 500, { error: "session_save_failed" });
+      // A distinct code when the cookie itself could not be delivered (#3010), so the
+      // failure names its own cause instead of looking like a store outage.
+      if (err) return _json(res, 500, { error: err.code || "session_save_failed" });
       _json(res, status, { ok: true, user: publicProfile(profile) });
     }
   );
