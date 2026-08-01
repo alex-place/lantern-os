@@ -3139,22 +3139,7 @@ function selectChart(t, ev){
 // Inline zoom: instead of a full-screen popup, expand the chart into the grid as a
 // single tall chart (reusing the 1-slot layout, #1628). A "← Back to grid" button
 // restores the previous layout.
-let _preZoomSlot = null;
-function openFullscreenChart(t){
-  // DISABLED: Prevent fullscreen zoom on chart click
-  // if(_preZoomSlot===null) _preZoomSlot = slotCount;   // remember layout to restore
-  // fullscreenTicker = t;
-  // chartSlots = [t]; slotCount = 1;
-  // const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value='1';
-  // const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='';
-  // persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
-  // try{ document.querySelector('.main').scrollTop = 0; }catch(e){}
-}
-
-function closeFullscreenChart(){
-  // Fullscreen zoom disabled per #3141 - do nothing
-  return;
-}
+// Fullscreen zoom feature completely removed per #3141
 
 function renderFullscreenChart(){
   if(!fullscreenTicker) return;
