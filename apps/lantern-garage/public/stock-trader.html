@@ -1271,6 +1271,26 @@ const TICK_SIZE = 0.01;
 // height reserved for time labels. Shared by renderChart() and the
 // wheel/drag handlers so hit-testing matches what's actually drawn.
 const AXIS_W = 52, AXIS_H = 16;
+// Price axis consistency (#3141): every chart renders EXACTLY this many
+// gridline intervals. The rendered range is snapped outward to clean 1/2/5
+// step boundaries (see _snapPriceRange), so labels always land on
+// .00/.10/.20/.50-style values and the count never varies chart-to-chart
+// or while zooming.
+const PRICE_AXIS_INTERVALS = 6;
+function _snapPriceRange(min, max){
+  const K = PRICE_AXIS_INTERVALS, R = max - min;
+  if(!(R > 0) || !isFinite(R)) return [min, max];
+  let mag = Math.pow(10, Math.floor(Math.log10(R/K)));
+  for(let guard = 0; guard < 12; guard++, mag *= 10){
+    for(const L of [1, 2, 5]){
+      const step = L * mag;
+      if(step * K < R) continue;                       // window too small to cover
+      const lo = Math.floor(min/step) * step;
+      if(lo + K*step >= max - step*1e-9) return [lo, lo + K*step];
+    }
+  }
+  return [min, max];
+}
 const MIN_VISIBLE_BARS = 10;
 
 // TradingView-style chart colors (canvas can't read CSS custom properties,
@@ -1610,17 +1630,17 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: the SAME fixed tick target on every chart (not height-scaled),
-  // snapped to the 1/2/5 ladder so labels land only on clean .00/.10/.20/.50
-  // values — uniform look across all cards, and the count stays steady while
-  // the price scale is zoomed (the step re-snaps to the visible range).
+  // Price axis: the incoming range is already snapped to clean 1/2/5 step
+  // boundaries (_snapPriceRange), so dividing it evenly gives EXACTLY
+  // PRICE_AXIS_INTERVALS+1 labels on every chart, all landing on
+  // .00/.10/.20/.50-style values — identical count across cards and steady
+  // under zoom.
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const PRICE_AXIS_TARGET = 6;
-  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, PRICE_AXIS_TARGET);
+  const priceStep = rng / PRICE_AXIS_INTERVALS;
+  const priceTicks = Array.from({length: PRICE_AXIS_INTERVALS+1}, (_,i)=> rMin + i*priceStep);
   const priceDec = Math.max(2, decimalsFor(priceStep));
   for(const price of priceTicks){
-    if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
     ctx.strokeStyle = CHART_GRID_COLOR();
     ctx.beginPath();
@@ -1997,6 +2017,10 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     const pad = (hi - lo) * 0.08 || hi * 0.001;   // breathing room top/bottom
     rMin = lo - pad; rMax = hi + pad;
   }
+  // Snap the rendered range outward to clean 1/2/5 step boundaries so the
+  // price axis shows EXACTLY PRICE_AXIS_INTERVALS gaps on every chart, at
+  // every zoom level (#3141).
+  [rMin, rMax] = _snapPriceRange(rMin, rMax);
   const rng = rMax - rMin; if(rng<=0) return;
   view.lastRMin = rMin; view.lastRMax = rMax;
 
