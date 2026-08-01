@@ -3111,6 +3111,9 @@ function focusTicker(t){
 // the watchlist click / expand control do). Desktop-oriented; harmless on mobile
 // (single chart, order panel stays closed via the isNarrowTrader guard).
 function selectChart(t, ev){
+  // DISABLED: All click-based fullscreen removed per #3141 - do nothing
+  return;
+  /*
   if(!t) return;
   // Clicks that land on a control inside the card (buy/sell, change-symbol, drag
   // handle) do their own thing — never focus or fullscreen from those.
@@ -3129,6 +3132,7 @@ function selectChart(t, ev){
     setOrderSymbol(t);                       // order ticket follows the selection
     // opening is reserved for the explicit BUY/SELL affordances (operator UI pass 2026-07-28)
   }
+  */
 }
 
 // ── Zoom a ticker (#1629) ─────────────────────────────────────────────────────
