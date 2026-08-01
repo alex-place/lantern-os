@@ -3116,10 +3116,8 @@ function selectChart(t, ev){
   // handle) do their own thing — never focus or fullscreen from those.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
-  // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
-  // right below it (focusTicker does all of that) — no two-tap dance.
-  if(isNarrowTrader()){ focusTicker(t); return; }
   // Click → focus it in the grid (darker grey) + point the peripherals at it.
+  // (removed fullscreen behavior entirely per #3141)
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}
   document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
