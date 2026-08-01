@@ -47,41 +47,13 @@
   // EXACTLY on 12 is cached and baked into every subsequent render. Sub-pixel
   // correct regardless of font metrics, baseline quirks, or browser.
   const FONT = 'Segoe UI, system-ui, sans-serif';
-  let _probe = null;
-  const _dyCache = Object.create(null);
-  function _measuredDy(ch, size) {
-    const key = ch + '|' + size;
-    if (key in _dyCache) return _dyCache[key];
-    if (typeof document === 'undefined') return { dx: 0, dy: 0 };   // SSR/tests: neutral
-    try {
-      if (!_probe) {
-        _probe = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        _probe.setAttribute('viewBox', '0 0 24 24');
-        _probe.style.cssText = 'position:absolute;width:24px;height:24px;left:-9999px;top:-9999px';
-        document.body.appendChild(_probe);
-      }
-      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      t.setAttribute('x', '12'); t.setAttribute('y', '12');
-      t.setAttribute('text-anchor', 'middle');
-      t.setAttribute('font-family', FONT);
-      t.setAttribute('font-size', String(size));
-      t.setAttribute('font-weight', '800');
-      t.textContent = ch;
-      _probe.appendChild(t);
-      const bb = t.getBBox();
-      _probe.removeChild(t);
-      const off = { dx: 12 - (bb.x + bb.width / 2), dy: 12 - (bb.y + bb.height / 2) };
-      // Only CACHE once the face is actually loaded — measuring during font
-      // fallback poisoned the cache (identical '100' badges rendered 0.6 units
-      // apart depending on when they were first measured).
-      const ready = !document.fonts || document.fonts.check('800 ' + size + 'px "Segoe UI"');
-      if (ready) _dyCache[key] = off;
-      return off;
-    } catch (_e) { return (_dyCache[key] = { dx: 0, dy: 0 }); }
-  }
+  // Centering: dominant-baseline="central" on the SVG text — the same
+  // mechanism the letter monograms use, so EVERY text badge (500 / 100 /
+  // 2000 / 20Y / monogram letters) sits identically. The old hidden-probe
+  // getBBox measurement raced font loading and drifted between renders
+  // (operator: "single letter logos are centered but SPY's isn't").
   function centerText(ch, size, fill) {
-    const off = _measuredDy(ch, size);
-    return '<text x="' + (12 + off.dx).toFixed(2) + '" y="' + (12 + off.dy).toFixed(2) + '" text-anchor="middle" ' +
+    return '<text x="12" y="12.5" text-anchor="middle" dominant-baseline="central" ' +
       'font-family="' + FONT + '" font-size="' + size + '" ' +
       'font-weight="800" fill="' + (fill || '#fff') + '">' + ch + '</text>';
   }
@@ -130,6 +102,7 @@
     DOGE: 'https://assets.coingecko.com/coins/images/5/large/dogecoin.png',
     XRP: 'https://assets.coingecko.com/coins/images/44/large/xrp-symbol-white-128.png',
     LTC: 'https://assets.coingecko.com/coins/images/2/large/litecoin.png',
+    ADA: 'https://assets.coingecko.com/coins/images/975/large/cardano.png',
   };
   // Crypto currency glyphs — the recognized signs, not letters.
   const CRYPTO = {
@@ -139,6 +112,7 @@
     DOGE: { ch: 'Ð', bg: 'linear-gradient(135deg,#c2a633,#8a7420)' },
     XRP: { ch: '✕', bg: 'linear-gradient(135deg,#23292f,#4b5563)' },
     LTC: { ch: 'Ł', bg: 'linear-gradient(135deg,#345d9d,#1e3a68)' },
+    ADA: { ch: '₳', bg: 'linear-gradient(135deg,#0d5ec8,#083a80)' },
   };
 
   function svgBadge(bg, inner, cls) {
@@ -173,9 +147,11 @@
         '<svg viewBox="0 0 24 24" aria-hidden="true">' + centerText(c.ch, 15) + '</svg></span>';
       const src = CRYPTO_LOGO[base];
       if (!src || m.noImage) return glyph;
-      const fb = glyph.replace(/"/g, '&quot;');
+      // Hidden-sibling fallback (same pattern as the stock logos): onerror
+      // toggles visibility instead of injecting escaped HTML.
+      const fb = glyph.replace('style="', 'style="display:none;');
       return '<img class="tb-badge tb-img" src="' + src + '" alt="" loading="lazy" ' +
-        'onerror="this.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;">';
+        'onerror="this.style.display=\'none\';var s=this.nextElementSibling;if(s)s.style.display=\'inline-flex\'">' + fb;
     }
     // 2. tracked index / commodity / sector fund → number or symbol badge
     const tr = TRACKS[t];
@@ -210,9 +186,23 @@
     const badge = tickerBadgeHtml(symbol, meta);
     if (badge) return badge;
     const t = String(symbol || '').toUpperCase();
-    const fb = String(tickerBadgeHtml(t, Object.assign({}, meta, { force: true })) || '').replace(/"/g, '&quot;');
-    return '<img class="tb-badge tb-img" src="/api/trading/logo?symbol=' + encodeURIComponent(t) +
-      '" alt="" loading="lazy" onerror="this.outerHTML=&quot;' + fb.replace(/&quot;/g, '&amp;quot;') + '&quot;">';
+    // Normalize the wildly inconsistent source art (full-bleed glyphs, baked-in
+    // square backgrounds, transparent dark marks with zero contrast on the dark
+    // theme): every logo renders at the SAME scale inside the SAME white disc —
+    // uniform zoom, guaranteed contrast, the disc crops any source square.
+    // The disc is the .tb-badge span (page CSS sizes it), so the inner %
+    // resolves against the badge itself, never the surrounding row.
+    // Fallback: the colored monogram badge is rendered ALONGSIDE, hidden, and
+    // onerror just swaps visibility — no HTML-in-attribute escaping (the old
+    // outerHTML=&quot;…&quot; injection parsed into mangled markup on 404s).
+    const fb = String(tickerBadgeHtml(t, Object.assign({}, meta, { force: true })) || '')
+      .replace('style="', 'style="display:none;');
+    return '<span class="tb-badge tb-img" style="background:#fff;border-radius:50%;display:inline-flex;' +
+      'align-items:center;justify-content:center;overflow:hidden">' +
+      '<img src="/api/trading/logo?symbol=' + encodeURIComponent(t) + '" alt="" loading="lazy" ' +
+      'style="width:78%;height:78%;object-fit:contain" ' +
+      'onerror="this.parentNode.style.display=\'none\';var s=this.parentNode.nextElementSibling;if(s)s.style.display=\'inline-flex\'">' +
+      '</span>' + fb;
   }
 
   window.tickerBadgeOrLogoHtml = tickerBadgeOrLogoHtml;

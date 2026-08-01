@@ -415,15 +415,27 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
     const token = process.env.LOGODEV_TOKEN || '';
     const fmpUrl = `https://financialmodelingprep.com/image-stock/${encodeURIComponent(sym)}.png`;
     const ldUrl = token
-      ? `https://img.logo.dev/ticker/${encodeURIComponent(sym)}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true`
+      ? `https://img.logo.dev/ticker/${encodeURIComponent(sym)}?token=${encodeURIComponent(token)}&size=128&format=png&retina=true&fallback=404`
       : '';
+    // FMP serves one generic stand-in image for every symbol it has no logo
+    // for — passing it through gave every small-cap the same samey badge.
+    // Detect it by hash and 404 instead, so the client's colored monogram
+    // fallback renders. (logo.dev placeholders are disabled via fallback=404.)
+    const PLACEHOLDER_SHA1 = 'b4e668e07c9d189f20f9e7302a5d8d1089abfb3a';
     const pipeFrom = (srcUrl, onFail) => {
       const rq = https.get(srcUrl, (up) => {
         const ct = up.headers['content-type'] || '';
-        if (up.statusCode >= 200 && up.statusCode < 300 && ct.startsWith('image')) {
+        if (!(up.statusCode >= 200 && up.statusCode < 300 && ct.startsWith('image'))) { up.resume(); onFail(); return; }
+        const chunks = [];
+        up.on('data', (c) => chunks.push(c));
+        up.on('end', () => {
+          const buf = Buffer.concat(chunks);
+          const sha = require('crypto').createHash('sha1').update(buf).digest('hex');
+          if (sha === PLACEHOLDER_SHA1) { onFail(); return; }
           res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400', 'Access-Control-Allow-Origin': '*' });
-          up.pipe(res);
-        } else { up.resume(); onFail(); }
+          res.end(buf);
+        });
+        up.on('error', onFail);
       });
       rq.on('error', onFail);
       rq.setTimeout(8000, () => { rq.destroy(); onFail(); });
