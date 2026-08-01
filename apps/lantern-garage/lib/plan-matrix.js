@@ -8,14 +8,13 @@
  * their access, and declares — as DATA — which capability each plan unlocks. Both
  * the server-side gates and the pricing page can read this one table, so
  * "pricing.html matches enforcement 1:1" becomes a checkable property instead of a
- * hope (that reconciliation + the flip to live enforcement are the founder's
- * Level-2 activation; see PLAN_ENFORCEMENT below).
+ * hope. Enforcement is live: see the note below.
  *
- * ENFORCEMENT IS OFF BY DEFAULT. This module is a pure matrix + resolvers. The
- * live gate (lib/auth-middleware.hasEntitlement) only consults it when
- * PLAN_ENFORCEMENT=1 — until then, current behavior is byte-identical. The plan
- * explicitly sequences activation AFTER Level 1 clears ("Pro isn't worth paying
- * for until BYOK works" — #2505, now done) and the green-path gate passes.
+ * ENFORCEMENT IS ALWAYS ON (operator, 2026-07-31: "I don't want hidden flags in
+ * the code — remove it or leave it on"). This module is a pure matrix +
+ * resolvers; lib/auth-middleware.hasEntitlement consults it on every call, and
+ * the route-level gates (options order, portfolio advisor, autonomous trader)
+ * enforce unconditionally. The PLAN_ENFORCEMENT env var is gone.
  *
  * LOOP STAGE: Act (role-appropriate capability surface, enforced not just hidden).
  */
@@ -55,9 +54,11 @@ const CAPABILITIES = {
   // plan alone does not grant it. Pro still buys the terminal extras below.
   // minPlan RESTORED to "pro" (operator, 2026-07-31). It was moved to "free" in #3111,
   // a navigation PR, which left test/plan-matrix.test.js red on master ("trade→Pro" and
-  // "Free denied Pro caps"). It also blocked turning PLAN_ENFORCEMENT on: hasEntitlement
-  // under enforcement only ever GRANTS, so a free-tier `trade` would have handed every
-  // Free user broker trading the moment the flag flipped. Keeping the clearer label.
+  // "Free denied Pro caps"). That mattered doubly once enforcement went always-on:
+  // hasEntitlement's matrix branch only ever GRANTS, so a free-tier `trade` would
+  // have handed every Free user broker trading. Own-broker trading is still
+  // reachable on Free — lib/auth-middleware grants `trade` when the user has
+  // connected their OWN broker — which is a narrower rule than the plan alone.
   live_trading:       { minPlan: "pro", label: "Trading via your own connected broker", entitlement: "trade" },
   // ── Pro adds ($20) ──────────────────────────────────────────────────────────
   trade_terminal:     { minPlan: "pro", label: "Trading terminal (manual orders + AI tradelist)" },
