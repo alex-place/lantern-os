@@ -28,10 +28,10 @@ const http = require('http');
 const pa = require('../../lib/portfolio-analytics');
 
 // Advisor tier gate (operator tiering 2026-07-26): the Advisor is a $20 Pro
-// capability. Enforcement follows the product-wide PLAN_ENFORCEMENT flag —
-// unset, behavior is unchanged; set, Free users get an honest 403 upgrade nudge.
+// capability, enforced always. It previously followed PLAN_ENFORCEMENT, which was
+// never set — so a feature the pricing page sells was free to everyone. Free users
+// now get an honest 403 upgrade nudge.
 function _advisorAllowed(req) {
-  if (process.env.PLAN_ENFORCEMENT !== '1') return true;
   try { return require('../../lib/auth-middleware').hasEntitlement(req, 'advisor'); }
   catch (_e) { return true; }   // gate infra must never break the surface
 }

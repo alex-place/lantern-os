@@ -59,19 +59,17 @@ module.exports = async function optionsRoutes(req, res, url, ctx) {
   // POST /api/trading/options/order — MANUAL paper option order (operator ask
   // 2026-07-26: the user can place their own paper option trade; the AI doesn't own
   // the account). Paper-host-only via options-shadow.placePaperOrder (live auth is
-  // refused in code). Signed-in users; Pro capability once PLAN_ENFORCEMENT=1.
+  // refused in code). Signed-in users; a Pro ($20) capability, enforced always.
   if (url.pathname === '/api/trading/options/order' && req.method === 'POST') {
     const uid = _uid();
     if (!uid) { sendJson(res, { error: 'not_authenticated' }, 401); return true; }
-    if (process.env.PLAN_ENFORCEMENT === '1') {
-      try {
-        const am = require('../../lib/auth-middleware');
-        if (!am.hasEntitlement(req, 'options_manual')) {
-          sendJson(res, { error: 'pro_required', message: 'Manual options orders are a Pro ($20) feature' }, 403);
-          return true;
-        }
-      } catch (_e) { /* gate infra must never break the surface */ }
-    }
+    try {
+      const am = require('../../lib/auth-middleware');
+      if (!am.hasEntitlement(req, 'options_manual')) {
+        sendJson(res, { error: 'pro_required', message: 'Manual options orders are a Pro ($20) feature' }, 403);
+        return true;
+      }
+    } catch (_e) { /* gate infra must never break the surface */ }
     let body = {};
     try { body = JSON.parse(await ctx.collectRequestBody(req) || '{}'); } catch (_e) { sendJson(res, { error: 'invalid_json' }, 400); return true; }
     const shadow = require('../../lib/options-shadow');

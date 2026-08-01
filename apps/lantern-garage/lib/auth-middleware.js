@@ -195,22 +195,20 @@ function hasEntitlement(req, key) {
   const role = effectiveRole(req);
   if (role === "admin") return true;
 
-  // #2550 — four-plan enforcement, OFF by default. When PLAN_ENFORCEMENT=1 (the
-  // founder's Level-2 activation), a capability is granted iff the caller's plan
-  // (resolved from their role via lib/plan-matrix) includes it. The matrix maps
-  // supporter→Free / deep_dreamer→Pro / pilot→Pilot, so this is consistent with the
-  // legacy role checks below — it just makes the WHOLE §01 matrix (not only
-  // trade/ai_trader) enforceable from one source of truth, verifiable via
-  // /api/plan/report before the flip. Flag unset → this block is skipped and
-  // behavior is byte-identical. It only ever GRANTS (never hard-denies), so the
-  // per-account override + legacy checks below still apply.
-  if (process.env.PLAN_ENFORCEMENT === "1") {
-    try {
-      const pm = require("./plan-matrix");
-      const capName = Object.keys(pm.CAPABILITIES).find((c) => pm.CAPABILITIES[c].entitlement === key) || key;
-      if (pm.minPlanForCapability(capName) && pm.roleHasCapability(role, capName)) return true;
-    } catch { /* the matrix must never break the legacy gate */ }
-  }
+  // #2550 — four-plan capability matrix, ALWAYS ON (operator, 2026-07-31: "I don't
+  // want hidden flags in the code — remove it or leave it on"). It used to sit
+  // behind PLAN_ENFORCEMENT=1, which meant the product shipped for months giving
+  // away capabilities the pricing page sold. The flag is gone; the matrix is the
+  // gate.
+  //
+  // This block only ever GRANTS. A capability the matrix does not cover falls
+  // through to the legacy role checks below, so the matrix can widen access but
+  // never silently narrow it.
+  try {
+    const pm = require("./plan-matrix");
+    const capName = Object.keys(pm.CAPABILITIES).find((c) => pm.CAPABILITIES[c].entitlement === key) || key;
+    if (pm.minPlanForCapability(capName) && pm.roleHasCapability(role, capName)) return true;
+  } catch { /* the matrix must never break the legacy gate */ }
 
   // Tier unlocks (product model — keyed off role level, itself derived from the
   // Patreon pledge amount in auth-providers.js):

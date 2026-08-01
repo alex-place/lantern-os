@@ -214,11 +214,12 @@ module.exports = async function statusRoutes(req, res, url, deps) {
   // events are never counted (Converge).
   // #2550 — the four-plan capability matrix, so the founder can verify pricing.html
   // matches enforcement 1:1 and see whether live enforcement is armed. Public read
-  // (it's the pricing truth, not sensitive); reports the PLAN_ENFORCEMENT flag state.
+  // (it's the pricing truth, not sensitive). Enforcement is always on — the flag
+  // it used to report is gone — so the field is a constant kept for compatibility.
   if (url.pathname === "/api/plan/report" && req.method === "GET") {
     try {
       const pm = require("../lib/plan-matrix");
-      sendJson(res, { ok: true, enforcementEnabled: process.env.PLAN_ENFORCEMENT === "1", ...pm.planReport() }, 200);
+      sendJson(res, { ok: true, enforcementEnabled: true, ...pm.planReport() }, 200);
     } catch (e) { sendJson(res, { ok: false, error: e.message }, 500); }
     return true;
   }
