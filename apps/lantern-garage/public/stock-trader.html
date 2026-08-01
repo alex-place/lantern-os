@@ -3141,19 +3141,14 @@ function selectChart(t, ev){
 // restores the previous layout.
 // Fullscreen zoom feature completely removed per #3141
 
-function renderFullscreenChart(){
-  if(!fullscreenTicker) return;
-  const price = getCurrentPrice(fullscreenTicker);
-  document.getElementById('fsPrice').textContent = price ? '$'+fmt(price, price>=100?2:4) : '—';
-  renderZoneLadder(fullscreenTicker, zonesData[fullscreenTicker]||{}, price,
-    document.getElementById('chart-fs'), document.getElementById('overlay-fs'));
-}
+// Fullscreen chart rendering disabled per #3141
+function renderFullscreenChart(){}  // no-op
 
 document.addEventListener('keydown', e=>{
   if(e.key!=='Escape') return;
   if(_drawTool || _drawPending){ setDrawTool(''); return; }   // #2444: Esc disarms drawing first
   if(!document.getElementById('otBg').classList.contains('hidden')) closeOrderTicket();
-  else closeFullscreenChart();
+  // Fullscreen zoom removed per #3141
 });
 
 // ── Keyboard-first trading (#2438) ───────────────────────────────────────────
