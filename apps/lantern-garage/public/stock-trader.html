@@ -3516,80 +3516,67 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click: inside chart = reset zoom/pan; outside chart on card = zoom to fullscreen
+// Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
 document.addEventListener('dblclick', function(e){
-  const card = e.target.closest('.card');
-  if(!card) return;
-
-  const ladder = e.target.closest('.zone-ladder');
-  const target = _ladderTarget(ladder || card.querySelector('.zone-ladder'));
-  if(!target) return;
-
-  const { dataTicker, viewKey, canvas } = target;
-
-  if(ladder){
-    // Double-click happened inside zone-ladder area, check if it's inside canvas bounds
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX-rect.left, y = e.clientY-rect.top;
-    // Check if click is within canvas (includes axes, so use generous bounds)
-    if(x >= -60 && x <= rect.width + 60 && y >= -20 && y <= rect.height + 20){
-      e.preventDefault();
-      // Reset zoom/pan
-      const view = chartView[viewKey];
-      if(view){
-        if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-        view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-        view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
-      }
-      renderTicker(dataTicker);
-      return;
-    }
-  }
-
-  // Double-click outside chart area or on card header: zoom to fullscreen
-  e.preventDefault();
-  openFullscreenChart(dataTicker);
-});
-
-// Click on time axis (bottom) to reset timeframe to default
-// Click on price axis (right) to reset price range to default
-document.addEventListener('click', function(e){
-  // Check if click is in a zone-ladder, but avoid bubbled clicks from canvas
-  if(e.target.tagName === 'CANVAS') return; // Ignore canvas clicks
-
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
-
   const target = _ladderTarget(ladder);
   if(!target) return;
-
   const { dataTicker, viewKey, canvas } = target;
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX-rect.left, y = e.clientY-rect.top;
+  if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
+  e.preventDefault();
   const view = chartView[viewKey];
-  if(!view) return;
-
-  const rect = ladder.getBoundingClientRect();
-  const x = e.clientX - rect.left;
-  const y = e.clientY - rect.top;
-
-  // Click on time axis (bottom 20px of ladder area)
-  if(y > rect.height - 20){
-    e.stopPropagation();
+  if(view){
     if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.barOffset = 0;
-    renderTicker(dataTicker);
-    return;
+    view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+    view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
   }
+  renderTicker(dataTicker);
+});
 
-  // Click on price axis (right 60px of ladder area)
-  if(x > rect.width - 60){
-    e.stopPropagation();
-    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.yMin = null; view.yMax = null;
-    view.gYMin = null; view.gYMax = null;
-    renderTicker(dataTicker);
-    return;
-  }
-}, true);
+// Attach click handlers to all canvas elements for axis resets
+function attachAxisClickHandlers(){
+  document.querySelectorAll('canvas').forEach(canvas => {
+    canvas.addEventListener('click', function(e){
+      const ladder = canvas.closest('.zone-ladder');
+      if(!ladder) return;
+
+      const target = _ladderTarget(ladder);
+      if(!target) return;
+
+      const { dataTicker, viewKey } = target;
+      const view = chartView[viewKey];
+      if(!view) return;
+
+      const canvasRect = canvas.getBoundingClientRect();
+      const x = e.clientX - canvasRect.left;
+      const y = e.clientY - canvasRect.top;
+
+      // Click on time axis (bottom 20px of canvas area)
+      if(y > canvasRect.height - 20 && y <= canvasRect.height){
+        e.stopPropagation();
+        if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+        view.barOffset = 0;
+        renderTicker(dataTicker);
+        return;
+      }
+
+      // Click on price axis (right 60px of canvas area)
+      if(x > canvasRect.width - 60 && x <= canvasRect.width){
+        e.stopPropagation();
+        if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+        view.yMin = null; view.yMax = null;
+        view.gYMin = null; view.gYMax = null;
+        renderTicker(dataTicker);
+        return;
+      }
+    }, true);
+  });
+}
+// Attach handlers after DOM is ready
+setTimeout(attachAxisClickHandlers, 500);
 
 // ── Page list (TRADELIST): the AI's per-user trading universe drives this page's
 // sidebar + cards. /api/trading/watchlist-prices returns the UNION (watchlists +
