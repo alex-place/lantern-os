@@ -92,8 +92,7 @@ WHSEC="${STRIPE_WEBHOOK_SECRET:-}"
 if [ -z "$WHSEC" ] && [ -t 0 ]; then
   printf 'Paste the Stripe WEBHOOK signing secret (whsec_..., blank to skip): ' >&2
   read -rs WHSEC
-  printf '
-' >&2
+  printf '\n' >&2
 fi
 case "$WHSEC" in
   "")       echo "WARNING: no webhook secret - checkout will work but entitlements will NOT apply." >&2 ;;
@@ -111,11 +110,16 @@ if [ "$MODE" = "envfile" ]; then
   # EnvironmentFile keeps the value out of `systemctl show`, which any local user
   # can read. The file itself is root-only 0600.
   mkdir -p "$(dirname "$ENVFILE")"
-  printf 'STRIPE_SECRET_KEY=%s\n' "$KEY" > "$ENVFILE"
+  { printf 'STRIPE_SECRET_KEY=%s\n' "$KEY"
+    [ -n "$WHSEC" ] && printf 'STRIPE_WEBHOOK_SECRET=%s\n' "$WHSEC"
+    true; } > "$ENVFILE"
   chmod 600 "$ENVFILE"; chown root:root "$ENVFILE"
   printf '[Service]\nEnvironmentFile=%s\n' "$ENVFILE" > "$DROPIN"
 else
-  printf '[Service]\nEnvironment="STRIPE_SECRET_KEY=%s"\n' "$KEY" > "$DROPIN"
+  { printf '[Service]\n'
+    printf 'Environment="STRIPE_SECRET_KEY=%s"\n' "$KEY"
+    [ -n "$WHSEC" ] && printf 'Environment="STRIPE_WEBHOOK_SECRET=%s"\n' "$WHSEC"
+    true; } > "$DROPIN"
 fi
 chmod 600 "$DROPIN"; chown root:root "$DROPIN"
 unset KEY WHSEC
