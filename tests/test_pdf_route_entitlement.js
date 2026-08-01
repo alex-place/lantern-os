@@ -14,6 +14,7 @@ const path = require("path");
 // auth-middleware -> user-profiles resolves data/profiles from cwd at require time.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-pdf-ent-"));
 process.chdir(tmp);
+process.env.UNISONA_STATE_DIR = tmp; // #3088: user-profiles roots at dataRoot(), not cwd
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");
 const profiles = require(path.join(LIB, "user-profiles"));
