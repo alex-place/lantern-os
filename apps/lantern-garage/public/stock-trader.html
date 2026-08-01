@@ -879,7 +879,7 @@
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
   <div class="hstat" title="CBOE Volatility Index — the market's fear gauge (higher = choppier)"><div class="l">VIX</div><div class="v" id="hVix">—</div></div>
   <div class="hstat" id="mktClockWrap" title="US equities session, Eastern Time"><div class="l" id="mktClockLabel">Closed</div><div class="v" id="mktClock">—</div></div>
-  <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="closeFullscreenChart()" title="Back to the chart grid">← Back to grid</button>
+  <button id="zoomBackBtn" class="chart-ctrl" style="display:none;cursor:pointer" onclick="setSlotCount(0)" title="Back to the chart grid">← Back to grid</button>
   <div class="hgroup" role="group" aria-label="Chart controls">
   <select id="chartLayoutSelect" class="chart-ctrl" aria-label="Number of charts to show" onchange="setSlotCount(this.value)" title="How many charts to show — fewer = bigger">
     <option value="0">⊞ All</option>
@@ -1051,7 +1051,7 @@
 </div>
 
 <!-- Fullscreen ticker chart -->
-<div class="fs-bg hidden" id="fsBg" onclick="if(event.target===this)closeFullscreenChart()">
+<div class="fs-bg hidden" id="fsBg" onclick="if(event.target===this)setSlotCount(0)">
   <div class="fs-chart">
     <div class="fs-header">
       <span class="fs-ticker" id="fsTicker">—</span>
@@ -1088,7 +1088,7 @@
         <button class="btn-buy" onclick="openOrderTicket(fullscreenTicker,'buy')" title="Open a buy order ticket for this symbol (paper trade)">BUY</button>
         <button class="btn-sell" onclick="openOrderTicket(fullscreenTicker,'sell')" title="Open a sell order ticket for this symbol (paper trade)">SELL</button>
       </div>
-      <span class="fs-close" onclick="closeFullscreenChart()">✕ Close</span>
+      <span class="fs-close" onclick="setSlotCount(0)">✕ Close</span>
     </div>
     <div class="fs-body">
       <div class="zone-ladder" id="ladder-fs">
