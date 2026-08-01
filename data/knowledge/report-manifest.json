@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Allowlist for the PDFs shown in the PUBLIC Knowledge Center 'Reports' section.",
+    "",
+    "It is empty on purpose. /api/pdfs is a directory listing of the research pool —",
+    "the corpus the RAG grounding index reads — and the Knowledge Center used to render",
+    "that listing verbatim on a public marketing page. What was actually being published:",
+    "",
+    "  • third-party copyrighted material we have no right to redistribute — a 1964",
+    "    Bjorken & Drell physics textbook, Osborne/Rubinstein game-theory texts, the",
+    "    Dunnigan wargames handbook, commercial research from GWI / IDHL / Smartsheet /",
+    "    Clifford Chance, and a Zero Hash user agreement",
+    "  • internal first-party documents — a Kalshi/Ko-fi revenue report, Polymarket",
+    "    convergence reports, prediction-market baseline tables",
+    "  • ten uploads whose filenames are raw content hashes, plus one called '8495630 (1)'",
+    "",
+    "Ingesting a document for retrieval is not a decision to publish it. Add an entry here",
+    "only for a report that is OURS and meant for the public; anything else stays in the",
+    "pool, where the grounding index can still read it. Admins signed in see the whole",
+    "pool on the page regardless, so ingest and cleanup workflows are unaffected.",
+    "",
+    "Entry shape: { filename, title, summary }"
+  ],
+  "reports": []
+}

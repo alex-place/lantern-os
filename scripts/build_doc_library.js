@@ -5,19 +5,27 @@
  *
  * SOURCE OF TRUTH: data/knowledge/doc-catalog.json — a reviewed record for every
  * in-repo doc: {path, title, description, category, status, updated, grounding,
- * action, mergeInto, reason}. It is the grounding for the surface: a card is shown
- * ONLY when action === "keep", and it carries a verified description + status +
- * grounding badge (NOT a scraped first line). Docs the catalog marks
+ * action, audience, mergeInto, reason}. It is the grounding for the surface: a card
+ * is shown ONLY when action === "keep", and it carries a verified description +
+ * status + grounding badge (NOT a scraped first line). Docs the catalog marks
  * archive/remove/merge are dropped from the Knowledge Center (and therefore from
  * the RAG grounding index, which scrapes /repo/*.md links from this page).
  *
- * Two doc sources, one ranked surface:
- *   1. IN-REPO docs → `/repo/<path>.md` cards (scraped by build_knowledge_index.py
- *      → grounding corpus + Explore feed).
- *   2. EXTERNAL docs (Human Flourishing Frameworks) → cards that LINK to the GitHub
- *      source, driven by the COMMITTED data/knowledge/external-sources.json (we do
- *      NOT re-walk the gitignored staging dir here — that could change/leak the
- *      curated external set).
+ * Three rules decide what a visitor sees (all added in the #kc-rework pass):
+ *   1. AUDIENCE. `internal` never renders — operator runbooks, deploy topology,
+ *      admin surfaces. The GCE runbook names the live origin IP; it has no business
+ *      on a public marketing page.
+ *   2. UNCATALOGUED DOCS ARE NOT PUBLISHED. They used to render with a scraped first
+ *      line and an "Unreviewed" badge, so any file landing in docs/ auto-published
+ *      itself with nobody having read it. scripts/check-doc-catalog.mjs fails CI
+ *      until an entry exists.
+ *   3. DATED RESEARCH NOTES ROLL UP. docs/research/YYYY-MM-DD-*.md is a lab journal
+ *      (87 of them); one card points at a generated docs/research/INDEX.md instead of
+ *      87 cards drowning the library.
+ *
+ * Every card carries data-rank (this script's ordering) and data-updated (ISO date)
+ * so the page can offer Recommended / Newest / A–Z without discarding the curation —
+ * an unconditional client-side A→Z re-sort is what put hex-named PDFs above the FAQ.
  *
  * The ENTIRE `<div class="doc-grid">` is regenerated between the AUTO markers.
  * Idempotent. CRLF-safe (the repo's docs are mostly CRLF; the old `^---\n`
@@ -44,17 +52,23 @@ const MARK_END = '<!-- LIBRARY:AUTO:END -->';
 // ── category presentation (data-cat must match the filter chips in the HTML) ──
 const CATS = {
   guides:           { label: 'Guides',              icon: '📘', order: 2 },
-  architecture:     { label: 'Architecture',        icon: '🏛️', order: 3 },
-  research:         { label: 'Research',            icon: '🧪', order: 4 },
-  'convergence-io': { label: 'Convergence IO',      icon: '🔭', order: 5 },
-  training:         { label: 'Training & models',   icon: '🧠', order: 6 },
-  trading:          { label: 'Trading',             icon: '📈', order: 7 },
+  setup:            { label: 'Setup & integrations',icon: '🔌', order: 3 },
+  trading:          { label: 'Trading',             icon: '📈', order: 4 },
+  architecture:     { label: 'Architecture',        icon: '🏛️', order: 5 },
+  research:         { label: 'Research',            icon: '🧪', order: 6 },
+  training:         { label: 'Models & training',   icon: '🧠', order: 7 },
   creator:          { label: 'Creator suite',       icon: '🎬', order: 8 },
-  setup:            { label: 'Setup & integrations',icon: '🔌', order: 9 },
-  ops:              { label: 'Operations',          icon: '⚙️', order: 10 },
-  reports:          { label: 'Audits & reports',    icon: '📋', order: 11 },
-  library:          { label: 'Library',             icon: '📄', order: 12 },
-  lore:             { label: 'Lore',                icon: '📜', order: 13 },
+  reports:          { label: 'Reports',             icon: '📋', order: 9 },
+};
+
+// Categories that no longer stand alone. `ops` and `lore` are gone because their docs
+// are audience:internal or off-product; the rest were one- and eight-card chips that
+// only made the filter row longer (#kc-rework).
+const CAT_ALIAS = {
+  'convergence-io': 'architecture',
+  library: 'architecture',
+  ops: 'architecture',
+  lore: 'guides',
 };
 
 // Essentials pinned to the front of the "All" view (independent of category).
@@ -66,6 +80,10 @@ const PIN = [
   'docs/UNISONA-1.8.md', 'docs/KEYSTONE-PRODUCT.md', 'docs/convergence-io/README.md',
 ];
 const PIN_IDX = new Map(PIN.map((p, i) => [p, i]));
+
+// docs/research/YYYY-MM-DD-*.md — the dated journal, rolled up rather than carded.
+const DATED_NOTE = /^docs\/research\/\d{4}-\d{2}-\d{2}-/;
+const NOTES_INDEX = path.join(REPO, 'docs', 'research', 'INDEX.md');
 
 const STATUS_ORDER = { Living: 0, Reference: 1, Draft: 2, Historical: 3, Superseded: 4, Duplicate: 5, Lore: 6, Unreviewed: 7 };
 
@@ -162,6 +180,43 @@ function reclassifyLibrary(rel) {
   return 'library';
 }
 
+// Regenerate the dated-notes index the rollup card points at: one line per note,
+// newest first, grouped by month. Generated, never hand-edited.
+function writeNotesIndex(notes) {
+  const byMonth = new Map();
+  for (const n of notes) {
+    const m = (String(n.date).match(/(\d{4})-(\d{2})/) || [])[0] || 'undated';
+    if (!byMonth.has(m)) byMonth.set(m, []);
+    byMonth.get(m).push(n);
+  }
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const pretty = (m) => {
+    const p = m.split('-');
+    return p.length === 2 ? `${months[+p[1] - 1]} ${p[0]}` : 'Undated';
+  };
+  const out = [
+    '# Research notes',
+    '',
+    '<!-- GENERATED by scripts/build_doc_library.js — do not hand-edit. -->',
+    '',
+    'Dated working notes: experiments, negative results, and design records, newest first.',
+    'These are lab notebooks, not guides — a note records what was true on its date and is',
+    'never revised afterwards. Findings that survive get folded into the docs above.',
+    '',
+    `${notes.length} notes.`,
+    '',
+  ];
+  for (const m of [...byMonth.keys()].sort().reverse()) {
+    out.push(`## ${pretty(m)}`, '');
+    for (const n of byMonth.get(m)) {
+      const rel = n.rel.replace(/^docs\/research\//, '');
+      out.push(`- **[${n.title}](${rel})** — ${String(n.date).slice(0, 10)}`);
+    }
+    out.push('');
+  }
+  fs.writeFileSync(NOTES_INDEX, out.join('\n'), 'utf8');
+}
+
 // ── card renderer (larger panel + metadata footer: category · status · grounding · date) ──
 function card(c) {
   const cat = c.cat;
@@ -171,6 +226,12 @@ function card(c) {
   const attrs = [
     `class="doc-card"`, `data-cat="${cat}"`, `data-type="${c.type || 'md'}"`,
     `data-status="${s.toLowerCase()}"`, g ? `data-grounding="${g.toLowerCase()}"` : '',
+    `data-audience="${c.audience || 'builder'}"`,
+    // The generator's own ranking (pin → category → status → title) and an ISO date.
+    // Without these the page could only re-sort by visible title text, which is how a
+    // library of hex-named PDFs ended up ahead of the FAQ (#kc-rework).
+    `data-rank="${String(c.rank ?? 9999).padStart(4, '0')}"`,
+    c.iso ? `data-updated="${c.iso}"` : 'data-updated="0000-00-00"',
     `href="${esc(c.href)}"`, c.external ? 'target="_blank" rel="noopener"' : '',
   ].filter(Boolean).join(' ');
   const badges = [
@@ -203,17 +264,33 @@ function inRepoCards() {
   ];
   const seen = new Set();
   const entries = [];
-  const stats = { keep: 0, excluded: 0, unreviewed: 0, missing: 0 };
+  const notes = [];   // dated research notes — rolled up into one card + an index
+  const stats = { keep: 0, excluded: 0, internal: 0, uncatalogued: 0, notes: 0, missing: 0 };
   for (const rel of onDisk) {
     if (seen.has(rel)) continue;
     seen.add(rel);
+    // This file is OUTPUT of this script (the dated-notes index). Cataloguing it would
+    // give the rollup card a second, duplicate copy of itself.
+    if (rel === 'docs/research/INDEX.md') continue;
     // CORE docs are always grounded by build_knowledge_index.py; skip them here
     // UNLESS the catalog explicitly surfaces one as a card (e.g. AGENTS.md).
     if (CORE.has(rel) && !byPath.has(rel)) continue;
     const e = byPath.get(rel);
     if (e) {
       if (e.action !== 'keep') { stats.excluded++; continue; }
-      let cat = CATS[e.category] ? e.category : 'library';
+      // Operator-only docs never reach the public surface — infra, deploy topology,
+      // admin surfaces, internal audits. This is the gate that keeps the GCE runbook
+      // (which names the live origin IP) off a marketing page (#kc-rework).
+      if (e.audience === 'internal') { stats.internal++; continue; }
+      // Dated research notes are a journal, not a library: 99 of them on disk, and
+      // every one used to claim a card. They roll up into a single card + a generated
+      // index so the library stays browsable.
+      if (DATED_NOTE.test(rel)) {
+        notes.push({ rel, title: e.title || prettyFromName(path.basename(rel)), date: e.updated || '', summary: e.description || '' });
+        stats.notes++;
+        continue;
+      }
+      let cat = CAT_ALIAS[e.category] || (CATS[e.category] ? e.category : 'library');
       if (cat === 'library') cat = reclassifyLibrary(rel);   // rescue catch-all into a topical bucket
       entries.push({
         rel, cat, icon: e.icon,
@@ -223,21 +300,17 @@ function inRepoCards() {
         status: e.status || 'Reference',
         grounding: e.grounding || '',
         date: fmtDate(e.updated),
+        iso: (String(e.updated || '').match(/\d{4}-\d{2}-\d{2}/) || [''])[0],
+        audience: e.audience || 'builder',
         pin: PIN_IDX.has(rel) ? PIN_IDX.get(rel) : 999,
       });
       stats.keep++;
     } else {
-      // uncatalogued → fallback extraction, flagged Unreviewed
-      const { title, summary } = fallbackMeta(readText(path.join(REPO, rel)));
-      const cat = reclassifyLibrary(rel);   // uncatalogued → best-effort topical bucket, not a dump
-      entries.push({
-        rel, cat, catLabel: catLabelFor(rel, cat),
-        title: title || prettyFromName(path.basename(rel)),
-        summary: summary || `Reference doc · ${rel}`,
-        status: 'Unreviewed', grounding: '', date: '',
-        pin: 999,
-      });
-      stats.unreviewed++;
+      // Uncatalogued docs are NOT published. They used to appear with a scraped
+      // first line and an "Unreviewed" badge, which meant any file landing in docs/
+      // auto-published itself to a public surface with nobody having read it. The
+      // catalog gate (scripts/check-doc-catalog.mjs) fails CI until it has an entry.
+      stats.uncatalogued++;
     }
   }
   // catalog entries whose file is gone
@@ -250,44 +323,44 @@ function inRepoCards() {
     (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9) ||
     a.title.localeCompare(b.title));
 
-  const cards = entries.map((e) => card({
+  const cards = entries.map((e, i) => card({
     cat: e.cat, href: '/repo/' + e.rel, icon: e.icon, title: e.title,
     summary: e.summary, catLabel: e.catLabel, status: e.status,
-    grounding: e.grounding, date: e.date,
+    grounding: e.grounding, date: e.date, iso: e.iso, audience: e.audience,
+    rank: i,
   }));
+  // One card for the whole dated-notes journal, ranked with the research bucket.
+  if (notes.length) {
+    notes.sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    writeNotesIndex(notes);
+    cards.push(card({
+      cat: 'research', href: '/repo/docs/research/INDEX.md', icon: '🗒️',
+      title: `Research notes — ${notes.length} dated entries`,
+      summary: `Every dated research note, newest first: experiments, negative results, and ` +
+        `design records from ${notes[notes.length - 1].date?.slice(0, 7) || ''} to ${notes[0].date?.slice(0, 7) || ''}. ` +
+        `Working notes, not polished guides.`,
+      catLabel: 'Research', status: 'Living', grounding: 'Grounded',
+      date: fmtDate(notes[0].date), iso: (String(notes[0].date).match(/\d{4}-\d{2}-\d{2}/) || [''])[0],
+      audience: 'builder', rank: entries.length,
+    }));
+  }
   return { cards, stats };
 }
 
-// ── 2. external HFF docs from the COMMITTED manifest (no staging re-walk) ──────
-function hffCards() {
-  let manifest = [];
-  try { manifest = JSON.parse(fs.readFileSync(EXTERNAL_OUT, 'utf8')); } catch { return { cards: [] }; }
-  const cards = manifest
-    .filter((e) => e && e.doc && e.url)
-    .map((e) => card({
-      cat: 'hff', href: e.url, external: true, icon: '🌍',
-      title: e.title || prettyFromName(e.doc.split('/').pop()),
-      summary: e.description || `Human Flourishing Frameworks · ${e.doc.replace(/^hff\//, '')}`,
-      catLabel: 'Convergence · HFF',
-      status: e.status || 'Reference', grounding: e.grounding || 'Ungrounded',
-      date: fmtDate(e.updated),
-    }));
-  return { cards };
-}
+// Human Flourishing Frameworks cards were removed (#kc-rework): a separate project,
+// unrelated to chat, trading, or model research, taking 34 of the library's cards and
+// linking off-site. data/knowledge/external-sources.json is left in place for the
+// record; nothing reads it into the surface any more.
 
 // ── main ──────────────────────────────────────────────────────────────────────
 function main() {
   let html = fs.readFileSync(KC_HTML, 'utf8');
   const repo = inRepoCards();
-  const hff = hffCards();
 
   const block = [
     MARK_START,
     '      <!-- In-repo library (catalog-driven; scraped by build_knowledge_index.py → grounding corpus + Explore) -->',
     repo.cards.join('\n'),
-    '',
-    '      <!-- External: Human Flourishing Frameworks (committed external-sources.json; links to GitHub source) -->',
-    hff.cards.join('\n'),
     '      ' + MARK_END,
   ].join('\n');
 
@@ -298,9 +371,9 @@ function main() {
   html = html.replace(reAuto, block);
 
   fs.writeFileSync(KC_HTML, html, 'utf8');
-  console.log(`doc library: ${repo.cards.length} in-repo cards (keep=${repo.stats.keep}, ` +
-    `excluded=${repo.stats.excluded}, unreviewed=${repo.stats.unreviewed}, missing=${repo.stats.missing}), ` +
-    `${hff.cards.length} HFF cards`);
+  console.log(`doc library: ${repo.cards.length} cards (published=${repo.stats.keep}, ` +
+    `notes rolled up=${repo.stats.notes}, internal withheld=${repo.stats.internal}, ` +
+    `catalog-excluded=${repo.stats.excluded}, uncatalogued skipped=${repo.stats.uncatalogued})`);
   console.log('  next: python scripts/build_knowledge_index.py');
 }
 
