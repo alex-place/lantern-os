@@ -63,9 +63,47 @@ function effectiveRole(req) {
 }
 
 /**
+ * Would a 302 to the HTML login page be the WRONG answer for this request? (#2980)
+ *
+ * A `fetch()`/XHR caller to a JSON surface follows a 302 transparently and receives a 200 +
+ * login *HTML* where it expected JSON — so `JSON.parse` throws (or the page is treated as
+ * empty data) and the real "not signed in" reason never surfaces; a polling client
+ * (stock-trader.html) then re-downloads auth.html every cycle, forever. Such requests must get
+ * a 401 with a JSON body instead. A genuine top-level *document* navigation still 302s so a
+ * human hitting a gated page lands on the login screen.
+ *
+ * Signals, any of which means "this is data, answer in JSON":
+ *   - the path is under `/api/` (the whole API surface is data, never a page), or
+ *   - `Sec-Fetch-Mode` is present and not `navigate` (a fetch/XHR/cors request, not a nav), or
+ *   - `Accept` asks for JSON and not HTML.
+ */
+function _expectsJson(req) {
+  const url = (req && req.url) || "";
+  if (url.startsWith("/api/")) return true;
+  const h = (req && req.headers) || {};
+  const mode = String(h["sec-fetch-mode"] || "");
+  if (mode && mode !== "navigate") return true;
+  const accept = String(h["accept"] || "");
+  if (accept.includes("application/json") && !accept.includes("text/html")) return true;
+  return false;
+}
+
+/**
+ * Deny an unauthenticated request the RIGHT way for its kind: a 401 JSON body for an API/XHR
+ * caller (#2980), letting the caller fall through to its existing 302→/auth.html for a document
+ * navigation. Returns true when it has written the 401 (caller must stop), false otherwise.
+ */
+function denyUnauthenticated(req, res) {
+  if (!_expectsJson(req)) return false;
+  res.writeHead(401, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ error: "auth_required", returnTo: (req && req.url) || "/" }));
+  return true;
+}
+
+/**
  * Require authentication for a route.
  * Returns true if user is authenticated, false otherwise.
- * Sends appropriate redirect (to /auth.html if not logged in).
+ * Sends a 401 JSON for API/XHR callers, else a 302 to /auth.html (#2980).
  */
 function requireAuth(req, res) {
   // Auth gate disabled by an admin → treat everyone as an allowed guest.
@@ -74,8 +112,10 @@ function requireAuth(req, res) {
   const session = getSessionUser(req);
 
   if (!session?.id) {
-    res.writeHead(302, { Location: "/auth.html" });
-    res.end();
+    if (!denyUnauthenticated(req, res)) {
+      res.writeHead(302, { Location: "/auth.html" });
+      res.end();
+    }
     return false;
   }
 
@@ -110,8 +150,10 @@ function requireRole(req, res, requiredRole = "supporter") {
       );
       return false;
     }
-    res.writeHead(302, { Location: "/auth.html" });
-    res.end();
+    if (!denyUnauthenticated(req, res)) {
+      res.writeHead(302, { Location: "/auth.html" });
+      res.end();
+    }
     return false;
   }
 
@@ -261,8 +303,10 @@ function requireEntitlement(req, res, key) {
       );
       return false;
     }
-    res.writeHead(302, { Location: "/auth.html" });
-    res.end();
+    if (!denyUnauthenticated(req, res)) {
+      res.writeHead(302, { Location: "/auth.html" });
+      res.end();
+    }
     return false;
   }
 
@@ -303,8 +347,10 @@ function requireStaff(req, res) {
       res.end(JSON.stringify({ error: "Staff access required." }));
       return false;
     }
-    res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(req.url || "/accounts.html") });
-    res.end();
+    if (!denyUnauthenticated(req, res)) {
+      res.writeHead(302, { Location: "/auth.html?returnTo=" + encodeURIComponent(req.url || "/accounts.html") });
+      res.end();
+    }
     return false;
   }
   // #2627: gate on the PERSISTED profile role (effectiveRole), NOT the role
