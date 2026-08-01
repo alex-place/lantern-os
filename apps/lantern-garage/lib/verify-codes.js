@@ -25,7 +25,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { dataPath } = require("./data-root");
+const { dataPath } = require("./app-paths");
 const TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 5;
 const CODE_DIGITS = 6;

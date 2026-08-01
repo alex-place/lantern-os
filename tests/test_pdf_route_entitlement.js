@@ -15,8 +15,8 @@ const path = require("path");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-pdf-ent-"));
 process.chdir(tmp);
 // The data root is resolved from the module tree, not the cwd (#3088) — isolate the
-// store with LANTERN_DATA_DIR, set BEFORE any lib require reads it.
-process.env.LANTERN_DATA_DIR = path.join(tmp, "data");
+// store with UNISONA_STATE_DIR, set BEFORE any lib require reads it.
+process.env.UNISONA_STATE_DIR = tmp;
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");
 const profiles = require(path.join(LIB, "user-profiles"));

@@ -15,7 +15,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { dataPath } = require("./data-root");
+const { dataPath } = require("./app-paths");
 const { higherRole } = require("./role-hierarchy");
 
 // The ONLY roles a Stripe purchase may resolve to. Never admin / tech_support / founder.

@@ -85,7 +85,7 @@ const { JobQueue } = require("./lib/job-queue");
 const { JobWorker } = require("./lib/job-worker");
 
 const repoRoot = path.resolve(__dirname, "..", "..");
-const { dataRoot } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
+const { dataRoot, dataPath } = require("./lib/app-paths"); // #1946 G2: writable state root (servers: <repoRoot>/data)
 const publicRoot = path.join(__dirname, "public");
 const port = Number(process.env.LANTERN_GARAGE_PORT || process.env.PORT || 4177);
 const host = process.env.LANTERN_GARAGE_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
@@ -391,7 +391,7 @@ try {
 const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
-  store: new FileSessionStore({ dir: require("./lib/data-root").dataPath("sessions") }),
+  store: new FileSessionStore({ dir: dataPath("sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -721,7 +721,7 @@ server.listen(port, host, () => {
   // Print the resolved data root (#3088): a CLI script and the server used to pick
   // different roots depending on cwd, so a `setUserRole` could "succeed" against a
   // store this process never reads. One line here makes that visible instead of silent.
-  console.info(`[data] root: ${require("./lib/data-root").DATA_ROOT}`);
+  console.info(`[data] root: ${dataRoot()}`);
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.

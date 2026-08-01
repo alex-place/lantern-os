@@ -16,9 +16,9 @@ const path = require("path");
 
 const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-liverole-"));
 process.chdir(_tmpDataRoot);
-// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
-// explicitly so this test never writes into the real repo data/ tree.
-process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store via
+// UNISONA_STATE_DIR so this test never writes into the real repo data/ tree.
+process.env.UNISONA_STATE_DIR = _tmpDataRoot;
 process.env.SESSION_SECRET = ["unit", "test", "strong", "secret", "value"].join("-");
 
 const profiles = require(path.join(__dirname, "..", "lib", "user-profiles"));

@@ -13,7 +13,7 @@
  */
 
 const fs = require("fs");
-const { dataPath } = require("./data-root");
+const { dataPath } = require("./app-paths");
 
 let _transport = null;
 let _checked = false;

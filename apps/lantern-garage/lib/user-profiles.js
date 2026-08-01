@@ -6,7 +6,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { dataPath } = require("./data-root");
+const { dataPath } = require("./app-paths");
 const crypto = require("crypto");
 const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
 const { effectiveRole } = require("./stripe-billing");

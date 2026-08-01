@@ -4,8 +4,8 @@ Role changes could silently not take effect. Every auth store (profiles, session
 action tokens, verify codes, billing ledger, mail outbox) resolved its path from
 `process.cwd()`, so a CLI script and the running server read two different stores
 depending on how each was started — `setUserRole()` reported success against a file
-the server never opened (#3088). All of them now resolve through one
-cwd-independent `lib/data-root.js` (override with `LANTERN_DATA_DIR`), and the
+the server never opened (#3088). All of them now resolve through the
+existing `lib/app-paths.js` seam (ADR-0014 G2), which is cwd-independent, and the
 server prints the resolved root at startup.
 
 `LANTERN_ADMIN_IDS` also had no effect on an email/password login: the override was

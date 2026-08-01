@@ -10,7 +10,7 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
-const { dataPath } = require("./data-root");
+const { dataPath } = require("./app-paths");
 const { resolveSessionSecret } = require("./session-secret");
 
 function secret() {
@@ -69,7 +69,7 @@ function verifyToken(token, expectedPurpose) {
 // ── Single-use ledger — a signed token is otherwise replayable for its whole TTL, so a
 // leaked reset/verify link works again even after the legitimate user used it (#2614).
 // jti → expiry, in-memory + an append log under the single data root (survives restart),
-// pruned on load. Anchored via data-root.js, never the cwd (#3088).
+// pruned on load. Anchored via app-paths.dataPath, never the cwd (#3088).
 function ledgerPath() { return dataPath("auth", "consumed-tokens.jsonl"); }
 let _consumed = null; // Map<jti, exp>
 function _load() {

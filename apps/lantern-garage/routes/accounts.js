@@ -24,7 +24,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { dataPath } = require("../lib/data-root");
+const { dataPath } = require("../lib/app-paths");
 const crypto = require("crypto");
 const { destroyUserSessions } = require("../lib/session-file-store");
 

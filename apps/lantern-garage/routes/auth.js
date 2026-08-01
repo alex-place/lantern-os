@@ -28,7 +28,7 @@ const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/a
 const { destroyUserSessions } = require("../lib/session-file-store");
 // Session store dir (mirrors server.js) — a password reset invalidates the account's live
 // sessions so a hijacked session can't survive the remediation (#2614).
-const AUTH_SESSION_DIR = require("../lib/data-root").dataPath("sessions");
+const AUTH_SESSION_DIR = require("../lib/app-paths").dataPath("sessions");
 const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
 const { issueCode, checkCode } = require("../lib/verify-codes");
 const { isLoopback, clientIp } = require("../lib/request-auth");

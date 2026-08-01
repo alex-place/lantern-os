@@ -16,7 +16,7 @@ const path = require("path");
 const { EventEmitter } = require("events");
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-admin-override-"));
-process.env.LANTERN_DATA_DIR = path.join(tmp, "data");
+process.env.UNISONA_STATE_DIR = tmp;
 process.env.SESSION_SECRET = ["unit", "test", "strong", "secret", "not", "dev", "default"].join("-");
 // The override is read at module load, so it must be set BEFORE the requires below.
 process.env.LANTERN_ADMIN_IDS = "local:Owner@Example.com";
