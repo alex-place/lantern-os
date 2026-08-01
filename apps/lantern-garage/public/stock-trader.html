@@ -3115,37 +3115,11 @@ function selectChart(t, ev){
   // handle) do their own thing — never focus or fullscreen from those.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
-
-  // Check if click is on the chart canvas area - if so, don't open fullscreen
-  const card = document.getElementById('card-'+t);
-  const canvas = card && card.querySelector('canvas');
-  if(canvas && ev){
-    const canvasRect = canvas.getBoundingClientRect();
-    const clickX = ev.clientX;
-    const clickY = ev.clientY;
-
-    // Check if click is within canvas bounds
-    if(clickX >= canvasRect.left && clickX <= canvasRect.right &&
-       clickY >= canvasRect.top && clickY <= canvasRect.bottom){
-      // Click inside chart canvas - just focus, don't open fullscreen
-      activeTicker = t;
-      try{ localStorage.setItem('trader.ticker', t); }catch(e){}
-      document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
-      if(card) card.classList.add('active');
-      renderWatchlist();
-      renderSymbolInfo(t);
-      if(!document.body.classList.contains('guest')){
-        setOrderSymbol(t);
-      }
-      return;
-    }
-  }
-
   // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
   // right below it (focusTicker does all of that) — no two-tap dance.
   if(isNarrowTrader()){ focusTicker(t); return; }
   const card = document.getElementById('card-'+t);
-  // Second click on the ALREADY-focused chart → open it fullscreen (if not on canvas).
+  // Second click on the ALREADY-focused chart → open it fullscreen.
   if(card && activeTicker === t && card.classList.contains('active')){
     openFullscreenChart(t);
     return;
@@ -3534,55 +3508,6 @@ document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
 
-// Track clicks to detect double-clicks and prevent fullscreen
-const _clickTracker = {};
-function attachDoubleClickSkip(){
-  document.addEventListener('mousedown', function(e){
-    const ladder = e.target.closest('.zone-ladder');
-    if(!ladder) return;
-
-    const target = _ladderTarget(ladder);
-    if(!target) return;
-
-    const { dataTicker } = target;
-    const now = Date.now();
-
-    if(!_clickTracker[dataTicker]) _clickTracker[dataTicker] = { count: 0, time: 0 };
-
-    // If last click was within 300ms, this is a double-click
-    if(now - _clickTracker[dataTicker].time < 300){
-      _clickTracker[dataTicker].count++;
-      _clickTracker[dataTicker].time = now;
-
-      // On second click (double-click), set flag and reset zoom
-      if(_clickTracker[dataTicker].count === 2){
-        window._skipFullscreen = dataTicker;
-
-        const card = document.getElementById('card-'+dataTicker);
-        if(card){
-          const ladderEl = card.querySelector('.zone-ladder');
-          if(ladderEl){
-            const tgt = _ladderTarget(ladderEl);
-            if(tgt){
-              const { viewKey } = tgt;
-              const view = chartView[viewKey];
-              if(view){
-                if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-                view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-                view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
-              }
-              renderTicker(dataTicker);
-            }
-          }
-        }
-      }
-    } else {
-      _clickTracker[dataTicker].count = 1;
-      _clickTracker[dataTicker].time = now;
-    }
-  }, true);
-}
-setTimeout(attachDoubleClickSkip, 500);
 
 // Attach click handlers to all canvas elements for axis resets
 function attachAxisClickHandlers(){
