@@ -3139,13 +3139,14 @@ function selectChart(t, ev){
 // restores the previous layout.
 let _preZoomSlot = null;
 function openFullscreenChart(t){
-  if(_preZoomSlot===null) _preZoomSlot = slotCount;   // remember layout to restore
-  fullscreenTicker = t;
-  chartSlots = [t]; slotCount = 1;
-  const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value='1';
-  const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='';
-  persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
-  try{ document.querySelector('.main').scrollTop = 0; }catch(e){}
+  // DISABLED: Prevent fullscreen zoom on chart click
+  // if(_preZoomSlot===null) _preZoomSlot = slotCount;   // remember layout to restore
+  // fullscreenTicker = t;
+  // chartSlots = [t]; slotCount = 1;
+  // const ls=document.getElementById('chartLayoutSelect'); if(ls) ls.value='1';
+  // const bb=document.getElementById('zoomBackBtn'); if(bb) bb.style.display='';
+  // persistSlots(); lastCardOrder=''; applyGridCols(); renderCards();
+  // try{ document.querySelector('.main').scrollTop = 0; }catch(e){}
 }
 
 function closeFullscreenChart(){
