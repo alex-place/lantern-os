@@ -22,24 +22,35 @@ const APP = path.join(__dirname, "..", "apps", "lantern-garage");
 let passed = 0;
 const ok = (n) => { passed++; console.log("  ✓ " + n); };
 
-// Files that sign or verify something with a server secret.
-const SIGNING_MODULES = [
-  "routes/indeed.js",
-  "lib/oauth-core.js",
-  "lib/auth-tokens.js",
-  "lib/referrals.js",
-];
+// Originally a hand-listed set of 4 signing modules. That list was the bug: it missed
+// lib/ibkr-credentials.js and lib/indeed-token-store.js, which derive AT-REST AES keys
+// from the same kind of literal fallback — found only by re-testing the whole tree
+// afterwards. Enumerate instead of enumerating-by-hand, so the next one can't hide.
+function walkJs(dir, out = []) {
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === "node_modules" || e.name === ".git" || e.name === "public") continue;
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) walkJs(full, out);
+    else if (e.name.endsWith(".js")) out.push(full);
+  }
+  return out;
+}
+const SIGNING_MODULES = walkJs(APP).map((f) => path.relative(APP, f).split(path.sep).join("/"));
 
 function main() {
   // ── 1. No literal fallback secret in any signing module ────────────────────────
   // Matches `SESSION_SECRET || "…"` and friends: an env read OR'd with a string.
-  const FALLBACK = /process\.env\.[A-Z_]*SECRET[A-Z_]*\s*\|\|\s*["'`]/;
+  // Any env-read for a secret/key OR'd with a non-empty string literal. `|| ''` is
+  // fine (an absent optional credential); `|| "some-constant"` is the defect.
+  const FALLBACK = /process\.env\.[A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASS)\s*\|\|\s*(?:process\.env\.[A-Z0-9_]+\s*\|\|\s*)*["'`][^"'`]+["'`]/;
   for (const rel of SIGNING_MODULES) {
     const src = fs.readFileSync(path.join(APP, rel), "utf8");
     // Strip comments so the explanatory note about the OLD code doesn't self-trip.
     const code = src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
-    assert.ok(!FALLBACK.test(code),
-      `${rel}: a hardcoded fallback signing secret is a forgeable-state bug (#2619)`);
+    const m = code.match(FALLBACK);
+    assert.ok(!m,
+      `${rel}: hardcoded fallback secret/key — forgeable state or decryptable at-rest ` +
+      `data on any deploy without the env var (#2619, #3101). Found: ${m && m[0]}`);
   }
   ok(`no literal fallback secret in ${SIGNING_MODULES.length} signing modules`);
 
