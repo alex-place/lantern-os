@@ -38,6 +38,9 @@ const { EventEmitter } = require("events");
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-auth-flow-"));
 const origCwd = process.cwd();
 process.chdir(tmp);
+// The data root is resolved from the module tree, not the cwd (#3088) — isolate the
+// store with LANTERN_DATA_DIR, set BEFORE any lib require reads it.
+process.env.LANTERN_DATA_DIR = path.join(tmp, "data");
 // A strong (non-default) secret so tokens mint/verify regardless of PORT/NODE_ENV.
 // Built via join() rather than a quoted literal so the repo slop-scan doesn't
 // mistake this test fixture for a committed credential.

@@ -18,6 +18,7 @@ const {
   updateProfile,
   getProfileByEmail,
 } = require("./user-profiles");
+const { profileHasAdminOverride } = require("./auth-providers");
 const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
@@ -160,6 +161,14 @@ function _json(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 function _establish(req, res, profile, status) {
+  // Admin override travels with the ACCOUNT, exactly as on the OAuth path
+  // (oauth-core.js) — an email/password login must honour LANTERN_ADMIN_IDS too.
+  // Without this, `local:you@email.com` was accepted, stored, and never applied, so a
+  // deploy with no working Google OAuth had NO path to admin via the documented env
+  // var (#3087). Only ever elevates; never demotes.
+  if (profileHasAdminOverride(profile) && profile.role !== "admin") {
+    profile = updateProfile(profile.id, { role: "admin" }) || profile;
+  }
   establishSession(
     req,
     {

@@ -12,10 +12,12 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// Isolate profile storage: user-profiles resolves data/profiles from process.cwd()
-// at require time, so chdir to a fresh temp dir BEFORE requiring it.
+// Isolate profile storage in a fresh temp dir.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-ent-"));
 process.chdir(tmp);
+// The data root is resolved from the module tree, not the cwd (#3088) — isolate the
+// store with LANTERN_DATA_DIR, set BEFORE any lib require reads it.
+process.env.LANTERN_DATA_DIR = path.join(tmp, "data");
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");
 const profiles = require(path.join(LIB, "user-profiles"));
@@ -42,23 +44,32 @@ const founder = profiles.createProfile("user-founder", { role: "deep_dreamer" })
 assert.strictEqual(founder.entitlements.trade, false);
 ok("new profile defaults entitlements.trade = false");
 
-// 2. Founder without entitlement is denied.
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), false);
-ok("founder without grant → hasEntitlement(trade) false");
+// 2. A FREE-tier role without an explicit grant is denied. (This is the real
+// "opt-in" case now: per the 2026-07-31 tier decision, trade is a Pro-tier unlock,
+// so the denied case must be a role BELOW Pro — supporter sits at the Free floor.)
+profiles.createProfile("user-free", { role: "supporter" });
+assert.strictEqual(hasEntitlement(req({ user: { id: "user-free", role: "supporter" } }), "trade"), false);
+ok("free role without grant → hasEntitlement(trade) false");
 
-// 3. Granting trade flips it.
-profiles.setEntitlement("user-founder", "trade", true);
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), true);
-ok("setEntitlement(trade,true) → hasEntitlement true");
+// 2b. Pro (deep_dreamer) gets trade BY TIER, with no per-account grant — the current
+// product model (auth-middleware: roleLevel(role) >= roleLevel("deep_dreamer")).
+// The old assertion here demanded false, encoding the retired opt-in-only model (#3130).
+assert.strictEqual(hasEntitlement(req({ user: { id: "user-founder", role: "deep_dreamer" } }), "trade"), true);
+ok("Pro tier (deep_dreamer) → hasEntitlement(trade) true by tier, no grant needed");
+
+// 3. Granting trade to a free account flips it (per-account override below the tier).
+profiles.setEntitlement("user-free", "trade", true);
+assert.strictEqual(hasEntitlement(req({ user: { id: "user-free", role: "supporter" } }), "trade"), true);
+ok("setEntitlement(trade,true) on a free account → hasEntitlement true");
 
 // 4. setEntitlement does not clobber other entitlements.
-profiles.setEntitlement("user-founder", "beta", true);
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-founder", role: "deep_dreamer" } }), "trade"), true);
+profiles.setEntitlement("user-free", "beta", true);
+assert.strictEqual(hasEntitlement(req({ user: { id: "user-free", role: "supporter" } }), "trade"), true);
 ok("setEntitlement preserves existing entitlements");
 
 // 5. admin role passes implicitly even without a profile flag.
 profiles.createProfile("user-admin", { role: "admin" });
-assert.strictEqual(hasEntitlement(req({ patreon: { id: "user-admin", role: "admin" } }), "trade"), true);
+assert.strictEqual(hasEntitlement(req({ user: { id: "user-admin", role: "admin" } }), "trade"), true);
 ok("admin role → hasEntitlement(trade) true implicitly");
 
 // 6. requireEntitlement: unauthenticated → 302 redirect, blocked.
@@ -68,16 +79,16 @@ assert.strictEqual(res.statusCode, 302);
 ok("requireEntitlement unauthenticated → 302, returns false");
 
 // 7. requireEntitlement: authed but not entitled → 403, blocked.
-profiles.createProfile("user-plain", { role: "deep_dreamer" });
+profiles.createProfile("user-plain", { role: "supporter" });
 res = fakeRes();
-assert.strictEqual(requireEntitlement(req({ patreon: { id: "user-plain", role: "deep_dreamer" } }), res, "trade"), false);
+assert.strictEqual(requireEntitlement(req({ user: { id: "user-plain", role: "supporter" } }), res, "trade"), false);
 assert.strictEqual(res.statusCode, 403);
 assert.ok(res.body.includes("trade"));
 ok("requireEntitlement authed-not-entitled → 403, returns false");
 
 // 8. requireEntitlement: entitled → true, no write.
 res = fakeRes();
-assert.strictEqual(requireEntitlement(req({ patreon: { id: "user-admin", role: "admin" } }), res, "trade"), true);
+assert.strictEqual(requireEntitlement(req({ user: { id: "user-admin", role: "admin" } }), res, "trade"), true);
 assert.strictEqual(res.statusCode, null);
 ok("requireEntitlement entitled → true, no response written");
 

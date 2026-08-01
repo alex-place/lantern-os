@@ -22,19 +22,51 @@ const { roleLevel } = require("./role-hierarchy");
 // other identities explicitly ("local:you@email.com"). Keeping the stored key
 // provider-qualified prevents a bare id from cross-granting admin to a
 // same-numbered id on a different provider.
-const ADMIN_OVERRIDES = new Set(
-  String(process.env.LANTERN_ADMIN_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((entry) => (entry.includes(":") ? entry : `google:${entry}`))
-);
+// Identity prefixes an override entry can actually match. "local" is the email+password
+// path (providerId = the lowercased email); patreon/discord are retired as sign-in
+// methods but remain as denormalized mirrors on older stored profiles.
+const KNOWN_OVERRIDE_PROVIDERS = new Set(["google", "local", "patreon", "discord"]);
+
+const _rawOverrides = String(process.env.LANTERN_ADMIN_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+function _normalizeOverride(entry) {
+  const qualified = entry.includes(":") ? entry : `google:${entry}`;
+  const idx = qualified.indexOf(":");
+  const provider = qualified.slice(0, idx).toLowerCase();
+  const id = qualified.slice(idx + 1);
+  // A local identity is keyed by the lowercased email, so match case-insensitively —
+  // otherwise "local:You@Example.com" silently never matches (#3087).
+  return `${provider}:${provider === "local" ? id.toLowerCase() : id}`;
+}
+
+const ADMIN_OVERRIDES = new Set(_rawOverrides.map(_normalizeOverride));
+
+// An entry naming a provider we never issue identities for can never grant admin. That
+// used to fail silently — including the easy mistake of a BARE id, which is normalized
+// to google: and so matches nothing on an email/password-only deploy (#3087).
+for (const entry of _rawOverrides) {
+  const provider = _normalizeOverride(entry).split(":")[0];
+  if (!KNOWN_OVERRIDE_PROVIDERS.has(provider)) {
+    console.warn(
+      `[auth] LANTERN_ADMIN_IDS entry "${entry}" names unknown provider "${provider}" — ` +
+        `it can never match. Use one of: ${[...KNOWN_OVERRIDE_PROVIDERS].join(", ")}.`
+    );
+  } else if (!entry.includes(":")) {
+    console.warn(
+      `[auth] LANTERN_ADMIN_IDS entry "${entry}" is unqualified and was read as ` +
+        `"google:${entry}". For an email/password account use "local:you@email.com".`
+    );
+  }
+}
 
 function isAdminOverride(provider, providerId) {
   // Strict provider-qualified match. Bare LANTERN_ADMIN_IDS entries were already
   // normalized to "google:<id>" at load, so a bare owner id can't cross-grant admin
   // to a same-numbered id on a different provider.
-  return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
+  return ADMIN_OVERRIDES.has(_normalizeOverride(`${provider}:${providerId}`));
 }
 
 // Operational guard: no OAuth tier grants admin — it comes ONLY from an admin

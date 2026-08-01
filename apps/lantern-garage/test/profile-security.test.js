@@ -8,7 +8,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-profsec-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-profsec-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
+// explicitly so this test never writes into the real repo data/ tree.
+process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
 const p = require(path.join(__dirname, "..", "lib", "user-profiles"));
 
 let failures = 0;

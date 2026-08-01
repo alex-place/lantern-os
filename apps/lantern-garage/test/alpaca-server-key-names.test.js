@@ -11,7 +11,11 @@ const os = require("os");
 const path = require("path");
 
 // Isolate so no real stored OAuth creds under data/ shadow the server-keys path.
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-alpaca-keys-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-alpaca-keys-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
+// explicitly so this test never writes into the real repo data/ tree.
+process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
 const adapter = require(path.join(__dirname, "..", "lib", "alpaca-adapter"));
 
 let failures = 0;

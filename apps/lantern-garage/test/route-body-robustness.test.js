@@ -12,7 +12,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-routebody-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-routebody-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
+// explicitly so this test never writes into the real repo data/ tree.
+process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
 
 const authRoutes = require("../routes/auth");
 const profileRoutes = require("../routes/profiles");

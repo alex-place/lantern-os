@@ -391,7 +391,7 @@ try {
 const { FileSessionStore } = require("./lib/session-file-store");
 const sessionMiddleware = session({
   secret: sessionSecret,
-  store: new FileSessionStore({ dir: path.join(__dirname, "..", "..", "data", "sessions") }),
+  store: new FileSessionStore({ dir: require("./lib/data-root").dataPath("sessions") }),
   resave: false,
   saveUninitialized: false,
   // Behind Railway's TLS-terminating proxy, honor X-Forwarded-Proto so a
@@ -718,6 +718,10 @@ process.on("uncaughtException", (err) => {
 
 server.listen(port, host, () => {
   console.log(`Lantern Garage app listening on ${host}:${port}`);
+  // Print the resolved data root (#3088): a CLI script and the server used to pick
+  // different roots depending on cwd, so a `setUserRole` could "succeed" against a
+  // store this process never reads. One line here makes that visible instead of silent.
+  console.log(`[data] root: ${require("./lib/data-root").DATA_ROOT}`);
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.

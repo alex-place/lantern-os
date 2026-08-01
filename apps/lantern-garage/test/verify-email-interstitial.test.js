@@ -11,7 +11,11 @@ const path = require("path");
 const { Readable } = require("stream");
 
 // Isolate the profile + token-ledger stores to a temp cwd BEFORE requiring the app.
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "verify-int-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "verify-int-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
+// explicitly so this test never writes into the real repo data/ tree.
+process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
 const profiles = require("../lib/user-profiles");
 const { createToken } = require("../lib/auth-tokens");
 const authRoutes = require("../routes/auth");

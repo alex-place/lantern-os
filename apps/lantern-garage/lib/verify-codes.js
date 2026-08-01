@@ -25,12 +25,13 @@
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./data-root");
 const TTL_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_ATTEMPTS = 5;
 const CODE_DIGITS = 6;
 
 function storePath() {
-  return path.resolve(process.cwd(), "data", "auth", "verify-codes.jsonl");
+  return dataPath("auth", "verify-codes.jsonl");
 }
 
 // scrypt, not a bare HMAC. A keyed HMAC is unforgeable without the secret, but a

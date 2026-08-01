@@ -11,9 +11,12 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// auth-middleware -> user-profiles resolves data/profiles from cwd at require time.
+// Isolate the profile store auth-middleware -> user-profiles reads.
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-pdf-ent-"));
 process.chdir(tmp);
+// The data root is resolved from the module tree, not the cwd (#3088) — isolate the
+// store with LANTERN_DATA_DIR, set BEFORE any lib require reads it.
+process.env.LANTERN_DATA_DIR = path.join(tmp, "data");
 
 const LIB = path.join(__dirname, "..", "apps", "lantern-garage", "lib");
 const profiles = require(path.join(LIB, "user-profiles"));
@@ -49,7 +52,7 @@ const blocked = (code) => code === 302 || code === 403;
   ok("requireEntitlement(pdf_admin) blocks an unauthenticated request");
 
   profiles.createProfile("pdf-admin", { role: "admin" });
-  assert.strictEqual(hasEntitlement(req({ patreon: { id: "pdf-admin", role: "admin" } }), "pdf_admin"), true);
+  assert.strictEqual(hasEntitlement(req({ user: { id: "pdf-admin", role: "admin" } }), "pdf_admin"), true);
   ok("admin role passes pdf_admin entitlement implicitly");
 
   // ── route integration: unentitled mutation is blocked ──

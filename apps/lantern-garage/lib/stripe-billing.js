@@ -15,6 +15,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./data-root");
 const { higherRole } = require("./role-hierarchy");
 
 // The ONLY roles a Stripe purchase may resolve to. Never admin / tech_support / founder.
@@ -167,7 +168,7 @@ const HANDLED_EVENTS = new Set([
 // Lives under the cwd-relative data store (same root as data/profiles), so it shares the
 // deployment's data dir and is correctly isolated per checkout — NOT module-relative.
 function ledgerPath() {
-  return path.resolve(process.cwd(), "data", "billing", "processed-events.jsonl");
+  return dataPath("billing", "processed-events.jsonl");
 }
 // In-memory dedup cache, loaded once from the ledger then kept in sync on write, so a
 // webhook doesn't re-read + re-scan the whole file per event (#2622). Keyed by ledger

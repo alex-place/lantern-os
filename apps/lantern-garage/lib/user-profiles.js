@@ -6,12 +6,13 @@
 
 const fs = require("fs");
 const path = require("path");
+const { dataPath } = require("./data-root");
 const crypto = require("crypto");
 const { higherRole, STAFF_ROLES } = require("./role-hierarchy");
 const { effectiveRole } = require("./stripe-billing");
 
 // Data directory for user profiles
-const PROFILES_DIR = path.join(process.cwd(), "data", "profiles");
+const PROFILES_DIR = dataPath("profiles");
 const PROFILES_INDEX = path.join(PROFILES_DIR, "index.jsonl");
 const PROFILES_CSF = path.join(PROFILES_DIR, "profiles.csf");
 // Append-only Patreon-id <-> Discord-id link store (#697). Latest record wins,

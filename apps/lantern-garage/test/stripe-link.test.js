@@ -14,8 +14,11 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-// user-profiles resolves data/profiles from process.cwd() at require time — chdir first.
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-link-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "lantern-stripe-link-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store
+// explicitly so this test never writes into the real repo data/ tree.
+process.env.LANTERN_DATA_DIR = path.join(_tmpDataRoot, "data");
 const { verifiedEmailOf } = require(path.join(__dirname, "..", "lib", "user-profiles"));
 const { pickLinkableSubscription } = require(path.join(__dirname, "..", "lib", "stripe-billing"));
 

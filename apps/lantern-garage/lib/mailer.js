@@ -13,7 +13,7 @@
  */
 
 const fs = require("fs");
-const path = require("path");
+const { dataPath } = require("./data-root");
 
 let _transport = null;
 let _checked = false;
@@ -98,7 +98,7 @@ function fromAddress() {
   return process.env.MAIL_FROM || process.env.SMTP_USER || "no-reply@unisona.ai";
 }
 
-const OUTBOX = path.join(process.cwd(), "data", "mail-outbox.jsonl");
+const OUTBOX = dataPath("mail-outbox.jsonl");
 
 /**
  * Send an email. Returns { ok, transport: 'smtp'|'dev', link? }.
