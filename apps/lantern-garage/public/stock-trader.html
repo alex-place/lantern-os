@@ -3516,34 +3516,39 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click behavior: inside chart canvas = reset zoom/pan; outside chart but on panel = zoom to fullscreen
+// Double-click: inside chart = reset zoom/pan; outside chart on card = zoom to fullscreen
 document.addEventListener('dblclick', function(e){
   const card = e.target.closest('.card');
   if(!card) return;
+
   const ladder = e.target.closest('.zone-ladder');
-  if(!ladder) return;
-  const target = _ladderTarget(ladder);
+  const target = _ladderTarget(ladder || card.querySelector('.zone-ladder'));
   if(!target) return;
+
   const { dataTicker, viewKey, canvas } = target;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX-rect.left, y = e.clientY-rect.top;
-  const insideCanvas = x >= 0 && x <= rect.width && y >= 0 && y <= rect.height;
 
-  e.preventDefault();
-
-  if(insideCanvas){
-    // Double-click inside the chart canvas: reset zoom/pan
-    const view = chartView[viewKey];
-    if(view){
-      if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-      view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-      view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+  if(ladder){
+    // Double-click happened inside zone-ladder area, check if it's inside canvas bounds
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX-rect.left, y = e.clientY-rect.top;
+    // Check if click is within canvas (includes axes, so use generous bounds)
+    if(x >= -60 && x <= rect.width + 60 && y >= -20 && y <= rect.height + 20){
+      e.preventDefault();
+      // Reset zoom/pan
+      const view = chartView[viewKey];
+      if(view){
+        if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+        view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+        view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+      }
+      renderTicker(dataTicker);
+      return;
     }
-    renderTicker(dataTicker);
-  } else {
-    // Double-click outside the chart but on the card: zoom into fullscreen mode
-    openFullscreenChart(dataTicker);
   }
+
+  // Double-click outside chart area or on card header: zoom to fullscreen
+  e.preventDefault();
+  openFullscreenChart(dataTicker);
 });
 
 // Click on time axis (bottom) to reset timeframe to default
