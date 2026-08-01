@@ -86,6 +86,21 @@ esac
 # Length sanity only; never print the key or any part of it.
 [ "${#KEY}" -ge 20 ] || { echo "key is implausibly short (${#KEY} chars); nothing written." >&2; exit 1; }
 
+# The webhook signing secret is what applies entitlements. Without it
+# /api/billing/webhook 503s: the customer pays and never receives their role.
+WHSEC="${STRIPE_WEBHOOK_SECRET:-}"
+if [ -z "$WHSEC" ] && [ -t 0 ]; then
+  printf 'Paste the Stripe WEBHOOK signing secret (whsec_..., blank to skip): ' >&2
+  read -rs WHSEC
+  printf '
+' >&2
+fi
+case "$WHSEC" in
+  "")       echo "WARNING: no webhook secret - checkout will work but entitlements will NOT apply." >&2 ;;
+  whsec_*)  : ;;
+  *)        echo "that does not look like a webhook signing secret (expected whsec_ prefix); nothing written." >&2; exit 1 ;;
+esac
+
 echo "key accepted: $LABEL"
 echo "scope:        $SCOPE"
 
@@ -103,7 +118,7 @@ else
   printf '[Service]\nEnvironment="STRIPE_SECRET_KEY=%s"\n' "$KEY" > "$DROPIN"
 fi
 chmod 600 "$DROPIN"; chown root:root "$DROPIN"
-unset KEY
+unset KEY WHSEC
 
 echo "wrote $DROPIN (0600, root)"
 

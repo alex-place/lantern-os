@@ -3,9 +3,16 @@
   Push the Stripe API key from THIS machine's environment to the prod VM.
 
 .DESCRIPTION
-  Reads STRIPE_SECRET_KEY from the local environment (User scope by default --
-  where `setx` puts it), validates its shape, installs it on the GCE box as a
-  systemd drop-in, restarts the app, and verifies billing came up configured.
+  Reads STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET from the local environment
+  (User scope by default -- where `setx` puts them), validates their shape,
+  installs them on the GCE box as a systemd drop-in, restarts the app, and
+  verifies billing came up configured.
+
+  BOTH matter. The secret key alone turns the Subscribe buttons on, but
+  /api/billing/webhook returns 503 without STRIPE_WEBHOOK_SECRET, and that
+  webhook is the SOURCE OF TRUTH for entitlements -- a customer would complete
+  checkout, be charged, and never receive the role they paid for. The script
+  warns loudly rather than silently installing half a config.
 
   The key is transferred with `gcloud compute scp`. It is never placed in a
   command line on either side: argv is world-readable through `ps` and /proc, so
@@ -59,6 +66,11 @@ param(
     # Verified against the public site, since prod sits behind Cloudflare.
     [string]$VerifyUrl = 'https://unisona.ai/api/billing/config',
 
+    # Set -AllowNoWebhook to install the secret key WITHOUT the webhook secret.
+    # Only sensible for a test-mode dry run: in that state a real payment is taken
+    # and no entitlement is granted.
+    [switch]$AllowNoWebhook,
+
     [switch]$Remove
 )
 
@@ -104,15 +116,36 @@ switch -Wildcard ($key) {
 }
 if ($key.Length -lt 20) { throw "Key is implausibly short ($($key.Length) chars). Nothing sent." }
 
+# --- Webhook signing secret (entitlements depend on it) ---------------------
+$whsec = if ($Scope -eq 'Process') { $env:STRIPE_WEBHOOK_SECRET }
+         else { [Environment]::GetEnvironmentVariable('STRIPE_WEBHOOK_SECRET', $Scope) }
+if ($whsec) { $whsec = $whsec.Trim() }
+
+if ([string]::IsNullOrWhiteSpace($whsec)) {
+    if (-not $AllowNoWebhook) {
+        throw ("STRIPE_WEBHOOK_SECRET is not set in the $Scope environment.`n" +
+               "Without it /api/billing/webhook returns 503, so a customer can complete checkout, " +
+               "be charged, and never receive the role they paid for.`n" +
+               "Get it from Stripe -> Developers -> Webhooks -> your endpoint -> Signing secret, then:`n" +
+               "  setx STRIPE_WEBHOOK_SECRET `"whsec_...`"   (then open a new shell)`n" +
+               "Or pass -AllowNoWebhook to install the secret key alone anyway (test mode only).")
+    }
+    Write-Warning "No STRIPE_WEBHOOK_SECRET. Checkout will work but entitlements will NOT be applied."
+} elseif ($whsec -notlike 'whsec_*') {
+    throw "STRIPE_WEBHOOK_SECRET does not look like a signing secret (expected a whsec_ prefix). Nothing sent."
+}
+
 Write-Host "Source : $Scope environment on $env:COMPUTERNAME"
 Write-Host "Key    : $mode, $($key.Length) chars (value not shown)"
 Write-Host "Note   : $note"
+Write-Host "Webhook: $(if ($whsec) { "whsec, $($whsec.Length) chars (value not shown)" } else { 'NOT SET - entitlements will not apply' })"
 Write-Host "Target : $Vm ($Zone) -> $DropIn"
 
 if (-not $PSCmdlet.ShouldProcess("$Vm ($Zone)", "install STRIPE_SECRET_KEY and restart lantern.service")) { return }
 
 # --- Install via scp (see the transport note in the header) -----------------
 $dropInBody = "[Service]`nEnvironment=`"STRIPE_SECRET_KEY=$key`"`n"
+if ($whsec) { $dropInBody += "Environment=`"STRIPE_WEBHOOK_SECRET=$whsec`"`n" }
 $tmp = Join-Path $env:TEMP ("stripe-" + [guid]::NewGuid().ToString('N') + ".conf")
 $remoteTmp = "/tmp/stripe-$([guid]::NewGuid().ToString('N')).conf"
 $result = $null
@@ -142,7 +175,7 @@ finally {
         Remove-Item $tmp -Force -ErrorAction SilentlyContinue
         if (Test-Path $tmp) { Write-Warning "Could not delete the temp file $tmp -- remove it by hand." }
     }
-    Remove-Variable key, dropInBody -ErrorAction SilentlyContinue
+    Remove-Variable key, whsec, dropInBody -ErrorAction SilentlyContinue
 }
 
 if ($result -notmatch 'INSTALLED') {
