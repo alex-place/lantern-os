@@ -1485,7 +1485,9 @@ function niceTicks(min, max, targetCount){
   const rawStep = range / Math.max(1, targetCount);
   const mag  = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const norm = rawStep / mag;
-  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * mag;
+  // 1/2/5 ladder only (no 2.5 rung): every label lands on a clean
+  // .00/.10/.20/.50-style value, never .25/.75.
+  const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
   const ticks = [];
   for(let v = Math.ceil(min/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
   return { ticks, step };
@@ -1608,20 +1610,17 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: a FIXED number of evenly spaced gridlines on every chart, so
-  // the label count is identical across all cards and stays constant while the
-  // price scale is zoomed (the labels re-space to the visible range instead of
-  // adding/dropping ticks). Labels show at least cents (2 dp), more decimals
-  // only when the step is sub-cent.
+  // Price axis: the SAME fixed tick target on every chart (not height-scaled),
+  // snapped to the 1/2/5 ladder so labels land only on clean .00/.10/.20/.50
+  // values — uniform look across all cards, and the count stays steady while
+  // the price scale is zoomed (the step re-snaps to the visible range).
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const PRICE_AXIS_INTERVALS = 6;                 // → 7 gridlines/labels per chart, always
-  const priceStep = rng / PRICE_AXIS_INTERVALS;
-  const priceTicks = Array.from({length: PRICE_AXIS_INTERVALS+1}, (_,i)=> rMin + i*priceStep);
-  // Evenly divided steps are rarely round numbers — pick decimals from the step's
-  // magnitude (cents for $1+ steps, one extra digit per decade below that).
-  const priceDec = priceStep >= 0.5 ? 2 : Math.min(6, Math.ceil(-Math.log10(priceStep)) + 1);
+  const PRICE_AXIS_TARGET = 6;
+  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, PRICE_AXIS_TARGET);
+  const priceDec = Math.max(2, decimalsFor(priceStep));
   for(const price of priceTicks){
+    if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
     ctx.strokeStyle = CHART_GRID_COLOR();
     ctx.beginPath();
