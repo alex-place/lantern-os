@@ -18,8 +18,8 @@ const {
   updateProfile,
   getProfileByEmail,
 } = require("./user-profiles");
-const { establishSession } = require("./session-identity");
 const { profileHasAdminOverride } = require("./auth-providers");
+const { establishSession } = require("./session-identity");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
 const { issueCode } = require("./verify-codes");
@@ -162,12 +162,17 @@ function _json(res, status, obj) {
 }
 function _establish(req, res, profile, status) {
   // Apply the LANTERN_ADMIN_IDS override on the LOCAL path too (#3087). The OAuth flow
-  // elevates via profileHasAdminOverride, but this path passed profile.role straight through,
-  // so a correctly-qualified `local:you@email.com` admin entry silently never took effect and
-  // an email/password box had NO working route to admin. profileHasAdminOverride only ever
-  // elevates (never downgrades), and a local account carries a {provider:"local"} identity, so
-  // the override matches the same way it does for a linked Google/Patreon id.
-  const role = profileHasAdminOverride(profile) ? "admin" : profile.role;
+  // elevates via profileHasAdminOverride, but this path passed profile.role straight
+  // through, so a correctly-qualified `local:you@email.com` entry silently never took
+  // effect and an email/password box had NO working route to admin. Only ever elevates.
+  //
+  // PERSIST it, not just the session (extends #3128): gates that read the stored profile
+  // rather than the session — routes/accounts, the entitlement checks — would otherwise
+  // still see `guest` for an account the login just treated as admin.
+  if (profileHasAdminOverride(profile) && profile.role !== "admin") {
+    profile = updateProfile(profile.id, { role: "admin" }) || { ...profile, role: "admin" };
+  }
+  const role = profile.role;
   establishSession(
     req,
     {

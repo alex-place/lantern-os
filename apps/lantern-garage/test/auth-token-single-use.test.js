@@ -9,7 +9,11 @@ const os = require("os");
 const path = require("path");
 
 // Isolate the consumed-tokens ledger to a temp cwd (it's cwd-relative).
-process.chdir(fs.mkdtempSync(path.join(os.tmpdir(), "authtok-")));
+const _tmpDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "authtok-"));
+process.chdir(_tmpDataRoot);
+// The data root is module-anchored, not cwd-derived (#3088) — isolate the store via
+// UNISONA_STATE_DIR so this test never writes into the real repo data/ tree.
+process.env.UNISONA_STATE_DIR = _tmpDataRoot;
 process.env.SESSION_SECRET = "test-secret-for-tokens";
 const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/auth-tokens");
 

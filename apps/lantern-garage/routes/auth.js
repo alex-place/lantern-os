@@ -26,10 +26,9 @@ const { loginGateEnabled } = require("../lib/auth-middleware");
 const { listEnabledProviders, getProvider } = require("../lib/auth-providers");
 const { createToken, verifyToken, isConsumed, consumeToken } = require("../lib/auth-tokens");
 const { destroyUserSessions } = require("../lib/session-file-store");
-const _pathAuth = require("path");
 // Session store dir (mirrors server.js) — a password reset invalidates the account's live
 // sessions so a hijacked session can't survive the remediation (#2614).
-const AUTH_SESSION_DIR = _pathAuth.join(__dirname, "..", "..", "..", "data", "sessions");
+const AUTH_SESSION_DIR = require("../lib/app-paths").dataPath("sessions");
 const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("../lib/mailer");
 const { issueCode, checkCode } = require("../lib/verify-codes");
 const { isLoopback, clientIp } = require("../lib/request-auth");

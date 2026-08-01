@@ -26,9 +26,17 @@ const _ADMIN_ID_ENTRIES = String(process.env.LANTERN_ADMIN_IDS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
-const ADMIN_OVERRIDES = new Set(
-  _ADMIN_ID_ENTRIES.map((entry) => (entry.includes(":") ? entry : `google:${entry}`))
-);
+// A local identity is keyed by the LOWERCASED email, so normalize local entries to
+// match case-insensitively — "local:You@Example.com" would otherwise silently never
+// match the stored "local:you@example.com" (#3087).
+function _normalizeOverride(entry) {
+  const qualified = entry.includes(":") ? entry : `google:${entry}`;
+  const idx = qualified.indexOf(":");
+  const provider = qualified.slice(0, idx).toLowerCase();
+  const id = qualified.slice(idx + 1);
+  return `${provider}:${provider === "local" ? id.toLowerCase() : id}`;
+}
+const ADMIN_OVERRIDES = new Set(_ADMIN_ID_ENTRIES.map(_normalizeOverride));
 
 // The providers an override key can actually match (see isAdminOverride callers +
 // profileHasAdminOverride). An entry qualified with anything else can never match, and a bare
@@ -60,7 +68,7 @@ function isAdminOverride(provider, providerId) {
   // Strict provider-qualified match. Bare LANTERN_ADMIN_IDS entries were already
   // normalized to "google:<id>" at load, so a bare owner id can't cross-grant admin
   // to a same-numbered id on a different provider.
-  return ADMIN_OVERRIDES.has(`${provider}:${providerId}`);
+  return ADMIN_OVERRIDES.has(_normalizeOverride(`${provider}:${providerId}`));
 }
 
 // Operational guard: no OAuth tier grants admin — it comes ONLY from an admin

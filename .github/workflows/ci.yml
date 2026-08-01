@@ -133,6 +133,10 @@ jobs:
           node tests/test_local_auth_flow.js
           node tests/test_patreon_auth_flag.js
           node tests/test_patreon_oauth_cookie.js
+          node tests/test_admin_override_local.js
+          node tests/test_verify_codes.js
+          node tests/test_trade_entitlement.js
+          node tests/test_pdf_route_entitlement.js
           node apps/lantern-garage/test/user-provider-keys.test.js
 
       - name: Start server
