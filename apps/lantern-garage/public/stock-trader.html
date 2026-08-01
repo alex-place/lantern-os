@@ -2352,9 +2352,11 @@ function buildLayoutOptions(){
   // Migrate phones off a persisted "All" (slotCount 0) — that option is retired
   // there, and existing users would otherwise land on a value the select no
   // longer offers. Default to 1 full-size chart.
-  if(phone && !slotCount) setSlotCount(1);
-  if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
-  else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
+  // DISABLED: Prevent automatic fullscreen zoom on narrow screens
+  // if(phone && !slotCount) setSlotCount(1);
+  // DISABLED: Prevent automatic layout changes that trigger fullscreen zoom
+  // if(slotCount > cap) setSlotCount(cap);                             // shrank the window with a big grid selected → clamp down
+  // else if(!opts.some(([v])=> v===slotCount)) setSlotCount(Math.min(10, cap));  // drop a retired layout to the max available
   sel.value = String(slotCount);
 }
 
