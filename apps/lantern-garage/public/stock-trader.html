@@ -1509,7 +1509,7 @@ function niceTicks(min, max, targetCount){
   // .00/.10/.20/.50-style value, never .25/.75.
   const step = (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 5 ? 5 : 10) * mag;
   const ticks = [];
-  for(let v = Math.ceil(min/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
+  for(let v = Math.ceil((min - step*1e-6)/step)*step; v <= max + step*1e-6; v += step) ticks.push(v);
   return { ticks, step };
 }
 // Decimals needed to render `step` exactly (2.5→1, 0.25→2, 5→0), capped at 6.
@@ -1630,17 +1630,17 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: the incoming range is already snapped to clean 1/2/5 step
-  // boundaries (_snapPriceRange), so dividing it evenly gives EXACTLY
-  // PRICE_AXIS_INTERVALS+1 labels on every chart, all landing on
-  // .00/.10/.20/.50-style values — identical count across cards and steady
-  // under zoom.
+  // Price axis, TradingView-style: fit nice 1/2/5-ladder ticks inside the
+  // visible range (labels only ever land on clean .00/.10/.20/.50 values).
+  // The DEFAULT auto-fit range is pre-snapped to step boundaries upstream
+  // (_snapPriceRange), so every chart enters with the same 7 labels; once
+  // the user zooms, ticks re-fit naturally and the count may vary.
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const priceStep = rng / PRICE_AXIS_INTERVALS;
-  const priceTicks = Array.from({length: PRICE_AXIS_INTERVALS+1}, (_,i)=> rMin + i*priceStep);
+  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, PRICE_AXIS_INTERVALS);
   const priceDec = Math.max(2, decimalsFor(priceStep));
   for(const price of priceTicks){
+    if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
     ctx.strokeStyle = CHART_GRID_COLOR();
     ctx.beginPath();
@@ -2016,11 +2016,12 @@ function _renderLadder(ticker, d, currentPrice, canvas, overlay, bars, viewKey){
     }
     const pad = (hi - lo) * 0.08 || hi * 0.001;   // breathing room top/bottom
     rMin = lo - pad; rMax = hi + pad;
+    // Default (auto-fit) view only: snap the range outward to clean 1/2/5
+    // step boundaries so every chart ENTERS with the same 7 evenly-spaced
+    // labels (#3141). Zoomed/panned ranges are left alone — the axis then
+    // re-fits ticks TradingView-style.
+    [rMin, rMax] = _snapPriceRange(rMin, rMax);
   }
-  // Snap the rendered range outward to clean 1/2/5 step boundaries so the
-  // price axis shows EXACTLY PRICE_AXIS_INTERVALS gaps on every chart, at
-  // every zoom level (#3141).
-  [rMin, rMax] = _snapPriceRange(rMin, rMax);
   const rng = rMax - rMin; if(rng<=0) return;
   view.lastRMin = rMin; view.lastRMax = rMax;
 
