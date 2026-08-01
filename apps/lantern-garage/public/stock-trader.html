@@ -3115,11 +3115,44 @@ function selectChart(t, ev){
   // handle) do their own thing — never focus or fullscreen from those.
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
+
+  // Track clicks for double-click detection
+  const now = Date.now();
+  if(!_chartClickTracker) _chartClickTracker = {};
+  if(!_chartClickTracker[t]) _chartClickTracker[t] = [];
+
+  // Remove clicks older than 350ms
+  _chartClickTracker[t] = _chartClickTracker[t].filter(time => now - time < 350);
+  _chartClickTracker[t].push(now);
+
+  // If 2 clicks within 350ms on the same chart, reset zoom instead of opening fullscreen
+  if(_chartClickTracker[t].length >= 2){
+    const card = document.getElementById('card-'+t);
+    if(card){
+      const ladderEl = card.querySelector('.zone-ladder');
+      if(ladderEl){
+        const target = _ladderTarget(ladderEl);
+        if(target){
+          const { viewKey } = target;
+          const view = chartView[viewKey];
+          if(view){
+            if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
+            view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
+            view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
+          }
+          renderTicker(t);
+        }
+      }
+    }
+    _chartClickTracker[t] = []; // Reset click tracker
+    return;
+  }
+
   // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
   // right below it (focusTicker does all of that) — no two-tap dance.
   if(isNarrowTrader()){ focusTicker(t); return; }
   const card = document.getElementById('card-'+t);
-  // Second click on the ALREADY-focused chart → open it fullscreen.
+  // Second click on the ALREADY-focused chart → open it fullscreen (but not on double-click).
   if(card && activeTicker === t && card.classList.contains('active')){
     openFullscreenChart(t);
     return;
@@ -3507,30 +3540,6 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click on chart frame (candlesticks area, not axes) resets zoom/pan
-document.addEventListener('dblclick', function(e){
-  const ladder = e.target.closest('.zone-ladder');
-  if(!ladder) return;
-  const target = _ladderTarget(ladder);
-  if(!target) return;
-  const { dataTicker, viewKey, canvas } = target;
-  const rect = canvas.getBoundingClientRect();
-  const x = e.clientX-rect.left, y = e.clientY-rect.top;
-  const pw = rect.width - 52; // price axis width (right 52px reserved for prices)
-  const ph = rect.height - 16; // time axis height (bottom 16px reserved for times)
-
-  // Only reset if click is on the chart frame (not on axes)
-  if(x < 0 || x > pw || y < 0 || y > ph) return;
-
-  e.preventDefault();
-  const view = chartView[viewKey];
-  if(view){
-    if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
-    view.visibleBars = null; view.barOffset = 0; view.yMin = null; view.yMax = null;
-    view.gVis = null; view.gOff = null; view.gYMin = null; view.gYMax = null;
-  }
-  renderTicker(dataTicker);
-});
 
 // Attach click handlers to all canvas elements for axis resets
 function attachAxisClickHandlers(){
