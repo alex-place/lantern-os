@@ -2183,10 +2183,6 @@ function buildCard(ticker, d){
   if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
 
   let watchHtml = '';
-  if(state==='watching'){
-    const near = (d.zones||[])[0];
-    if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-  }
 
   const badge = regimeBadgeInfo(ticker, state);
   const emph = emphasisAttrs(dir, conf);
@@ -2258,12 +2254,7 @@ function updateCardMeta(ticker, d){
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
     const confHtml = sigBadge(d);
-    let watchHtml = '';
-    if(state==='watching'){
-      const near = (d.zones||[])[0];
-      if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-    }
-    metaEl.innerHTML = confHtml + patternChipHtml(sig) + watchHtml;
+    metaEl.innerHTML = confHtml + patternChipHtml(sig);
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
@@ -3516,7 +3507,7 @@ function _endXhTouch(){ if(_xhTouch){ _hideXh(_xhTouch.ladder); _xhTouch = null;
 document.addEventListener('touchend', _endXhTouch);
 document.addEventListener('touchcancel', _endXhTouch);
 
-// Double-click anywhere on a chart resets zoom/pan to the default auto-fit view.
+// Double-click on chart frame (candlesticks area, not axes) resets zoom/pan
 document.addEventListener('dblclick', function(e){
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
@@ -3525,7 +3516,12 @@ document.addEventListener('dblclick', function(e){
   const { dataTicker, viewKey, canvas } = target;
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX-rect.left, y = e.clientY-rect.top;
-  if(x < 0 || x > rect.width || y < 0 || y > rect.height) return;
+  const pw = rect.width - 52; // price axis width (right 52px reserved for prices)
+  const ph = rect.height - 16; // time axis height (bottom 16px reserved for times)
+
+  // Only reset if click is on the chart frame (not on axes)
+  if(x < 0 || x > pw || y < 0 || y > ph) return;
+
   e.preventDefault();
   const view = chartView[viewKey];
   if(view){
@@ -3553,9 +3549,11 @@ function attachAxisClickHandlers(){
       const canvasRect = canvas.getBoundingClientRect();
       const x = e.clientX - canvasRect.left;
       const y = e.clientY - canvasRect.top;
+      const pw = canvasRect.width - 52;  // price axis starts at width - 52
+      const ph = canvasRect.height - 16; // time axis starts at height - 16
 
-      // Click on time axis (bottom 20px of canvas area)
-      if(y > canvasRect.height - 20 && y <= canvasRect.height){
+      // Click on time axis (bottom 16px of canvas where times are shown)
+      if(y > ph && y <= canvasRect.height && x >= 0 && x <= pw){
         e.stopPropagation();
         if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
         view.barOffset = 0;
@@ -3563,8 +3561,8 @@ function attachAxisClickHandlers(){
         return;
       }
 
-      // Click on price axis (right 60px of canvas area)
-      if(x > canvasRect.width - 60 && x <= canvasRect.width){
+      // Click on price axis (right 52px of canvas where prices are shown)
+      if(x > pw && x <= canvasRect.width && y >= 0 && y <= ph){
         e.stopPropagation();
         if(view._raf){ cancelAnimationFrame(view._raf); view._raf = null; }
         view.yMin = null; view.yMax = null;
