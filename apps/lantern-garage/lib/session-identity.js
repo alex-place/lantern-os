@@ -94,12 +94,54 @@ function setSessionUser(req, user) {
 }
 
 /**
+ * Is this request carrying TLS, as far as the cookie layer is concerned? Mirrors what
+ * express-session checks before it will emit a `Secure` cookie: the socket itself, or
+ * a trusted X-Forwarded-Proto (we run with proxy:true).
+ */
+function _isSecureRequest(req) {
+  if (!req) return false;
+  const sock = req.socket || req.connection;
+  if (sock && sock.encrypted) return true;
+  const xfp = req.headers && req.headers["x-forwarded-proto"];
+  if (!xfp) return false;
+  return String(xfp).split(",")[0].trim().toLowerCase() === "https";
+}
+
+/**
+ * True when the session cookie is marked Secure but the request is plain http — the
+ * combination where express-session saves the session to the store and quietly emits
+ * NO Set-Cookie at all. The caller "logs in" and stays a guest, with a 200 ok:true and
+ * no error on any path (#3010). A login that cannot persist must SAY so, so we surface
+ * it as a hard failure rather than a cheerful lie.
+ *
+ * `secure: "auto"` never lands here (it resolves to false on http). This is the
+ * belt-and-braces guard for any future config, or an operator forcing secure:true.
+ */
+function sessionCookieUndeliverable(req) {
+  const cookie = req && req.session && req.session.cookie;
+  if (!cookie || cookie.secure !== true) return false;
+  return !_isSecureRequest(req);
+}
+
+/**
  * Establish an authenticated session for `user`, regenerating the session id first
  * to defeat session fixation (a pre-set SID must not survive a privilege change),
  * then persisting. Calls `done(err)` when saved. Falls back gracefully if the
  * session store lacks regenerate/save (e.g. a plain object in a unit test).
+ *
+ * Refuses outright when the cookie could not reach the browser — see
+ * sessionCookieUndeliverable: `done` gets an Error with code "secure_cookie_on_http".
  */
 function establishSession(req, user, done) {
+  if (sessionCookieUndeliverable(req)) {
+    const err = new Error(
+      "session cookie is marked Secure but this request is plain http — the browser " +
+        "would never receive it, so the sign-in cannot persist"
+    );
+    err.code = "secure_cookie_on_http";
+    console.error("[auth] refusing to report a sign-in that cannot persist: " + err.message);
+    return done ? done(err) : undefined;
+  }
   const finish = () => {
     setSessionUser(req, user);
     if (typeof req.session.save === "function") req.session.save(done);
@@ -112,4 +154,4 @@ function establishSession(req, user, done) {
   }
 }
 
-module.exports = { getSessionUser, getSessionUserId, getEffectiveUserId, getSessionRole, setSessionUser, establishSession };
+module.exports = { getSessionUser, getSessionUserId, getEffectiveUserId, getSessionRole, setSessionUser, establishSession, sessionCookieUndeliverable };

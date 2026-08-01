@@ -399,11 +399,19 @@ const sessionMiddleware = session({
   proxy: true,
   cookie: {
     httpOnly: true,
-    // Secure whenever bound beyond loopback — PORT set (Railway/tunnel) OR production —
-    // not NODE_ENV alone. A PORT-set deploy that didn't also set NODE_ENV was serving the
-    // session cookie without Secure, so it could ride a downgraded/http request (#2618).
-    // Mirrors the fail-closed rule in session-secret.resolveSessionSecret.
-    secure: !!process.env.PORT || process.env.NODE_ENV === "production",
+    // Production is hard-Secure, no exceptions — that keeps #2618's fail-closed rule
+    // (a PORT-set deploy that didn't also set NODE_ENV must not serve a cookie that
+    // can ride a downgraded http request).
+    //
+    // Everywhere else the flag tracks the ACTUAL connection ("auto" + proxy:true above
+    // → https when X-Forwarded-Proto says so, plain http on loopback). The old rule
+    // keyed off `!!PORT`, which any launcher that injects PORT trips: express-session
+    // then saved the session and silently omitted Set-Cookie entirely, so every
+    // sign-in returned ok:true and left the user a guest with no error anywhere
+    // (#3010). "auto" is the truthful signal; establishSession additionally refuses to
+    // report success when the cookie cannot be delivered, so this can never fail
+    // silently again.
+    secure: process.env.NODE_ENV === "production" ? true : "auto",
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   },

@@ -181,7 +181,8 @@ module.exports = async function authRoutes(req, res, url, deps) {
       (err) => {
         if (err) {
           res.writeHead(500, { "Content-Type": "application/json" });
-          return res.end(JSON.stringify({ error: "session_save_failed" }));
+          // "secure_cookie_on_http" when the cookie could not be delivered (#3010).
+          return res.end(JSON.stringify({ error: err.code || "session_save_failed" }));
         }
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ ok: true, role, provider }));
