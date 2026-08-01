@@ -3116,17 +3116,36 @@ function selectChart(t, ev){
   if(ev && ev.target && ev.target.closest &&
      ev.target.closest('button, a, input, select, .drag-handle, .card-ticker, .order-ticket')) return;
 
-  // Check if this is a double-click (skip fullscreen if so)
-  if(window._skipFullscreen === t){
-    window._skipFullscreen = null;
-    return;
+  // Check if click is on the chart canvas area - if so, don't open fullscreen
+  const card = document.getElementById('card-'+t);
+  const canvas = card && card.querySelector('canvas');
+  if(canvas && ev){
+    const canvasRect = canvas.getBoundingClientRect();
+    const clickX = ev.clientX;
+    const clickY = ev.clientY;
+
+    // Check if click is within canvas bounds
+    if(clickX >= canvasRect.left && clickX <= canvasRect.right &&
+       clickY >= canvasRect.top && clickY <= canvasRect.bottom){
+      // Click inside chart canvas - just focus, don't open fullscreen
+      activeTicker = t;
+      try{ localStorage.setItem('trader.ticker', t); }catch(e){}
+      document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
+      if(card) card.classList.add('active');
+      renderWatchlist();
+      renderSymbolInfo(t);
+      if(!document.body.classList.contains('guest')){
+        setOrderSymbol(t);
+      }
+      return;
+    }
   }
 
   // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
   // right below it (focusTicker does all of that) — no two-tap dance.
   if(isNarrowTrader()){ focusTicker(t); return; }
   const card = document.getElementById('card-'+t);
-  // Second click on the ALREADY-focused chart → open it fullscreen (but not on double-click).
+  // Second click on the ALREADY-focused chart → open it fullscreen (if not on canvas).
   if(card && activeTicker === t && card.classList.contains('active')){
     openFullscreenChart(t);
     return;
