@@ -1608,19 +1608,20 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
   const rng = rMax - rMin;
   const y   = p => ((rMax-p)/rng)*ph;
 
-  // Price axis: nice-number gridlines across the plot + labels in the right
-  // gutter. Tick count scales with plot height (~one per 38px) so even the small
-  // cards get 3-5 gridlines, and the fullscreen / price-zoomed chart get more —
-  // the count naturally grows/shrinks as the price scale is zoomed. Labels show
-  // at least cents (2 dp), e.g. 380.50 / 381.00, and more decimals only when the
-  // step is sub-cent.
+  // Price axis: a FIXED number of evenly spaced gridlines on every chart, so
+  // the label count is identical across all cards and stays constant while the
+  // price scale is zoomed (the labels re-space to the visible range instead of
+  // adding/dropping ticks). Labels show at least cents (2 dp), more decimals
+  // only when the step is sub-cent.
   ctx.font = CHART_AXIS_FONT;
   ctx.lineWidth = 1;
-  const priceTargetTicks = Math.max(4, Math.min(16, Math.round(ph / 30)));
-  const { ticks: priceTicks, step: priceStep } = niceTicks(rMin, rMax, priceTargetTicks);
-  const priceDec = Math.max(2, decimalsFor(priceStep));
+  const PRICE_AXIS_INTERVALS = 6;                 // → 7 gridlines/labels per chart, always
+  const priceStep = rng / PRICE_AXIS_INTERVALS;
+  const priceTicks = Array.from({length: PRICE_AXIS_INTERVALS+1}, (_,i)=> rMin + i*priceStep);
+  // Evenly divided steps are rarely round numbers — pick decimals from the step's
+  // magnitude (cents for $1+ steps, one extra digit per decade below that).
+  const priceDec = priceStep >= 0.5 ? 2 : Math.min(6, Math.ceil(-Math.log10(priceStep)) + 1);
   for(const price of priceTicks){
-    if(price < rMin || price > rMax) continue;
     const yy = Math.round(y(price)) + 0.5;
     ctx.strokeStyle = CHART_GRID_COLOR();
     ctx.beginPath();
@@ -2188,7 +2189,7 @@ function buildCard(ticker, d){
   const emph = emphasisAttrs(dir, conf);
 
   return `
-<div class="card state-${state}${activeTicker===ticker?' active':''}" id="card-${ticker}" data-ticker="${ticker}" onclick="selectChart('${ticker}', event)">
+<div class="card state-${state}" id="card-${ticker}" data-ticker="${ticker}" onclick="selectChart('${ticker}', event)">
   <div class="card-header">
     <div style="display:flex;align-items:center;gap:8px">
       ${slotCount ? `<span class="drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder ${ticker}">⠿</span>` : ''}<span class="card-ticker" role="button" tabindex="0" aria-label="Change symbol, currently ${ticker}" onclick="editSlot('${ticker}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();editSlot('${ticker}')}" title="Click to change symbol">${ticker}</span><span id="pnl-${ticker}">${pnlHtml}</span>
@@ -2199,7 +2200,7 @@ function buildCard(ticker, d){
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
-  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}${watchHtml}</div>
+  <div id="meta-${ticker}">${confHtml}${watchHtml}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
@@ -2254,7 +2255,7 @@ function updateCardMeta(ticker, d){
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
     const confHtml = sigBadge(d);
-    metaEl.innerHTML = confHtml + patternChipHtml(sig);
+    metaEl.innerHTML = confHtml;
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
