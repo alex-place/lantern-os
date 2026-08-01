@@ -3118,16 +3118,11 @@ function selectChart(t, ev){
   // Phone: ONE tap = focus. Zoom the chart tall with the technicals + buy/sell
   // right below it (focusTicker does all of that) — no two-tap dance.
   if(isNarrowTrader()){ focusTicker(t); return; }
-  const card = document.getElementById('card-'+t);
-  // Second click on the ALREADY-focused chart → open it fullscreen.
-  if(card && activeTicker === t && card.classList.contains('active')){
-    openFullscreenChart(t);
-    return;
-  }
-  // First click → focus it in the grid (darker grey) + point the peripherals at it.
+  // Click → focus it in the grid (darker grey) + point the peripherals at it.
   activeTicker = t;
   try{ localStorage.setItem('trader.ticker', t); }catch(e){}
   document.querySelectorAll('#cardsGrid .card.active').forEach(c=>c.classList.remove('active'));
+  const card = document.getElementById('card-'+t);
   if(card) card.classList.add('active');
   renderWatchlist();                       // sidebar highlight follows the selection
   renderSymbolInfo(t);                      // detail panel follows the selection
