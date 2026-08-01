@@ -19,6 +19,7 @@ const {
   getProfileByEmail,
 } = require("./user-profiles");
 const { establishSession } = require("./session-identity");
+const { profileHasAdminOverride } = require("./auth-providers");
 const { createToken } = require("./auth-tokens");
 const { sendVerificationCodeEmail, sendPasswordResetEmail, mailerConfigured } = require("./mailer");
 const { issueCode } = require("./verify-codes");
@@ -160,6 +161,13 @@ function _json(res, status, obj) {
   res.end(JSON.stringify(obj));
 }
 function _establish(req, res, profile, status) {
+  // Apply the LANTERN_ADMIN_IDS override on the LOCAL path too (#3087). The OAuth flow
+  // elevates via profileHasAdminOverride, but this path passed profile.role straight through,
+  // so a correctly-qualified `local:you@email.com` admin entry silently never took effect and
+  // an email/password box had NO working route to admin. profileHasAdminOverride only ever
+  // elevates (never downgrades), and a local account carries a {provider:"local"} identity, so
+  // the override matches the same way it does for a linked Google/Patreon id.
+  const role = profileHasAdminOverride(profile) ? "admin" : profile.role;
   establishSession(
     req,
     {
@@ -167,7 +175,7 @@ function _establish(req, res, profile, status) {
       name: profile.name,
       email: profile.email,
       emailVerified: profile.emailVerified === true,
-      role: profile.role,
+      role,
       tier: profile.tier,
       provider: "local",
     },

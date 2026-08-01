@@ -2459,7 +2459,7 @@ function renderSymResults(){
     const cr=a.class==='crypto';
     const esc=s=>String(s||'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     // Shared badge library: issuer glyphs / crypto signs / monogram fallback.
-    const logo = window.tickerBadgeHtml ? tickerBadgeHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
+    const logo = window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(a.symbol, {assetClass:a.class}) : `<div class='sym-logo ph'>${esc(a.symbol).slice(0,3)}</div>`;
     return `<div class="sym-row${i===_symSel?' sel':''}" data-i="${i}" onclick="pickSym(${i})">
       ${logo}<span class="sym-sym">${esc(a.symbol)}</span>
       <span class="sym-name">${esc(a.name)}</span>
@@ -2863,7 +2863,7 @@ const _wlIsCrypto = (tk)=> /USD$/.test(tk) && tk.length>=6;
 function tickerLogoHtml(ticker){
   // Delegates to the shared badge library (/js/ticker-badges.js): designed
   // issuer/asset-class glyphs, monogram fallback. One source of truth.
-  return window.tickerBadgeHtml ? tickerBadgeHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
+  return window.tickerBadgeOrLogoHtml ? tickerBadgeOrLogoHtml(ticker, {assetClass:_wlIsCrypto(ticker)?'crypto':undefined}) : `<span class='wl-logo ph'>${(ticker||'').slice(0,3)}</span>`;
 }// Pick the badge background per logo by sampling its luminance (FMP sends CORS, so
 // the canvas isn't tainted). Dark-monochrome marks (Intel) get a light badge;
 // everything else keeps the dark badge so colour logos pop. Cached in localStorage.
@@ -3797,6 +3797,19 @@ function _animateLastBar(tk, fromClose, toClose){
   };
   _liveAnims[tk] = requestAnimationFrame(step);
 }
+// #3014: a believable intraday tick sits within TICK_MAX_DEV of the bar it belongs to; a value
+// further out is a stale re-emitted quote, not a real move (a >5% single-tick jump on an
+// intraday bar is circuit-breaker / LULD-halt territory). Compared against the NEARER of the
+// bar's open/close so a legitimately trending bar isn't clipped. Fails OPEN (splice as before)
+// when no positive anchor exists, so it can only ever REMOVE bad ticks, never invent behavior.
+const TICK_MAX_DEV = 0.05;
+function _plausibleTick(px, open, close){
+  if(!(px > 0)) return false;
+  const refs = [open, close].filter((r) => r > 0);
+  if(!refs.length) return true;
+  const nearest = refs.reduce((a, r) => (Math.abs(px - r) < Math.abs(px - a) ? r : a));
+  return Math.abs(px - nearest) <= nearest * TICK_MAX_DEV;
+}
 function _tickLastBar(tk, px){
   const bars = barsData[tk];
   const dur = _TF_MS[chartTimeframe];
@@ -3805,6 +3818,14 @@ function _tickLastBar(tk, px){
   const t0 = +new Date(last.timestamp);
   const now = Date.now();
   if(now < t0 + dur){                                        // tick belongs to the open bar
+    // #3014: reject a physically-impossible quote before it permanently deforms the bar.
+    // high/low use an unbounded monotonic min/max that never recovers and is persisted to
+    // localStorage, so ONE stale re-emitted price (watchlist-prices occasionally re-sends a
+    // past quote) leaves a wick that survives reloads — every audited bad SPY 5m tick was a
+    // $44–52 (≈6–7%) spike, which inflated the regime engine's ATR ~3.4×. A >TICK_MAX_DEV
+    // intraday move in a single tick is circuit-breaker / LULD-halt territory, far outside
+    // real noise; drop it and let the next real server bar re-anchor truth.
+    if(!_plausibleTick(px, last.open, last.close)) return;
     if(px > last.high) last.high = px;
     if(px < last.low)  last.low  = px;
     if(px !== last.close) _animateLastBar(tk, last.close, px);
@@ -3812,9 +3833,12 @@ function _tickLastBar(tk, px){
     // New candle opens at the PREVIOUS close (standard synthesis) and glides to
     // the tick, so the boundary reads as continuous motion, not a teleport.
     const prevClose = last.close;
+    // Same guard (#3014): a stale tick at the boundary must not seed the fresh bar with a
+    // bogus wick. If implausible vs the prior close, open the bar flat and wait for real data.
+    const p = _plausibleTick(px, prevClose, prevClose) ? px : prevClose;
     bars.push({ timestamp:new Date(t0+dur).toISOString(), open:prevClose,
-                high:Math.max(prevClose,px), low:Math.min(prevClose,px), close:prevClose, volume:0 });
-    _animateLastBar(tk, prevClose, px);
+                high:Math.max(prevClose,p), low:Math.min(prevClose,p), close:prevClose, volume:0 });
+    if(p !== prevClose) _animateLastBar(tk, prevClose, px);
   }                                                          // older gap → wait for real server bars
 }
 

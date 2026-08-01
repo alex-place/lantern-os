@@ -22,13 +22,39 @@ const { roleLevel } = require("./role-hierarchy");
 // other identities explicitly ("local:you@email.com"). Keeping the stored key
 // provider-qualified prevents a bare id from cross-granting admin to a
 // same-numbered id on a different provider.
+const _ADMIN_ID_ENTRIES = String(process.env.LANTERN_ADMIN_IDS || "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 const ADMIN_OVERRIDES = new Set(
-  String(process.env.LANTERN_ADMIN_IDS || "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .map((entry) => (entry.includes(":") ? entry : `google:${entry}`))
+  _ADMIN_ID_ENTRIES.map((entry) => (entry.includes(":") ? entry : `google:${entry}`))
 );
+
+// The providers an override key can actually match (see isAdminOverride callers +
+// profileHasAdminOverride). An entry qualified with anything else can never match, and a bare
+// entry becomes google:<id> — surprising if you meant your local email account (#3087).
+const _KNOWN_OVERRIDE_PROVIDERS = new Set(["google", "patreon", "discord", "local"]);
+for (const entry of _ADMIN_ID_ENTRIES) {
+  if (!entry.includes(":")) {
+    // Bare → google:<id>. If it looks like an email it was almost certainly meant to be a
+    // local account, which this will NOT match — the exact silent no-op #3087 describes.
+    if (entry.includes("@")) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" is bare, so it is read as a GOOGLE id ` +
+          `("google:${entry}") and will NOT elevate an email/password account. Use ` +
+          `"local:${entry.toLowerCase()}" for a local login.`
+      );
+    }
+  } else {
+    const prov = entry.slice(0, entry.indexOf(":")).toLowerCase();
+    if (!_KNOWN_OVERRIDE_PROVIDERS.has(prov)) {
+      console.warn(
+        `[auth] LANTERN_ADMIN_IDS entry "${entry}" names provider "${prov}", which no login ` +
+          `path checks — it can never grant admin. Known: ${[..._KNOWN_OVERRIDE_PROVIDERS].join(", ")}.`
+      );
+    }
+  }
+}
 
 function isAdminOverride(provider, providerId) {
   // Strict provider-qualified match. Bare LANTERN_ADMIN_IDS entries were already

@@ -398,30 +398,7 @@
 
 </main>
 
-<!-- ── Site footer ── -->
-<footer class="site-footer">
-  <div class="footer-inner">
-    <span class="footer-brand">
-      <span class="dot" id="status-dot" title="Checking status…"></span>
-      unisona.ai
-    </span>
-    <span class="sep">·</span>
-    <!-- Link set kept in lock-step with site-chrome.js NAV_LINKS so the home
-         footer matches the shared footer + the top nav on every page (#2479). -->
-    <a href="/">Home</a>
-    <a href="/chat.html">Chat</a>
-    <a href="/stock-trader.html">Trader</a>
-    <a href="/orchestration.html">Settings</a>
-    <a href="/work.html">Work</a>
-    <a href="/explore.html">Explore</a>
-    <a href="/knowledgecenter.html">Docs</a>
-    <span class="sep">·</span>
-    <a href="https://github.com/alex-place/lantern-os" target="_blank" rel="noopener noreferrer">GitHub</a>
-    <span class="visually-hidden" id="status-label">connecting…</span>
-    <span class="sep">·</span>
-    <span class="footer-meta"><span id="hero-edition">Orion Edition</span> · <span data-version-badge="">v—</span> · <span id="hero-git">—</span></span>
-  </div>
-</footer>
+<!-- Site footer injected by /js/site-chrome.js (single source of truth) -->
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
 <script>
@@ -433,88 +410,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* Real-time honest state loader */
-(function() {
-  const $ = id => document.getElementById(id) || { textContent: '', className: '', style: {}, title: '', onclick: null };
-  const fmtDate = iso => { try { return new Date(iso).toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'}); } catch { return iso; } };
-
-  async function fetchJson(path) {
-    try { const r = await fetch(path, { cache: 'no-store', signal: AbortSignal.timeout(5000) }); return r.ok ? await r.json() : null; }
-    catch { return null; }
-  }
-
-  async function loadState() {
-    // #878: only these 3 endpoints drive elements that exist on this page
-    // (footer status dot/label, hero edition/commit line, version badges).
-    // The former "full index" dashboard — providers, agents, node mesh,
-    // dreamer, readiness, recent entries — was removed, so its loader and the
-    // 8 endpoints it polled (incl. /api/nodes/mesh, /api/agents/workers and
-    // /api/nodes/this, which 404'd every cycle) are gone with it.
-    const [health, version, git, serving] = await Promise.all([
-      fetchJson('/api/health'),
-      fetchJson('/version.json'),
-      fetchJson('/api/version'),
-      fetchJson('/api/serving/status'),
-    ]);
-
-    // Footer light = Ollama health. /api/serving/status → local_model probes
-    // Ollama at :11434: `serving` = server reachable, `pinned_served` = the
-    // pinned model is actually loaded. RED when Ollama is down (or the web server
-    // itself is unreachable), GOLD when Ollama is up but the pinned model isn't
-    // served, GREEN when Ollama is up and ready.
-    const serverOnline = !!(health && health.ok);
-    const lm = serving?.local_model;
-    const ollamaUp = !!(lm && lm.serving);
-    const pinnedConfigured = !!(lm && lm.pinned);
-    const modelUp = !!(lm && lm.pinned_served);
-    let dotState, statusText, statusTitle;
-    if (!serverOnline || !ollamaUp) {
-      dotState = 'offline';                                   // red — Ollama is down
-      statusText = serverOnline ? 'ollama offline' : 'server unreachable';
-      statusTitle = serverOnline
-        ? 'Ollama down' + (lm && lm.base ? ' (' + lm.base + ')' : '')
-        : 'Server unreachable';
-    } else if (pinnedConfigured && !modelUp) {
-      dotState = 'warn';                                      // gold — up but model not loaded
-      statusText = 'ollama online · model not loaded';
-      statusTitle = 'Ollama up · pinned model ' + lm.pinned + ' not served';
-    } else {
-      dotState = 'online';                                   // green — Ollama up and ready
-      statusText = 'ollama online';
-      const active = lm.active_model || lm.pinned;
-      statusTitle = 'Ollama up' + (active ? ' · ' + active : '');
-    }
-    const dotEl = $('status-dot');
-    dotEl.className = 'dot ' + dotState;
-    dotEl.title = statusTitle;
-    $('status-label').textContent = statusText;
-
-    // Version + git (hero sub-line + clickable version badges)
-    // /version.json can 500 in some checkouts; fall back to the git
-    // endpoint's semver (already fetched below) before giving up.
-    const g = git?.version;
-    // Prefer the live git semver (reflects the running commit) over the static
-    // /version.json file, which is committed and routinely lags the real build.
-    const v = g?.semver || version?.version || 'unknown';
-    const branch = g?.branch || '';
-    const shortCommit = g?.commit ? g.commit.slice(0, 7) : '—';
-    const commitDate = g?.date ? fmtDate(g.date) : '';
-
-    $('hero-edition').textContent = 'Orion Edition';
-    $('hero-git').textContent = [branch, shortCommit, commitDate].filter(Boolean).join(' · ');
-
-    document.querySelectorAll('[data-version-badge]').forEach(el => {
-      const prefix = el.dataset.versionBadge || '';
-      el.textContent = prefix + 'v' + v;
-      el.style.cursor = 'pointer';
-      el.title = 'View changelog';
-      el.onclick = () => window.open('/changelog.html', '_blank');
-    });
-  }
-
-  loadState();
-  setInterval(loadState, 30_000);
-})();
+/* Footer status dot, label and version badge now come from /js/site-chrome.js —
+   the loader that used to live here duplicated it once the footer went global. */
 </script>
 <script>
 (function applyIndexFeatureFlag() {
