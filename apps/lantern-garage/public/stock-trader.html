@@ -5074,12 +5074,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
   // arrives with #2443) simply joins the menu once it exists. Its sibling pulse
   // dot deliberately STAYS inline — the stale-feed signal must remain glanceable.
   const picks=[
-    // Header diet (operator, 2026-07-25): layout + timeframe + range stay inline
-    // (the most-used controls); chart type, patterns, and draw live in the ☰ at
-    // every width alongside the other secondary toggles.
-    {sel:'#chartTypeSelect',           narrowOnly:false},
-    {sel:'#patternsToggle',            narrowOnly:false},
-    {sel:'#drawToolSel',               narrowOnly:false},
+    // Chart type, patterns, and draw live INLINE in the toolbar on desktop
+    // (operator, 2026-08-01) and collapse into the ☰ only when the toolbar is
+    // too tight; layout + timeframe + range stay inline at every width.
+    {sel:'#chartTypeSelect',           narrowOnly:true},
+    {sel:'#patternsToggle',            narrowOnly:true},
+    {sel:'#drawToolSel',               narrowOnly:true},
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
