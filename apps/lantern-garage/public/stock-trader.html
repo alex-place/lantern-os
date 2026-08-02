@@ -319,7 +319,10 @@
      tracks. Theme-aware. */
   .card.active{background:rgba(32,38,52,.98);border-color:var(--accent);box-shadow:0 0 0 1px color-mix(in srgb, var(--accent) 40%, transparent)}
   html[data-theme="light"] .card.active{background:#e5eaf2;border-color:var(--accent)}
-  .card.state-open{border-color:rgba(0,212,170,.35);grid-column:span 2}
+  /* An open position changes the card's BORDER, never its footprint. This used to be
+     `grid-column:span 2`, so opening a position silently doubled that card's width and
+     re-flowed every other chart on the deck (#3139). */
+  .card.state-open{border-color:rgba(0,212,170,.35)}
   .card.state-watching{border-color:color-mix(in srgb, var(--accent) 28%, var(--border))}
   .card.state-quiet{opacity:.75}
   .card-header{padding:10px 14px 6px;display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -332,7 +335,14 @@
      space below, and no chart bleeding under the footer. Rows/cols set in JS. */
   .main.main-fixed{overflow:hidden}
   .cards-grid.grid-fixed{height:100%;gap:8px}
-  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1;aspect-ratio:auto}
+  /* Square in the fixed layouts too (#3138). The tracks are sized in JS to the largest
+     square that fits the deck (see applyGridCols), so aspect-ratio here is the guarantee
+     rather than the mechanism — and every panel in a layout is identically sized (#3139). */
+  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1;aspect-ratio:1/1}
+  .cards-grid.grid-fixed{justify-content:center;align-content:center}
+  /* Phones keep the stacked, height-filling layout: a square panel in a single narrow
+     column wastes the little vertical room a phone has. */
+  .cards-grid.grid-fixed.grid-narrow .card{aspect-ratio:auto}
   .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
   /* Drag-to-reorder chart slots (multi-chart layouts) */
   .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
@@ -2334,15 +2344,31 @@ function applyGridCols(){
     const narrow = isNarrowTrader();
     const cols = narrow ? 1 : (SLOT_COLS[shown] || Math.ceil(Math.sqrt(shown)));
     const rows = Math.ceil(shown / cols);
-    grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-    grid.style.gridTemplateRows    = narrow ? `repeat(${rows},minmax(0,1fr))` : `repeat(${rows},1fr)`;
+    grid.classList.toggle('grid-narrow', narrow);
+    if(narrow){
+      // Phone: stack and fill the height. A square panel in one narrow column would
+      // waste the little vertical room a phone has.
+      grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+      grid.style.gridTemplateRows    = `repeat(${rows},minmax(0,1fr))`;
+    } else {
+      // Square panels, all identical (#3138/#3139). `1fr` tracks stretched each cell to
+      // whatever shape the deck happened to be, so panels were wide rectangles that
+      // changed shape with the window, the chat rail, and the order panel. Size the
+      // track to the largest square that fits instead, and centre the block.
+      const gap = parseFloat(getComputedStyle(grid).gap) || 8;
+      const availW = grid.clientWidth  - gap * (cols - 1);
+      const availH = grid.clientHeight - gap * (rows - 1);
+      const cell = Math.max(180, Math.floor(Math.min(availW / cols, availH / rows)));
+      grid.style.gridTemplateColumns = `repeat(${cols},${cell}px)`;
+      grid.style.gridTemplateRows    = `repeat(${rows},${cell}px)`;
+    }
     grid.classList.add('grid-fixed');
     grid.classList.toggle('grid-single', shown === 1);
     if(main) main.classList.add('main-fixed');
   } else {
     grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(340px,1fr))';
     grid.style.gridTemplateRows    = '';
-    grid.classList.remove('grid-fixed','grid-single');
+    grid.classList.remove('grid-fixed','grid-single','grid-narrow');
     if(main) main.classList.remove('main-fixed');
   }
 }
@@ -2654,8 +2680,9 @@ function openOrderPanel(){
   otUserClosed = false;
   document.getElementById('otBg').classList.remove('hidden');
   document.body.classList.add('ot-open');
-  // The chart area just got narrower — re-fit visible charts to the new width.
-  requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
+  // The chart area just got narrower — re-tile (square tracks depend on the width) and
+  // re-fit the visible charts.
+  requestAnimationFrame(()=>{ applyGridCols(); renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 function openOrderTicket(ticker, side){
   if(window.GUEST){ location.href='/auth.html?returnTo=%2Fstock-trader.html'; return; }   // read-only view → send to sign-in
@@ -2671,7 +2698,7 @@ function closeOrderTicket(){
   // Disarm any pending two-step confirm so a reopened ticket starts clean.
   _otArmed=false; clearTimeout(_otArmTimer);
   const sub=document.getElementById('otSubmit'); if(sub) sub.classList.remove('armed');
-  requestAnimationFrame(()=>{ renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
+  requestAnimationFrame(()=>{ applyGridCols(); renderTicker(fullscreenTicker); wlPrices.forEach(t=>renderTicker(t.ticker)); });
 }
 
 function setOtSide(side){
@@ -4942,9 +4969,14 @@ function startDashboard(){
   // Re-tile when crossing the phone breakpoint (rotate / resize) so 2–4 chart grids
   // switch between the desktop tiling and the single-column phone stack.
   let _lastNarrow = isNarrowTrader();
+  let _retileTimer = null;
   window.addEventListener('resize', function(){
     const n = isNarrowTrader();
-    if(n !== _lastNarrow){ _lastNarrow = n; buildLayoutOptions(); applyGridCols(); renderCards(); }
+    if(n !== _lastNarrow){ _lastNarrow = n; buildLayoutOptions(); applyGridCols(); renderCards(); return; }
+    // Square tracks are sized in PIXELS, so every resize has to recompute them — not
+    // just crossing the phone breakpoint. Debounced so a drag doesn't re-tile per frame.
+    clearTimeout(_retileTimer);
+    _retileTimer = setTimeout(()=>{ applyGridCols(); renderCards(); }, 120);
   });
   fullRefresh();
   loadBars();
