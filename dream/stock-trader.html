@@ -386,7 +386,6 @@
      Dashed border distinguishes a "read" from the solid conviction badge; only shown
      when Patterns is ON and a pattern is genuinely detected. Bias-coloured. */
   .pat-chip{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:10px;display:inline-flex;align-items:center;gap:4px;margin:0 14px 5px;width:fit-content;max-width:calc(100% - 28px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px dashed var(--border);background:var(--bg2);cursor:help}
-  .pat-chip .pat-type{color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-size:10px}
   .pat-chip.bull{border-color:rgba(0,212,170,.45);color:var(--green)}
   .pat-chip.bear{border-color:rgba(255,95,109,.45);color:var(--red)}
   .pat-chip.neut{border-color:var(--border);color:var(--text1)}
@@ -2189,6 +2188,11 @@ const PATTERN_MENU = [
 // genuinely detected a named pattern AND that pattern's family is opted-in via the
 // Patterns menu — so nothing is invented and the default clean view is untouched.
 // The engine's own `reasons` string rides along as the tooltip (the evidence).
+//
+// The chip shows the pattern NAME only (#3140). It used to lead with the category —
+// "REVERSAL Double Top" — which read as a second, louder claim about what the market
+// was about to do, on top of the name. The category still rides in the tooltip, so the
+// classification is one hover away rather than gone.
 function patternChipHtml(sig){
   if(!sig || !sig.candle) return '';
   const meta = PATTERN_META[sig.candle];
@@ -2198,7 +2202,7 @@ function patternChipHtml(sig){
   const struct = (sig.structure && sig.structure !== 'NEUTRAL')
     ? ` · structure ${sig.structure.toLowerCase()}` : '';
   return `<div class="pat-chip ${cls}" title="Detected by the deterministic signal engine — ${meta.type}. ${why}${struct}">`
-    + `<span class="pat-type">${meta.type}</span>${meta.label}</div>`;
+    + `${meta.label}</div>`;
 }
 
 function buildCard(ticker, d){
