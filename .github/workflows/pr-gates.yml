@@ -156,6 +156,15 @@ jobs:
         run: node scripts/check-docs-drift.mjs
       - name: Validate docs-drift gate logic
         run: node apps/lantern-garage/test/docs-drift-gate.test.js
+      # The Knowledge Center publishes from data/knowledge/doc-catalog.json, and nothing
+      # used to check it: 51 docs accumulated with no entry (auto-publishing themselves
+      # with a scraped first line), and the committed page ran 48 cards behind. This gate
+      # covers catalog coverage both ways, the audience field, page freshness, and the
+      # "no origin IP in a public doc" rule.
+      - name: Check Knowledge Center doc catalog
+        run: node scripts/check-doc-catalog.mjs
+      - name: Knowledge Center publication invariants
+        run: node --test apps/lantern-garage/test/knowledge-center.test.js
 
   # ── No deterministic keyword intent-routing ─────────────────────────────────
   # The chat routes capabilities through the model's native tool calls, not pre-LLM
