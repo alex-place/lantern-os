@@ -9,6 +9,19 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+// Redirect the trade log BEFORE any lib loads — auto-trader (pulled in
+// transitively) resolves TRADER_TRADES_LOG at require time, and without this
+// the direction-lock test's fixtures append to the operator's LIVE
+// autopilot-trades.jsonl (observed polluting it 2026-07-27 → 08-01).
+{
+  const os = require('os');
+  const fs = require('fs');
+  const p = require('path');
+  const _tmp = fs.mkdtempSync(p.join(os.tmpdir(), 'ot-test-'));
+  process.env.TRADER_TRADES_LOG = p.join(_tmp, 'trades.jsonl');
+  process.env.TRADER_STATE_FILE = p.join(_tmp, 'state.json');
+}
+
 const ot = require('../lib/overnight-trader');
 const sigma = require('../lib/sigma-trader');
 
