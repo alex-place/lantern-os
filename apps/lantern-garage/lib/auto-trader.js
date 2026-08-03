@@ -204,6 +204,14 @@ function _saveState() {
       lastOrderAt: Object.fromEntries(_lastOrderAt),
       dirStreak: Object.fromEntries(_dirStreak),
       lastPos: Object.fromEntries(_lastPos),
+      // The unclosable freeze must survive a restart. exitStatus was persisted but
+      // its two companions were not, so every restart reset the failure count to 0,
+      // cleared the freeze, and let a structurally-unclosable position re-attempt its
+      // exit 3 more times and re-log exit_frozen (the 0.8-share SOXS dust did this
+      // after each restart on 2026-08-03). Released as before the moment the position
+      // leaves the book — see the reconcile loop, which deletes both.
+      exitFailures: Object.fromEntries(_exitFailures),
+      unclosable: [..._unclosable],
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -218,6 +226,8 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.lastOrderAt || {})) _lastOrderAt.set(k, v);
     for (const [k, v] of Object.entries(o.dirStreak || {})) _dirStreak.set(k, v);
     for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
+    for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
+    for (const s of (o.unclosable || [])) _unclosable.add(s);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -745,6 +755,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _saveState(); }
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
