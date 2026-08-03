@@ -160,6 +160,21 @@ async function _autoscanTick() {
         if (!resolved || !resolved.accountId) continue;          // neither broker connected
         if (_seenAccts.has(resolved.accountId)) continue;        // alias → same account, skip
         _seenAccts.add(resolved.accountId);
+        // ARM BEFORE LOCK (2026-08-03). The lock used to be claimed before we knew
+        // whether this process would act at all, so a DISARMED instance squatted the
+        // account: the dev server (TRADER_AUTO_EXECUTE removed) re-claimed IBKR
+        // DUR193395 every tick and held it, while the ARMED stable server saw
+        // "managed by another process" and stood down — nothing traded for the whole
+        // session. Decide whether we can place orders for this user FIRST, and only
+        // contend for the account if we can. Mirrors each strategy's own arm gate:
+        //   champion   → sigma.rebalanceNow needs SIGMA_ARM=1
+        //   day-trader → runAutoTrade needs TRADER_AUTO_EXECUTE=1 or TRADER_MANAGE_EXITS=1
+        // A disarmed process places no orders either way, so skipping costs nothing.
+        const _isChampion = traderMode.get(uid) === 'champion';
+        const _canAct = _isChampion
+          ? process.env.SIGMA_ARM === '1'
+          : (process.env.TRADER_AUTO_EXECUTE === '1' || process.env.TRADER_MANAGE_EXITS === '1');
+        if (!_canAct) continue;                                  // disarmed here → never touch the lock
         // CROSS-PROCESS ACCOUNT LOCK (lib/account-lock.js). _seenAccts only dedupes
         // within THIS process; on 2026-07-31 the stable and dev servers both drove
         // IBKR DUR193395 with separate cooldown state and double-submitted. One
@@ -180,7 +195,7 @@ async function _autoscanTick() {
         // has the day-trader PAUSED — instead we run the Champion allocation book on
         // their own account (throttled; DRY unless SIGMA_ARM=1, same governance as the
         // standalone Sigma book). Default 'stock' users fall through to runAutoTrade.
-        if (traderMode.get(uid) === 'champion') {
+        if (_isChampion) {
           if (_championDue(uid, Date.now())) {
             await sigma.rebalanceNow({ userId: uid, arm: true }).catch((e) => console.error('[Trading] champion rebalance failed:', e.message));
           }
