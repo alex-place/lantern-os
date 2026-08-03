@@ -62,13 +62,29 @@ const DEFAULT_BASE = 'https://api.ibkr.com/v1/api';
 //        data, which removes the notice at the source.
 const BENIGN_WARNING_IDS = new Set(['20']);
 
+// IBKR STOPPED SENDING THE NUMERIC PREFIX (observed live 2026-08-03). Reply ids are
+// now UUIDs and the message text arrives WITHOUT the leading "20/", so matching on the
+// numeric id alone silently stopped recognising this very notice — isBenignWarning
+// returned false for it and every autopilot entry parked as Inactive for days (22 on
+// 2026-08-03 alone). Match the message TEXT as well: same advisory, identified by its
+// wording instead of a prefix IBKR no longer sends.
+//
+// This does NOT widen P0-8. Only the market-data advisory is listed; MARGIN /
+// SIZE-vs-ADV / PRICE-CAP / outside-RTH warnings match nothing here and still block
+// until the caller passes acceptWarnings explicitly.
+const BENIGN_WARNING_TEXT = [
+  /submitting an order without market data/i,
+];
+
 /** True when EVERY line of an IBKR reply message is a known-benign advisory notice. */
 function isBenignWarning(message) {
   const lines = Array.isArray(message) ? message : [message];
   if (!lines.length) return false;
   return lines.every((m) => {
-    const id = (String(m == null ? '' : m).match(/^\s*(\d+)\s*\//) || [])[1];
-    return !!id && BENIGN_WARNING_IDS.has(id);
+    const s = String(m == null ? '' : m);
+    const id = (s.match(/^\s*(\d+)\s*\//) || [])[1];        // legacy "20/…" form
+    if (id) return BENIGN_WARNING_IDS.has(id);
+    return BENIGN_WARNING_TEXT.some((re) => re.test(s));    // current, prefix-less form
   });
 }
 
