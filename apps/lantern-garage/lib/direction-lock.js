@@ -54,12 +54,16 @@ function instrumentSign(sym) {
 }
 
 /** Net direction per family from live positions: { FAMILY: -1|1 } (0 net → absent).
- *  positions: [{ symbol, qty }] — negative qty (a real short) flips the sign. */
+ *  positions: [{ symbol, qty }] — negative qty (a real short) flips the sign.
+ *  Sub-share DUST (|qty| < 1) is ignored: IBKR structurally cannot trade a
+ *  fractional-only position (the 0.8-share SOXS remnant froze its own exits and
+ *  then vetoed every semiconductor long via this exposure map, 2026-08-03) — an
+ *  untradeable stub is not real directional exposure. */
 function familyExposure(positions) {
   const score = {};
   for (const p of (positions || [])) {
     const qty = Number(p.qty) || 0;
-    if (!qty) continue;
+    if (Math.abs(qty) < 1) continue;   // untradeable dust — not exposure
     const { family, sign } = instrumentSign(p.symbol);
     score[family] = (score[family] || 0) + sign * qty;
   }
