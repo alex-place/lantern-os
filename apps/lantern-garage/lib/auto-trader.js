@@ -98,6 +98,13 @@ function cfg() {
     persistWindowMs: n('TRADER_PERSIST_WINDOW_MS', DEFAULTS.persistWindowMs),
     requirePersist: process.env.TRADER_REQUIRE_PERSIST !== '0',          // on by default
     allowShorts: process.env.TRADER_ALLOW_SHORTS === '1',
+    // Zone-ladder exit (#3165, OOS-validated on SPY+QQQ only): sell at the first
+    // resistance zone unless price punches THROUGH it — then the second zone is the
+    // target and the first becomes the floor. Ladder symbols skip take-profit/trail/
+    // momentum/signal exits (the ladder + broker stop own the position).
+    zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
+    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ')
+      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
     // ── Exit management (trailing stop / take-profit / momentum death) ──────────
     trailPct: n('TRADER_TRAIL_PCT', DEFAULTS.trailPct),
@@ -165,6 +172,7 @@ const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
+const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 // sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
 // This is what makes an EXTERNAL close (a resting protective stop filling, a manual
@@ -212,6 +220,7 @@ function _saveState() {
       // leaves the book — see the reconcile loop, which deletes both.
       exitFailures: Object.fromEntries(_exitFailures),
       unclosable: [..._unclosable],
+      zoneLadder: Object.fromEntries(_zoneLadder),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -228,6 +237,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
     for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
     for (const s of (o.unclosable || [])) _unclosable.add(s);
+    for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -341,6 +351,31 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // resting order (or the next fill) will close it — give it time before re-attempting.
     const exitAt = _exitAt.get(sym) || 0;
     if (exitAt && (now - exitAt) < c.exitReattemptMs) continue;
+
+    // ── ZONE-LADDER EXIT (#3165) — OOS-validated for SPY/QQQ-class names ──────────
+    // Sell at R1 (first resistance above entry) unless price broke THROUGH the zone —
+    // then hold for R2 with the floor ratcheted to R1. While the ladder owns a symbol
+    // the generic exits below (take-profit/trail/momentum) are skipped; the broker
+    // protective stop and the max-loss backstop above still guard the downside.
+    // Live-price approximation of the sim's close-through: mark > zone TOP.
+    const _lad = c.zoneExit ? _zoneLadder.get(sym) : null;
+    if (_lad && _lad.r1 > 0) {
+      if (!_lad.broke) {
+        if (cur > (_lad.r1top || _lad.r1)) {
+          _lad.broke = true; _zoneLadder.set(sym, _lad); _saveState();   // upgraded: R2 target, R1 floor
+        } else if (cur >= _lad.r1) {
+          await closeLong(bridge, userId, sym, qty, p, `zone_r1 (first resistance ${_lad.r1})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
+      } else if (_lad.r2 > 0 && cur >= _lad.r2) {
+        await closeLong(bridge, userId, sym, qty, p, `zone_r2 (runner target ${_lad.r2})`, out, now, { extended, refPrice: cur });
+        delete heldQty[sym]; continue;
+      } else if (cur <= _lad.r1) {
+        await closeLong(bridge, userId, sym, qty, p, `zone_r1_floor (gave back to ${_lad.r1})`, out, now, { extended, refPrice: cur });
+        delete heldQty[sym]; continue;
+      }
+      continue;   // ladder owns this symbol — skip take-profit / trailing / momentum
+    }
 
     const pnlPct = ((cur - entry) / entry) * 100;
     const peak = Math.max(_peak.get(sym) || 0, cur, entry);   // running high-water mark
@@ -491,6 +526,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       // Position gone → exit resolved. Drop its state.
       _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
+      _zoneLadder.delete(sym);
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
     } else {
@@ -642,6 +678,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         // exit on a STRONG bearish read, (3) require it to persist across scans.
         const entryAt = _entryAt.get(sym) || 0;
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
+        if (c.zoneExit && _zoneLadder.has(sym)) { out.skipped.push({ ...record, why: 'zone ladder owns this exit (#3165) — R1/R2/floor + broker stop' }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
         // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
@@ -715,6 +752,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
     }
+    if (r && r.status === 'placed' && c.zoneExit && c.zoneExitSyms.has(sym)) {
+      // Arm the zone ladder (#3165): the two nearest resistance zones above entry.
+      // No zones above -> no ladder; the generic exits manage it as before.
+      const res = (Array.isArray(s.zones) ? s.zones : [])
+        .filter((z) => z && /RESIST/i.test(z.type || '') && Number(z.level) > price * 1.001)
+        .sort((x, y) => x.level - y.level);
+      if (res[0]) _zoneLadder.set(sym, { r1: res[0].level, r1top: res[0].top || res[0].level, r2: res[1] ? res[1].level : 0, broke: false });
+    }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
       logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
@@ -755,6 +800,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _saveState(); }
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
