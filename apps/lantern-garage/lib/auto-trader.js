@@ -407,6 +407,19 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     const _lad = c.zoneExit ? _zoneLadder.get(sym) : null;
     if (_lad && _lad.r1 > 0) {
       if (!_lad.broke) {
+        // PEAK GIVE-BACK (#3165, OOS-validated on the support-entry geometry —
+        // holdout PF: SPY 1.32->1.57, QQQ 2.06->2.13): a near-miss of R1 must not
+        // round-trip. Track the peak on the way to R1; once >=90% of the distance
+        // was reached, a give-back of 40% of the peak gain exits near the peak.
+        _lad.zPeak = Math.max(_lad.zPeak || 0, cur);
+        const _span = _lad.r1 - entry;
+        if (_span > 0 && (_lad.zPeak - entry) / _span >= 0.9) {
+          const _gb = entry + 0.6 * (_lad.zPeak - entry);
+          if (cur <= _gb) {
+            await closeLong(bridge, userId, sym, qty, p, 'peak_giveback (reached ' + Math.round((_lad.zPeak - entry) / _span * 100) + '% of R1, gave back 40% of peak gain)', out, now, { extended, refPrice: cur });
+            delete heldQty[sym]; continue;
+          }
+        }
         if (cur > (_lad.r1top || _lad.r1)) {
           _lad.broke = true; _zoneLadder.set(sym, _lad); _saveState();   // upgraded: R2 target, R1 floor
         } else if (cur >= _lad.r1) {
