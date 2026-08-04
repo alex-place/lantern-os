@@ -102,6 +102,13 @@ function cfg() {
     // resistance zone unless price punches THROUGH it — then the second zone is the
     // target and the first becomes the floor. Ladder symbols skip take-profit/trail/
     // momentum/signal exits (the ladder + broker stop own the position).
+    // ATR-based protective stops (operator decision 2026-08-04): use the signal's
+    // own ATR/S-R trade-plan stop (what the backtests actually validated) instead of
+    // a flat stopPct, clamped to [atrStopMinPct, atrStopMaxPct]. The flat stopPct
+    // remains the fallback when a signal ships no plan. Kill: TRADER_ATR_STOPS=0.
+    atrStops: process.env.TRADER_ATR_STOPS !== '0',
+    atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
+    atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
     zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
@@ -131,6 +138,16 @@ async function cancelRestingStops(bridge, userId, sym) {
       }
     }
   } catch (_e) { /* fail-soft — a missed cancel is caught by the never-short guard */ }
+}
+
+/** Stop distance %% for an entry: the signal's ATR/S-R plan stop when enabled and
+ * sane, clamped to [min,max]; else the flat stopPct fallback. */
+function stopDistPctFor(price, plan, c) {
+  if (c.atrStops && plan && Number(plan.stop) > 0 && Number(price) > 0) {
+    const d = ((price - Number(plan.stop)) / price) * 100;
+    if (d > 0) return Math.min(c.atrStopMaxPct, Math.max(c.atrStopMinPct, d));
+  }
+  return c.stopPct;
 }
 
 /** Protective stop trigger price for a long entry: `stopPct` below entry. */
@@ -172,6 +189,7 @@ const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
+const _stopDistPct = new Map(); // sym -> protective-stop distance % at entry (ATR stops make it per-trade)
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 // sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
@@ -221,6 +239,7 @@ function _saveState() {
       exitFailures: Object.fromEntries(_exitFailures),
       unclosable: [..._unclosable],
       zoneLadder: Object.fromEntries(_zoneLadder),
+      stopDistPct: Object.fromEntries(_stopDistPct),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -238,6 +257,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
     for (const s of (o.unclosable || [])) _unclosable.add(s);
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
+    for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -386,8 +406,9 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     // 1a) R-multiple take-profit — exit at +takeProfitR × risk (risk = stopPct). This
     //     engine's winners don't run: backtests show a tight 1R target beats 2R/3R on
     //     every basket, so bank the gain fast instead of round-tripping it. 1R = +stopPct%.
-    if (c.takeProfitR > 0 && c.stopPct > 0 && pnlPct >= c.takeProfitR * c.stopPct) {
-      await closeLong(bridge, userId, sym, qty, p, `take_profit_R (+${pnlPct.toFixed(1)}% ≈ ${c.takeProfitR}R)`, out, now, { extended, refPrice: cur });
+    const riskPct = _stopDistPct.get(sym) || c.stopPct;   // per-trade stop distance (ATR stops)
+    if (c.takeProfitR > 0 && riskPct > 0 && pnlPct >= c.takeProfitR * riskPct) {
+      await closeLong(bridge, userId, sym, qty, p, `take_profit_R (+${pnlPct.toFixed(1)}% ≈ ${c.takeProfitR}R @ ${riskPct.toFixed(1)}% risk)`, out, now, { extended, refPrice: cur });
       delete heldQty[sym]; continue;
     }
     // 1) Hard take-profit (fixed %, off by default).
@@ -526,7 +547,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       // Position gone → exit resolved. Drop its state.
       _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
-      _zoneLadder.delete(sym);
+      _zoneLadder.delete(sym); _stopDistPct.delete(sym);
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
     } else {
@@ -593,7 +614,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       if (qty > 0 && !hasStop(sym)) {
         const entry = Number(p.avg_entry_price || p.avg_fill_price || p.current_price) || 0;
         const curPx = Number(p.current_price) || 0;
-        let stop = stopPriceFor(entry, c.stopPct);
+        let stop = stopPriceFor(entry, _stopDistPct.get(sym) || c.stopPct);
         // A sell-STOP must sit BELOW the market or the broker rejects it. For a position
         // already underwater, the entry-based stop (entry×0.98) is ABOVE the current
         // price — so re-protect would silently fail and the loser stays naked. Clamp the
@@ -746,7 +767,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
     if (r && r.status === 'placed') {
-      const stop = stopPriceFor(price, c.stopPct);
+      const stopDist = stopDistPctFor(price, s.plan, c);
+      _stopDistPct.set(sym, stopDist);
+      const stop = stopPriceFor(price, stopDist);
       if (stop) {
         const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
@@ -800,6 +823,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _saveState(); }
+function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
