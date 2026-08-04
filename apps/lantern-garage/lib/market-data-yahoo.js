@@ -314,6 +314,8 @@ async function getQuotes(tickers) {
  * OHLCV bars for one ticker at a timeframe.
  * Returns: { bars: [...], ticker, timeframe, count }
  */
+const _barArchive = require('./bar-archive');
+
 async function getBars(ticker, timeframe = '5m') {
   const tf = TF[timeframe] || TF['5m'];
   const key = `b:${ticker}:${timeframe}`;
@@ -322,6 +324,7 @@ async function getBars(ticker, timeframe = '5m') {
   try {
     const result = await fetchChart(ticker, tf.interval, tf.range);
     const bars = parseBars(result, tf.agg);
+    _barArchive.archive(ticker, timeframe, bars);   // Observe: grow the intraday corpus (fail-soft)
     const out = { bars, ticker, timeframe, count: bars.length };
     cacheSet(key, out);
     return out;
@@ -345,6 +348,7 @@ async function getBarsMulti(tickers, timeframe = '5m') {
     try {
       const result = await fetchChart(ticker, tf.interval, tf.range);
       const bars = parseBars(result, tf.agg);
+      _barArchive.archive(ticker, timeframe, bars); // Observe: grow the intraday corpus (fail-soft)
       return { ticker, bars };
     } catch (e) {
       return { ticker, bars: [] };
