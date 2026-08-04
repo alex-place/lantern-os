@@ -226,6 +226,42 @@ async function _autoscanTick() {
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
+
+  // ── FAST EXIT LOOP (#3165): price-only exit checks between full scans ──────────
+  // The 60s scan cadence made exits blind for a minute at a time — a near-miss of R1
+  // with momentum dying round-tripped before the next scan could act. This loop runs
+  // auto-trader.fastExitTick (no bars, no Python, no signal engine — mark-price only)
+  // every TRADER_FAST_EXIT_MS (default 10s) during market hours, owner account only,
+  // honoring the same cross-process account lock as the scan loop. Cost: one
+  // positions + one open-orders call per tick against the local gateway; zero extra
+  // Yahoo calls. Kill: TRADER_FAST_EXITS=0.
+  const FAST_EXIT_MS = Math.max(3000, parseInt(process.env.TRADER_FAST_EXIT_MS || '10000'));
+  let _fastExitBusy = false;
+  if (process.env.TRADER_FAST_EXITS !== '0') {
+    const t = setInterval(async () => {
+      if (_fastExitBusy || _autoscanStopped || !traderAgent) return;
+      const mh = _isUsMarketHours();
+      const ext = _isUsExtendedHours() && _extendedTrading;
+      if (!mh && !ext) return;
+      _fastExitBusy = true;
+      try {
+        const { brokerFacadeFor } = require('../lib/broker-facade');
+        const resolved = await brokerFacadeFor('local-owner', _autoBridge).catch(() => null);
+        if (resolved && resolved.accountId && !resolved.demo) {
+          const lock = accountLock.acquire(resolved.accountId);   // re-stamps if ours; skips if another process owns it
+          if (lock.acquired) {
+            let ovn = [];
+            try { ovn = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
+            await require('../lib/auto-trader').fastExitTick({
+              bridge: resolved.facade, userId: 'local-owner', extended: !mh, excludeSymbols: ovn,
+            });
+          }
+        }
+      } catch (_e) { /* fail-soft — the fast path must never take down the server */ }
+      finally { _fastExitBusy = false; }
+    }, FAST_EXIT_MS);
+    if (t.unref) t.unref();
+  }
   console.info(`[Trading] autonomous scan loop started (every ${AUTOSCAN_MS}ms)`);
 }
 

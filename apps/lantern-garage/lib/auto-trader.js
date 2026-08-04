@@ -443,6 +443,35 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
 }
 
 /**
+ * PRICE-ONLY exit tick (#3165 "fast exit loop") — runs BETWEEN full scans so the
+ * ladder / trailing / max-loss exits react in seconds, not the 60s scan cadence
+ * (operator: a near-miss of R1 with dying momentum must exit near the peak, not a
+ * minute later). Deliberately fetches NO bars and skips the momentum-death read —
+ * everything here needs only the broker's live mark, so the added API cost is one
+ * positions + one open-orders call per tick against the LOCAL gateway. All the
+ * anti-churn gates (min-hold, exit debounce, oversell guard) apply unchanged.
+ */
+async function fastExitTick({ bridge, userId, now = Date.now(), extended = false, excludeSymbols = [] } = {}) {
+  const c = cfg();
+  if (!c.enabled && !c.manageExits) return { reason: 'disarmed' };
+  if (!bridge || !userId) return { reason: 'no bridge/userId' };
+  c.momentumExit = false;                        // price-only on the fast path
+  const out = { executed: [], skipped: [] };
+  const positions = await bridge.getIBKRPositions(userId).catch(() => []);
+  const heldQty = {}, heldPos = {};
+  for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+  if (!Object.values(heldQty).some((q) => q > 0)) return out;   // flat → nothing to do
+  const openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const workingSells = new Set((openOrders || [])
+    .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
+    .map((o) => String(o.symbol || '').toUpperCase()));
+  const exclude = new Set([...(excludeSymbols || [])].map((x) => String(x).toUpperCase()));
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude }); } catch (_e) { /* fail-soft */ }
+  _saveState();
+  return out;
+}
+
+/**
  * Execute the ENTER verdicts from a scan against the user's IBKR account.
  * @param {object} scan   result of traderAgent.scanMarket() — { signals: [...] }
  * @param {object} deps   { bridge, userId, now?, caps? }
@@ -825,4 +854,4 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
-module.exports = { runAutoTrade, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
+module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
