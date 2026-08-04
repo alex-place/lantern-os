@@ -505,6 +505,11 @@ async function fastExitTick({ bridge, userId, now = Date.now(), extended = false
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
   const exclude = new Set([...(excludeSymbols || [])].map((x) => String(x).toUpperCase()));
+  // The fast path must honor the unclosable freeze and in-flight exits exactly like
+  // the scan loop's reconcile does — without this it re-attempted the frozen SOXS
+  // dust every debounce window (observed live 2026-08-04 09:31/09:39 ET).
+  for (const sym of _unclosable) workingSells.add(sym);
+  for (const [sym, st] of _exitStatus) if (_isExitInFlight(st)) workingSells.add(sym);
   try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude }); } catch (_e) { /* fail-soft */ }
   _saveState();
   return out;
