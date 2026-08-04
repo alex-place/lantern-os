@@ -159,7 +159,15 @@ function journeyFor(n) {
     // ── s6: the Free→Pro gate renders, then the upgrade happens for real ───────
     step('s6', async () => {
       // (a) UI upgrade prompt: signed-in Free on the stock trader sees the tier CTA.
-      await page.goto('/stock-trader.html');
+      //
+      // Arrive the way a Free user actually does. Since #3039 ("route Free users to
+      // Watch"), a NON-deliberate landing on /stock-trader.html redirects to
+      // /watch.html?from=trader — so a bare goto() never renders the CTA and this step
+      // failed on a behaviour change, not a defect. A deliberate arrival (the in-page
+      // Trade tab, a pricing link, or a referrer from watch/options/pricing) still gets
+      // the explanatory CTA, which is the journey being validated here.
+      await page.goto('/watch.html');
+      await page.goto('/stock-trader.html?stay=1');
       const cta = page.locator('#signinCta');
       await expect(cta, 'Free account should see the upgrade CTA on stock-trader').toBeVisible();
       await expect(cta).toHaveText(/Upgrade to trade/);
@@ -174,7 +182,12 @@ function journeyFor(n) {
       expect(gatePage).toContain('needs an upgrade');
 
       // (d) Upgrade — the real staff endpoint stands in for the purchase webhook.
-      const up = await admin.post('/api/accounts/role', { data: { id: state.userId, role: 'deep_dreamer' } });
+      // A `reason` is REQUIRED to grant a paid tier by hand since #3100 (it is recorded
+      // on the account so a comp is distinguishable from a real subscription); without
+      // it the endpoint answers 400 reason_required.
+      const up = await admin.post('/api/accounts/role', {
+        data: { id: state.userId, role: 'deep_dreamer', reason: 'greenpath release gate — simulated purchase' },
+      });
       expect(up.ok(), 'staff role upgrade should succeed').toBe(true);
       const upBody = await up.json();
 
