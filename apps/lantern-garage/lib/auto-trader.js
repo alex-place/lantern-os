@@ -132,10 +132,10 @@ function cfg() {
     // Kill: TRADER_SUP_ENTRY=0. Scope: TRADER_SUP_ENTRY_SYMBOLS (validated names).
     supEntry: process.env.TRADER_SUP_ENTRY !== '0',
     supEntryAtr: n('TRADER_SUP_ENTRY_ATR', 0.5),
-    supEntrySyms: new Set(String(process.env.TRADER_SUP_ENTRY_SYMBOLS || 'SPY,QQQ,SQQQ,SOXS,SPXS')
+    supEntrySyms: new Set(String(process.env.TRADER_SUP_ENTRY_SYMBOLS || 'SPY,QQQ,GLD,SMH,TLT,SQQQ,SOXS,SPXS')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
-    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO,SQQQ,SOXS,SPXS')
+    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO,GLD,SMH,TLT,SQQQ,SOXS,SPXS')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
     // ── Exit management (trailing stop / take-profit / momentum death) ──────────
