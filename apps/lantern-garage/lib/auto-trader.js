@@ -103,7 +103,7 @@ function cfg() {
     // target and the first becomes the floor. Ladder symbols skip take-profit/trail/
     // momentum/signal exits (the ladder + broker stop own the position).
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
-    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ')
+    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
     // ── Exit management (trailing stop / take-profit / momentum death) ──────────
