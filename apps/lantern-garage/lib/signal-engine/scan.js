@@ -313,6 +313,7 @@ async function scanAll(watchlist) {
         earnings: earn ? { surprise_pct: earn.surprisePct, quarter: earn.quarter } : null, // Tier-2
         sector: secEtf ? { etf: secEtf, trend_pct: sector_trend != null ? r2(sector_trend * 100) : null } : null, // Tier-2
         volume_ratio: r2(volume_ratio),
+        atr: r2(a || price * 0.005),   // 15m ATR — the support-entry gate measures zone distance in this unit
         plan: { stop: r2(stopPx), target1: r2(dirUp ? price + tr * riskAbs : price - tr * riskAbs), target2: r2(dirUp ? price + tr * 1.7 * riskAbs : price - tr * 1.7 * riskAbs), hold_days: holdDays },
         reasons: gate.reason,
       });

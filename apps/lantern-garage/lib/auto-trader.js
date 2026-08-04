@@ -123,6 +123,17 @@ function cfg() {
       }
       return m;
     })(),
+    // SUPPORT-ENTRY GATE (#3165 RR-geometry, OOS-validated on SPY+QQQ,
+    // operator green-light 2026-08-05): only enter AT the support zone (within
+    // supEntryAtr ATRs of its top) and put the protective stop UNDER the zone
+    // (bottom - 0.25 ATR) — structural: it has wiggle room below break-even and
+    // only triggers when the entry thesis actually failed (price broke the zone).
+    // Validated: RR flips 1:0.46 -> >1:1 in every window; QQQ holdout PF 2.06.
+    // Kill: TRADER_SUP_ENTRY=0. Scope: TRADER_SUP_ENTRY_SYMBOLS (validated names).
+    supEntry: process.env.TRADER_SUP_ENTRY !== '0',
+    supEntryAtr: n('TRADER_SUP_ENTRY_ATR', 0.5),
+    supEntrySyms: new Set(String(process.env.TRADER_SUP_ENTRY_SYMBOLS || 'SPY,QQQ')
+      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
     zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
@@ -799,6 +810,23 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Defensive: on a stray short, clear any stale resting orders before re-entering.
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
 
+    // ── SUPPORT-ENTRY GATE (#3165): for validated symbols, only take the long AT
+    //    the support zone; the stop goes UNDER the zone (structural) instead of the
+    //    plan's ATR distance. Entries away from support are skipped — that is the
+    //    point: mid-chop entries are where the old RR (1:0.46) came from.
+    let _supStopPx = null;
+    if (c.supEntry && c.supEntrySyms.has(sym)) {
+      const aAbs = Number(s.atr) > 0 ? Number(s.atr) : price * 0.005;
+      const sup = (Array.isArray(s.zones) ? s.zones : [])
+        .filter((z) => z && /SUPPORT/i.test(z.type || '') && Number(z.top || z.level) <= price * 1.001)
+        .sort((x, y) => (y.top || y.level) - (x.top || x.level))[0];
+      if (!sup) { out.skipped.push({ ...record, why: 'sup_entry: no support zone below price' }); continue; }
+      const dist = (price - (sup.top || sup.level)) / aAbs;
+      if (dist > c.supEntryAtr) { out.skipped.push({ ...record, why: `sup_entry: ${dist.toFixed(1)} ATR above support (max ${c.supEntryAtr}) — not at the zone` }); continue; }
+      const cand = (sup.bottom || sup.level) - 0.25 * aAbs;
+      if (cand > 0 && cand < price * 0.999) _supStopPx = cand;
+    }
+
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
@@ -811,7 +839,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
     if (r && r.status === 'placed') {
-      const stopDist = stopDistPctFor(price, s.plan, c, sym);
+      // Structural stop for support entries (validated WITHOUT the per-symbol
+      // stop-scale — the zone bottom IS the thesis line; scaling it would put the
+      // stop inside the zone's noise).
+      const stopDist = _supStopPx != null
+        ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
+        : stopDistPctFor(price, s.plan, c, sym);
       _stopDistPct.set(sym, stopDist);
       const stop = stopPriceFor(price, stopDist);
       if (stop) {
