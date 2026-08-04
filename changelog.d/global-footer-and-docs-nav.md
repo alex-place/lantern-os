@@ -1,3 +1,0 @@
-- Global header: dropped **Explore**, kept **Docs** (Knowledge Center) as the fourth nav entry. `/explore.html` still resolves and stays reachable from the footer.
-- The site footer is now genuinely global: the four hand-rolled copies in `index.html`, `kalshi-terminal.html`, `orchestration.html` and `auth.html` had drifted apart (stale link sets, "Help" vs "Docs", a dead Explore entry). `js/site-chrome.js` now owns the footer markup, the live status dot, and the edition · version · commit line for every page that loads the chrome.
-- `build-nav-map.mjs` reads the new `FOOTER_EXTRA_LINKS` array alongside `NAV_LINKS`, so footer-only surfaces (Create, Explore) still count as reachable. Sitemap e2e holds at 18 reachable / 11 orphaned with Knowledge Center at depth 1.

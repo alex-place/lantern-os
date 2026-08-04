@@ -1,3 +1,78 @@
+## [1.14.2] - 2026-08-04
+
+### Added
+- **Every account gets its own practice trading account.** A DEMO / PAPER / TRADE ladder
+  (`/api/trading/account-mode`) closes the Free-tier promise of "your own paper-trading
+  account" (#2546). **demo** is the read-only simulated champion book — read-only
+  structurally, the facade has no write path at all. **paper** is your own practice
+  account: your connected Alpaca paper account, or a per-user house ledger until you
+  connect keys, with cash and positions *derived* from an append-only ledger rather than
+  stored. **trade** is live money and is refused unless your own live keys are connected.
+- This also fixed a privacy bug found on the way: any signed-in user who had not connected
+  a broker fell through to the shared operator keys, so they all resolved to the **same**
+  Alpaca account and could see one another's positions and orders. Server keys are now
+  owner-only.
+
+### Changed
+- **Paid features are actually gated now.** The tier matrix sat behind a `PLAN_ENFORCEMENT`
+  env var that was never set, so three capabilities the pricing page sells as paid were
+  free to everyone: the portfolio advisor and manual paper options orders ($20 Pro), and
+  the autonomous AI trader ($200 Pilot). What's advertised is now what's enforced. Free
+  still includes chat with memory, paper trading, the contest, and placing orders through
+  your own connected broker.
+- **The Knowledge Center is a curated library again.** It was publishing operator runbooks
+  (one of which named the production origin IP), rendering the research-ingest directory
+  verbatim — third-party copyrighted PDFs and an internal revenue report among them — and
+  re-sorting everything alphabetically on load, which pushed ten hex-named uploads above
+  the FAQ. Docs now carry an audience (public / builder / internal) and internal never
+  renders; reports come from a curated allowlist that fails closed; sorting offers
+  Recommended / Newest / A-Z; 87 dated research notes roll up into one card plus an index;
+  13 category chips become 8.
+- **Chat opens on what the product actually does** — the starter chips are markets-first:
+  "What's moving today?", "Explain SPY's chart", "How do paper trades work?"
+- **Trader chart panels are square and stay put.** Every panel in a layout is now the
+  largest square that fits, all identical, and a card no longer doubles its width the
+  moment a position opens.
+- The trader's pattern chip shows the pattern name ("Double Top") rather than leading with
+  its category; the category moved to the tooltip beside the engine's evidence.
+- **Symbol search is a browsable universe** — 124 instruments in the empty state (mega-cap
+  tech, blue chips, core/sector/leveraged ETFs, 14 crypto majors) instead of 15 curated
+  names, and typed queries return up to 120 matches from the broker's full asset universe.
+- Global nav: **Explore** left the header, **Docs** stays as the fourth entry, and the
+  footer is genuinely global — four hand-rolled copies had drifted apart.
+- Unauthenticated `/api/*` requests get `401` JSON instead of a `302` to the login page
+  (#2980), so `fetch()` callers stop receiving login HTML where they expected data.
+- Connect-your-own-broker live trading is restored to the $20 Pro tier.
+- One broker account is managed by exactly one process (a machine-wide per-account lock),
+  and the overnight sleeve book is staff-only.
+
+### Fixed
+- **Sign-in works again on any PORT-launched local server (#3010).** The session cookie was
+  marked `Secure` whenever `PORT` was set, but a launcher injecting `PORT` on plain-http
+  localhost is not HTTPS — so the session saved and `Set-Cookie` was silently dropped, and
+  every sign-in returned `200 ok` while the browser stayed a guest with no error anywhere.
+  A sign-in that cannot persist now fails loudly instead of reporting success.
+- **`LANTERN_ADMIN_IDS` can finally elevate an email/password account (#3087).** The
+  override was only consulted on the OAuth path, so a deploy without working Google sign-in
+  had no route to admin at all.
+- **Role changes take effect (#3088).** Every auth store resolved its path from the current
+  working directory, so a CLI script and the running server read two different stores —
+  `setUserRole()` reported success against a file the server never opened. All of them now
+  resolve through one fixed root.
+- **Stale quotes no longer permanently deform live candles or inflate ATR (#3014).**
+- **Real brand logos are back for single stocks, and the literal word "null" is gone** from
+  the search popup and sidebars; crypto shows real coin logos with a glyph fallback.
+- Eval-ledger provenance: `served_checkpoint` no longer collapses every adapter to `@final`,
+  so a HumanEval row can be traced to the adapter that produced it (#2766).
+
+### Security
+- Operator runbooks, deploy topology, admin surfaces and internal audits are no longer
+  published to the public docs site, and a CI gate now fails if a public doc names a
+  routable IP address.
+- Prod secrets install in one pass via `ops/gce/Set-ProdSecrets.ps1`, which refuses a
+  Stripe key without its webhook signing secret — the half-config where a customer is
+  charged and never receives the tier they paid for.
+
 ## [1.14.1] - 2026-07-31
 
 ### Changed
