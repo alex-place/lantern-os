@@ -109,6 +109,20 @@ function cfg() {
     atrStops: process.env.TRADER_ATR_STOPS !== '0',
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
+    // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
+    // distance for listed symbols. SPY at 0.65x earned +30% more R per $ risked in
+    // BOTH the 2000-14 fit and 2015-26 holdout windows with flat drawdown; QQQ's
+    // equivalent was a drawdown trade-off and is deliberately NOT defaulted.
+    // Format: "SPY:0.65,QQQ:0.8". Kill: TRADER_STOP_SCALE_SYMBOLS="".
+    stopScale: (() => {
+      const m = new Map();
+      for (const part of String(process.env.TRADER_STOP_SCALE_SYMBOLS ?? 'SPY:0.65').split(',')) {
+        const [sym, k] = part.split(':');
+        const v = parseFloat(k);
+        if (sym && Number.isFinite(v) && v > 0.2 && v <= 1) m.set(sym.trim().toUpperCase(), v);
+      }
+      return m;
+    })(),
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
     zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
@@ -142,12 +156,13 @@ async function cancelRestingStops(bridge, userId, sym) {
 
 /** Stop distance %% for an entry: the signal's ATR/S-R plan stop when enabled and
  * sane, clamped to [min,max]; else the flat stopPct fallback. */
-function stopDistPctFor(price, plan, c) {
+function stopDistPctFor(price, plan, c, sym) {
+  const scale = (sym && c.stopScale && c.stopScale.get(String(sym).toUpperCase())) || 1;
   if (c.atrStops && plan && Number(plan.stop) > 0 && Number(price) > 0) {
     const d = ((price - Number(plan.stop)) / price) * 100;
-    if (d > 0) return Math.min(c.atrStopMaxPct, Math.max(c.atrStopMinPct, d));
+    if (d > 0) return Math.min(c.atrStopMaxPct, Math.max(c.atrStopMinPct, d * scale));
   }
-  return c.stopPct;
+  return c.stopPct * scale;
 }
 
 /** Protective stop trigger price for a long entry: `stopPct` below entry. */
@@ -796,7 +811,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
     if (r && r.status === 'placed') {
-      const stopDist = stopDistPctFor(price, s.plan, c);
+      const stopDist = stopDistPctFor(price, s.plan, c, sym);
       _stopDistPct.set(sym, stopDist);
       const stop = stopPriceFor(price, stopDist);
       if (stop) {
