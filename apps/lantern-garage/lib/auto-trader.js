@@ -124,6 +124,15 @@ function cfg() {
     roomTier: process.env.TRADER_ROOM_TIER !== '0',
     roomMinR: n('TRADER_ROOM_MIN_R', 1.5),
     roomBMult: n('TRADER_ROOM_B_MULT', 0.5),
+    // A+ TIER (confluence study 2026-08-05): room AND volume expansion. Pooled
+    // OOS gate — fit +0.856R/trade, holdout +1.036R/trade vs +0.425R for room
+    // alone (2.4x), positive on all 5 symbols in both windows. Held at the SAME
+    // risk as A for now: 65 pooled trades is thin evidence for extra weight, so
+    // A+ must first prove itself in live logging (TRADER_APLUS_MULT raises it).
+    // Zone TOUCHES were tested alongside and FALSIFIED (+0.468R vs +0.425R at
+    // the corrected >=2 threshold) — a proxy for what room/volume already catch.
+    volAplus: n('TRADER_VOL_APLUS', 1.2),
+    aplusMult: n('TRADER_APLUS_MULT', 1.0),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -898,11 +907,13 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDist, 1e-9);
         if (_roomR < c.roomMinR) _tier = 'B';
       }
+      // A+ upgrade: room AND volume expansion (the confluence the OOS gate passed).
+      if (_tier === 'A' && Number(s.volume_ratio) >= c.volAplus) _tier = 'A+';
     }
     // B-tier scales BOTH the risk target and the notional cap — support entries
     // have such tight structural stops that the 5% cap binds before the risk
     // target, and without scaling the cap the tiers would size identically.
-    const _tierMult = _tier === 'B' ? c.roomBMult : 1;
+    const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDist });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
@@ -935,7 +946,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null });
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null });
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
