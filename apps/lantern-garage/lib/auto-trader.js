@@ -152,6 +152,12 @@ function cfg() {
     takeProfitPct: n('TRADER_TAKE_PROFIT_PCT', DEFAULTS.takeProfitPct),
     takeProfitR: n('TRADER_TAKE_PROFIT_R', DEFAULTS.takeProfitR),        // R-multiple take-profit (tight target)
     momentumExit: process.env.TRADER_MOMENTUM_EXIT !== '0',              // on unless disabled
+    // Momentum-death needs a MINIMUM PROFIT before it may fire. Measured on 131 real
+    // filled exits: 31 of 33 sub-0.15% "wins" were momentum_died at RSI~50 — banking
+    // ~nothing, paying two commissions, then re-entering the same name hours later.
+    // A fading winner needs a winner to fade; below this floor the protective stop
+    // (capped at 1R) is the better risk manager. Expressed in R (x stop distance).
+    momentumMinR: n('TRADER_MOMENTUM_MIN_R', 0.5),
     momentumTf: process.env.TRADER_MOMENTUM_TF || '5m',                  // candle size for the momentum-death read (5m = faster peak capture; 15m = smoother)
     entryKnifeFilter: process.env.TRADER_ENTRY_KNIFE_FILTER !== '0',      // veto buying into still-cratering momentum (falling knife); on by default
     // Manage/close held positions (trailing/TP/momentum) WITHOUT opening new ones.
@@ -484,7 +490,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
       delete heldQty[sym]; continue;
     }
     // 3) Momentum death — fading winner: MACD histogram negative + below short EMA.
-    if (c.momentumExit && pnlPct > 0) {
+    const _momFloorPct = (c.momentumMinR || 0) * riskPct;   // riskPct = this trade's stop distance
+    if (c.momentumExit && pnlPct > 0 && pnlPct >= _momFloorPct) {
       const closes = ((bars[sym] && bars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
       if (closes.length >= 30) {
         const m = macd(closes);
