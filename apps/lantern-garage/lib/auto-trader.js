@@ -107,6 +107,14 @@ function cfg() {
     // a flat stopPct, clamped to [atrStopMinPct, atrStopMaxPct]. The flat stopPct
     // remains the fallback when a signal ships no plan. Kill: TRADER_ATR_STOPS=0.
     atrStops: process.env.TRADER_ATR_STOPS !== '0',
+    // RISK-BASED SIZING (Phase 0, 2026-08-04). Notional sizing made risk-per-trade
+    // an accidental byproduct of two independent knobs (position% x stop%), so
+    // identical $36k positions carried 0.047%-0.068% risk purely because their stops
+    // differed. Size from RISK instead: qty = equity*riskPct / (entry-stop). Default
+    // 0.06 is calibrated to today's MEASURED average risk — same exposure, uniform
+    // risk. Raising it is a separate, evidence-gated decision. 0 = legacy notional
+    // sizing. The maxPositionPct notional cap still binds on top.
+    riskPct: n('TRADER_RISK_PCT', 0.06),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -191,11 +199,23 @@ function stopPriceFor(entry, stopPct) {
  *                   qty·price ≤ maxNotional.
  * Returns 0 when unpriced/negative — the caller then skips.
  */
-function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.positionPct, maxPositionPct = DEFAULTS.maxPositionPct, maxQty = 100000 }) {
+function sizePosition({ equity, price, sizeMult = 1, positionPct = DEFAULTS.positionPct, maxPositionPct = DEFAULTS.maxPositionPct, maxQty = 100000, riskPct = 0, stopDistPct = 0 }) {
   const px = Number(price);
   const eq = Number(equity);
   if (!(px > 0) || !(eq > 0)) return 0;
   const mult = Math.max(0.5, Math.min(1.5, Number(sizeMult) || 1));
+  // RISK-BASED (preferred): notional = (equity x risk%) / stopDistance% — every
+  // trade carries the SAME risk regardless of symbol or stop width. Conviction
+  // still scales it. Falls back to notional sizing when risk/stop are unknown.
+  if (riskPct > 0 && stopDistPct > 0) {
+    const riskDollars = eq * (riskPct / 100) * mult;
+    const capNotionalR = eq * (maxPositionPct / 100);
+    const wanted = Math.min(riskDollars / (stopDistPct / 100), capNotionalR);
+    let q = Math.floor(wanted / px);
+    q = Math.max(0, Math.min(q, maxQty));
+    while (q > 0 && q * px > capNotionalR) q -= 1;
+    return q;
+  }
   // % of PORTFOLIO — scales with equity. Average positionPct, conviction-scaled,
   // hard-capped at maxPositionPct of equity (e.g. 2.5% avg, 5%/$50k max on $1M).
   const capNotional = eq * (maxPositionPct / 100);
@@ -846,7 +866,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     }
 
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct });
+    // Stop distance is now an INPUT to sizing (risk-based), so it must be resolved
+    // before the order is sized. Structural (support-entry) stop wins when armed.
+    const _stopDist = _supStopPx != null
+      ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
+      : stopDistPctFor(price, s.plan, c, sym);
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct, riskPct: c.riskPct, stopDistPct: _stopDist });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
     const enOrder = (extended && price > 0)
@@ -860,9 +885,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       // Structural stop for support entries (validated WITHOUT the per-symbol
       // stop-scale — the zone bottom IS the thesis line; scaling it would put the
       // stop inside the zone's noise).
-      const stopDist = _supStopPx != null
-        ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
-        : stopDistPctFor(price, s.plan, c, sym);
+      const stopDist = _stopDist;   // resolved before sizing (risk-based)
       _stopDistPct.set(sym, stopDist);
       const stop = stopPriceFor(price, stopDist);
       if (stop) {
