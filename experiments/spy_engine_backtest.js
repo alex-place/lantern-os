@@ -111,6 +111,8 @@ async function main() {
       // This is what decides whether a target was ever REACHABLE, vs merely unmet.
       const _fav = open.dir === "BULLISH" ? (nb.high - open.entryPx) : (open.entryPx - nb.low);
       open.mfeR = Math.max(open.mfeR || 0, _fav / open.riskAbs);
+      const _adv = open.dir === "BULLISH" ? (open.entryPx - nb.low) : (nb.high - open.entryPx);
+      open.maeR = Math.max(open.maeR || 0, _adv / open.riskAbs);
       let exit = null;
       if (open.dir === "BULLISH") {
         if (nb.low <= open.stop) exit = { px: open.stop, why: "stop" };
@@ -123,7 +125,32 @@ async function main() {
             else if (nb.high >= open.r1) exit = { px: open.r1, why: "zone_r1" };
           } else {
             if (open.r2 != null && nb.high >= open.r2) exit = { px: open.r2, why: "zone_r2" };
+            else if (process.env.BT_TRAIL_FLOOR === "1") {
+              // STRUCTURE-TRAILING FLOOR (operator 2026-08-05): after the R1 break the
+              // floor ratchets UP to each newly-formed support zone — a late retrace
+              // no longer gives back the whole run.
+              if (open.floorPx == null) open.floorPx = open.r1;
+              const _aN = atr(bars.slice(Math.max(0, i - 30), i + 1)) || nb.close * 0.005;
+              const _srN = findSrZones(SYM, nb.close, bars.slice(Math.max(0, i - 120), i + 1));
+              const _supN = ((_srN && _srN.zones) || [])
+                .filter((z) => /SUPPORT/i.test(z.type || "") && (z.bottom || z.level) - 0.25 * _aN > open.floorPx && (z.top || z.level) < nb.close)
+                .sort((x, y) => (y.bottom || y.level) - (x.bottom || x.level))[0];
+              if (_supN) open.floorPx = (_supN.bottom || _supN.level) - 0.25 * _aN;
+              if (nb.low <= open.floorPx) exit = { px: Math.min(open.floorPx, nb.high), why: "struct_floor" };
+            }
             else if (nb.low <= open.r1) exit = { px: open.r1, why: "zone_r1_floor" };
+          }
+          // give-back tier (validated 2026-08-04): >=90% of the way to R1 then a 40%
+          // give-back of the peak gain exits near the peak instead of round-tripping.
+          if (!exit && !open.brokeR1 && process.env.BT_ZONE_GB === "1") {
+            const _span = open.r1 - open.entryPx;
+            if (_span > 0) {
+              open.zPeak = Math.max(open.zPeak || 0, nb.high);
+              if ((open.zPeak - open.entryPx) / _span >= 0.9) {
+                const _gb = open.entryPx + 0.6 * (open.zPeak - open.entryPx);
+                if (nb.low <= _gb) exit = { px: _gb, why: "peak_giveback" };
+              }
+            }
           }
           // no zones above (r1 null) falls through to plan target below
         }
@@ -200,6 +227,33 @@ async function main() {
     }
     if (process.env.BT_LONG_ONLY === "1" && direction === "BEARISH") continue;
 
+    // SUPPORT-ENTRY GATE (BT_SUP_ENTRY, validated 2026-08-05): only enter within
+    // BT_SUP_ATR (0.5) ATRs of the nearest support zone's top; stop goes UNDER the
+    // zone. BT_MOMO (operator 2026-08-05): when there is NO zone to lean on (or
+    // price already left it), enter on IGNITION — 3 rising closes clearing the
+    // prior 8-bar high with MACD positive — and exit by the validated 3xATR trail:
+    // hold until the trend actually dies, no zone required.
+    let _supStop = null, _momoEntry = false;
+    if (process.env.BT_SUP_ENTRY === "1") {
+      const aNow = atr(win) || price * 0.005;
+      const sup = ((sr && sr.zones) || []).filter((z) => /SUPPORT/i.test(z.type || "") && (z.top || z.level) <= price * 1.001)
+        .sort((x, y) => (y.top || y.level) - (x.top || x.level))[0];
+      const _cramped = !sup || (price - (sup.top || sup.level)) / aNow > (Number(process.env.BT_SUP_ATR) || 0.5);
+      if (_cramped) {
+        if (process.env.BT_MOMO === "1") {
+          const _n = closes.length;
+          const _rising = _n >= 3 && closes[_n - 1] > closes[_n - 2] && closes[_n - 2] > closes[_n - 3];
+          const _prevHigh = _n >= 12 ? Math.max(...closes.slice(_n - 12, _n - 3)) : Infinity;
+          if (_rising && closes[_n - 1] > _prevHigh && macd_hist > 0) _momoEntry = true;
+        }
+        if (!_momoEntry) continue;
+        _supStop = price - 2.2 * aNow;
+      } else {
+        _supStop = (sup.bottom || sup.level) - 0.25 * aNow;
+        if (!(_supStop > 0) || _supStop >= price * 0.999) continue;
+      }
+    }
+
     // ATR trade plan (scan.js verbatim)
     const a = atr(win);
     const dirUp = direction === "BULLISH";
@@ -208,7 +262,14 @@ async function main() {
     const near = (lvl) => Math.abs(price - lvl) / price;
     if (dirUp && sr.support > 0 && sr.support < price && near(sr.support) >= 0.005 && near(sr.support) < 0.06) stopPx = sr.support;
     if (!dirUp && sr.resistance > price && near(sr.resistance) >= 0.005 && near(sr.resistance) < 0.06) stopPx = sr.resistance;
-    const riskAbs = Math.max(Math.abs(price - stopPx), price * 0.008);
+    let riskAbs = Math.max(Math.abs(price - stopPx), price * 0.008);
+    const _provRisk = _supStop != null ? Math.max(price - _supStop, price * 0.002) : riskAbs;
+    // ROOM FILTER (BT_MIN_R1R, magnitude study): skip entries whose first
+    // resistance is closer than this many R. Momo entries are exempt (no ladder).
+    if (!_momoEntry && Number(process.env.BT_MIN_R1R) > 0) {
+      const _res1 = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > price * 1.001).sort((x, y) => x.level - y.level)[0];
+      if (_res1 && (_res1.level - price) / Math.max(_provRisk, 1e-9) < Number(process.env.BT_MIN_R1R)) { regimeBlocked++; continue; }
+    }
     let tr = Number(process.env.BT_TARGET_R) || (convergence && convergence.target_r) || 2;
     // BT_ADAPTIVE_TGT: target = p-th percentile of the LAST 40 completed trades' MFE
     // (this symbol, walk-forward — only history that existed at entry time; falls back
@@ -222,18 +283,20 @@ async function main() {
 
     // fill next bar's open (no same-bar close fills = no look-ahead)
     const fillPx = bars[i + 1].open;
-    const stop = dirUp ? fillPx - riskAbs : fillPx + riskAbs;
-    const target = dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs;
+    let stop = dirUp ? fillPx - riskAbs : fillPx + riskAbs;
+    if (_supStop != null && dirUp) { stop = _supStop; riskAbs = Math.max(fillPx - stop, fillPx * 0.002); }
+    const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
     open = {
       dir: direction, entryIdx: i + 1, entryPx: fillPx, entryDate: bars[i + 1].timestamp.slice(0, 10),
       regime: marketStatus.market,           // market tape at entry — for the by-regime P&L split
       targetR: tr, mfeR: 0,                  // plan target (R) and max favourable excursion (R)
-      trailAtr: Number(process.env.BT_TRAIL_ATR) > 0 ? Number(process.env.BT_TRAIL_ATR) * (a || price * 0.005) : 0,
+      momo: _momoEntry,
+      trailAtr: (_momoEntry ? 3 : (Number(process.env.BT_TRAIL_ATR) > 0 ? Number(process.env.BT_TRAIL_ATR) : 0)) * (a || price * 0.005),
       peakPx: 0,
       // BT_ZONE_EXIT (operator design 2026-08-04): the two nearest RESISTANCE zones
       // above the fill form an exit ladder. r1 = first resistance (momentum usually
       // dies here), r2 = the runner target beyond it.
-      ...(process.env.BT_ZONE_EXIT === "1" ? (() => {
+      ...(process.env.BT_ZONE_EXIT === "1" && !_momoEntry ? (() => {
         const res = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > fillPx * 1.001)
           .sort((x, y) => x.level - y.level);
         return { r1: res[0] ? res[0].level : null, r1top: res[0] ? res[0].top : null,
@@ -242,7 +305,7 @@ async function main() {
       stop, target, riskAbs,
       // BT_HOLD_CAP bounds the ATR-scaled horizon to the operator's 1-7 day band
       // (a month-long hold is out of scope regardless of backtest result).
-      holdDays: Math.min(
+      holdDays: _momoEntry ? 60 : Math.min(
         Number(process.env.BT_HOLD_CAP) || 15,
         Math.max(1, Math.min(15, Math.round((tr * riskAbs) / ((a || price * 0.005))))) * (Number(process.env.BT_HOLD_MULT) || 1)
       ),
@@ -282,6 +345,9 @@ async function main() {
         mean_target_R: +(tgt.reduce((a, b) => a + b, 0) / tgt.length).toFixed(2),
         mfe_p50: q(0.5), mfe_p75: q(0.75), mfe_p90: q(0.9), mfe_max: q(1),
         pct_mfe_reached_target: +(reach / trades.length * 100).toFixed(1),
+        mae_winners_p50: (() => { const w = trades.filter((t) => t.r > 0).map((t) => t.maeR || 0).sort((x, y) => x - y); return w.length ? +w[Math.floor(0.5 * (w.length - 1))].toFixed(2) : null; })(),
+        avg_win_R: (() => { const w = trades.filter((t) => t.r > 0); return w.length ? +(w.reduce((x, t) => x + t.r, 0) / w.length).toFixed(2) : null; })(),
+        avg_loss_R: (() => { const l = trades.filter((t) => t.r <= 0); return l.length ? +(l.reduce((x, t) => x + t.r, 0) / l.length).toFixed(2) : null; })(),
       };
     })(),
     by_regime: ["BULLISH","BEARISH","NEUTRAL"].reduce((acc,g)=>{const t=trades.filter(x=>x.regime===g);if(t.length){const w=t.filter(x=>x.r>0).length;const tot=t.reduce((a,x)=>a+x.r,0);acc[g]={n:t.length,win_pct:+(w/t.length*100).toFixed(1),total_R:+tot.toFixed(1),avg_R:+(tot/t.length).toFixed(3)};}return acc;},{}),
