@@ -115,6 +115,15 @@ function cfg() {
     // risk. Raising it is a separate, evidence-gated decision. 0 = legacy notional
     // sizing. The maxPositionPct notional cap still binds on top.
     riskPct: n('TRADER_RISK_PCT', 0.06),
+    // ROOM TIERING (magnitude study 2026-08-05, OOS-validated on 5 symbols):
+    // entries with the first resistance >= roomMinR away (in R) earn 3-10x more
+    // per trade (0.48-1.6R vs 0.08-0.16R). A-tier (room) gets full risk;
+    // B-tier (cramped) gets roomBMult x risk and keeps the tight R1 harvest.
+    // Total risk goes DOWN, expectancy concentrates where the room is.
+    // Kill: TRADER_ROOM_TIER=0 (all entries full risk).
+    roomTier: process.env.TRADER_ROOM_TIER !== '0',
+    roomMinR: n('TRADER_ROOM_MIN_R', 1.5),
+    roomBMult: n('TRADER_ROOM_B_MULT', 0.5),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -878,7 +887,23 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const _stopDist = _supStopPx != null
       ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
       : stopDistPctFor(price, s.plan, c, sym);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct, riskPct: c.riskPct, stopDistPct: _stopDist });
+    // Room tier: distance to the first resistance, in R (this trade's stop units).
+    // No resistance above = open room = A-tier.
+    let _roomR = null, _tier = 'A';
+    if (c.roomTier) {
+      const _res1 = (Array.isArray(s.zones) ? s.zones : [])
+        .filter((z) => z && /RESIST/i.test(z.type || '') && Number(z.level) > price * 1.001)
+        .sort((x, y) => x.level - y.level)[0];
+      if (_res1) {
+        _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDist, 1e-9);
+        if (_roomR < c.roomMinR) _tier = 'B';
+      }
+    }
+    // B-tier scales BOTH the risk target and the notional cap — support entries
+    // have such tight structural stops that the 5% cap binds before the risk
+    // target, and without scaling the cap the tiers would size identically.
+    const _tierMult = _tier === 'B' ? c.roomBMult : 1;
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDist });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
 
     const enOrder = (extended && price > 0)
@@ -910,7 +935,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null });
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null });
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
