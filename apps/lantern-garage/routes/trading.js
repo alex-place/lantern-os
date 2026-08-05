@@ -182,7 +182,14 @@ async function _autoscanTick() {
         // Covers BOTH strategies below (champion rebalance and the day-trader), since
         // either would place orders on this account. Fails OPEN if the lock is
         // unreadable: an unmanaged position is worse than a duplicate order.
-        const _lock = accountLock.acquire(resolved.accountId);
+        // ARMED RANK: only a process that can place ENTRIES claims armed priority.
+        // An exit-only instance (TRADER_MANAGE_EXITS without TRADER_AUTO_EXECUTE)
+        // still takes a free lock, but yields it to the armed trader — see the
+        // 2026-08-05 incident note in lib/account-lock.js.
+        const _armed = _isChampion
+          ? process.env.SIGMA_ARM === '1'
+          : process.env.TRADER_AUTO_EXECUTE === '1';
+        const _lock = accountLock.acquire(resolved.accountId, { armed: _armed });
         if (!_lock.acquired) {
           if (!_lockNoticed.has(resolved.accountId)) {          // log the change, not every tick
             _lockNoticed.add(resolved.accountId);
@@ -248,7 +255,9 @@ if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
         const { brokerFacadeFor } = require('../lib/broker-facade');
         const resolved = await brokerFacadeFor('local-owner', _autoBridge).catch(() => null);
         if (resolved && resolved.accountId && !resolved.demo) {
-          const lock = accountLock.acquire(resolved.accountId);   // re-stamps if ours; skips if another process owns it
+          // Fast-exit is exit management, so it never claims armed rank — it must
+          // not be able to preempt the armed trader that owns this account.
+          const lock = accountLock.acquire(resolved.accountId, { armed: false });   // re-stamps if ours; skips if another process owns it
           if (lock.acquired) {
             let ovn = [];
             try { ovn = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }

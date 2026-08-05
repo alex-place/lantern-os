@@ -206,7 +206,15 @@ test('direction-lock: the intraday engine refuses an entry against family exposu
     cancelIBKROrder: async () => ({ status: 'cancelled' }),
     placeIBKROrder: async (uid, o) => { if (/buy/i.test(o.side)) buys.push(o.ticker); return { status: 'placed' }; },
   };
-  const enter = (sym) => ({ symbol: sym, direction: 'BULLISH', entry_price: 100, convergence: { decision: 'ENTER', p_win: 0.7, size_mult: 1 } });
+  // GLD/SPY/QQQ/SMH/TLT are SUPPORT-ENTRY symbols now, so a zone-less signal is
+  // refused with 'sup_entry: no support zone below price' before direction-lock is
+  // ever consulted — which silently turned this into a test of nothing. Give the
+  // signal a support zone just under price so it reaches the gate under test.
+  const enter = (sym) => ({
+    symbol: sym, direction: 'BULLISH', entry_price: 100, atr: 1,
+    zones: [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }],
+    convergence: { decision: 'ENTER', p_win: 0.7, size_mult: 1 },
+  });
   try {
     process.env.TRADER_AUTO_EXECUTE = '1';
     process.env.TRADER_REQUIRE_PERSIST = '0';

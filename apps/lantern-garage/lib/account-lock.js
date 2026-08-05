@@ -23,6 +23,8 @@
  *     heartbeat is STALE (older than staleMs — a crashed process must never wedge an
  *     account forever; that would silently stop exit management on real positions).
  *   - The holder re-stamps the heartbeat on every acquire, so a live owner keeps it.
+ *   - An ARMED caller (one that can place entries) preempts a live DISARMED holder
+ *     (exit-management only). Never the reverse, and never between equal ranks.
  *   - release() removes only OUR lock, never someone else's.
  *
  * Deliberately a file lock, not an OS mutex: it must work across separate node
@@ -77,7 +79,7 @@ function _isSelf(held) {
  * Claim management of a broker account for this process.
  * @returns {{acquired:boolean, reason:string, heldBy?:object, staleMs:number}}
  */
-function acquire(accountId, { now = Date.now(), staleMs = DEFAULT_STALE_MS } = {}) {
+function acquire(accountId, { now = Date.now(), staleMs = DEFAULT_STALE_MS, armed = false } = {}) {
   if (!accountId) return { acquired: true, reason: 'no account id — nothing to lock', staleMs };
   const file = _fileFor(accountId);
   try {
@@ -85,18 +87,40 @@ function acquire(accountId, { now = Date.now(), staleMs = DEFAULT_STALE_MS } = {
     const held = _read(file);
     if (held && !_isSelf(held)) {
       const age = now - Number(held.heartbeat || 0);
-      if (age < staleMs) {
-        // Someone else owns it and is alive — stand down.
+      // ARMED PRIORITY (2026-08-05). Exit-management alone is enough to win this
+      // lock, so on 2026-08-05 the DISARMED dev server (:4178, exits only) grabbed
+      // IBKR DUR193395 at the open and the ARMED stable server (:4177) stood down
+      // for the whole morning — zero entries on a live trading day, and no error
+      // anywhere to show for it. Ranking fixes that: a process that can place
+      // ENTRIES outranks one that can only manage exits, so the armed trader
+      // preempts an exit-only holder instead of waiting out its 5-minute
+      // heartbeat. The reverse is never allowed — an exit-only process must never
+      // evict the armed trader. Equal rank keeps first-come-first-served, so two
+      // armed instances still cannot both drive one account (the original bug).
+      if (age < staleMs && !(armed && !held.armed)) {
+        // Someone else owns it and outranks-or-ties us — stand down.
         return { acquired: false, reason: `held by pid ${held.pid}@${held.host} (${Math.round(age / 1000)}s ago)`, heldBy: held, staleMs };
       }
-      // Stale: the holder died mid-session. Take over rather than leave the account
-      // unmanaged — open positions still need their exits run.
-      const rec = { ...selfId(), accountId, heartbeat: now, tookOverFrom: held.pid };
+      // Stale holder (died mid-session), or a disarmed holder being preempted by
+      // the armed trader. Take over rather than leave the account unmanaged —
+      // open positions still need their exits run.
+      const preempt = age < staleMs;
+      const rec = { ...selfId(), accountId, armed, heartbeat: now, tookOverFrom: held.pid };
       fs.writeFileSync(file, JSON.stringify(rec));
-      return { acquired: true, reason: `took over from stale pid ${held.pid} (${Math.round(age / 1000)}s stale)`, staleMs };
+      return {
+        acquired: true,
+        reason: preempt
+          ? `preempted disarmed pid ${held.pid} (armed trader outranks exit-only)`
+          : `took over from stale pid ${held.pid} (${Math.round(age / 1000)}s stale)`,
+        staleMs,
+      };
     }
-    // Free, or already ours → (re)stamp the heartbeat.
-    fs.writeFileSync(file, JSON.stringify({ ...selfId(), accountId, heartbeat: now }));
+    // Free, or already ours → (re)stamp the heartbeat. Armed rank is STICKY across
+    // our own renewals: the armed trader also runs an exit-only fast-exit tick on
+    // the same account, and that tick passing armed:false must not silently demote
+    // the process's own lock (which would let a second armed instance preempt it).
+    const _armed = armed || !!(held && _isSelf(held) && held.armed);
+    fs.writeFileSync(file, JSON.stringify({ ...selfId(), accountId, armed: _armed, heartbeat: now }));
     return { acquired: true, reason: held ? 'renewed' : 'acquired', staleMs };
   } catch (e) {
     // Fail OPEN — see the header. Never let a lock problem strand a live position.

@@ -297,8 +297,19 @@ async function main() {
       // above the fill form an exit ladder. r1 = first resistance (momentum usually
       // dies here), r2 = the runner target beyond it.
       ...(process.env.BT_ZONE_EXIT === "1" && !_momoEntry ? (() => {
-        const res = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > fillPx * 1.001)
+        let res = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > fillPx * 1.001)
           .sort((x, y) => x.level - y.level);
+        // BT_TGT_MIN_R (operator design 2026-08-05): "what actually makes the
+        // trades bigger". Measured live, the FIRST resistance above price is
+        // routinely inside the noise: SMH +0.00%, QQQ +0.19%, IWM +0.20% — i.e.
+        // 0.0-0.25R. Aiming the ladder there caps the trade at a scratch before
+        // it is even placed, no matter how good the entry. A zone that close is
+        // not a target, it IS the entry. So skip resistances nearer than
+        // BT_TGT_MIN_R and aim at the first one with real separation. Nothing
+        // qualifying => blue sky (no zone overhead): leave r1/r2 null so the
+        // trade runs on the trail/target instead of banking a scratch.
+        const _tgtMinR = Number(process.env.BT_TGT_MIN_R) || 0;
+        if (_tgtMinR > 0) res = res.filter((z) => (z.level - fillPx) / Math.max(riskAbs, 1e-9) >= _tgtMinR);
         return { r1: res[0] ? res[0].level : null, r1top: res[0] ? res[0].top : null,
                  r2: res[1] ? res[1].level : null, brokeR1: false };
       })() : {}),

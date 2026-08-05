@@ -133,6 +133,21 @@ function cfg() {
     // the corrected >=2 threshold) — a proxy for what room/volume already catch.
     volAplus: n('TRADER_VOL_APLUS', 1.2),
     aplusMult: n('TRADER_APLUS_MULT', 1.0),
+    // TARGET SEPARATION (2026-08-05). Measured live, the FIRST resistance above
+    // price is routinely inside the noise — SMH +0.00%, QQQ +0.19%, IWM +0.20%,
+    // i.e. 0.0-0.25R. A zone that close is not a target, it IS the entry, and
+    // aiming the ladder there caps the trade at a scratch before it is placed no
+    // matter how good the setup. So resistances nearer than tgtMinR are treated
+    // as noise: skipped for BOTH the exit ladder and the room tier (they were
+    // also demoting good entries to B for lack of "room" that never existed).
+    // Nothing qualifying = blue sky overhead, which is the A-tier case already.
+    // OOS gate, 5 symbols, fit 2000-2014 / holdout 2015-2026:
+    //   0 (old): fit +0.326R  holdout +0.383R
+    //   0.5    : fit +0.334R  holdout +0.400R   <- better in BOTH windows
+    //   1.0    : fit +0.314R  holdout +0.404R   (holdout-only; rejected)
+    // 0.5 is chosen because it improves fit AND holdout — the signature of a
+    // structural effect rather than a fitted constant. Kill: TRADER_TGT_MIN_R=0.
+    tgtMinR: n('TRADER_TGT_MIN_R', 0.5),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -898,11 +913,16 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       : stopDistPctFor(price, s.plan, c, sym);
     // Room tier: distance to the first resistance, in R (this trade's stop units).
     // No resistance above = open room = A-tier.
+    // Resistances above price that are FAR ENOUGH to be real targets (c.tgtMinR).
+    // Anything nearer is noise sitting on top of the entry — see tgtMinR above.
+    const _resAbove = (Array.isArray(s.zones) ? s.zones : [])
+      .filter((z) => z && /RESIST/i.test(z.type || '') && Number(z.level) > price * 1.001)
+      .filter((z) => c.tgtMinR <= 0
+        || ((Number(z.level) - price) / price) * 100 / Math.max(_stopDist, 1e-9) >= c.tgtMinR)
+      .sort((x, y) => x.level - y.level);
     let _roomR = null, _tier = 'A';
     if (c.roomTier) {
-      const _res1 = (Array.isArray(s.zones) ? s.zones : [])
-        .filter((z) => z && /RESIST/i.test(z.type || '') && Number(z.level) > price * 1.001)
-        .sort((x, y) => x.level - y.level)[0];
+      const _res1 = _resAbove[0];
       if (_res1) {
         _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDist, 1e-9);
         if (_roomR < c.roomMinR) _tier = 'B';
@@ -937,11 +957,11 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       }
     }
     if (r && r.status === 'placed' && c.zoneExit && c.zoneExitSyms.has(sym)) {
-      // Arm the zone ladder (#3165): the two nearest resistance zones above entry.
-      // No zones above -> no ladder; the generic exits manage it as before.
-      const res = (Array.isArray(s.zones) ? s.zones : [])
-        .filter((z) => z && /RESIST/i.test(z.type || '') && Number(z.level) > price * 1.001)
-        .sort((x, y) => x.level - y.level);
+      // Arm the zone ladder (#3165): the two nearest resistance zones above entry
+      // that clear c.tgtMinR. No qualifying zone above -> blue sky, no ladder; the
+      // generic exits (trail/target) manage it instead of banking a scratch at a
+      // level that was never more than noise.
+      const res = _resAbove;
       if (res[0]) _zoneLadder.set(sym, { r1: res[0].level, r1top: res[0].top || res[0].level, r2: res[1] ? res[1].level : 0, broke: false });
     }
     if (r && r.status === 'placed') {

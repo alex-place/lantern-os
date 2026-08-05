@@ -29,11 +29,11 @@ function clearLock(acct) {
   try { fs.unlinkSync(path.join(lock.LOCK_DIR, acct + ".lock.json")); } catch (_e) { /* absent */ }
 }
 
-function writeForeignLock(heartbeat) {
+function writeForeignLock(heartbeat, armed = false) {
   fs.mkdirSync(lock.LOCK_DIR, { recursive: true });
   fs.writeFileSync(
     path.join(lock.LOCK_DIR, ACCT + ".lock.json"),
-    JSON.stringify({ ...OTHER_PROCESS, accountId: ACCT, heartbeat }),
+    JSON.stringify({ ...OTHER_PROCESS, accountId: ACCT, armed, heartbeat }),
   );
 }
 
@@ -71,6 +71,43 @@ test("a holder that is merely slow is NOT evicted", () => {
   const r = lock.acquire(ACCT);
   assert.strictEqual(r.acquired, false, "staleMs must comfortably exceed the scan interval");
   assert.ok(lock.DEFAULT_STALE_MS > 60_000, "a 60s scan must never look stale");
+});
+
+// ── ARMED RANK (2026-08-05 incident) ─────────────────────────────────────────
+// The disarmed dev server held IBKR DUR193395 all morning and the armed trader
+// stood down, so a live trading day produced zero entries and no error.
+
+test("the ARMED trader preempts a live DISARMED holder — the 2026-08-05 lockout", () => {
+  lock.release(ACCT);
+  writeForeignLock(Date.now(), false);        // exit-only dev server, heartbeating NOW
+  const r = lock.acquire(ACCT, { armed: true });
+  assert.strictEqual(r.acquired, true, "an armed trader must outrank an exit-only holder");
+  assert.match(r.reason, /preempted disarmed/);
+  assert.strictEqual(lock.holder(ACCT).pid, process.pid);
+  assert.strictEqual(lock.holder(ACCT).armed, true);
+});
+
+test("a DISARMED process must NEVER evict the armed trader", () => {
+  lock.release(ACCT);
+  writeForeignLock(Date.now(), true);         // the armed trader owns it
+  const r = lock.acquire(ACCT, { armed: false });
+  assert.strictEqual(r.acquired, false, "exit-only must not steal the account from the armed trader");
+  assert.strictEqual(lock.holder(ACCT).pid, OTHER_PROCESS.pid, "their lock survives");
+});
+
+test("two ARMED instances still cannot both drive one account", () => {
+  lock.release(ACCT);
+  writeForeignLock(Date.now(), true);
+  const r = lock.acquire(ACCT, { armed: true });
+  assert.strictEqual(r.acquired, false, "equal rank stays first-come-first-served — the original bug");
+});
+
+test("armed rank is STICKY — our own exit-only tick must not demote our lock", () => {
+  clearLock(ACCT);                            // prior test seeded a FOREIGN lock; release() won't remove it
+  assert.strictEqual(lock.acquire(ACCT, { armed: true }).acquired, true);
+  lock.acquire(ACCT, { armed: false });       // the armed trader's own fast-exit tick
+  assert.strictEqual(lock.holder(ACCT).armed, true,
+    "a self-renewal must not drop armed rank, or a second armed instance could preempt us");
 });
 
 test("release only ever removes OUR lock", () => {
