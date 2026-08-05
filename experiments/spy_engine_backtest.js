@@ -170,7 +170,14 @@ async function main() {
       if (!exit && held >= open.holdDays) exit = { px: nb.close, why: "time" };
       if (exit) {
         const sign = open.dir === "BULLISH" ? 1 : -1;
-        const r = (sign * (exit.px - open.entryPx)) / open.riskAbs;
+        // BT_COST: round-trip transaction cost as a FRACTION of notional (spread +
+        // slippage + commission), charged per trade. Default 0 preserves every
+        // earlier headline number. This matters because the lab otherwise gives
+        // trade COUNT away for free: a change that trades 60% more looks strictly
+        // better even if the extra trades barely clear the spread. 0.0005 (5bp
+        // round trip) is a fair liquid-ETF assumption.
+        const _cost = Number(process.env.BT_COST) || 0;
+        const r = (sign * (exit.px - open.entryPx) - _cost * open.entryPx) / open.riskAbs;
         trades.push({ ...open, exitPx: exit.px, exitWhy: exit.why, exitDate: nb.timestamp.slice(0, 10), heldDays: held, r });
         open = null;
       }
@@ -181,7 +188,7 @@ async function main() {
     const sr = findSrZones(SYM, price, win);
     const thresholds = adaptiveRsiThresholds(closes);
     const rsiVal = rsi(closes) ?? 50;
-    const direction = scan.deriveDirection(sr, rsiVal, thresholds);
+    const direction = scan.deriveDirection(sr, rsiVal, thresholds, { closes });
     if (direction === "NEUTRAL") continue;
     const struct = checkMarketStructureShift(win, direction);
     const candle = detectCandlePatterns(win, direction);
@@ -316,7 +323,12 @@ async function main() {
       stop, target, riskAbs,
       // BT_HOLD_CAP bounds the ATR-scaled horizon to the operator's 1-7 day band
       // (a month-long hold is out of scope regardless of backtest result).
-      holdDays: _momoEntry ? 60 : Math.min(
+      // BT_MOMO_HOLD: a momo trade used a hardcoded 60-day horizon, which
+      // contradicts the cap directly above and lets ONE momo entry monopolise a
+      // symbol for a quarter — measurably displacing dozens of zone trades
+      // (portfolio trade count FELL 733->702 when momo was enabled, which is
+      // backwards for a feature whose whole purpose is to add entries).
+      holdDays: _momoEntry ? (Number(process.env.BT_MOMO_HOLD) || 60) : Math.min(
         Number(process.env.BT_HOLD_CAP) || 15,
         Math.max(1, Math.min(15, Math.round((tr * riskAbs) / ((a || price * 0.005))))) * (Number(process.env.BT_HOLD_MULT) || 1)
       ),

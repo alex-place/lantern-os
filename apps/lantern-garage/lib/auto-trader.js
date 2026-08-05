@@ -998,12 +998,46 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
     else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
+  _logSkips(out.skipped);
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
   return out;
 }
 
-/** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+// ── SKIP-REASON OBSERVABILITY (2026-08-05) ───────────────────────────────────
+// out.skipped lived and died in memory, so a session where the trader declined
+// every opportunity left NO record of why. On 2026-08-05 GLD ran +1.85% and
+// SQQQ +4.75% untouched, and the post-mortem could only INFER the cause by
+// replaying bars offline — the live reasons were gone.
+//
+// Logging every skip would write ~400 rows/day of pure repetition, so this logs
+// a symbol's reason only when it CHANGES. Digits are normalised out of the
+// comparison key first, otherwise counters embedded in the text ("min-hold
+// (3<5min)") would look like a new reason on every scan and defeat the dedupe.
+// Result: one row per symbol per distinct blocker — the day's story, not its
+// transcript. Kill: TRADER_LOG_SKIPS=0.
+const _lastSkipWhy = new Map();
+function _logSkips(skipped) {
+  if (process.env.TRADER_LOG_SKIPS === '0' || !Array.isArray(skipped)) return;
+  const seen = new Set();
+  for (const s of skipped) {
+    if (!s || !s.symbol) continue;
+    seen.add(s.symbol);
+    const why = String(s.why || 'unknown');
+    const key = why.replace(/\d+(\.\d+)?/g, '#');          // ignore churning counters
+    if (_lastSkipWhy.get(s.symbol) === key) continue;      // same blocker as last scan → already on record
+    _lastSkipWhy.set(s.symbol, key);
+    logTrade({
+      event: 'skip', symbol: s.symbol, direction: s.direction ?? null,
+      p_win: s.p_win ?? null, reason: why.slice(0, 300),
+    });
+  }
+  // A symbol that stops being skipped must forget its reason, so that if the
+  // SAME blocker returns later it is recorded again as a new occurrence.
+  for (const sym of [..._lastSkipWhy.keys()]) if (!seen.has(sym)) _lastSkipWhy.delete(sym);
+}
 
-module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _saveState, _loadState, STATE_FILE };
+/** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
+function _resetCooldowns() { _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+
+module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

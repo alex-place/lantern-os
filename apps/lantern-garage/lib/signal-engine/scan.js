@@ -29,14 +29,39 @@ const tradingNews = require("../trading-news"); // directional news sentiment (e
 // Derive a candidate trade direction from zone posture, falling back to RSI
 // mean-reversion. (In the Python flow Grok proposed the direction; here it's
 // deterministic: support → look long, resistance → look short.)
-function deriveDirection(sr, rsiVal, thresholds) {
+// TREND OVERRIDE (opt-in, ZONE_TREND_DIR=1 / opts.trendDir).
+//
+// The zone rules below are pure MEAN-REVERSION: nearest zone is resistance ->
+// BEARISH. In an UPTREND price sits near its highs by definition, so the nearest
+// zone is essentially always resistance and the read is permanently BEARISH —
+// on exactly the instruments that are going up. Measured 2026-08-05: GLD read
+// BEARISH on all 49 intraday bars while climbing +2.0%, and a 2,338-sample
+// forward-return test found BULLISH reads followed by -0.003% vs BEARISH by
+// +0.009%/+0.029% — i.e. the primitive was mildly INVERTED, not merely noisy.
+//
+// This does not delete the mean-reversion read; it declines to call a rising
+// market bearish purely because there is overhead resistance. In a confirmed
+// uptrend, resistance above is a TARGET, not a short signal.
+function _isUptrend(closes) {
+  if (!Array.isArray(closes) || closes.length < 50) return false;
+  const sma = (n) => closes.slice(-n).reduce((a, b) => a + b, 0) / n;
+  const px = closes[closes.length - 1];
+  const s20 = sma(20), s50 = sma(50);
+  return px > s20 && s20 > s50;          // price above a rising short MA stack
+}
+
+function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
+  const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
+  const up = trendDir && _isUptrend(opts.closes);
   if (sr.in_zone) {
     if (sr.zone_type === "SUPPORT") return "BULLISH";
-    if (sr.zone_type === "RESISTANCE") return "BEARISH";
+    // In an uptrend, trading INSIDE a resistance zone is the breakout, not the
+    // rejection — the zone is being consumed. Overbought still vetoes the chase.
+    if (sr.zone_type === "RESISTANCE") return up && rsiVal < thresholds.overbought ? "BULLISH" : "BEARISH";
   }
   const nz = sr.nearest_zone || {};
   if (nz.type === "SUPPORT") return "BULLISH";
-  if (nz.type === "RESISTANCE") return "BEARISH";
+  if (nz.type === "RESISTANCE") return up && rsiVal < thresholds.overbought ? "BULLISH" : "BEARISH";
   if (rsiVal <= thresholds.oversold) return "BULLISH";
   if (rsiVal >= thresholds.overbought) return "BEARISH";
   return "NEUTRAL";
@@ -227,8 +252,11 @@ async function scanAll(watchlist) {
 
     const sr = findSrZones(t, price, b15);
     const thresholds = adaptiveRsiThresholds(b1h.map((b) => b.close));
-    const rsiVal = rsi(b15.map((b) => b.close)) ?? 50;
-    const direction = deriveDirection(sr, rsiVal, thresholds);
+    const _closes15 = b15.map((b) => b.close);
+    const rsiVal = rsi(_closes15) ?? 50;
+    // closes feed the ZONE_TREND_DIR override — without them the trend can't be
+    // judged and deriveDirection silently falls back to pure mean-reversion.
+    const direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15 });
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
     const gate = rileyGate({ sr, rsiVal, thresholds, struct, candle, direction, trending });
