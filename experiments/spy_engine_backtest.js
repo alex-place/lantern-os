@@ -206,7 +206,17 @@ async function main() {
     // the edge lives there, so this only replaces entry selection.
     const _meanRev = process.env.BT_MEANREV === "1";
     let direction = scan.deriveDirection(sr, rsiVal, thresholds, { closes });
-    if (_meanRev) direction = rsiVal <= thresholds.oversold ? "BULLISH" : "NEUTRAL";
+    // BT_MEANREV_SHORT (operator ask 2026-08-06): the short mirror — enter SHORT
+    // on RSI overbought. Audit prior: overbought was NOISE in the BULLISH-read
+    // universe (t=+0.18/-0.30); untested conditioned on a BEAR tape, which is
+    // what this resolves. BT_SHORT_REGIME=1 additionally requires SPY<SMA200
+    // (only short a falling market).
+    if (_meanRev) {
+      direction = rsiVal <= thresholds.oversold ? "BULLISH"
+        : (process.env.BT_MEANREV_SHORT === "1" && rsiVal >= thresholds.overbought ? "BEARISH" : "NEUTRAL");
+      if (direction === "BEARISH" && process.env.BT_SHORT_REGIME === "1"
+          && (regimeByDate.get(bars[i].timestamp.slice(0, 10)) || "NEUTRAL") !== "BEARISH") direction = "NEUTRAL";
+    }
     if (direction === "NEUTRAL") continue;
     const struct = checkMarketStructureShift(win, direction);
     const candle = detectCandlePatterns(win, direction);
@@ -267,7 +277,7 @@ async function main() {
     // prior 8-bar high with MACD positive — and exit by the validated 3xATR trail:
     // hold until the trend actually dies, no zone required.
     let _supStop = null, _momoEntry = false;
-    if (process.env.BT_SUP_ENTRY === "1") {
+    if (process.env.BT_SUP_ENTRY === "1" && direction === "BULLISH") {
       const aNow = atr(win) || price * 0.005;
       const sup = ((sr && sr.zones) || []).filter((z) => /SUPPORT/i.test(z.type || "") && (z.top || z.level) <= price * 1.001)
         .sort((x, y) => (y.top || y.level) - (x.top || x.level))[0];

@@ -86,6 +86,10 @@ function cfg() {
   return {
     positionPct: n('TRADER_POSITION_PCT', DEFAULTS.positionPct),
     maxPositionPct: n('TRADER_MAX_POSITION_PCT', DEFAULTS.maxPositionPct),
+    // Portfolio-level cash reserve (2026-08-06): gross exposure across ALL
+    // positions is capped at this % of equity; the rest stays in cash. 0 or
+    // >=100 disables. Default 80 = always keep 20% cash.
+    maxGrossPct: n('TRADER_MAX_GROSS_PCT', 80),
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
@@ -936,6 +940,20 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
     const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDist });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
+    // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
+    // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
+    // cash. Per-position caps alone don't bound the SUM: 12 tradelist symbols x
+    // a 7% cap could theoretically deploy 84%. This is the portfolio-level
+    // brake: an entry that would push gross exposure past the cap is skipped
+    // (exits are never blocked — reducing risk is always allowed).
+    if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
+      const _gross = Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
+      const _budget = account.equity * (c.maxGrossPct / 100);
+      if (_gross + qty * price > _budget) {
+        out.skipped.push({ ...record, why: `cash reserve: gross $${Math.round(_gross).toLocaleString()} + $${Math.round(qty * price).toLocaleString()} would exceed ${c.maxGrossPct}% of equity ($${Math.round(_budget).toLocaleString()})` });
+        continue;
+      }
+    }
 
     const enOrder = (extended && price > 0)
       ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity }

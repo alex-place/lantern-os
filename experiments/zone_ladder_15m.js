@@ -33,7 +33,7 @@ const STOP_MULT = 2.2; // trader_walkforward's shipped lever
 
 function closesOf(bars) { return bars.map((b) => b.close); }
 
-function simulate(sym, bars, exitMode, entryAtrMax, entryMode) {
+function simulate(sym, bars, exitMode, entryAtrMax, entryMode, dailyBars) {
   const trades = [];
   let pos = null;
   for (let t = WARMUP; t < bars.length - 1; t++) {
@@ -107,7 +107,27 @@ function simulate(sym, bars, exitMode, entryAtrMax, entryMode) {
     // RSI-oversold the only informative one (t=+5.4). On daily bars replacing the
     // stack with it took OOS avg R 0.266 -> 0.581. This is the 15m check of that
     // claim on the timeframe the trader actually runs.
-    const _mr = entryMode === 'meanrev';
+    const _mr = String(entryMode || '').startsWith('meanrev');
+    // TLT KNIFE FIX (2026-08-06): 15m mean-reversion failed ONLY on TLT (29% WR,
+    // 15/21 stopped) — buying 15m dips inside a multi-week daily decline, where
+    // "oversold" keeps getting more oversold. Gate the 15m entry on the DAILY
+    // timeframe agreeing the instrument is not in a falling knife:
+    //   meanrev-sma20 : daily close must be above its 20-day SMA
+    //   meanrev-knife : at.isFallingKnife() on the DAILY closes must be false
+    if (_mr && entryMode !== 'meanrev') {
+      // COMPLETED daily closes strictly before the current 15m bar's day — real
+      // daily history (passed in), not aggregated from the thin 15m window, so
+      // SMA-20 has substance. No look-ahead: today's (partial) close excluded.
+      const _day = String(cur.timestamp).slice(0, 10);
+      const _dailyCloses = (dailyBars || []).filter((b) => String(b.timestamp).slice(0, 10) < _day).map((b) => b.close);
+      if (entryMode === 'meanrev-sma20') {
+        if (_dailyCloses.length < 20) continue;
+        const s20 = _dailyCloses.slice(-20).reduce((a, b) => a + b, 0) / 20;
+        if (price <= s20) continue;
+      } else if (entryMode === 'meanrev-knife') {
+        if (at.isFallingKnife(_dailyCloses)) continue;
+      }
+    }
     const dir = _mr ? (rv <= th.oversold ? 'BULLISH' : 'NEUTRAL') : deriveDirection(sr, rv, th);
     if (dir !== 'BULLISH') continue;
     const struct = checkMarketStructureShift(slice, dir);
@@ -170,6 +190,7 @@ function summarize(trades) {
   const syms = (args.indexOf('--symbols') >= 0 ? args[args.indexOf('--symbols') + 1] : 'SPY,QQQ').split(',');
   for (const sym of syms) {
     const data = await yahoo.getBars(sym.trim(), '15m');
+    const dailyBars = (((await yahoo.getBars(sym.trim(), '1d').catch(() => null)) || {}).bars) || [];
     const bars = (data && data.bars) || [];
     if (bars.length < WARMUP + 10) { console.log(`${sym}: only ${bars.length} 15m bars — skipped`); continue; }
     console.log(`\n=== ${sym} — ${bars.length} x 15m bars (${bars[0].timestamp.slice(0, 10)} -> ${bars[bars.length - 1].timestamp.slice(0, 10)})`);
@@ -184,8 +205,11 @@ function summarize(trades) {
       ['MR zone     ', 'zone', null, 'meanrev'],
       ['MR zone+sup ', 'zone', 0.5, 'meanrev'],
       ['MR live     ', 'live', null, 'meanrev'],
+      ['MR+sup+sma20', 'zone', 0.5, 'meanrev-sma20'],
+      ['MR+sup+knife', 'zone', 0.5, 'meanrev-knife'],
+      ['MR+sma20    ', 'zone', null, 'meanrev-sma20'],
     ].map((r) => [r[0], r[1], r[2], r[3]])) {
-      const s = summarize(simulate(sym.trim(), bars, mode, gate, entryMode));
+      const s = summarize(simulate(sym.trim(), bars, mode, gate, entryMode, dailyBars));
       console.log(`  ${label} n=${s.n ?? 0} win=${s.win_pct ?? '-'}% PF=${s.pf ?? '-'} totR=${s.total_R ?? '-'} avgR=${s.avg_R ?? '-'} exits=${JSON.stringify(s.reasons || {})}`);
     }
   }
