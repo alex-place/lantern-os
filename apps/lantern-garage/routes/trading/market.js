@@ -190,7 +190,21 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       return true;
     }
     try {
-      const uid = getEffectiveUserId(req);
+      // OPERATOR VIEW (2026-08-06). The autonomous trader manages the operator
+      // account under the fixed id 'local-owner', but this route resolves the
+      // BROWSER session's profile id. Those are different identities, so an
+      // admin signed in normally queried a profile with no linked broker and the
+      // dashboard rendered $0.00 account value / $0 buying power while the bot
+      // was trading a $960k IBKR account — the UI could not see the book it
+      // exists to monitor.
+      //
+      // ADMIN ONLY, and only as a FALLBACK below: an admin whose own profile has
+      // a broker linked still sees their own account, and non-admins are
+      // unaffected, so no real account can leak to a normal user.
+      const _sessionUid = getEffectiveUserId(req);
+      const _isAdmin = (() => { try { return require('../../lib/auth-middleware').isAdmin(req); } catch (_e) { return false; } })();
+      const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+      const uid = _sessionUid;
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Serve the Alpaca account view (the user's own OAuth account, else the
@@ -273,6 +287,22 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
       }
       // No IBKR account (or IBKR preferred but unavailable) → Alpaca fallback.
       if (await serveAlpaca()) return true;
+      // Nothing resolved for the session profile — fall back to the operator
+      // account so the admin dashboard shows the book the trader actually runs.
+      if (_isAdmin && _sessionUid !== OPERATOR_UID) {
+        const opAccount = await bridge.getIBKRAccount(OPERATOR_UID).catch(() => null);
+        if (opAccount) {
+          const opPositions = (await bridge.getIBKRPositions(OPERATOR_UID).catch(() => []))
+            .filter((p) => Math.abs(Number(p && p.qty) || 0) > 0);
+          if (opPositions.length) {
+            opAccount.unrealized = Math.round(opPositions.reduce((t, p) => t + (Number(p && p.unrealized_pl) || 0), 0) * 100) / 100;
+          }
+          // Flagged so the UI can never silently present the operator book as
+          // the viewer's own account.
+          sendJson(res, { positions: opPositions, account: opAccount, operator_view: true }, 200);
+          return true;
+        }
+      }
     } catch (_e) { /* fall through to the legacy agent */ }
     // No broker connected (no IBKR, no Alpaca account, no legacy agent). Emit an
     // explicit `available:false` + reason so callers — the chat's trader_positions
