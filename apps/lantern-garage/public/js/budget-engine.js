@@ -98,20 +98,35 @@
     const byId = {};
     for (const c of CATEGORIES) byId[c.id] = num(cats[c.id]);
 
+    // Housing / transport / debt-to-income benchmarks are DEFINED against gross (pre-tax) income.
+    // If the user supplies a gross figure we measure those ratios against it; otherwise we fall
+    // back to take-home (and the UI keeps the "reads a little high" caveat). The 50/30/20 split
+    // and the savings rate stay on take-home, which is how those are defined.
+    const usedGross = num(input && input.grossIncome) > 0;
+    const gross = usedGross ? num(input.grossIncome) : income;
+    const rp = (n) => (gross > 0 ? n / gross : 0);
+    const basisWord = usedGross ? "gross income" : "income";
+
     // Spending excludes the explicit savings/investing category (that money IS saved, not spent).
     const spend = CATEGORIES.filter((c) => c.cls !== "savings").reduce((s, c) => s + byId[c.id], 0);
     const explicitSavings = byId.savings;
     const surplus = income - spend;                 // whatever isn't spent is saved (leftover + explicit)
     const savingsRate = income > 0 ? surplus / income : 0;
     const band = savingsBand(savingsRate);
+    // Zero-based "give every dollar a job": income minus everything assigned (spending + explicit
+    // savings). ~0 = fully allocated; >0 = unassigned money to direct; <0 = over-allocated.
+    const unallocated = round2(income - spend - explicitSavings);
 
     // 50/30/20 split — needs/wants from spending, savings = the surplus.
     const needs = CATEGORIES.filter((c) => c.cls === "needs").reduce((s, c) => s + byId[c.id], 0);
     const wants = CATEGORIES.filter((c) => c.cls === "wants").reduce((s, c) => s + byId[c.id], 0);
+    // Each leg carries its target dollars and the signed delta from target (negative = under budget
+    // for needs/wants, or short of the savings goal).
+    const mkLeg = (amt, pctv, tgt) => ({ amount: round2(amt), pct: pctv, target: tgt, targetAmount: round2(tgt * income), delta: round2(amt - tgt * income) });
     const split = {
-      needs:   { amount: round2(needs),  pct: income > 0 ? needs / income : 0,  target: BUDGET_BENCHMARKS.fiftyThirtyTwenty.needs },
-      wants:   { amount: round2(wants),  pct: income > 0 ? wants / income : 0,  target: BUDGET_BENCHMARKS.fiftyThirtyTwenty.wants },
-      savings: { amount: round2(Math.max(0, surplus)), pct: Math.max(0, savingsRate), target: BUDGET_BENCHMARKS.fiftyThirtyTwenty.savings },
+      needs:   mkLeg(needs, income > 0 ? needs / income : 0, BUDGET_BENCHMARKS.fiftyThirtyTwenty.needs),
+      wants:   mkLeg(wants, income > 0 ? wants / income : 0, BUDGET_BENCHMARKS.fiftyThirtyTwenty.wants),
+      savings: mkLeg(Math.max(0, surplus), Math.max(0, savingsRate), BUDGET_BENCHMARKS.fiftyThirtyTwenty.savings),
     };
 
     // ── Benchmark flags ──────────────────────────────────────────────────────────────────────
@@ -130,8 +145,8 @@
       else push(7, "emergency", "ok", `Emergency fund covers ~${emergencyMonths.toFixed(1)} months — beyond 6; consider investing the excess.`, BUDGET_BENCHMARKS.sources.emergencyFund);
     }
 
-    // Debt-to-income (housing + debt payments, back-end).
-    const dti = pct(byId.housing + byId.debt);
+    // Debt-to-income (housing + debt payments, back-end) — gross-based.
+    const dti = rp(byId.housing + byId.debt);
     if (dti > BUDGET_BENCHMARKS.dtiHigh) push(2, "debt", "high", `Debt-to-income ~${(dti * 100).toFixed(0)}% exceeds the 43% qualified-mortgage ceiling — high risk.`, BUDGET_BENCHMARKS.sources.dti);
     else if (dti > BUDGET_BENCHMARKS.dtiWarn) push(4, "debt", "warn", `Debt-to-income ~${(dti * 100).toFixed(0)}% is over the 36% guideline.`, BUDGET_BENCHMARKS.sources.dti);
 
@@ -139,15 +154,15 @@
     if (savingsRate < BUDGET_BENCHMARKS.savingsBands.poor) push(3, "savings", "high", `Savings rate ~${(savingsRate * 100).toFixed(0)}% is critically low (target 20%).`, BUDGET_BENCHMARKS.sources.savingsRate);
     else if (savingsRate < BUDGET_BENCHMARKS.savingsTarget) push(5, "savings", "warn", `Savings rate ~${(savingsRate * 100).toFixed(0)}% is below the 20% target.`, BUDGET_BENCHMARKS.sources.savingsRate);
 
-    // Housing.
-    const hp = pct(byId.housing);
-    if (hp > BUDGET_BENCHMARKS.housingHigh) push(4, "housing", "high", `Housing is ~${(hp * 100).toFixed(0)}% of income — over the ~30% ceiling.`, BUDGET_BENCHMARKS.sources.housing2836);
-    else if (hp > BUDGET_BENCHMARKS.housingWarn) push(6, "housing", "warn", `Housing is ~${(hp * 100).toFixed(0)}% of income — over the 28% guideline.`, BUDGET_BENCHMARKS.sources.housing2836);
+    // Housing (gross-based).
+    const hp = rp(byId.housing);
+    if (hp > BUDGET_BENCHMARKS.housingHigh) push(4, "housing", "high", `Housing is ~${(hp * 100).toFixed(0)}% of ${basisWord} — over the ~30% ceiling.`, BUDGET_BENCHMARKS.sources.housing2836);
+    else if (hp > BUDGET_BENCHMARKS.housingWarn) push(6, "housing", "warn", `Housing is ~${(hp * 100).toFixed(0)}% of ${basisWord} — over the 28% guideline.`, BUDGET_BENCHMARKS.sources.housing2836);
 
-    // Transportation.
-    const tp = pct(byId.transportation);
-    if (tp > BUDGET_BENCHMARKS.transportWarn) push(6, "transportation", "warn", `Transportation is ~${(tp * 100).toFixed(0)}% of income — over the ~15% guideline.`, BUDGET_BENCHMARKS.sources.transport);
-    else if (tp > BUDGET_BENCHMARKS.transportSoft) push(7, "transportation", "soft", `Transportation is ~${(tp * 100).toFixed(0)}% of income — above the ~10% car-cost target.`, BUDGET_BENCHMARKS.sources.transport);
+    // Transportation (gross-based).
+    const tp = rp(byId.transportation);
+    if (tp > BUDGET_BENCHMARKS.transportWarn) push(6, "transportation", "warn", `Transportation is ~${(tp * 100).toFixed(0)}% of ${basisWord} — over the ~15% guideline.`, BUDGET_BENCHMARKS.sources.transport);
+    else if (tp > BUDGET_BENCHMARKS.transportSoft) push(7, "transportation", "soft", `Transportation is ~${(tp * 100).toFixed(0)}% of ${basisWord} — above the ~10% car-cost target.`, BUDGET_BENCHMARKS.sources.transport);
 
     // 50/30/20 caps.
     if (split.needs.pct > BUDGET_BENCHMARKS.fiftyThirtyTwenty.needs) push(6, "needs", "warn", `Needs are ~${(split.needs.pct * 100).toFixed(0)}% of income — over the 50% cap.`, BUDGET_BENCHMARKS.sources["50/30/20"]);
@@ -175,14 +190,26 @@
       }
     }
 
+    // Where the money goes — one slice per spent category, plus savings + any unallocated, so the
+    // ring sums to income. cls drives the slice color.
+    const breakdown = CATEGORIES.filter((c) => c.cls !== "savings" && byId[c.id] > 0)
+      .map((c) => ({ id: c.id, label: c.label, cls: c.cls, amount: round2(byId[c.id]), pct: income > 0 ? byId[c.id] / income : 0 }))
+      .sort((a, b) => b.amount - a.amount);
+    if (explicitSavings > 0) breakdown.push({ id: "savings", label: "Savings & investing", cls: "savings", amount: round2(explicitSavings), pct: income > 0 ? explicitSavings / income : 0 });
+    if (unallocated > 0) breakdown.push({ id: "unallocated", label: "Left to allocate", cls: "savings", amount: round2(unallocated), pct: income > 0 ? unallocated / income : 0 });
+
     return {
       income: round2(income),
+      gross: round2(gross),
+      basis: { gross: round2(gross), usedGross },
       spend: round2(spend),
       surplus: round2(surplus),
+      unallocated,
       explicitSavings: round2(explicitSavings),
       savingsRate: Math.round(savingsRate * 1000) / 1000,
       band,
       split,
+      categoryBreakdown: breakdown,
       dti: Math.round(dti * 1000) / 1000,
       emergencyMonths: emergencyMonths == null ? null : Math.round(emergencyMonths * 10) / 10,
       flags,
@@ -196,5 +223,82 @@
     return "$" + Math.round(v).toLocaleString("en-US");
   }
 
-  return { analyze, savingsBand, fmtMoney, CATEGORIES, CATEGORY_BY_ID, BUDGET_BENCHMARKS };
+  // ── Sinking funds & savings goals ─────────────────────────────────────────────────────────────
+  // Turn a target (+ due month, or a chosen monthly amount) into "$X/mo to stay on track" and a
+  // progress %. Pure — `todayISO` is passed in so tests can pin the clock.
+  function monthsBetween(todayISO, dueYYYYMM) {
+    if (!dueYYYYMM) return 1;
+    const [ty, tm] = String(todayISO || "").slice(0, 7).split("-").map(Number);
+    const [dy, dm] = String(dueYYYYMM).slice(0, 7).split("-").map(Number);
+    if (!ty || !dy) return 1;
+    return Math.max(1, (dy - ty) * 12 + (dm - tm));
+  }
+  function fundProgress(fund, todayISO) {
+    const target = num(fund && fund.target);
+    const saved = Math.min(num(fund && fund.saved), target || Infinity);
+    const remaining = Math.max(0, target - saved);
+    let monthsRemaining, monthly;
+    if (fund && fund.type === "monthly") {
+      monthly = num(fund.monthly);
+      monthsRemaining = monthly > 0 ? Math.ceil(remaining / monthly) : null;
+    } else { // "by-date" (default): split the remaining evenly over the months left
+      monthsRemaining = monthsBetween(todayISO, fund && fund.dueMonth);
+      monthly = remaining / monthsRemaining;
+    }
+    return {
+      monthly: round2(monthly || 0),
+      monthsRemaining,
+      remaining: round2(remaining),
+      pctFunded: target > 0 ? Math.min(1, saved / target) : 0,
+      done: target > 0 && saved >= target,
+    };
+  }
+  function fundsMonthlyTotal(funds, todayISO) {
+    return round2((funds || []).reduce((s, f) => s + fundProgress(f, todayISO).monthly, 0));
+  }
+
+  // ── Debt payoff — avalanche (highest APR first) vs snowball (smallest balance first) ──────────
+  // Month-by-month: accrue interest, pay each minimum, then throw (extra + freed minimums from
+  // cleared debts) at the current target. Guards negative amortization; caps iterations at 1200.
+  function simulateDebtPayoff(debts, extra, strategy) {
+    const list = (debts || [])
+      .map((d) => ({ name: d.name || "Debt", balance: num(d.balance), apr: num(d.apr), min: num(d.minPayment) }))
+      .filter((d) => d.balance > 0);
+    if (!list.length) return { months: 0, totalInterest: 0, order: [], schedule: [{ month: 0, totalBalance: 0 }], infeasible: false };
+    list.sort((a, b) => (strategy === "snowball" ? a.balance - b.balance : b.apr - a.apr));
+    const order = list.map((d) => d.name);
+    const extraPool = Math.max(0, num(extra));
+    let months = 0, totalInterest = 0;
+    const schedule = [{ month: 0, totalBalance: round2(list.reduce((s, d) => s + d.balance, 0)) }];
+    const CAP = 1200;
+    while (list.some((d) => d.balance > 0.005) && months < CAP) {
+      months++;
+      let interest = 0;
+      for (const d of list) if (d.balance > 0) { const i = (d.balance * d.apr) / 1200; d.balance += i; interest += i; }
+      totalInterest += interest;
+      let pool = extraPool;
+      for (const d of list) if (d.balance > 0) pool += d.min;
+      if (pool <= interest + 0.005) return { infeasible: true, reason: "monthly payments don't cover the interest — increase them", order, months: null, totalInterest: null, schedule };
+      for (const d of list) if (d.balance > 0) { const p = Math.min(d.min, d.balance, pool); d.balance -= p; pool -= p; }   // minimums
+      for (const d of list) { if (pool <= 0) break; if (d.balance > 0) { const p = Math.min(pool, d.balance); d.balance -= p; pool -= p; } } // extra at target
+      for (const d of list) if (d.balance < 0.005) d.balance = 0;
+      schedule.push({ month: months, totalBalance: round2(list.reduce((s, d) => s + d.balance, 0)) });
+    }
+    return { months, totalInterest: round2(totalInterest), order, schedule, infeasible: false, cappedOut: months >= CAP };
+  }
+  function compareDebtStrategies(debts, extra) {
+    const avalanche = simulateDebtPayoff(debts, extra, "avalanche");
+    const snowball = simulateDebtPayoff(debts, extra, "snowball");
+    let interestSaved = null, monthsSaved = null;
+    if (!avalanche.infeasible && !snowball.infeasible) {
+      interestSaved = round2(snowball.totalInterest - avalanche.totalInterest); // avalanche minimizes interest
+      monthsSaved = snowball.months - avalanche.months;
+    }
+    return { avalanche, snowball, interestSaved, monthsSaved };
+  }
+
+  return {
+    analyze, savingsBand, fmtMoney, CATEGORIES, CATEGORY_BY_ID, BUDGET_BENCHMARKS,
+    fundProgress, fundsMonthlyTotal, monthsBetween, simulateDebtPayoff, compareDebtStrategies,
+  };
 });

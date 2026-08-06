@@ -11,19 +11,22 @@
   <link rel="stylesheet" href="/css/site.css">
   <title>Budget & Savings — Unisona</title>
   <style>
-    :root { --head-font: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; }
+    :root { --head-font: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; --ok: #22c55e; }
     .budget-shell { max-width: 1120px; margin: 0 auto; padding: 22px 16px 72px; display: grid; grid-template-columns: 1fr 360px; gap: 26px; align-items: start; }
     .b-head h1 { font-family: var(--head-font); font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin: 2px 0 4px; }
     .b-head p { color: var(--muted); font-size: 14px; margin: 0 0 18px; max-width: 60ch; }
     .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 16px 14px; margin-bottom: 16px; }
     .card > h2 { font-family: var(--head-font); font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+    .card > h2 .sub { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--muted); font-size: 12px; margin-left: 6px; }
     .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .row label { flex: 1; font-size: 14px; }
     .money { position: relative; }
     .money::before { content: "$"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; }
-    input.amt, input.inc, input.emg { width: 130px; padding: 8px 8px 8px 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+    input.amt, input.inc, input.emg, input.dol { width: 130px; padding: 8px 8px 8px 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
     input.inc, input.emg { width: 160px; }
     input.name { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+    input.pctin { width: 70px; padding: 8px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+    input.month { width: 140px; padding: 7px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; }
     input:focus { outline: none; border-color: var(--accent); }
     .cat { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
     .cat-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; background: color-mix(in srgb, var(--surface) 60%, transparent); }
@@ -36,30 +39,70 @@
     .li { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
     .li .del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
     .li .del:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+    .li .u { color: var(--muted); font-size: 12px; width: 26px; text-align: left; }
     .add-li { border: 1px dashed var(--border); background: none; color: var(--muted); border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; margin-top: 3px; }
     .add-li:hover { border-color: var(--accent); color: var(--accent); }
     .over { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); }
     .over .cat-head .tot { color: var(--danger); font-weight: 600; }
 
+    /* Goals / sinking funds */
+    .fund { border: 1px solid var(--border); border-radius: 12px; padding: 11px 12px; margin-bottom: 10px; }
+    .fund .fr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .fund .fr .lab { color: var(--muted); font-size: 12px; }
+    .fprog { height: 8px; border-radius: 5px; background: var(--border); overflow: hidden; }
+    .fprog .fill { height: 100%; background: var(--ok); border-radius: 5px; }
+    .fund .fnote { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-top: 6px; }
+    .fund .fnote .strong { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* Debt planner */
+    .debt-hd { display: flex; gap: 8px; align-items: center; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; padding: 0 2px 6px; }
+    .debt-hd .c-bal { width: 130px; text-align: right; } .debt-hd .c-apr { width: 70px; text-align: right; } .debt-hd .c-min { width: 130px; text-align: right; } .debt-hd .c-x { width: 26px; }
+    .debt-ctl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 10px 0 12px; }
+    .debt-res { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 6px; }
+    .debt-res .big { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .debt-res .cmp { font-size: 12.5px; color: var(--muted); margin-top: 5px; }
+    .debt-res.infeasible { border-color: color-mix(in srgb, var(--danger) 45%, var(--border)); }
+    .debt-res .warn { color: var(--danger); font-size: 13px; }
+    .payoff { margin-top: 10px; }
+
     .summary { position: sticky; top: 16px; }
-    .rate-big { text-align: center; padding: 20px 12px 14px; }
+    .hero { text-align: center; padding: 15px 12px 13px; }
+    .hero .hero-lab { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; }
+    .hero .hero-n { font-family: var(--head-font); font-size: 30px; font-weight: 700; line-height: 1.05; margin: 5px 0 3px; }
+    .hero .hero-sub { font-size: 12px; color: var(--muted); }
+    .hero.ok .hero-n { color: var(--ok); } .hero.warn .hero-n { color: var(--gold); } .hero.bad .hero-n { color: var(--danger); }
+    .rate-big { text-align: center; padding: 16px 12px 12px; }
     .rate-big .n { font-family: var(--head-font); font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
     .rate-big .lab { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; margin-top: 6px; }
     .band { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
     .band.poor { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
     .band.fair { background: color-mix(in srgb, var(--gold) 22%, transparent); color: var(--gold); }
     .band.good { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
-    .band.excellent { background: color-mix(in srgb, #22c55e 22%, transparent); color: #22c55e; }
+    .band.excellent { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
     .kpis { display: flex; justify-content: space-around; text-align: center; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
     .kpis .k .v { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
     .kpis .k .l { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-    .bars .bar-row { margin: 9px 0; }
+
+    /* Donut */
+    .donut-wrap { display: flex; align-items: center; gap: 14px; }
+    .donut-wrap svg { flex: none; }
+    .legend { flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none; font-size: 12.5px; }
+    .legend li { display: flex; align-items: center; gap: 7px; margin: 4px 0; }
+    .legend .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+    .legend .lg-lab { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .legend .lg-val { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+    .bars .bar-row { margin: 11px 0; }
     .bars .bar-row .top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
     .bars .bar-row .top .r { color: var(--muted); font-variant-numeric: tabular-nums; }
     .track { height: 8px; border-radius: 5px; background: var(--border); position: relative; overflow: hidden; }
     .track .fill { height: 100%; border-radius: 5px; }
-    .track .fill.needs { background: var(--accent); } .track .fill.wants { background: var(--gold); } .track .fill.savings { background: #22c55e; }
+    .track .fill.needs { background: var(--accent); } .track .fill.wants { background: var(--gold); } .track .fill.savings { background: var(--ok); }
     .track .tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .55; }
+    .bars .bar-row .note { font-size: 11.5px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .bars .bar-row .note.over { color: var(--danger); }
+    .bars .bar-row .note.under { color: var(--ok); }
+
     .recs .rec { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 9px; font-size: 13.5px; }
     .recs .rec.head { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
     .recs .rec .t { font-weight: 600; margin-bottom: 4px; }
@@ -67,9 +110,20 @@
     .recs .rec ul li { margin: 3px 0; }
     .recs .rec a { color: var(--accent); font-size: 12px; text-decoration: none; }
     .foot { color: var(--muted); font-size: 12px; margin-top: 10px; line-height: 1.5; }
-    .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+    .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
     .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 8px 13px; font-size: 13px; cursor: pointer; }
     .btn:hover { border-color: var(--accent); }
+    .btn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg button { border: none; background: var(--surface); color: var(--muted); font-size: 13px; padding: 8px 13px; cursor: pointer; }
+    .seg button + button { border-left: 1px solid var(--border); }
+    .seg button.active { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); color: var(--accent); font-weight: 600; }
+
+    /* Privacy blur — hide amounts for shoulder-surfing; focused inputs un-blur so you can still edit. */
+    .priv .blurme { filter: blur(7px); user-select: none; }
+    .priv input.amt, .priv input.inc, .priv input.emg, .priv input.dol, .priv input.pctin { filter: blur(6px); }
+    .priv input:focus { filter: none; }
+
     @media (max-width: 860px) { .budget-shell { grid-template-columns: 1fr; } .summary { position: static; } }
   </style>
 </head>
@@ -78,12 +132,18 @@
   <div class="left">
     <div class="b-head">
       <h1>💰 Budget &amp; Savings</h1>
-      <p>Enter your monthly income and expenses to see your savings rate against studied benchmarks, a 50/30/20 breakdown, and where to trim. Everything is computed locally in your browser from cited rules — no numbers are guessed, nothing is sent to a server.</p>
+      <p>Enter your monthly income and expenses to see your savings rate against studied benchmarks, a 50/30/20 breakdown, where your money goes, and how fast you could be debt-free. Everything is computed locally in your browser from cited rules — no numbers are guessed, nothing is sent to a server.</p>
     </div>
 
     <div class="toolbar">
       <button class="btn" id="collapse-all" type="button">Collapse all</button>
       <button class="btn" id="reset" type="button">Reset</button>
+      <span style="flex:1"></span>
+      <div class="seg" id="view-seg" role="group" aria-label="Amount period" title="Show monthly or annual totals — always enter amounts as monthly">
+        <button data-view="monthly" type="button" class="active">Monthly</button>
+        <button data-view="annual" type="button">Annual</button>
+      </div>
+      <button class="btn" id="hide-amt" type="button" aria-pressed="false" title="Blur every dollar figure for privacy">Hide amounts</button>
     </div>
 
     <div class="card">
@@ -93,28 +153,70 @@
         <span class="money"><input class="inc" id="income" type="number" inputmode="decimal" min="0" step="50" placeholder="0"></span>
       </div>
       <div class="row">
+        <label for="gross">Monthly gross income <span style="color:var(--muted)">(optional — pre-tax, for the housing/debt rules)</span></label>
+        <span class="money"><input class="inc" id="gross" type="number" inputmode="decimal" min="0" step="50" placeholder="0"></span>
+      </div>
+      <div class="row">
         <label for="emergency">Current emergency savings <span style="color:var(--muted)">(optional — for months-covered)</span></label>
         <span class="money"><input class="emg" id="emergency" type="number" inputmode="decimal" min="0" step="100" placeholder="0"></span>
       </div>
+      <div class="foot">The 50/30/20 split and savings rate use take-home. The 28/36 housing rule and debt-to-income are defined on <em>gross</em> — add your gross above to measure those correctly; otherwise they fall back to take-home (and read a little high).</div>
     </div>
 
     <div class="card">
       <h2>Monthly expenses</h2>
       <div id="cats"></div>
     </div>
+
+    <div class="card">
+      <h2>Goals &amp; sinking funds <span class="sub">save a set amount toward a target by a date</span></h2>
+      <div id="funds"></div>
+      <button class="add-li" id="add-fund" type="button">+ Add a goal</button>
+      <div class="foot" id="funds-foot">Sinking funds turn big irregular costs (holidays, car repairs, insurance) into a small, steady monthly set-aside so they never blow up your budget.</div>
+    </div>
+
+    <div class="card">
+      <h2>Debt payoff planner <span class="sub">what-if — not counted in the budget above</span></h2>
+      <div class="debt-hd"><span style="flex:1">Debt</span><span class="c-bal">Balance</span><span class="c-apr">APR %</span><span class="c-min">Min / mo</span><span class="c-x"></span></div>
+      <div id="debts"></div>
+      <button class="add-li" id="add-debt" type="button">+ Add a debt</button>
+      <div class="debt-ctl">
+        <span class="lab" style="color:var(--muted);font-size:13px">Extra toward debt / mo</span>
+        <span class="money"><input class="dol" id="debt-extra" type="number" inputmode="decimal" min="0" step="25" placeholder="0"></span>
+        <div class="seg" id="strategy-seg" role="group" aria-label="Payoff strategy" title="Avalanche pays highest APR first (least interest); snowball pays smallest balance first (fastest wins)">
+          <button data-strategy="avalanche" type="button" class="active">Avalanche</button>
+          <button data-strategy="snowball" type="button">Snowball</button>
+        </div>
+      </div>
+      <div class="debt-res" id="debt-res"><div class="foot" style="margin:0">Add a debt to model a payoff plan. Avalanche minimizes interest; snowball clears small balances first for momentum.</div></div>
+    </div>
   </div>
 
   <aside class="left summary">
+    <div class="card hero" id="hero">
+      <div class="hero-lab">Left to allocate</div>
+      <div class="hero-n blurme" id="hero-n">—</div>
+      <div class="hero-sub" id="hero-sub">give every dollar a job</div>
+    </div>
+
     <div class="card">
       <div class="rate-big">
-        <div class="n" id="rate">—</div>
+        <div class="n blurme" id="rate">—</div>
         <div class="lab">savings rate</div>
         <div><span class="band" id="band">enter your income</span></div>
       </div>
       <div class="kpis">
-        <div class="k"><div class="v" id="k-income">—</div><div class="l">Income</div></div>
-        <div class="k"><div class="v" id="k-spend">—</div><div class="l">Spending</div></div>
-        <div class="k"><div class="v" id="k-surplus">—</div><div class="l">Saved / mo</div></div>
+        <div class="k"><div class="v blurme" id="k-income">—</div><div class="l">Income</div></div>
+        <div class="k"><div class="v blurme" id="k-spend">—</div><div class="l">Spending</div></div>
+        <div class="k"><div class="v blurme" id="k-surplus">—</div><div class="l">Saved</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Where it goes</h2>
+      <div class="donut-wrap">
+        <div class="blurme" id="donut">—</div>
+        <ul class="legend blurme" id="legend"></ul>
       </div>
     </div>
 
@@ -129,7 +231,7 @@
       <div class="recs" id="recs"><div class="foot">Fill in your income and expenses to get recommendations.</div></div>
     </div>
 
-    <div class="foot">Housing / transport / debt-to-income benchmarks are conventionally measured against <em>gross</em> (pre-tax) income; computed here against take-home, so those percentages read a little high. Your data stays in this browser (<code>localStorage</code>).</div>
+    <div class="foot">Your data stays in this browser (<code>localStorage</code>) — nothing is uploaded. Benchmarks are guidelines, not personalized financial advice.</div>
   </aside>
 </main>
 
@@ -139,7 +241,10 @@
   "use strict";
   var E = window.BudgetEngine;
   var KEY = "lantern.budget.v1";
-  var fmt = E.fmtMoney;
+  var fmt = E.fmtMoney; // unscaled monthly (used for category headers you type into)
+
+  // Distinct per-category donut palette; savings/unallocated get semantic colors.
+  var PALETTE = ["#06b6d4", "#f59e0b", "#8b5cf6", "#ef4444", "#3b82f6", "#14b8a6", "#ec4899", "#84cc16", "#f97316", "#a855f7", "#64748b"];
 
   // Default line items per category — a helpful starting structure, all amounts blank.
   var SEED = {
@@ -159,16 +264,34 @@
   function freshState() {
     var items = {};
     E.CATEGORIES.forEach(function (c) { items[c.id] = (SEED[c.id] || ["Item"]).map(function (n) { return { name: n, amount: "" }; }); });
-    return { income: "", emergency: "", items: items, collapsed: {} };
+    return { income: "", gross: "", emergency: "", items: items, collapsed: {}, view: "monthly", blur: false, funds: [], debts: [], debtStrategy: "avalanche", debtExtra: "" };
   }
   var state = (function () {
-    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.items) return s; } catch (e) {}
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY));
+      if (s && s.items) {
+        // Migrate older v1 states that predate the new fields.
+        if (s.gross == null) s.gross = "";
+        if (s.view == null) s.view = "monthly";
+        if (s.blur == null) s.blur = false;
+        if (!Array.isArray(s.funds)) s.funds = [];
+        if (!Array.isArray(s.debts)) s.debts = [];
+        if (s.debtStrategy == null) s.debtStrategy = "avalanche";
+        if (s.debtExtra == null) s.debtExtra = "";
+        return s;
+      }
+    } catch (e) {}
     return freshState();
   })();
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
 
   var $ = function (id) { return document.getElementById(id); };
   var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); };
+
+  // View-scaled money: monthly shows the raw figure; annual multiplies by 12.
+  function fmtV(n) { return E.fmtMoney((Number(n) || 0) * (state.view === "annual" ? 12 : 1)); }
+  function per() { return state.view === "annual" ? "/yr" : "/mo"; }
+  function todayISO() { try { return new Date().toISOString(); } catch (e) { return "2026-01-01"; } }
 
   function catTotals() {
     var t = {};
@@ -194,7 +317,7 @@
         '<div class="cat-head" data-toggle="' + c.id + '">' +
           '<span class="chev">▾</span>' +
           '<span class="nm">' + esc(c.label) + '</span>' +
-          '<span class="tot" data-tot="' + c.id + '">' + fmt(totals[c.id]) + '</span>' +
+          '<span class="tot blurme" data-tot="' + c.id + '">' + fmt(totals[c.id]) + '</span>' +
         '</div>' +
         '<div class="cat-body">' + lis +
           '<button class="add-li" data-add="' + c.id + '" type="button">+ Add line item</button>' +
@@ -204,28 +327,177 @@
     $("cats").innerHTML = html;
   }
 
+  // ── Goals / sinking funds ─────────────────────────────────────────────────────────────────────
+  function toFund(f) { return { name: f.name, target: f.target, saved: f.saved, dueMonth: f.dueMonth, type: "by-date" }; }
+  function renderFunds() {
+    var t = todayISO();
+    var html = (state.funds || []).map(function (f, i) {
+      var pr = E.fundProgress(toFund(f), t);
+      var pct = Math.round(pr.pctFunded * 100);
+      var note = f.done || pr.done
+        ? '<span>Funded ✓</span>'
+        : '<span>' + (pr.monthsRemaining != null ? pr.monthsRemaining + ' mo left · ' : '') + fmtV(pr.remaining) + ' to go</span><span class="strong">' + fmtV(pr.monthly) + per() + '</span>';
+      return '<div class="fund" data-i="' + i + '">' +
+        '<div class="fr">' +
+          '<input class="name" data-fi="' + i + '" data-ff="name" value="' + esc(f.name || "") + '" placeholder="Goal (e.g. Car repair fund)">' +
+          '<button class="del" data-fdel="' + i + '" title="Remove" type="button" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:4px 6px">×</button>' +
+        '</div>' +
+        '<div class="fr">' +
+          '<span class="lab">Target</span><span class="money"><input class="dol" data-fi="' + i + '" data-ff="target" type="number" inputmode="decimal" min="0" step="50" value="' + esc(f.target || "") + '" placeholder="0"></span>' +
+          '<span class="lab">Saved</span><span class="money"><input class="dol" data-fi="' + i + '" data-ff="saved" type="number" inputmode="decimal" min="0" step="50" value="' + esc(f.saved || "") + '" placeholder="0"></span>' +
+          '<span class="lab">By</span><input class="month" data-fi="' + i + '" data-ff="dueMonth" type="month" value="' + esc(f.dueMonth || "") + '">' +
+        '</div>' +
+        '<div class="fprog"><div class="fill" style="width:' + Math.min(100, pct) + '%"></div></div>' +
+        '<div class="fnote blurme">' + note + '</div>' +
+      '</div>';
+    }).join("");
+    $("funds").innerHTML = html;
+    var total = E.fundsMonthlyTotal((state.funds || []).map(toFund), t);
+    var n = (state.funds || []).filter(function (f) { return Number(f.target) > 0; }).length;
+    if (n > 0) $("funds-foot").innerHTML = 'Set aside <span class="strong blurme" style="color:var(--text);font-weight:600">' + fmtV(total) + per() + '</span> across ' + n + ' goal' + (n === 1 ? "" : "s") + ' to stay on track. Sinking funds keep big irregular costs from blowing up your budget.';
+    else $("funds-foot").textContent = "Sinking funds turn big irregular costs (holidays, car repairs, insurance) into a small, steady monthly set-aside so they never blow up your budget.";
+  }
+
+  // ── Debt payoff planner ───────────────────────────────────────────────────────────────────────
+  function toDebt(d) { return { name: d.name, balance: d.balance, apr: d.apr, minPayment: d.min }; }
+  function monthsWord(m) {
+    if (m == null) return "—";
+    if (m < 12) return m + " mo";
+    return Math.floor(m / 12) + "y " + (m % 12) + "m";
+  }
+  function renderDebts() {
+    var html = (state.debts || []).map(function (d, i) {
+      return '<div class="li" data-i="' + i + '">' +
+        '<input class="name" data-di="' + i + '" data-df="name" value="' + esc(d.name || "") + '" placeholder="Card / loan">' +
+        '<span class="money"><input class="dol" data-di="' + i + '" data-df="balance" type="number" inputmode="decimal" min="0" step="100" value="' + esc(d.balance || "") + '" placeholder="0"></span>' +
+        '<input class="pctin" data-di="' + i + '" data-df="apr" type="number" inputmode="decimal" min="0" step="0.1" value="' + esc(d.apr || "") + '" placeholder="0">' +
+        '<span class="money"><input class="dol" data-di="' + i + '" data-df="min" type="number" inputmode="decimal" min="0" step="10" value="' + esc(d.min || "") + '" placeholder="0"></span>' +
+        '<button class="del" data-ddel="' + i + '" title="Remove" type="button">×</button>' +
+      '</div>';
+    }).join("");
+    $("debts").innerHTML = html;
+    renderDebtResult();
+  }
+  function renderDebtResult() {
+    var el = $("debt-res");
+    var live = (state.debts || []).map(toDebt).filter(function (d) { return Number(d.balance) > 0; });
+    if (!live.length) {
+      el.className = "debt-res";
+      el.innerHTML = '<div class="foot" style="margin:0">Add a debt to model a payoff plan. Avalanche minimizes interest; snowball clears small balances first for momentum.</div>';
+      return;
+    }
+    var cmp = E.compareDebtStrategies(live, Number(state.debtExtra));
+    var chosen = state.debtStrategy === "snowball" ? cmp.snowball : cmp.avalanche;
+    if (chosen.infeasible) {
+      el.className = "debt-res infeasible";
+      el.innerHTML = '<div class="warn">⚠ Your minimum payments don\'t cover the monthly interest — the balance never falls. Increase the minimums or add extra.</div>';
+      return;
+    }
+    var cmpLine;
+    if (cmp.interestSaved == null) cmpLine = "";
+    else if (cmp.interestSaved <= 0.5 && Math.abs(cmp.monthsSaved) < 1) cmpLine = live.length > 1 ? "Avalanche and snowball give the same plan for these debts." : "One debt — avalanche and snowball are identical.";
+    else cmpLine = "Avalanche saves <span class=\"blurme\">" + fmtV(cmp.interestSaved) + "</span> interest" + (cmp.monthsSaved > 0 ? " and " + cmp.monthsSaved + " month" + (cmp.monthsSaved === 1 ? "" : "s") : "") + " vs snowball.";
+    el.className = "debt-res";
+    el.innerHTML =
+      '<div>Debt-free in <span class="big">' + monthsWord(chosen.months) + '</span></div>' +
+      '<div class="cmp">Total interest paid: <span class="strong blurme" style="color:var(--text);font-weight:600">' + fmtV(chosen.totalInterest) + '</span> · order: ' + esc(chosen.order.join(" → ")) + '</div>' +
+      (cmpLine ? '<div class="cmp">' + cmpLine + '</div>' : "") +
+      '<div class="payoff">' + payoffSVG(chosen.schedule) + '</div>';
+  }
+  function payoffSVG(schedule) {
+    if (!schedule || schedule.length < 2) return "";
+    var W = 320, H = 84, pad = 4;
+    var n = schedule.length, max = schedule[0].totalBalance || 1;
+    var pts = schedule.map(function (p, i) {
+      var x = pad + (W - 2 * pad) * (i / (n - 1));
+      var y = pad + (H - 2 * pad) * (1 - (p.totalBalance / max));
+      return [x, y];
+    });
+    var line = pts.map(function (p, i) { return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+    var area = line + " L" + pts[n - 1][0].toFixed(1) + " " + (H - pad) + " L" + pts[0][0].toFixed(1) + " " + (H - pad) + " Z";
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" height="' + H + '" preserveAspectRatio="none" role="img" aria-label="Debt balance falling to zero over time">' +
+      '<path d="' + area + '" fill="color-mix(in srgb, var(--ok) 15%, transparent)"></path>' +
+      '<path d="' + line + '" fill="none" stroke="var(--ok)" stroke-width="2" stroke-linejoin="round"></path></svg>';
+  }
+
+  // ── Donut ─────────────────────────────────────────────────────────────────────────────────────
+  function donutSVG(slices) {
+    var total = slices.reduce(function (s, x) { return s + x.amount; }, 0);
+    var r = 54, C = 2 * Math.PI * r, off = 0, sw = 20;
+    var segs;
+    if (total > 0) {
+      segs = slices.map(function (sl) {
+        var len = (sl.amount / total) * C;
+        var seg = '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="' + sl.color + '" stroke-width="' + sw + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"></circle>';
+        off += len; return seg;
+      }).join("");
+    } else {
+      segs = '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="' + sw + '"></circle>';
+    }
+    return '<svg viewBox="0 0 140 140" width="132" height="132" role="img" aria-label="Spending breakdown">' + segs +
+      '<text x="70" y="66" text-anchor="middle" font-size="10" fill="var(--muted)">total</text>' +
+      '<text x="70" y="85" text-anchor="middle" font-size="15" font-weight="700" fill="var(--text)">' + esc(fmtV(total)) + '</text></svg>';
+  }
+
   function renderSummary() {
     var totals = catTotals();
-    var a = E.analyze({ income: Number(state.income), categories: totals, emergencySavings: Number(state.emergency) });
+    var a = E.analyze({ income: Number(state.income), grossIncome: Number(state.gross), categories: totals, emergencySavings: Number(state.emergency) });
 
-    if (Number(state.income) > 0) {
+    // Left-to-allocate hero (zero-based: give every dollar a job).
+    var hero = $("hero"), heroN = $("hero-n"), heroSub = $("hero-sub");
+    if (a.income > 0) {
+      var u = a.unallocated;
+      if (Math.abs(u) < 1) { hero.className = "card hero ok"; heroN.textContent = fmtV(0); heroSub.textContent = "every dollar is assigned — zero-based ✓"; }
+      else if (u > 0) { hero.className = "card hero warn"; heroN.textContent = fmtV(u); heroSub.textContent = "unassigned — send it to savings or a goal"; }
+      else { hero.className = "card hero bad"; heroN.textContent = "−" + fmtV(-u); heroSub.textContent = "over-allocated — you're assigning more than you earn"; }
+    } else { hero.className = "card hero"; heroN.textContent = "—"; heroSub.textContent = "give every dollar a job"; }
+
+    if (a.income > 0) {
       $("rate").textContent = Math.round(a.savingsRate * 100) + "%";
       $("band").textContent = a.band.label;
       $("band").className = "band " + a.band.key;
     } else {
       $("rate").textContent = "—"; $("band").textContent = "enter your income"; $("band").className = "band";
     }
-    $("k-income").textContent = fmt(a.income);
-    $("k-spend").textContent = fmt(a.spend);
-    $("k-surplus").textContent = fmt(a.surplus);
+    $("k-income").textContent = fmtV(a.income);
+    $("k-spend").textContent = fmtV(a.spend);
+    $("k-surplus").textContent = fmtV(a.surplus);
 
-    // 50/30/20 bars
+    // Donut + legend from the category breakdown (slices sum to income).
+    var slices = a.categoryBreakdown.map(function (s, i) {
+      var color = s.id === "unallocated" ? "var(--muted)" : s.id === "savings" ? "var(--ok)" : PALETTE[i % PALETTE.length];
+      return { label: s.label, amount: s.amount, pct: s.pct, color: color };
+    });
+    $("donut").innerHTML = donutSVG(slices);
+    $("legend").innerHTML = slices.length
+      ? slices.map(function (s) {
+          return '<li><span class="sw" style="background:' + s.color + '"></span><span class="lg-lab">' + esc(s.label) + '</span><span class="lg-val">' + fmtV(s.amount) + ' · ' + Math.round(s.pct * 100) + '%</span></li>';
+        }).join("")
+      : '<li class="lg-val" style="list-style:none">Enter expenses to see where your money goes.</li>';
+
+    // 50/30/20 bars with target-dollar notes.
     var bars = [["needs", "Needs", 0.50], ["wants", "Wants", 0.30], ["savings", "Savings", 0.20]];
     $("bars").innerHTML = bars.map(function (b) {
-      var s = a.split[b[0]]; var p = Math.max(0, s.pct); var over = (b[0] !== "savings" && p > b[2]) || (b[0] === "savings" && a.income > 0 && p < b[2]);
+      var leg = a.split[b[0]]; var p = Math.max(0, leg.pct);
+      var isSavings = b[0] === "savings";
+      var over = (!isSavings && p > b[2]) || (isSavings && a.income > 0 && p < b[2]);
       var wPct = Math.min(100, p * 100);
+      var note = "";
+      if (a.income > 0) {
+        var absd = fmtV(Math.abs(leg.delta));
+        if (isSavings) {
+          note = leg.delta >= 0
+            ? '<div class="note under">' + fmtV(leg.amount) + ' saved · target ≥ ' + fmtV(leg.targetAmount) + ' (+' + absd + ' ahead)</div>'
+            : '<div class="note over">' + fmtV(leg.amount) + ' saved · target ≥ ' + fmtV(leg.targetAmount) + ' (' + absd + ' short)</div>';
+        } else {
+          note = leg.delta <= 0
+            ? '<div class="note under">' + fmtV(leg.amount) + ' · target ≤ ' + fmtV(leg.targetAmount) + ' (' + absd + ' under)</div>'
+            : '<div class="note over">' + fmtV(leg.amount) + ' · target ≤ ' + fmtV(leg.targetAmount) + ' (+' + absd + ' over)</div>';
+        }
+      }
       return '<div class="bar-row"><div class="top"><span>' + b[1] + '</span><span class="r">' + Math.round(p * 100) + '% <span style="opacity:.6">/ ' + Math.round(b[2] * 100) + '%</span></span></div>' +
-        '<div class="track"><div class="fill ' + b[0] + '" style="width:' + wPct + '%' + (over ? ';filter:saturate(1.4)' : '') + '"></div><div class="tgt" style="left:' + (b[2] * 100) + '%"></div></div></div>';
+        '<div class="track"><div class="fill ' + b[0] + '" style="width:' + wPct + '%' + (over ? ';filter:saturate(1.4)' : '') + '"></div><div class="tgt" style="left:' + (b[2] * 100) + '%"></div></div>' +
+        '<div class="blurme">' + note + '</div></div>';
     }).join("");
 
     // Recommendations
@@ -234,7 +506,6 @@
       var src = ""; var flag = a.flags.find(function (f) { return f.category === r.category && f.benchmark; });
       if (flag) src = ' <a href="' + esc(flag.benchmark) + '" target="_blank" rel="noopener">source</a>';
       var title = r.category === "savings" || r.category === "income" ? "" : '<div class="t">' + esc((E.CATEGORY_BY_ID[r.category] || { label: r.category }).label) + src + '</div>';
-      // For a trim card the ideas list already leads with r.text — show the list, not a duplicate line.
       var textLine = r.ideas ? "" : '<div>' + esc(r.text) + '</div>';
       return '<div class="rec' + (i === 0 ? " head" : "") + '">' + title + textLine + ideas + '</div>';
     }).join("");
@@ -250,10 +521,24 @@
   }
 
   function recompute() { renderSummary(); save(); }
-  function fullRender() { renderCats(); $("income").value = state.income; $("emergency").value = state.emergency; renderSummary(); }
+  function fullRender() {
+    renderCats(); renderFunds(); renderDebts();
+    $("income").value = state.income; $("gross").value = state.gross; $("emergency").value = state.emergency;
+    $("debt-extra").value = state.debtExtra;
+    applyView(); applyBlur();
+    renderSummary();
+  }
+  function applyView() {
+    Array.prototype.forEach.call($("view-seg").children, function (btn) { btn.classList.toggle("active", btn.getAttribute("data-view") === state.view); });
+  }
+  function applyBlur() {
+    document.querySelector("main").classList.toggle("priv", !!state.blur);
+    var b = $("hide-amt"); b.setAttribute("aria-pressed", state.blur ? "true" : "false"); b.textContent = state.blur ? "Show amounts" : "Hide amounts";
+  }
 
   // ── Events (delegated) ──────────────────────────────────────────────────────────────────────
   $("income").addEventListener("input", function (e) { state.income = e.target.value; recompute(); });
+  $("gross").addEventListener("input", function (e) { state.gross = e.target.value; recompute(); });
   $("emergency").addEventListener("input", function (e) { state.emergency = e.target.value; recompute(); });
 
   $("cats").addEventListener("input", function (e) {
@@ -261,7 +546,6 @@
     var i = +t.getAttribute("data-i"); var f = t.getAttribute("data-f");
     if (!state.items[cat] || !state.items[cat][i]) return;
     state.items[cat][i][f] = t.value;
-    // update just this category's total live, then the summary
     var totals = catTotals(); var totEl = document.querySelector('[data-tot="' + cat + '"]'); if (totEl) totEl.textContent = fmt(totals[cat]);
     recompute();
   });
@@ -271,15 +555,51 @@
     var add = t.getAttribute("data-add");
     var del = t.classList.contains("del") ? t : null;
     var toggle = t.closest ? t.closest(".cat-head") : null;
-    if (add) { state.items[add].push({ name: "", amount: "" }); renderCats(); recompute(); return; }
-    if (del) { var c = del.getAttribute("data-cat"); var i = +del.getAttribute("data-i"); state.items[c].splice(i, 1); renderCats(); recompute(); return; }
+    if (add) { state.items[add].push({ name: "", amount: "" }); renderCats(); applyBlur(); recompute(); return; }
+    if (del) { var c = del.getAttribute("data-cat"); var i = +del.getAttribute("data-i"); state.items[c].splice(i, 1); renderCats(); applyBlur(); recompute(); return; }
     if (toggle) { var cid = toggle.getAttribute("data-toggle"); state.collapsed[cid] = !state.collapsed[cid]; document.querySelector('.cat[data-cat="' + cid + '"]').classList.toggle("collapsed"); save(); return; }
   });
+
+  // Funds
+  $("funds").addEventListener("input", function (e) {
+    var t = e.target; var i = t.getAttribute("data-fi"); if (i == null) return;
+    var f = t.getAttribute("data-ff"); state.funds[+i][f] = t.value; renderFunds(); applyBlur(); save();
+  });
+  $("funds").addEventListener("click", function (e) {
+    var d = e.target.getAttribute("data-fdel"); if (d == null) return;
+    state.funds.splice(+d, 1); renderFunds(); applyBlur(); save();
+  });
+  $("add-fund").addEventListener("click", function () { state.funds.push({ name: "", target: "", saved: "", dueMonth: "" }); renderFunds(); applyBlur(); save(); });
+
+  // Debts
+  $("debts").addEventListener("input", function (e) {
+    var t = e.target; var i = t.getAttribute("data-di"); if (i == null) return;
+    var f = t.getAttribute("data-df"); state.debts[+i][f] = t.value; renderDebtResult(); save();
+  });
+  $("debts").addEventListener("click", function (e) {
+    var d = e.target.getAttribute("data-ddel"); if (d == null) return;
+    state.debts.splice(+d, 1); renderDebts(); applyBlur(); save();
+  });
+  $("add-debt").addEventListener("click", function () { state.debts.push({ name: "", balance: "", apr: "", min: "" }); renderDebts(); applyBlur(); save(); });
+  $("debt-extra").addEventListener("input", function (e) { state.debtExtra = e.target.value; renderDebtResult(); save(); });
+  $("strategy-seg").addEventListener("click", function (e) {
+    var s = e.target.getAttribute("data-strategy"); if (!s) return;
+    state.debtStrategy = s;
+    Array.prototype.forEach.call($("strategy-seg").children, function (btn) { btn.classList.toggle("active", btn.getAttribute("data-strategy") === s); });
+    renderDebtResult(); save();
+  });
+
+  // View toggle + privacy blur
+  $("view-seg").addEventListener("click", function (e) {
+    var v = e.target.getAttribute("data-view"); if (!v || v === state.view) return;
+    state.view = v; applyView(); renderFunds(); renderDebtResult(); renderSummary(); save();
+  });
+  $("hide-amt").addEventListener("click", function () { state.blur = !state.blur; applyBlur(); save(); });
 
   $("collapse-all").addEventListener("click", function () {
     var anyOpen = E.CATEGORIES.some(function (c) { return !state.collapsed[c.id]; });
     E.CATEGORIES.forEach(function (c) { state.collapsed[c.id] = anyOpen; });
-    renderCats(); save();
+    renderCats(); applyBlur(); save();
     $("collapse-all").textContent = anyOpen ? "Expand all" : "Collapse all";
   });
 

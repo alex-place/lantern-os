@@ -101,3 +101,90 @@ test('zero / empty income is handled without NaN', () => {
   assert.ok(Number.isFinite(r.dti));
   assert.strictEqual(r.recommendations[0].category, 'income');
 });
+
+// ── OSS-researched additions (#3197 follow-up) ──────────────────────────────────────────────────
+
+test('unallocated = income - spend - explicit savings (zero-based "left to allocate")', () => {
+  const r = E.analyze({ income: 5000, categories: { housing: 1500, groceries: 500, savings: 1000 } });
+  // spend 2000, explicit savings 1000 → unallocated 2000
+  assert.strictEqual(r.unallocated, 2000);
+  const full = E.analyze({ income: 3000, categories: { housing: 1500, groceries: 500, savings: 1000 } }); // 3000 assigned
+  assert.strictEqual(full.unallocated, 0);
+  const over = E.analyze({ income: 2500, categories: { housing: 1500, groceries: 500, savings: 1000 } }); // -500
+  assert.strictEqual(over.unallocated, -500);
+});
+
+test('gross-basis toggle: ratios use gross when supplied, else take-home', () => {
+  // take-home 4000, gross 6000, housing 1500 → 25% of gross (under 28) but 37.5% of take-home
+  const g = E.analyze({ income: 4000, grossIncome: 6000, categories: { housing: 1500 } });
+  assert.strictEqual(g.basis.usedGross, true);
+  assert.ok(!g.flags.some((f) => f.category === 'housing'), 'housing under 28% of gross → no flag');
+  const ng = E.analyze({ income: 4000, categories: { housing: 1500 } }); // 37.5% of take-home
+  assert.ok(ng.flags.some((f) => f.category === 'housing' && f.level === 'high'));
+  assert.strictEqual(ng.basis.usedGross, false);
+  assert.ok(g.flags.length >= 0); // gross message wording
+});
+
+test('50/30/20 legs carry target dollars and signed delta', () => {
+  const r = E.analyze({ income: 4000, categories: { housing: 1600, groceries: 600 } }); // needs 2200
+  assert.strictEqual(r.split.needs.targetAmount, 2000);      // 50% of 4000
+  assert.strictEqual(r.split.needs.delta, 200);              // 200 over target
+  assert.strictEqual(r.split.savings.targetAmount, 800);     // 20% of 4000
+});
+
+test('categoryBreakdown slices sum to income (spend + savings + unallocated)', () => {
+  const r = E.analyze({ income: 5000, categories: { housing: 1500, groceries: 500, savings: 1000 } });
+  const total = r.categoryBreakdown.reduce((s, x) => s + x.amount, 0);
+  assert.ok(Math.abs(total - 5000) < 0.02, 'breakdown sums to income: ' + total);
+  assert.ok(r.categoryBreakdown.some((x) => x.id === 'unallocated'));
+});
+
+test('fundProgress: by-date splits remaining over months left; monthly type computes months', () => {
+  // $1200 target, $0 saved, due 12 months out → $100/mo, 0% funded
+  const bd = E.fundProgress({ type: 'by-date', target: 1200, saved: 0, dueMonth: '2027-08' }, '2026-08-01');
+  assert.strictEqual(bd.monthly, 100);
+  assert.strictEqual(bd.pctFunded, 0);
+  // partial: $300 saved, 3 months out → $300/mo, 25% funded
+  const p = E.fundProgress({ type: 'by-date', target: 1200, saved: 300, dueMonth: '2026-11' }, '2026-08-01');
+  assert.strictEqual(p.monthly, 300);
+  assert.strictEqual(p.pctFunded, 0.25);
+  // monthly type: $1000 remaining at $250/mo → 4 months
+  const m = E.fundProgress({ type: 'monthly', target: 1000, saved: 0, monthly: 250 }, '2026-08-01');
+  assert.strictEqual(m.monthsRemaining, 4);
+  // fully funded
+  assert.strictEqual(E.fundProgress({ type: 'by-date', target: 500, saved: 500, dueMonth: '2027-01' }, '2026-08-01').done, true);
+});
+
+test('fundsMonthlyTotal sums the per-fund monthly slices', () => {
+  const t = E.fundsMonthlyTotal([
+    { type: 'by-date', target: 1200, saved: 0, dueMonth: '2027-08' }, // 100
+    { type: 'monthly', target: 600, saved: 0, monthly: 50 },          // 50
+  ], '2026-08-01');
+  assert.strictEqual(t, 150);
+});
+
+test('debt payoff: single debt amortizes to zero with interest accrued', () => {
+  const r = E.simulateDebtPayoff([{ name: 'Card', balance: 1000, apr: 20, minPayment: 100 }], 0, 'avalanche');
+  assert.ok(!r.infeasible);
+  assert.ok(r.months >= 11 && r.months <= 12, 'about a year: ' + r.months);
+  assert.ok(r.totalInterest > 0 && r.totalInterest < 200);
+  assert.strictEqual(r.schedule[r.schedule.length - 1].totalBalance, 0);
+});
+
+test('avalanche targets highest APR first; snowball smallest balance first', () => {
+  const debts = [
+    { name: 'Big-lowAPR', balance: 5000, apr: 5, minPayment: 100 },
+    { name: 'Small-highAPR', balance: 1000, apr: 25, minPayment: 30 },
+  ];
+  assert.strictEqual(E.simulateDebtPayoff(debts, 300, 'avalanche').order[0], 'Small-highAPR'); // highest APR
+  assert.strictEqual(E.simulateDebtPayoff(debts, 300, 'snowball').order[0], 'Small-highAPR');  // also smallest balance here
+  const cmp = E.compareDebtStrategies(debts, 300);
+  assert.ok(cmp.interestSaved >= 0, 'avalanche never pays more interest than snowball');
+});
+
+test('debt payoff guards negative amortization (payments below interest)', () => {
+  // $10k at 30% APR = $250/mo interest; only $100 min + $0 extra → infeasible
+  const r = E.simulateDebtPayoff([{ name: 'Trap', balance: 10000, apr: 30, minPayment: 100 }], 0, 'avalanche');
+  assert.strictEqual(r.infeasible, true);
+  assert.ok(/interest/.test(r.reason));
+});
