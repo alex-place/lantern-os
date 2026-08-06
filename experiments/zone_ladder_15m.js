@@ -187,7 +187,8 @@ function summarize(trades) {
 
 (async () => {
   const args = process.argv.slice(2);
-  const syms = (args.indexOf('--symbols') >= 0 ? args[args.indexOf('--symbols') + 1] : 'SPY,QQQ').split(',');
+  // Default = the MEANREV set (TLT excluded 2026-08-06 — worst on both timeframes).
+  const syms = (args.indexOf('--symbols') >= 0 ? args[args.indexOf('--symbols') + 1] : 'SPY,QQQ,GLD,SMH').split(',');
   for (const sym of syms) {
     const data = await yahoo.getBars(sym.trim(), '15m');
     const dailyBars = (((await yahoo.getBars(sym.trim(), '1d').catch(() => null)) || {}).bars) || [];

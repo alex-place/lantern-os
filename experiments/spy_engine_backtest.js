@@ -204,7 +204,14 @@ async function main() {
     // trend regime filter (all three of which are built on inverted inputs).
     // Exits, stops, sizing and the zone ladder are UNCHANGED — the audit says
     // the edge lives there, so this only replaces entry selection.
-    const _meanRev = process.env.BT_MEANREV === "1";
+    // MEANREV SET (operator decision 2026-08-06): SPY, QQQ, GLD, SMH — TLT is
+    // EXCLUDED. Both timeframes independently rank it worst: daily 26y avg
+    // 0.207R / PF 1.48 (half the others), 15m 29% WR with 15/21 stopped buying
+    // dips inside a multi-week decline. The gate alternatives were measured and
+    // rejected (knife gate halves TLT's bleed but kills QQQ's win; SMA20
+    // over-filters) — removing the instrument beats handicapping the method.
+    const MEANREV_SET = new Set(String(process.env.BT_MEANREV_SET || "SPY,QQQ,GLD,SMH").split(",").map((x) => x.trim().toUpperCase()));
+    const _meanRev = process.env.BT_MEANREV === "1" && MEANREV_SET.has(SYM);
     let direction = scan.deriveDirection(sr, rsiVal, thresholds, { closes });
     // BT_MEANREV_SHORT (operator ask 2026-08-06): the short mirror — enter SHORT
     // on RSI overbought. Audit prior: overbought was NOISE in the BULLISH-read
