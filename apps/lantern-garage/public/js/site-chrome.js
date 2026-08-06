@@ -23,6 +23,7 @@
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
+    { href: "/budget.html", label: "Budget" },
     { href: "/work.html", label: "Work" },
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
     // fronted duplicates the Trader surface, and its only unique job was the

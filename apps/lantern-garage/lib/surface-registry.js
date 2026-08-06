@@ -58,6 +58,10 @@ const EXTENSION = {
   // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
+  // Personal budgeting tool (#budget-tool) — client-side only (localStorage), no server store.
+  // An EXTENSION beside the loop: it serves none of the six stages, so it honestly names a module
+  // + flag rather than claiming a loop stage.
+  "budget.html":                   ["budget", "BUDGET_ENABLED"],
   "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
@@ -122,7 +126,14 @@ const SUBSYSTEMS = {
 // unreachable core pages were removed. Raising the cap records that as a
 // deliberate re-baseline rather than letting a cleanup read as sprawl. Tighten it
 // again if core surfaces are added back.
-const MAX_EXTENSION_RATIO = 1.45;
+//
+// 2026-08-06: raised 1.45 → 1.50 to admit the client-side budgeting tool
+// (budget.html), a genuinely NEW optional capability (not a cleanup artifact) →
+// 12 core : 18 extension = 1.50. This is a real, deliberate acceptance of one more
+// unit of sprawl for an owner-requested feature — the guardrail is doing its job by
+// forcing this to be an explicit, reviewed one-line change. The NEXT extension must
+// again either add a loop-serving core surface or justify another bump.
+const MAX_EXTENSION_RATIO = 1.50;
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always

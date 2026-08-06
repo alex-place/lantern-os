@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#06b6d4">
+  <script>
+    (function () { try { var s = localStorage.getItem('lantern-theme'); var d = window.matchMedia('(prefers-color-scheme: dark)').matches; document.documentElement.setAttribute('data-theme', (s ? s === 'dark' : d) ? 'dark' : 'light'); } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); } })();
+  </script>
+  <link rel="stylesheet" href="/css/site.css">
+  <title>Budget & Savings — Unisona</title>
+  <style>
+    :root { --head-font: "Century Gothic", "Franklin Gothic Heavy", "Arial Rounded MT Bold", "Segoe UI Black", "Segoe UI", system-ui, sans-serif; }
+    .budget-shell { max-width: 1120px; margin: 0 auto; padding: 22px 16px 72px; display: grid; grid-template-columns: 1fr 360px; gap: 26px; align-items: start; }
+    .b-head h1 { font-family: var(--head-font); font-size: 26px; font-weight: 700; letter-spacing: -.01em; margin: 2px 0 4px; }
+    .b-head p { color: var(--muted); font-size: 14px; margin: 0 0 18px; max-width: 60ch; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 16px 14px; margin-bottom: 16px; }
+    .card > h2 { font-family: var(--head-font); font-size: 15px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 700; margin: 0 0 12px; }
+    .row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .row label { flex: 1; font-size: 14px; }
+    .money { position: relative; }
+    .money::before { content: "$"; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; }
+    input.amt, input.inc, input.emg { width: 130px; padding: 8px 8px 8px 20px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; text-align: right; }
+    input.inc, input.emg { width: 160px; }
+    input.name { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+    input:focus { outline: none; border-color: var(--accent); }
+    .cat { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+    .cat-head { display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer; background: color-mix(in srgb, var(--surface) 60%, transparent); }
+    .cat-head .nm { font-weight: 600; font-size: 14.5px; flex: 1; }
+    .cat-head .tot { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13.5px; }
+    .cat-head .chev { transition: transform .18s; color: var(--muted); }
+    .cat.collapsed .cat-head .chev { transform: rotate(-90deg); }
+    .cat.collapsed .cat-body { display: none; }
+    .cat-body { padding: 10px 14px 12px; }
+    .li { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .li .del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+    .li .del:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+    .add-li { border: 1px dashed var(--border); background: none; color: var(--muted); border-radius: 8px; padding: 7px 12px; font-size: 13px; cursor: pointer; margin-top: 3px; }
+    .add-li:hover { border-color: var(--accent); color: var(--accent); }
+    .over { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 45%, transparent); }
+    .over .cat-head .tot { color: var(--danger); font-weight: 600; }
+
+    .summary { position: sticky; top: 16px; }
+    .rate-big { text-align: center; padding: 20px 12px 14px; }
+    .rate-big .n { font-family: var(--head-font); font-size: 52px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+    .rate-big .lab { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .07em; margin-top: 6px; }
+    .band { display: inline-block; margin-top: 10px; padding: 4px 12px; border-radius: 999px; font-size: 12.5px; font-weight: 600; }
+    .band.poor { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+    .band.fair { background: color-mix(in srgb, var(--gold) 22%, transparent); color: var(--gold); }
+    .band.good { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+    .band.excellent { background: color-mix(in srgb, #22c55e 22%, transparent); color: #22c55e; }
+    .kpis { display: flex; justify-content: space-around; text-align: center; border-top: 1px solid var(--border); padding-top: 12px; margin-top: 4px; }
+    .kpis .k .v { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 15px; }
+    .kpis .k .l { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+    .bars .bar-row { margin: 9px 0; }
+    .bars .bar-row .top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 4px; }
+    .bars .bar-row .top .r { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .track { height: 8px; border-radius: 5px; background: var(--border); position: relative; overflow: hidden; }
+    .track .fill { height: 100%; border-radius: 5px; }
+    .track .fill.needs { background: var(--accent); } .track .fill.wants { background: var(--gold); } .track .fill.savings { background: #22c55e; }
+    .track .tgt { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .55; }
+    .recs .rec { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 9px; font-size: 13.5px; }
+    .recs .rec.head { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+    .recs .rec .t { font-weight: 600; margin-bottom: 4px; }
+    .recs .rec ul { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+    .recs .rec ul li { margin: 3px 0; }
+    .recs .rec a { color: var(--accent); font-size: 12px; text-decoration: none; }
+    .foot { color: var(--muted); font-size: 12px; margin-top: 10px; line-height: 1.5; }
+    .toolbar { display: flex; gap: 8px; margin-bottom: 14px; }
+    .btn { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 8px; padding: 8px 13px; font-size: 13px; cursor: pointer; }
+    .btn:hover { border-color: var(--accent); }
+    @media (max-width: 860px) { .budget-shell { grid-template-columns: 1fr; } .summary { position: static; } }
+  </style>
+</head>
+
+<main class="budget-shell">
+  <div class="left">
+    <div class="b-head">
+      <h1>💰 Budget &amp; Savings</h1>
+      <p>Enter your monthly income and expenses to see your savings rate against studied benchmarks, a 50/30/20 breakdown, and where to trim. Everything is computed locally in your browser from cited rules — no numbers are guessed, nothing is sent to a server.</p>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn" id="collapse-all" type="button">Collapse all</button>
+      <button class="btn" id="reset" type="button">Reset</button>
+    </div>
+
+    <div class="card">
+      <h2>Income</h2>
+      <div class="row">
+        <label for="income">Monthly take-home income <span style="color:var(--muted)">(after tax)</span></label>
+        <span class="money"><input class="inc" id="income" type="number" inputmode="decimal" min="0" step="50" placeholder="0"></span>
+      </div>
+      <div class="row">
+        <label for="emergency">Current emergency savings <span style="color:var(--muted)">(optional — for months-covered)</span></label>
+        <span class="money"><input class="emg" id="emergency" type="number" inputmode="decimal" min="0" step="100" placeholder="0"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Monthly expenses</h2>
+      <div id="cats"></div>
+    </div>
+  </div>
+
+  <aside class="left summary">
+    <div class="card">
+      <div class="rate-big">
+        <div class="n" id="rate">—</div>
+        <div class="lab">savings rate</div>
+        <div><span class="band" id="band">enter your income</span></div>
+      </div>
+      <div class="kpis">
+        <div class="k"><div class="v" id="k-income">—</div><div class="l">Income</div></div>
+        <div class="k"><div class="v" id="k-spend">—</div><div class="l">Spending</div></div>
+        <div class="k"><div class="v" id="k-surplus">—</div><div class="l">Saved / mo</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>50 / 30 / 20 split</h2>
+      <div class="bars" id="bars"></div>
+      <div class="foot">The mark on each bar is the target: needs ≤50%, wants ≤30%, savings ≥20% of take-home. <a href="https://www.transamerica.com/knowledge-place/50-30-20-budget-rule" target="_blank" rel="noopener" style="color:var(--accent)">source</a></div>
+    </div>
+
+    <div class="card">
+      <h2>Recommendations</h2>
+      <div class="recs" id="recs"><div class="foot">Fill in your income and expenses to get recommendations.</div></div>
+    </div>
+
+    <div class="foot">Housing / transport / debt-to-income benchmarks are conventionally measured against <em>gross</em> (pre-tax) income; computed here against take-home, so those percentages read a little high. Your data stays in this browser (<code>localStorage</code>).</div>
+  </aside>
+</main>
+
+<script src="/js/budget-engine.js"></script>
+<script>
+(function () {
+  "use strict";
+  var E = window.BudgetEngine;
+  var KEY = "lantern.budget.v1";
+  var fmt = E.fmtMoney;
+
+  // Default line items per category — a helpful starting structure, all amounts blank.
+  var SEED = {
+    housing: ["Rent / Mortgage", "Property tax", "Home / Renters insurance"],
+    utilities: ["Electricity", "Water / Gas", "Internet", "Phone"],
+    transportation: ["Car payment", "Fuel", "Auto insurance", "Transit / Parking"],
+    groceries: ["Groceries"],
+    insurance: ["Health insurance"],
+    debt: ["Credit cards", "Student loans"],
+    dining: ["Restaurants & takeout"],
+    subscriptions: ["Streaming", "Gym", "Software"],
+    personal: ["Shopping", "Entertainment"],
+    other: ["Other"],
+    savings: ["401(k) / IRA", "Brokerage"],
+  };
+
+  function freshState() {
+    var items = {};
+    E.CATEGORIES.forEach(function (c) { items[c.id] = (SEED[c.id] || ["Item"]).map(function (n) { return { name: n, amount: "" }; }); });
+    return { income: "", emergency: "", items: items, collapsed: {} };
+  }
+  var state = (function () {
+    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && s.items) return s; } catch (e) {}
+    return freshState();
+  })();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); };
+
+  function catTotals() {
+    var t = {};
+    E.CATEGORIES.forEach(function (c) {
+      t[c.id] = (state.items[c.id] || []).reduce(function (s, li) { var n = Number(li.amount); return s + (isFinite(n) && n > 0 ? n : 0); }, 0);
+    });
+    return t;
+  }
+
+  function renderCats() {
+    var totals = catTotals();
+    var html = E.CATEGORIES.map(function (c) {
+      var items = state.items[c.id] || [];
+      var collapsed = !!state.collapsed[c.id];
+      var lis = items.map(function (li, i) {
+        return '<div class="li">' +
+          '<input class="name" data-cat="' + c.id + '" data-i="' + i + '" data-f="name" value="' + esc(li.name) + '" placeholder="Item name">' +
+          '<span class="money"><input class="amt" data-cat="' + c.id + '" data-i="' + i + '" data-f="amount" type="number" inputmode="decimal" min="0" step="10" value="' + esc(li.amount) + '" placeholder="0"></span>' +
+          '<button class="del" data-cat="' + c.id + '" data-i="' + i + '" title="Remove" type="button">×</button>' +
+        '</div>';
+      }).join("");
+      return '<div class="cat' + (collapsed ? " collapsed" : "") + '" data-cat="' + c.id + '">' +
+        '<div class="cat-head" data-toggle="' + c.id + '">' +
+          '<span class="chev">▾</span>' +
+          '<span class="nm">' + esc(c.label) + '</span>' +
+          '<span class="tot" data-tot="' + c.id + '">' + fmt(totals[c.id]) + '</span>' +
+        '</div>' +
+        '<div class="cat-body">' + lis +
+          '<button class="add-li" data-add="' + c.id + '" type="button">+ Add line item</button>' +
+        '</div>' +
+      '</div>';
+    }).join("");
+    $("cats").innerHTML = html;
+  }
+
+  function renderSummary() {
+    var totals = catTotals();
+    var a = E.analyze({ income: Number(state.income), categories: totals, emergencySavings: Number(state.emergency) });
+
+    if (Number(state.income) > 0) {
+      $("rate").textContent = Math.round(a.savingsRate * 100) + "%";
+      $("band").textContent = a.band.label;
+      $("band").className = "band " + a.band.key;
+    } else {
+      $("rate").textContent = "—"; $("band").textContent = "enter your income"; $("band").className = "band";
+    }
+    $("k-income").textContent = fmt(a.income);
+    $("k-spend").textContent = fmt(a.spend);
+    $("k-surplus").textContent = fmt(a.surplus);
+
+    // 50/30/20 bars
+    var bars = [["needs", "Needs", 0.50], ["wants", "Wants", 0.30], ["savings", "Savings", 0.20]];
+    $("bars").innerHTML = bars.map(function (b) {
+      var s = a.split[b[0]]; var p = Math.max(0, s.pct); var over = (b[0] !== "savings" && p > b[2]) || (b[0] === "savings" && a.income > 0 && p < b[2]);
+      var wPct = Math.min(100, p * 100);
+      return '<div class="bar-row"><div class="top"><span>' + b[1] + '</span><span class="r">' + Math.round(p * 100) + '% <span style="opacity:.6">/ ' + Math.round(b[2] * 100) + '%</span></span></div>' +
+        '<div class="track"><div class="fill ' + b[0] + '" style="width:' + wPct + '%' + (over ? ';filter:saturate(1.4)' : '') + '"></div><div class="tgt" style="left:' + (b[2] * 100) + '%"></div></div></div>';
+    }).join("");
+
+    // Recommendations
+    var recs = a.recommendations.map(function (r, i) {
+      var ideas = r.ideas ? '<ul>' + r.ideas.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join("") + '</ul>' : "";
+      var src = ""; var flag = a.flags.find(function (f) { return f.category === r.category && f.benchmark; });
+      if (flag) src = ' <a href="' + esc(flag.benchmark) + '" target="_blank" rel="noopener">source</a>';
+      var title = r.category === "savings" || r.category === "income" ? "" : '<div class="t">' + esc((E.CATEGORY_BY_ID[r.category] || { label: r.category }).label) + src + '</div>';
+      // For a trim card the ideas list already leads with r.text — show the list, not a duplicate line.
+      var textLine = r.ideas ? "" : '<div>' + esc(r.text) + '</div>';
+      return '<div class="rec' + (i === 0 ? " head" : "") + '">' + title + textLine + ideas + '</div>';
+    }).join("");
+    $("recs").innerHTML = recs || '<div class="foot">Fill in your income and expenses to get recommendations.</div>';
+
+    // Mark over-benchmark category cards
+    var flaggedCats = {};
+    a.flags.forEach(function (f) { if (f.level === "warn" || f.level === "high") flaggedCats[f.category] = true; });
+    E.CATEGORIES.forEach(function (c) {
+      var el = document.querySelector('.cat[data-cat="' + c.id + '"]');
+      if (el) el.classList.toggle("over", !!flaggedCats[c.id]);
+    });
+  }
+
+  function recompute() { renderSummary(); save(); }
+  function fullRender() { renderCats(); $("income").value = state.income; $("emergency").value = state.emergency; renderSummary(); }
+
+  // ── Events (delegated) ──────────────────────────────────────────────────────────────────────
+  $("income").addEventListener("input", function (e) { state.income = e.target.value; recompute(); });
+  $("emergency").addEventListener("input", function (e) { state.emergency = e.target.value; recompute(); });
+
+  $("cats").addEventListener("input", function (e) {
+    var t = e.target; var cat = t.getAttribute("data-cat"); if (cat == null) return;
+    var i = +t.getAttribute("data-i"); var f = t.getAttribute("data-f");
+    if (!state.items[cat] || !state.items[cat][i]) return;
+    state.items[cat][i][f] = t.value;
+    // update just this category's total live, then the summary
+    var totals = catTotals(); var totEl = document.querySelector('[data-tot="' + cat + '"]'); if (totEl) totEl.textContent = fmt(totals[cat]);
+    recompute();
+  });
+
+  $("cats").addEventListener("click", function (e) {
+    var t = e.target;
+    var add = t.getAttribute("data-add");
+    var del = t.classList.contains("del") ? t : null;
+    var toggle = t.closest ? t.closest(".cat-head") : null;
+    if (add) { state.items[add].push({ name: "", amount: "" }); renderCats(); recompute(); return; }
+    if (del) { var c = del.getAttribute("data-cat"); var i = +del.getAttribute("data-i"); state.items[c].splice(i, 1); renderCats(); recompute(); return; }
+    if (toggle) { var cid = toggle.getAttribute("data-toggle"); state.collapsed[cid] = !state.collapsed[cid]; document.querySelector('.cat[data-cat="' + cid + '"]').classList.toggle("collapsed"); save(); return; }
+  });
+
+  $("collapse-all").addEventListener("click", function () {
+    var anyOpen = E.CATEGORIES.some(function (c) { return !state.collapsed[c.id]; });
+    E.CATEGORIES.forEach(function (c) { state.collapsed[c.id] = anyOpen; });
+    renderCats(); save();
+    $("collapse-all").textContent = anyOpen ? "Expand all" : "Collapse all";
+  });
+
+  $("reset").addEventListener("click", function () {
+    if (!confirm("Clear your budget and start over? This only affects this browser.")) return;
+    state = freshState(); save(); fullRender();
+  });
+
+  fullRender();
+})();
+</script>
+<script src="/js/theme-toggle.js"></script>
+<script src="/js/site-chrome.js" defer></script>
+<script src="/js/auth-gate.js" defer></script>
+</html>
