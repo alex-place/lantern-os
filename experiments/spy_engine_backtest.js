@@ -205,7 +205,13 @@ async function main() {
     }
     const trending = marketStatus.market !== "NEUTRAL";
     const gate = scan.rileyGate({ sr, rsiVal, thresholds, struct, candle, direction, trending });
-    if (!gate.actionable) continue;
+    // BT_NO_GATE (2026-08-06): rileyGate measured ANTI-PREDICTIVE. Over 31,293
+    // daily bars it discards ~46% of candidates and the survivors have LOWER
+    // forward returns than the pool it started from — at every horizon tested
+    // (1/5/10/20 bars) and with the trend flag both on and off. See
+    // experiments/entry_edge_test.js. This knob removes it so the strategy can
+    // be measured with and without, rather than assuming the filter helps.
+    if (!gate.actionable && process.env.BT_NO_GATE !== "1") continue;
     signalsSeen++;
 
     const volume_ratio = volumeRatio(win);
