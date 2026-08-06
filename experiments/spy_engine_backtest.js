@@ -188,7 +188,25 @@ async function main() {
     const sr = findSrZones(SYM, price, win);
     const thresholds = adaptiveRsiThresholds(closes);
     const rsiVal = rsi(closes) ?? 50;
-    const direction = scan.deriveDirection(sr, rsiVal, thresholds, { closes });
+    // BT_MEANREV (2026-08-06) — MEAN-REVERSION-FIRST entry.
+    //
+    // signal_audit.js split 26y of daily bars on every component the engine
+    // boosts or filters on. Result: EVERY momentum/confirmation component is
+    // inverted (candle confirms t=-5.3, structureShifted -4.6, rileyGate
+    // -4.1, macd_hist>0 -3.9, price>SMA20 -3.8, zone_strength -3.3), and the
+    // ONLY strongly informative one is RSI OVERSOLD (t=+5.4/+4.6/+4.8 across
+    // horizons and both trend-flag settings).
+    //
+    // These are mean-reverting index ETFs; the Riley stack buys CONFIRMED
+    // STRENGTH, which is the wrong side. So this mode takes the one signal that
+    // measured positive and drops the stack that measured negative: enter long
+    // when RSI is oversold, and skip rileyGate, the convergence verdict and the
+    // trend regime filter (all three of which are built on inverted inputs).
+    // Exits, stops, sizing and the zone ladder are UNCHANGED — the audit says
+    // the edge lives there, so this only replaces entry selection.
+    const _meanRev = process.env.BT_MEANREV === "1";
+    let direction = scan.deriveDirection(sr, rsiVal, thresholds, { closes });
+    if (_meanRev) direction = rsiVal <= thresholds.oversold ? "BULLISH" : "NEUTRAL";
     if (direction === "NEUTRAL") continue;
     const struct = checkMarketStructureShift(win, direction);
     const candle = detectCandlePatterns(win, direction);
@@ -211,7 +229,7 @@ async function main() {
     // (1/5/10/20 bars) and with the trend flag both on and off. See
     // experiments/entry_edge_test.js. This knob removes it so the strategy can
     // be measured with and without, rather than assuming the filter helps.
-    if (!gate.actionable && process.env.BT_NO_GATE !== "1") continue;
+    if (!gate.actionable && process.env.BT_NO_GATE !== "1" && !_meanRev) continue;
     signalsSeen++;
 
     const volume_ratio = volumeRatio(win);
@@ -223,14 +241,16 @@ async function main() {
       news_sentiment: 0, volume_ratio, macd_hist, ma_signal,
       earnings_surprise: null, sector_trend: null,
     });
-    if (!convergence || convergence.decision !== "ENTER") continue;
+    if ((!convergence || convergence.decision !== "ENTER") && !_meanRev) continue;
     enterVerdicts++;
 
     // regime filter (scan.js lines ~275-279, verbatim logic)
     const sma50 = closes.length >= 50 ? closes.slice(-50).reduce((s, x) => s + x, 0) / 50 : null;
     if (direction === "BULLISH") {
+      // price>SMA50 and macd_hist>0 both measured INVERTED (t=-3.8/-3.9), so
+      // mean-reversion mode does not apply this filter.
       const trendOk = (sma50 == null || price > sma50) && macd_hist > 0;
-      if (!trendOk) { regimeBlocked++; continue; }
+      if (!trendOk && !_meanRev) { regimeBlocked++; continue; }
     }
     // --symmetric: apply the SAME regime gate to shorts (candidate fix — prod
     // only filters longs, which let the engine short a rising index for years)
@@ -338,7 +358,7 @@ async function main() {
         Number(process.env.BT_HOLD_CAP) || 15,
         Math.max(1, Math.min(15, Math.round((tr * riskAbs) / ((a || price * 0.005))))) * (Number(process.env.BT_HOLD_MULT) || 1)
       ),
-      p_win: convergence.p_win, conf: gate.confidence, quality: gate.quality,
+      p_win: convergence ? convergence.p_win : null, conf: gate.confidence, quality: gate.quality,
     };
   }
 
