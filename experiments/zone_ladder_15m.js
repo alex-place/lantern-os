@@ -33,7 +33,7 @@ const STOP_MULT = 2.2; // trader_walkforward's shipped lever
 
 function closesOf(bars) { return bars.map((b) => b.close); }
 
-function simulate(sym, bars, exitMode, entryAtrMax) {
+function simulate(sym, bars, exitMode, entryAtrMax, entryMode) {
   const trades = [];
   let pos = null;
   for (let t = WARMUP; t < bars.length - 1; t++) {
@@ -102,15 +102,21 @@ function simulate(sym, bars, exitMode, entryAtrMax) {
     const sr = findSrZones(sym, price, slice);
     const th = adaptiveRsiThresholds(closes);
     const rv = rsi(closes) ?? 50;
-    const dir = deriveDirection(sr, rv, th);
+    // MEAN-REVERSION ENTRY (entryMode='meanrev', 2026-08-06). signal_audit.js
+    // found every momentum/confirmation component INVERTED on daily bars and
+    // RSI-oversold the only informative one (t=+5.4). On daily bars replacing the
+    // stack with it took OOS avg R 0.266 -> 0.581. This is the 15m check of that
+    // claim on the timeframe the trader actually runs.
+    const _mr = entryMode === 'meanrev';
+    const dir = _mr ? (rv <= th.oversold ? 'BULLISH' : 'NEUTRAL') : deriveDirection(sr, rv, th);
     if (dir !== 'BULLISH') continue;
     const struct = checkMarketStructureShift(slice, dir);
     const candle = detectCandlePatterns(slice, dir);
     const gate = rileyGate({ sr, rsiVal: rv, thresholds: th, struct, candle, direction: dir, trending: false });
-    if (!gate.actionable) continue;
+    if (!gate.actionable && !_mr) continue;
     const m = macd(closes);
     const cv = convergenceVerdict({ t: sym, direction: dir, sr, struct, candle, marketStatus: { market: 'NEUTRAL' }, news_sentiment: 0, volume_ratio: volumeRatio(slice), macd_hist: m ? m.histogram : 0, ma_signal: priceVsSma(closes, 20), earnings_surprise: null, sector_trend: null });
-    if (!cv || cv.decision !== 'ENTER') continue;
+    if ((!cv || cv.decision !== 'ENTER') && !_mr) continue;
     if (at.isFallingKnife(closes)) continue;
     const fill = bars[t + 1];
     const a = atr(slice) || price * 0.005;
@@ -167,7 +173,7 @@ function summarize(trades) {
     const bars = (data && data.bars) || [];
     if (bars.length < WARMUP + 10) { console.log(`${sym}: only ${bars.length} 15m bars — skipped`); continue; }
     console.log(`\n=== ${sym} — ${bars.length} x 15m bars (${bars[0].timestamp.slice(0, 10)} -> ${bars[bars.length - 1].timestamp.slice(0, 10)})`);
-    for (const [label, mode, gate] of [
+    for (const [label, mode, gate, entryMode] of [
       ['live        ', 'live', null],
       ['zone        ', 'zone', null],
       ['zone+sup1.0 ', 'zone', 1.0],
@@ -175,8 +181,11 @@ function summarize(trades) {
       ['zone+sup0.25', 'zone', 0.25],
       ['zone+trend  ', 'zone', 'trend'],
       ['live+trend  ', 'live', 'trend'],
-    ]) {
-      const s = summarize(simulate(sym.trim(), bars, mode, gate));
+      ['MR zone     ', 'zone', null, 'meanrev'],
+      ['MR zone+sup ', 'zone', 0.5, 'meanrev'],
+      ['MR live     ', 'live', null, 'meanrev'],
+    ].map((r) => [r[0], r[1], r[2], r[3]])) {
+      const s = summarize(simulate(sym.trim(), bars, mode, gate, entryMode));
       console.log(`  ${label} n=${s.n ?? 0} win=${s.win_pct ?? '-'}% PF=${s.pf ?? '-'} totR=${s.total_R ?? '-'} avgR=${s.avg_R ?? '-'} exits=${JSON.stringify(s.reasons || {})}`);
     }
   }
