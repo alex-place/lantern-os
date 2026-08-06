@@ -362,6 +362,21 @@ async function scanAll(watchlist) {
         sector: secEtf ? { etf: secEtf, trend_pct: sector_trend != null ? r2(sector_trend * 100) : null } : null, // Tier-2
         volume_ratio: r2(volume_ratio),
         atr: r2(a || price * 0.005),   // 15m ATR — the support-entry gate measures zone distance in this unit
+        // ZONES ARRAY (2026-08-06). findSrZones returns a full zone LIST, but the
+        // signal only ever carried the `support`/`resistance` SCALARS, so
+        // auto-trader's `Array.isArray(s.zones) ? s.zones : []` always resolved
+        // to []. Three consumers were silently dead in production:
+        //   1. the support-entry gate skipped EVERY symbol it governs with
+        //      "sup_entry: no support zone below price" — 8 of the 12 tradelist
+        //      names (SPY QQQ GLD SMH TLT SQQQ SOXS SPXS) could never enter;
+        //   2. the zone-ladder exit (#3165) never armed — the live ledger has
+        //      ZERO zone_r1/zone_r2/peak_giveback exits across its whole history,
+        //      every exit falling through to momentum_died/signal_exit;
+        //   3. room tiering and tgtMinR were no-ops (no resistances to measure),
+        //      so every entry was A-tier by default.
+        // Passing the list through is what those features were always written
+        // against.
+        zones: Array.isArray(sr.zones) ? sr.zones : [],
         plan: { stop: r2(stopPx), target1: r2(dirUp ? price + tr * riskAbs : price - tr * riskAbs), target2: r2(dirUp ? price + tr * 1.7 * riskAbs : price - tr * 1.7 * riskAbs), hold_days: holdDays },
         reasons: gate.reason,
       });
