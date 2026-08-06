@@ -50,6 +50,16 @@ function _isUptrend(closes) {
   return px > s20 && s20 > s50;          // price above a rising short MA stack
 }
 
+/**
+ * May a signal be emitted for this gate result? Normally "only if rileyGate
+ * approved"; with RILEY_GATE=0 the gate is computed but no longer vetoes.
+ * Split out so the decision is testable without driving a full network scan.
+ */
+function gateAllows(gate, opts = {}) {
+  if ((opts.rileyGate ?? process.env.RILEY_GATE) === '0') return true;
+  return !!(gate && gate.actionable);
+}
+
 function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
   const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
   const up = trendDir && _isUptrend(opts.closes);
@@ -260,6 +270,16 @@ async function scanAll(watchlist) {
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
     const gate = rileyGate({ sr, rsiVal, thresholds, struct, candle, direction, trending });
+    // RILEY_GATE=0 (opt-in, 2026-08-06): stop using rileyGate as a VETO. It is
+    // still computed — confidence/quality/reason stay on the signal — it just no
+    // longer decides what may be traded.
+    //
+    // Measured over 31,293 daily bars (experiments/entry_edge_test.js): the gate
+    // discards ~46% of candidates and the survivors have LOWER forward returns
+    // than the pool it selected from, at every horizon (1/5/10/20 bars) and with
+    // the trend flag both on and off — 6 of 6. It is not a weak filter, it is an
+    // anti-predictive one.
+    const _gateOk = gateAllows(gate);
 
     // Tesseract cross-check (5-dimension eval) — advisory action alongside the gate.
     const zData = {
@@ -270,7 +290,7 @@ async function scanAll(watchlist) {
 
     zones[t] = { mid: sr.mid, top: sr.resistance, bottom: sr.support, type: sr.type, strength: sr.strength, touches: sr.touches, triggered_entry: gate.approved };
 
-    if (gate.actionable) {
+    if (_gateOk) {
       // External anchor (Σ₀): directional news sentiment for this ticker, signed
       // into the EV verdict. Impact-weighted score in [-100,100] → [-1,1]. Only
       // computed for gate-passing tickers (cheap; a few per scan).
@@ -360,4 +380,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, gateAllows, rileyGate, candleGrade, convergenceVerdict };
