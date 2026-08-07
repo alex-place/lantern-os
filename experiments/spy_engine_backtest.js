@@ -120,6 +120,19 @@ async function main() {
       let exit = null;
       if (open.dir === "BULLISH") {
         if (nb.low <= open.stop) exit = { px: open.stop, why: "stop" };
+        // BT_EXIT_MA5 (weekend research 2026-08-08): Connors-style mean-reversion
+        // exit — close the long when price CLOSES above its 5-day SMA. Published
+        // RSI-2 results (75% WR, +0.57%/trade on SPY since 1993) use exactly this
+        // exit and NO ordinary stop: Connors' own testing over hundreds of
+        // thousands of trades found stops HURT mean reversion because they fire
+        // at maximum stretch, right before the snapback — which is literally what
+        // our live stops did all week (every loss was a stop; every ladder exit
+        // won). The floor stop is kept as the disaster brake only.
+        else if (process.env.BT_EXIT_MA5 === "1" && held >= 1) {
+          const _c5 = bars.slice(Math.max(0, i - 4), i + 1).map((b) => b.close);
+          const _sma5 = _c5.reduce((a, b) => a + b, 0) / _c5.length;
+          if (nb.close > _sma5) exit = { px: nb.close, why: "ma5_exit" };
+        }
         else if (process.env.BT_ZONE_EXIT === "1" && open.r1 != null) {
           // Operator's ladder: momentum that CLOSES through R1 upgrades the target to
           // R2 and ratchets the floor to R1 (give-backs close there). A mere touch of
@@ -228,7 +241,12 @@ async function main() {
     // what this resolves. BT_SHORT_REGIME=1 additionally requires SPY<SMA200
     // (only short a falling market).
     if (_meanRev) {
-      direction = rsiVal <= thresholds.oversold ? "BULLISH"
+      // BT_RSI_DEPTH (weekend research 2026-08-08): entry SELECTIVITY, in RSI
+      // points below the adaptive oversold line. Connors' published ladder is
+      // exactly this — RSI(2)<10 trades often, RSI(2)<5 trades less but earns
+      // more per trade. This is the "raise R without raising size" knob.
+      const _depth = Number(process.env.BT_RSI_DEPTH) || 0;
+      direction = rsiVal <= thresholds.oversold - _depth ? "BULLISH"
         : (process.env.BT_MEANREV_SHORT === "1" && rsiVal >= thresholds.overbought ? "BEARISH" : "NEUTRAL");
       if (direction === "BEARISH" && process.env.BT_SHORT_REGIME === "1"
           && (regimeByDate.get(bars[i].timestamp.slice(0, 10)) || "NEUTRAL") !== "BEARISH") direction = "NEUTRAL";
@@ -388,7 +406,7 @@ async function main() {
         if (_derived > 0 && _derived < fillPx) { stop = _derived; riskAbs = fillPx - stop; }
       }
     }
-    const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
+    const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
     open = {
       dir: direction, entryIdx: i + 1, entryPx: fillPx, entryDate: bars[i + 1].timestamp.slice(0, 10),
       regime: marketStatus.market,           // market tape at entry — for the by-regime P&L split
