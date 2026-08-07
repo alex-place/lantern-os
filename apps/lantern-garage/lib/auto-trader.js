@@ -164,6 +164,13 @@ function cfg() {
     // ETF a 3% stop is only a ~1% move in the underlying, so it is tighter in
     // real terms there, not wider — see TRADER_STOP_MIN_PCT_BY_SYMBOL.
     stopMinPct: n('TRADER_STOP_MIN_PCT', 3),
+    // RR by construction: stop = (distance to first real resistance) / n.
+    // 0 disables (stop stays structural). Gated 2:1/3:1/4:1 — all beat off in
+    // both windows; 3:1 best on holdout (+0.378%/trade vs +0.334%).
+    stopFromTgt: n('TRADER_STOP_FROM_TGT', 3),
+    // Max simultaneous open positions. Truncates the left tail (worst days are
+    // concurrency x stop width). 0 disables.
+    maxConcurrent: n('TRADER_MAX_CONCURRENT', 2),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -947,11 +954,29 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       .filter((z) => c.tgtMinR <= 0
         || ((Number(z.level) - price) / price) * 100 / Math.max(_stopDist, 1e-9) >= c.tgtMinR)
       .sort((x, y) => x.level - y.level);
-    let _roomR = null, _tier = 'A';
+    // STOP DERIVED FROM TARGET (stopFromTgt, 2026-08-07). Traders don't carry a
+    // flat RR — they judge how far price can run and set the stop at a fraction
+    // of that. Today stop and target are chosen INDEPENDENTLY (stop under the
+    // support zone, target wherever R1 lands), so RR is an accident of geometry:
+    // live 2026-08-06 produced targets of 0.53R-1.62R, i.e. winners paying LESS
+    // than the 1R they risked. Deriving the stop as (distance to first real
+    // resistance) / n makes RR exactly n:1 by construction and lets the stop
+    // scale with the size of the opportunity.
+    //   gate, holdout 2015-2026, %/trade: off +0.334  2:1 +0.355  3:1 +0.378
+    //   (all three beat off in BOTH windows; 3:1 best on holdout)
+    // The stopMinPct floor still wins afterwards — a derived stop must never
+    // land back inside the noise band.
+    let _stopDistEff = _stopDist;
+    if (c.stopFromTgt > 0 && _resAbove[0]) {
+      const _tgtPct = ((Number(_resAbove[0].level) - price) / price) * 100;
+      _stopDistEff = Math.min(15, Math.max(c.stopMinPct, _tgtPct / c.stopFromTgt));
+      if (_supStopPx != null) _supStopPx = price * (1 - _stopDistEff / 100);
+    }
+    let _roomR = null, _tier = 'A';
     if (c.roomTier) {
       const _res1 = _resAbove[0];
       if (_res1) {
-        _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDist, 1e-9);
+        _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDistEff, 1e-9);
         if (_roomR < c.roomMinR) _tier = 'B';
       }
       // A+ upgrade: room AND volume expansion (the confluence the OOS gate passed).
@@ -961,7 +986,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // have such tight structural stops that the 5% cap binds before the risk
     // target, and without scaling the cap the tiers would size identically.
     const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDist });
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -969,7 +994,22 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // a 7% cap could theoretically deploy 84%. This is the portfolio-level
     // brake: an entry that would push gross exposure past the cap is skipped
     // (exits are never blocked — reducing risk is always allowed).
-    if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
+    // CONCURRENT-POSITION CAP (maxConcurrent, 2026-08-07). Portfolio replay of
+    // the holdout showed the left tail is a product of CONCURRENCY x STOP WIDTH,
+    // not of any single bad trade: every worst day pinned at exactly -9.00% =
+    // 3 positions x the 3% stop floor. Capping concurrency at 2 cut days worse
+    // than -5% by 15% while AVERAGE %/trade actually improved (+0.384 vs
+    // +0.378) and total return fell only 10%.
+    // Honest limit: this does NOT reduce the negative-DAY rate (59-60% positive
+    // at every cap tested, including off) — it truncates severity, not frequency.
+    if (c.maxConcurrent > 0) {
+      const _openN = Object.values(heldPos).filter((p) => Math.abs(Number(p.qty) || 0) > 0).length;
+      if (_openN >= c.maxConcurrent) {
+        out.skipped.push({ ...record, why: `concurrent cap: ${_openN} positions open (max ${c.maxConcurrent})` });
+        continue;
+      }
+    }
+    if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
       const _gross = Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
       if (_gross + qty * price > _budget) {

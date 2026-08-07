@@ -49,6 +49,11 @@ async function run({ positions, signals, env }) {
     Object.assign(process.env, {
       TRADER_AUTO_EXECUTE: '1', TRADER_REQUIRE_PERSIST: '0', TRADER_MOMENTUM_EXIT: '0',
       TRADER_ENTRY_KNIFE_FILTER: '0', TRADER_LOG_SKIPS: '0',
+      // These fixtures hold 2 positions to exercise the GROSS cap. The
+      // concurrent-position cap (default 2) would otherwise intercept first and
+      // the test would assert the wrong gate — disable it so each test isolates
+      // the brake it names.
+      TRADER_MAX_CONCURRENT: '0',
     }, env || {});
     at._resetCooldowns();
     const out = await at.runAutoTrade({ signals }, { bridge: mkBridge({ positions, buys, sells }), userId: 'u', now: 1_700_000_000_000 });

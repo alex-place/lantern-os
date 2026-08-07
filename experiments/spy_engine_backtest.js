@@ -89,6 +89,10 @@ async function main() {
   }
 
   const trades = [];
+  // BT_DAY_DUMP=1 — emit one line per closed trade so daily P&L can be
+  // aggregated ACROSS symbols. "No fully negative days" is a portfolio-level
+  // property; per-symbol win rate cannot answer it.
+  const _dayDump = process.env.BT_DAY_DUMP === "1";
   let open = null;              // { dir, entryIdx, entryPx, stop, target, holdDays }
   let signalsSeen = 0, enterVerdicts = 0, regimeBlocked = 0;
 
@@ -179,6 +183,11 @@ async function main() {
         const _cost = Number(process.env.BT_COST) || 0;
         const r = (sign * (exit.px - open.entryPx) - _cost * open.entryPx) / open.riskAbs;
         trades.push({ ...open, exitPx: exit.px, exitWhy: exit.why, exitDate: nb.timestamp.slice(0, 10), heldDays: held, r });
+        if (_dayDump) {
+          const _sign = open.dir === "BULLISH" ? 1 : -1;
+          const _ret = (_sign * (exit.px - open.entryPx)) / open.entryPx * 100;
+          console.log("DAYTRADE	" + nb.timestamp.slice(0, 10) + "	" + SYM + "	" + _ret.toFixed(4) + "	" + r.toFixed(3) + "	" + open.entryDate);
+        }
         open = null;
       }
       if (open) continue;                                 // still in a trade → no new scans
@@ -354,7 +363,32 @@ async function main() {
       stop = Math.min(_supStop, fillPx * (1 - _minPct));
       riskAbs = fillPx - stop;
     }
-    const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
+    // BT_STOP_FROM_TGT=<n> (operator design 2026-08-07) — DERIVE THE STOP FROM
+    // THE TARGET. "Traders don't have a flat RR; they judge how far price can go
+    // and set the stop at 1/3 of that."
+    //
+    // Today the stop and the target are chosen INDEPENDENTLY: the stop sits under
+    // the support zone, the target is wherever R1 happens to be. So RR is an
+    // accident of geometry — live 2026-08-06 produced targets of 0.53R-1.62R,
+    // i.e. winners that paid LESS than the 1R they risked. Deriving the stop as
+    // (distance to first resistance) / n makes RR exactly n:1 BY CONSTRUCTION and
+    // makes the stop adapt to the size of the opportunity: a big expected move
+    // earns a wide stop, a small one gets a tight stop or is skipped.
+    //
+    // The MIN floor still applies afterwards — a derived stop must not land back
+    // inside the noise band.
+    if (Number(process.env.BT_STOP_FROM_TGT) > 0 && dirUp && !_momoEntry) {
+      const _n = Number(process.env.BT_STOP_FROM_TGT);
+      const _res = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > fillPx * 1.001)
+        .sort((x, y) => x.level - y.level)[0];
+      if (_res) {
+        const _tgtDist = _res.level - fillPx;
+        const _minPct = Number(process.env.BT_STOP_MIN_PCT) || 0.002;
+        const _derived = fillPx - Math.max(_tgtDist / _n, fillPx * _minPct);
+        if (_derived > 0 && _derived < fillPx) { stop = _derived; riskAbs = fillPx - stop; }
+      }
+    }
+    const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
     open = {
       dir: direction, entryIdx: i + 1, entryPx: fillPx, entryDate: bars[i + 1].timestamp.slice(0, 10),
       regime: marketStatus.market,           // market tape at entry — for the by-regime P&L split
