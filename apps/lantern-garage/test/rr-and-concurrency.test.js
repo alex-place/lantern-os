@@ -91,3 +91,51 @@ test('the tail arithmetic this exists to bound: concurrency x stop width', () =>
   assert.strictEqual(3 * 3, 9, '3 concurrent positions x 3% stop floor = the -9% worst day');
   assert.strictEqual(2 * 3, 6, 'cap 2 bounds the same-day stop-out cluster to -6%');
 });
+
+// ── dust exclusion (2026-08-07 near-miss) ───────────────────────────────────
+// The cap shipped counting any qty>0 row. Next morning the book held QQQ
+// ($32,983, real) plus the SOXS remnant (0.8 sh, $35, unclosable) = 2 of 2
+// slots, so EVERY entry that session would have been refused by a position
+// worth 0.004% of equity that cannot even be sold. A slot must mean a real,
+// exitable position.
+function countSlots(held, { equity, dustPct, unclosable = new Set() }) {
+  const floor = equity * (dustPct / 100);
+  return Object.values(held).filter((p) => {
+    const q = Math.abs(Number(p.qty) || 0);
+    if (!(q > 0)) return false;
+    if (unclosable.has(String(p.symbol).toUpperCase())) return false;
+    const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
+    return mv >= floor;
+  }).length;
+}
+
+test('dust does not consume a concurrency slot — the exact live book that would have blocked the day', () => {
+  const held = {
+    QQQ: { symbol: 'QQQ', qty: 46, market_value: 32983.38 },
+    SOXS: { symbol: 'SOXS', qty: 0.8, market_value: 34.94 },
+  };
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0 }), 2, 'old behaviour: dust counted, cap saturated');
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1 }), 1, 'dust excluded -> a slot remains free');
+});
+
+test('an unclosable position never consumes a slot even if it is large', () => {
+  const held = { SPY: { symbol: 'SPY', qty: 100, market_value: 77000 } };
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1, unclosable: new Set(['SPY']) }), 0,
+    'a position that cannot be exited is not a risk slot the engine can free');
+});
+
+test('a real position still consumes a slot', () => {
+  const held = { GLD: { symbol: 'GLD', qty: 85, market_value: 33267 } };
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1 }), 1);
+});
+
+test('market_value falls back to qty x price when the broker omits it', () => {
+  const held = { XLK: { symbol: 'XLK', qty: 154, current_price: 185.96 } };
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1 }), 1);
+});
+
+test('the dust floor scales with equity, not a hardcoded dollar amount', () => {
+  const held = { TINY: { symbol: 'TINY', qty: 1, market_value: 500 } };
+  assert.strictEqual(countSlots(held, { equity: 100000, dustPct: 0.1 }), 1, '$500 on a $100k account is real');
+  assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1 }), 0, '$500 on a $959k account is dust');
+});
