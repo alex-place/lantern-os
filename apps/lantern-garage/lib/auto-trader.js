@@ -300,6 +300,10 @@ const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
 const _loggedFills = new Set();   // broker order ids already written to the ledger
+// Fills older than this process are not reconciled: after a restart the entry
+// price is not in memory, so back-filling only produces pnl:null noise (observed
+// 2026-08-07). Their ids are still remembered, so they can never resurface.
+const _PROCESS_START = Date.now();
 const _exitIntent = new Map();    // sym -> reason for the exit we just ordered (labels the fill row)
 const fillLedger = require('./fill-ledger');
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
@@ -349,7 +353,7 @@ function _reconcileFills(orders) {
     const rows = fillLedger.newExitRows(orders, _loggedFills, (sym) => {
       const lp = _lastPos.get(sym);
       return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym) };
-    });
+    }, _PROCESS_START);
     for (const row of rows) {
       logTrade(row);
       done.add(row.symbol);

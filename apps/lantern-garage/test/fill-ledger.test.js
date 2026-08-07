@@ -11,7 +11,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert');
-const { newExitRows, idsToRemember, isFilledSell } = require('../lib/fill-ledger');
+const { newExitRows, idsToRemember, isFilledSell, orderTimeMs } = require('../lib/fill-ledger');
 
 const entryFor = (map) => (sym) => map[sym] || {};
 
@@ -94,4 +94,46 @@ test('partial fills are recorded at the quantity actually filled', () => {
   const rows = newExitRows(orders, new Set(), entryFor({ IWM: { avg_entry_price: 300.64 } }));
   assert.strictEqual(rows[0].qty, 100, 'P&L must reflect what filled, not what was ordered');
   assert.ok(Math.abs(rows[0].pnl - (-164)) < 1);
+});
+
+// ── timestamp guard (2026-08-07 deploy artifact) ────────────────────────────
+// On the first run after a deploy the reconciler saw fills it never observed
+// and back-filled them with pnl:null (the entry price is not in memory after a
+// restart), on top of the day's already-wrong rows. Fills older than the
+// process only produce noise.
+const NOW = 1786060000000;
+const older = { orderId: 'old', symbol: 'QQQ', side: 'SELL', filledQty: 46, avgPrice: 720.85, status: 'Filled', time: NOW - 3600_000 };
+const newer = { orderId: 'new', symbol: 'XLK', side: 'SELL', filledQty: 10, avgPrice: 186.65, status: 'Filled', time: NOW + 60_000 };
+
+test('a fill from BEFORE this process is skipped', () => {
+  const rows = newExitRows([older], new Set(), entryFor({}), NOW);
+  assert.strictEqual(rows.length, 0, 'pre-restart fills must not be back-filled');
+});
+
+test('a fill from AFTER process start is recorded', () => {
+  const rows = newExitRows([newer], new Set(), entryFor({ XLK: { avg_entry_price: 188.45 } }), NOW);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].symbol, 'XLK');
+});
+
+test('a skipped-by-time fill is still REMEMBERED so it cannot resurface later', () => {
+  assert.ok(idsToRemember([older]).includes('old'),
+    'the id must be recorded even though no row was written');
+});
+
+test('sinceMs=0 disables the guard (back-compat)', () => {
+  assert.strictEqual(newExitRows([older], new Set(), entryFor({}), 0).length, 1);
+});
+
+test('a fill with NO timestamp is kept — never drop a real trade on a missing field', () => {
+  const noTime = { orderId: 'x', symbol: 'GLD', side: 'SELL', filledQty: 5, avgPrice: 389.3, status: 'Filled' };
+  assert.strictEqual(newExitRows([noTime], new Set(), entryFor({}), NOW).length, 1);
+});
+
+test('orderTimeMs handles seconds, milliseconds and ISO strings', () => {
+  assert.strictEqual(orderTimeMs({ time: 1786060000 }), 1786060000000, 'seconds -> ms');
+  assert.strictEqual(orderTimeMs({ time: 1786060000000 }), 1786060000000, 'ms stays ms');
+  assert.strictEqual(orderTimeMs({ time: '2026-08-07T13:36:21.000Z' }), Date.parse('2026-08-07T13:36:21.000Z'));
+  assert.strictEqual(orderTimeMs({}), null);
+  assert.strictEqual(orderTimeMs({ time: 'not-a-date' }), null);
 });
