@@ -74,3 +74,37 @@ test('sizing: the floor lets risk-based sizing reach its target instead of being
   assert.ok(want(0.2) > cap * 4, `a 0.2% stop demands $${Math.round(want(0.2))} — over 4x the $${Math.round(cap)} cap, so the cap truncates and real risk collapses`);
   assert.ok(want(3) < cap, `a 3% stop wants $${Math.round(want(3))}, inside the cap — the intended risk is actually taken`);
 });
+
+// ── the floor must cover EVERY entry path (2026-08-07) ──────────────────────
+// Shipped 2026-08-06 wired only into the support-entry branch, so the four
+// symbols outside supEntrySyms (XLK IWM DIA SOXL) kept plan/ATR stops. On
+// 2026-08-07 all three entries were such symbols; XLK went in at 1.00% and was
+// tagged 24 min later for -$642 — the exact failure the floor prevents, on a
+// symbol the floor did not cover.
+function effStopPct({ supStopPct, planStopPct, floor }) {
+  return Math.min(15, Math.max(floor, supStopPct != null ? supStopPct : planStopPct));
+}
+const stopPriceFor = (entry, pct) => Math.round(entry * (1 - Math.max(0.1, pct) / 100) * 100) / 100;
+
+test('a NON-support entry gets the floor too — the XLK gap', () => {
+  const pct = effStopPct({ supStopPct: null, planStopPct: 1.00, floor: 3 });
+  assert.strictEqual(pct, 3, 'plan-path stops must be floored, not passed through');
+});
+
+test('the floored distance moves the BROKER stop price, not just sizing', () => {
+  const entry = 188.585;
+  const unfloored = stopPriceFor(entry, 1.00);
+  const floored = stopPriceFor(entry, effStopPct({ supStopPct: null, planStopPct: 1.00, floor: 3 }));
+  assert.ok(floored < unfloored, 'the resting stop must sit further from entry');
+  // XLK's stop actually filled at 186.65; the floored stop would not have been hit.
+  assert.ok(floored < 186.65, `floored stop ${floored} must clear the 186.65 low that tagged the real one`);
+});
+
+test('a support entry still wins when its structural stop is wider than the floor', () => {
+  assert.strictEqual(effStopPct({ supStopPct: 5.39, planStopPct: 1.0, floor: 3 }), 5.39);
+});
+
+test('every entry path is capped at 15%', () => {
+  assert.strictEqual(effStopPct({ supStopPct: null, planStopPct: 40, floor: 3 }), 15);
+  assert.strictEqual(effStopPct({ supStopPct: 40, planStopPct: 1, floor: 3 }), 15);
+});
