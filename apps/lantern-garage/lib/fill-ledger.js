@@ -36,20 +36,41 @@ function isFilledSell(o) {
   return Number(o.filledQty) > 0;
 }
 
+/** Broker order timestamp in epoch ms, or null when absent/unparseable. */
+function orderTimeMs(o) {
+  const raw = (o && (o.time ?? o.lastExecutionTime ?? o.filledAt ?? o.updatedAt)) ?? null;
+  if (raw == null) return null;
+  if (typeof raw === 'number') return raw < 1e12 ? raw * 1000 : raw;   // sec vs ms
+  const t = Date.parse(String(raw));
+  return Number.isFinite(t) ? t : null;
+}
+
 /**
  * Broker orders -> exit rows that are NOT yet in the ledger.
  *
  * @param orders      broker order list (getIBKROpenOrders shape)
  * @param loggedIds   Set of order ids already written
  * @param entryFor    (symbol) -> { avg_entry_price, reason } best-known entry
+ * @param sinceMs     ignore fills older than this (default 0 = no cutoff)
  * @returns array of ledger rows (event:'exit', source:'fill')
  */
-function newExitRows(orders, loggedIds, entryFor) {
+function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
   const out = [];
   for (const o of orders || []) {
     if (!isFilledSell(o)) continue;
     const id = String(o.orderId ?? o.order_id ?? '');
     if (!id || loggedIds.has(id)) continue;
+
+    // TIMESTAMP GUARD. On the first run after a deploy the reconciler sees fills
+    // it never observed and back-fills them — with pnl:null, because the entry
+    // price is not in memory after a restart. On 2026-08-07 that added two null
+    // rows on top of the day's already-wrong ones and made the ledger unusable
+    // for P&L. A fill older than this process only ever produces noise, so skip
+    // it. The id is still REMEMBERED (see idsToRemember) so it cannot resurface.
+    if (sinceMs > 0) {
+      const t = orderTimeMs(o);
+      if (t != null && t < sinceMs) continue;
+    }
 
     const qty = Number(o.filledQty);
     const exitPx = Number(o.avgPrice ?? o.avg_price);
@@ -98,4 +119,4 @@ function idsToRemember(orders) {
   return ids;
 }
 
-module.exports = { newExitRows, idsToRemember, isFilledSell };
+module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs };
