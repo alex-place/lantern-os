@@ -139,3 +139,51 @@ test('the dust floor scales with equity, not a hardcoded dollar amount', () => {
   assert.strictEqual(countSlots(held, { equity: 100000, dustPct: 0.1 }), 1, '$500 on a $100k account is real');
   assert.strictEqual(countSlots(held, { equity: 959068, dustPct: 0.1 }), 0, '$500 on a $959k account is dust');
 });
+
+// ── in-scan concurrency (2026-08-07 cap breach) ─────────────────────────────
+// heldPos is a snapshot taken ONCE at scan start, so several entries in the
+// same cycle all saw the same pre-scan count and each took "the last slot".
+// SOXL exited 19:36:08, then XLK (:10) and QQQ (:11) both entered — 3 positions
+// open against maxConcurrent=2.
+const blockedWithScan = (held, cap, openedThisScan) =>
+  cap > 0 && (openedThisScan + countSlots(held, { equity: 959068, dustPct: 0.1 })) >= cap;
+
+test('a second entry in the SAME scan counts against the cap', () => {
+  const held = { IWM: { symbol: 'IWM', qty: 191, market_value: 57601 } };
+  assert.strictEqual(blockedWithScan(held, 2, 0), false, 'first entry of the scan: one slot free');
+  assert.strictEqual(blockedWithScan(held, 2, 1), true, 'second entry must see the slot it just took');
+});
+
+test('the exact 2026-08-07 sequence can no longer breach the cap', () => {
+  const held = { IWM: { symbol: 'IWM', qty: 191, market_value: 57601 } };
+  let opened = 0;
+  const taken = [];
+  for (const sym of ['XLK', 'QQQ']) {
+    if (blockedWithScan(held, 2, opened)) continue;
+    taken.push(sym); opened++;
+  }
+  assert.deepStrictEqual(taken, ['XLK'], 'only one of the two may enter');
+});
+
+// ── minimum entry RR (SOXL 0.53:1) ──────────────────────────────────────────
+const rrOk = (tgtPct, flooredStopPct, minRr) => !(minRr > 0) || (tgtPct / flooredStopPct) >= minRr;
+
+test('SOXL 2026-08-07: a 3.00% stop against a 1.60% target is refused', () => {
+  assert.strictEqual(rrOk(1.60, 3.00, 1), false, '0.53:1 loses more than it wins even when right');
+});
+
+test('a target that clears the floored stop is allowed', () => {
+  assert.strictEqual(rrOk(3.00, 3.00, 1), true, '1:1 passes at minEntryRr=1');
+  assert.strictEqual(rrOk(9.00, 3.00, 1), true);
+});
+
+test('minEntryRr=0 disables the gate', () => {
+  assert.strictEqual(rrOk(1.60, 3.00, 0), true);
+});
+
+test('the gate uses the FLOORED stop, not the pre-floor one', () => {
+  // Pre-floor the stop would have been 0.53%, giving 3:1 — the floor is what
+  // destroys the RR, so the gate must measure against the floored value.
+  assert.strictEqual(rrOk(1.60, 0.53, 1), true, 'pre-floor it looks fine');
+  assert.strictEqual(rrOk(1.60, 3.00, 1), false, 'post-floor it is not');
+});
