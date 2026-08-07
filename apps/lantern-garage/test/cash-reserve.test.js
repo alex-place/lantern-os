@@ -57,10 +57,14 @@ async function run({ positions, signals, env }) {
 }
 
 test('an entry that would breach the gross cap is SKIPPED with a cash-reserve reason', async () => {
-  // $78k already deployed on $100k equity; cap 80% leaves a $2k budget — any
+  // $79.5k already deployed on $100k equity; cap 80% leaves a $500 budget — any
   // normal-sized entry must be refused.
+  // (Was 40k+38k = a $2,000 budget, which the 3% stop floor made EXACTLY equal
+  // to the sized position — `gross + qty*price > budget` is false at equality,
+  // so the fixture sat on a knife edge and started passing. Widen the margin so
+  // the test asserts the brake, not a boundary coincidence.)
   const { out, buys } = await run({
-    positions: [pos('SPY', 40000), pos('QQQ', 38000)],
+    positions: [pos('SPY', 40000), pos('QQQ', 39500)],
     signals: [enter('GLD')],
     env: { TRADER_MAX_GROSS_PCT: '80' },
   });
