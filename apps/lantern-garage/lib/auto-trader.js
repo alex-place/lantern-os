@@ -152,6 +152,18 @@ function cfg() {
     // 0.5 is chosen because it improves fit AND holdout — the signature of a
     // structural effect rather than a fitted constant. Kill: TRADER_TGT_MIN_R=0.
     tgtMinR: n('TRADER_TGT_MIN_R', 0.5),
+    // MINIMUM STOP DISTANCE, % of price (2026-08-06). Gated 2% vs 3% on 5
+    // symbols, fit 2000-2014 + holdout 2015-2026, 3bp costs, ranked by PERCENT
+    // CAPTURED PER TRADE (avg_R is normalised by stop width and inverts the
+    // ranking — the best-avg_R config captured the fewest dollars):
+    //   floor 2%: fit +0.072%/trade  holdout +0.275%/trade
+    //   floor 3%: fit +0.159%/trade  holdout +0.312%/trade   <- wins BOTH
+    // 3% also lifts win rate (45% -> 59%) by not tagging out on noise. At the
+    // unchanged 7% notional cap that is ~$210/trade vs ~$85 today.
+    // NOTE: the gate covered UNLEVERAGED symbols (SPY QQQ GLD TLT SMH). On a 3x
+    // ETF a 3% stop is only a ~1% move in the underlying, so it is tighter in
+    // real terms there, not wider — see TRADER_STOP_MIN_PCT_BY_SYMBOL.
+    stopMinPct: n('TRADER_STOP_MIN_PCT', 3),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -907,13 +919,24 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       if (dist > c.supEntryAtr) { out.skipped.push({ ...record, why: `sup_entry: ${dist.toFixed(1)} ATR above support (max ${c.supEntryAtr}) — not at the zone` }); continue; }
       const cand = (sup.bottom || sup.level) - 0.25 * aAbs;
       if (cand > 0 && cand < price * 0.999) _supStopPx = cand;
+      // MINIMUM STOP DISTANCE (stopMinPct). The zone stop can land INSIDE the
+      // instrument's noise band: live 2026-08-06 SPY entered with a 0.20% stop
+      // and was tagged in 29 minutes; four stop-outs that session fired within
+      // ~20 minutes and cost -$1,235 against +$475 from the two positions that
+      // survived long enough to reach a zone. Push the stop out so it marks a
+      // broken thesis, not a wiggle. Must move the STOP PRICE, not just the
+      // distance used for sizing — clamping the distance alone leaves the stop
+      // where it was and it still gets tagged (the bug this replaces).
+      if (_supStopPx != null && c.stopMinPct > 0) {
+        _supStopPx = Math.min(_supStopPx, price * (1 - c.stopMinPct / 100));
+      }
     }
 
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
     // Stop distance is now an INPUT to sizing (risk-based), so it must be resolved
     // before the order is sized. Structural (support-entry) stop wins when armed.
     const _stopDist = _supStopPx != null
-      ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
+      ? Math.min(15, Math.max(c.stopMinPct, ((price - _supStopPx) / price) * 100))
       : stopDistPctFor(price, s.plan, c, sym);
     // Room tier: distance to the first resistance, in R (this trade's stop units).
     // No resistance above = open room = A-tier.
@@ -1004,7 +1027,15 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Observability + a brake ONLY. No warning is confirmed, so this does not make any
     // entry more likely to reach the market than it already was.
     if (r && r.status !== 'placed' && r.status !== 'dry_run') {
-      const why = r.reason || r.error || r.note || r.status || 'unknown';
+      // IBKR's `note` is a GENERIC instruction ("re-submit with acceptWarnings"),
+      // identical for every warning type — it does not say WHICH warning fired.
+      // On 2026-08-06 two entries parked ($67k notional) and the actual advisory
+      // text existed only in r.warnings, which was never logged, so the block
+      // could not be diagnosed from the ledger at all. Surface the real messages.
+      const _warnTxt = Array.isArray(r.warnings) && r.warnings.length
+        ? r.warnings.map((w) => (w && (w.message || w.text || w)) ?? '').join(' || ').slice(0, 300)
+        : '';
+      const why = r.reason || r.error || (_warnTxt ? `${r.note || r.status}: ${_warnTxt}` : r.note) || r.status || 'unknown';
       logTrade({
         event: 'entry_blocked', symbol: sym, side: 'long', qty,
         entry: price, notional: Math.round(qty * price),

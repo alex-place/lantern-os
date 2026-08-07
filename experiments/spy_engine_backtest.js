@@ -313,7 +313,7 @@ async function main() {
     if (dirUp && sr.support > 0 && sr.support < price && near(sr.support) >= 0.005 && near(sr.support) < 0.06) stopPx = sr.support;
     if (!dirUp && sr.resistance > price && near(sr.resistance) >= 0.005 && near(sr.resistance) < 0.06) stopPx = sr.resistance;
     let riskAbs = Math.max(Math.abs(price - stopPx), price * 0.008);
-    const _provRisk = _supStop != null ? Math.max(price - _supStop, price * 0.002) : riskAbs;
+    const _provRisk = _supStop != null ? Math.max(price - _supStop, price * (Number(process.env.BT_STOP_MIN_PCT) || 0.002)) : riskAbs;
     // ROOM FILTER (BT_MIN_R1R, magnitude study): skip entries whose first
     // resistance is closer than this many R. Momo entries are exempt (no ladder).
     if (!_momoEntry && Number(process.env.BT_MIN_R1R) > 0) {
@@ -334,7 +334,26 @@ async function main() {
     // fill next bar's open (no same-bar close fills = no look-ahead)
     const fillPx = bars[i + 1].open;
     let stop = dirUp ? fillPx - riskAbs : fillPx + riskAbs;
-    if (_supStop != null && dirUp) { stop = _supStop; riskAbs = Math.max(fillPx - stop, fillPx * 0.002); }
+    // BT_STOP_MIN_PCT (2026-08-06) — MINIMUM STOP DISTANCE.
+    //
+    // The support-entry stop sits just under the zone, so on a tight zone it
+    // lands INSIDE the instrument's noise band. Live 2026-08-06: SPY entered
+    // with a 0.20% stop and was tagged in 29 minutes; QQQ 0.32%; four of the
+    // day's stop-outs fired within ~20 minutes of entry and produced -$1,235
+    // against +$475 from the two positions that survived to a zone.
+    //
+    // It also breaks SIZING. Risk-based sizing solves qty = risk / stopDist, so
+    // a 0.20% stop asks for a $289k position to risk $576; the notional cap then
+    // truncates it to $33k and the trade ends up risking $66 — 11% of intended.
+    // That is why a 13-entry day moved the account 0.09%.
+    //
+    // Flooring riskAbs alone would only fix the arithmetic: the stop would still
+    // sit where it was and still get tagged. The STOP PRICE itself has to move.
+    if (_supStop != null && dirUp) {
+      const _minPct = Number(process.env.BT_STOP_MIN_PCT) || 0.002;   // 0.002 = the shipped 0.2% floor
+      stop = Math.min(_supStop, fillPx * (1 - _minPct));
+      riskAbs = fillPx - stop;
+    }
     const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
     open = {
       dir: direction, entryIdx: i + 1, entryPx: fillPx, entryDate: bars[i + 1].timestamp.slice(0, 10),
@@ -421,6 +440,13 @@ async function main() {
     win_rate_pct: n ? +(100 * wins.length / n).toFixed(1) : null,
     profit_factor: n ? +pf.toFixed(2) : null,
     total_R: +sumR.toFixed(1),
+    // PERCENT CAPTURED PER TRADE — the metric that maps to P&L. avg_R is
+    // NORMALISED BY STOP WIDTH, so a tight-stop config can post a higher avg_R
+    // while capturing far fewer dollars at the same position size. Ranking
+    // configs by avg_R nearly led us to reject a wider stop floor that is 2.5x
+    // better in dollars. Dollars/trade = position x avg_ret_pct.
+    avg_ret_pct: +(trades.reduce((a, t) => a + ((t.exitPx - t.entryPx) / t.entryPx) * (t.dir === "BULLISH" ? 1 : -1) * 100, 0) / Math.max(1, trades.length)).toFixed(4),
+    total_ret_pct: +trades.reduce((a, t) => a + ((t.exitPx - t.entryPx) / t.entryPx) * (t.dir === "BULLISH" ? 1 : -1) * 100, 0).toFixed(2),
     avg_R: n ? +(sumR / n).toFixed(3) : null,
     equity_1pct_risk: +eq.toFixed(3),
     max_drawdown_pct: +(100 * maxDd).toFixed(1),
