@@ -299,6 +299,9 @@ const _peak = new Map();        // sym -> highest price seen since entry (traili
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
+const _loggedFills = new Set();   // broker order ids already written to the ledger
+const _exitIntent = new Map();    // sym -> reason for the exit we just ordered (labels the fill row)
+const fillLedger = require('./fill-ledger');
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
 const _stopDistPct = new Map(); // sym -> protective-stop distance % at entry (ATR stops make it per-trade)
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
@@ -330,7 +333,34 @@ function _isExitInFlight(status) {
 const STATE_FILE = process.env.TRADER_STATE_FILE
   ? path.resolve(process.env.TRADER_STATE_FILE)
   : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
-function _saveState() {
+/**
+ * RECONCILE THE LEDGER AGAINST BROKER FILLS.
+ *
+ * Exits used to be written at order-PLACEMENT time from the position's last
+ * MARK, which was wrong in both directions every session 2026-08-05..07:
+ * stop-outs understated 30-60% (XLK -$319 logged vs -$641 filled), and an exit
+ * order that never filled still logged as a completed exit (QQQ logged twice,
+ * +$453 vs +$217 real). This makes the broker the source of truth — a row is
+ * written when, and only when, a sell actually filled, priced at the fill.
+ */
+function _reconcileFills(orders) {
+  const done = new Set();
+  try {
+    const rows = fillLedger.newExitRows(orders, _loggedFills, (sym) => {
+      const lp = _lastPos.get(sym);
+      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym) };
+    });
+    for (const row of rows) {
+      logTrade(row);
+      done.add(row.symbol);
+      _exitIntent.delete(row.symbol);
+    }
+    for (const id of fillLedger.idsToRemember(orders)) _loggedFills.add(String(id));
+  } catch (_e) { /* reconciliation must never break trading */ }
+  return done;
+}
+
+function _saveState() {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
     fs.writeFileSync(STATE_FILE, JSON.stringify({
@@ -349,6 +379,7 @@ function _saveState() {
       // leaves the book — see the reconcile loop, which deletes both.
       exitFailures: Object.fromEntries(_exitFailures),
       unclosable: [..._unclosable],
+      loggedFills: [..._loggedFills].slice(-500),   // bounded: ids only matter within a session
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
       savedAt: Date.now(),
@@ -367,6 +398,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
     for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
     for (const s of (o.unclosable || [])) _unclosable.add(s);
+    for (const id of (o.loggedFills || [])) _loggedFills.add(String(id));
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
@@ -419,7 +451,8 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   await cancelRestingStops(bridge, userId, sym);
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
-  logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
+  _exitIntent.set(sym, reason);
+  logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
 }
@@ -644,6 +677,13 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   }
 
   // ── External-close sweep: THE LOSS PATH ────────────────────────────────────────
+  // Broker orders are fetched HERE (before the reconstruct loop) because the
+  // fill-based reconciliation must run first: a real fill is authoritative and
+  // the reconstruct loop below must yield to it rather than logging a second,
+  // mark-priced row for the same exit.
+  const _ordersEarly = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
+
   // Only a symbol the autopilot itself decided to exit was ever reconciled below, so
   // a position closed by anything ELSE left no ledger row at all. The dominant such
   // path is the resting protective STOP filling — i.e. every stop-out, i.e. the
@@ -667,6 +707,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // top of it produced two rows for one SHOP position. The presence of a status at
     // all means we decided (and logged) an exit for this symbol.
     if (_exitStatus.has(sym)) continue;
+    // A real broker fill was reconciled for this symbol this cycle — that row is
+    // authoritative and priced at the fill. Reconstructing from a mark on top of
+    // it is exactly the double-count that logged QQQ twice on 2026-08-07.
+    if (_filledSyms && _filledSyms.has(sym)) continue;
     const entry = Number(snap.entry);
     const mark = Number(snap.mark);
     const qty = Number(snap.qty);
@@ -686,7 +730,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // stack another sell on those, so a lagging position snapshot can't make the loop sell
   // `held` again and blow through flat into a short. Survives restarts (broker-side state),
   // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
-  const _openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const _openOrders = _ordersEarly;
   const workingSells = new Set((_openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
@@ -881,7 +925,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
-        logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
+        _exitIntent.set(sym, 'signal_exit');
+        logTrade({ event: 'exit_intent', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason: 'signal_exit', status: r && r.status });
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
       } else {
