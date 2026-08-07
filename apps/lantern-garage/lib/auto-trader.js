@@ -945,9 +945,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
     // Stop distance is now an INPUT to sizing (risk-based), so it must be resolved
     // before the order is sized. Structural (support-entry) stop wins when armed.
-    const _stopDist = _supStopPx != null
-      ? Math.min(15, Math.max(c.stopMinPct, ((price - _supStopPx) / price) * 100))
-      : stopDistPctFor(price, s.plan, c, sym);
+    // The minimum-stop floor applies to EVERY entry, not just support entries.
+    // Shipped 2026-08-06 wired only into the support-entry branch, so the four
+    // symbols outside supEntrySyms (XLK IWM DIA SOXL) kept taking plan/ATR stops
+    // of 1.0-1.5%. On 2026-08-07 all three entries were such symbols: XLK went in
+    // with a 1.00% stop and was tagged 24 minutes later for -$642 on a 1% wiggle
+    // — exactly the failure the floor exists to prevent, on a symbol the floor
+    // did not cover. Applied to NEW entries only; stops already resting at the
+    // broker are left alone.
+    const _stopDist = Math.min(15, Math.max(c.stopMinPct, _supStopPx != null
+      ? ((price - _supStopPx) / price) * 100
+      : stopDistPctFor(price, s.plan, c, sym)));
     // Room tier: distance to the first resistance, in R (this trade's stop units).
     // No resistance above = open room = A-tier.
     // Resistances above price that are FAR ENOUGH to be real targets (c.tgtMinR).
