@@ -366,7 +366,7 @@ function _reconcileFills(orders) {
   return done;
 }
 
-function _saveState() {
+function _saveState() {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
     fs.writeFileSync(STATE_FILE, JSON.stringify({
@@ -1049,7 +1049,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         continue;
       }
     }
-    let _roomR = null, _tier = 'A';
+    let _roomR = null, _tier = 'A';
     if (c.roomTier) {
       const _res1 = _resAbove[0];
       if (_res1) {
@@ -1106,7 +1106,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         continue;
       }
     }
-    if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
+    if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
       const _gross = Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
       if (_gross + qty * price > _budget) {
@@ -1185,10 +1185,36 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
   _logSkips(out.skipped);
+  // ── SLOT-UTILIZATION OBSERVABILITY (2026-08-08) ────────────────────────────
+  // Throughput, not signal quality, is the open question at ~$235-400 captured
+  // per trade: 0.5%/day needs both concurrency slots WORKING. This records every
+  // transition of slots-in-use (same slot definition as the cap: dust and
+  // unclosable positions excluded), so the daily report can time-weight how much
+  // of the session ran 0/1/2 slots filled. One row per change, not per scan.
+  if (process.env.TRADER_LOG_SKIPS !== '0' && c.maxConcurrent > 0) {
+    const _dustFloorU = account.equity * (c.dustPct / 100);
+    const _slotSyms = Object.values(heldPos).filter((p) => {
+      const q = Math.abs(Number(p.qty) || 0);
+      if (!(q > 0)) return false;
+      if (_unclosable.has(String(p.symbol).toUpperCase())) return false;
+      const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
+      return mv >= _dustFloorU;
+    }).map((p) => String(p.symbol).toUpperCase()).sort();
+    const _used = _slotSyms.length + _openedThisScan;
+    const _sig = `${_used}/${c.maxConcurrent}:${_slotSyms.join(',')}`;
+    if (_lastSlotSig !== _sig) {
+      _lastSlotSig = _sig;
+      logTrade({
+        event: 'slot_util', slots_used: _used, cap: c.maxConcurrent,
+        held: _slotSyms, opened_this_scan: _openedThisScan,
+      });
+    }
+  }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
   return out;
 }
+let _lastSlotSig = null;   // last logged slots-in-use signature (change-only dedupe)
 
 // ── SKIP-REASON OBSERVABILITY (2026-08-05) ───────────────────────────────────
 // out.skipped lived and died in memory, so a session where the trader declined
@@ -1224,6 +1250,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
