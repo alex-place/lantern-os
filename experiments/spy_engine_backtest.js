@@ -246,7 +246,20 @@ async function main() {
       // exactly this — RSI(2)<10 trades often, RSI(2)<5 trades less but earns
       // more per trade. This is the "raise R without raising size" knob.
       const _depth = Number(process.env.BT_RSI_DEPTH) || 0;
-      direction = rsiVal <= thresholds.oversold - _depth ? "BULLISH"
+      // BT_IBS_MAX (research 2026-08-08): Internal Bar Strength = (close-low)/
+      // (high-low) of TODAY's bar — where in its range the day closed. Published
+      // results (Pagonidis 2013; QuantifiedStrategies): IBS<0.2 -> next-day
+      // +0.35% avg; IBS<0.1 buy / >0.9 sell on QQQ = 0.9%/trade, 70% WR. As a
+      // FILTER it requires the day to close near its low (true washout), as
+      // BT_IBS_ONLY=1 it replaces the RSI signal entirely.
+      const _bar = bars[i];
+      const _ibs = (_bar.high - _bar.low) > 0 ? (_bar.close - _bar.low) / (_bar.high - _bar.low) : 0.5;
+      const _ibsMax = Number(process.env.BT_IBS_MAX);
+      const _rsiLong = rsiVal <= thresholds.oversold - _depth;
+      const _ibsLong = _ibsMax > 0 ? _ibs <= _ibsMax : true;
+      if (process.env.BT_IBS_ONLY === "1") direction = _ibsLong && _ibsMax > 0 ? "BULLISH" : "NEUTRAL";
+      else if (process.env.BT_IBS_OR === "1") direction = (_rsiLong || (_ibsMax > 0 && _ibs <= _ibsMax)) ? "BULLISH" : "NEUTRAL";
+      else direction = _rsiLong && _ibsLong ? "BULLISH"
         : (process.env.BT_MEANREV_SHORT === "1" && rsiVal >= thresholds.overbought ? "BEARISH" : "NEUTRAL");
       if (direction === "BEARISH" && process.env.BT_SHORT_REGIME === "1"
           && (regimeByDate.get(bars[i].timestamp.slice(0, 10)) || "NEUTRAL") !== "BEARISH") direction = "NEUTRAL";
