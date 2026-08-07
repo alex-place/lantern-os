@@ -238,25 +238,39 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           const sumUpl = ibkrPositions.reduce(
             (t, p) => t + (Number(p && p.unrealized_pl) || 0), 0);
           ibkrAccount.unrealized = Math.round(sumUpl * 100) / 100;
-          // Realized today: IBKR reports $0 on the paper CPAPI (both `rpl` and the portfolio
-          // summary), so tally it from the autopilot ledger — the P&L of positions that
-          // ACTUALLY closed today (symbol now flat). One value per symbol (its LAST exit row;
-          // earlier rows were phantom re-attempts on the still-open position, now prevented by
-          // the exit-reattempt cooldown). Positions still open are skipped (their exits didn't
-          // fill). Cheap: the ledger is a small append-only file.
+          // REALIZED TODAY. IBKR reports $0 on the paper CPAPI (both `rpl` and the
+          // portfolio summary), so tally it from the autopilot ledger.
+          //
+          // SUM EVERY exit row for the day. Two earlier assumptions are now wrong:
+          //
+          //   "one value per symbol (its LAST exit row)" — true when the ledger was
+          //   written at order-placement time and earlier rows were phantom
+          //   re-attempts. Since #3203 a row exists only when a sell actually
+          //   FILLED, so every row is a real closed trade and keeping just the last
+          //   one silently drops the others. SMH alone round-tripped 4x on
+          //   2026-08-06.
+          //
+          //   "skip symbols still open (their exits didn't fill)" — a symbol that
+          //   closed and was RE-ENTERED the same day is open again, so its realized
+          //   P&L vanished. On 2026-08-07 that dropped QQQ (+$218.48) and XLK
+          //   (-$641.92): realized read -$230.98 instead of -$654.42, and Day P&L
+          //   would have shown +$80.55 instead of -$342.89.
+          //
+          // Superseded/estimated rows carry event:'exit_superseded', so they are
+          // excluded by the event filter without any special case.
           try {
             const fs = require('fs'), path = require('path');
             const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
-            const openSyms = new Set(ibkrPositions.map((p) => p.symbol));
             const today = new Date().toISOString().slice(0, 10);
-            const lastBySym = {};
-            for (const line of fs.readFileSync(logPath, 'utf8').split('\n')) {
+            let realized = 0, any = false;
+            for (const line of fs.readFileSync(logPath, 'utf8').split(String.fromCharCode(10))) {
               if (!line.trim()) continue;
               let r; try { r = JSON.parse(line); } catch (_e) { continue; }
-              if (r && r.event === 'exit' && String(r.ts || '').slice(0, 10) === today && r.pnl != null) lastBySym[r.symbol] = Number(r.pnl);
+              if (!r || r.event !== 'exit') continue;
+              if (String(r.ts || '').slice(0, 10) !== today) continue;
+              if (r.pnl == null || !Number.isFinite(Number(r.pnl))) continue;
+              realized += Number(r.pnl); any = true;
             }
-            let realized = 0, any = false;
-            for (const [sym, pnl] of Object.entries(lastBySym)) if (!openSyms.has(sym) && Number.isFinite(pnl)) { realized += pnl; any = true; }
             if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
           } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
           // DAY P&L = realized today + current unrealized.
