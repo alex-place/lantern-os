@@ -259,28 +259,32 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             for (const [sym, pnl] of Object.entries(lastBySym)) if (!openSyms.has(sym) && Number.isFinite(pnl)) { realized += pnl; any = true; }
             if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
           } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
-          // Reconcile Day P&L the same way. IBKR's `dpl` lags/rounds on the paper CPAPI
-          // (it read −2310 while Realized stayed $0 despite closes today), so derive each
-          // position's day change from the cached watchlist chg_pct — prevClose =
-          // price/(1+chg%) — and sum. Reuses the 30s price cache (no extra fetch); only
-          // overrides when EVERY held symbol has a fresh %, else keeps the broker figure.
+          // DAY P&L = realized today + current unrealized.
+          //
+          // The previous derivation summed each position's move since YESTERDAY'S
+          // CLOSE (prevClose = price/(1+chg%)). For an intraday trader that is
+          // simply the wrong quantity: a position opened at 15:36 was credited
+          // with the entire morning rally it was never in. Worse, it added
+          // `realized_today`, which IBKR CPAPI always reports as 0.00, so every
+          // closed loss vanished. On 2026-08-07 that showed +$1,383.96 while the
+          // broker read -$337.60 and the fills said -$654.42 realized: the
+          // formula counted gains the account never captured and ignored the
+          // losses it actually took. It printed a profit on every losing day this
+          // week (+$584, +$538, +$1,386).
+          //
+          // realized_today is reconciled from the ledger just above, and the
+          // ledger is now fill-priced (lib/fill-ledger.js), so this is consistent
+          // with the positions table the user is looking at. It excludes
+          // commissions, which the ledger does not track — expect a small gap to
+          // the broker's own dpl, in that direction only.
           try {
-            const wlp = await traderAgent.getWatchlistPrices().catch(() => []);
-            const chgBy = {};
-            for (const w of (wlp || [])) if (w && w.ticker) chgBy[w.ticker] = Number(w.chg_pct);
-            let dayPnl = 0, haveAll = true;
-            for (const p of ibkrPositions) {
-              const chg = chgBy[p.symbol];
-              const cur = Number(p.current_price) || 0;
-              if (chg == null || Number.isNaN(chg) || !cur) { haveAll = false; break; }
-              const prev = cur / (1 + chg / 100);
-              dayPnl += (Number(p.qty) || 0) * (cur - prev);
-            }
-            if (haveAll) {
-              ibkrAccount.pnl_today = Math.round((dayPnl + (Number(ibkrAccount.realized_today) || 0)) * 100) / 100;
-              ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
-            }
-          } catch (_e) { /* keep the broker dpl if the price cache isn't ready */ }
+            let unreal = 0;
+            for (const p of ibkrPositions) unreal += Number(p.unrealized_pl) || 0;
+            const realized = Number(ibkrAccount.realized_today) || 0;
+            ibkrAccount.pnl_today = Math.round((realized + unreal) * 100) / 100;
+            ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
+            ibkrAccount.pnl_basis = 'realized(ledger fills) + unrealized; excludes commissions';
+          } catch (_e) { /* keep the broker dpl if positions are unreadable */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
         return true;

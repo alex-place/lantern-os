@@ -174,6 +174,8 @@ function cfg() {
     // Positions below this % of equity are DUST and never consume a
     // concurrency slot (nor do unclosable ones). 0 counts every row.
     dustPct: n('TRADER_DUST_PCT', 0.1),
+    // Minimum reward:risk, measured against the FLOORED stop. 0 disables.
+    minEntryRr: n('TRADER_MIN_ENTRY_RR', 1),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -667,6 +669,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const positions = await bridge.getIBKRPositions(userId).catch(() => []);
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
+  let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
@@ -1032,6 +1035,20 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       _stopDistEff = Math.min(15, Math.max(c.stopMinPct, _tgtPct / c.stopFromTgt));
       if (_supStopPx != null) _supStopPx = price * (1 - _stopDistEff / 100);
     }
+    // MINIMUM ENTRY RR (minEntryRr). The stop floor and the 3:1 derivation fight
+    // each other: stopFromTgt wants stop = target/3, but if that lands inside the
+    // floor the floor wins (Math.max) and RR collapses. 2026-08-07 SOXL took a
+    // 3.00% stop against a 1.60% target — 0.53:1, a trade that loses more than it
+    // wins even when right — and closed -$217. When the floored stop cannot pay
+    // at least minEntryRr, SKIP rather than take it.
+    if (c.minEntryRr > 0 && _resAbove[0]) {
+      const _tgtPct = ((Number(_resAbove[0].level) - price) / price) * 100;
+      const _rr = _tgtPct / Math.max(_stopDistEff, 1e-9);
+      if (_rr < c.minEntryRr) {
+        out.skipped.push({ ...record, why: `rr ${_rr.toFixed(2)}:1 below ${c.minEntryRr}:1 (target ${_tgtPct.toFixed(2)}% vs floored stop ${_stopDistEff.toFixed(2)}%)` });
+        continue;
+      }
+    }
     let _roomR = null, _tier = 'A';
     if (c.roomTier) {
       const _res1 = _resAbove[0];
@@ -1072,7 +1089,12 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       // A slot is consumed only by a position that is (a) economically
       // meaningful and (b) actually exitable.
       const _dustFloor = account.equity * (c.dustPct / 100);
-      const _openN = Object.values(heldPos).filter((p) => {
+      // heldPos is a snapshot taken ONCE at scan start, so several entries in the
+      // same cycle all saw the same pre-scan count and each took "the last slot".
+      // 2026-08-07: SOXL exited at 19:36:08, then XLK (:10) and QQQ (:11) both
+      // entered in that cycle, leaving 3 positions open against maxConcurrent=2 —
+      // the cap that bounds the left tail silently did not hold.
+      const _openN = _openedThisScan + Object.values(heldPos).filter((p) => {
         const q = Math.abs(Number(p.qty) || 0);
         if (!(q > 0)) return false;
         if (_unclosable.has(String(p.symbol).toUpperCase())) return false;   // cannot be exited -> not a slot
@@ -1159,7 +1181,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1; } }
     else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
   _logSkips(out.skipped);
