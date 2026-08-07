@@ -171,6 +171,9 @@ function cfg() {
     // Max simultaneous open positions. Truncates the left tail (worst days are
     // concurrency x stop width). 0 disables.
     maxConcurrent: n('TRADER_MAX_CONCURRENT', 2),
+    // Positions below this % of equity are DUST and never consume a
+    // concurrency slot (nor do unclosable ones). 0 counts every row.
+    dustPct: n('TRADER_DUST_PCT', 0.1),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -1003,7 +1006,22 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Honest limit: this does NOT reduce the negative-DAY rate (59-60% positive
     // at every cap tested, including off) — it truncates severity, not frequency.
     if (c.maxConcurrent > 0) {
-      const _openN = Object.values(heldPos).filter((p) => Math.abs(Number(p.qty) || 0) > 0).length;
+      // DUST EXCLUSION (2026-08-07). The cap counts RISK SLOTS, not rows in the
+      // book. Counting any qty>0 position saturated it with garbage: on the
+      // morning after this shipped the account held QQQ ($32,983, real) plus the
+      // SOXS remnant (0.8 shares, $35, flagged unclosable since 2026-08-04) —
+      // 2 of 2 slots, so EVERY entry that session would have been refused by a
+      // position worth 0.004% of equity that cannot even be sold.
+      // A slot is consumed only by a position that is (a) economically
+      // meaningful and (b) actually exitable.
+      const _dustFloor = account.equity * (c.dustPct / 100);
+      const _openN = Object.values(heldPos).filter((p) => {
+        const q = Math.abs(Number(p.qty) || 0);
+        if (!(q > 0)) return false;
+        if (_unclosable.has(String(p.symbol).toUpperCase())) return false;   // cannot be exited -> not a slot
+        const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
+        return mv >= _dustFloor;
+      }).length;
       if (_openN >= c.maxConcurrent) {
         out.skipped.push({ ...record, why: `concurrent cap: ${_openN} positions open (max ${c.maxConcurrent})` });
         continue;
