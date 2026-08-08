@@ -176,6 +176,12 @@ function cfg() {
     dustPct: n('TRADER_DUST_PCT', 0.1),
     // Minimum reward:risk, measured against the FLOORED stop. 0 disables.
     minEntryRr: n('TRADER_MIN_ENTRY_RR', 1),
+    // Trail past R2 instead of selling AT it (lab 2026-08-08, Monday-config
+    // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
+    // A mark through R2 upgrades the runner to a ratcheting floor at
+    // peak*(1 - r2TrailPct%), never below R2. 0 keeps the fixed R2 sell.
+    r2Trail: n('TRADER_R2_TRAIL', 0),
+    r2TrailPct: n('TRADER_R2_TRAIL_PCT', 1),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -550,9 +556,26 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
           await closeLong(bridge, userId, sym, qty, p, `zone_r1 (first resistance ${_lad.r1})`, out, now, { extended, refPrice: cur });
           delete heldQty[sym]; continue;
         }
+      } else if (_lad.broke2) {
+        // R2-TRAIL (lab-gated 2026-08-08): the runner broke THROUGH R2 — ride it
+        // with a ratcheting floor instead of having sold at the target. QQQ
+        // 2026-08-07 sold its runner at 720.85 and price closed 723.03.
+        _lad.peak2 = Math.max(_lad.peak2 || _lad.r2, cur);
+        _lad.floor2 = Math.max(_lad.floor2 || _lad.r2, _lad.peak2 * (1 - c.r2TrailPct / 100));
+        _zoneLadder.set(sym, _lad);
+        if (cur <= _lad.floor2) {
+          await closeLong(bridge, userId, sym, qty, p, `r2_trail (peak ${_lad.peak2.toFixed(2)}, floor ${_lad.floor2.toFixed(2)})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
       } else if (_lad.r2 > 0 && cur >= _lad.r2) {
-        await closeLong(bridge, userId, sym, qty, p, `zone_r2 (runner target ${_lad.r2})`, out, now, { extended, refPrice: cur });
-        delete heldQty[sym]; continue;
+        if (c.r2Trail) {
+          _lad.broke2 = true; _lad.peak2 = cur;
+          _lad.floor2 = Math.max(_lad.r2, cur * (1 - c.r2TrailPct / 100));
+          _zoneLadder.set(sym, _lad); _saveState();
+        } else {
+          await closeLong(bridge, userId, sym, qty, p, `zone_r2 (runner target ${_lad.r2})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
       } else if (cur <= _lad.r1) {
         await closeLong(bridge, userId, sym, qty, p, `zone_r1_floor (gave back to ${_lad.r1})`, out, now, { extended, refPrice: cur });
         delete heldQty[sym]; continue;

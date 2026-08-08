@@ -141,7 +141,21 @@ async function main() {
             if (nb.close > (open.r1top || open.r1)) { open.brokeR1 = true; }
             else if (nb.high >= open.r1) exit = { px: open.r1, why: "zone_r1" };
           } else {
-            if (open.r2 != null && nb.high >= open.r2) exit = { px: open.r2, why: "zone_r2" };
+            // BT_R2_TRAIL (2026-08-08, from the QQQ +$218 autopsy): the runner sold
+            // AT its fixed R2 target while price ran another +0.38% into the close
+            // at the top of its range. Mirror the R1 rule one rung higher: a CLOSE
+            // through R2 upgrades it to a ratcheting floor (peak - 1.5 ATR, never
+            // below R2); a mere touch without a close-through still sells at R2.
+            if (open.brokeR2) {
+              const _aT = atr(bars.slice(Math.max(0, i - 30), i + 1)) || nb.close * 0.005;
+              open.peak2 = Math.max(open.peak2 || open.r2, nb.high);
+              open.floor2 = Math.max(open.floor2 ?? open.r2, open.peak2 - 1.5 * _aT);
+              if (nb.low <= open.floor2) exit = { px: Math.min(open.floor2, nb.high), why: "r2_trail" };
+            }
+            else if (open.r2 != null && nb.high >= open.r2) {
+              if (process.env.BT_R2_TRAIL === "1" && nb.close > open.r2) { open.brokeR2 = true; open.peak2 = nb.high; open.floor2 = open.r2; }
+              else exit = { px: open.r2, why: "zone_r2" };
+            }
             else if (process.env.BT_TRAIL_FLOOR === "1") {
               // STRUCTURE-TRAILING FLOOR (operator 2026-08-05): after the R1 break the
               // floor ratchets UP to each newly-formed support zone — a late retrace
