@@ -38,6 +38,13 @@ function resendConfigured() {
 // path and no confirmation email is ever sent, i.e. "the emails aren't wired"
 // even though Resend works. (#3021)
 function mailerConfigured() {
+  // MAIL_DISABLE=1 — hard kill-switch for test harnesses (greenpath). Blanking
+  // RESEND_API_KEY/SMTP_* in the child env does NOT work: server.js loads the
+  // repo-root .env.local with override:true, which stomps the blanks back to the
+  // host's real provider config. This flag is never IN .env.local, so the
+  // harness's value survives the override and signup uses the loopback
+  // devVerifyCode flow. Never set it in production.
+  if (process.env.MAIL_DISABLE === "1") return false;
   return resendConfigured() || smtpConfigured();
 }
 function sendViaResend({ to, subject, html, text }) {

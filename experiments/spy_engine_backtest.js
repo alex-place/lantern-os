@@ -89,10 +89,15 @@ async function main() {
   }
 
   const trades = [];
+  // BT_DAY_DUMP=1 — emit one line per closed trade so daily P&L can be
+  // aggregated ACROSS symbols. "No fully negative days" is a portfolio-level
+  // property; per-symbol win rate cannot answer it.
+  const _dayDump = process.env.BT_DAY_DUMP === "1";
   let open = null;              // { dir, entryIdx, entryPx, stop, target, holdDays }
   let signalsSeen = 0, enterVerdicts = 0, regimeBlocked = 0;
 
   const allCloses = bars.map((b) => b.close);
+  let _stopCooldownUntil = -1;   // BT_STOP_COOLDOWN: bar index before which re-entry is refused
 
   for (let i = WINDOW; i < bars.length - 1; i++) {
     const today = bars[i];
@@ -116,6 +121,19 @@ async function main() {
       let exit = null;
       if (open.dir === "BULLISH") {
         if (nb.low <= open.stop) exit = { px: open.stop, why: "stop" };
+        // BT_EXIT_MA5 (weekend research 2026-08-08): Connors-style mean-reversion
+        // exit — close the long when price CLOSES above its 5-day SMA. Published
+        // RSI-2 results (75% WR, +0.57%/trade on SPY since 1993) use exactly this
+        // exit and NO ordinary stop: Connors' own testing over hundreds of
+        // thousands of trades found stops HURT mean reversion because they fire
+        // at maximum stretch, right before the snapback — which is literally what
+        // our live stops did all week (every loss was a stop; every ladder exit
+        // won). The floor stop is kept as the disaster brake only.
+        else if (process.env.BT_EXIT_MA5 === "1" && held >= 1) {
+          const _c5 = bars.slice(Math.max(0, i - 4), i + 1).map((b) => b.close);
+          const _sma5 = _c5.reduce((a, b) => a + b, 0) / _c5.length;
+          if (nb.close > _sma5) exit = { px: nb.close, why: "ma5_exit" };
+        }
         else if (process.env.BT_ZONE_EXIT === "1" && open.r1 != null) {
           // Operator's ladder: momentum that CLOSES through R1 upgrades the target to
           // R2 and ratchets the floor to R1 (give-backs close there). A mere touch of
@@ -124,7 +142,21 @@ async function main() {
             if (nb.close > (open.r1top || open.r1)) { open.brokeR1 = true; }
             else if (nb.high >= open.r1) exit = { px: open.r1, why: "zone_r1" };
           } else {
-            if (open.r2 != null && nb.high >= open.r2) exit = { px: open.r2, why: "zone_r2" };
+            // BT_R2_TRAIL (2026-08-08, from the QQQ +$218 autopsy): the runner sold
+            // AT its fixed R2 target while price ran another +0.38% into the close
+            // at the top of its range. Mirror the R1 rule one rung higher: a CLOSE
+            // through R2 upgrades it to a ratcheting floor (peak - 1.5 ATR, never
+            // below R2); a mere touch without a close-through still sells at R2.
+            if (open.brokeR2) {
+              const _aT = atr(bars.slice(Math.max(0, i - 30), i + 1)) || nb.close * 0.005;
+              open.peak2 = Math.max(open.peak2 || open.r2, nb.high);
+              open.floor2 = Math.max(open.floor2 ?? open.r2, open.peak2 - 1.5 * _aT);
+              if (nb.low <= open.floor2) exit = { px: Math.min(open.floor2, nb.high), why: "r2_trail" };
+            }
+            else if (open.r2 != null && nb.high >= open.r2) {
+              if (process.env.BT_R2_TRAIL === "1" && nb.close > open.r2) { open.brokeR2 = true; open.peak2 = nb.high; open.floor2 = open.r2; }
+              else exit = { px: open.r2, why: "zone_r2" };
+            }
             else if (process.env.BT_TRAIL_FLOOR === "1") {
               // STRUCTURE-TRAILING FLOOR (operator 2026-08-05): after the R1 break the
               // floor ratchets UP to each newly-formed support zone — a late retrace
@@ -179,10 +211,25 @@ async function main() {
         const _cost = Number(process.env.BT_COST) || 0;
         const r = (sign * (exit.px - open.entryPx) - _cost * open.entryPx) / open.riskAbs;
         trades.push({ ...open, exitPx: exit.px, exitWhy: exit.why, exitDate: nb.timestamp.slice(0, 10), heldDays: held, r });
+        if (_dayDump) {
+          const _sign = open.dir === "BULLISH" ? 1 : -1;
+          const _ret = (_sign * (exit.px - open.entryPx)) / open.entryPx * 100;
+          console.log("DAYTRADE	" + nb.timestamp.slice(0, 10) + "	" + SYM + "	" + _ret.toFixed(4) + "	" + r.toFixed(3) + "	" + open.entryDate);
+        }
+        // BT_STOP_COOLDOWN=<bars> (2026-08-08, tail autopsy): after a STOP exit,
+        // refuse re-entry in this symbol for N bars. Every worst backtest day is
+        // the same shape — a crisis session where the engine stopped out, re-
+        // entered the still-falling washout, and stopped again (12 exits under a
+        // cap of 4 = 3 churn rounds on 2008-10-06). Losses correlate across
+        // symbols on those days; wins don't. This targets ONLY the churn rounds.
+        if (exit.why === "stop" && Number(process.env.BT_STOP_COOLDOWN) > 0) {
+          _stopCooldownUntil = i + Number(process.env.BT_STOP_COOLDOWN);
+        }
         open = null;
       }
       if (open) continue;                                 // still in a trade → no new scans
     }
+    if (i < _stopCooldownUntil) continue;                 // post-stop cooldown active
 
     // ── run the production per-ticker scan logic on the trailing window ──
     const sr = findSrZones(SYM, price, win);
@@ -219,7 +266,25 @@ async function main() {
     // what this resolves. BT_SHORT_REGIME=1 additionally requires SPY<SMA200
     // (only short a falling market).
     if (_meanRev) {
-      direction = rsiVal <= thresholds.oversold ? "BULLISH"
+      // BT_RSI_DEPTH (weekend research 2026-08-08): entry SELECTIVITY, in RSI
+      // points below the adaptive oversold line. Connors' published ladder is
+      // exactly this — RSI(2)<10 trades often, RSI(2)<5 trades less but earns
+      // more per trade. This is the "raise R without raising size" knob.
+      const _depth = Number(process.env.BT_RSI_DEPTH) || 0;
+      // BT_IBS_MAX (research 2026-08-08): Internal Bar Strength = (close-low)/
+      // (high-low) of TODAY's bar — where in its range the day closed. Published
+      // results (Pagonidis 2013; QuantifiedStrategies): IBS<0.2 -> next-day
+      // +0.35% avg; IBS<0.1 buy / >0.9 sell on QQQ = 0.9%/trade, 70% WR. As a
+      // FILTER it requires the day to close near its low (true washout), as
+      // BT_IBS_ONLY=1 it replaces the RSI signal entirely.
+      const _bar = bars[i];
+      const _ibs = (_bar.high - _bar.low) > 0 ? (_bar.close - _bar.low) / (_bar.high - _bar.low) : 0.5;
+      const _ibsMax = Number(process.env.BT_IBS_MAX);
+      const _rsiLong = rsiVal <= thresholds.oversold - _depth;
+      const _ibsLong = _ibsMax > 0 ? _ibs <= _ibsMax : true;
+      if (process.env.BT_IBS_ONLY === "1") direction = _ibsLong && _ibsMax > 0 ? "BULLISH" : "NEUTRAL";
+      else if (process.env.BT_IBS_OR === "1") direction = (_rsiLong || (_ibsMax > 0 && _ibs <= _ibsMax)) ? "BULLISH" : "NEUTRAL";
+      else direction = _rsiLong && _ibsLong ? "BULLISH"
         : (process.env.BT_MEANREV_SHORT === "1" && rsiVal >= thresholds.overbought ? "BEARISH" : "NEUTRAL");
       if (direction === "BEARISH" && process.env.BT_SHORT_REGIME === "1"
           && (regimeByDate.get(bars[i].timestamp.slice(0, 10)) || "NEUTRAL") !== "BEARISH") direction = "NEUTRAL";
@@ -313,7 +378,7 @@ async function main() {
     if (dirUp && sr.support > 0 && sr.support < price && near(sr.support) >= 0.005 && near(sr.support) < 0.06) stopPx = sr.support;
     if (!dirUp && sr.resistance > price && near(sr.resistance) >= 0.005 && near(sr.resistance) < 0.06) stopPx = sr.resistance;
     let riskAbs = Math.max(Math.abs(price - stopPx), price * 0.008);
-    const _provRisk = _supStop != null ? Math.max(price - _supStop, price * 0.002) : riskAbs;
+    const _provRisk = _supStop != null ? Math.max(price - _supStop, price * (Number(process.env.BT_STOP_MIN_PCT) || 0.002)) : riskAbs;
     // ROOM FILTER (BT_MIN_R1R, magnitude study): skip entries whose first
     // resistance is closer than this many R. Momo entries are exempt (no ladder).
     if (!_momoEntry && Number(process.env.BT_MIN_R1R) > 0) {
@@ -334,7 +399,51 @@ async function main() {
     // fill next bar's open (no same-bar close fills = no look-ahead)
     const fillPx = bars[i + 1].open;
     let stop = dirUp ? fillPx - riskAbs : fillPx + riskAbs;
-    if (_supStop != null && dirUp) { stop = _supStop; riskAbs = Math.max(fillPx - stop, fillPx * 0.002); }
+    // BT_STOP_MIN_PCT (2026-08-06) — MINIMUM STOP DISTANCE.
+    //
+    // The support-entry stop sits just under the zone, so on a tight zone it
+    // lands INSIDE the instrument's noise band. Live 2026-08-06: SPY entered
+    // with a 0.20% stop and was tagged in 29 minutes; QQQ 0.32%; four of the
+    // day's stop-outs fired within ~20 minutes of entry and produced -$1,235
+    // against +$475 from the two positions that survived to a zone.
+    //
+    // It also breaks SIZING. Risk-based sizing solves qty = risk / stopDist, so
+    // a 0.20% stop asks for a $289k position to risk $576; the notional cap then
+    // truncates it to $33k and the trade ends up risking $66 — 11% of intended.
+    // That is why a 13-entry day moved the account 0.09%.
+    //
+    // Flooring riskAbs alone would only fix the arithmetic: the stop would still
+    // sit where it was and still get tagged. The STOP PRICE itself has to move.
+    if (_supStop != null && dirUp) {
+      const _minPct = Number(process.env.BT_STOP_MIN_PCT) || 0.002;   // 0.002 = the shipped 0.2% floor
+      stop = Math.min(_supStop, fillPx * (1 - _minPct));
+      riskAbs = fillPx - stop;
+    }
+    // BT_STOP_FROM_TGT=<n> (operator design 2026-08-07) — DERIVE THE STOP FROM
+    // THE TARGET. "Traders don't have a flat RR; they judge how far price can go
+    // and set the stop at 1/3 of that."
+    //
+    // Today the stop and the target are chosen INDEPENDENTLY: the stop sits under
+    // the support zone, the target is wherever R1 happens to be. So RR is an
+    // accident of geometry — live 2026-08-06 produced targets of 0.53R-1.62R,
+    // i.e. winners that paid LESS than the 1R they risked. Deriving the stop as
+    // (distance to first resistance) / n makes RR exactly n:1 BY CONSTRUCTION and
+    // makes the stop adapt to the size of the opportunity: a big expected move
+    // earns a wide stop, a small one gets a tight stop or is skipped.
+    //
+    // The MIN floor still applies afterwards — a derived stop must not land back
+    // inside the noise band.
+    if (Number(process.env.BT_STOP_FROM_TGT) > 0 && dirUp && !_momoEntry) {
+      const _n = Number(process.env.BT_STOP_FROM_TGT);
+      const _res = ((sr && sr.zones) || []).filter((z) => /RESIST/i.test(z.type || "") && z.level > fillPx * 1.001)
+        .sort((x, y) => x.level - y.level)[0];
+      if (_res) {
+        const _tgtDist = _res.level - fillPx;
+        const _minPct = Number(process.env.BT_STOP_MIN_PCT) || 0.002;
+        const _derived = fillPx - Math.max(_tgtDist / _n, fillPx * _minPct);
+        if (_derived > 0 && _derived < fillPx) { stop = _derived; riskAbs = fillPx - stop; }
+      }
+    }
     const target = _momoEntry ? Infinity : (dirUp ? fillPx + tr * riskAbs : fillPx - tr * riskAbs);
     open = {
       dir: direction, entryIdx: i + 1, entryPx: fillPx, entryDate: bars[i + 1].timestamp.slice(0, 10),
@@ -421,6 +530,13 @@ async function main() {
     win_rate_pct: n ? +(100 * wins.length / n).toFixed(1) : null,
     profit_factor: n ? +pf.toFixed(2) : null,
     total_R: +sumR.toFixed(1),
+    // PERCENT CAPTURED PER TRADE — the metric that maps to P&L. avg_R is
+    // NORMALISED BY STOP WIDTH, so a tight-stop config can post a higher avg_R
+    // while capturing far fewer dollars at the same position size. Ranking
+    // configs by avg_R nearly led us to reject a wider stop floor that is 2.5x
+    // better in dollars. Dollars/trade = position x avg_ret_pct.
+    avg_ret_pct: +(trades.reduce((a, t) => a + ((t.exitPx - t.entryPx) / t.entryPx) * (t.dir === "BULLISH" ? 1 : -1) * 100, 0) / Math.max(1, trades.length)).toFixed(4),
+    total_ret_pct: +trades.reduce((a, t) => a + ((t.exitPx - t.entryPx) / t.entryPx) * (t.dir === "BULLISH" ? 1 : -1) * 100, 0).toFixed(2),
     avg_R: n ? +(sumR / n).toFixed(3) : null,
     equity_1pct_risk: +eq.toFixed(3),
     max_drawdown_pct: +(100 * maxDd).toFixed(1),

@@ -3937,5 +3937,18 @@
     "mergeInto": "",
     "reason": "Stable design/wording policy guide still applied across pages",
     "audience": "builder"
+  },
+  {
+    "path": "docs/TRADER-GUIDE.md",
+    "title": "Trader Guide (user)",
+    "category": "guides",
+    "description": "End-user path from zero to a running autopilot: signup + email gate, BYOK Alpaca paper connect, the account-mode and Off/Intraday/Champion switches, what the autopilot does when on, how to stop/disconnect, troubleshooting. Mirrored as public/trader-guide.html.",
+    "status": "Living",
+    "updated": "2026-08-08",
+    "grounding": "Grounded",
+    "action": "keep",
+    "mergeInto": "",
+    "reason": "User-facing setup/usage guide for the trader (#3213); linked from the stock-trader header.",
+    "audience": "public"
   }
 ]

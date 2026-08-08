@@ -276,13 +276,43 @@ function journeyFor(n) {
       const res = await context.request.get('/api/broker/alpaca/status');
       expect(res.status(), 'alpaca status should be reachable for Pro').toBe(200);
       const body = await res.json();
-      if (!(body.connected === true || body.configured === true)) {
-        throw new Error('Alpaca test broker not available on this host — set paper server keys ' +
-          '(ALPACA_API_KEY_ID/ALPACA_API_SECRET_KEY) or the OAuth app ' +
-          '(ALPACA_OAUTH_CLIENT_ID/SECRET). Status: ' + JSON.stringify(body).slice(0, 200));
+      // Owner/OAuth boxes: already connected → surface is live, done.
+      if (body.connected === true) {
+        return `alpaca connected (via ${body.via || 'oauth'}, env ${body.env || 'paper'})`;
       }
-      return `alpaca ${body.connected ? 'connected' : 'configured'} ` +
-        `(via ${body.via || 'oauth'}, env ${body.env || 'paper'})`;
+      // Signed-in users get NO shared server account (#2546 — pooling was a privacy
+      // bug), so the REAL journey is bring-your-own-keys. Exercise that actual flow:
+      // paste keys → status connected via 'keys' → disconnect (cleanup, so the demo
+      // account is never left broker-linked). Test material: the host's own paper
+      // keys, read from the repo-root .env.local (the server validates them against
+      // Alpaca before storing — a dead key fails loudly here, which is the point).
+      const fs = require('fs');
+      const path = require('path');
+      let keyId = '', secretKey = '';
+      try {
+        const envTxt = fs.readFileSync(path.resolve(__dirname, '..', '..', '.env.local'), 'utf8');
+        keyId = (envTxt.match(/^ALPACA_API_KEY(?:_ID)?=(.*)$/m) || [])[1] || '';
+        secretKey = (envTxt.match(/^ALPACA_(?:API_)?SECRET(?:_KEY)?=(.*)$/m) || [])[1] || '';
+      } catch { /* no .env.local on this host */ }
+      if (!keyId || !secretKey) {
+        throw new Error('Alpaca test broker not available on this host — no connected account, ' +
+          'no OAuth app, and no paper keys in .env.local to exercise the BYOK connect flow. ' +
+          'Status: ' + JSON.stringify(body).slice(0, 200));
+      }
+      const conn = await context.request.post('/api/broker/alpaca/connect-keys', {
+        data: { keyId: keyId.trim(), secretKey: secretKey.trim(), env: 'paper' },
+      });
+      expect(conn.ok(), 'BYOK connect-keys should validate and store: ' +
+        (await conn.text()).slice(0, 200)).toBe(true);
+      const after = await (await context.request.get('/api/broker/alpaca/status')).json();
+      expect(after.connected, 'status should show connected after BYOK').toBe(true);
+      expect(after.via, 'BYOK connection reports via=keys').toBe('keys');
+      expect(after.env, 'BYOK defaults to the paper account').toBe('paper');
+      const off = await context.request.post('/api/broker/alpaca/disconnect');
+      expect(off.ok(), 'disconnect should remove the stored keys').toBe(true);
+      const final = await (await context.request.get('/api/broker/alpaca/status')).json();
+      expect(final.connected, 'demo account must not stay broker-linked').toBe(false);
+      return `alpaca BYOK journey: connect-keys → connected (via keys, paper, acct ${after.accountNumber || '?'}) → disconnected`;
     });
   });
 }

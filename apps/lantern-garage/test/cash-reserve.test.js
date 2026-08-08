@@ -49,6 +49,11 @@ async function run({ positions, signals, env }) {
     Object.assign(process.env, {
       TRADER_AUTO_EXECUTE: '1', TRADER_REQUIRE_PERSIST: '0', TRADER_MOMENTUM_EXIT: '0',
       TRADER_ENTRY_KNIFE_FILTER: '0', TRADER_LOG_SKIPS: '0',
+      // These fixtures hold 2 positions to exercise the GROSS cap. The
+      // concurrent-position cap (default 2) would otherwise intercept first and
+      // the test would assert the wrong gate — disable it so each test isolates
+      // the brake it names.
+      TRADER_MAX_CONCURRENT: '0',
     }, env || {});
     at._resetCooldowns();
     const out = await at.runAutoTrade({ signals }, { bridge: mkBridge({ positions, buys, sells }), userId: 'u', now: 1_700_000_000_000 });
@@ -57,10 +62,14 @@ async function run({ positions, signals, env }) {
 }
 
 test('an entry that would breach the gross cap is SKIPPED with a cash-reserve reason', async () => {
-  // $78k already deployed on $100k equity; cap 80% leaves a $2k budget — any
+  // $79.5k already deployed on $100k equity; cap 80% leaves a $500 budget — any
   // normal-sized entry must be refused.
+  // (Was 40k+38k = a $2,000 budget, which the 3% stop floor made EXACTLY equal
+  // to the sized position — `gross + qty*price > budget` is false at equality,
+  // so the fixture sat on a knife edge and started passing. Widen the margin so
+  // the test asserts the brake, not a boundary coincidence.)
   const { out, buys } = await run({
-    positions: [pos('SPY', 40000), pos('QQQ', 38000)],
+    positions: [pos('SPY', 40000), pos('QQQ', 39500)],
     signals: [enter('GLD')],
     env: { TRADER_MAX_GROSS_PCT: '80' },
   });

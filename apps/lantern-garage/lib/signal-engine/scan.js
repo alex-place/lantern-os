@@ -60,7 +60,43 @@ function gateAllows(gate, opts = {}) {
   return !!(gate && gate.actionable);
 }
 
+// IBS — Internal Bar Strength: where price sits in the session's range,
+// (last - low) / (high - low) over the bars of the most recent session date.
+// Null when the range is degenerate or bars are missing (fail-soft: no signal).
+function sessionIbs(bars) {
+  if (!Array.isArray(bars) || !bars.length) return null;
+  const last = bars[bars.length - 1];
+  const day = String(last.timestamp || "").slice(0, 10);
+  if (!day) return null;
+  let hi = -Infinity, lo = Infinity;
+  for (const b of bars) {
+    if (String(b.timestamp || "").slice(0, 10) !== day) continue;
+    const h = Number(b.high), l = Number(b.low);
+    if (Number.isFinite(h)) hi = Math.max(hi, h);
+    if (Number.isFinite(l)) lo = Math.min(lo, l);
+  }
+  const px = Number(last.close);
+  if (!Number.isFinite(px) || !(hi > lo)) return null;
+  return (px - lo) / (hi - lo);
+}
+
 function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
+  // IBS ENTRY (research 2026-08-08, weighed on ALL factors — per-trade, win
+  // rate, volume, total income). OOS 2015-26 across SPY/QQQ/GLD/SMH at the
+  // live 5% floor + 3:1 config: IBS<0.15 ALONE captures 658% total vs the RSI
+  // baseline's 297% (+0.741%/trade vs +0.559, WR 61.0 vs 55.7, 888 vs 531
+  // trades), and RSI∪IBS adds no total beyond IBS alone — IBS subsumes the RSI
+  // edge. Matches published results (Pagonidis 2013; QQQ 0.9%/trade, 70% WR).
+  //   TRADER_IBS_MODE=only  IBS is THE long entry signal (lab-validated winner)
+  //   TRADER_IBS_MODE=or    IBS adds entries on top of the zone/RSI logic
+  //   unset/off             no behavior change
+  const _ibsMax = Number(process.env.TRADER_IBS_MAX) || 0.15;
+  const _ibsMode = String(process.env.TRADER_IBS_MODE || "off");
+  if (_ibsMode === "only") {
+    const v = opts.ibs;
+    return (v != null && v <= _ibsMax) ? "BULLISH" : "NEUTRAL";
+  }
+  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMax) return "BULLISH";
   const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
   const up = trendDir && _isUptrend(opts.closes);
   if (sr.in_zone) {
@@ -266,7 +302,7 @@ async function scanAll(watchlist) {
     const rsiVal = rsi(_closes15) ?? 50;
     // closes feed the ZONE_TREND_DIR override — without them the trend can't be
     // judged and deriveDirection silently falls back to pure mean-reversion.
-    const direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15 });
+    const direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
     const gate = rileyGate({ sr, rsiVal, thresholds, struct, candle, direction, trending });
@@ -395,4 +431,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, gateAllows, rileyGate, candleGrade, convergenceVerdict };
