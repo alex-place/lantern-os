@@ -170,7 +170,12 @@ async function _autoscanTick() {
         //   champion   → sigma.rebalanceNow needs SIGMA_ARM=1
         //   day-trader → runAutoTrade needs TRADER_AUTO_EXECUTE=1 or TRADER_MANAGE_EXITS=1
         // A disarmed process places no orders either way, so skipping costs nothing.
-        const _isChampion = traderMode.get(uid) === 'champion';
+        // Per-user autopilot kill-switch (#3212): 'off' means NOTHING touches this
+        // account — no entries, no exits, no lock contention. Checked before the
+        // lock so an off user can never squat an account another process manages.
+        const _userMode = traderMode.get(uid);
+        if (_userMode === 'off') continue;
+        const _isChampion = _userMode === 'champion';
         const _canAct = _isChampion
           ? process.env.SIGMA_ARM === '1'
           : (process.env.TRADER_AUTO_EXECUTE === '1' || process.env.TRADER_MANAGE_EXITS === '1');

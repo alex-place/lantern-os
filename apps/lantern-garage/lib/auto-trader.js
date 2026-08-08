@@ -152,6 +152,41 @@ function cfg() {
     // 0.5 is chosen because it improves fit AND holdout — the signature of a
     // structural effect rather than a fitted constant. Kill: TRADER_TGT_MIN_R=0.
     tgtMinR: n('TRADER_TGT_MIN_R', 0.5),
+    // MINIMUM STOP DISTANCE, % of price (2026-08-06). Gated 2% vs 3% on 5
+    // symbols, fit 2000-2014 + holdout 2015-2026, 3bp costs, ranked by PERCENT
+    // CAPTURED PER TRADE (avg_R is normalised by stop width and inverts the
+    // ranking — the best-avg_R config captured the fewest dollars):
+    //   floor 2%: fit +0.072%/trade  holdout +0.275%/trade
+    //   floor 3%: fit +0.159%/trade  holdout +0.312%/trade   <- wins BOTH
+    // 3% also lifts win rate (45% -> 59%) by not tagging out on noise. At the
+    // unchanged 7% notional cap that is ~$210/trade vs ~$85 today.
+    // NOTE: the gate covered UNLEVERAGED symbols (SPY QQQ GLD TLT SMH). On a 3x
+    // ETF a 3% stop is only a ~1% move in the underlying, so it is tighter in
+    // real terms there, not wider — see TRADER_STOP_MIN_PCT_BY_SYMBOL.
+    stopMinPct: n('TRADER_STOP_MIN_PCT', 3),
+    // RR by construction: stop = (distance to first real resistance) / n.
+    // 0 disables (stop stays structural). Gated 2:1/3:1/4:1 — all beat off in
+    // both windows; 3:1 best on holdout (+0.378%/trade vs +0.334%).
+    stopFromTgt: n('TRADER_STOP_FROM_TGT', 3),
+    // Max simultaneous open positions. Truncates the left tail (worst days are
+    // concurrency x stop width). 0 disables.
+    maxConcurrent: n('TRADER_MAX_CONCURRENT', 2),
+    // Positions below this % of equity are DUST and never consume a
+    // concurrency slot (nor do unclosable ones). 0 counts every row.
+    dustPct: n('TRADER_DUST_PCT', 0.1),
+    // Minimum reward:risk, measured against the FLOORED stop. 0 disables.
+    minEntryRr: n('TRADER_MIN_ENTRY_RR', 1),
+    // Trail past R2 instead of selling AT it (lab 2026-08-08, Monday-config
+    // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
+    // A mark through R2 upgrades the runner to a ratcheting floor at
+    // peak*(1 - r2TrailPct%), never below R2. 0 keeps the fixed R2 sell.
+    r2Trail: n('TRADER_R2_TRAIL', 0),
+    r2TrailPct: n('TRADER_R2_TRAIL_PCT', 1),
+    // Trading days a stopped-out symbol stays barred from re-entry (0 disables).
+    stopCooldownDays: n('TRADER_STOP_COOLDOWN_DAYS', 1),
+    // Daily circuit breaker: after this many stop FILLS in one ET session, no
+    // new entries for the rest of it (0 disables). Exits are never blocked.
+    stopBreaker: n('TRADER_STOP_BREAKER', 2),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -277,8 +312,50 @@ const _peak = new Map();        // sym -> highest price seen since entry (traili
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
+const _loggedFills = new Set();   // broker order ids already written to the ledger
+// Fills older than this process are not reconciled: after a restart the entry
+// price is not in memory, so back-filling only produces pnl:null noise (observed
+// 2026-08-07). Their ids are still remembered, so they can never resurface.
+const _PROCESS_START = Date.now();
+const _exitIntent = new Map();    // sym -> reason for the exit we just ordered (labels the fill row)
+const fillLedger = require('./fill-ledger');
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
 const _stopDistPct = new Map(); // sym -> protective-stop distance % at entry (ATR stops make it per-trade)
+// POST-STOP RE-ENTRY COOLDOWN (2026-08-08 tail gate). After a protective stop
+// fills, the symbol is barred from re-entry for the rest of that session plus
+// TRADER_STOP_COOLDOWN_DAYS trading days. Lab (both windows, 19 symbols, live
+// config): halves the holdout's worst day (-2.86% -> -1.40%) at -0.004%/trade.
+// sym -> ET date string (inclusive) through which entries are refused.
+const _stopCooldownThrough = new Map();
+// DAILY CIRCUIT BREAKER (2026-08-08 tail gate #2). The 2008-class worst days
+// were CROSS-symbol churn: stops freed slots, fresh symbols refilled them into
+// the same crashing market. Once TRADER_STOP_BREAKER stop fills land in one ET
+// session, entries are refused for the rest of it. Replay (both windows, on top
+// of the cooldown): worst day -3.97% -> -1.40% (= the pure 4x0.35% structural
+// bound) AND %/trade improved in both windows — crash-day refills were -EV.
+let _stopFillsDay = null;   // ET date the counter belongs to
+let _stopFillsCount = 0;    // stop fills observed that date
+function _noteStopFill(ts) {
+  const d = _etDate(ts);
+  if (_stopFillsDay !== d) { _stopFillsDay = d; _stopFillsCount = 0; }
+  _stopFillsCount++;
+}
+function _breakerTripped(now, k) {
+  return k > 0 && _stopFillsDay === _etDate(now) && _stopFillsCount >= k;
+}
+function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+function _nextTradingDates(dateStr, n) {
+  // dateStr + n trading days (weekend-skipping; holidays just widen the block,
+  // which errs on the safe side for a cooldown).
+  const d = new Date(dateStr + 'T12:00:00Z');
+  let left = n;
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return d.toISOString().slice(0, 10);
+}
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 // sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
@@ -308,6 +385,39 @@ function _isExitInFlight(status) {
 const STATE_FILE = process.env.TRADER_STATE_FILE
   ? path.resolve(process.env.TRADER_STATE_FILE)
   : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'trader-state.json');
+/**
+ * RECONCILE THE LEDGER AGAINST BROKER FILLS.
+ *
+ * Exits used to be written at order-PLACEMENT time from the position's last
+ * MARK, which was wrong in both directions every session 2026-08-05..07:
+ * stop-outs understated 30-60% (XLK -$319 logged vs -$641 filled), and an exit
+ * order that never filled still logged as a completed exit (QQQ logged twice,
+ * +$453 vs +$217 real). This makes the broker the source of truth — a row is
+ * written when, and only when, a sell actually filled, priced at the fill.
+ */
+function _reconcileFills(orders) {
+  const done = new Set();
+  try {
+    const rows = fillLedger.newExitRows(orders, _loggedFills, (sym) => {
+      const lp = _lastPos.get(sym);
+      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym) };
+    }, _PROCESS_START);
+    for (const row of rows) {
+      logTrade(row);
+      done.add(row.symbol);
+      _exitIntent.delete(row.symbol);
+      // A STOP fill arms the re-entry cooldown: today + N trading days.
+      const _cdDays = cfg().stopCooldownDays;
+      if (String(row.order_type || '') === 'Stop' || /(^|\b)stop\b/i.test(String(row.reason || ''))) {
+        if (_cdDays > 0) _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
+        _noteStopFill(Date.now());   // feeds the daily circuit breaker
+      }
+    }
+    for (const id of fillLedger.idsToRemember(orders)) _loggedFills.add(String(id));
+  } catch (_e) { /* reconciliation must never break trading */ }
+  return done;
+}
+
 function _saveState() {
   try {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
@@ -327,8 +437,11 @@ function _saveState() {
       // leaves the book — see the reconcile loop, which deletes both.
       exitFailures: Object.fromEntries(_exitFailures),
       unclosable: [..._unclosable],
+      loggedFills: [..._loggedFills].slice(-500),   // bounded: ids only matter within a session
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
+      stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
+      stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -345,8 +458,11 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
     for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
     for (const s of (o.unclosable || [])) _unclosable.add(s);
+    for (const id of (o.loggedFills || [])) _loggedFills.add(String(id));
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
+    for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
+    if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -397,7 +513,8 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   await cancelRestingStops(bridge, userId, sym);
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
-  logTrade({ event: 'exit', symbol: sym, qty, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason, status: r && r.status });
+  _exitIntent.set(sym, reason);
+  logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status });
   out.executed.push({ symbol: sym, action: 'exit_long', qty, reason, result: r });
   return r;
 }
@@ -489,9 +606,26 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
           await closeLong(bridge, userId, sym, qty, p, `zone_r1 (first resistance ${_lad.r1})`, out, now, { extended, refPrice: cur });
           delete heldQty[sym]; continue;
         }
+      } else if (_lad.broke2) {
+        // R2-TRAIL (lab-gated 2026-08-08): the runner broke THROUGH R2 — ride it
+        // with a ratcheting floor instead of having sold at the target. QQQ
+        // 2026-08-07 sold its runner at 720.85 and price closed 723.03.
+        _lad.peak2 = Math.max(_lad.peak2 || _lad.r2, cur);
+        _lad.floor2 = Math.max(_lad.floor2 || _lad.r2, _lad.peak2 * (1 - c.r2TrailPct / 100));
+        _zoneLadder.set(sym, _lad);
+        if (cur <= _lad.floor2) {
+          await closeLong(bridge, userId, sym, qty, p, `r2_trail (peak ${_lad.peak2.toFixed(2)}, floor ${_lad.floor2.toFixed(2)})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
       } else if (_lad.r2 > 0 && cur >= _lad.r2) {
-        await closeLong(bridge, userId, sym, qty, p, `zone_r2 (runner target ${_lad.r2})`, out, now, { extended, refPrice: cur });
-        delete heldQty[sym]; continue;
+        if (c.r2Trail) {
+          _lad.broke2 = true; _lad.peak2 = cur;
+          _lad.floor2 = Math.max(_lad.r2, cur * (1 - c.r2TrailPct / 100));
+          _zoneLadder.set(sym, _lad); _saveState();
+        } else {
+          await closeLong(bridge, userId, sym, qty, p, `zone_r2 (runner target ${_lad.r2})`, out, now, { extended, refPrice: cur });
+          delete heldQty[sym]; continue;
+        }
       } else if (cur <= _lad.r1) {
         await closeLong(bridge, userId, sym, qty, p, `zone_r1_floor (gave back to ${_lad.r1})`, out, now, { extended, refPrice: cur });
         delete heldQty[sym]; continue;
@@ -608,6 +742,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const positions = await bridge.getIBKRPositions(userId).catch(() => []);
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
+  let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
@@ -622,6 +757,13 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   }
 
   // ── External-close sweep: THE LOSS PATH ────────────────────────────────────────
+  // Broker orders are fetched HERE (before the reconstruct loop) because the
+  // fill-based reconciliation must run first: a real fill is authoritative and
+  // the reconstruct loop below must yield to it rather than logging a second,
+  // mark-priced row for the same exit.
+  const _ordersEarly = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const _filledSyms = _reconcileFills(_ordersEarly);   // authoritative exits, priced at the fill
+
   // Only a symbol the autopilot itself decided to exit was ever reconciled below, so
   // a position closed by anything ELSE left no ledger row at all. The dominant such
   // path is the resting protective STOP filling — i.e. every stop-out, i.e. the
@@ -645,6 +787,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // top of it produced two rows for one SHOP position. The presence of a status at
     // all means we decided (and logged) an exit for this symbol.
     if (_exitStatus.has(sym)) continue;
+    // A real broker fill was reconciled for this symbol this cycle — that row is
+    // authoritative and priced at the fill. Reconstructing from a mark on top of
+    // it is exactly the double-count that logged QQQ twice on 2026-08-07.
+    if (_filledSyms && _filledSyms.has(sym)) continue;
     const entry = Number(snap.entry);
     const mark = Number(snap.mark);
     const qty = Number(snap.qty);
@@ -664,7 +810,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // stack another sell on those, so a lagging position snapshot can't make the loop sell
   // `held` again and blow through flat into a short. Survives restarts (broker-side state),
   // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
-  const _openOrders = await bridge.getIBKROpenOrders(userId).catch(() => []);
+  const _openOrders = _ordersEarly;
   const workingSells = new Set((_openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
@@ -859,7 +1005,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
         const hp = heldPos[sym] || {};
         // Realized P&L on the closed long (the position's unrealized P&L becomes real).
-        logTrade({ event: 'exit', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, exit: hp.current_price ?? null, pnl: hp.unrealized_pl ?? null, pnl_pct: hp.pnl_pct ?? null, reason: 'signal_exit', status: r && r.status });
+        _exitIntent.set(sym, 'signal_exit');
+        logTrade({ event: 'exit_intent', symbol: sym, qty: held, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason: 'signal_exit', status: r && r.status });
         out.executed.push({ ...record, action: 'exit_long', qty: held, result: r });
         _lastOrderAt.set(sym, now);
       } else {
@@ -907,14 +1054,33 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       if (dist > c.supEntryAtr) { out.skipped.push({ ...record, why: `sup_entry: ${dist.toFixed(1)} ATR above support (max ${c.supEntryAtr}) — not at the zone` }); continue; }
       const cand = (sup.bottom || sup.level) - 0.25 * aAbs;
       if (cand > 0 && cand < price * 0.999) _supStopPx = cand;
+      // MINIMUM STOP DISTANCE (stopMinPct). The zone stop can land INSIDE the
+      // instrument's noise band: live 2026-08-06 SPY entered with a 0.20% stop
+      // and was tagged in 29 minutes; four stop-outs that session fired within
+      // ~20 minutes and cost -$1,235 against +$475 from the two positions that
+      // survived long enough to reach a zone. Push the stop out so it marks a
+      // broken thesis, not a wiggle. Must move the STOP PRICE, not just the
+      // distance used for sizing — clamping the distance alone leaves the stop
+      // where it was and it still gets tagged (the bug this replaces).
+      if (_supStopPx != null && c.stopMinPct > 0) {
+        _supStopPx = Math.min(_supStopPx, price * (1 - c.stopMinPct / 100));
+      }
     }
 
     const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
     // Stop distance is now an INPUT to sizing (risk-based), so it must be resolved
     // before the order is sized. Structural (support-entry) stop wins when armed.
-    const _stopDist = _supStopPx != null
-      ? Math.min(6, Math.max(0.2, ((price - _supStopPx) / price) * 100))
-      : stopDistPctFor(price, s.plan, c, sym);
+    // The minimum-stop floor applies to EVERY entry, not just support entries.
+    // Shipped 2026-08-06 wired only into the support-entry branch, so the four
+    // symbols outside supEntrySyms (XLK IWM DIA SOXL) kept taking plan/ATR stops
+    // of 1.0-1.5%. On 2026-08-07 all three entries were such symbols: XLK went in
+    // with a 1.00% stop and was tagged 24 minutes later for -$642 on a 1% wiggle
+    // — exactly the failure the floor exists to prevent, on a symbol the floor
+    // did not cover. Applied to NEW entries only; stops already resting at the
+    // broker are left alone.
+    const _stopDist = Math.min(15, Math.max(c.stopMinPct, _supStopPx != null
+      ? ((price - _supStopPx) / price) * 100
+      : stopDistPctFor(price, s.plan, c, sym)));
     // Room tier: distance to the first resistance, in R (this trade's stop units).
     // No resistance above = open room = A-tier.
     // Resistances above price that are FAR ENOUGH to be real targets (c.tgtMinR).
@@ -924,11 +1090,43 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       .filter((z) => c.tgtMinR <= 0
         || ((Number(z.level) - price) / price) * 100 / Math.max(_stopDist, 1e-9) >= c.tgtMinR)
       .sort((x, y) => x.level - y.level);
+    // STOP DERIVED FROM TARGET (stopFromTgt, 2026-08-07). Traders don't carry a
+    // flat RR — they judge how far price can run and set the stop at a fraction
+    // of that. Today stop and target are chosen INDEPENDENTLY (stop under the
+    // support zone, target wherever R1 lands), so RR is an accident of geometry:
+    // live 2026-08-06 produced targets of 0.53R-1.62R, i.e. winners paying LESS
+    // than the 1R they risked. Deriving the stop as (distance to first real
+    // resistance) / n makes RR exactly n:1 by construction and lets the stop
+    // scale with the size of the opportunity.
+    //   gate, holdout 2015-2026, %/trade: off +0.334  2:1 +0.355  3:1 +0.378
+    //   (all three beat off in BOTH windows; 3:1 best on holdout)
+    // The stopMinPct floor still wins afterwards — a derived stop must never
+    // land back inside the noise band.
+    let _stopDistEff = _stopDist;
+    if (c.stopFromTgt > 0 && _resAbove[0]) {
+      const _tgtPct = ((Number(_resAbove[0].level) - price) / price) * 100;
+      _stopDistEff = Math.min(15, Math.max(c.stopMinPct, _tgtPct / c.stopFromTgt));
+      if (_supStopPx != null) _supStopPx = price * (1 - _stopDistEff / 100);
+    }
+    // MINIMUM ENTRY RR (minEntryRr). The stop floor and the 3:1 derivation fight
+    // each other: stopFromTgt wants stop = target/3, but if that lands inside the
+    // floor the floor wins (Math.max) and RR collapses. 2026-08-07 SOXL took a
+    // 3.00% stop against a 1.60% target — 0.53:1, a trade that loses more than it
+    // wins even when right — and closed -$217. When the floored stop cannot pay
+    // at least minEntryRr, SKIP rather than take it.
+    if (c.minEntryRr > 0 && _resAbove[0]) {
+      const _tgtPct = ((Number(_resAbove[0].level) - price) / price) * 100;
+      const _rr = _tgtPct / Math.max(_stopDistEff, 1e-9);
+      if (_rr < c.minEntryRr) {
+        out.skipped.push({ ...record, why: `rr ${_rr.toFixed(2)}:1 below ${c.minEntryRr}:1 (target ${_tgtPct.toFixed(2)}% vs floored stop ${_stopDistEff.toFixed(2)}%)` });
+        continue;
+      }
+    }
     let _roomR = null, _tier = 'A';
     if (c.roomTier) {
       const _res1 = _resAbove[0];
       if (_res1) {
-        _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDist, 1e-9);
+        _roomR = ((_res1.level - price) / price) * 100 / Math.max(_stopDistEff, 1e-9);
         if (_roomR < c.roomMinR) _tier = 'B';
       }
       // A+ upgrade: room AND volume expansion (the confluence the OOS gate passed).
@@ -938,7 +1136,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // have such tight structural stops that the 5% cap binds before the risk
     // target, and without scaling the cap the tiers would size identically.
     const _tierMult = _tier === 'B' ? c.roomBMult : (_tier === 'A+' ? c.aplusMult : 1);
-    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDist });
+    const qty = sizePosition({ equity: account.equity, price, sizeMult, positionPct: c.positionPct, maxPositionPct: c.maxPositionPct * _tierMult, riskPct: c.riskPct * _tierMult, stopDistPct: _stopDistEff });
     if (qty < 1) { out.skipped.push({ ...record, why: 'size < 1 share' }); continue; }
     // CASH RESERVE (operator, 2026-08-06): total deployed capital is capped at
     // maxGrossPct of equity — the account always keeps (100 - maxGrossPct)% in
@@ -946,6 +1144,60 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // a 7% cap could theoretically deploy 84%. This is the portfolio-level
     // brake: an entry that would push gross exposure past the cap is skipped
     // (exits are never blocked — reducing risk is always allowed).
+    // DAILY CIRCUIT BREAKER (2026-08-08). Two stop fills in one session = the
+    // market is hostile today; refilling freed slots with fresh symbols into the
+    // same tape built every 2008-class worst day. Entries only — exits and the
+    // protective stops are untouched.
+    if (_breakerTripped(now, c.stopBreaker)) {
+      out.skipped.push({ ...record, why: `circuit breaker: ${_stopFillsCount} stop-outs today (max ${c.stopBreaker}) — no new entries this session` });
+      continue;
+    }
+    // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
+    // falling — re-buying the same knife the same/next session is the churn that
+    // built the worst backtest days. Barred through the recorded ET date.
+    if (c.stopCooldownDays > 0) {
+      const _cdThrough = _stopCooldownThrough.get(sym);
+      if (_cdThrough && _etDate(now) <= _cdThrough) {
+        out.skipped.push({ ...record, why: `post-stop cooldown: stopped out, no re-entry through ${_cdThrough}` });
+        continue;
+      }
+      if (_cdThrough) { _stopCooldownThrough.delete(sym); _saveState(); }   // expired → clean up
+    }
+    // CONCURRENT-POSITION CAP (maxConcurrent, 2026-08-07). Portfolio replay of
+    // the holdout showed the left tail is a product of CONCURRENCY x STOP WIDTH,
+    // not of any single bad trade: every worst day pinned at exactly -9.00% =
+    // 3 positions x the 3% stop floor. Capping concurrency at 2 cut days worse
+    // than -5% by 15% while AVERAGE %/trade actually improved (+0.384 vs
+    // +0.378) and total return fell only 10%.
+    // Honest limit: this does NOT reduce the negative-DAY rate (59-60% positive
+    // at every cap tested, including off) — it truncates severity, not frequency.
+    if (c.maxConcurrent > 0) {
+      // DUST EXCLUSION (2026-08-07). The cap counts RISK SLOTS, not rows in the
+      // book. Counting any qty>0 position saturated it with garbage: on the
+      // morning after this shipped the account held QQQ ($32,983, real) plus the
+      // SOXS remnant (0.8 shares, $35, flagged unclosable since 2026-08-04) —
+      // 2 of 2 slots, so EVERY entry that session would have been refused by a
+      // position worth 0.004% of equity that cannot even be sold.
+      // A slot is consumed only by a position that is (a) economically
+      // meaningful and (b) actually exitable.
+      const _dustFloor = account.equity * (c.dustPct / 100);
+      // heldPos is a snapshot taken ONCE at scan start, so several entries in the
+      // same cycle all saw the same pre-scan count and each took "the last slot".
+      // 2026-08-07: SOXL exited at 19:36:08, then XLK (:10) and QQQ (:11) both
+      // entered in that cycle, leaving 3 positions open against maxConcurrent=2 —
+      // the cap that bounds the left tail silently did not hold.
+      const _openN = _openedThisScan + Object.values(heldPos).filter((p) => {
+        const q = Math.abs(Number(p.qty) || 0);
+        if (!(q > 0)) return false;
+        if (_unclosable.has(String(p.symbol).toUpperCase())) return false;   // cannot be exited -> not a slot
+        const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
+        return mv >= _dustFloor;
+      }).length;
+      if (_openN >= c.maxConcurrent) {
+        out.skipped.push({ ...record, why: `concurrent cap: ${_openN} positions open (max ${c.maxConcurrent})` });
+        continue;
+      }
+    }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
       const _gross = Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
@@ -1004,7 +1256,15 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Observability + a brake ONLY. No warning is confirmed, so this does not make any
     // entry more likely to reach the market than it already was.
     if (r && r.status !== 'placed' && r.status !== 'dry_run') {
-      const why = r.reason || r.error || r.note || r.status || 'unknown';
+      // IBKR's `note` is a GENERIC instruction ("re-submit with acceptWarnings"),
+      // identical for every warning type — it does not say WHICH warning fired.
+      // On 2026-08-06 two entries parked ($67k notional) and the actual advisory
+      // text existed only in r.warnings, which was never logged, so the block
+      // could not be diagnosed from the ledger at all. Surface the real messages.
+      const _warnTxt = Array.isArray(r.warnings) && r.warnings.length
+        ? r.warnings.map((w) => (w && (w.message || w.text || w)) ?? '').join(' || ').slice(0, 300)
+        : '';
+      const why = r.reason || r.error || (_warnTxt ? `${r.note || r.status}: ${_warnTxt}` : r.note) || r.status || 'unknown';
       logTrade({
         event: 'entry_blocked', symbol: sym, side: 'long', qty,
         entry: price, notional: Math.round(qty * price),
@@ -1013,14 +1273,56 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; } }
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+      // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
+      // paper cash-secured-put leg for this same signal, paired by symbol+ts.
+      // Fire-and-forget: the chain fetch must never delay or break the scan.
+      try { require('./csp-shadow').onEntry({ symbol: sym, price, qty, ts: now }).catch(() => {}); } catch (_e) { /* shadow book absent → nothing */ }
+    } }
     else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
   _logSkips(out.skipped);
+  // CSP shadow book: resolve any paper legs whose expiry has passed (cheap —
+  // no-op when nothing is due; quotes fetched lazily per due symbol).
+  try {
+    const _csp = require('./csp-shadow');
+    if (_csp.openCount() > 0) {
+      _csp.resolveDue(async (s) => {
+        const q = await require('./market-data-yahoo').getQuotes([s]).catch(() => []);
+        return q && q[0] && Number(q[0].price) > 0 ? Number(q[0].price) : null;
+      }, now).catch(() => {});
+    }
+  } catch (_e) { /* observer only — never breaks the scan */ }
+  // ── SLOT-UTILIZATION OBSERVABILITY (2026-08-08) ────────────────────────────
+  // Throughput, not signal quality, is the open question at ~$235-400 captured
+  // per trade: 0.5%/day needs both concurrency slots WORKING. This records every
+  // transition of slots-in-use (same slot definition as the cap: dust and
+  // unclosable positions excluded), so the daily report can time-weight how much
+  // of the session ran 0/1/2 slots filled. One row per change, not per scan.
+  if (process.env.TRADER_LOG_SKIPS !== '0' && c.maxConcurrent > 0) {
+    const _dustFloorU = account.equity * (c.dustPct / 100);
+    const _slotSyms = Object.values(heldPos).filter((p) => {
+      const q = Math.abs(Number(p.qty) || 0);
+      if (!(q > 0)) return false;
+      if (_unclosable.has(String(p.symbol).toUpperCase())) return false;
+      const mv = Math.abs(Number(p.market_value) || q * (Number(p.current_price) || 0));
+      return mv >= _dustFloorU;
+    }).map((p) => String(p.symbol).toUpperCase()).sort();
+    const _used = _slotSyms.length + _openedThisScan;
+    const _sig = `${_used}/${c.maxConcurrent}:${_slotSyms.join(',')}`;
+    if (_lastSlotSig !== _sig) {
+      _lastSlotSig = _sig;
+      logTrade({
+        event: 'slot_util', slots_used: _used, cap: c.maxConcurrent,
+        held: _slotSyms, opened_this_scan: _openedThisScan,
+      });
+    }
+  }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
   return out;
 }
+let _lastSlotSig = null;   // last logged slots-in-use signature (change-only dedupe)
 
 // ── SKIP-REASON OBSERVABILITY (2026-08-05) ───────────────────────────────────
 // out.skipped lived and died in memory, so a session where the trader declined
@@ -1056,6 +1358,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

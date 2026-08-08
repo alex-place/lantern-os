@@ -30,7 +30,7 @@ module.exports = async function traderModeRoutes(req, res, url, ctx) {
     let mode = '';
     try { mode = String((JSON.parse(body || '{}') || {}).mode || '').toLowerCase(); } catch (_e) { /* bad json */ }
     if (!traderMode.set(uid, mode)) {
-      return sendJson(res, { error: 'invalid_mode', message: "mode must be 'stock' or 'champion'" }, 400), true;
+      return sendJson(res, { error: 'invalid_mode', message: "mode must be 'off', 'stock' or 'champion'" }, 400), true;
     }
     // Single-user/owner box (auth off): mirror to local-owner so the background
     // autopilot (which trades the 'local-owner' account) follows the UI choice.

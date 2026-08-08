@@ -435,12 +435,18 @@
     // broker is connected. 📈 Stock = signals + your manual buy/sell; 🏆 Champion = the
     // automated diversified ETF-allocation book run on your account.
     const anyBroker = alConn || ibLive;
-    const curMode = (mode.body && mode.body.mode === "champion") ? "champion" : "stock";
+    const modeDesc = (m) => m === "champion"
+      ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)."
+      : m === "stock"
+        ? "📈 Intraday trader — automated signal entries/exits + your manual buy/sell."
+        : "⏸ Off — the autopilot never touches this account; you trade manually.";
+    const curMode = ["off", "stock", "champion"].includes(mode.body && mode.body.mode) ? mode.body.mode : "off";
     const traderRow = anyBroker ? `
-      <div class="group-label">Active trader</div>
-      <div class="row"><div class="rl"><div class="k">Which trader runs your account</div><div class="v" id="t-mode-desc">${curMode === "champion" ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)." : "📈 Stock trader — signal entries + your manual buy/sell."}</div></div><div class="rc">
+      <div class="group-label">Trader</div>
+      <div class="row"><div class="rl"><div class="k">Autopilot on your account</div><div class="v" id="t-mode-desc">${modeDesc(curMode)}</div></div><div class="rc">
         <div class="seg" id="t-mode">
-          <button data-m="stock" class="${curMode === "stock" ? "on" : ""}" title="Signals + manual buy/sell">📈 Stock</button>
+          <button data-m="off" class="${curMode === "off" ? "on" : ""}" title="The autopilot never touches this account">⏸ Off</button>
+          <button data-m="stock" class="${curMode === "stock" ? "on" : ""}" title="Automated intraday signal entries/exits">📈 Intraday</button>
           <button data-m="champion" class="${curMode === "champion" ? "on" : ""}" title="Automated ETF allocation book">🏆 Champion</button>
         </div></div></div>` : "";
 
@@ -497,9 +503,7 @@
       if (!o.ok) { alert("Couldn't switch trader — try again."); return; }
       const m = (o.body && o.body.mode) || b.dataset.m;
       btns.forEach((x) => x.classList.toggle("on", x.dataset.m === m));
-      const d = $("t-mode-desc"); if (d) d.textContent = m === "champion"
-        ? "🏆 Champion — automated diversified ETF allocation (the day-trader is paused)."
-        : "📈 Stock trader — signal entries + your manual buy/sell.";
+      const d = $("t-mode-desc"); if (d) d.textContent = modeDesc(m);
     });
     el.querySelectorAll("[data-key-set]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.keySet; const v = prompt(`Paste your ${id} API key:`); if (!v) return;

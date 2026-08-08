@@ -596,7 +596,22 @@
       if (!err) return;
       const provider = q.get("provider");
       const base = ERROR_TEXT[err] || "Sign-in error.";
-      showError(provider ? `${base} (${provider})` : base);
+      // A bare "didn't complete" tells the user (and us) nothing — the server now
+      // classifies the failure and passes a stable `reason`, so say what broke and
+      // what to do about it. Unknown reasons still render, so a new code is never
+      // swallowed.
+      const REASON_TEXT = {
+        token_exchange: "the server couldn't exchange the sign-in code with the provider",
+        code_rejected: "the provider rejected the sign-in code — it may have expired; try again",
+        bad_client_credentials: "this server's provider credentials are wrong — an operator needs to fix them",
+        userinfo: "the provider wouldn't return your account details",
+        storage: "this server couldn't save your profile (storage problem) — an operator needs to fix it",
+        profile: "your profile couldn't be created or linked",
+      };
+      const reason = new URLSearchParams(location.search).get("reason");
+      let msg = provider ? `${base} (${provider})` : base;
+      if (reason) msg += ` — ${REASON_TEXT[reason] || reason}`;
+      showError(msg);
     } catch (_) {}
   }
 

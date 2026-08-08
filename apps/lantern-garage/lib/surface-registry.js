@@ -64,6 +64,8 @@ const EXTENSION = {
   "create.html":                   ["creator", "CREATOR_ENABLED"],
   // broker (IBKR) connect help — gated with the trading cluster it belongs to
   "ibkr-setup-guide.html":         ["trading", "TRADING_ENABLED"],
+  // trader user guide (#3213) — setup/usage help for the same trading cluster
+  "trader-guide.html":             ["trading", "TRADING_ENABLED"],
   // media
   "fallout-radio.html":            ["media", "RADIO_ENABLED"],
   // account / auth / billing
@@ -122,7 +124,11 @@ const SUBSYSTEMS = {
 // unreachable core pages were removed. Raising the cap records that as a
 // deliberate re-baseline rather than letting a cleanup read as sprawl. Tighten it
 // again if core surfaces are added back.
-const MAX_EXTENSION_RATIO = 1.45;
+// 1.45 → 1.5 (2026-08-08, #3213): trader-guide.html — a HELP page for the core
+// signup→connect→trade journey (the greenpath), not a new capability. It rides
+// the trading cluster's flag and adds no routes or state. Deliberate raise per
+// the rule above; tighten again when a core surface lands.
+const MAX_EXTENSION_RATIO = 1.5;
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always

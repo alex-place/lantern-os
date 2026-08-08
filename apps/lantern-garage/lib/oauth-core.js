@@ -364,8 +364,32 @@ async function handleOAuthCallback(providerId, req, res, query) {
     );
     return publicProfile(profile);
   } catch (err) {
-    console.error(`[AUTH] ${providerId} callback error:`, err.message);
-    res.writeHead(302, { "Set-Cookie": clearCookie, Location: `/auth.html?error=oauth_failed&provider=${providerId}` });
+    // CLASSIFY the failure so the user (and the log) learn something. A bare
+    // "Sign-in didn't complete" is the same silent-failure pattern that hid the
+    // trader outages: the operator hit it on 2026-08-01 and nothing on screen or
+    // in the response said which of five very different things went wrong.
+    //
+    // The `reason` is a short STABLE code, never the raw message — upstream error
+    // bodies can carry tokens/PII and must not reach a URL. The full detail stays
+    // server-side in the log line below.
+    const msg = String((err && err.message) || err || '');
+    const reason =
+      /Token exchange failed/i.test(msg) ? 'token_exchange'
+      : /invalid_grant/i.test(msg) ? 'code_rejected'
+      : /invalid_client/i.test(msg) ? 'bad_client_credentials'
+      : /userinfo|fetch user|profile fetch/i.test(msg) ? 'userinfo'
+      : /ENOENT|EACCES|EROFS|permission|read-only/i.test(msg) ? 'storage'
+      : /profile|identity/i.test(msg) ? 'profile'
+      : 'unknown';
+    console.error(
+      `[AUTH] ${providerId} callback FAILED reason=${reason} msg=${msg}` +
+      ` | redirect_uri=${(() => { try { return resolveRedirectUri(req, providerId); } catch (_e) { return '?'; } })()}`
+    );
+    if (err && err.stack) console.error(`[AUTH] ${providerId} stack: ${String(err.stack).slice(0, 400)}`);
+    res.writeHead(302, {
+      "Set-Cookie": clearCookie,
+      Location: `/auth.html?error=oauth_failed&provider=${providerId}&reason=${encodeURIComponent(reason)}`,
+    });
     res.end();
   }
 }

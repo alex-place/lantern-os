@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta charset="utf-8">
+  <meta name="loop-stage" content="act">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trader Guide — unisona.ai</title>
+  <script>(function(){try{var s=localStorage.getItem('lantern-theme');var d=s?s==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+  <link rel="stylesheet" href="/css/site.css">
+  <style>
+    main{max-width:720px;margin:0 auto;padding:28px 20px 72px}
+    h1{font-size:26px;margin:0 0 4px}
+    .sub{color:var(--muted);font-size:15px;margin:0 0 22px;line-height:1.6}
+    .step{border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:20px 22px;margin-bottom:14px}
+    .step h2{font-size:16px;margin:0 0 8px;display:flex;align-items:center;gap:10px}
+    .num{flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
+    .step p,.step li{font-size:15px;line-height:1.65;color:var(--text)}
+    .step li{margin-bottom:5px}
+    .step a{color:var(--accent)}
+    .muted{color:var(--muted);font-size:13.5px}
+    code{font-family:'IBM Plex Mono',monospace;font-size:13px;background:color-mix(in srgb,var(--accent) 10%,transparent);padding:1px 6px;border-radius:4px}
+    .callout{border-left:3px solid var(--accent);background:color-mix(in srgb,var(--accent) 7%,transparent);padding:11px 15px;border-radius:0 10px 10px 0;font-size:14px;margin:10px 0;line-height:1.6}
+    .warn{border-left-color:#f59e0b;background:color-mix(in srgb,#f59e0b 8%,transparent)}
+    table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0}
+    th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--border);line-height:1.5;vertical-align:top}
+    th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+  </style>
+</head>
+<body>
+<nav class="site-nav">
+  <a class="nav-brand" href="/"><img src="/mandala.svg" alt="" aria-hidden="true" style="width:24px;height:24px;vertical-align:middle"><span style="font-size:18px;font-weight:600">unisona.ai</span></a>
+</nav>
+
+<main>
+  <h1>Trader Guide</h1>
+  <p class="sub">From zero to a running autopilot: create an account, connect your own Alpaca paper account, choose what runs, turn it on — and turn it off. <strong>The autopilot is off by default</strong> and only ever trades your account after you switch it on yourself.</p>
+
+  <div class="step" id="signup">
+    <h2><span class="num">1</span> Create your account</h2>
+    <ul>
+      <li>Open <a href="/auth.html">Sign in → Create account</a>, enter your name, email and a password, and accept the terms.</li>
+      <li><strong>Check your email</strong> for a 6-digit code (sender <code>no-reply@unisona.ai</code>) and type it into the boxes — you can't log in until the address is verified.</li>
+      <li>Log in with your email and password.</li>
+    </ul>
+    <p class="muted">No code? Check spam. Stay on the page — the code entry doesn't navigate away.</p>
+  </div>
+
+  <div class="step" id="connect">
+    <h2><span class="num">2</span> Connect your Alpaca paper account</h2>
+    <p>The trader runs on <strong>your own</strong> Alpaca account. We never see your Alpaca password; pasted keys are encrypted on the server and never shown, logged or shared.</p>
+    <ul>
+      <li>Create a free account at <a href="https://alpaca.markets" target="_blank" rel="noopener">alpaca.markets</a>.</li>
+      <li>In Alpaca: <strong>Paper Trading → API Keys → Generate</strong>.</li>
+      <li>Here: <a href="/settings.html#connections">Settings → Connections → Alpaca → Connect</a>, paste the <strong>API Key ID</strong> (<code>PK…</code>) and <strong>Secret Key</strong>.</li>
+    </ul>
+    <div class="callout">The server validates the keys against Alpaca <em>before</em> storing them — a typo fails immediately; nothing broken is ever saved. <strong>Paper keys only:</strong> the form refuses live keys by design.</div>
+  </div>
+
+  <div class="step" id="choose">
+    <h2><span class="num">3</span> Choose whose money, and which strategy</h2>
+    <p><strong>Account mode</strong> — whose money the trader acts on:</p>
+    <table>
+      <tr><th>Demo</th><td>Read-only tour of the Champion book. Can <em>never</em> place an order — enforced on the server.</td></tr>
+      <tr><th>Paper</th><td>Your own practice account: your connected Alpaca paper account (or a house practice ledger until you connect one).</td></tr>
+      <tr><th>Trade</th><td>Live money. Needs live keys and separate arming — not available through the normal flow.</td></tr>
+    </table>
+    <p><strong>Trader</strong> — <a href="/settings.html#connections">Settings → Connections → “Autopilot on your account”</a>:</p>
+    <table>
+      <tr><th>⏸ Off</th><td>Nothing runs. The autopilot never touches your account. <strong>This is the default.</strong></td></tr>
+      <tr><th>📈 Intraday</th><td>The day-trader: automated washout entries and ladder exits on liquid ETFs — your own manual buy/sell works alongside.</td></tr>
+      <tr><th>🏆 Champion</th><td>The slow allocation book: a diversified ETF portfolio rebalanced on a schedule. Pauses the intraday trader.</td></tr>
+    </table>
+    <p class="muted">One account, one active strategy. Switching takes effect on the next scan (~1 minute).</p>
+  </div>
+
+  <div class="step" id="running">
+    <h2><span class="num">4</span> Turn it on — what the autopilot actually does</h2>
+    <p>Flip the Trader switch from <strong>Off</strong> to <strong>Intraday</strong> (or <strong>Champion</strong>). That's the whole arming step. The intraday autopilot then:</p>
+    <ul>
+      <li><strong>Scans about once a minute</strong> during market hours.</li>
+      <li><strong>Buys only</strong> (no shorting), on liquid ETFs from a curated watchlist, when a symbol is <em>washed out</em> — trading at the bottom of its session range.</li>
+      <li><strong>Sizes positions</strong> as a percentage of your equity, caps how many are open at once, and always keeps a cash reserve.</li>
+      <li><strong>Places a protective stop at the broker</strong> the moment a position opens — the stop exists even if the app goes down.</li>
+      <li><strong>Exits on a ladder</strong>: banks profit at the first resistance, lets a runner ride through the second, then trails it. Losses exit at the stop.</li>
+      <li><strong>Journals everything</strong> — every entry, every exit with P&amp;L, and every opportunity it declined, with the reason.</li>
+    </ul>
+    <div class="callout">Plan note: paper trading needs the <strong>Pro</strong> plan; the autonomous AI trader is a <strong>Pilot</strong> capability. <a href="/pricing.html">Pricing</a> shows what each plan includes.</div>
+  </div>
+
+  <div class="step" id="stopping">
+    <h2><span class="num">5</span> Turn it off</h2>
+    <ul>
+      <li><strong>Pause the autopilot:</strong> Trader switch → <strong>⏸ Off</strong>. Takes effect within ~1 minute. Off is <em>fully hands-off</em>: it won't open <strong>or close</strong> anything — open positions are yours to manage, and their broker-side stops stay in place.</li>
+      <li><strong>Disconnect Alpaca:</strong> Settings → Connections → Alpaca → Disconnect. Your keys are deleted from our server; positions and stops remain in your Alpaca account (it was always your account — we never had custody).</li>
+      <li><strong>Delete your account:</strong> Settings → Account. Broker credentials are removed with it.</li>
+    </ul>
+  </div>
+
+  <div class="step" id="troubleshooting">
+    <h2><span class="num">6</span> When something seems off</h2>
+    <table>
+      <tr><th>Connect fails</th><td>Regenerate the key pair in Alpaca (the <em>Paper</em> section!) and paste both values fresh.</td></tr>
+      <tr><th>"It isn't trading"</th><td>Is the Trader switch on? Is the market open? The journal's <em>skip log</em> lists every declined opportunity with its reason — most "not trading" is the trader correctly declining.</td></tr>
+      <tr><th>A position closed "by itself"</th><td>Check the journal: stops and ladder exits are recorded with their reason.</td></tr>
+      <tr><th>"Not signed in" flickers</th><td>The server may be restarting — reload in ~30 seconds.</td></tr>
+    </table>
+    <p class="muted">Want the deep dive — what the signals are, why the stops are wide, what was measured and rejected? See the trader algorithm paper in the docs, or just ask in <a href="/chat.html">chat</a>.</p>
+  </div>
+</main>
+</body>
+</html>
