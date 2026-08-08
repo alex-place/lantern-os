@@ -258,20 +258,31 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           //
           // Superseded/estimated rows carry event:'exit_superseded', so they are
           // excluded by the event filter without any special case.
+          // ET TRADING DATE, not UTC (2026-08-08). "today" was the UTC date, so
+          // from 20:00 ET every evening the filter looked for fills dated
+          // TOMORROW, found none, and Day P&L silently dropped the session's
+          // realized losses (Friday's -$654 vanished at midnight UTC — the
+          // "still shows the wrong P&L" report). Rows are stamped UTC; both
+          // sides convert to the America/New_York calendar date before comparing.
+          const _etDay = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+          const _entryDayBySym = new Map();   // sym -> ET date of its LAST ledger entry row
           try {
             const fs = require('fs'), path = require('path');
             const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
-            const today = new Date().toISOString().slice(0, 10);
+            const today = _etDay(Date.now());
             let realized = 0, any = false;
             for (const line of fs.readFileSync(logPath, 'utf8').split(String.fromCharCode(10))) {
               if (!line.trim()) continue;
               let r; try { r = JSON.parse(line); } catch (_e) { continue; }
-              if (!r || r.event !== 'exit') continue;
-              if (String(r.ts || '').slice(0, 10) !== today) continue;
+              if (!r) continue;
+              if (r.event === 'entry' && r.symbol) _entryDayBySym.set(String(r.symbol).toUpperCase(), _etDay(r.ts));
+              if (r.event !== 'exit') continue;
+              if (_etDay(r.ts) !== today) continue;
               if (r.pnl == null || !Number.isFinite(Number(r.pnl))) continue;
               realized += Number(r.pnl); any = true;
             }
             if (any) ibkrAccount.realized_today = Math.round(realized * 100) / 100;
+            else ibkrAccount.realized_today = 0;   // a day with no ET fills has zero realized — never yesterday's
           } catch (_e) { /* keep the broker realized if the ledger isn't readable */ }
           // DAY P&L = realized today + current unrealized.
           //
@@ -291,13 +302,49 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           // with the positions table the user is looking at. It excludes
           // commissions, which the ledger does not track — expect a small gap to
           // the broker's own dpl, in that direction only.
+          // HYBRID UNREALIZED BASIS (2026-08-08). Adding the FULL since-entry
+          // unrealized was only correct while every position was opened the same
+          // day. With multi-day holds (IWM/QQQ/XLK carried over a weekend) it
+          // re-counts every prior day's move each new day. The correct per-
+          // position "today" contribution is:
+          //   entered TODAY (ET, per the ledger's entry rows) → mark − entry
+          //   carried overnight → mark − PREVIOUS CLOSE (prevClose derived from
+          //   the quote's own chg_pct, the same source the row displays)
+          // Yahoo unavailable → fall back to since-entry and say so in the basis.
           try {
-            let unreal = 0;
-            for (const p of ibkrPositions) unreal += Number(p.unrealized_pl) || 0;
             const realized = Number(ibkrAccount.realized_today) || 0;
+            const todayEt = _etDay(Date.now());
+            const carried = ibkrPositions.filter((p) => _entryDayBySym.get(String(p.symbol).toUpperCase()) !== todayEt);
+            let prevCloseBySym = new Map();
+            let quotesOk = false;
+            if (carried.length) {
+              try {
+                const q = await require('../../lib/market-data-yahoo').getQuotes(carried.map((p) => p.symbol));
+                for (const r of (q || [])) {
+                  if (r && Number(r.price) > 0 && Number.isFinite(Number(r.chg_pct))) {
+                    prevCloseBySym.set(String(r.ticker).toUpperCase(), Number(r.price) / (1 + Number(r.chg_pct) / 100));
+                  }
+                }
+                quotesOk = prevCloseBySym.size === carried.length;
+              } catch (_e) { /* fall through to since-entry */ }
+            }
+            let unreal = 0;
+            for (const p of ibkrPositions) {
+              const sym = String(p.symbol).toUpperCase();
+              const qty = Number(p.qty) || 0;
+              const cur = Number(p.current_price) || 0;
+              const prevC = prevCloseBySym.get(sym);
+              if (_entryDayBySym.get(sym) !== todayEt && prevC > 0 && cur > 0 && qty) {
+                unreal += (cur - prevC) * qty;               // carried: today's move only
+              } else {
+                unreal += Number(p.unrealized_pl) || 0;      // opened today (or no quote): since entry
+              }
+            }
             ibkrAccount.pnl_today = Math.round((realized + unreal) * 100) / 100;
             ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
-            ibkrAccount.pnl_basis = 'realized(ledger fills) + unrealized; excludes commissions';
+            ibkrAccount.pnl_basis = 'realized(ET ledger fills) + unrealized change today'
+              + (quotesOk || !carried.length ? ' (entry basis for today-opened, prevClose for carried)' : ' (prevClose unavailable — carried positions shown since entry)')
+              + '; excludes commissions';
           } catch (_e) { /* keep the broker dpl if positions are unreadable */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
