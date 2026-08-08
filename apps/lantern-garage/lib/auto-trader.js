@@ -312,6 +312,12 @@ const _peak = new Map();        // sym -> highest price seen since entry (traili
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
+const _unclosableAt = new Map();  // sym -> ts frozen; after TRADER_UNCLOSABLE_RETRY_MIN the freeze
+                                  //   lifts for ONE clean retry cycle (a transient order-path outage
+                                  //   must not strand a position's exits until it leaves the book)
+const _exitNoOrder = new Map();   // sym -> consecutive scans an IN-FLIGHT exit had NO live sell at
+                                  //   the broker (freeze-expiry needs two misses so a fill racing
+                                  //   the positions snapshot can't unfreeze into a double-sell)
 const _loggedFills = new Set();   // broker order ids already written to the ledger
 // Fills older than this process are not reconciled: after a restart the entry
 // price is not in memory, so back-filling only produces pnl:null noise (observed
@@ -320,6 +326,12 @@ const _PROCESS_START = Date.now();
 const _exitIntent = new Map();    // sym -> reason for the exit we just ordered (labels the fill row)
 const fillLedger = require('./fill-ledger');
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
+// How long an unclosable freeze holds before ONE clean retry cycle is allowed.
+// Permanent freezing turned a ~25-min transient order-path outage into positions
+// stranded from every engine exit until they left the book (audit 2026-08-08);
+// hourly retry bounds the churn for the genuinely-structural case (the 0.8-share
+// SOXS class) to ~3 error rows/hour instead of the historical every-9-minutes.
+const _unclosableRetryMs = () => Math.max(5, parseFloat(process.env.TRADER_UNCLOSABLE_RETRY_MIN) || 60) * 60000;
 const _stopDistPct = new Map(); // sym -> protective-stop distance % at entry (ATR stops make it per-trade)
 // POST-STOP RE-ENTRY COOLDOWN (2026-08-08 tail gate). After a protective stop
 // fills, the symbol is barred from re-entry for the rest of that session plus
@@ -437,6 +449,7 @@ function _saveState() {
       // leaves the book — see the reconcile loop, which deletes both.
       exitFailures: Object.fromEntries(_exitFailures),
       unclosable: [..._unclosable],
+      unclosableAt: Object.fromEntries(_unclosableAt),
       loggedFills: [..._loggedFills].slice(-500),   // bounded: ids only matter within a session
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
@@ -458,6 +471,7 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.lastPos || {})) _lastPos.set(k, v);
     for (const [k, v] of Object.entries(o.exitFailures || {})) _exitFailures.set(k, v);
     for (const s of (o.unclosable || [])) _unclosable.add(s);
+    for (const [k, v] of Object.entries(o.unclosableAt || {})) _unclosableAt.set(k, v);
     for (const id of (o.loggedFills || [])) _loggedFills.add(String(id));
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
@@ -743,6 +757,11 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
+  let _grossThisScan = 0;    // notional placed during THIS scan — the gross brake has the same
+                             // start-of-scan-snapshot blind spot the concurrency cap had
+                             // (2026-08-07): without it, two same-scan entries each compared
+                             // against the stale pre-scan gross and stacked past the cap
+                             // (probed to 126% of budget; audit 2026-08-08).
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
@@ -830,9 +849,36 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       // Position gone → exit resolved. Drop its state.
       _exitStatus.delete(sym); _exitAt.delete(sym); _peak.delete(sym); _entryAt.delete(sym);
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
+      _unclosableAt.delete(sym); _exitNoOrder.delete(sym);
       _zoneLadder.delete(sym); _stopDistPct.delete(sym);
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
-      workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
+      // FREEZE EXPIRY AGAINST BROKER TRUTH (2026-08-08). The in-flight freeze had
+      // no expiry and was never re-checked: a parked exit later cancelled/expired
+      // at the broker kept the symbol frozen from EVERY engine exit — including
+      // the max-loss backstop — until the position left the book. If no sell
+      // order for the symbol is alive at the broker in ANY resurrectable status
+      // (parked 'Inactive' counts as alive — a human can still confirm it) for
+      // two consecutive scans AND the re-fire debounce has passed, the exit is
+      // dead: release the freeze so the position can be managed again. Two misses
+      // are required so a fill racing this scan's positions snapshot can't
+      // unfreeze into a double-sell.
+      const _sellAlive = (_openOrders || []).some((o) =>
+        String(o.symbol || '').toUpperCase() === sym && /sell/i.test(o.side || '') &&
+        !/cancel|reject|expired|filled/i.test(String(o.status || '')));
+      if (_sellAlive) {
+        _exitNoOrder.delete(sym);
+        workingSells.add(sym);   // exit still outstanding on a still-held position → don't re-fire
+      } else {
+        const misses = (_exitNoOrder.get(sym) || 0) + 1;
+        _exitNoOrder.set(sym, misses);
+        if (misses >= 2 && now - (_exitAt.get(sym) || 0) > c.exitReattemptMs) {
+          _exitStatus.delete(sym); _exitNoOrder.delete(sym);
+          logTrade({ event: 'exit_unfrozen', symbol: sym, qty: heldQty[sym],
+            reason: 'in-flight exit order no longer exists at the broker — freeze released, exits re-enabled' });
+        } else {
+          workingSells.add(sym);   // first miss (or inside debounce) → stay frozen this scan
+        }
+      }
     } else {
       // Position still held but the last exit was terminal-non-fill (error/dry_run).
       // Clearing the freeze lets a genuine later exit retry — but an exit that keeps
@@ -848,11 +894,21 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         const n = (_exitFailures.get(sym) || 0) + 1;
         _exitFailures.set(sym, n);
         if (n >= MAX_EXIT_FAILURES) {
+          // UNCLOSABLE RETRY (2026-08-08): the freeze is a backoff now, not a
+          // life sentence. After TRADER_UNCLOSABLE_RETRY_MIN (default 60) the
+          // symbol gets one clean retry cycle; a still-failing exit re-freezes
+          // for another interval, a transient outage recovers on its own.
+          if (_unclosable.has(sym) && now - (_unclosableAt.get(sym) || 0) > _unclosableRetryMs()) {
+            _unclosable.delete(sym); _unclosableAt.delete(sym);
+            _exitFailures.delete(sym); _exitStatus.delete(sym);
+            continue;                            // freeze lifted — exits may retry this scan
+          }
           workingSells.add(sym);                 // stop both exit paths re-deciding
           if (!_unclosable.has(sym)) {
             _unclosable.add(sym);
+            _unclosableAt.set(sym, now);
             logTrade({ event: 'exit_frozen', symbol: sym, qty: heldQty[sym],
-              reason: `exit failed ${n}x consecutively — treating as unclosable, no further attempts`,
+              reason: `exit failed ${n}x consecutively — treating as unclosable, retry in ${Math.round(_unclosableRetryMs() / 60000)} min`,
               status: 'frozen' });
           }
           continue;                              // keep the freeze; don't clear state
@@ -931,7 +987,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // Daily-loss circuit breaker: once the account's day P&L is at/below the limit,
   // stop opening NEW positions (exits still run — closing losers is allowed).
   const dailyLimit = account.equity * (c.maxDailyLossPct / 100);
-  const dayPnl = await bridge.getIBKRDayPnl(userId).catch(() => null);
+  // Broker shape normalization: the IBKR bridge returns a NUMBER, but the Alpaca,
+  // house-paper, and demo facades return { dailyPnl, ... } objects — so the
+  // `typeof === 'number'` check silently never armed the breaker on any of those
+  // accounts (a -3% day kept opening fresh positions; audit 2026-08-08). Accept
+  // both shapes; anything else (fetch failure) still fails open by design.
+  const _dayRaw = await bridge.getIBKRDayPnl(userId).catch(() => null);
+  const dayPnl = typeof _dayRaw === 'number' ? _dayRaw
+    : (_dayRaw && typeof _dayRaw.dailyPnl === 'number' ? _dayRaw.dailyPnl : null);
   const haltEntries = typeof dayPnl === 'number' && dayPnl <= -dailyLimit;
   if (haltEntries) out.circuit_breaker = { dayPnl, limit: -Math.round(dailyLimit) };
 
@@ -1106,7 +1169,6 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (c.stopFromTgt > 0 && _resAbove[0]) {
       const _tgtPct = ((Number(_resAbove[0].level) - price) / price) * 100;
       _stopDistEff = Math.min(15, Math.max(c.stopMinPct, _tgtPct / c.stopFromTgt));
-      if (_supStopPx != null) _supStopPx = price * (1 - _stopDistEff / 100);
     }
     // MINIMUM ENTRY RR (minEntryRr). The stop floor and the 3:1 derivation fight
     // each other: stopFromTgt wants stop = target/3, but if that lands inside the
@@ -1199,7 +1261,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       }
     }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
-      const _gross = Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
+      const _gross = _grossThisScan + Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
       if (_gross + qty * price > _budget) {
         out.skipped.push({ ...record, why: `cash reserve: gross $${Math.round(_gross).toLocaleString()} + $${Math.round(qty * price).toLocaleString()} would exceed ${c.maxGrossPct}% of equity ($${Math.round(_budget).toLocaleString()})` });
@@ -1215,10 +1277,15 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // Attach a broker-side protective stop on the placed long — the hard stop the
     // position keeps even if the scan loop dies. Cancelled on the signal exit above.
     if (r && r.status === 'placed') {
-      // Structural stop for support entries (validated WITHOUT the per-symbol
-      // stop-scale — the zone bottom IS the thesis line; scaling it would put the
-      // stop inside the zone's noise).
-      const stopDist = _stopDist;   // resolved before sizing (risk-based)
+      // The PLACED stop must be the same stop that sized the position and passed
+      // the RR gate (_stopDistEff — target/3, floored, capped). It used to place
+      // the pre-derivation structural stop (_stopDist) instead: sizing budgeted
+      // risk at the derived stop while the broker held an 8-12% one, so realized
+      // risk ran 1.6-2.4x the configured riskPct and the minEntryRr gate passed
+      // trades whose true geometry was below 1:1 (audit 2026-08-08, probe-
+      // verified). With no qualifying resistance _stopDistEff === _stopDist,
+      // so structural/ATR stops are unchanged there.
+      const stopDist = _stopDistEff;   // resolved before sizing (risk-based)
       _stopDistPct.set(sym, stopDist);
       const stop = stopPriceFor(price, stopDist);
       if (stop) {
@@ -1273,7 +1340,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1; _grossThisScan += qty * price;
       // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
       // paper cash-secured-put leg for this same signal, paired by symbol+ts.
       // Fire-and-forget: the chain fetch must never delay or break the scan.
@@ -1358,6 +1425,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

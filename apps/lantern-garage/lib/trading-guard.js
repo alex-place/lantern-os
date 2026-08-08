@@ -49,8 +49,10 @@ function haltFile() {
 function orderGate({ mode = "unknown", qty, price, equity } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
-  // equity (default 5% → $50k on $1M). Falls back to the flat MAX_ORDER_NOTIONAL
-  // only when equity is unknown, so we never place a huge order while blind.
+  // equity (default 5% → $50k on $1M; must MATCH auto-trader.js maxPositionPct or
+  // the guard denies what the sizer produces). Falls back to the flat
+  // MAX_ORDER_NOTIONAL only when equity is unknown, so we never place a huge order
+  // while blind.
   const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 5;
   const eq = Number(equity) || 0;
   const flatNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
