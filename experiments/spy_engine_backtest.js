@@ -97,6 +97,7 @@ async function main() {
   let signalsSeen = 0, enterVerdicts = 0, regimeBlocked = 0;
 
   const allCloses = bars.map((b) => b.close);
+  let _stopCooldownUntil = -1;   // BT_STOP_COOLDOWN: bar index before which re-entry is refused
 
   for (let i = WINDOW; i < bars.length - 1; i++) {
     const today = bars[i];
@@ -215,10 +216,20 @@ async function main() {
           const _ret = (_sign * (exit.px - open.entryPx)) / open.entryPx * 100;
           console.log("DAYTRADE	" + nb.timestamp.slice(0, 10) + "	" + SYM + "	" + _ret.toFixed(4) + "	" + r.toFixed(3) + "	" + open.entryDate);
         }
+        // BT_STOP_COOLDOWN=<bars> (2026-08-08, tail autopsy): after a STOP exit,
+        // refuse re-entry in this symbol for N bars. Every worst backtest day is
+        // the same shape — a crisis session where the engine stopped out, re-
+        // entered the still-falling washout, and stopped again (12 exits under a
+        // cap of 4 = 3 churn rounds on 2008-10-06). Losses correlate across
+        // symbols on those days; wins don't. This targets ONLY the churn rounds.
+        if (exit.why === "stop" && Number(process.env.BT_STOP_COOLDOWN) > 0) {
+          _stopCooldownUntil = i + Number(process.env.BT_STOP_COOLDOWN);
+        }
         open = null;
       }
       if (open) continue;                                 // still in a trade → no new scans
     }
+    if (i < _stopCooldownUntil) continue;                 // post-stop cooldown active
 
     // ── run the production per-ticker scan logic on the trailing window ──
     const sr = findSrZones(SYM, price, win);
