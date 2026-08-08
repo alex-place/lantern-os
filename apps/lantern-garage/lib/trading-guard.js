@@ -10,7 +10,7 @@
  *   1. No global halt file: data/kalshi/LIVE-KILL-SWITCH or data/kalshi/TRADING-PAUSED.
  *   2. TRADER_LIVE=1              — master arm switch (default unset/0 = dry run).
  *   3. notional ≤ the per-position cap (TRADER_MAX_POSITION_PCT of equity, default
- *      5%; falls back to the flat MAX_ORDER_NOTIONAL, $2000, when equity is unknown)
+ *      14%; falls back to the flat MAX_ORDER_NOTIONAL, $2000, when equity is unknown)
  *      and qty ≤ MAX_ORDER_QTY — a share-count SANITY ceiling (default 100000), not
  *      the real limit. Notional governs; a fractional-share book legitimately places
  *      four-figure share counts on cheap names.
@@ -49,9 +49,11 @@ function haltFile() {
 function orderGate({ mode = "unknown", qty, price, equity } = {}) {
   const maxQty = envInt("MAX_ORDER_QTY", 100000); // share-count sanity ceiling; notional governs
   // Per-position notional cap SCALES WITH THE PORTFOLIO: TRADER_MAX_POSITION_PCT of
-  // equity (default 5% → $50k on $1M). Falls back to the flat MAX_ORDER_NOTIONAL
-  // only when equity is unknown, so we never place a huge order while blind.
-  const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 5;
+  // equity (default 14% → $140k on $1M; must MATCH auto-trader.js maxPositionPct or
+  // the guard denies what the sizer produces). Falls back to the flat
+  // MAX_ORDER_NOTIONAL only when equity is unknown, so we never place a huge order
+  // while blind.
+  const maxPositionPct = Number(process.env.TRADER_MAX_POSITION_PCT) || 14;
   const eq = Number(equity) || 0;
   const flatNotional = envInt("MAX_ORDER_NOTIONAL", 2000);
   const maxNotional = eq > 0 ? eq * (maxPositionPct / 100) : flatNotional;

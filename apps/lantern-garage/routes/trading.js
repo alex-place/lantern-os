@@ -257,6 +257,13 @@ if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
       if (!mh && !ext) return;
       _fastExitBusy = true;
       try {
+        // Honor the active-trader switch (#3212), same contract as the scan loop:
+        // 'off' means NOTHING touches this account — the fast loop used to keep
+        // firing day-trader exits every 10s regardless (audit 2026-08-08); and a
+        // 'champion' account belongs to the allocation book, whose positions the
+        // day-trader's exit set (1R take-profit, 2.5% trail, -8% backstop) would
+        // actively unwind. Only 'stock' gets the fast day-trader exit path.
+        if (require('../lib/trader-mode').get('local-owner') !== 'stock') return;
         const { brokerFacadeFor } = require('../lib/broker-facade');
         const resolved = await brokerFacadeFor('local-owner', _autoBridge).catch(() => null);
         if (resolved && resolved.accountId && !resolved.demo) {
