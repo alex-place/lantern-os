@@ -182,6 +182,8 @@ function cfg() {
     // peak*(1 - r2TrailPct%), never below R2. 0 keeps the fixed R2 sell.
     r2Trail: n('TRADER_R2_TRAIL', 0),
     r2TrailPct: n('TRADER_R2_TRAIL_PCT', 1),
+    // Trading days a stopped-out symbol stays barred from re-entry (0 disables).
+    stopCooldownDays: n('TRADER_STOP_COOLDOWN_DAYS', 1),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
     // Per-symbol stop tightening (OOS-validated 2026-08-05): scale the plan stop
@@ -316,6 +318,25 @@ const _exitIntent = new Map();    // sym -> reason for the exit we just ordered 
 const fillLedger = require('./fill-ledger');
 const MAX_EXIT_FAILURES = 3;      // structural failure (e.g. fractional-only qty) -> stop
 const _stopDistPct = new Map(); // sym -> protective-stop distance % at entry (ATR stops make it per-trade)
+// POST-STOP RE-ENTRY COOLDOWN (2026-08-08 tail gate). After a protective stop
+// fills, the symbol is barred from re-entry for the rest of that session plus
+// TRADER_STOP_COOLDOWN_DAYS trading days. Lab (both windows, 19 symbols, live
+// config): halves the holdout's worst day (-2.86% -> -1.40%) at -0.004%/trade.
+// sym -> ET date string (inclusive) through which entries are refused.
+const _stopCooldownThrough = new Map();
+function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
+function _nextTradingDates(dateStr, n) {
+  // dateStr + n trading days (weekend-skipping; holidays just widen the block,
+  // which errs on the safe side for a cooldown).
+  const d = new Date(dateStr + 'T12:00:00Z');
+  let left = n;
+  while (left > 0) {
+    d.setUTCDate(d.getUTCDate() + 1);
+    const dow = d.getUTCDay();
+    if (dow !== 0 && dow !== 6) left--;
+  }
+  return d.toISOString().slice(0, 10);
+}
 const _zoneLadder = new Map();  // sym -> {r1, r1top, r2, broke} — zone-ladder exit state, set at entry (#3165)
 const _exitStatus = new Map();  // sym -> broker status of the last exit order (an UNCONFIRMED exit — e.g. needs_confirmation — keeps the symbol frozen from re-exit until the position actually leaves the book)
 // sym -> last observed broker snapshot { qty, entry, mark, ts } while we held it.
@@ -366,6 +387,11 @@ function _reconcileFills(orders) {
       logTrade(row);
       done.add(row.symbol);
       _exitIntent.delete(row.symbol);
+      // A STOP fill arms the re-entry cooldown: today + N trading days.
+      const _cdDays = cfg().stopCooldownDays;
+      if (_cdDays > 0 && (String(row.order_type || '') === 'Stop' || /(^|\b)stop\b/i.test(String(row.reason || '')))) {
+        _stopCooldownThrough.set(row.symbol, _nextTradingDates(_etDate(Date.now()), _cdDays));
+      }
     }
     for (const id of fillLedger.idsToRemember(orders)) _loggedFills.add(String(id));
   } catch (_e) { /* reconciliation must never break trading */ }
@@ -394,6 +420,7 @@ function _saveState() {
       loggedFills: [..._loggedFills].slice(-500),   // bounded: ids only matter within a session
       zoneLadder: Object.fromEntries(_zoneLadder),
       stopDistPct: Object.fromEntries(_stopDistPct),
+      stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -413,6 +440,7 @@ function _loadState() {
     for (const id of (o.loggedFills || [])) _loggedFills.add(String(id));
     for (const [k, v] of Object.entries(o.zoneLadder || {})) _zoneLadder.set(k, v);
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
+    for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -1094,6 +1122,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // a 7% cap could theoretically deploy 84%. This is the portfolio-level
     // brake: an entry that would push gross exposure past the cap is skipped
     // (exits are never blocked — reducing risk is always allowed).
+    // POST-STOP RE-ENTRY COOLDOWN (2026-08-08). A stop-out means the washout kept
+    // falling — re-buying the same knife the same/next session is the churn that
+    // built the worst backtest days. Barred through the recorded ET date.
+    if (c.stopCooldownDays > 0) {
+      const _cdThrough = _stopCooldownThrough.get(sym);
+      if (_cdThrough && _etDate(now) <= _cdThrough) {
+        out.skipped.push({ ...record, why: `post-stop cooldown: stopped out, no re-entry through ${_cdThrough}` });
+        continue;
+      }
+      if (_cdThrough) { _stopCooldownThrough.delete(sym); _saveState(); }   // expired → clean up
+    }
     // CONCURRENT-POSITION CAP (maxConcurrent, 2026-08-07). Portfolio replay of
     // the holdout showed the left tail is a product of CONCURRENCY x STOP WIDTH,
     // not of any single bad trade: every worst day pinned at exactly -9.00% =
@@ -1273,6 +1312,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
