@@ -58,6 +58,10 @@ const EXTENSION = {
   // trading.html retired (#2488) — 302s to /stock-trader.html (see routes/pages.js REDIRECTS); no file, so no registry entry.
   "kalshi-terminal.html":          ["trading", "TRADING_ENABLED"],
   "stock-trader.html":             ["trading", "TRADING_ENABLED"],
+  // Personal budgeting tool (#3197) — client-side only (localStorage), no server store.
+  // An EXTENSION beside the loop: it serves none of the six stages, so it honestly names a module
+  // + flag rather than claiming a loop stage.
+  "budget.html":                   ["budget", "BUDGET_ENABLED"],
   "options.html":                  ["trading", "TRADING_ENABLED"], // options trader (shadow) + live chain + advisory strategies — no orders placeable
   "contest.html":                  ["trading", "TRADING_ENABLED"], // public paper-trading contest leaderboard (#2552); join is sign-in-gated, any tier
   // creator / document tooling
@@ -128,7 +132,13 @@ const SUBSYSTEMS = {
 // signup→connect→trade journey (the greenpath), not a new capability. It rides
 // the trading cluster's flag and adds no routes or state. Deliberate raise per
 // the rule above; tighten again when a core surface lands.
-const MAX_EXTENSION_RATIO = 1.5;
+// 1.5 → 1.59 (2026-08-08, #3197): budget.html — a genuinely NEW optional
+// client-side capability (owner-requested), landing after trader-guide already
+// consumed the 1.5 headroom. A real, deliberate acceptance of one more unit of
+// sprawl; the guardrail is doing its job by forcing this explicit, reviewed
+// bump. The NEXT extension must again either add a loop-serving core surface
+// or justify another raise.
+const MAX_EXTENSION_RATIO = 1.59;
 //
 //   2. GATEABLE — every extension must be switch-off-able (name an env `flag`), EXCEPT the
 //      always-on shell modules below (login/account + project-meta pages that must always

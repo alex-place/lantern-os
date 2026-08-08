@@ -38,6 +38,7 @@ const PUBLIC_PAGES = {
   // client-side; the trade-gated data endpoints stay blocked server-side by
   // tradeApiGuard). A single page = a true 1:1 view, no duplicated chart layer.
   "/stock-trader.html":   "stock-trader.html",
+  "/budget.html":         "budget.html",    // personal budgeting tool (client-side, free/ungated)
   "/watch.html":          "watch.html",     // market watch — tracking-only twin of the trader (guest read-only)
   "/options.html":        "options.html",   // options trader (shadow) + chain — advisory, no orders placeable
   // Orchestration is a public READ-ONLY fleet view. Guests/non-admins see status
