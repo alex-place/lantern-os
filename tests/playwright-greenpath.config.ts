@@ -10,12 +10,10 @@ import { defineConfig, devices } from '@playwright/test';
  *   GREENPATH_ACCOUNTS=2 npm run test:greenpath   # smoke run with fewer accounts
  *
  * Environment notes (details in docs/GREENPATH-GATE.md):
- *   - RESEND_API_KEY + SMTP_* are force-blanked so signup uses the loopback
- *     devVerifyCode flow (the hard email gate stays exercised: register →
- *     enter emailed code → login).
- *     CAVEAT: a repo-root .env.local sets env with override:true at server boot,
- *     so a checkout whose .env.local configures a mailer will break step 1 — run the
- *     gate from a checkout without SMTP in .env.local.
+ *   - MAIL_DISABLE=1 forces the loopback devVerifyCode signup flow (the hard
+ *     email gate stays exercised: register → enter code → login) regardless of
+ *     what mailer the host's .env.local configures — the old caveat about
+ *     needing a mailer-free checkout is gone.
  *   - Chat (step 5) needs a working LLM provider key in the host env.
  *   - Broker status (step 7) needs Alpaca paper server keys or an OAuth app.
  *   - LANTERN_CHAT_ONLY=1 skips market collectors/loops but keeps every route —
@@ -65,10 +63,13 @@ export default defineConfig({
       // Free → Pro purchase via POST /api/accounts/role) and account cleanup. The
       // journey itself signs up + logs in as real local accounts.
       LANTERN_TEST_AUTH_TOKEN: TOKEN,
-      // Force the loopback no-mailer signup path (devVerifyCode) even if the shell
-      // env carries provider creds. mailerConfigured() is resend OR smtp, so BOTH
-      // must be blanked — blanking SMTP alone leaves Resend live and the dev code
-      // is (correctly) never returned, which fails s1 with a confusing "code missing".
+      // Force the loopback no-mailer signup path (devVerifyCode) even if the host
+      // carries provider creds. Blanking RESEND_API_KEY/SMTP_* here does NOT
+      // survive boot — server.js loads the repo-root .env.local with override:true,
+      // which stomps these blanks back to the host's real mailer (2026-08-08,
+      // exactly the failure the old CAVEAT described). MAIL_DISABLE=1 is honored
+      // by mailerConfigured() and is never present in .env.local, so it survives.
+      MAIL_DISABLE: '1',
       RESEND_API_KEY: '',
       SMTP_HOST: '',
       SMTP_USER: '',
