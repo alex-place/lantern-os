@@ -80,6 +80,9 @@ test('the placed broker stop is the DERIVED stop that sized the position, not th
       { type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 },
       { type: 'RESISTANCE', level: 118, top: 118 },
     ])],
+    // Pin sizing so the assertions don't drift with shipped defaults: 0.7% risk
+    // at the derived 6% stop = $11.6k notional (cap 14% so risk sizing governs).
+    env: { TRADER_RISK_PCT: '0.7', TRADER_STOP_MIN_PCT: '5', TRADER_MAX_POSITION_PCT: '14' },
   });
   assert.strictEqual(buys.length, 1, 'entry must place');
   const stop = sells.find((o) => /stop/i.test(o.type || ''));
@@ -127,7 +130,9 @@ test('two same-scan entries cannot stack past the gross cap', async () => {
       bull('GLD', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }]),
       bull('TLT', [{ type: 'SUPPORT', level: 99.8, top: 99.8, bottom: 99.5 }]),
     ],
-    env: { TRADER_MAX_GROSS_PCT: '80' },
+    // Pin sizing to $14k entries (0.7% risk at the 5% floor, cap 14%) so both
+    // would fit a stale snapshot but the second must trip the in-scan accumulator.
+    env: { TRADER_MAX_GROSS_PCT: '80', TRADER_RISK_PCT: '0.7', TRADER_STOP_MIN_PCT: '5', TRADER_MAX_POSITION_PCT: '14' },
   });
   assert.strictEqual(buys.length, 1, `only the first entry fits the budget (placed: ${buys.map((b) => b.ticker)})`);
   assert.ok(out.skipped.some((s) => s.symbol === 'TLT' && /cash reserve/.test(s.why)),

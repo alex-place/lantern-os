@@ -45,13 +45,7 @@ function logTrade(rec) {
 
 const DEFAULTS = {
   positionPct: 2.5,        // AVERAGE position as % of equity (conviction scales it)
-  maxPositionPct: 14,      // HARD cap per position as % of equity. 14 (was 5) per the
-                           //    2026-08-08 scaling sweep: portfolio replay of the ladder
-                           //    config on the 8 unleveraged watchlist ETFs, 3bp costs —
-                           //    14%×cap-6 beats 7%×cap-4 in BOTH windows (fit 2000-14:
-                           //    14.8%/yr Sharpe 1.47 vs 5.0%/1.30; holdout 2015-26:
-                           //    15.3%/yr Sharpe 1.87 vs 4.9%/1.69), max gross 84%, no
-                           //    margin. Guard fallback in trading-guard.js must match.
+  maxPositionPct: 5,       // HARD cap per position as % of equity ($50k on $1M)
   maxNewPerScan: 3,        // cap new entries opened in a single scan tick
   cooldownMs: 45 * 60000,  // don't re-ENTER the same symbol within 45 min (anti-churn)
   minPrice: 1,             // skip sub-$1 names
@@ -94,9 +88,8 @@ function cfg() {
     maxPositionPct: n('TRADER_MAX_POSITION_PCT', DEFAULTS.maxPositionPct),
     // Portfolio-level cash reserve (2026-08-06): gross exposure across ALL
     // positions is capped at this % of equity; the rest stays in cash. 0 or
-    // >=100 disables. Default 85 (was 80) so the 14%×6 optimum (max gross 84%,
-    // 2026-08-08 sweep) never binds on the brake; still always ≥15% cash.
-    maxGrossPct: n('TRADER_MAX_GROSS_PCT', 85),
+    // >=100 disables. Default 80 = always keep 20% cash.
+    maxGrossPct: n('TRADER_MAX_GROSS_PCT', 80),
     maxNewPerScan: n('TRADER_MAX_NEW_PER_SCAN', DEFAULTS.maxNewPerScan),
     cooldownMs: n('TRADER_COOLDOWN_MS', DEFAULTS.cooldownMs),
     stopPct: n('TRADER_STOP_PCT', DEFAULTS.stopPct),                     // protective stop distance
@@ -122,12 +115,10 @@ function cfg() {
     // an accidental byproduct of two independent knobs (position% x stop%), so
     // identical $36k positions carried 0.047%-0.068% risk purely because their stops
     // differed. Size from RISK instead: qty = equity*riskPct / (entry-stop). Default
-    // 0.06 was calibrated to the then-MEASURED average risk — same exposure, uniform
-    // risk. 0 = legacy notional sizing. The maxPositionPct notional cap still binds
-    // on top. RAISED 0.06 → 0.7 (2026-08-08 scaling sweep): 0.7% equity risk at the
-    // 5% stop floor = 14% notional, the 14%×cap-6 config that wins BOTH windows
-    // (see maxPositionPct). Wider structural stops shrink notional pro-rata.
-    riskPct: n('TRADER_RISK_PCT', 0.7),
+    // 0.06 is calibrated to today's MEASURED average risk — same exposure, uniform
+    // risk. Raising it is a separate, evidence-gated decision. 0 = legacy notional
+    // sizing. The maxPositionPct notional cap still binds on top.
+    riskPct: n('TRADER_RISK_PCT', 0.06),
     // ROOM TIERING (magnitude study 2026-08-05, OOS-validated on 5 symbols):
     // entries with the first resistance >= roomMinR away (in R) earn 3-10x more
     // per trade (0.48-1.6R vs 0.08-0.16R). A-tier (room) gets full risk;
@@ -166,25 +157,20 @@ function cfg() {
     // CAPTURED PER TRADE (avg_R is normalised by stop width and inverts the
     // ranking — the best-avg_R config captured the fewest dollars):
     //   floor 2%: fit +0.072%/trade  holdout +0.275%/trade
-    //   floor 3%: fit +0.159%/trade  holdout +0.312%/trade
-    //   floor 5%: fit +0.43%/trade   holdout +0.56%/trade    <- wins BOTH (2026-08-08
-    //             lab, vs +0.17/+0.39 at 3% under the full ladder config)
-    // Wider floors win because MR's failure mode is the ordinary stop firing at
-    // max stretch right before the snapback; 5% is the deployed session floor.
+    //   floor 3%: fit +0.159%/trade  holdout +0.312%/trade   <- wins BOTH
+    // 3% also lifts win rate (45% -> 59%) by not tagging out on noise. At the
+    // unchanged 7% notional cap that is ~$210/trade vs ~$85 today.
     // NOTE: the gate covered UNLEVERAGED symbols (SPY QQQ GLD TLT SMH). On a 3x
     // ETF a 3% stop is only a ~1% move in the underlying, so it is tighter in
     // real terms there, not wider — see TRADER_STOP_MIN_PCT_BY_SYMBOL.
-    stopMinPct: n('TRADER_STOP_MIN_PCT', 5),
+    stopMinPct: n('TRADER_STOP_MIN_PCT', 3),
     // RR by construction: stop = (distance to first real resistance) / n.
     // 0 disables (stop stays structural). Gated 2:1/3:1/4:1 — all beat off in
     // both windows; 3:1 best on holdout (+0.378%/trade vs +0.334%).
     stopFromTgt: n('TRADER_STOP_FROM_TGT', 3),
     // Max simultaneous open positions. Truncates the left tail (worst days are
-    // concurrency x stop width). 0 disables. RAISED 2 → 6 (2026-08-08 sweep):
-    // washouts cluster, so at cap 4 the replay SKIPPED 26% (fit) / 31% (holdout)
-    // of entries on exactly the highest-signal days; cap 6 recovers nearly all
-    // of them and lifts holdout Sharpe 1.69 → 1.87 at 14% sizing, no margin.
-    maxConcurrent: n('TRADER_MAX_CONCURRENT', 6),
+    // concurrency x stop width). 0 disables.
+    maxConcurrent: n('TRADER_MAX_CONCURRENT', 2),
     // Positions below this % of equity are DUST and never consume a
     // concurrency slot (nor do unclosable ones). 0 counts every row.
     dustPct: n('TRADER_DUST_PCT', 0.1),
@@ -194,9 +180,7 @@ function cfg() {
     // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
     // A mark through R2 upgrades the runner to a ratcheting floor at
     // peak*(1 - r2TrailPct%), never below R2. 0 keeps the fixed R2 sell.
-    // Default ON (2026-08-08): the gate above won both windows and the trail
-    // beat fixed-R2 by >2x per trade; this is the deployed session config.
-    r2Trail: n('TRADER_R2_TRAIL', 1),
+    r2Trail: n('TRADER_R2_TRAIL', 0),
     r2TrailPct: n('TRADER_R2_TRAIL_PCT', 1),
     atrStopMinPct: n('TRADER_ATR_STOP_MIN_PCT', 1),
     atrStopMaxPct: n('TRADER_ATR_STOP_MAX_PCT', 6),
@@ -1226,8 +1210,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (r && r.status === 'placed') {
       // The PLACED stop must be the same stop that sized the position and passed
       // the RR gate (_stopDistEff — target/3, floored, capped). It used to place
-      // the pre-derivation structural stop (_stopDist) instead: sizing computed
-      // 0.7% risk at a 5% stop while the broker held an 8-12% one, so realized
+      // the pre-derivation structural stop (_stopDist) instead: sizing budgeted
+      // risk at the derived stop while the broker held an 8-12% one, so realized
       // risk ran 1.6-2.4x the configured riskPct and the minEntryRr gate passed
       // trades whose true geometry was below 1:1 (audit 2026-08-08, probe-
       // verified). With no qualifying resistance _stopDistEff === _stopDist,
