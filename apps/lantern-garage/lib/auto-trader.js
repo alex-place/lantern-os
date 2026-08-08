@@ -1273,10 +1273,26 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1; } }
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+      // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
+      // paper cash-secured-put leg for this same signal, paired by symbol+ts.
+      // Fire-and-forget: the chain fetch must never delay or break the scan.
+      try { require('./csp-shadow').onEntry({ symbol: sym, price, qty, ts: now }).catch(() => {}); } catch (_e) { /* shadow book absent → nothing */ }
+    } }
     else if (r) { _lastOrderAt.set(sym, now); }   // blocked → back off for the cooldown rather than re-fire every scan
   }
   _logSkips(out.skipped);
+  // CSP shadow book: resolve any paper legs whose expiry has passed (cheap —
+  // no-op when nothing is due; quotes fetched lazily per due symbol).
+  try {
+    const _csp = require('./csp-shadow');
+    if (_csp.openCount() > 0) {
+      _csp.resolveDue(async (s) => {
+        const q = await require('./market-data-yahoo').getQuotes([s]).catch(() => []);
+        return q && q[0] && Number(q[0].price) > 0 ? Number(q[0].price) : null;
+      }, now).catch(() => {});
+    }
+  } catch (_e) { /* observer only — never breaks the scan */ }
   // ── SLOT-UTILIZATION OBSERVABILITY (2026-08-08) ────────────────────────────
   // Throughput, not signal quality, is the open question at ~$235-400 captured
   // per trade: 0.5%/day needs both concurrency slots WORKING. This records every
