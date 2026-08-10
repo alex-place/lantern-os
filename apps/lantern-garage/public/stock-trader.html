@@ -4639,8 +4639,14 @@ async function loadPortfolio(){
     const r  = await fetch('/api/trading/positions' + demoQS);
     const d  = await r.json();
     const a  = d.account||{};
+    // Day P&L: the SERVER figure is authoritative (2026-08-10). It is realized
+    // (ET-dated ledger fills) + today's unrealized change with the correct basis
+    // per position (entry for today-opened, prevClose for carried), and it knows
+    // when today's session simply hasn't traded (weekend/pre-open → $0, not
+    // Friday's move re-badged as today — the +$1,359.77 header this fixes).
+    // computeDayPnl remains ONLY as a fallback when the server sends nothing.
     const dayPnl = computeDayPnl(d.positions||[]);
-    if(dayPnl != null) a.pnl_today = dayPnl;   // reconcile Day P&L with the visible day moves
+    if(a.pnl_today == null && dayPnl != null) a.pnl_today = dayPnl;
     const _he=document.getElementById('hEquity'); if(_he) _he.textContent = a.equity ? '$'+fmt(a.equity,0) : '—';
     const pnl= a.pnl_today;
     const pe = document.getElementById('hDayPnl');
