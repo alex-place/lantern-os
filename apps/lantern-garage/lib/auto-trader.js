@@ -514,6 +514,12 @@ function trailTriggerPct(peakGainPct, base) {
 /** Close a held long at market: cancel its resting stop, clear per-symbol state,
  *  log the realized outcome, and record it on `out`. Shared by every exit path. */
 async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { extended = false, refPrice = 0 } = {}) {
+  // WHOLE-SHARE EXITS (2026-08-10, dust re-entry companion). IBKR CPAPI rejects
+  // fractional sells on these ETFs (the 0.8-share SOXS lesson). A position of
+  // 300.8 must sell 300 and leave the inert sub-share tail — otherwise the
+  // whole exit is rejected and the symbol re-strands. Sub-1 positions keep
+  // their raw qty (nothing to floor to) and stay the unclosable-freeze's job.
+  if (Number(qty) >= 1) qty = Math.floor(Number(qty));
   // Regular hours: a market SELL closes instantly. Pre/post market: IBKR rejects market
   // orders outside RTH, so use a marketable LIMIT (≈0.2% below the last print, to cross
   // the wider extended-hours spread) with outsideRTH=true so the exit still fills.
@@ -971,8 +977,11 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
           stop = Math.round(curPx * (1 - Math.max(0.1, c.stopPct) / 100) * 100) / 100;
         }
         if (stop) {
-          const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity, acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
-          (out.reprotected = out.reprotected || []).push({ symbol: sym, qty, stop, status: sr && sr.status });
+          // Whole-share stops: a 300.8-share position (dust remnant + re-entry)
+          // must protect 300 — a fractional stop qty is rejected outright.
+          const _sq = Number(qty) >= 1 ? Math.floor(Number(qty)) : Number(qty);
+          const sr = await bridge.placeIBKROrder(userId, { ticker: sym, side: 'sell', qty: _sq, type: 'stop', stopPrice: stop, timeInForce: 'gtc', equity: account.equity, acceptWarnings: true }).catch((e) => ({ status: 'error', reason: e.message }));
+          (out.reprotected = out.reprotected || []).push({ symbol: sym, qty: _sq, stop, status: sr && sr.status });
         }
       }
     }
@@ -1086,7 +1095,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     }
 
     // ── BULLISH: open a long only if flat. Never pyramid; never sell. ──
-    if (held > 0) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // DUST DOES NOT BLOCK RE-ENTRY (2026-08-10). The 0.8-share SOXS remnant
+    // ($34, unclosable) made 'already long' permanent for its symbol — the slot
+    // fix excluded dust from the CAP but not from this gate, so SOXS's +2.7%
+    // washout this morning was unenterable. Same dust rule as the cap: a
+    // position below dustPct of equity is not a position. The new integer-qty
+    // entry merges with the remnant; exits floor to whole shares (closeLong),
+    // so the sub-share tail stays inert instead of re-stranding the symbol.
+    const _heldMv = Math.abs(Number(heldPos[sym] && heldPos[sym].market_value)
+      || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
+    const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
+    if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
     // DIRECTION LOCK (lib/direction-lock.js): an inverse ETF is an economic short on
     // its underlying — never open a position whose direction opposes existing family
     // exposure (e.g. buying SQQQ while long TQQQ/QQQ, or vice versa). Closing is never
