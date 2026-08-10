@@ -204,6 +204,25 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         result = await attempt().catch(() => null);
         if (result) break;                                  // connected broker answered → done
       }
+      // ADMIN OPERATOR-VIEW WRITE FALLBACK (2026-08-10). The dashboard's READ
+      // fallback shows an admin with no linked broker the operator book — but
+      // Flatten then failed "No broker connected" because this write path only
+      // resolved the admin's own (empty) uid. Mirror the read fallback: an
+      // ADMIN acting from the operator view acts on the operator account,
+      // flagged in the result so the UI can say whose account traded.
+      // Admin-only; non-admins keep the exact old behavior.
+      if (!result) {
+        try {
+          const { isAdmin } = require('../../lib/auth-middleware');
+          const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+          if (isAdmin(req) && uid !== OPERATOR_UID) {
+            for (const attempt of [() => bridge.placeIBKROrder(OPERATOR_UID, orderReq), () => alpaca.placeOrder(OPERATOR_UID, orderReq)]) {
+              result = await attempt().catch(() => null);
+              if (result) { result.operator_account = true; break; }
+            }
+          }
+        } catch (_e) { /* auth module absent → no fallback */ }
+      }
       result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Add your Alpaca API keys in Settings → Connections to trade.' };
       if (result && result.status === 'placed') {
