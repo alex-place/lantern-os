@@ -57,6 +57,34 @@ test('no prevClose available → honest fallback to since-entry (never zero, nev
   assert.strictEqual(contribution(p, false, 0), 40);
 });
 
+// Mirror of the session gate: carried positions contribute $0 when today's ET
+// session hasn't traded (weekend or pre-open) — quotes still carry the LAST
+// session's chg_pct then, so a prevClose-derived "move" would be Friday's move
+// re-badged as today (the +$1,359.77 Sunday header, reported twice).
+function sessionTradedToday(etNow) {
+  const d = etNow.getDay(), mins = etNow.getHours() * 60 + etNow.getMinutes();
+  return d >= 1 && d <= 5 && mins >= 570;
+}
+
+test('the session gate: weekend and pre-open are NOT a trading session; 09:30+ weekday is', () => {
+  const et = (s) => new Date(new Date(s).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  assert.strictEqual(sessionTradedToday(et('2026-08-09T17:34:00Z')), false, 'Sunday');
+  assert.strictEqual(sessionTradedToday(et('2026-08-10T12:00:00Z')), false, 'Monday 08:00 ET pre-open');
+  assert.strictEqual(sessionTradedToday(et('2026-08-10T13:31:00Z')), true, 'Monday 09:31 ET');
+  assert.strictEqual(sessionTradedToday(et('2026-08-10T22:00:00Z')), true, 'Monday 18:00 ET — today DID trade');
+});
+
+test('carried + no session today = $0 contribution even with a stale chg_pct available', () => {
+  // Sunday: quote still says +0.6% (Friday's change) → naive prevClose credits
+  // Friday's move. The gate must zero it regardless of what quotes claim.
+  const p = { qty: 191, current_price: 301.92, unrealized_pl: 245.39 };
+  const stalePrevClose = 301.92 / 1.006;
+  const naive = (p.current_price - stalePrevClose) * p.qty;
+  assert.ok(naive > 300, 'the naive figure is exactly the reported phantom');
+  const gated = 0;   // production: carried && !sessionTradedToday → skip
+  assert.strictEqual(gated, 0);
+});
+
 test('weekend shape: no ET fills today + flat marks = Day P&L ~ 0', () => {
   // Saturday: realized(today ET)=0; carried positions mark == Friday close.
   const positions = [

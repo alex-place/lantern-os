@@ -314,10 +314,17 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           try {
             const realized = Number(ibkrAccount.realized_today) || 0;
             const todayEt = _etDay(Date.now());
+            // Has TODAY'S session traded at all (ET weekday, at/after 09:30)?
+            // On a weekend or pre-open, quotes still carry the LAST session's
+            // chg_pct, so prevClose-derived "moves" are Friday's move re-badged
+            // as today (the +$1,359.77 Sunday header). No session → no move.
+            const _etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const _sessionTradedToday = _etNow.getDay() >= 1 && _etNow.getDay() <= 5
+              && (_etNow.getHours() * 60 + _etNow.getMinutes()) >= 570;
             const carried = ibkrPositions.filter((p) => _entryDayBySym.get(String(p.symbol).toUpperCase()) !== todayEt);
             let prevCloseBySym = new Map();
             let quotesOk = false;
-            if (carried.length) {
+            if (carried.length && _sessionTradedToday) {
               try {
                 const q = await require('../../lib/market-data-yahoo').getQuotes(carried.map((p) => p.symbol));
                 for (const r of (q || [])) {
@@ -334,7 +341,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               const qty = Number(p.qty) || 0;
               const cur = Number(p.current_price) || 0;
               const prevC = prevCloseBySym.get(sym);
-              if (_entryDayBySym.get(sym) !== todayEt && prevC > 0 && cur > 0 && qty) {
+              const _carriedPos = _entryDayBySym.get(sym) !== todayEt;
+              if (_carriedPos && !_sessionTradedToday) {
+                // no session today → a carried position has moved $0 today
+              } else if (_carriedPos && prevC > 0 && cur > 0 && qty) {
                 unreal += (cur - prevC) * qty;               // carried: today's move only
               } else {
                 unreal += Number(p.unrealized_pl) || 0;      // opened today (or no quote): since entry
@@ -343,7 +353,9 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
             ibkrAccount.pnl_today = Math.round((realized + unreal) * 100) / 100;
             ibkrAccount.pnl_pct = ibkrAccount.equity ? (ibkrAccount.pnl_today / ibkrAccount.equity) * 100 : 0;
             ibkrAccount.pnl_basis = 'realized(ET ledger fills) + unrealized change today'
-              + (quotesOk || !carried.length ? ' (entry basis for today-opened, prevClose for carried)' : ' (prevClose unavailable — carried positions shown since entry)')
+              + (!_sessionTradedToday ? ' (no session today — carried positions contribute $0)'
+                : quotesOk || !carried.length ? ' (entry basis for today-opened, prevClose for carried)'
+                : ' (prevClose unavailable — carried positions shown since entry)')
               + '; excludes commissions';
           } catch (_e) { /* keep the broker dpl if positions are unreadable */ }
         }
