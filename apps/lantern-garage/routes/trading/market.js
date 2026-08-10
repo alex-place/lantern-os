@@ -374,6 +374,53 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
           if (opPositions.length) {
             opAccount.unrealized = Math.round(opPositions.reduce((t, p) => t + (Number(p && p.unrealized_pl) || 0), 0) * 100) / 100;
           }
+          // DAY P&L, SAME FORMULA AS THE PRIMARY PATH (2026-08-10). This fallback
+          // passed the broker's raw `dpl` straight through, so the admin dashboard
+          // — the view the operator actually watches — showed IBKR's pre-market
+          // drift vs Friday's close (-$448.80 at 3am) while the fixed path would
+          // say $0. Same ET-dated realized, same session gate, same hybrid basis;
+          // compact duplicate of the primary computation above (kept inline so
+          // the tested primary path stays byte-identical this close to the open).
+          try {
+            const fs = require('fs'), path = require('path');
+            const _etDayF = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+            const logPath = path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+            const today = _etDayF(Date.now());
+            const entryDay = new Map();
+            let realized = 0;
+            for (const line of fs.readFileSync(logPath, 'utf8').split(String.fromCharCode(10))) {
+              if (!line.trim()) continue;
+              let r; try { r = JSON.parse(line); } catch (_e) { continue; }
+              if (!r) continue;
+              if (r.event === 'entry' && r.symbol) entryDay.set(String(r.symbol).toUpperCase(), _etDayF(r.ts));
+              if (r.event === 'exit' && _etDayF(r.ts) === today && Number.isFinite(Number(r.pnl))) realized += Number(r.pnl);
+            }
+            opAccount.realized_today = Math.round(realized * 100) / 100;
+            const _etNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+            const _sessionLive = _etNow.getDay() >= 1 && _etNow.getDay() <= 5
+              && (_etNow.getHours() * 60 + _etNow.getMinutes()) >= 570;
+            const carried = opPositions.filter((p) => entryDay.get(String(p.symbol).toUpperCase()) !== today);
+            const prevCloseBySym = new Map();
+            if (carried.length && _sessionLive) {
+              try {
+                const q = await require('../../lib/market-data-yahoo').getQuotes(carried.map((p) => p.symbol));
+                for (const r of (q || [])) if (r && Number(r.price) > 0 && Number.isFinite(Number(r.chg_pct))) prevCloseBySym.set(String(r.ticker).toUpperCase(), Number(r.price) / (1 + Number(r.chg_pct) / 100));
+              } catch (_e) { /* fall through to since-entry */ }
+            }
+            let unreal = 0;
+            for (const p of opPositions) {
+              const sym = String(p.symbol).toUpperCase();
+              const isCarried = entryDay.get(sym) !== today;
+              const prevC = prevCloseBySym.get(sym);
+              if (isCarried && !_sessionLive) continue;                     // no session today → $0
+              if (isCarried && prevC > 0) unreal += ((Number(p.current_price) || 0) - prevC) * (Number(p.qty) || 0);
+              else unreal += Number(p.unrealized_pl) || 0;
+            }
+            opAccount.pnl_today = Math.round((realized + unreal) * 100) / 100;
+            opAccount.pnl_pct = opAccount.equity ? (opAccount.pnl_today / opAccount.equity) * 100 : 0;
+            opAccount.pnl_basis = 'operator view: realized(ET ledger fills) + unrealized change today'
+              + (!_sessionLive ? ' (no session yet — carried positions contribute $0)' : '') + '; excludes commissions';
+          } catch (_e) { /* ledger unreadable → keep the broker figures */ }
           // Flagged so the UI can never silently present the operator book as
           // the viewer's own account.
           sendJson(res, { positions: opPositions, account: opAccount, operator_view: true }, 200);

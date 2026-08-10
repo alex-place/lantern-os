@@ -523,8 +523,15 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   const order = (extended && refPrice > 0)
     ? { ticker: sym, side: 'sell', qty, type: 'limit', limitPrice: Math.round(refPrice * 0.998 * 100) / 100, outsideRth: true, acceptWarnings: true }
     : { ticker: sym, side: 'sell', qty, type: 'market', acceptWarnings: true };
-  const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
+  // CANCEL THE RESTING STOP **BEFORE** SELLING (2026-08-10, QQQ 9:33 incident).
+  // Sell-first left both the protective stop AND the market sell open at the
+  // broker for a beat — IBKR's oversell protection saw 2x the held quantity in
+  // sells and CANCELLED the market exit (QQQ order 1119264656: Cancelled, 0
+  // filled; XLK/IWM merely won the same race). Cancel-first closes that window;
+  // if the sell then errors, the fast-exit tick re-attaches the missing stop
+  // within seconds, so the position is never left unprotected for long.
   await cancelRestingStops(bridge, userId, sym);
+  const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
   _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
