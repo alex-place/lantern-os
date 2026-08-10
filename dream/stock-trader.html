@@ -4333,7 +4333,7 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
     });
     const result = await r.json();
     if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||r.statusText)); return false; }
-    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}`);
+    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
