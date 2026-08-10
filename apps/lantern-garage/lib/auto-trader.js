@@ -557,7 +557,12 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
 async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set() }) {
-  const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) > 0);
+  // SUB-SHARE DUST NEVER EXITS (2026-08-10). A fractional-only order can never
+  // fill on this API — the 0.8-share SOXS split remnant sprayed 3 error orders
+  // at IBKR after EVERY restart (the failure-freeze is per-process-lifecycle in
+  // practice). Skip by construction: qty < 1 = unfillable, full stop. Real
+  // fractional positions ≥1 share still exit via the whole-share floor.
+  const longs = Object.entries(heldPos).filter(([, p]) => (Number(p.qty) || 0) >= 1);
   if (!longs.length) return;
 
   // Recent bars for the momentum-death read — one batched fetch for all held longs
@@ -1055,7 +1060,9 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     //    and open an unintended short (this is what put JPM/META short). ──
     if (exclude.has(sym)) { out.skipped.push({ ...record, why: 'overnight-book position — managed by its own engine' }); continue; }
     if (!bullish) {
-      if (held > 0) {
+      if (held >= 1) {
+        // (held >= 1, not > 0: a sub-share split remnant can never fill a sell on
+        // this API — same rule as manageHeldExits' dust guard, 2026-08-10.)
         // Anti-churn gates on the signal-exit (the broker stop still protects the
         // downside independently): (1) don't dump a long we just opened, (2) only
         // exit on a STRONG bearish read, (3) require it to persist across scans.
