@@ -1295,9 +1295,16 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       }
     }
 
+    // acceptWarnings on ENTRIES too (2026-08-10). IBKR attaches disclosure
+    // prompts to leveraged/inverse-ETF orders ("intended for daily use…");
+    // exits and stops already auto-confirm them, but entries did not — so the
+    // first inverse signal of the session (SPXS, $115k, A-tier) died at
+    // needs_confirmation while its exit would have sailed through. These
+    // symbols were deliberately gated INTO the watchlist; the disclosure is
+    // acknowledged by design, not per-order.
     const enOrder = (extended && price > 0)
-      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity }
-      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity };
+      ? { ticker: sym, side: 'buy', qty, type: 'limit', limitPrice: Math.round(price * 1.002 * 100) / 100, outsideRth: true, equity: account.equity, acceptWarnings: true }
+      : { ticker: sym, side: 'buy', qty, type: 'market', equity: account.equity, acceptWarnings: true };
     const r = await bridge.placeIBKROrder(userId, enOrder).catch((e) => ({ status: 'error', reason: e.message }));
     const exec = { ...record, action: 'open_long', qty, notional: Math.round(qty * price), result: r };
     // Attach a broker-side protective stop on the placed long — the hard stop the
