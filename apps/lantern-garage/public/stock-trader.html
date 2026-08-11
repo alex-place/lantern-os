@@ -4283,6 +4283,29 @@ function tpTab(name){
     if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');  // hide inactive panels from AT
   });
 }
+// Degraded-account-state handling (2026-08-11): keep the last good figures on
+// screen (dimmed, tooltip says why) and explain ONCE what happened + the fix,
+// instead of rendering an auth failure or backend outage as a $0.00 account.
+let _staleKind = null;
+function _accountDegraded(kind, reason){
+  const el = document.getElementById('tpSummary');
+  if (el) { el.style.opacity = '0.45'; el.title = kind === 'session'
+    ? 'Session expired — figures frozen at the last update. Sign in again to resume.'
+    : 'Trading backend unreachable — figures frozen at the last update.' + (reason ? ' (' + reason + ')' : ''); }
+  const pe = document.getElementById('hDayPnl');
+  if (pe && !el?.innerHTML) { pe.textContent = '—'; pe.className = 'v'; }
+  if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
+    _staleKind = kind;
+    _alertToast(kind === 'session'
+      ? '⚠ Session expired — account data is paused (showing last known). Sign in again to resume; it will not recover on its own.'
+      : '⚠ Trading backend unreachable — showing last known account data.' + (reason ? ' ' + reason : ''));
+  }
+}
+function _accountFresh(){
+  const el = document.getElementById('tpSummary');
+  if (el) { el.style.opacity = ''; el.title = ''; }
+  _staleKind = null;
+}
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
   a=a||{};
@@ -4637,8 +4660,18 @@ async function loadPortfolio(){
   const demoQS = window.DEMO_ACCT ? '?demo=champion' : '';
   try{
     const r  = await fetch('/api/trading/positions' + demoQS);
+    // HONEST DEGRADED STATES (2026-08-11). A session that expires overnight made
+    // every poll fail and the header rendered $0.00 — which reads as "the account
+    // is empty", the worst possible lie. Auth failures and backend outages now:
+    // (1) KEEP the last good figures on screen, dimmed + marked stale, and
+    // (2) SAY what happened and what fixes it, once, instead of zeroing.
+    // A session expiry does NOT self-heal — re-signing-in is the only cure.
+    if (r.status === 401 || r.status === 403) { _accountDegraded('session'); return; }
     const d  = await r.json();
+    if (d && (d.error === 'auth_required' || d.error === 'forbidden')) { _accountDegraded('session'); return; }
+    if (d && d.available === false) { _accountDegraded('backend', d.reason); return; }
     const a  = d.account||{};
+    _accountFresh(a);
     // Day P&L: the SERVER figure is authoritative (2026-08-10). It is realized
     // (ET-dated ledger fills) + today's unrealized change with the correct basis
     // per position (entry for today-opened, prevClose for carried), and it knows
