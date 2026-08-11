@@ -444,6 +444,21 @@ async function route(req, res) {
     return sendJson(res, { error: "bad_request", detail: "malformed request target" }, 400);
   }
 
+  // CANONICAL HOST (2026-08-11): strip a leading "www." with a 308 to the apex.
+  // OAuth redirect_uris are minted from the request Host, and only the apex
+  // callback is registered with Google — signing in on www.unisona.ai produced
+  // "Error 400: redirect_uri_mismatch" at the consent screen. Redirecting the
+  // whole www host (not just OAuth routes) keeps sessions/cookies on ONE origin.
+  // 308 preserves method for the rare POST. Loopback/dev hosts never match.
+  {
+    const _host = String(req.headers.host || "");
+    if (/^www\./i.test(_host)) {
+      const _proto = String(req.headers["x-forwarded-proto"] || (req.socket && req.socket.encrypted ? "https" : "http")).split(",")[0].trim();
+      res.writeHead(308, { Location: `${_proto}://${_host.replace(/^www\./i, "")}${req.url}`, "Cache-Control": "no-store" });
+      return res.end();
+    }
+  }
+
   // #1946 G4 desktop loopback token: when the launcher-opened page carries the
   // per-boot ?__lt=<token> matching UNISONA_LOCAL_TOKEN, hand the browser a
   // SameSite=Strict, HttpOnly session cookie so every SUBSEQUENT request (fetch,
