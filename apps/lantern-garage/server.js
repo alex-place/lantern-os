@@ -732,6 +732,12 @@ server.listen(port, host, () => {
   // different roots depending on cwd, so a `setUserRole` could "succeed" against a
   // store this process never reads. One line here makes that visible instead of silent.
   console.info(`[data] root: ${dataRoot()}`);
+  // #3136 follow-up: if a pre-collapse cwd-relative store still holds the auth data
+  // (the GCE systemd cwd was the app dir, so the 08-04 v1.14.2 upgrade orphaned every
+  // existing account — email+password 401'd and Google minted fresh guest profiles),
+  // MERGE it into the canonical root instead of just warning about it. One-time,
+  // idempotent, fail-soft; legacy files are renamed *.migrated after the merge.
+  try { require('./lib/legacy-data-migrate').migrateLegacyData(); } catch (e) { console.warn(`[data-migrate] skipped: ${e.message}`); }
 
   // Desktop app: arm the window-heartbeat watchdog (quits the Core if the app window's
   // beats stop). No-op unless UNISONA_DESKTOP=1.
