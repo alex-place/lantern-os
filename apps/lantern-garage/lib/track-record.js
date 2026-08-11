@@ -1,13 +1,16 @@
 'use strict';
 
 /**
- * track-record.js — the public, settlement-graded track record (Converge stage).
+ * track-record.js — the settlement-graded record snapshot (Verify stage).
  *
- * Turns the autopilot's exit ledger into a PUBLIC-SAFE daily snapshot: confirmed
+ * Turns the autopilot's exit ledger into a daily snapshot: confirmed
  * (broker-accepted) fills only, realized P&L by ET day, cumulative curve, max
- * drawdown, and the per-exit-reason table — the honest version of the "AI robot
- * with a win rate" page (#3246). Book-level only: no account balances, no share
- * quantities, no order ids, no user data.
+ * drawdown, and the per-exit-reason table — the data layer behind the signed-in
+ * journal's equity-curve/drawdown views (#3242). Product decision 2026-08-11:
+ * the ledger is NOT published — this serves behind the trade gate only; the
+ * public proof surface is the live demo book, not a performance record. The
+ * snapshot stays book-level and hygiene-clean regardless (no balances, no share
+ * quantities, no order ids — asserted by test), so a leak can't ride on it.
  *
  * HONESTY RULES (each enforced here, not promised):
  *   - confirmed fills ONLY — the `all`/decisioned view never enters this artifact;

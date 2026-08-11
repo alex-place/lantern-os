@@ -4595,8 +4595,7 @@ function _noteRedirectedFromTrader(){
     bar.innerHTML='<b style="white-space:nowrap">You’re on Watch</b>'
       +'<span>Charts, your watchlist, news and signals are <b>free</b>. The trading terminal — placing orders and editing the AI tradelist — is part of <b>$20 Pro</b>. '
       +'<a href="/pricing.html" style="color:var(--blue,#58a6ff)">See plans</a> · '
-      +'<a href="/stock-trader.html?stay=1" style="color:var(--text2,#8b8b95)">peek at the terminal</a> · '
-      +'<a href="/track-record.html" style="color:var(--text2,#8b8b95)">see the autopilot’s live record</a></span>'
+      +'<a href="/stock-trader.html?stay=1" style="color:var(--text2,#8b8b95)">peek at the terminal</a></span>'
       +'<button type="button" aria-label="Dismiss" style="margin-left:auto;background:none;border:1px solid var(--border,#30363d);color:inherit;border-radius:6px;padding:2px 9px;cursor:pointer">✕</button>';
     bar.querySelector('button').onclick=()=>{ bar.remove(); try{sessionStorage.setItem('fromTraderNoteSeen','1');}catch(e){} };
     const layout=document.querySelector('.layout');

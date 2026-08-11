@@ -27,10 +27,6 @@ const PUBLIC_PAGES = {
   // Paper-trading contest leaderboard (#2552) — public READ (anyone can watch the
   // board); joining/start/stop are auth-gated server-side in routes/trading/champion.js.
   "/contest.html":        "contest.html",
-  // The live track record (#3247) — the settlement-graded proof page. Its entire
-  // purpose is that a logged-out visitor can audit it, so it MUST be public; the
-  // JSON it reads is on PUBLIC_TRADING_READS and is book-level only (no balances).
-  "/track-record.html":   "track-record.html",
   "/knowledgecenter.html":"knowledgecenter.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
   // Primary interface: the chat must be reachable without a Patreon login so the
