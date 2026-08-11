@@ -549,8 +549,15 @@
   function renderProviders(providers) {
     const wrap = document.getElementById("provider-buttons");
     wrap.innerHTML = "";
-    // Render all three OAuth options every time, in the fixed order above.
+    // Render only the OAuth providers the SERVER reports as configured (#1877) —
+    // a button for an unconfigured provider just bounces back here with
+    // provider_unconfigured. When the list is unavailable (session fetch failed)
+    // fail OPEN and render them all: a transient hiccup must not hide sign-in.
+    const advertised = Array.isArray(providers) && providers.length
+      ? new Set(providers.map((p) => p && p.id))
+      : null;
     OAUTH_ORDER.forEach((id) => {
+      if (advertised && !advertised.has(id)) return;
       const meta = PROVIDER_META[id];
       const btn = document.createElement("button");
       btn.className = "provider-btn";
