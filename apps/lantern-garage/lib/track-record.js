@@ -31,10 +31,13 @@ const {
 
 function _round(n) { return Math.round(n * 100) / 100; }
 
-/** Pure build from a ledger path — everything below is derived, nothing invented. */
-function buildTrackRecord(logPath = DEFAULT_LOG) {
-  const exits = readExits(logPath);
-  const confirmedRaw = exits.filter((e) => CONFIRMED.has(String(e.status || '').toLowerCase()));
+/**
+ * Pure per-book build from caller-supplied exit rows — shared by the real
+ * ledger and the simulated demo feed (#3242 demo-mode), so both go through
+ * identical filtering/curve/drawdown math.
+ */
+function buildBookFromRows(exits, { label = 'Intraday book' } = {}) {
+  const confirmedRaw = (exits || []).filter((e) => CONFIRMED.has(String(e.status || '').toLowerCase()));
   const full = computeScorecard(confirmedRaw);
   // Broker-rejected/frozen attempts carry a non-confirmed status, so the confirmed
   // filter above removes them before computeScorecard can count them — the honest
@@ -65,24 +68,29 @@ function buildTrackRecord(logPath = DEFAULT_LOG) {
   }
 
   return {
+    label,
+    status: rows.length ? 'live' : 'no_confirmed_trades',
+    stats: slimStats(full),
+    byReason: full.byReason,
+    daily,
+    maxDrawdown,
+    firstExitAt: rows.length ? rows[0].ts : null,
+    lastExitAt: rows.length ? rows[rows.length - 1].ts : null,
+    disclosures: {
+      duplicateExitsCollapsed: full.duplicateExits,
+      failedAttemptsExcluded: allStats.failedAttempts,
+      estimatedTrades: full.estimatedTrades,
+    },
+  };
+}
+
+/** Full snapshot from a ledger path — everything derived, nothing invented. */
+function buildTrackRecord(logPath = DEFAULT_LOG) {
+  return {
     generatedAt: new Date().toISOString(),
     confirmedOnly: true,
     books: {
-      intraday: {
-        label: 'Intraday book',
-        status: rows.length ? 'live' : 'no_confirmed_trades',
-        stats: slimStats(full),
-        byReason: full.byReason,
-        daily,
-        maxDrawdown,
-        firstExitAt: rows.length ? rows[0].ts : null,
-        lastExitAt: rows.length ? rows[rows.length - 1].ts : null,
-        disclosures: {
-          duplicateExitsCollapsed: full.duplicateExits,
-          failedAttemptsExcluded: allStats.failedAttempts,
-          estimatedTrades: full.estimatedTrades,
-        },
-      },
+      intraday: buildBookFromRows(readExits(logPath), { label: 'Intraday book' }),
       champion: {
         label: 'Champion book',
         status: 'pending',
@@ -91,7 +99,7 @@ function buildTrackRecord(logPath = DEFAULT_LOG) {
     },
     method: 'Broker-accepted (confirmed) fills only, from the autopilot’s append-only exit ledger. Re-decisions of one open position are collapsed to a single round-trip; attempts the broker rejected or froze realize nothing and are excluded (both exclusions disclosed above). "Estimated" trades are positions that left the book without an autopilot fill (a protective stop filling, a manual close), valued at the last observed mark — counted, and disclosed. Days are exchange days (America/New_York).',
     disclaimers: [
-      'This is the record of the house book, published for transparency. It is not investment advice and not an offer to manage money.',
+      'This is the record of the house book, shown to signed-in members for transparency. It is not investment advice and not an offer to manage money.',
       'Past performance does not predict future results. Drawdown is shown at the same prominence as profit because both are the record.',
     ],
   };
@@ -123,4 +131,4 @@ function getTrackRecord(logPath = DEFAULT_LOG) {
 /** Test hook: drop the cache so a rewritten fixture ledger is re-read. */
 function _resetCache() { _cache = { at: 0, key: null, value: null }; }
 
-module.exports = { buildTrackRecord, getTrackRecord, snapshotPathFor, _resetCache };
+module.exports = { buildTrackRecord, buildBookFromRows, getTrackRecord, snapshotPathFor, _resetCache };

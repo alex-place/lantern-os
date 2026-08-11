@@ -180,7 +180,11 @@ function tradeApiGuard(req, res, url) {
   // gated shell. The param is what the pages request for guests; the real,
   // broker-backed paths (no param) stay trade-gated, so no real account leaks.
   if (req.method === "GET" &&
-      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history") &&
+      (url.pathname === "/api/trading/positions" || url.pathname === "/api/trading/portfolio/history" ||
+       // Journal demo-mode (#3242): the guest Journal tab reads a SIMULATED
+       // book (lib/champion-demo.journalRows) through these two — the routes
+       // switch to demo data on this param and never read the real ledger.
+       url.pathname === "/api/trading/track-record" || url.pathname === "/api/trading/scorecard") &&
       url.searchParams.get("demo") === "champion") return false;
   // Watchlist add/remove is available to everyone incl. read-only guests — it is
   // "which symbols to chart", not a trade, so it isn't behind the trade gate.
