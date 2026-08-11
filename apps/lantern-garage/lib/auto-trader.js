@@ -958,9 +958,21 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     // stop attempts, ~33 per symbol. Retry a bounded number of times, then stop adding
     // and let the ledger show the failure instead of burying it under duplicates.
     const REPROTECT_MAX_ATTEMPTS = 3;
+    // COUNT ONLY FAILED placements (2026-08-10 stop-lifecycle hardening). This
+    // cap originally counted EVERY stop order for the symbol — including stops
+    // we ourselves cancelled during healthy exit cycles (cancel-first sell) and
+    // stops that FILLED. On 2026-08-10 each exit/retry cycle added a
+    // Cancelled-by-us row until attemptsFor hit 3, and re-protection was then
+    // refused for the rest of the session (149 're-protect capped' rows; IWM
+    // and SOXL ran naked-stop stretches during venue retry cycles). A stop we
+    // cancelled on purpose is lifecycle, not failure; only the parked/refused
+    // vocabulary (Inactive / needs_confirmation / rejected) marks a placement
+    // that never protected anything — the 972-order incident this cap exists
+    // for was exactly that shape, and it still trips the cap.
     const attemptsFor = (sym) => (_openOrders || []).filter((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
-      /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')).length;
+      /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
+      /inactive|reject|needs?[_-]?confirm/i.test(o.status || '')).length;
     for (const [sym, p] of Object.entries(heldPos)) {
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
