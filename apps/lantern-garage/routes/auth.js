@@ -401,7 +401,11 @@ module.exports = async function authRoutes(req, res, url, deps) {
     const b = await readJsonBody(req);
     const email = String((b && b.email) || "").trim().toLowerCase();
     if (EMAIL_RE.test(email)) {
-      const profile = getProfileByEmail(email);
+      // rootOnly: the reset link goes to the address the user TYPED or nowhere.
+      // Matching linked-identity emails resolved the account and mailed its
+      // ROOT address instead (2026-08-11) — a reset for a linked gmail landed
+      // in founder@'s inbox. Identity emails never receive reset links.
+      const profile = getProfileByEmail(email, { rootOnly: true });
       if (profile) {
         const token = createToken("reset_password", profile.id, profile.email);
         const link = `${originOf(req)}/reset-password.html?token=${encodeURIComponent(token)}`;

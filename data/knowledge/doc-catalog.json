@@ -3950,5 +3950,16 @@
     "mergeInto": "",
     "reason": "User-facing setup/usage guide for the trader (#3213); linked from the stock-trader header.",
     "audience": "public"
+  },
+  {
+    "path": "docs/research/2026-08-11-auto-trader-competitive-analysis.md",
+    "title": "Auto-Trader Competitive Analysis - Retail AI Trading Software (2026-08-11)",
+    "category": "research",
+    "description": "Where the stock autopilot stands against the seven retail AI-trading products (Danelfin, Trade Ideas, TrendSpider, Tickeron, Capitalise.ai, Coinrule, TradeZella) plus the OSS field; ends in a prioritized feature backlog. Companion to TRADER-ANALYSIS-2026-07.md.",
+    "status": "Point-in-time",
+    "action": "keep",
+    "audience": "builder",
+    "updated": "2026-08-11",
+    "grounding": "web-fetched competitor pricing 2026-08-11 (Danelfin via third-party reviews, medium-confidence) + OSS star counts + internal ledger"
   }
 ]
