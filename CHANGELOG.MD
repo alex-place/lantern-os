@@ -1,3 +1,131 @@
+## [1.15.0] - 2026-08-11
+
+### Added
+- trader: skip reasons are now logged to the trade ledger (deduped — one row per symbol per distinct blocker). A session where the trader declines everything now leaves a record of why.
+- signals: opt-in `ZONE_TREND_DIR=1` stops the direction primitive calling a confirmed uptrend BEARISH just because there is overhead resistance. Holdout total R +35-38%; fit is break-even at ~3bp costs. Default OFF pending live measurement.
+- backtest: `BT_COST` charges round-trip transaction costs, so changes that trade more no longer get trade count for free.
+- ops: `scripts/trader-watchdog.js` — durable health check for the live day-trader. Catches the failures that look like a quiet market: a disarmed process holding the account lock, a stalled scan loop behind a healthy HTTP endpoint, and silently refused entries. Read-only w.r.t. trading; run it from outside the checkout on a ~5min schedule during market hours.
+- signals: `RILEY_GATE=0` stops rileyGate vetoing trades. Measured over 31,293 daily bars it discards ~46% of candidates and the survivors have *lower* forward returns than the pool it selected from. Removing the veto improved the backtest in both fit and holdout, on both total R and avg R, across all 5 symbols. Default unchanged (gate still vetoes) pending live measurement.
+- backtest: `BT_NO_GATE=1`, and `experiments/entry_edge_test.js` — measures whether each stage of the entry stack beats the unconditional base rate.
+- backtest: `experiments/signal_audit.js` — splits 26y of daily bars on every component the signal engine boosts or filters on. Result: every momentum/confirmation component is *inverted*; the only informative one is RSI oversold.
+- backtest: `BT_MEANREV=1` — mean-reversion-first entry (RSI oversold, no confirmation stack), exits unchanged. OOS total R +192% and avg R +118% vs the current entry, better on all 5 symbols.
+- trader: portfolio-level cash reserve — `TRADER_MAX_GROSS_PCT` (default 80) caps total deployed capital; the account always keeps the remainder in cash. Per-position caps alone never bounded the sum. Exits are never blocked by it.
+- backtest: 15m harness gained daily-timeframe knife gates for the mean-reversion entry (`meanrev-sma20`, `meanrev-knife`) — measured: the knife gate halves TLT's loss but costs QQQ's win; neither is a clean fix on 22 days of data.
+- trader: `TRADER_STOP_FROM_TGT` (default 3) derives the stop from the target — stop = (distance to first real resistance) / n — so reward:risk is n:1 by construction instead of an accident of zone geometry. Holdout: +0.378%/trade vs +0.334%; 2:1/3:1/4:1 all beat off in both windows.
+- trader: `TRADER_MAX_CONCURRENT` (default 2) caps simultaneous open positions. Portfolio replay showed every worst day pinned at exactly −9.00% = 3 positions × the 3% stop floor; cap 2 cuts days worse than −5% by 15% with average %/trade slightly better. It truncates severity, not frequency — the negative-day rate is 59–60% at every cap including off.
+
+### Fixed
+- **A failed OAuth sign-in now says what went wrong.** "Sign-in didn't complete.
+  Please try again. (google)" was the same message for five very different faults —
+  a rejected code, wrong client credentials, an unreachable userinfo endpoint, a
+  storage failure, or a profile-linking error — so neither the user nor the log
+  could tell them apart. The callback now classifies the exception into a stable
+  `reason` code, surfaces a plain-English explanation on the sign-in page, and logs
+  the full detail server-side with the resolved `redirect_uri` and a truncated
+  stack. The reason is a fixed code, never the raw upstream message, so provider
+  error bodies (which can carry tokens/PII) never reach a URL.
+- trader: an ARMED trader now preempts a DISARMED (exit-only) holder of the same broker account. On 2026-08-05 the disarmed dev server held IBKR DUR193395 from the open and the armed trader stood down all morning — zero entries, no error.
+- backtest: a momentum entry used a hardcoded 60-day hold, monopolising a symbol and displacing zone trades. Now `BT_MOMO_HOLD`. Momentum mode was re-gated at every hold length and FAILED — it is not shipped.
+- trader UI: the dashboard showed $0.00 account value / $0 buying power for an admin while the autonomous trader was running a real IBKR account. The trader keys the operator account on the fixed id `local-owner`; the UI resolved the browser session's profile id. An admin whose own profile has no broker linked now falls back to the operator account (flagged `operator_view`), so the dashboard can see the book it exists to monitor.
+- signals: the scan signal now carries the zone LIST, not just the support/resistance scalars. `auto-trader` reads `s.zones` as an array, so it always saw `[]` — silently disabling the support-entry gate (8 of 12 tradelist symbols could never enter), the zone-ladder exit (zero `zone_r1`/`zone_r2` exits in the entire live ledger), room tiering and `tgtMinR`.
+- Security: force exceljs's transitive brace-expansion (1.1.18 / 2.1.4) and uuid (11.1.1) to patched versions via npm overrides, clearing 7 Dependabot alerts (#244, #248-254; GHSA-3jxr-9vmj-r5cp, GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895, GHSA-w5hq-g745-h8pq). exceljs stays at 4.4.0; xlsx write+read verified.
+- backtest: a full stop-out on a sub-floor stop was booked as a fractional-R loss (risk was floored for the R denominator while the stop price stayed put), overstating every support-entry result.
+- trader: dust and unclosable positions no longer consume a concurrency slot. The cap shipped counting every `qty > 0` row, so the SOXS remnant (0.8 shares, $35, unclosable) plus one real position saturated `maxConcurrent=2` — every entry would have been refused. `TRADER_DUST_PCT` (default 0.1% of equity) sets the floor.
+- trader: the minimum-stop floor now applies to **every** entry path, not just support entries. The four symbols outside `TRADER_SUP_ENTRY_SYMBOLS` (XLK, IWM, DIA, SOXL) kept taking 1.0–1.5% plan/ATR stops; XLK was tagged 24 minutes after entry for −$642 on a 1% move. New entries only — stops already resting at the broker are untouched.
+- trader: the concurrency cap now counts entries opened during the same scan. `heldPos` is a start-of-scan snapshot, so several entries in one cycle each saw the same pre-scan count — on 2026-08-07 that left 3 positions open against `maxConcurrent=2`.
+- trader: `TRADER_MIN_ENTRY_RR` (default 1) skips entries whose **floored** stop leaves reward:risk below the threshold. The stop floor and the 3:1 derivation fight each other; when the floor wins, RR can collapse — SOXL took a 3.00% stop against a 1.60% target (0.53:1) and closed −$217.
+- trader UI: Day P&L is `realized + unrealized` instead of each position's move since *yesterday's close* plus a `realized_today` that IBKR always reports as 0.00. The old formula credited positions with rallies they were never in and hid every closed loss — it showed **+$1,383.96** while the broker read **−$337.60**.
+- trader: exits are recorded from **broker fills**, not from the engine's intent priced at the last mark. The old path was wrong in both directions every session — stop-outs understated 30–60% (XLK logged −$319.62, filled −$641.62), exit orders that never filled still logged as completed exits (QQQ logged twice, +$453.54 vs +$218.48 real), and fast stop-outs could vanish entirely (SOXL −$590, no row). Placement-time rows are now `exit_intent`; only a confirmed fill produces an `exit`.
+- trader: the fill reconciler ignores fills that predate the running process. On the first run after a deploy it back-filled the day's already-closed trades with `pnl: null` (the entry price isn't in memory after a restart), adding noise on top of the rows it was meant to replace. Their order ids are still remembered, so they can never resurface.
+- trader UI: `realized_today` sums **every** exit row for the day. It previously kept only the last exit per symbol and skipped symbols that were open again — so a symbol closed and re-entered the same day lost its realized P&L entirely. On 2026-08-07 that dropped QQQ (+$218.48) and XLK (−$641.92), reading −$230.98 instead of −$654.42 and showing Day P&L as +$80.55 instead of −$342.89.
+- **trader: five money-path bugs from the 2026-08-08 entry/exit audit.** (1) The
+  placed broker stop now uses the same derived stop (`_stopDistEff`, target÷3
+  floored/capped) that sized the position and passed the RR gate — it used to
+  place the pre-derivation structural stop, so realized risk ran 1.6–2.4× the
+  configured `riskPct` and the RR≥1 gate passed trades whose true geometry was
+  below 1:1 (probe-verified). (2) The daily-loss circuit breaker now accepts the
+  `{dailyPnl}` object shape the Alpaca/house/demo facades return — it silently
+  never armed on any non-IBKR account. (3) The gross cash-reserve brake counts
+  notional placed earlier in the same scan (same start-of-scan-snapshot blind
+  spot the concurrency cap had; probed stacking to 126% of budget). (4) An
+  in-flight exit whose parked order died at the broker un-freezes after two
+  order-less scans plus the re-fire debounce instead of stranding the position
+  from every engine exit — and the "unclosable" 3-strikes freeze is now a
+  backoff (retry after `TRADER_UNCLOSABLE_RETRY_MIN`, default 60) instead of a
+  life sentence, so a transient order-path outage recovers on its own. (5) The
+  10s fast-exit loop now honors the per-user active-trader switch (#3212): an
+  'off' account is fully hands-off and a 'champion' account no longer gets
+  day-trader exits unwinding the allocation book. New regression suite
+  `test/entry-exit-brakes.test.js` drives all of these through the real module.
+- **auth: un-orphan pre-v1.14.2 accounts and stop advertising unconfigured
+  sign-in methods.** The #3136 data-root collapse was correct going forward but
+  orphaned every existing account on deployments whose service cwd was the app
+  dir (the GCE box): the server read an empty canonical store while the real
+  accounts sat in the legacy cwd-relative tree — email+password logins returned
+  "Email or password is incorrect" and Google sign-ins silently minted fresh
+  guest profiles, i.e. both login methods read as broken. #3136 shipped only a
+  startup warning; boot now runs `lib/legacy-data-migrate.js`, a one-time,
+  idempotent, fail-soft merge of the auth-critical stores (profiles, auth
+  ledgers, billing idempotency) into the canonical root — JSONL merged
+  legacy-first so latest-record-wins keeps canonical authority, token/event
+  ledgers become the union, binary files never overwrite, canonical files are
+  backed up as `*.pre-merge.bak`, and migrated legacy files are retired as
+  `*.migrated`. Also: auth.html now renders only the OAuth buttons the server
+  actually advertises (matching its own #1877 comment) instead of
+  unconditionally showing Google and bouncing users into
+  `provider_unconfigured`; if the provider list is unavailable it fails open
+  and renders them all.
+
+### Changed
+- trader: archive completed 5m/15m/1h bars into a rolling per-symbol corpus (data/lantern-garage/trading/bars) so intraday backtests stop being capped at Yahoo's ~30-day window
+- trader: zone-ladder exit for SPY/QQQ (#3165) — bank at the first resistance zone unless price breaks through, then hold for the second with the floor ratcheted to R1; OOS-validated (2015-2026 holdout: SPY PF 1.52, QQQ 1.62)
+- trader: SSO joins the zone-ladder defaults (OOS-validated: holdout PF 1.99, 74% win); exit-scheme backtest lab + 15m zone-ladder harness land in experiments/
+- trader: protective stops are ATR-based (the signal's own trade-plan stop, clamped 1-6%) instead of a flat 2%; per-trade risk drives the 1R take-profit; TRADER_ATR_STOPS=0 reverts
+- trader: fast exit loop — price-only exit checks every 10s between scans (ladder/trailing/max-loss react in seconds; no extra Yahoo calls); TRADER_FAST_EXITS=0 kills
+- trader: SPY protective stop tightened to 0.65x its plan distance (OOS-validated: +30% R per dollar risked in both fit and holdout windows, flat drawdown); per-symbol via TRADER_STOP_SCALE_SYMBOLS
+- trader: support-zone entries for SPY/QQQ — only enter AT the support zone with the stop UNDER it (structural); OOS-validated RR >1:1 (QQQ holdout PF 2.06); TRADER_SUP_ENTRY=0 kills
+- trader: SQQQ/SOXS/SPXS readmitted UNDER the support-entry gate only — inverse ETFs with structural stops are OOS-robust early-downtrend entries (holdout PF 2.5-13.4, RR 1:2.7-4.9)
+- trader: peak give-back exit — a near-miss of R1 (>=90% of the distance) that gives back 40% of its peak gain exits near the peak instead of round-tripping; OOS-validated on support entries (holdout PF SPY 1.57, QQQ 2.13)
+- trader: fast exit loop honors the unclosable freeze and in-flight exits (frozen SOXS dust was re-attempting through the fast path)
+- trader: GLD/SMH/TLT join the support-entry gate + zone ladder (OOS: GLD PF 2.55/2.60, TLT 2.05/2.14, SMH 1.96/1.89 — ends the momentum-death scratch churn observed live 2026-08-04)
+- trader: risk-based position sizing — qty derived from equity x risk% / stop distance so every trade carries uniform risk (Phase 0 default 0.06% = today's measured average, exposure unchanged)
+- trader: momentum-death exit now requires a minimum profit (0.5R) before firing — 31 of 33 sub-0.15% wins were momentum exits banking nothing
+- trader: room-based tiering — entries with 1.5R+ to first resistance keep full risk; cramped entries get half risk and half cap; OOS-validated on 5 symbols
+- backtest lab: rebuilt sup-entry/give-back/room-filter/MAE harness as a committed change; added structure-trailing floor and momentum-ignition mode
+- trader: A+ tier — room plus volume expansion, logged and measured at A-tier risk until live evidence justifies more; zone touches tested and falsified
+- zones: GLD gets volatility-scaled clustering (1.0x ATR) — measured better in two independent tests; every other symbol keeps the fixed 0.5%
+- trader: resistance zones nearer than 0.5R are treated as noise, not targets — they no longer arm the exit ladder or demote an entry to B-tier. OOS-gated on 5 symbols: better in both the fit and the holdout window.
+- trader: minimum stop distance `TRADER_STOP_MIN_PCT` (default 3%). The support-entry stop could land inside the instrument's noise band — live 2026-08-06 SPY entered with a 0.20% stop and was tagged in 29 minutes. Gated 2% vs 3% across fit and holdout ranked by percent captured per trade: 3% wins both windows and lifts win rate 45% → 59%.
+- backtest: `BT_STOP_MIN_PCT`, plus `avg_ret_pct` / `total_ret_pct` in the summary — `avg_R` is normalised by stop width and inverts the dollar ranking.
+- trader: log slot utilization transitions (event slot_util) so daily reports can time-weight 0/1/2-slot occupancy; lab: BT_RSI_DEPTH entry-selectivity knob with negative sweep result
+- signal-engine: Internal Bar Strength entry (TRADER_IBS_MODE only|or, TRADER_IBS_MAX) — OOS 658% vs 297% total captured vs the RSI baseline; default off. Lab: BT_IBS_MAX/BT_IBS_ONLY/BT_IBS_OR knobs
+- trader: trail the runner past R2 (TRADER_R2_TRAIL, ratcheting 1% floor, never below R2) — lab OOS +0.733%/trade vs +0.328 selling at R2; lab knob BT_R2_TRAIL
+- greenpath: MAIL_DISABLE=1 mailer kill-switch (survives .env.local override) + s7 rewritten to exercise the real BYOK Alpaca connect journey (connect-keys -> connected -> disconnect); gate GREEN 18/18
+- trader: per-user autopilot on/off ('off' mode, safe default for signed-in users) + 3-way Off/Intraday/Champion switch in Settings (#3212)
+- docs: user Trader Guide (docs/TRADER-GUIDE.md + public /trader-guide.html, linked from the trader header) — signup, Alpaca connect, mode/strategy switches, on/off, troubleshooting (#3213)
+- trader: post-stop re-entry cooldown (TRADER_STOP_COOLDOWN_DAYS, default 1) — lab: halves the holdout worst day at -0.004%/trade; lab knob BT_STOP_COOLDOWN
+- trader: daily circuit breaker (TRADER_STOP_BREAKER=2) — after 2 stop fills in a session, no new entries; replay: worst day -3.97 -> -1.40 with %/trade IMPROVED both windows
+- trader: CSP shadow book (#3219) — paper cash-secured put recorded per live IBS entry (nearest weekly at washout strike, quoted bid), resolved at expiry vs the underlying; paired journal csp-shadow.jsonl; observer only, TRADER_CSP_SHADOW=0 kills
+- trader UI: Day P&L now uses ET trading dates (UTC roll made evening/weekend figures drop the session's realized) and a hybrid unrealized basis (today-opened since entry; carried positions since prevClose) so multi-day holds stop re-counting prior days
+- trader UI: Day P&L session gate — carried positions contribute $0 on weekends/pre-open (stale chg_pct re-badged Friday's move as today); client no longer overrides the server figure
+- trader UI: operator-view fallback now computes Day P&L with the same ET/session-gated formula instead of passing broker dpl through (pre-market -$448.80 on the admin dashboard)
+- trader: admin operator-view Flatten works — write path mirrors the read fallback (admin with no linked broker acts on the operator account, flagged in the toast)
+- trader: cancel the resting protective stop BEFORE the exit sell — IBKR oversell protection was cancelling market exits that raced their own stop (QQQ 9:33 Cancelled/0-filled)
+- trader: dust holdings no longer block re-entry (SOXS 0.8sh stranded its symbol); exits/stops floor to whole shares so rebuilt positions never re-strand on the fractional tail
+- trader: entries auto-confirm IBKR order warnings like exits already do — SPXS $115k A-tier entry died at needs_confirmation on the leveraged-ETF disclosure prompt
+- trader: sub-share dust never attempts an exit (qty<1 unfillable by construction) — ends the 3-error-orders-per-restart SOXS spray in both the exit manager and the bearish signal-exit branch
+- trader: re-protect cap counts only FAILED stop placements (Inactive/needs_confirmation/rejected) — deliberately-cancelled lifecycle stops no longer starve re-protection (149 capped rows + naked-stop stretches on 2026-08-10)
+- **BENCHMARKS.md — HumanEval registry refreshed (2026-08-06)** with the newest raw-Ouro ledger row and an honest provenance note. The freshest run (`diag-fullrec`, 08-01) is **5% / 17-of-20 no-parse**, but it is **not** a new capability headline: it measured the coding-regressed Σ₀ `@final` tune because `eval_humaneval_ouro.py` defaults `--adapter` to `ouro-sigma0-adapters/final`. Recorded that footgun (pass `--adapter` explicitly — base ≈7.3%, `checkpoint-600` for the 0.427 reference), the #3127 fix (adapters no longer collapse to `<model>@final` in the ledger), and re-checked the public SOTA (still saturated 96–98%). Real marks unchanged: chat product 0.829 (qwen2.5-coder, full-164), raw-Ouro reference 0.427 (ck600).
+- **New Budget & Savings tool** (`/budget.html`, a tab beside the Trader) — enter monthly income and expenses across studied categories and get a live savings rate (banded Poor/Fair/Good/Excellent), a 50/30/20 breakdown, per-category benchmark flags, and prioritized trim recommendations. Everything is computed **deterministically from cited rules** (`js/budget-engine.js`, unit-tested) — no LLM guesses a number — and every threshold links its source (50/30/20, 28/36 housing rule, ≤36% DTI, 3–6mo emergency fund, 20% savings target). **Client-side only** (`localStorage['lantern.budget.v1']`) — no server store, no `/api/*` calls, nothing leaves the browser — so it adds no persistence surface. Registered as an EXTENSION (it honestly serves no convergence-loop stage); this raised the surface extension:core ratio to 1.50 and `MAX_EXTENSION_RATIO` was bumped 1.45→1.50 as a deliberate, documented acceptance of one owner-requested feature.
+- **The demo portfolio marks its positions at live quotes now, so it agrees with the watchlist (#2983)** — on `explore.html` the demo POSITIONS card and the WATCHLIST showed two different prices for the same symbol on one screen (TLT valued off a baked `$88.10` mark while the live quote read `$83.70`), and the displayed P&L was computed off the stale mark. `broker-facade`'s demo rung called `champion-demo.positions()` (baked static marks) instead of the already-present `positionsLive()`, which pulls the SAME Yahoo feed `/api/trading/watchlist-prices` uses. Wired `positionsLive()` in; it falls back to the baked marks per-symbol if a quote fetch fails, so this only ever improves accuracy and can't blank the book offline. Verified end-to-end: the demo facade now returns TLT at the live ~$83 mark, not $88.10. Unit-tested in `champion-demo-live-marks.test.js`.
+- fix(tests): the greenpath release gate was red on two behaviour changes, not defects
+- The gate walks a Free account to Pro, and it still encoded the pre-#3039 journey: a bare
+- `goto('/stock-trader.html')` now redirects a Free user to Watch, so the upgrade CTA it
+- asserts never rendered. It also called the staff role endpoint without a `reason`, which
+- #3100 made mandatory for granting a paid tier by hand. Both are now correct, taking the
+- run from 3 passed / 1 failed / 5 not-run to 8 passed.
+- **Pin the Stripe API version so a dependency bump can't silently drift prod billing** — `routes/billing.js` never passed `apiVersion` to `new Stripe(...)`, so the effective request/response shape was whatever the installed SDK defaulted to. The #3156 `stripe` 18→22 bump therefore moved prod onto `2026-07-29.dahlia` on merge. It's pinned now to the version this integration is written and verified against (matching stripe@22.4.0's own default), making any future SDK upgrade a deliberate, reviewed change. Also hardened the `/api/billing/cancel` response to read `current_period_end` from the subscription **item** (with a fallback to the legacy subscription-level field) — the same mapping the sync path already uses — so the cancel confirmation shows the real period-end date under the new API version instead of `null`.
+
 ## [1.14.2] - 2026-08-04
 
 ### Added
