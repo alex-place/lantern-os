@@ -145,6 +145,15 @@ function computeScorecard(exits) {
     duplicateExits,
     // How much of the above is priced off a last-observed mark instead of a fill.
     estimatedTrades: estimated.length,
+    // Excursion quality (#3241): averaged ONLY over rows that observed their run —
+    // historical rows without mfe/mae stay out of the denominator (n says how many
+    // contributed; averages are null, never 0, when nothing did).
+    excursions: (() => {
+      const mfe = rows.map((e) => e.mfe_pct).filter((v) => typeof v === 'number' && Number.isFinite(v));
+      const mae = rows.map((e) => e.mae_pct).filter((v) => typeof v === 'number' && Number.isFinite(v));
+      const avg = (a) => (a.length ? _round(a.reduce((s, v) => s + v, 0) / a.length) : null);
+      return { nMfe: mfe.length, nMae: mae.length, avgMfePct: avg(mfe), avgMaePct: avg(mae) };
+    })(),
     byReason,
   };
 }
