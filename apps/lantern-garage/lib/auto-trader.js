@@ -309,6 +309,11 @@ const _lastOrderAt = new Map(); // sym -> last order ts (re-entry cooldown)
 const _entryAt = new Map();     // sym -> ts we opened the long (min-hold before exit)
 const _dirStreak = new Map();   // sym -> { dir, count, at } (signal-persistence filter)
 const _peak = new Map();        // sym -> highest price seen since entry (trailing stop)
+const _trough = new Map();      // sym -> lowest price seen since entry (MAE capture, #3241)
+// sym -> { peak, trough, stopDistPct } frozen at exit-order placement, because the
+// live maps are cleared there while the fill row is only written later, at broker
+// reconcile — without this snapshot every closeLong exit would log null excursions.
+const _excursion = new Map();
 const _exitAt = new Map();      // sym -> ts of the last exit attempt (don't re-fire while an exit may be resting)
 const _exitFailures = new Map();  // sym -> consecutive terminal exit failures
 const _unclosable = new Set();    // syms declared unclosable (logged once, no re-attempts)
@@ -412,12 +417,17 @@ function _reconcileFills(orders) {
   try {
     const rows = fillLedger.newExitRows(orders, _loggedFills, (sym) => {
       const lp = _lastPos.get(sym);
-      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym) };
+      // Excursions (#3241): the placement snapshot when this exit came from
+      // closeLong (which clears the live maps), else the live maps — a protective
+      // STP fills without ever passing through closeLong.
+      const ex = _excursion.get(sym) || { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null };
+      return { avg_entry_price: lp && lp.entry, reason: _exitIntent.get(sym), ...ex };
     }, _PROCESS_START);
     for (const row of rows) {
       logTrade(row);
       done.add(row.symbol);
       _exitIntent.delete(row.symbol);
+      _excursion.delete(row.symbol);   // consumed by the fill row it was frozen for
       // A STOP fill arms the re-entry cooldown: today + N trading days.
       const _cdDays = cfg().stopCooldownDays;
       if (String(row.order_type || '') === 'Stop' || /(^|\b)stop\b/i.test(String(row.reason || ''))) {
@@ -435,6 +445,9 @@ function _saveState() {
     fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
     fs.writeFileSync(STATE_FILE, JSON.stringify({
       peak: Object.fromEntries(_peak),
+      trough: Object.fromEntries(_trough),
+      excursion: Object.fromEntries(_excursion),   // placement→fill handoff must survive a restart
+
       entryAt: Object.fromEntries(_entryAt),
       exitAt: Object.fromEntries(_exitAt),
       exitStatus: Object.fromEntries(_exitStatus),
@@ -463,6 +476,8 @@ function _loadState() {
   try {
     const o = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     for (const [k, v] of Object.entries(o.peak || {})) _peak.set(k, v);
+    for (const [k, v] of Object.entries(o.trough || {})) _trough.set(k, v);
+    for (const [k, v] of Object.entries(o.excursion || {})) _excursion.set(k, v);
     for (const [k, v] of Object.entries(o.entryAt || {})) _entryAt.set(k, v);
     for (const [k, v] of Object.entries(o.exitAt || {})) _exitAt.set(k, v);
     for (const [k, v] of Object.entries(o.exitStatus || {})) _exitStatus.set(k, v);
@@ -538,7 +553,10 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
   // within seconds, so the position is never left unprotected for long.
   await cancelRestingStops(bridge, userId, sym);
   const r = await bridge.placeIBKROrder(userId, order).catch((e) => ({ status: 'error', reason: e.message }));
-  _entryAt.delete(sym); _peak.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
+  // Freeze the excursion run BEFORE clearing per-symbol state — the fill row that
+  // needs it is only written later, at broker reconcile (#3241).
+  _excursion.set(sym, { peak: _peak.get(sym) ?? null, trough: _trough.get(sym) ?? null, stopDistPct: _stopDistPct.get(sym) ?? null });
+  _entryAt.delete(sym); _peak.delete(sym); _trough.delete(sym); _lastOrderAt.set(sym, now); _exitAt.set(sym, now);
   _exitStatus.set(sym, r && r.status);   // freeze re-exit until this order confirms / the position leaves the book
   _exitIntent.set(sym, reason);
   logTrade({ event: 'exit_intent', symbol: sym, qty, entry: hp.avg_entry_price ?? null, mark: hp.current_price ?? null, reason, status: r && r.status });
@@ -668,6 +686,8 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
     const pnlPct = ((cur - entry) / entry) * 100;
     const peak = Math.max(_peak.get(sym) || 0, cur, entry);   // running high-water mark
     _peak.set(sym, peak);
+    // Running low-water mark (#3241): MAE = how far the trade went against us.
+    _trough.set(sym, Math.min(_trough.get(sym) || Infinity, cur, entry));
     const peakGainPct = ((peak - entry) / entry) * 100;         // best gain reached
     const dropFromPeakPct = peak > 0 ? ((peak - cur) / peak) * 100 : 0;
 
@@ -838,6 +858,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       pnl, pnl_pct: entry > 0 ? ((mark - entry) / entry) * 100 : null,
       reason: 'closed_externally (position left the book with no autopilot exit — protective stop, manual close, or another engine)',
       status: 'reconstructed', estimated: true,
+      ...fillLedger.excursionFields(entry, _peak.get(sym), _trough.get(sym), _stopDistPct.get(sym)),
     });
   }
 
@@ -869,6 +890,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       _exitFailures.delete(sym); _unclosable.delete(sym);   // position gone → a future re-entry starts clean
       _unclosableAt.delete(sym); _exitNoOrder.delete(sym);
       _zoneLadder.delete(sym); _stopDistPct.delete(sym);
+      _trough.delete(sym); _excursion.delete(sym);
     } else if (_isExitInFlight(_exitStatus.get(sym))) {
       // FREEZE EXPIRY AGAINST BROKER TRUTH (2026-08-08). The in-flight freeze had
       // no expiry and was never re-checked: a parked exit later cancelled/expired
@@ -1477,6 +1499,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

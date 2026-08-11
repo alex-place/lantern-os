@@ -430,6 +430,7 @@ const optionsRoutes = require('./trading/options');
 const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
+const trackRecordRoutes = require('./trading/track-record');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
@@ -484,6 +485,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await brakeRoutes(req, res, url, ctx)) return true;
   if (await demoRoutes(req, res, url, ctx)) return true;
   if (await scorecardRoutes(req, res, url, ctx)) return true;
+  if (await trackRecordRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;

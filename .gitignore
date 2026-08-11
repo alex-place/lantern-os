@@ -50,6 +50,7 @@ data/dream_journal/*.jsonl
 data/lantern-garage/trading/agent-log.jsonl
 data/lantern-garage/trading/news.jsonl
 data/lantern-garage/trading/orders.jsonl
+data/lantern-garage/trading/track-record-snapshot.json
 
 # Flourishing feeds cache — runtime-derived World Bank snapshot (local only)
 data/flourishing-cache.json

@@ -1,0 +1,3 @@
+### Added
+
+- trader: **MFE/MAE capture on exit rows** (#3241) — every autopilot exit now records how far the trade ran in our favor (`mfe_pct`) and against us (`mae_pct`) while open, plus R-multiples when the protective-stop distance is known. The engine tracks a running low-water mark beside the existing peak, freezes the excursion at exit-order placement (the live maps are cleared there while the fill row is only written at broker reconcile), and the snapshot survives restarts. Nulls — never zeros — when the run wasn't observed. The scorecard aggregates `avgMfePct`/`avgMaePct` only over rows that carry the fields, so historical rows stay out of the denominator.

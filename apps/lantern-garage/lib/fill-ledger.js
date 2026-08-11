@@ -96,6 +96,9 @@ function newExitRows(orders, loggedIds, entryFor, sinceMs = 0) {
       order_type: o.orderType || null,
       status: 'filled',
       source: 'fill',
+      // MFE/MAE (#3241) — from the excursion snapshot the engine passes through
+      // entryFor(); null when the run wasn't observed (e.g. pre-restart fills).
+      ...excursionFields(entryPx, info.peak, info.trough, info.stopDistPct),
     });
   }
   return out;
@@ -119,4 +122,28 @@ function idsToRemember(orders) {
   return ids;
 }
 
-module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs };
+/**
+ * Excursion fields for an exit row (#3241): how far the position ran in our
+ * favor (MFE) and against us (MAE) while open, as % of entry — and in R when
+ * the protective-stop distance is known. Nulls (never zeros) when the peak /
+ * trough was not observed: an invented excursion is worse than an absent one.
+ * Long-only book, so favorable = peak above entry, adverse = trough below.
+ */
+function excursionFields(entryPx, peak, trough, stopDistPct) {
+  const out = { mfe_pct: null, mae_pct: null, mfe_r: null, mae_r: null };
+  if (!(entryPx > 0)) return out;
+  if (Number.isFinite(peak) && peak > 0) {
+    out.mfe_pct = +(((Math.max(peak, entryPx) - entryPx) / entryPx) * 100).toFixed(4);
+  }
+  if (Number.isFinite(trough) && trough > 0) {
+    out.mae_pct = +(((Math.min(trough, entryPx) - entryPx) / entryPx) * 100).toFixed(4);
+  }
+  const sd = Number(stopDistPct);
+  if (sd > 0) {
+    if (out.mfe_pct != null) out.mfe_r = +(out.mfe_pct / sd).toFixed(3);
+    if (out.mae_pct != null) out.mae_r = +(out.mae_pct / sd).toFixed(3);
+  }
+  return out;
+}
+
+module.exports = { newExitRows, idsToRemember, isFilledSell, orderTimeMs, excursionFields };
