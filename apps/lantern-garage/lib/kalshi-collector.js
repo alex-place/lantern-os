@@ -42,9 +42,13 @@ function getSnapshotPath() {
   return path.join(KALSHI_DIR, `tight-band-${today}.jsonl`);
 }
 
+let _lastSnapshotPath = null;
 function logSnapshot(snapshot) {
   try {
     fs.mkdirSync(KALSHI_DIR, { recursive: true });
+    // Day rollover → new file → prune anything past retention.
+    const p = getSnapshotPath();
+    if (p !== _lastSnapshotPath) { _lastSnapshotPath = p; pruneOldSnapshots(); }
     const ts = new Date().toISOString();
     const line = JSON.stringify({
       ts,
@@ -176,14 +180,46 @@ async function tick() {
 }
 
 /**
- * Start the polling loop.
+ * Retention sweep: delete tight-band snapshot files older than
+ * KALSHI_SNAPSHOT_RETAIN_DAYS (default 14; 0 disables the sweep). The 6s loop
+ * writes ~2.5 GB/day of snapshots; left unrotated they filled the 30 GB GCE
+ * disk to 100% on 2026-08-06, which broke every write on the box (sessions,
+ * ledgers, deploys) for five days. Runs at start and on each day rollover.
+ */
+function pruneOldSnapshots() {
+  const days = parseFloat(process.env.KALSHI_SNAPSHOT_RETAIN_DAYS ?? "14");
+  if (!(days > 0)) return;
+  try {
+    const cutoff = Date.now() - days * 86400000;
+    for (const f of fs.readdirSync(KALSHI_DIR)) {
+      if (!/^tight-band-\d{4}-\d{2}-\d{2}\.jsonl(\.gz)?$/.test(f)) continue;
+      const full = path.join(KALSHI_DIR, f);
+      try {
+        if (fs.statSync(full).mtimeMs < cutoff) {
+          fs.unlinkSync(full);
+          console.info(`[Kalshi Collector] pruned ${f} (older than ${days}d retention)`);
+        }
+      } catch { /* per-file best-effort */ }
+    }
+  } catch { /* dir missing / unreadable — nothing to prune */ }
+}
+
+/**
+ * Start the polling loop. KALSHI_COLLECTOR=0 disables the collector outright
+ * (no polling, no snapshot files) — the surgical off-switch for deployments
+ * that don't want the telemetry; LANTERN_CHAT_ONLY=1 remains the broad one.
  */
 function start() {
+  if (String(process.env.KALSHI_COLLECTOR || "1") === "0") {
+    console.info("[Kalshi Collector] disabled (KALSHI_COLLECTOR=0) — no polling, no snapshot files");
+    return;
+  }
   if (isRunning) return;
   isRunning = true;
   console.info(
     `[Kalshi Collector] starting ${adaptiveEnabled ? "adaptive send-on-delta" : "6s fixed"} polling loop`
   );
+  pruneOldSnapshots();
   // Initial collection, then self-scheduling chain.
   tick();
 }

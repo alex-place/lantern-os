@@ -467,13 +467,19 @@ function getProfileByIdentity(provider, providerId) {
  * email a provider has verified (`emailVerified === true` or a verified identity
  * with that email) — this is the gate that makes auto-linking safe (ADR-0016).
  */
-function getProfileByEmail(email, { verifiedOnly = false } = {}) {
+function getProfileByEmail(email, { verifiedOnly = false, rootOnly = false } = {}) {
   if (!email) return null;
   const needle = String(email).toLowerCase();
   let fallback = null;
   for (const p of allProfiles()) {
     const rootMatch = p.email && p.email.toLowerCase() === needle;
-    const idMatch = (p.identities || []).find((i) => i.email && i.email.toLowerCase() === needle);
+    // rootOnly: match ONLY the profile's root email, never a linked-identity
+    // email. Password reset needs this — matching an OAuth identity's address
+    // resolved the whole account and mailed the reset link to the profile's
+    // ROOT address instead of the one the user typed (2026-08-11: a reset
+    // requested for a linked gmail delivered founder@'s inbox — "wrong email
+    // to the wrong person"). Reset mail must go to the typed address or nowhere.
+    const idMatch = rootOnly ? null : (p.identities || []).find((i) => i.email && i.email.toLowerCase() === needle);
     if (!rootMatch && !idMatch) continue;
     const verified = p.emailVerified === true || (idMatch && idMatch.emailVerified === true);
     if (verified) return p; // strongest match wins immediately
