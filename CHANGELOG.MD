@@ -1,3 +1,19 @@
+## [1.15.2] - 2026-08-11
+
+### Added
+- trader: **MFE/MAE capture on exit rows** (#3241) — every autopilot exit now records how far the trade ran in our favor (`mfe_pct`) and against us (`mae_pct`) while open, plus R-multiples when the protective-stop distance is known. The engine tracks a running low-water mark beside the existing peak, freezes the excursion at exit-order placement (the live maps are cleared there while the fill row is only written at broker reconcile), and the snapshot survives restarts. Nulls — never zeros — when the run wasn't observed. The scorecard aggregates `avgMfePct`/`avgMaePct` only over rows that carry the fields, so historical rows stay out of the denominator.
+- trader: **record snapshot + scorecard slices — the journal's data layer** (gated, signed-in). `GET /api/trading/track-record` serves the autopilot books' settlement-graded snapshot — confirmed (broker-accepted) fills only, daily realized P&L with cumulative curve and max drawdown, per-exit-path table with structural win rates flagged, every exclusion disclosed as a count, and the Champion book honestly `pending` until it writes a ledger of its own (#3246, reworked). `GET /api/trading/scorecard?by=symbol|hour|reason|skip` slices the ledger with the same honesty pipeline as the headline scorecard (no-fill attempts dropped and re-decisions collapsed BEFORE bucketing, confirmed-vs-all split per slice, profit-only exit reasons flagged); `by=skip` groups the skip log by number-normalized decline reason (#3240 progress, #3243 v1 API). `lib/trader-scorecard.js` now honors the same `TRADER_TRADES_LOG` override as its writer. **Per product decision (2026-08-11) the ledger is not published** — no public page or public endpoint ships; the public proof surface remains the live demo book.
+
+### Fixed
+- **auth: signing in from www.unisona.ai no longer fails at Google with
+-   "Error 400: redirect_uri_mismatch".** OAuth redirect URIs are minted from the
+-   request Host and only the apex callback is registered with Google, so the
+-   `www.` host produced an unregistered `https://www.unisona.ai/...` callback.
+-   The server now 308-redirects any `www.`-prefixed Host to the apex before
+-   routing, which also keeps sessions and cookies on a single origin.
+-   (`cloud.lantern-os.net` sign-in still requires its callback to be registered
+-   in the Google Console — operator action.)
+
 ## [1.15.1] - 2026-08-11
 
 ### Added
