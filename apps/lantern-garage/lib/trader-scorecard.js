@@ -19,7 +19,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_LOG = path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+// Honors the same TRADER_TRADES_LOG override as auto-trader.js (its writer), so a
+// test or preview can point BOTH the writer and every reader at a fixture ledger.
+const DEFAULT_LOG = process.env.TRADER_TRADES_LOG
+  ? path.resolve(process.env.TRADER_TRADES_LOG)
+  : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
 
 // A confirmed fill is one the broker actually accepted/executed. Everything else
 // (needs_confirmation, dry_run, error, null) is a DECISION the strategy made but
@@ -173,4 +177,137 @@ function scorecard(logPath = DEFAULT_LOG) {
   };
 }
 
-module.exports = { computeScorecard, readExits, scorecard, reasonFamily, DEFAULT_LOG };
+/** Read + parse rows of one event type from a trades log (fail-soft → []). */
+function readEvents(event, logPath = DEFAULT_LOG) {
+  let text = '';
+  try { text = fs.readFileSync(logPath, 'utf8'); } catch (_e) { return []; }
+  const out = [];
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    let d; try { d = JSON.parse(line); } catch (_e) { continue; }
+    if (d && d.event === event) out.push(d);
+  }
+  return out;
+}
+
+// ── Breakdown slices (#3240) — the journal-analytics data layer ───────────────
+
+// All ledger timestamps are ISO UTC; every "which day / which hour" question is an
+// exchange-time question, so slicing happens in America/New_York (the day-pnl ET
+// convention). hourCycle h23 pins midnight to "00" (some engines emit "24").
+const ET_FMT = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/New_York', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+});
+function etParts(ts) {
+  const d = new Date(ts);
+  if (!Number.isFinite(d.getTime())) return null;
+  const p = {};
+  for (const part of ET_FMT.formatToParts(d)) p[part.type] = part.value;
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: p.hour === '24' ? '00' : p.hour };
+}
+
+/**
+ * The same filtering pipeline computeScorecard applies internally (drop no-fill
+ * attempts, collapse re-decisions), exposed so callers can bucket rows FIRST and
+ * still get numbers consistent with the headline scorecard. Deduping before
+ * bucketing matters: a duplicate pair split across two hour-buckets would never
+ * collapse if each bucket deduped separately.
+ */
+function preparedRows(exits) {
+  const priced = (exits || []).filter((e) => e && typeof e.pnl === 'number' && Number.isFinite(e.pnl));
+  const filled = priced.filter((e) => !NO_FILL_STATUSES.has(String(e.status || '').toLowerCase()));
+  return dedupeRoundTrips(filled);
+}
+
+/** The compact per-slice stat set (drops nested byReason + global-only counters). */
+function slimStats(full) {
+  return {
+    trades: full.trades, wins: full.wins, losses: full.losses, winRate: full.winRate,
+    totalRealized: full.totalRealized, avgWin: full.avgWin, avgLoss: full.avgLoss,
+    expectancy: full.expectancy, profitFactor: full.profitFactor,
+    riskExitTrades: full.riskExitTrades, riskExitWinRate: full.riskExitWinRate,
+    estimatedTrades: full.estimatedTrades,
+  };
+}
+
+const BREAKDOWN_KEYS = ['symbol', 'hour', 'reason', 'skip'];
+
+/**
+ * Slice the ledger by symbol / ET hour / exit-reason family — each slice carrying
+ * the same honesty split as the headline scorecard (confirmed = broker-accepted
+ * fills; all = every exit decision). `by=skip` slices the skip log instead: every
+ * declined opportunity grouped by its (number-normalized) decline reason.
+ */
+function breakdown(by, logPath = DEFAULT_LOG) {
+  if (!BREAKDOWN_KEYS.includes(by)) {
+    return { error: 'unknown_breakdown', by, supported: BREAKDOWN_KEYS };
+  }
+  if (by === 'skip') return skipBreakdown(logPath);
+
+  const exits = readExits(logPath);
+  const groupOf = (e) => {
+    if (by === 'symbol') return String(e.symbol || '?').toUpperCase();
+    if (by === 'hour') { const p = etParts(e.ts); return p ? `${p.hour}:00 ET` : '?'; }
+    return reasonFamily(e.reason);
+  };
+  const views = {
+    confirmed: exits.filter((e) => CONFIRMED.has(String(e.status || '').toLowerCase())),
+    all: exits,
+  };
+  const out = {
+    by,
+    generatedAt: new Date().toISOString(),
+    confirmed: {}, all: {},
+    note: 'Same honesty split as /api/trading/scorecard: confirmed = broker-accepted fills (booked); all = every exit decision. Slices are computed AFTER the global no-fill drop + duplicate-collapse, so slice totals reconcile with the headline scorecard. Win rates on profit-only exit reasons are structural (they can only close winners) — flagged, not headline.',
+  };
+  for (const [view, rows] of Object.entries(views)) {
+    const buckets = new Map();
+    for (const e of preparedRows(rows)) {
+      const k = groupOf(e);
+      if (!buckets.has(k)) buckets.set(k, []);
+      buckets.get(k).push(e);
+    }
+    const groups = {};
+    for (const k of [...buckets.keys()].sort()) {
+      const g = slimStats(computeScorecard(buckets.get(k)));
+      if (by === 'reason') g.profitOnly = PROFIT_ONLY_REASONS.has(k);
+      groups[k] = g;
+    }
+    out[view] = groups;
+  }
+  return out;
+}
+
+/**
+ * The skip log, grouped (#3243 v1): every opportunity the autopilot DECLINED,
+ * by decline reason with counters normalized out (so "gross 81% > cap 80%" and
+ * "gross 83% > cap 80%" are one family). Counts only — the counterfactual
+ * "what declining saved you" pricing is a separate, clearly-labeled step.
+ */
+function skipBreakdown(logPath = DEFAULT_LOG) {
+  const skips = readEvents('skip', logPath);
+  const buckets = new Map();
+  for (const s of skips) {
+    const key = String(s.reason || 'unspecified').replace(/\d+(\.\d+)?/g, '#').slice(0, 160);
+    if (!buckets.has(key)) buckets.set(key, { count: 0, symbols: new Set(), firstAt: s.ts || null, lastAt: s.ts || null });
+    const b = buckets.get(key);
+    b.count += 1;
+    if (s.symbol) b.symbols.add(String(s.symbol).toUpperCase());
+    if (s.ts) { if (!b.firstAt || s.ts < b.firstAt) b.firstAt = s.ts; if (!b.lastAt || s.ts > b.lastAt) b.lastAt = s.ts; }
+  }
+  const groups = {};
+  for (const [k, b] of [...buckets.entries()].sort((a, z) => z[1].count - a[1].count)) {
+    groups[k] = { count: b.count, symbols: b.symbols.size, firstAt: b.firstAt, lastAt: b.lastAt };
+  }
+  return {
+    by: 'skip', generatedAt: new Date().toISOString(),
+    totalSkips: skips.length, groups,
+    note: 'Declined opportunities from the skip log, grouped by decline reason (numbers normalized to #). Counts only — no counterfactual P&L is implied here.',
+  };
+}
+
+module.exports = {
+  computeScorecard, readExits, readEvents, scorecard, breakdown, reasonFamily,
+  preparedRows, etParts, slimStats, CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG,
+};

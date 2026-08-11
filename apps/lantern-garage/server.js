@@ -166,6 +166,10 @@ const PUBLIC_TRADING_READS = new Set([
   // (/api/trading/options/order) and this allowlist is GET-only.
   "/api/trading/options/chain",     // read-only chain snapshot (free quote feed)
   "/api/trading/options/strategies", // deterministic advisory proposals — no orders
+  // The public track record (#3246/#3247): book-level, confirmed-fills-only stats
+  // with drawdown — published PRECISELY so a logged-out visitor can audit it.
+  // Contains no balances, quantities, order ids, or user data (lib/track-record.js).
+  "/api/trading/track-record",
 ]);
 function tradeApiGuard(req, res, url) {
   if (!url.pathname.startsWith("/api/trading/")) return false; // not ours → continue

@@ -31,6 +31,7 @@ const LOOP_STAGES = ["Observe", "Remember", "Reason", "Act", "Verify", "Converge
 const CORE = {
   "index.html":             "Observe",   // hub / entry into the loop
   "watch.html":             "Observe",   // market watch — tracking watchlist/charts/signals (the trader's Observe surface; trading split to stock-trader.html)
+  "track-record.html":      "Converge",  // the public settlement-graded track record (#3247) — the autopilot's convergence record (claim=edge, evidence=confirmed fills, drawdown disclosed) published outward; deliberately un-flagged + logged-out-readable
   "welcome.html":           "Observe",   // first-run entry into the loop (#2079)
   "chat.html":        "Reason",    // THE product: observe→remember→reason→act→verify
   "explore.html":           "Remember",  // retrieval feed over the memory archive
