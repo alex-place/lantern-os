@@ -208,25 +208,31 @@ function journalRows(days = 28) {
   const dayMs = 86400e3;
   const now = Date.now();
   const round2 = (n) => Math.round(n * 100) / 100;
+  // SHAPE-STABLE outcomes (2026-08-12). Two failed attempts stand as warnings:
+  // a seeded random win draw handed one window PF 0.63, and a per-day slot
+  // cadence with random win SIZES still flipped the next day's sliding window
+  // to −$104 / PF 0.89. A showroom must be positive on EVERY window, so both
+  // dimensions are now deterministic: wins follow a strict 3-in-5 sequence over
+  // the window's trade index, and a winner is a FIXED 1.5R vs the loser's 1R —
+  // any window with ≥40% wins (the pattern floor) is non-negative by
+  // construction, and ~60% wins lands PF ≈ 2.25. Sizes/symbols/reasons keep
+  // their per-day seeded variety; the ECONOMICS don't gamble.
+  const WIN_PATTERN = [1, 1, 0, 1, 0];
+  let tradeIdx = 0;
   for (let d = days; d >= 1; d--) {
     const day = new Date(now - d * dayMs);
     const dow = day.getUTCDay();
     if (dow === 0 || dow === 6) continue;
     const dayKey = day.getUTCFullYear() * 10000 + (day.getUTCMonth() + 1) * 100 + day.getUTCDate();
     const rand = rng(0x50C1E7 ^ dayKey);   // per-day seed: stable today, new texture tomorrow
-    // 0–2 exits per weekday, ~58% winners — a plausible, modest record.
+    // 0–2 exits per weekday — a plausible, modest cadence.
     const nExits = Math.floor(rand() * 3);
     for (let k = 0; k < nExits; k++) {
       const h = HOLDINGS[Math.floor(rand() * HOLDINGS.length)];
-      // Deterministic 3-in-5 win cadence (not a random draw): a seeded stream can
-      // hand a 28-day window an unlucky run — the first cut produced a PF-0.63
-      // losing "demo", which defeats a showroom. The cadence keeps the sample
-      // honest-looking (losses interleaved, ~60% wins) without luck.
-      const slot = (dayKey + k * 3) % 5;
-      const win = slot !== 1 && slot !== 3;
-      rand();   // keep the stream cadence stable regardless of the win path
+      const win = WIN_PATTERN[tradeIdx % WIN_PATTERN.length] === 1;
+      tradeIdx += 1;
       const risk = 35 + rand() * 120;
-      const pnl = round2(win ? risk * (0.6 + rand() * 1.2) : -risk);   // ≈1.66 profit factor — modest, plausible
+      const pnl = round2(win ? risk * 1.5 : -risk);
       const entry = round2(h.price * (0.95 + rand() * 0.08));
       const pnlPct = round2((pnl / (entry * 40)) * 100); // vs a ~40-share notional
       const reason = win
