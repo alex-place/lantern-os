@@ -1034,6 +1034,7 @@
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
     <button class="tp-tab" role="tab" id="tptab-book" aria-selected="false" aria-controls="tp-book" data-tab="book" onclick="tpTab('book');loadBook()" title="The capital allocator — one evidence-driven budget over the trader sleeves. Each sleeve earns capital only as its own live ledger proves an edge">Book</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');loadJournal()" title="The journal — realized results by day, the equity curve with drawdown, where exits happened, and every trade the autopilot declined with its reason">Journal</button>
+    <button class="tp-tab" role="tab" id="tptab-alerts" aria-selected="false" aria-controls="tp-alerts" data-tab="alerts" onclick="tpTab('alerts');loadAlerts()" title="Engine alerts on your watchlist — a signal fired, a price reached a zone, a washout setup confirmed. The scan runs every minute; alerts tell you what it saw.">Alerts</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -1043,6 +1044,7 @@
     <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-book" role="tabpanel" aria-labelledby="tptab-book" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-alerts" role="tabpanel" aria-labelledby="tptab-alerts" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -4348,6 +4350,18 @@ async function jrFetch(demo){
   return { rec, slice, skips, demo };
 }
 
+/** Error card with a real Retry control — a dead server (deploy restart, a
+ *  stopped dev preview) rejects fetch with a bare "Failed to fetch", so name
+ *  the situation and hand the user the fix instead of "switch tabs and back". */
+function jrErrorCard(e, retryFn){
+  const network = !(e && e.status);
+  const what = network
+    ? 'The server didn\'t answer — it may be restarting or the dev preview may have stopped.'
+    : 'The server said '+jrEsc(e.message)+'.';
+  return '<div class="jr-empty">'+what+' Nothing is shown rather than something stale. '
+    +'<button type="button" class="jr-chip on" style="margin-left:6px" onclick="'+retryFn+'(true)">Retry</button></div>';
+}
+const _sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 async function loadJournal(force){
   const pane=document.getElementById('tp-journal');
   if(!pane || (pane.dataset.loaded==='1' && !force)) return;
@@ -4361,12 +4375,15 @@ async function loadJournal(force){
       // Auth race on deep links: if the real feed is gated for us, fall back to
       // the simulated demo book rather than a dead pane.
       if(!demo && (e.status===401||e.status===403)){ demo=true; data=await jrFetch(true); }
+      // A network-level rejection (no HTTP status) is usually a server mid-restart
+      // — one quiet retry before surfacing the error card.
+      else if(!e.status){ await _sleep(1500); data=await jrFetch(demo); }
       else throw e;
     }
     pane.dataset.loaded='1';
     jrRender(pane, data);
   }catch(e){
-    pane.innerHTML='<div class="jr-empty">The journal could not load ('+jrEsc(e.message)+'). Nothing is shown rather than something stale — switch tabs and back to retry.</div>';
+    pane.innerHTML=jrErrorCard(e,'loadJournal');
   }finally{ jrBusy=false; }
 }
 
@@ -4490,20 +4507,136 @@ function jrSkipsTable(sk){
 function jrSetSlice(k){ if(jrSlice===k) return; jrSlice=k; loadJournal(true); }
 function jrSetView(v){ if(jrView===v) return; jrView=v; loadJournal(true); }
 function jrHash(){
-  if(location.hash==='#journal'){
-    tpTab('journal'); loadJournal();
-    // The journal entry is a sanctioned read-only demo surface for guests
-    // (#3242 demo-mode) — the Pro-gate overlay must not wall off a page whose
-    // guest state IS the pitch. Scoped to the #journal arrival only; every
-    // trade action stays server-gated regardless (#3008 tracks the wider fix).
-    const tl=document.getElementById('tradeLock');
-    if(tl) tl.style.display='none';
-    const p=document.getElementById('tp-journal');
-    if(p) p.scrollIntoView({block:'nearest'});
+  // Deep-linkable panel tabs. Both are read-only surfaces whose guest state IS
+  // the pitch (#3242 demo journal, #3250 alerts teaser) — the Pro-gate overlay
+  // must not wall them off. Scoped to these arrivals only; every trade action
+  // stays server-gated regardless (#3008 tracks the wider gating collision).
+  const target = location.hash==='#journal' ? 'journal' : location.hash==='#alerts' ? 'alerts' : null;
+  if(!target) return;
+  tpTab(target);
+  if(target==='journal') loadJournal(); else loadAlerts();
+  // Durable suppression: on a DIRECT deep link, applyTierGate() runs after this
+  // (session fetch) and would re-show the overlay — watch it for a few seconds
+  // and keep it hidden, then disconnect.
+  const tl=document.getElementById('tradeLock');
+  if(tl){
+    tl.style.display='none';
+    try{
+      const mo=new MutationObserver(()=>{ if(tl.style.display!=='none') tl.style.display='none'; });
+      mo.observe(tl,{attributes:true,attributeFilter:['style']});
+      setTimeout(()=>mo.disconnect(), 8000);
+    }catch(_e){ /* very old engines: the immediate hide above still applied */ }
   }
+  const p=document.getElementById('tp-'+target);
+  if(p) p.scrollIntoView({block:'nearest'});
 }
 window.addEventListener('hashchange', jrHash);
-if(location.hash==='#journal') setTimeout(jrHash, 500);   // after guest/demo detection settles
+if(location.hash==='#journal'||location.hash==='#alerts') setTimeout(jrHash, 500);   // after guest/demo detection settles
+
+/* ── Alerts tab (#3248 + #3250) ─────────────────────────────────────────────
+   Rules + fired-alert feed over the per-user alerts API. Signed-in Pro+ only
+   (the endpoints sit behind the standard trading gate); guests get the teaser.
+   In-app feed today — email/push delivery lands with #3249. */
+let alBusy=false, alRules=[];
+async function loadAlerts(force){
+  const pane=document.getElementById('tp-alerts');
+  if(!pane || (pane.dataset.loaded==='1' && !force)) return;
+  if(alBusy) return; alBusy=true;
+  pane.innerHTML='<div class="jr-loading">Loading alerts…</div>';
+  try{
+    let rres;
+    try{ rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
+    catch(_e){ await _sleep(1500); rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
+    if(rres.status===401||rres.status===403){ pane.dataset.loaded='1'; alTeaser(pane); return; }
+    if(!rres.ok){ const err=new Error('HTTP '+rres.status); err.status=rres.status; throw err; }
+    const rj=await rres.json();
+    const fres=await fetch('/api/trading/alerts/feed?limit=50',{cache:'no-store'});
+    const fj=fres.ok? await fres.json():{alerts:[]};
+    alRules=rj.rules||[];
+    pane.dataset.loaded='1';
+    alRender(pane, alRules, rj.cap||20, fj.alerts||[]);
+  }catch(e){
+    pane.innerHTML=jrErrorCard(e,'loadAlerts');
+  }finally{ alBusy=false; }
+}
+function alTeaser(pane){
+  pane.innerHTML='<div class="jr-wrap"><div class="jr-banner"><span><b>Engine alerts come with Pro.</b> The scan already watches the list every minute — alerts tell you when a signal fires, a price reaches a support or resistance zone, or a washout setup is confirmed, without you watching the screen.</span>'
+    +'<a href="/pricing.html" style="margin-left:auto;white-space:nowrap">See plans →</a></div></div>';
+}
+function alTypeDesc(r){
+  if(r.type==='signal') return (r.direction==='ANY'?'any':String(r.direction||'').toLowerCase())+' signal';
+  if(r.type==='zone') return 'within '+r.proximityPct+'% of '+r.zone;
+  return 'washout confirmed (ENTER)';
+}
+function alRender(pane, rules, cap, feed){
+  let html='<div class="jr-wrap">';
+  html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">';
+  html+='<div class="jr-card"><h4>New alert rule</h4>'
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
+    +'<input id="alSym" maxlength="8" placeholder="Symbol" aria-label="Symbol" style="width:82px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit;text-transform:uppercase">'
+    +'<select id="alType" aria-label="Alert type" onchange="alTypeChanged()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
+    +'<option value="signal">Signal fired</option><option value="zone">Price at zone</option><option value="washout">Washout confirmed</option></select>'
+    +'<select id="alDir" aria-label="Direction" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
+    +'<option value="ANY">Any direction</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>'
+    +'<select id="alZone" aria-label="Zone side" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
+    +'<option value="support">Support</option><option value="resistance">Resistance</option></select>'
+    +'<input id="alProx" type="number" min="0.1" max="5" step="0.1" value="0.5" aria-label="Proximity percent" title="How close price must get to the zone, in %" style="display:none;width:64px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
+    +'<input id="alCool" type="number" min="5" max="1440" step="5" value="60" aria-label="Cooldown minutes" title="Once fired, stay quiet for this many minutes" style="width:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
+    +'<span style="font-size:10.5px;color:var(--text2)">min quiet</span>'
+    +'<button type="button" class="jr-chip on" onclick="alSaveRule()">Add rule</button>'
+    +'</div><p class="jr-note" id="alFormMsg">'+rules.length+' of '+cap+' rules · in-app feed today, email + push land next (#3249)</p></div>';
+  html+='<div class="jr-card"><h4>Your rules</h4>';
+  if(!rules.length){ html+='<p class="jr-note">No rules yet — add one above. The scan checks them every minute during market hours.</p>'; }
+  else{
+    html+='<table class="jr-table"><thead><tr><th>Symbol</th><th>When</th><th class="num">Quiet</th><th class="num">On</th><th class="num"></th></tr></thead><tbody>';
+    for(const r of rules){
+      html+='<tr><td>'+jrEsc(r.symbol)+'</td><td>'+jrEsc(alTypeDesc(r))+'</td><td class="num">'+r.cooldownMin+'m</td>'
+        +'<td class="num"><input type="checkbox" '+(r.enabled!==false?'checked':'')+' aria-label="Enable rule for '+jrEsc(r.symbol)+'" onchange="alToggleRule(\''+jrEsc(r.id)+'\')"></td>'
+        +'<td class="num"><button type="button" class="jr-chip" aria-label="Delete rule for '+jrEsc(r.symbol)+'" onclick="alDeleteRule(\''+jrEsc(r.id)+'\')">✕</button></td></tr>';
+    }
+    html+='</tbody></table>';
+  }
+  html+='</div></div>';
+  html+='<div class="jr-card" style="min-width:0"><h4>Fired alerts</h4>';
+  if(!feed.length){ html+='<p class="jr-note">Nothing fired yet. When a rule matches a scan, it lands here'+(rules.length?' (and respects its quiet window)':'')+'.</p>'; }
+  else{
+    html+='<table class="jr-table"><thead><tr><th style="width:96px">When</th><th>Alert</th></tr></thead><tbody>';
+    for(const a of feed.slice(0,50)){
+      const t=a.ts? new Date(a.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+      html+='<tr><td title="'+jrEsc(a.ts||'')+'">'+jrEsc(t)+'</td><td style="white-space:normal">'+jrEsc(a.message||'')+'</td></tr>';
+    }
+    html+='</tbody></table>';
+  }
+  html+='</div></div>';
+  pane.innerHTML=html;
+  alTypeChanged();
+}
+function alTypeChanged(){
+  const t=(document.getElementById('alType')||{}).value;
+  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+  show('alDir', t==='signal'); show('alZone', t==='zone'); show('alProx', t==='zone');
+}
+async function alSaveRule(){
+  const v=id=>{ const el=document.getElementById(id); return el?el.value:''; };
+  const body={ symbol:v('alSym').trim().toUpperCase(), type:v('alType'), direction:v('alDir'), zone:v('alZone'), proximityPct:parseFloat(v('alProx')), cooldownMin:parseInt(v('alCool'),10) };
+  const msg=document.getElementById('alFormMsg');
+  try{
+    const r=await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const j=await r.json();
+    if(!r.ok){ if(msg) msg.textContent='Could not add: '+(j.error||r.status).toString().replace(/_/g,' '); return; }
+    loadAlerts(true);
+  }catch(e){ if(msg) msg.textContent='Could not add: '+e.message; }
+}
+async function alToggleRule(id){
+  const r=alRules.find(x=>x.id===id); if(!r) return;
+  r.enabled=r.enabled===false;
+  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+  loadAlerts(true);
+}
+async function alDeleteRule(id){
+  try{ await fetch('/api/trading/alerts/rules/'+encodeURIComponent(id),{method:'DELETE'}); }catch(_e){}
+  loadAlerts(true);
+}
 // Degraded-account-state handling (2026-08-11): keep the last good figures on
 // screen (dimmed, tooltip says why) and explain ONCE what happened + the fix,
 // instead of rendering an auth failure or backend outage as a $0.00 account.
