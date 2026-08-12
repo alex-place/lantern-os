@@ -882,7 +882,7 @@
 <div class="header" role="region" aria-label="Trading toolbar">
   <div class="logo" title="Unisona Trader — the paper-trading terminal">Unisona<span>Trader</span></div>
   <div class="page-tabs" role="navigation" aria-label="Trading pages">
-    <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/options.html">Options</a>
+    <a class="pt" href="/watch.html">Watch</a><a class="pt on" href="/stock-trader.html" aria-current="page">Trade</a><a class="pt" href="/options.html">Options</a><a class="pt" href="#journal" title="Your trading journal — realized results, the equity curve, and every declined trade">Journal</a>
   </div>
   <div class="badge badge-paper" title="Paper trading — simulated money; orders are practice, not real" aria-label="Paper trading mode">PAPER</div>
   <div class="badge guest-badge" id="guestBadge" style="display:none" title="Read-only guest view — sign in to trade" aria-label="Read-only guest view">READ-ONLY</div>
@@ -996,12 +996,44 @@
   <!-- Account summary row (#1712) -->
   <div class="tp-summary" id="tpSummary"></div>
   <!-- Tabs -->
+  <style>
+    /* ── Journal tab (#3242 + #3243 v1) ── terminal-native, tokens only */
+    .jr-wrap{display:flex;flex-direction:column;gap:10px;padding:10px 4px 16px;font-size:12px;color:var(--text1)}
+    .jr-banner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:0;padding:8px 12px;color:var(--text0)}
+    .jr-banner a{color:var(--blue)}
+    .jr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px}
+    .jr-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;min-width:0}
+    .jr-kpi .k{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--text2)}
+    .jr-kpi .v{font-size:17px;font-weight:600;color:var(--text0);font-variant-numeric:tabular-nums;margin-top:2px}
+    .jr-kpi .s{font-size:10.5px;color:var(--text2);margin-top:1px}
+    .jr-pos{color:var(--green)} .jr-neg{color:var(--red)}
+    .jr-cols{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:10px}
+    @media (max-width:900px){.jr-cols{grid-template-columns:1fr}}
+    .jr-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
+    .jr-card h4{margin:0 0 7px;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--text2);font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .jr-chips{margin-left:auto;display:flex;gap:4px}
+    .jr-chip{font-size:10px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;font-family:inherit}
+    .jr-chip.on{background:var(--blue);border-color:var(--blue);color:#08131f}
+    .jr-chip:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+    .jr-table{width:100%;border-collapse:collapse;font-size:11.5px;table-layout:fixed}
+    .jr-table th{text-align:left;color:var(--text2);font-weight:500;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:3px 6px;border-bottom:1px solid var(--border)}
+    .jr-table td{padding:4px 6px;border-bottom:1px solid var(--border);color:var(--text1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .jr-table td.num,.jr-table th.num{text-align:right;font-variant-numeric:tabular-nums}
+    .jr-note{font-size:10px;color:var(--text2);margin-top:6px}
+    .jr-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+    .jr-cell{height:20px;border-radius:4px;background:var(--bg3)}
+    .jr-curve svg{display:block;width:100%;height:auto}
+    .jr-empty{color:var(--text2);padding:14px 4px;max-width:60ch;line-height:1.5}
+    .jr-loading{color:var(--text2);padding:14px 4px}
+    .jr-flag{color:var(--gold);font-size:10px}
+  </style>
   <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
     <button class="tp-tab" role="tab" id="tptab-book" aria-selected="false" aria-controls="tp-book" data-tab="book" onclick="tpTab('book');loadBook()" title="The capital allocator — one evidence-driven budget over the trader sleeves. Each sleeve earns capital only as its own live ledger proves an edge">Book</button>
+    <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');loadJournal()" title="The journal — realized results by day, the equity curve with drawdown, where exits happened, and every trade the autopilot declined with its reason">Journal</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -1010,6 +1042,7 @@
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-book" role="tabpanel" aria-labelledby="tptab-book" tabindex="0" hidden></div>
+    <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -4283,6 +4316,194 @@ function tpTab(name){
     if(on) p.removeAttribute('hidden'); else p.setAttribute('hidden','');  // hide inactive panels from AT
   });
 }
+
+/* ── Journal tab (#3242 + #3243 v1) ─────────────────────────────────────────
+   Reads the gated journal data layer (/api/trading/track-record + scorecard
+   ?by=) for entitled users, or the sanctioned SIMULATED demo feed
+   (?demo=champion, lib/champion-demo.journalRows) for guests — never the real
+   ledger without entitlement. Plain-English labels for exit families; the
+   structural win-rate flag and the disclosures line are always visible. */
+const JR_LABELS = {
+  stop:'Protective stop', trailing_stop:'Trailing stop', take_profit_R:'Profit target (R)',
+  take_profit:'Profit target', momentum_died:'Momentum faded', signal_exit:'Signal exit',
+  zone_r:'Banked at level', zone_r1_floor:'Gave back to level', max_loss:'Max-loss backstop',
+  closed_externally:'Closed externally', broker:'Broker fill', exit_unfrozen:'Exit retried',
+};
+let jrSlice='reason', jrView='confirmed', jrBusy=false;
+function jrEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function jrUsd(n){ if(typeof n!=='number'||!isFinite(n)) return '—'; return (n<0?'−':'')+'$'+Math.abs(n).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function jrPct(n){ return (typeof n==='number'&&isFinite(n))?n.toFixed(1)+'%':'—'; }
+function jrLabel(k){ return JR_LABELS[k] || String(k||'').replace(/_/g,' '); }
+function jrDay(iso){ return iso?String(iso).slice(0,10):'—'; }
+
+async function jrFetch(demo){
+  const qs = demo ? '?demo=champion' : '';
+  const amp = demo ? '&' : '?';
+  const get = (u)=>fetch(u,{cache:'no-store'}).then(r=>{ if(!r.ok){ const e=new Error('HTTP '+r.status); e.status=r.status; throw e; } return r.json(); });
+  const [rec, slice, skips] = await Promise.all([
+    get('/api/trading/track-record'+qs),
+    get('/api/trading/scorecard'+qs+amp+'by='+jrSlice),
+    get('/api/trading/scorecard'+qs+amp+'by=skip'),
+  ]);
+  return { rec, slice, skips, demo };
+}
+
+async function loadJournal(force){
+  const pane=document.getElementById('tp-journal');
+  if(!pane || (pane.dataset.loaded==='1' && !force)) return;
+  if(jrBusy) return; jrBusy=true;
+  pane.innerHTML='<div class="jr-loading">Loading the journal…</div>';
+  let demo = !!(window.DEMO_ACCT || window.GUEST);
+  try{
+    let data;
+    try{ data = await jrFetch(demo); }
+    catch(e){
+      // Auth race on deep links: if the real feed is gated for us, fall back to
+      // the simulated demo book rather than a dead pane.
+      if(!demo && (e.status===401||e.status===403)){ demo=true; data=await jrFetch(true); }
+      else throw e;
+    }
+    pane.dataset.loaded='1';
+    jrRender(pane, data);
+  }catch(e){
+    pane.innerHTML='<div class="jr-empty">The journal could not load ('+jrEsc(e.message)+'). Nothing is shown rather than something stale — switch tabs and back to retry.</div>';
+  }finally{ jrBusy=false; }
+}
+
+function jrCurveSvg(daily){
+  if(!daily||!daily.length) return '';
+  const W=560,H=120,padL=6,padR=64,padT=10,padB=18,iw=W-padL-padR,ih=H-padT-padB;
+  const cums=daily.map(d=>d.cum);
+  let lo=Math.min(0,Math.min.apply(null,cums)), hi=Math.max(0,Math.max.apply(null,cums));
+  if(hi===lo) hi=lo+1;
+  const x=i=>padL+(daily.length===1?iw/2:(i/(daily.length-1))*iw);
+  const y=v=>padT+(1-(v-lo)/(hi-lo))*ih;
+  const path=daily.map((d,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(d.cum).toFixed(1)).join(' ');
+  const last=daily[daily.length-1];
+  return '<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Cumulative realized profit and loss by exchange day, ending at '+jrEsc(jrUsd(last.cum))+'">'
+    +'<line x1="'+padL+'" y1="'+y(0).toFixed(1)+'" x2="'+(W-padR)+'" y2="'+y(0).toFixed(1)+'" stroke="var(--border)" stroke-dasharray="3 3"/>'
+    +'<path d="'+path+'" fill="none" stroke="var(--blue)" stroke-width="2"/>'
+    +'<circle cx="'+x(daily.length-1).toFixed(1)+'" cy="'+y(last.cum).toFixed(1)+'" r="3" fill="var(--blue)"/>'
+    +'<text x="'+(W-padR+6)+'" y="'+(y(last.cum)+4).toFixed(1)+'" font-size="11" fill="var(--text0)" font-weight="600">'+jrEsc(jrUsd(last.cum))+'</text>'
+    +'<text x="'+padL+'" y="'+(H-4)+'" font-size="9" fill="var(--text2)">'+jrEsc(daily[0].date)+'</text>'
+    +'<text x="'+(W-padR)+'" y="'+(H-4)+'" font-size="9" fill="var(--text2)" text-anchor="end">'+jrEsc(last.date)+'</text>'
+    +'</svg>';
+}
+
+function jrCalendar(daily){
+  if(!daily||!daily.length) return '';
+  const byDate={}; let maxAbs=0;
+  daily.forEach(d=>{ byDate[d.date]=d.pnl; maxAbs=Math.max(maxAbs,Math.abs(d.pnl)); });
+  const end=new Date(daily[daily.length-1].date+'T12:00:00Z');
+  const cells=[];
+  const start=new Date(end); start.setUTCDate(end.getUTCDate()-34);
+  start.setUTCDate(start.getUTCDate()-((start.getUTCDay()+7)%7));   // back to Sunday
+  for(let i=0;i<35;i++){
+    const d=new Date(start); d.setUTCDate(start.getUTCDate()+i);
+    const key=d.toISOString().slice(0,10);
+    const pnl=byDate[key];
+    let style='', title=key+' — no trades';
+    if(typeof pnl==='number'){
+      const a=(0.18+0.62*(maxAbs?Math.abs(pnl)/maxAbs:0)).toFixed(2);
+      style=pnl>=0?('background:rgba(0,212,170,'+a+')'):('background:rgba(255,95,109,'+a+')');
+      title=key+' — '+jrUsd(pnl);
+    }
+    cells.push('<div class="jr-cell" style="'+style+'" title="'+jrEsc(title)+'"></div>');
+  }
+  return '<div class="jr-cal" role="img" aria-label="Daily profit and loss for the last five weeks — teal up days, red down days, depth is size">'+cells.join('')+'</div>'
+    +'<p class="jr-note">last 5 weeks · teal = up day · red = down day · depth = size</p>';
+}
+
+function jrBreakdownTable(slice){
+  const view=(slice&&slice[jrView])||{};
+  const keys=Object.keys(view);
+  const head='<tr><th style="width:44%">'+(jrSlice==='reason'?'Exit path':jrSlice==='hour'?'Hour (ET)':'Symbol')+'</th><th class="num">n</th><th class="num">Win</th><th class="num">P&L</th></tr>';
+  if(!keys.length) return '<table class="jr-table"><thead>'+head+'</thead><tbody><tr><td colspan="4" style="color:var(--text2)">nothing in this view yet</td></tr></tbody></table>';
+  keys.sort((a,b)=>view[b].trades-view[a].trades);
+  const rows=keys.map(k=>{
+    const g=view[k];
+    const label=jrSlice==='reason'?jrLabel(k):k;
+    const win=g.profitOnly?'<span class="jr-flag" title="This exit only ever closes winners — its win rate is structural, not skill.">'+jrPct(g.winRate)+'*</span>':jrPct(g.winRate);
+    return '<tr><td title="'+jrEsc(k)+'">'+jrEsc(label)+'</td><td class="num">'+g.trades+'</td><td class="num">'+win+'</td>'
+      +'<td class="num '+(g.totalRealized>=0?'jr-pos':'jr-neg')+'">'+jrUsd(g.totalRealized)+'</td></tr>';
+  }).join('');
+  const flag=keys.some(k=>view[k].profitOnly)?'<p class="jr-note">* structural — profit-taking exits can only close winners, so this win rate is excluded from the honest risk-exit number above.</p>':'';
+  return '<table class="jr-table"><thead>'+head+'</thead><tbody>'+rows+'</tbody></table>'+flag;
+}
+
+function jrRender(pane, data){
+  const bookKey=Object.keys(data.rec.books||{})[0];
+  const book=(data.rec.books||{})[bookKey]||{};
+  const s=book.stats||{};
+  let html='<div class="jr-wrap">';
+  if(data.demo){
+    html+='<div class="jr-banner"><span><b>'+jrEsc(book.label||'Demo book')+'</b> — simulated sample data, not real trades. Your own account gets the real journal automatically.</span>'
+      +'<a href="/pricing.html" style="margin-left:auto;white-space:nowrap">See plans →</a></div>';
+  }
+  if(!s.trades){
+    html+='<div class="jr-empty">No confirmed trades yet. As soon as the first position closes with a broker-accepted fill, this tab fills in: realized P&L by day, the equity curve with drawdown, where exits happened, and every opportunity the autopilot declined with its reason.</div></div>';
+    pane.innerHTML=html; return;
+  }
+  const dd=book.maxDrawdown||{amount:0};
+  const ex=s.excursions||{};
+  html+='<div class="jr-kpis">'
+    +'<div class="jr-kpi"><div class="k">Total realized</div><div class="v '+(s.totalRealized>=0?'jr-pos':'jr-neg')+'">'+jrUsd(s.totalRealized)+'</div><div class="s">'+s.trades+' round-trips · '+jrEsc(jrDay(book.firstExitAt))+' → '+jrEsc(jrDay(book.lastExitAt))+'</div></div>'
+    +'<div class="jr-kpi"><div class="k">Max drawdown</div><div class="v jr-neg">'+jrUsd(-dd.amount)+'</div><div class="s">'+(dd.peakDate?jrEsc(dd.peakDate)+' → '+jrEsc(dd.troughDate):'no drawdown yet')+'</div></div>'
+    +'<div class="jr-kpi"><div class="k">Win rate</div><div class="v">'+jrPct(s.winRate)+'</div><div class="s">risk exits only: '+jrPct(s.riskExitWinRate)+' (n='+(s.riskExitTrades||0)+')</div></div>'
+    +'<div class="jr-kpi"><div class="k">Expectancy</div><div class="v">'+jrUsd(s.expectancy)+'</div><div class="s">per trade · profit factor '+(s.profitFactor==null?'∞':(typeof s.profitFactor==='number'?s.profitFactor.toFixed(2):'—'))+'</div></div>'
+    +'<div class="jr-kpi"><div class="k">Avg MFE / MAE</div><div class="v">'+(ex.nMfe? (jrPct(ex.avgMfePct)+' / '+jrPct(ex.avgMaePct)) : '—')+'</div><div class="s">'+(ex.nMfe?('n='+ex.nMfe):'accruing — needs observed runs')+'</div></div>'
+    +'</div>';
+  html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">'
+    +'<div class="jr-card jr-curve"><h4>Equity curve — realized, by exchange day</h4>'+jrCurveSvg(book.daily)+'</div>'
+    +'<div class="jr-card"><h4>Daily P&L calendar</h4>'+jrCalendar(book.daily)+'</div>'
+    +'</div><div style="display:flex;flex-direction:column;gap:10px;min-width:0">'
+    +'<div class="jr-card"><h4>Breakdown</h4>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin:-2px 0 8px">'
+      +'<span class="jr-chips" style="margin-left:0" role="group" aria-label="Slice the breakdown">'
+      +['reason','hour','symbol'].map(k=>'<button type="button" class="jr-chip'+(jrSlice===k?' on':'')+'" onclick="jrSetSlice(\''+k+'\')">'+(k==='reason'?'Reason':k==='hour'?'Hour':'Symbol')+'</button>').join('')
+      +'</span>'
+      +'<span class="jr-chips" role="group" aria-label="Which decisions count">'
+      +'<button type="button" class="jr-chip'+(jrView==='confirmed'?' on':'')+'" onclick="jrSetView(\'confirmed\')" title="Broker-accepted fills — booked money">Confirmed</button>'
+      +'<button type="button" class="jr-chip'+(jrView==='all'?' on':'')+'" onclick="jrSetView(\'all\')" title="Every exit decision, including unconfirmed — the strategy view, not necessarily real money">All decisions</button>'
+      +'</span></div>'
+      +'<div id="jrBreakdown">'+jrBreakdownTable(data.slice)+'</div></div>'
+    +'<div class="jr-card"><h4>What the autopilot declined</h4>'+jrSkipsTable(data.skips)+'</div>'
+    +'</div></div>';
+  const disc=book.disclosures;
+  if(disc) html+='<p class="jr-note">Disclosures: '+disc.duplicateExitsCollapsed+' re-decision rows collapsed · '+disc.failedAttemptsExcluded+' broker-rejected attempts excluded (they realized nothing) · '+disc.estimatedTrades+' external closes valued at the last observed mark.</p>';
+  html+='</div>';
+  pane.innerHTML=html;
+}
+
+function jrSkipsTable(sk){
+  const keys=Object.keys((sk&&sk.groups)||{});
+  if(!keys.length) return '<p class="jr-note">Nothing declined in this window.</p>';
+  const rows=keys.slice(0,7).map(k=>{
+    const g=sk.groups[k];
+    const label=k.replace(/#/g,'N');   // grouping normalizes numbers to # — read as N
+    return '<tr><td title="'+jrEsc(k)+'">'+jrEsc(label)+'</td><td class="num">'+g.count+'×</td><td class="num">'+g.symbols+' syms</td></tr>';
+  }).join('');
+  return '<table class="jr-table"><thead><tr><th style="width:64%">Reason</th><th class="num">Count</th><th class="num">Breadth</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'<p class="jr-note">every pass, with its reason — the record an import-based journal can\'t have · '+(sk.totalSkips||0)+' total</p>';
+}
+
+function jrSetSlice(k){ if(jrSlice===k) return; jrSlice=k; loadJournal(true); }
+function jrSetView(v){ if(jrView===v) return; jrView=v; loadJournal(true); }
+function jrHash(){
+  if(location.hash==='#journal'){
+    tpTab('journal'); loadJournal();
+    // The journal entry is a sanctioned read-only demo surface for guests
+    // (#3242 demo-mode) — the Pro-gate overlay must not wall off a page whose
+    // guest state IS the pitch. Scoped to the #journal arrival only; every
+    // trade action stays server-gated regardless (#3008 tracks the wider fix).
+    const tl=document.getElementById('tradeLock');
+    if(tl) tl.style.display='none';
+    const p=document.getElementById('tp-journal');
+    if(p) p.scrollIntoView({block:'nearest'});
+  }
+}
+window.addEventListener('hashchange', jrHash);
+if(location.hash==='#journal') setTimeout(jrHash, 500);   // after guest/demo detection settles
 // Degraded-account-state handling (2026-08-11): keep the last good figures on
 // screen (dimmed, tooltip says why) and explain ONCE what happened + the fix,
 // instead of rendering an auth failure or backend outage as a $0.00 account.
