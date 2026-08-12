@@ -108,6 +108,11 @@ async function _autoscanTick() {
       const scan = await traderAgent.scanMarket();
       const n = Array.isArray(scan && scan.signals) ? scan.signals.length : 0;
       if (n) console.info(`[Trading] autoscan — ${n} signal(s)${marketHours ? '' : ' (extended hours)'}`);
+      // User alerts (#3248): evaluate every user's rules against THIS scan —
+      // zero extra market-data calls, fail-soft by construction (the engine
+      // swallows its own errors and returns a count).
+      const alertsFired = require('../lib/alert-engine').evaluateScan(scan);
+      if (alertsFired) console.info(`[Trading] alerts — ${alertsFired} fired`);
       // Act stage: execute on EVERY connected IBKR account, not just one — so when a
       // second person links their account the autopilot trades both. TRADER_AUTO_USER,
       // if set, pins it to a single user (back-compat / testing). Dedupe by broker
@@ -431,6 +436,7 @@ const brakeRoutes = require('./trading/brake');
 const demoRoutes = require('./trading/demo');
 const scorecardRoutes = require('./trading/scorecard');
 const trackRecordRoutes = require('./trading/track-record');
+const alertsRoutes = require('./trading/alerts');
 const championRoutes = require('./trading/champion');
 const sigmaRoutes = require('./trading/sigma');
 const traderModeRoutes = require('./trading/mode');
@@ -486,6 +492,7 @@ module.exports = async function tradingRoutes(req, res, url, deps) {
   if (await demoRoutes(req, res, url, ctx)) return true;
   if (await scorecardRoutes(req, res, url, ctx)) return true;
   if (await trackRecordRoutes(req, res, url, ctx)) return true;
+  if (await alertsRoutes(req, res, url, ctx)) return true;
   if (await championRoutes(req, res, url, ctx)) return true;
   if (await sigmaRoutes(req, res, url, ctx)) return true;
   if (await traderModeRoutes(req, res, url, ctx)) return true;
