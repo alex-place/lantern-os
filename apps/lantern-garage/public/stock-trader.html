@@ -4554,7 +4554,7 @@ async function loadAlerts(force){
     const fj=fres.ok? await fres.json():{alerts:[]};
     alRules=rj.rules||[];
     pane.dataset.loaded='1';
-    alRender(pane, alRules, rj.cap||20, fj.alerts||[]);
+    alRender(pane, alRules, rj.cap||20, fj.alerts||[], rj.prefs||{email:false}, rj.email||{possible:false,why:'unknown'});
   }catch(e){
     pane.innerHTML=jrErrorCard(e,'loadAlerts');
   }finally{ alBusy=false; }
@@ -4568,7 +4568,24 @@ function alTypeDesc(r){
   if(r.type==='zone') return 'within '+r.proximityPct+'% of '+r.zone;
   return 'washout confirmed (ENTER)';
 }
-function alRender(pane, rules, cap, feed){
+function alDeliveryRow(prefs, email){
+  // In-app is always on; email is a real opt-in (#3249) that explains itself
+  // when it can't work; push is deliberately absent until it truly exists.
+  let emailBit;
+  if(email.possible || prefs.email){
+    emailBit='<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(prefs.email?'checked':'')+' onchange="alToggleEmail(this.checked)" aria-label="Email me fired alerts"> Email me</label>'
+      +(email.possible?'':' <span class="jr-flag">(currently undeliverable — '+(email.why==='mailer_unconfigured'?'no mailer configured on this server':'no email on your account')+')</span>');
+  }else{
+    emailBit='<span title="'+(email.why==='mailer_unconfigured'?'This server has no mailer configured':'Your account has no email address')+'">Email — unavailable ('+(email.why==='mailer_unconfigured'?'no mailer on this server':'no email on your account')+')</span>';
+  }
+  return '<p class="jr-note" style="margin:6px 0 0">Delivery: <b style="color:var(--text1)">In-app feed</b> (always) · '+emailBit+' · Push — not built yet (#3249); capped at 6 emails/hour so a bug can\'t spam you.</p>';
+}
+async function alToggleEmail(on){
+  try{ await fetch('/api/trading/alerts/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:!!on})}); }catch(_e){}
+  loadAlerts(true);
+}
+function alRender(pane, rules, cap, feed, prefs, email){
+  prefs=prefs||{email:false}; email=email||{possible:false,why:'unknown'};
   let html='<div class="jr-wrap">';
   html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">';
   html+='<div class="jr-card"><h4>New alert rule</h4>'
@@ -4584,7 +4601,8 @@ function alRender(pane, rules, cap, feed){
     +'<input id="alCool" type="number" min="5" max="1440" step="5" value="60" aria-label="Cooldown minutes" title="Once fired, stay quiet for this many minutes" style="width:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
     +'<span style="font-size:10.5px;color:var(--text2)">min quiet</span>'
     +'<button type="button" class="jr-chip on" onclick="alSaveRule()">Add rule</button>'
-    +'</div><p class="jr-note" id="alFormMsg">'+rules.length+' of '+cap+' rules · in-app feed today, email + push land next (#3249)</p></div>';
+    +'</div><p class="jr-note" id="alFormMsg">'+rules.length+' of '+cap+' rules</p>'
+    +alDeliveryRow(prefs, email)+'</div>';
   html+='<div class="jr-card"><h4>Your rules</h4>';
   if(!rules.length){ html+='<p class="jr-note">No rules yet — add one above. The scan checks them every minute during market hours.</p>'; }
   else{

@@ -139,6 +139,44 @@ function readFeed(userId, limit = 50) {
   return rows.slice(-Math.min(Number(limit) || 50, MAX_FEED_READ)).reverse();
 }
 
+// ── Delivery prefs + email rate budget (#3249) ───────────────────────────────
+// prefs.json: { email: boolean } — in-app is always on and push is not stored
+// until a real push sender exists (an unwired pref would be a lie in the UI).
+function prefsPath(uid) { return path.join(userDir(uid), 'prefs.json'); }
+function getPrefs(userId) {
+  const uid = safeUid(userId);
+  if (!uid) return { email: false };
+  try {
+    const p = JSON.parse(fs.readFileSync(prefsPath(uid), 'utf8'));
+    return { email: p.email === true };
+  } catch (_e) { return { email: false }; }
+}
+function setPrefs(userId, input) {
+  const uid = safeUid(userId);
+  if (!uid) return { ok: false, error: 'invalid_user' };
+  const prefs = { email: !!(input && input.email === true) };
+  fs.mkdirSync(userDir(uid), { recursive: true });
+  fs.writeFileSync(prefsPath(uid), JSON.stringify(prefs, null, 2));
+  return { ok: true, prefs };
+}
+
+// Rolling-hour email budget: a bug (or a hair-trigger rule set) must never be
+// able to spam a mailbox. Consuming is atomic-enough for a single process —
+// the same constraint every other per-user file here lives under.
+function budgetPath(uid) { return path.join(userDir(uid), 'email-budget.json'); }
+function tryConsumeEmailBudget(userId, cap, nowMs = Date.now()) {
+  const uid = safeUid(userId);
+  if (!uid || !(cap > 0)) return false;
+  let b = { hourStartMs: nowMs, count: 0 };
+  try { b = JSON.parse(fs.readFileSync(budgetPath(uid), 'utf8')); } catch (_e) { /* fresh window */ }
+  if (!Number.isFinite(b.hourStartMs) || nowMs - b.hourStartMs >= 3600e3) b = { hourStartMs: nowMs, count: 0 };
+  if (b.count >= cap) return false;
+  b.count += 1;
+  fs.mkdirSync(userDir(uid), { recursive: true });
+  fs.writeFileSync(budgetPath(uid), JSON.stringify(b));
+  return true;
+}
+
 /** Every user who has at least one rule on disk (drives per-scan evaluation). */
 function listUsersWithRules() {
   try {
@@ -151,4 +189,5 @@ function listUsersWithRules() {
 module.exports = {
   listRules, saveRule, deleteRule, recordFire, readFeed, listUsersWithRules,
   normalizeRule, safeUid, MAX_RULES_PER_USER, RULE_TYPES,
+  getPrefs, setPrefs, tryConsumeEmailBudget,
 };

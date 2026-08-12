@@ -82,11 +82,15 @@ function evaluateScan(scan, nowMs = Date.now()) {
           if (rule.enabled === false || _coolingDown(rule, nowMs)) continue;
           const hit = matchRule(rule, bySym.get(rule.symbol));
           if (!hit) continue;
-          store.recordFire(uid, rule.id, {
+          const row = {
             ts: new Date(nowMs).toISOString(),
             ruleId: rule.id, symbol: rule.symbol, type: rule.type,
             message: hit.message, evidence: hit.evidence,
-          });
+          };
+          store.recordFire(uid, rule.id, row);
+          // Delivery beyond the feed (#3249): fire-and-forget, fail-soft —
+          // the in-app row above is already durable whatever email does.
+          try { require('./alert-delivery').deliver(uid, row).catch(() => {}); } catch (_e) { /* absent → in-app only */ }
           fired += 1;
         } catch (_e) { /* one bad rule must not stop the rest */ }
       }
