@@ -962,6 +962,23 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
   try {
+    // EMPTY ORDERS != NO STOPS (2026-08-12). Every re-protect decision below reads
+    // ONE orders fetch. IBKR's CPAPI intermittently answers /iserver/account/orders
+    // with an empty array (cold endpoint, session re-auth, maintenance window) —
+    // and an empty list makes hasStop() false for EVERY symbol, so the pass
+    // concludes the whole book is naked and stacks a duplicate GTC stop on each
+    // position. That is precisely the mechanism behind the 2026-07-27 incident
+    // (488 resting stop-sells, 95,561 shares against 3,772 held). The correct
+    // reading of "no orders came back while positions exist" is UNKNOWN, not
+    // UNPROTECTED: skip the pass and re-check next scan (~60s), by which point
+    // the fetch has recovered. A genuinely naked position stays naked one extra
+    // scan; a duplicate stop is an oversell that can flip the account short.
+    // A truly empty book (no positions) is unambiguous and still passes through.
+    const _heldCount = Object.values(heldPos).filter((p) => (Number(p.qty) || 0) > 0).length;
+    const _ordersUnknown = _heldCount > 0 && (!Array.isArray(_openOrders) || _openOrders.length === 0);
+    if (_ordersUnknown) {
+      (out.skipped = out.skipped || []).push({ symbol: '*', why: `re-protect deferred: broker returned 0 orders while holding ${_heldCount} position(s) — treating as UNKNOWN, not unprotected` });
+    }
     // Status vocabulary: this guard originally matched only IBKR's NATIVE words
     // (PreSubmitted/Submitted/Pending), but the normalized order shape the bridge and
     // Alpaca return says 'open' / 'accepted' / 'new'. So hasStop() never matched, the
@@ -996,6 +1013,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
       /inactive|reject|needs?[_-]?confirm/i.test(o.status || '')).length;
     for (const [sym, p] of Object.entries(heldPos)) {
+      if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
       if (qty > 0 && !hasStop(sym) && attemptsFor(sym) >= REPROTECT_MAX_ATTEMPTS) {
