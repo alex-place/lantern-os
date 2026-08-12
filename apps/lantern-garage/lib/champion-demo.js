@@ -182,4 +182,73 @@ function history(range = '1D') {
   };
 }
 
-module.exports = { positions, positionsLive, history, EQUITY, HOLDINGS };
+// ── Demo journal (#3242 demo-mode) ───────────────────────────────────────────
+// Deterministic, SIMULATED exit + skip rows for the guest Journal tab — same
+// sanctioned pattern as positions()/history(): never real ledger data, seeded
+// per ET calendar day so the feed is stable within a day and evolves across
+// days. Row shape mirrors the real autopilot ledger (lib/trader-scorecard.js
+// consumes them through the same row-based builders as the real thing).
+const DEMO_EXIT_WINS = [
+  'zone_r1 (banked at first level)',
+  'take_profit_R (1R)',
+  'trailing_stop (-2.1% from peak)',
+  'zone_r2 (runner through)',
+];
+const DEMO_EXIT_LOSSES = ['stop (broker STP filled)', 'signal_exit (bearish flip)'];
+const DEMO_SKIPS = [
+  (r) => `gross ${78 + Math.floor(r() * 6)}% > cap 80% — cash reserve`,
+  (r) => `signal not persistent yet (${1 + Math.floor(r() * 2)}/2 scans)`,
+  () => 'cooldown active after a stop fill',
+  () => 'below minimum price',
+];
+
+function journalRows(days = 28) {
+  const exits = [];
+  const skips = [];
+  const dayMs = 86400e3;
+  const now = Date.now();
+  const round2 = (n) => Math.round(n * 100) / 100;
+  for (let d = days; d >= 1; d--) {
+    const day = new Date(now - d * dayMs);
+    const dow = day.getUTCDay();
+    if (dow === 0 || dow === 6) continue;
+    const dayKey = day.getUTCFullYear() * 10000 + (day.getUTCMonth() + 1) * 100 + day.getUTCDate();
+    const rand = rng(0x50C1E7 ^ dayKey);   // per-day seed: stable today, new texture tomorrow
+    // 0–2 exits per weekday, ~58% winners — a plausible, modest record.
+    const nExits = Math.floor(rand() * 3);
+    for (let k = 0; k < nExits; k++) {
+      const h = HOLDINGS[Math.floor(rand() * HOLDINGS.length)];
+      // Deterministic 3-in-5 win cadence (not a random draw): a seeded stream can
+      // hand a 28-day window an unlucky run — the first cut produced a PF-0.63
+      // losing "demo", which defeats a showroom. The cadence keeps the sample
+      // honest-looking (losses interleaved, ~60% wins) without luck.
+      const slot = (dayKey + k * 3) % 5;
+      const win = slot !== 1 && slot !== 3;
+      rand();   // keep the stream cadence stable regardless of the win path
+      const risk = 35 + rand() * 120;
+      const pnl = round2(win ? risk * (0.6 + rand() * 1.2) : -risk);   // ≈1.66 profit factor — modest, plausible
+      const entry = round2(h.price * (0.95 + rand() * 0.08));
+      const pnlPct = round2((pnl / (entry * 40)) * 100); // vs a ~40-share notional
+      const reason = win
+        ? DEMO_EXIT_WINS[Math.floor(rand() * DEMO_EXIT_WINS.length)]
+        : DEMO_EXIT_LOSSES[Math.floor(rand() * DEMO_EXIT_LOSSES.length)];
+      const ts = new Date(day.setUTCHours(14 + k * 2, 30, 0, 0)).toISOString();
+      exits.push({
+        ts, event: 'exit', symbol: h.symbol, entry, exit: round2(entry + pnl / 40),
+        pnl, pnl_pct: pnlPct, reason, status: 'filled', source: 'champion-demo',
+        mfe_pct: round2(Math.abs(pnlPct) * (win ? 1 + rand() * 0.4 : rand() * 0.8)),
+        mae_pct: round2(-(win ? rand() * 0.9 : Math.abs(pnlPct) * (1 + rand() * 0.3))),
+      });
+    }
+    const nSkips = 1 + Math.floor(rand() * 2);
+    for (let k = 0; k < nSkips; k++) {
+      const h = HOLDINGS[Math.floor(rand() * HOLDINGS.length)];
+      const mk = DEMO_SKIPS[Math.floor(rand() * DEMO_SKIPS.length)];
+      const ts = new Date(day.setUTCHours(13, 5 + k * 7, 0, 0)).toISOString();
+      skips.push({ ts, event: 'skip', symbol: h.symbol, reason: mk(rand), source: 'champion-demo' });
+    }
+  }
+  return { exits, skips };
+}
+
+module.exports = { positions, positionsLive, history, journalRows, EQUITY, HOLDINGS };

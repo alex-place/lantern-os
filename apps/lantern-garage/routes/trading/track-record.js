@@ -12,12 +12,29 @@
  *   GET /api/trading/track-record → { generatedAt, confirmedOnly, books, method, disclaimers }
  */
 
-const { getTrackRecord } = require('../../lib/track-record');
+const { getTrackRecord, buildBookFromRows } = require('../../lib/track-record');
+const championDemo = require('../../lib/champion-demo');
 
 module.exports = async function trackRecordRoutes(req, res, url, ctx) {
   if (url.pathname !== '/api/trading/track-record' || req.method !== 'GET') return false;
   const { sendJson } = ctx;
   try {
+    // Demo showroom (#3242 demo-mode): ?demo=champion serves a SIMULATED book —
+    // the sanctioned guest pattern (see server.js tradeApiGuard). Never touches
+    // the real ledger, so nothing real is published.
+    if (url.searchParams.get('demo') === 'champion') {
+      const { exits } = championDemo.journalRows();
+      sendJson(res, {
+        generatedAt: new Date().toISOString(),
+        confirmedOnly: true,
+        demo: true,
+        source: 'champion-demo',
+        books: { demo: buildBookFromRows(exits, { label: 'Demo book (simulated)' }) },
+        method: 'A simulated demo book — deterministic sample data, not real trades and not the house ledger. Your own account gets the real version of this journal automatically.',
+        disclaimers: ['Simulated for demonstration. No real positions, fills, or P&L are shown here.'],
+      }, 200);
+      return true;
+    }
     sendJson(res, getTrackRecord(), 200);
   } catch (e) {
     sendJson(res, { error: 'track_record_failed', message: e.message }, 500);

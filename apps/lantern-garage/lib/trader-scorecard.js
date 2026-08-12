@@ -237,6 +237,7 @@ function slimStats(full) {
     expectancy: full.expectancy, profitFactor: full.profitFactor,
     riskExitTrades: full.riskExitTrades, riskExitWinRate: full.riskExitWinRate,
     estimatedTrades: full.estimatedTrades,
+    excursions: full.excursions,   // avg MFE/MAE with its n — null-honest (#3241)
   };
 }
 
@@ -249,12 +250,20 @@ const BREAKDOWN_KEYS = ['symbol', 'hour', 'reason', 'skip'];
  * declined opportunity grouped by its (number-normalized) decline reason.
  */
 function breakdown(by, logPath = DEFAULT_LOG) {
+  if (by === 'skip') return breakdownFromRows(by, null, readEvents('skip', logPath));
+  return breakdownFromRows(by, readExits(logPath), null);
+}
+
+/**
+ * Row-based variant — the same slicing over caller-supplied rows, so a
+ * simulated feed (the demo journal) and the real ledger share ONE pipeline.
+ */
+function breakdownFromRows(by, exits, skips) {
   if (!BREAKDOWN_KEYS.includes(by)) {
     return { error: 'unknown_breakdown', by, supported: BREAKDOWN_KEYS };
   }
-  if (by === 'skip') return skipBreakdown(logPath);
-
-  const exits = readExits(logPath);
+  if (by === 'skip') return skipBreakdownFromRows(skips || []);
+  exits = exits || [];
   const groupOf = (e) => {
     if (by === 'symbol') return String(e.symbol || '?').toUpperCase();
     if (by === 'hour') { const p = etParts(e.ts); return p ? `${p.hour}:00 ET` : '?'; }
@@ -294,8 +303,7 @@ function breakdown(by, logPath = DEFAULT_LOG) {
  * "gross 83% > cap 80%" are one family). Counts only — the counterfactual
  * "what declining saved you" pricing is a separate, clearly-labeled step.
  */
-function skipBreakdown(logPath = DEFAULT_LOG) {
-  const skips = readEvents('skip', logPath);
+function skipBreakdownFromRows(skips) {
   const buckets = new Map();
   for (const s of skips) {
     const key = String(s.reason || 'unspecified').replace(/\d+(\.\d+)?/g, '#').slice(0, 160);
@@ -317,6 +325,6 @@ function skipBreakdown(logPath = DEFAULT_LOG) {
 }
 
 module.exports = {
-  computeScorecard, readExits, readEvents, scorecard, breakdown, reasonFamily,
-  preparedRows, etParts, slimStats, CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG,
+  computeScorecard, readExits, readEvents, scorecard, breakdown, breakdownFromRows,
+  reasonFamily, preparedRows, etParts, slimStats, CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG,
 };
