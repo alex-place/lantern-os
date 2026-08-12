@@ -4350,6 +4350,18 @@ async function jrFetch(demo){
   return { rec, slice, skips, demo };
 }
 
+/** Error card with a real Retry control — a dead server (deploy restart, a
+ *  stopped dev preview) rejects fetch with a bare "Failed to fetch", so name
+ *  the situation and hand the user the fix instead of "switch tabs and back". */
+function jrErrorCard(e, retryFn){
+  const network = !(e && e.status);
+  const what = network
+    ? 'The server didn\'t answer — it may be restarting or the dev preview may have stopped.'
+    : 'The server said '+jrEsc(e.message)+'.';
+  return '<div class="jr-empty">'+what+' Nothing is shown rather than something stale. '
+    +'<button type="button" class="jr-chip on" style="margin-left:6px" onclick="'+retryFn+'(true)">Retry</button></div>';
+}
+const _sleep=(ms)=>new Promise(r=>setTimeout(r,ms));
 async function loadJournal(force){
   const pane=document.getElementById('tp-journal');
   if(!pane || (pane.dataset.loaded==='1' && !force)) return;
@@ -4363,12 +4375,15 @@ async function loadJournal(force){
       // Auth race on deep links: if the real feed is gated for us, fall back to
       // the simulated demo book rather than a dead pane.
       if(!demo && (e.status===401||e.status===403)){ demo=true; data=await jrFetch(true); }
+      // A network-level rejection (no HTTP status) is usually a server mid-restart
+      // — one quiet retry before surfacing the error card.
+      else if(!e.status){ await _sleep(1500); data=await jrFetch(demo); }
       else throw e;
     }
     pane.dataset.loaded='1';
     jrRender(pane, data);
   }catch(e){
-    pane.innerHTML='<div class="jr-empty">The journal could not load ('+jrEsc(e.message)+'). Nothing is shown rather than something stale — switch tabs and back to retry.</div>';
+    pane.innerHTML=jrErrorCard(e,'loadJournal');
   }finally{ jrBusy=false; }
 }
 
@@ -4529,9 +4544,11 @@ async function loadAlerts(force){
   if(alBusy) return; alBusy=true;
   pane.innerHTML='<div class="jr-loading">Loading alerts…</div>';
   try{
-    const rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'});
+    let rres;
+    try{ rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
+    catch(_e){ await _sleep(1500); rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
     if(rres.status===401||rres.status===403){ pane.dataset.loaded='1'; alTeaser(pane); return; }
-    if(!rres.ok) throw new Error('HTTP '+rres.status);
+    if(!rres.ok){ const err=new Error('HTTP '+rres.status); err.status=rres.status; throw err; }
     const rj=await rres.json();
     const fres=await fetch('/api/trading/alerts/feed?limit=50',{cache:'no-store'});
     const fj=fres.ok? await fres.json():{alerts:[]};
@@ -4539,7 +4556,7 @@ async function loadAlerts(force){
     pane.dataset.loaded='1';
     alRender(pane, alRules, rj.cap||20, fj.alerts||[]);
   }catch(e){
-    pane.innerHTML='<div class="jr-empty">Alerts could not load ('+jrEsc(e.message)+'). Switch tabs and back to retry.</div>';
+    pane.innerHTML=jrErrorCard(e,'loadAlerts');
   }finally{ alBusy=false; }
 }
 function alTeaser(pane){
