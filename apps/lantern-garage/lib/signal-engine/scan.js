@@ -428,6 +428,12 @@ async function scanAll(watchlist) {
     timestamp: nowIso,
     watchlist_count: list.length,
     signals_count: signals.length,
+    // Tape context for entry attribution (2026-08-11): the drift-day question
+    // ("do washout entries underperform when the broad tape is sinking?") needs
+    // SPY's same-day move stamped on every entry row. Attribution first,
+    // behavior later — any drift governor must earn its gate from this data.
+    spy_1d: Number(marketStatus.spy_1d) ?? null,
+    market: marketStatus.market || null,
   };
 }
 

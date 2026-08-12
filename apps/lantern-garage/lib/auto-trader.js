@@ -1086,7 +1086,17 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const fresh = streak && (now - streak.at) < c.persistWindowMs;
     const count = fresh && streak.dir === s.direction ? streak.count + 1 : 1;
     _dirStreak.set(sym, { dir: s.direction, count, at: now });
-    const persistent = !c.requirePersist || count >= c.persistScans;
+    // OPENING FAST-PATH (2026-08-11). Two consecutive sessions showed the same
+    // structural miss: the biggest washout bounces happen 09:45-09:55 (SLV +3.7%
+    // and GLD +1.65% Mon; SOXL +2.72%, TQQQ +1.36% Tue) and the 2-scan
+    // persistence requirement systematically eats them — by the second scan the
+    // bounce is underway. During the opening window one scan suffices; every
+    // other gate (falling-knife veto, cap, cooldown, breaker, dust) still
+    // applies. TRADER_OPEN_FASTPATH=0 disables; window ends 10:00 ET.
+    const _etNowMin = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+    const _openWindow = process.env.TRADER_OPEN_FASTPATH !== '0' && _etNowMin >= 570 && _etNowMin < 600;
+    const _needScans = _openWindow ? 1 : c.persistScans;
+    const persistent = !c.requirePersist || count >= _needScans;
 
     // ── BEARISH: only ever CLOSE a long we already hold. NEVER open or deepen a
     //    short (longs-only). Critically, cancel the resting protective stop when we
@@ -1158,7 +1168,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     if (haltEntries) { out.skipped.push({ ...record, why: `daily-loss limit hit (day P&L ${Math.round(dayPnl)})` }); continue; }
     const last = _lastOrderAt.get(sym) || 0;
     if (now - last < c.cooldownMs) { out.skipped.push({ ...record, why: 'cooldown' }); continue; }
-    if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bullish scans (persistence)` }); continue; }
+    if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${_needScans} consecutive bullish scans (persistence)` }); continue; }
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
     // Falling-knife veto: don't buy the dip while down-momentum is still accelerating.
     // Wait for the momentum to turn (histogram rising, even if negative). (#c)
@@ -1197,7 +1207,19 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       }
     }
 
-    const sizeMult = (s.convergence && s.convergence.size_mult) || 1;
+    let sizeMult = (s.convergence && s.convergence.size_mult) || 1;
+    // LOW-CONVICTION SIZE CUT (2026-08-11). On the first red-drift session all
+    // four sub-0.5-p_win entries underperformed (XLK 0.483 took the day's only
+    // loss; QQQ 0.452 scratched; the carried reds were 0.48-0.54) while every
+    // >=0.55 entry won. Sizing already scales with conviction, but the curve
+    // barely bit (0.452 still sized 0.76x). Below the coin-flip line the
+    // position is a probe, not a bet: hard-cap the multiplier at 0.5x.
+    // TRADER_LOWCONV_MULT tunes (0 disables). Entry count is unchanged — this
+    // cuts exposure to weak signals, not the signals themselves.
+    const _lowConvMult = process.env.TRADER_LOWCONV_MULT === undefined ? 0.5 : Number(process.env.TRADER_LOWCONV_MULT);
+    if (_lowConvMult > 0 && Number(record.p_win) > 0 && Number(record.p_win) < 0.5) {
+      sizeMult = Math.min(sizeMult, _lowConvMult);
+    }
     // Stop distance is now an INPUT to sizing (risk-based), so it must be resolved
     // before the order is sized. Structural (support-entry) stop wins when armed.
     // The minimum-stop floor applies to EVERY entry, not just support entries.
@@ -1377,7 +1399,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
-      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null });
+      logTrade({ event: 'entry', symbol: sym, side: 'long', qty, entry: price, notional: Math.round(qty * price), p_win: s.convergence && s.convergence.p_win, stop: (exec.stop && exec.stop.price) ?? pl.stop ?? null, target1: pl.target1 ?? null, target2: pl.target2 ?? null, hold_days: pl.hold_days ?? null, tier: _tier, room_r: _roomR != null ? +_roomR.toFixed(2) : null, vol_ratio: Number(s.volume_ratio) || null,
+        // drift-day attribution (2026-08-11): SPY's same-day % at entry time, so
+        // the report can split entry outcomes by tape without guessing later.
+        spy_1d: (scan && Number.isFinite(Number(scan.spy_1d))) ? Number(scan.spy_1d) : null });
     }
     // ── An entry that did NOT place must be narrated and must back off ────────────
     // Entries deliberately don't pass acceptWarnings (P0-8: never blindly click
