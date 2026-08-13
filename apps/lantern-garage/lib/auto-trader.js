@@ -176,6 +176,9 @@ function cfg() {
     dustPct: n('TRADER_DUST_PCT', 0.1),
     // Minimum reward:risk, measured against the FLOORED stop. 0 disables.
     minEntryRr: n('TRADER_MIN_ENTRY_RR', 1),
+    // Max simultaneous positions sharing ONE correlated risk bucket
+    // (equity_long / equity_short / metals / per-symbol). 0 disables.
+    maxPerBucket: n('TRADER_MAX_PER_BUCKET', 0),
     // Trail past R2 instead of selling AT it (lab 2026-08-08, Monday-config
     // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
     // A mark through R2 upgrades the runner to a ratcheting floor at
@@ -830,6 +833,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
+  const _bucketOpenedThisScan = {};   // correlated-risk bucket -> entries placed this scan
   let _grossThisScan = 0;    // notional placed during THIS scan — the gross brake has the same
                              // start-of-scan-snapshot blind spot the concurrency cap had
                              // (2026-08-07): without it, two same-scan entries each compared
@@ -1445,6 +1449,29 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
         continue;
       }
     }
+    // CORRELATED-RISK CAP (2026-08-13). The concurrency cap counts SYMBOLS; risk
+    // is carried by DIRECTION. Live that day the book held SOXS + SQQQ + SPXS —
+    // three families, so the direction-lock (which only blocks OPPOSING
+    // exposure) permitted all three and the cap counted three independent slots.
+    // They were one bet, "the market falls", held in triplicate; the market
+    // rallied and they lost together for -$1,431 while a single position would
+    // have lost a third of that.
+    //
+    // Structural, not bad luck: IBS buys whatever sits at the bottom of its
+    // session range, and in a rally that is always the inverse ETFs — so the
+    // engine concentrates short exactly when it is most wrong. Counting by
+    // bucket bounds that. Positions opened THIS scan count too (same
+    // start-of-scan-snapshot blind spot the concurrency cap had).
+    if (c.maxPerBucket > 0) {
+      const { riskBucket, bucketCounts } = require('./direction-lock');
+      const _bucket = riskBucket(sym);
+      const _counts = bucketCounts(Object.values(heldPos));
+      const _inBucket = (_counts[_bucket] || 0) + (_bucketOpenedThisScan[_bucket] || 0);
+      if (_inBucket >= c.maxPerBucket) {
+        out.skipped.push({ ...record, why: `correlated-risk cap: ${_inBucket} position(s) already in '${_bucket}' (max ${c.maxPerBucket})` });
+        continue;
+      }
+    }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
       const _gross = _grossThisScan + Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
@@ -1535,7 +1562,8 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1; _grossThisScan += qty * price;
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+      try { const _b = require('./direction-lock').riskBucket(sym); _bucketOpenedThisScan[_b] = (_bucketOpenedThisScan[_b] || 0) + 1; } catch (_e) { /* bucketing is advisory */ } _grossThisScan += qty * price;
       // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
       // paper cash-secured-put leg for this same signal, paired by symbol+ts.
       // Fire-and-forget: the chain fetch must never delay or break the scan.
