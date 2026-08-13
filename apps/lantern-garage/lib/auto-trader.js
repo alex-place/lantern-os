@@ -817,7 +817,16 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // scan even when there are no new ENTER signals.
   const account = await bridge.getIBKRAccount(userId).catch(() => null);
   if (!account || !(account.equity > 0)) { out.reason = 'account/equity unavailable'; return out; }
-  const positions = await bridge.getIBKRPositions(userId).catch(() => []);
+  // null = the FETCH FAILED (never [] — "the call errored" and "you hold nothing"
+  // are opposite facts, and collapsing them made an API error read as a flat book).
+  const positions = await bridge.getIBKRPositions(userId).catch(() => null);
+  const _positionsOk = Array.isArray(positions);
+  // NEVER TRADE BLIND. Without a readable book the engine sees no holdings, so the
+  // entry loop's `already long` guard cannot fire and it would happily re-buy a
+  // symbol it is already carrying. Same contract as the account fetch above: no
+  // broker truth, no orders. Exits are skipped too — the broker-side protective
+  // stops are what guard the book in this state.
+  if (!_positionsOk) { out.reason = 'positions unavailable — standing down this scan (never trade blind)'; return out; }
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
@@ -829,8 +838,20 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
+  // OWNERSHIP FILTER (2026-08-13). heldPos is EVERY position in the account,
+  // including other books' (champion holds XMMO/SPMO, the overnight sleeve holds
+  // its own). Snapshotting them made the sweep below "reconstruct" their exits as
+  // ours: on 2026-08-13 it logged SPMO -$199 and XMMO -$107 into the day-trader's
+  // ledger. Only track symbols this engine actually scans — the scan's own signal
+  // set is that list — plus anything we already have engine state for (ladder /
+  // entry timestamp), so a position opened before a restart is still reconciled.
+  const _ourSyms = new Set([
+    ...signals.map((x) => String(x && x.symbol || '').toUpperCase()),
+    ..._zoneLadder.keys(), ..._entryAt.keys(),
+  ].filter(Boolean));
   for (const [k, p] of Object.entries(heldPos)) {
     if (!(Number(heldQty[k]) > 0)) continue;
+    if (_ourSyms.size && !_ourSyms.has(k)) continue;   // another engine's position
     _lastPos.set(k, {
       qty: Number(p.qty) || 0,
       entry: p.avg_entry_price ?? p.avg_fill_price ?? null,
@@ -859,7 +880,26 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // is marked status:'reconstructed' + estimated:true and is deliberately excluded
   // from the scorecard's `confirmed` view. An estimate that is labelled beats a loss
   // that is silently dropped.
-  for (const sym of [..._lastPos.keys()]) {
+  // TRUST GUARD (2026-08-13). This sweep infers "closed" from ABSENCE, so it is
+  // only as sound as the snapshot. Two ways the snapshot lies:
+  //   (a) the fetch failed — now null, never an empty array;
+  //   (b) IBKR returned an EMPTY/partial book at the open. Observed live on
+  //       2026-08-13 09:30: every tracked position vanished for one cycle and the
+  //       sweep invented four exits (SOXS double-counted at +$4,174 on top of its
+  //       real +$2,740 fill; SQQQ "closed" while 1,566 shares were still held),
+  //       inflating the day's ledger to +$7,305 against a broker equity that had
+  //       FALLEN $4,634.
+  // Absence is only evidence of a close when we can see the rest of the book. A
+  // genuine simultaneous multi-symbol external close is vanishingly rare — real
+  // stop fills arrive through _reconcileFills, which runs first and marks them.
+  const _vanished = [..._lastPos.keys()].filter((k) => !(Number(heldQty[k]) > 0));
+  const _snapshotSuspect = !_positionsOk
+    || (positions.length === 0 && _lastPos.size > 0)
+    || (_vanished.length >= 3 && _vanished.length > positions.length);
+  if (_snapshotSuspect && _vanished.length) {
+    out.skipped.push({ symbol: '*', why: `external-close sweep deferred: ${_vanished.length} position(s) absent from a ${_positionsOk ? positions.length + '-row' : 'FAILED'} snapshot — treating as unreadable, not closed` });
+  }
+  for (const sym of (_snapshotSuspect ? [] : [..._lastPos.keys()])) {
     if (Number(heldQty[sym]) > 0) continue;           // still held → nothing to reconcile
     if (exclude.has(sym)) { _lastPos.delete(sym); continue; }  // another engine owns it
     const snap = _lastPos.get(sym) || {};
