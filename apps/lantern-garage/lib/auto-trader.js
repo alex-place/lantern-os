@@ -574,7 +574,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
  *      momentum is dying / about to die" before the full bearish signal would fire.
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
-async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set() }) {
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set(), protectiveOnly = false }) {
   // SUB-SHARE DUST NEVER EXITS (2026-08-10). A fractional-only order can never
   // fill on this API — the 0.8-share SOXS split remnant sprayed 3 error orders
   // at IBKR after EVERY restart (the failure-freeze is per-process-lifecycle in
@@ -722,7 +722,10 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
         const e9 = ema9[ema9.length - 1];
         const last = closes[closes.length - 1];
         const r = rsi(closes);
-        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55)) {
+        // protectiveOnly (extended hours): momentum_died is a SIGNAL read, and
+        // MACD/EMA/RSI over thin pre-market bars is noise — never dump a
+        // position on it outside regular hours.
+        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55) && !protectiveOnly) {
           await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
           delete heldQty[sym]; continue;
         }
@@ -771,7 +774,30 @@ async function fastExitTick({ bridge, userId, now = Date.now(), extended = false
  * @param {object} deps   { bridge, userId, now?, caps? }
  * @returns {Promise<{executed:Array, skipped:Array, enabled:boolean, reason?:string}>}
  */
-async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [] } = {}) {
+/**
+ * EXTENDED-HOURS PROTECTIVE MODE (`protectiveOnly`, 2026-08-12).
+ *
+ * Between 16:00 and 09:30 the scan loop is idle, so a winner's trailing floor is
+ * never evaluated: on 2026-08-12 SOXS sat at +$3,617 exactly on its R2 target,
+ * riding a trail that could not ratchet, and gave back into the after-hours
+ * session with nothing but the -3% GTC stop underneath it. 17.5 hours of every
+ * weekday the book was unmanaged.
+ *
+ * This mode runs the loop in pre/after-hours for MANAGEMENT ONLY:
+ *   - NO entries. IBS is a position-within-session-range signal and the extended
+ *     session has almost no range, so the signal is undefined there, and nothing
+ *     in the lab covers extended-hours entries.
+ *   - Only PRICE-THRESHOLD exits: r2_trail, zone floors, peak_giveback,
+ *     trailing_stop, targets, max_loss. Each protects a gain or caps a loss at a
+ *     level decided during regular hours.
+ *   - NO signal-derived exits (momentum_died, the bearish signal_exit): a read
+ *     computed off three thin pre-market bars is noise, and acting on it would
+ *     dump a six-figure position into a wide spread.
+ *
+ * Orders still route as marketable LIMIT + outsideRth (closeLong's `extended`
+ * path), never naked market orders into a thin book.
+ */
+async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [], protectiveOnly = false } = {}) {
   // Position partitioning: symbols owned by ANOTHER engine (the overnight sleeve book)
   // are completely off-limits — no exits, no re-protect stops, no signal-sells, no
   // entries. Each engine manages only its own positions; the caller (trading.js)
@@ -1047,7 +1073,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude }); } catch (_e) { /* fail-soft */ }
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
   // manageHeldExits updates every held position's peak; persist NOW so the common
   // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
   _saveState();
@@ -1085,7 +1111,14 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     } catch (_e) { entryBars = {}; }
   }
 
-  for (const s of enters) {
+  // protectiveOnly (extended hours): manage what we hold, open nothing new.
+  // IBS is position-within-session-range; the extended session has almost no
+  // range, so the entry signal is undefined there and unbacked by any lab gate.
+  const _entryCandidates = protectiveOnly ? [] : enters;
+  if (protectiveOnly && enters.length) {
+    out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
+  }
+  for (const s of _entryCandidates) {
     const sym = String(s.symbol).toUpperCase();
     const price = Number(s.entry_price) || 0;
     const held = heldQty[sym] || 0;
@@ -1122,6 +1155,11 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     //    and open an unintended short (this is what put JPM/META short). ──
     if (exclude.has(sym)) { out.skipped.push({ ...record, why: 'overnight-book position — managed by its own engine' }); continue; }
     if (!bullish) {
+      // protectiveOnly (extended hours): the bearish read driving signal_exit is
+      // computed off the same thin extended-session bars — skip it. Price
+      // thresholds (trail/floor/max-loss) in manageHeldExits still run, and the
+      // broker stop is untouched.
+      if (protectiveOnly) { out.skipped.push({ ...record, why: 'extended hours: protective exits only — signal exit suppressed' }); continue; }
       if (held >= 1) {
         // (held >= 1, not > 0: a sub-share split remnant can never fill a sell on
         // this API — same rule as manageHeldExits' dust guard, 2026-08-10.)
