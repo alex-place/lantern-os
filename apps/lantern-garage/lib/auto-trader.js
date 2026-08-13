@@ -938,7 +938,7 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
   // stack another sell on those, so a lagging position snapshot can't make the loop sell
   // `held` again and blow through flat into a short. Survives restarts (broker-side state),
   // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
-  const _openOrders = _ordersEarly;
+  let _openOrders = _ordersEarly;
   const workingSells = new Set((_openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
@@ -1082,6 +1082,44 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
       /inactive|reject|needs?[_-]?confirm/i.test(o.status || '')).length;
+    // STOP-SIZE RECONCILIATION (2026-08-13). hasStop() asks "is there a stop?"
+    // but never "is it the RIGHT SIZE?". After a partial exit the original stop
+    // keeps its old quantity: live today GLD held 66 shares behind a 147-share
+    // stop. Had it triggered it would have sold 81 shares we do not own — an
+    // oversell opening an unintended SHORT, or (per IBKR's oversell protection,
+    // seen on the QQQ race this morning) an outright rejection leaving the
+    // position naked. Both unacceptable.
+    //
+    // A stop whose size does not match the position is not protection. Cancel it
+    // here; the pass below then places a correctly-sized one. The failure cap is
+    // untouched: a deliberate cancel is lifecycle, not a failed placement
+    // (2026-08-12 hardening).
+    const _stopQtyFor = (sym) => (_openOrders || [])
+      .filter((o) => String(o.symbol || '').toUpperCase() === sym
+        && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
+        && /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''))
+      .reduce((a, o) => a + (Number(o.qty) || 0), 0);
+    if (!_ordersUnknown) {
+      for (const [sym, p] of Object.entries(heldPos)) {
+        if (exclude.has(sym)) continue;
+        const _held = Math.abs(Number(p.qty) || 0);
+        if (_held < 1) continue;                  // dust cannot carry a stop at all
+        const _stopQty = _stopQtyFor(sym);
+        const _want = Math.floor(_held);          // whole-share stops (2026-08-10)
+        if (_stopQty > 0 && _stopQty !== _want) {
+          await cancelRestingStops(bridge, userId, sym);
+          (out.stopResized = out.stopResized || []).push({ symbol: sym, was: _stopQty, want: _want });
+          logTrade({ event: 'stop_resize', symbol: sym, stop_qty_was: _stopQty, held: _held, want: _want,
+            reason: _stopQty > _want ? 'oversized stop would oversell' : 'undersized stop leaves part of the position naked' });
+        }
+      }
+      // Re-read orders after any cancel, so the pass below does not still see the
+      // stop it just removed and wrongly conclude the position is protected.
+      if ((out.stopResized || []).length) {
+        const _fresh = await bridge.getIBKROpenOrders(userId).catch(() => null);
+        if (Array.isArray(_fresh)) _openOrders = _fresh;
+      }
+    }
     for (const [sym, p] of Object.entries(heldPos)) {
       if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
