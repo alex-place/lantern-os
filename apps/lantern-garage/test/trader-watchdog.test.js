@@ -34,7 +34,13 @@ test('a healthy armed trader during market hours is ok', () => {
 });
 
 test('THE 2026-08-05 BUG: a DISARMED process holding the lock is a PROBLEM', () => {
-  const r = wd.evaluate({ ...HEALTHY, lock: { pid: 9948, armed: false } });
+  // NARROWED 2026-08-12: the trigger now also requires a STALE state file, so
+  // the fixture carries the real incident's shape. In that incident the armed
+  // stable trader stood down and stopped writing ITS state file (the watchdog
+  // reads the stable tree's state; a disarmed squatter in another tree writes
+  // its own elsewhere) — so state genuinely went cold. Fresh state means the
+  // armed loop IS scanning, which is not a lockout; see the guard tests below.
+  const r = wd.evaluate({ ...HEALTHY, lock: { pid: 9948, armed: false }, stateAgeMs: 95 * 60 * 1000 });
   assert.strictEqual(r.verdict, 'PROBLEM');
   assert.match(r.problems.join(' '), /DISARMED pid 9948.*locked out/);
 });
@@ -110,4 +116,35 @@ test('market hours: weekend is closed, and the force hook overrides the clock', 
   } finally {
     if (saved === undefined) delete process.env.WATCHDOG_FORCE_OPEN; else process.env.WATCHDOG_FORCE_OPEN = saved;
   }
+});
+
+// ── false-alarm guard (2026-08-12) ──────────────────────────────────────────
+// The armed server also claims the account lock through its exit-only fast
+// tick, so a watchdog sample landing in that window saw armed=false for the pid
+// that was trading normally. It fired at 09:33 two mornings running while the
+// session went on to take entries and exits — and a daily false alarm is how a
+// real one gets ignored. "Locked out" now requires a disarmed holder AND a
+// stale state file (the scan loop writes state every scan, so fresh state
+// proves the armed loop is alive).
+const OPEN = { open: true, httpStatus: 200, today: { entry_blocked: 0 } };
+
+test('disarmed lock + FRESH state = the armed loop is running, no alarm', () => {
+  const r = wd.evaluate({ ...OPEN, lock: { pid: 8892, armed: false }, lockAgeMs: 1000, stateAgeMs: 20 * 1000 });
+  assert.strictEqual(r.verdict, 'ok', 'the exact 2026-08-11/12 09:33 false alarm must not fire');
+});
+
+test('the real 2026-08-05 failure still trips: disarmed lock + STALE state', () => {
+  const r = wd.evaluate({ ...OPEN, lock: { pid: 33200, armed: false }, lockAgeMs: 1000, stateAgeMs: 90 * 60 * 1000 });
+  assert.strictEqual(r.verdict, 'PROBLEM');
+  assert.ok(r.problems.some((p) => /locked out/.test(p)), 'a genuine squatter must still alarm');
+});
+
+test('disarmed lock + MISSING state alarms (cannot prove the loop is alive)', () => {
+  const r = wd.evaluate({ ...OPEN, lock: { pid: 1, armed: false }, lockAgeMs: 1000, stateMissing: true });
+  assert.ok(r.problems.some((p) => /locked out/.test(p)));
+});
+
+test('an ARMED holder never produces the locked-out problem', () => {
+  const r = wd.evaluate({ ...OPEN, lock: { pid: 8892, armed: true }, lockAgeMs: 1000, stateAgeMs: 90 * 60 * 1000 });
+  assert.ok(!r.problems.some((p) => /locked out/.test(p)), 'armed holder is never a lockout');
 });

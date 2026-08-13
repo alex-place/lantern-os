@@ -99,7 +99,19 @@ function evaluate({ open, httpStatus, lock, lockAgeMs, stateAgeMs, stateMissing,
     if (!lock) problems.push('no account lock held during market hours - trader is not scanning');
     else {
       // THE 2026-08-05 FAILURE: exit-only process holding the armed trader out.
-      if (lock.armed !== true) problems.push(`account lock held by DISARMED pid ${lock.pid} - armed trader is locked out`);
+      //
+      // FALSE-ALARM GUARD (2026-08-12). The armed server ALSO claims this lock
+      // through its exit-only fast tick, so a sample landing in that window sees
+      // armed=false for the very pid that is trading normally. It fired at 09:33
+      // on two consecutive mornings while the trader went on to take entries and
+      // exits all session — and a daily false alarm is how a real one gets
+      // ignored. "Locked out" is only true if the armed loop is ALSO not
+      // running, and a fresh trader-state.json proves that it is: the scan loop
+      // writes it every scan. So require BOTH a disarmed holder and a stale
+      // state file. The genuine 2026-08-05 shape (disarmed squatter, armed
+      // trader standing down, state going cold) still trips it.
+      const _scanAlive = stateAgeMs != null && !stateMissing && stateAgeMs <= STALE_STATE_MS;
+      if (lock.armed !== true && !_scanAlive) problems.push(`account lock held by DISARMED pid ${lock.pid} - armed trader is locked out`);
       if (lockAgeMs != null && lockAgeMs > STALE_LOCK_MS) {
         problems.push(`lock heartbeat stale (${Math.round(lockAgeMs / 1000)}s) - holder may be dead`);
       }
