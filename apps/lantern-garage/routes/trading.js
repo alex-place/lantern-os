@@ -89,16 +89,27 @@ function _championDue(uid, now) {
 // or TRADER_EXTENDED_HOURS=1) the trader also scans + acts during the extended session,
 // placing marketable-limit + outsideRTH orders (regular hours use market orders as before).
 let _extendedTrading = process.env.TRADER_EXTENDED_HOURS === '1';
+// EXTENDED-HOURS PROTECTIVE MODE (TRADER_EXTENDED_EXITS=1, 2026-08-12). Distinct
+// from _extendedTrading: it does NOT enable extended-hours entries. It runs the
+// loop pre/after-hours purely to MANAGE open positions — trailing floors, zone
+// floors, give-back, max-loss — because between 16:00 and 09:30 the loop is idle
+// and a winner's trail cannot ratchet (2026-08-12: SOXS sat on its R2 target at
+// +$3,617 and gave back into the close with nobody watching). Signal-derived
+// exits and all entries stay off; see runAutoTrade's `protectiveOnly` contract.
+const _extendedExitsOnly = () => process.env.TRADER_EXTENDED_EXITS === '1';
 async function _autoscanTick() {
   if (_autoscanStopped || !traderAgent) return;
   const marketHours = _isUsMarketHours();
   const extNow = _isUsExtendedHours() && _extendedTrading;   // only pre/post when the toggle is on
+  // Protective-only window: run the loop, manage positions, take no entries.
+  // Full extended trading (extNow) supersedes it — no double-gating.
+  const extManageNow = !marketHours && !extNow && _isUsExtendedHours() && _extendedExitsOnly();
   // Asymmetric-options SHADOW trader (Verify stage): measurement only, never orders.
   // Self-throttles to its own close/open ET windows; fail-soft so it can't break scans.
   try { require('../lib/options-shadow').tick().catch(() => {}); } catch (_e) { /* absent/failed → skip */ }
   // Regular hours always run; extended hours only when the toggle is on. Otherwise idle
   // (no Python spawn / model call — the price collectors keep polling for free).
-  if (marketHours || extNow) {
+  if (marketHours || extNow || extManageNow) {
     // Overnight sleeve book (lib/overnight-trader.js): opt-in (OVERNIGHT_TRADER=1),
     // dry unless OVERNIGHT_ARM=1. Self-windowing (15:45 enter / 09:31 exit ET) — a
     // no-op on every other tick. Fail-soft: the scan loop must never die for it.
@@ -233,13 +244,13 @@ async function _autoscanTick() {
         // each engine manages only its own positions. Fail-soft empty set.
         let _ovnHeld = [];
         try { _ovnHeld = [...require('../lib/overnight-trader').heldSymbols()]; } catch (_e) { /* absent → none */ }
-        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld });
+        await runAutoTrade(userScan, { bridge: resolved.facade, userId: uid, extended: !marketHours, excludeSymbols: _ovnHeld, protectiveOnly: extManageNow });
       }
     } catch (e) {
       console.error('[Trading] autoscan failed:', e.message);
     }
   }
-  if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
+  if (!_autoscanStopped) setTimeout(_autoscanTick, (marketHours || extNow || extManageNow) ? AUTOSCAN_MS : AUTOSCAN_CLOSED_MS);
 }
 if (traderAgent && process.env.TRADER_AUTOSCAN !== '0') {
   setTimeout(_autoscanTick, 5000); // first scan shortly after boot
