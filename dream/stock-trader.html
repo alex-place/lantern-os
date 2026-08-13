@@ -4641,11 +4641,37 @@ async function alDeleteRule(id){
 // screen (dimmed, tooltip says why) and explain ONCE what happened + the fix,
 // instead of rendering an auth failure or backend outage as a $0.00 account.
 let _staleKind = null;
+// Last time the account panel rendered REAL server data. The watchdog below is
+// the backstop: any future failure mode we have not thought of still surfaces,
+// because it is driven by "how old is what you're looking at", not by guessing
+// the cause. Belt and braces after a silent 35-minute freeze.
+let _lastGoodPoll = Date.now();
+const STALE_AFTER_MS = 90_000;                 // 3 missed 30s polls
+setInterval(() => {
+  if (window.GUEST && !window.DEMO_ACCT) return;
+  if (Date.now() - _lastGoodPoll > STALE_AFTER_MS && !_staleKind) {
+    _accountDegraded('unreachable', 'no account update for ' + Math.round((Date.now() - _lastGoodPoll) / 1000) + 's');
+  }
+}, 30_000);
 function _accountDegraded(kind, reason){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = '0.45'; el.title = kind === 'session'
     ? 'Session expired — figures frozen at the last update. Sign in again to resume.'
-    : 'Trading backend unreachable — figures frozen at the last update.' + (reason ? ' (' + reason + ')' : ''); }
+    : 'Account data unreachable — figures frozen at the last update.' + (reason ? ' (' + reason + ')' : ''); }
+  // A dimmed panel is easy to miss on a dark theme — the 2026-08-13 freeze looked
+  // completely normal. State it in words, IN the summary row itself. Anchored to
+  // #tpSummary because that is the element carrying the numbers the user reads;
+  // the first attempt hung this off #hDayPnl, which does not exist on this
+  // layout, so the badge silently never rendered (caught in browser test).
+  const host = el || document.getElementById('tpSummary');
+  if (host && !document.getElementById('staleBadge')) {
+    const b = document.createElement('span');
+    b.id = 'staleBadge';
+    b.style.cssText = 'align-self:center;margin-right:10px;padding:2px 7px;border-radius:4px;background:#f59e0b;color:#1a1a1a;font-size:10px;font-weight:800;letter-spacing:.05em';
+    b.textContent = kind === 'session' ? '⚠ STALE — SIGN IN' : '⚠ STALE';
+    b.title = 'These figures are NOT live' + (reason ? ' — ' + reason : '') + '.';
+    host.insertBefore(b, host.firstChild);
+  }
   const pe = document.getElementById('hDayPnl');
   if (pe && !el?.innerHTML) { pe.textContent = '—'; pe.className = 'v'; }
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
@@ -4658,7 +4684,10 @@ function _accountDegraded(kind, reason){
 function _accountFresh(){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = ''; el.title = ''; }
+  const b = document.getElementById('staleBadge');
+  if (b && b.parentNode) b.parentNode.removeChild(b);
   _staleKind = null;
+  _lastGoodPoll = Date.now();
 }
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -5021,6 +5050,14 @@ async function loadPortfolio(){
     // (2) SAY what happened and what fixes it, once, instead of zeroing.
     // A session expiry does NOT self-heal — re-signing-in is the only cure.
     if (r.status === 401 || r.status === 403) { _accountDegraded('session'); return; }
+    // THE SILENT FREEZE (2026-08-13). An expired session does not always answer
+    // 401: the auth funnel REDIRECTS to the login page, i.e. HTTP 200 with an
+    // HTML body. That sailed past the status check, r.json() threw, and the bare
+    // catch below swallowed it — leaving a normal-looking screen frozen at the
+    // last good render for 35 minutes mid-session, with no dim and no toast.
+    // A non-JSON body from this endpoint means "not signed in", full stop.
+    const _ct = r.headers.get('content-type') || '';
+    if (r.redirected || !/json/i.test(_ct)) { _accountDegraded('session'); return; }
     const d  = await r.json();
     if (d && (d.error === 'auth_required' || d.error === 'forbidden')) { _accountDegraded('session'); return; }
     if (d && d.available === false) { _accountDegraded('backend', d.reason); return; }
@@ -5051,7 +5088,14 @@ async function loadPortfolio(){
     // height back to the charts (#2301). Re-expands the moment there's equity or a
     // position. Trade actions stay available; they just stop dominating.
     document.body.classList.toggle('acct-empty', !(a.equity>0) && (d.positions||[]).length===0);
-  }catch(e){}
+    _lastGoodPoll = Date.now();
+  }catch(e){
+    // NEVER SWALLOW. Whatever went wrong — network blip, server restart, a body
+    // that would not parse, a render throw — the figures on screen are now stale
+    // and the user must be told. Silence here is what produced the 2026-08-13
+    // freeze; an empty catch on the panel that reports money is not acceptable.
+    _accountDegraded('unreachable', e && e.message);
+  }
 }
 
 async function loadMarketStatus(){
