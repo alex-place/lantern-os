@@ -261,6 +261,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               ledgerText: fs.readFileSync(logPath, 'utf8'),
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
+              // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
+              // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
+              // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
+              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
             });
             ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
             ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
@@ -310,6 +314,10 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               ledgerText: fs.readFileSync(logPath, 'utf8'),
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
+              // own bar cache first: Yahoo's 1d chart rolls per-symbol at an undocumented
+              // hour, and pre-market it can still serve the SESSION-BEFORE-LAST as
+              // prevClose (live 2026-08-14 04:42: SPXS referenced Wednesday) — #3301 follow-up
+              getPrevClose: require('../../lib/day-pnl').prevCloseFromBarsFactory(path.join(__dirname, '..', '..', '..', '..', 'data', 'lantern-garage', 'trading', 'bars')),
             });
             opAccount.realized_today = _d.realized_today;
             opAccount.realized_booked = _d.realized_booked;
