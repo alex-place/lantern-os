@@ -169,14 +169,32 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // acceptWarnings (2026-08-14): IBKR raises disclosure/size warnings and the
       // manual Flatten path dead-ended on them — the bridge supports the flag but
       // this route never forwarded it, so the operator could not trim the 3x carry
-      // ("Couldn't flatten SOXS: re-submit with acceptWarnings:true"). The UI now
-      // resubmits WITH the flag after showing the human IBKR's own warning text.
-      // SELLS ONLY, and never defaulted on: a buy that draws warnings must keep
-      // surfacing them (P0-8), and this endpoint takes arbitrary user qty — an
-      // auto-accepted oversell warning could blow through flat into a short. The
-      // engine's own exit path reconciles qty to the held position first; here the
-      // human IS the reconciliation, so the warning text must reach them.
-      const acceptWarnings = payload.acceptWarnings === true && String(side).toLowerCase() === 'sell';
+      // ("Couldn't flatten SOXS: re-submit with acceptWarnings:true").
+      // SELLS ONLY, always: a buy that draws warnings must keep surfacing them
+      // (P0-8), whether the engine or a person is driving.
+      const _isSell = String(side).toLowerCase() === 'sell';
+      let acceptWarnings = payload.acceptWarnings === true && _isSell;
+      let _autoAccepted = null;
+      // VERIFIED RISK-REDUCING SELLS AUTO-ACCEPT (2026-08-14, second pass). The
+      // first fix bounced every warned sell to a confirm popup, and the popup was
+      // asking the human to approve "IBKR returned order warnings" — no content,
+      // pure friction (operator: "i dont like this popup"). The engine's own
+      // exits already auto-accept (2026-07-27, after 13 stalled exits, one run to
+      // -18.9% waiting for a click); what that decision actually requires is not
+      // a human, it is PROOF the sell reduces risk. The engine proves it by
+      // reconciling qty to the held position — so this route now does the same:
+      // verify against the live book that qty <= |held|, and only then accept.
+      // Oversell stays impossible to auto-clear: unverifiable (feed down, symbol
+      // not held, qty too big) falls back to the explicit human confirm.
+      const _sellRiskReducing = async (uidX) => {
+        try {
+          const pos = await bridge.getIBKRPositions(uidX);
+          if (!Array.isArray(pos)) return false;
+          const p = pos.find((x) => String(x && x.symbol).toUpperCase() === String(ticker).toUpperCase());
+          const held = Math.abs(Number(p && p.qty) || 0);
+          return held >= 1 && Number(qty) <= Math.floor(held);
+        } catch (_e) { return false; }   // cannot verify -> cannot auto-accept
+      };
       if (stopLoss != null && Number(stopLoss) <= 0) {
         sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
         return true;
@@ -189,6 +207,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
       // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
+      if (_isSell && !acceptWarnings && await _sellRiskReducing(uid)) {
+        acceptWarnings = true;
+        _autoAccepted = 'risk_reducing_sell';
+      }
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings };
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
@@ -227,7 +249,15 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           const { isAdmin } = require('../../lib/auth-middleware');
           const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
           if (isAdmin(req) && uid !== OPERATOR_UID) {
-            for (const attempt of [() => bridge.placeIBKROrder(OPERATOR_UID, orderReq), () => alpaca.placeOrder(OPERATOR_UID, orderReq)]) {
+            // The order is going to the OPERATOR book, so the risk-reducing
+            // verification must be re-run against that book, not the admin's own
+            // (empty) account — otherwise operator-view flattens keep the popup.
+            const opReq = { ...orderReq };
+            if (_isSell && !opReq.acceptWarnings && await _sellRiskReducing(OPERATOR_UID)) {
+              opReq.acceptWarnings = true;
+              _autoAccepted = 'risk_reducing_sell';
+            }
+            for (const attempt of [() => bridge.placeIBKROrder(OPERATOR_UID, opReq), () => alpaca.placeOrder(OPERATOR_UID, opReq)]) {
               result = await attempt().catch(() => null);
               if (result) { result.operator_account = true; break; }
             }
@@ -236,6 +266,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       }
       result = result
         || { status: 'error', ticker, side, qty, reason: 'No broker connected. Add your Alpaca API keys in Settings → Connections to trade.' };
+      // Transparency: when warnings were cleared by position-verification rather
+      // than a human, the response says so — the journal and any audit can tell
+      // the two apart.
+      if (_autoAccepted) result.auto_warnings = _autoAccepted;
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,

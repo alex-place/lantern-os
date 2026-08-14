@@ -25,13 +25,15 @@ const assert = require('node:assert');
 
 const ordersRoutes = require('../routes/trading/orders');
 
-async function drive(payload) {
+async function drive(payload, { positions } = {}) {
   const captured = { orderReq: null, response: null, code: null };
   const ctx = {
     sendJson: (_res, body, code) => { captured.response = body; captured.code = code; },
     collectRequestBody: async () => JSON.stringify(payload),
     bridge: {
       placeIBKROrder: async (_uid, orderReq) => { captured.orderReq = orderReq; return { status: 'error', error: 'stub' }; },
+      // absent option → feed unreadable (throws), the conservative default
+      getIBKRPositions: async () => { if (positions === undefined) throw new Error('feed down'); return positions; },
     },
     traderAgent: null,
     tradingMemory: { recordNewOrders: async () => {} },
@@ -66,4 +68,64 @@ test('absent flag defaults to false — first attempts never accept silently', a
 test('non-boolean truthy values do not sneak through (strict === true)', async () => {
   const c = await drive({ ticker: 'GLD', side: 'sell', qty: 10, type: 'market', acceptWarnings: 'yes' });
   assert.strictEqual(c.orderReq.acceptWarnings, false, 'only an explicit boolean true counts as a human confirm');
+});
+
+// ── verified risk-reducing sells auto-accept (2026-08-14 second pass) ────────
+// The popup asked the human to approve "IBKR returned order warnings" — no
+// content. What the 2026-07-27 exit policy actually requires is PROOF the sell
+// reduces risk, and the server can prove that itself against the live book.
+
+test('a sell covered by the held position auto-accepts — no popup, like engine exits', async () => {
+  const c = await drive(
+    { ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' },
+    { positions: [{ symbol: 'SQQQ', qty: 1614 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true, 'qty <= held is verified risk-reducing');
+  assert.strictEqual(c.response.auto_warnings, 'risk_reducing_sell', 'the response says the machine cleared it, not a human');
+});
+
+test('fractional book: SOXS 3057 sell against 3057.8 held auto-accepts (floored)', async () => {
+  const c = await drive(
+    { ticker: 'SOXS', side: 'sell', qty: 3057, type: 'market' },
+    { positions: [{ symbol: 'SOXS', qty: 3057.8 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true);
+});
+
+test('an OVERSELL never auto-accepts — qty above the held size keeps the human check', async () => {
+  const c = await drive(
+    { ticker: 'GLD', side: 'sell', qty: 147, type: 'market' },
+    { positions: [{ symbol: 'GLD', qty: 66 }] },        // the live 2026-08-13 shape
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false, 'selling 147 against 66 held would open a short');
+  assert.strictEqual(c.response.auto_warnings, undefined);
+});
+
+test('a symbol not in the book never auto-accepts — that sell IS a short attempt', async () => {
+  const c = await drive(
+    { ticker: 'NVDA', side: 'sell', qty: 10, type: 'market' },
+    { positions: [{ symbol: 'GLD', qty: 66 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false);
+});
+
+test('positions feed unreadable → cannot verify → no auto-accept (never trade blind)', async () => {
+  const c = await drive({ ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' });   // getIBKRPositions throws
+  assert.strictEqual(c.orderReq.acceptWarnings, false, 'the dropout case must fall back to the human');
+});
+
+test('a BUY never auto-accepts even when a position exists (P0-8 holds)', async () => {
+  const c = await drive(
+    { ticker: 'SQQQ', side: 'buy', qty: 10, type: 'market' },
+    { positions: [{ symbol: 'SQQQ', qty: 1614 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false);
+});
+
+test('dust cannot certify a sell: 0.8 held does not cover a 1-share sell', async () => {
+  const c = await drive(
+    { ticker: 'SOXS', side: 'sell', qty: 1, type: 'market' },
+    { positions: [{ symbol: 'SOXS', qty: 0.8 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false, 'held < 1 share cannot cover any whole-share sell');
 });
