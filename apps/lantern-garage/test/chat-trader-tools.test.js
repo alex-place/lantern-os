@@ -138,11 +138,74 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     assert.ok(/already OFF/.test(again.result), "pausing twice is safe and says so");
   });
 
-  await check("guests are denied every one of these tools", async () => {
+  await check("signed-OUT callers are denied every one of these tools", async () => {
     for (const n of NEW_TOOLS) {
-      const r = await run(n, {}, { operator: false, userId: "guest" });
-      assert.strictEqual(r.status, "denied", `${n} must be denied to non-operators`);
+      const r = await run(n, {}, { operator: false });   // no userId → not signed in
+      assert.strictEqual(r.status, "denied", `${n} must be denied to a signed-out caller`);
     }
+  });
+
+  // ── The signed-in tier (hosted users) ──────────────────────────────────────
+  const PRO = { operator: false, userId: "hosted-pro", role: "deep_dreamer" };
+  const FREE = { operator: false, userId: "hosted-free", role: "supporter" };
+
+  await check("TIER: a signed-in Pro user reaches their own per-user tools", async () => {
+    for (const n of ["trader_config", "trader_alerts", "trader_pause"]) {
+      const r = await run(n, {}, PRO);
+      assert.strictEqual(r.status, "executed", `${n} must run for a signed-in Pro user`);
+    }
+  });
+
+  await check("TIER: the shared un-attributed ledger stays operator-only", async () => {
+    for (const n of ["trader_journal", "trader_skips"]) {
+      const r = await run(n, {}, PRO);
+      assert.strictEqual(r.status, "denied", `${n} reads the shared house ledger — it must NOT cross the tier`);
+      assert.strictEqual(r.reason_code, "operator_required");
+    }
+  });
+
+  await check("TIER: a signed-out caller gets 'sign in', not a misleading 'operator' reason", async () => {
+    const r = await run("trader_alerts", {}, { operator: false });
+    assert.strictEqual(r.reason_code, "sign_in_required");
+    assert.ok(/signed in/.test(r.error));
+  });
+
+  await check("PLAN BYPASS: chat cannot hand a Free user a Pro feature", async () => {
+    const listed = await run("trader_alerts", {}, FREE);
+    assert.strictEqual(listed.status, "executed", "the tool runs...");
+    assert.ok(/Pro plan/.test(listed.result), "...but refuses the feature and names the plan");
+    const made = await run("trader_alert_create", { symbol: "SPY", type: "signal" }, FREE);
+    assert.ok(/refused: price alerts are part of the Pro plan/.test(made.result));
+    assert.ok(/do NOT pretend the alert was created/.test(made.result), "the model is told not to fake success");
+    // and nothing was actually written
+    const asPro = await run("trader_alerts", {}, { operator: false, userId: "hosted-free", role: "deep_dreamer" });
+    assert.ok(/\(none set\)/.test(asPro.result), "the refused create must not have persisted a rule");
+  });
+
+  await check("PLAN BYPASS: capability check fails CLOSED on an unknown role", async () => {
+    const r = await run("trader_alert_create", { symbol: "SPY", type: "signal" }, { operator: false, userId: "u", role: "nonsense-role" });
+    assert.ok(/Pro plan/.test(r.result), "an unrecognized role must be refused, not allowed");
+  });
+
+  await check("PAUSE is never withheld: a Free user can still stop their own trader", async () => {
+    const r = await run("trader_pause", {}, FREE);
+    assert.strictEqual(r.status, "executed", "stopping is risk-reducing — it must not be plan-gated");
+  });
+
+  await check("the advertised set matches the gate on every provider builder", () => {
+    const anth = (o) => reg.anthropicTools(o).map((t) => t.name);
+    const oai = (o) => reg.openaiTools(o).map((t) => t.function.name);
+    const gem = (o) => reg.geminiTools(o)[0].functionDeclarations.map((d) => d.name);
+    for (const o of [{}, { signedIn: true }, { operator: true }]) {
+      assert.deepStrictEqual(anth(o), oai(o), "anthropic and openai sets must match");
+      assert.deepStrictEqual(anth(o), gem(o), "anthropic and gemini sets must match");
+    }
+    const guest = anth({});
+    const signed = anth({ signedIn: true });
+    assert.ok(!guest.includes("trader_alerts"), "a signed-out model must not even SEE the per-user tools");
+    assert.ok(signed.includes("trader_alerts") && signed.includes("trader_pause"), "a signed-in model sees its per-user tools");
+    assert.ok(!signed.includes("trader_journal"), "the shared-ledger tools stay out of the signed-in set");
+    assert.ok(!signed.includes("workspace_read"), "the signed-in tier must not leak filesystem tools");
   });
 
   fs.rmSync(TMP, { recursive: true, force: true });

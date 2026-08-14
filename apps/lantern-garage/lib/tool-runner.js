@@ -135,6 +135,30 @@ function _userHeaders(ctx) {
   return ctx && ctx.userId ? { "x-keystone-user": encodeURIComponent(String(ctx.userId)) } : null;
 }
 
+/**
+ * Does this caller's PLAN include `capability` (lib/plan-matrix)?
+ *
+ * user_safe tools reach per-user stores directly, bypassing the route-level
+ * entitlement gate in server.js — so a plan-gated feature must re-check here or
+ * chat becomes a way around the plan matrix. Role comes from the session when the
+ * caller passed it, else from the stored profile. Operators (loopback/admin box)
+ * pass. Fails CLOSED: any error or unknown role means "no".
+ */
+function _hasCapability(ctx, capability) {
+  try {
+    if (ctx && ctx.operator) return true;
+    let role = ctx && ctx.role;
+    if (!role && ctx && ctx.userId) {
+      const p = require("./user-profiles").getProfile(ctx.userId);
+      role = p && p.role;
+    }
+    if (!role) return false;
+    return require("./plan-matrix").roleHasCapability(role, capability);
+  } catch (_e) {
+    return false;
+  }
+}
+
 // ── portfolio-tool formatting (portfolio_analysis / portfolio_whatif /
 // propose_rebalance) — shared so all three speak the same evidence language. ──
 function _pfPct(x, dp = 1) {
@@ -1696,8 +1720,10 @@ const REGISTRY = {
   // it. Stopping is risk-reducing and wants to be sayable fast; arming is a
   // deliberate, gated act that keeps its own UI + approval path.
   trader_config: {
-    policy: "read", // operator-only (no guest_safe): the operator's own machine state
-    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing.",
+    policy: "read",
+    user_safe: true, // signed-in: the active book is read for THEIR uid; the rest is the
+                     // strategy contract that governs their account (public in the guide)
+    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing. YOUR OWN LIMITS, state them rather than offering what you cannot do: you can PAUSE the autopilot (trader_pause) but you can NEVER start, arm, or change its settings — arming and every knob above live only in Settings, by deliberate human action. If you were not given a tool for the realized trade journal, say it is not available to you here instead of promising to fetch it or inferring results from the arming state.",
     schema: { type: "object", properties: {} },
     async run(_i, ctx) {
       try {
@@ -1731,7 +1757,12 @@ const REGISTRY = {
   },
 
   trader_journal: {
-    policy: "read", // operator-only (no guest_safe): the account's realized record
+    // OPERATOR-ONLY, deliberately NOT user_safe: the autopilot writes ONE shared
+    // ledger with no per-user attribution (rows carry ts/event/symbol/qty/entry/
+    // pnl/reason/status — no userId), so serving it to a hosted user would answer
+    // their question with the house book. Per-user attribution in the ledger is the
+    // prerequisite for opening this up; a gate flag alone would be a data leak.
+    policy: "read",
     desc: "Read the autopilot's REALIZED record from its append-only exit ledger: total realized P&L, the daily curve's max drawdown with its dates, win rate (both the headline and the honest risk-exit-only number), expectancy per trade, profit factor, average MFE/MAE, and the per-exit-path breakdown. Use when the user asks how the trader is doing, how their week/month went, which exits make or lose money, or whether the stops are too tight. HONESTY CONTRACT, relay it: numbers are broker-CONFIRMED fills only; profit-taking exit paths can only ever close winners so their ~100% win rates are structural (never quote them as skill); and the disclosures line (collapsed re-decisions, excluded rejected attempts, externally-closed positions valued at the last mark) must be passed on, not hidden.",
     schema: { type: "object", properties: {} },
     async run(_i, _ctx) {
@@ -1764,7 +1795,9 @@ const REGISTRY = {
   },
 
   trader_skips: {
-    policy: "read", // operator-only (no guest_safe): the account's own decision log
+    // OPERATOR-ONLY for the same reason as trader_journal — the skip log lives in
+    // that same un-attributed shared ledger.
+    policy: "read",
     desc: "Read the SKIP LOG — every opportunity the autopilot DECLINED and why, grouped by decline reason with counts and how many distinct symbols each touched (numbers in a reason are normalized, so '81% > cap 80%' and '83% > cap 80%' are one family). Use when the user asks why the trader isn't trading, why it passed on a symbol, or what its risk rules are actually blocking — most 'it isn't working' is the trader correctly declining. These are COUNTS ONLY: never imply a skipped trade would have made or lost money, because it was never priced.",
     schema: { type: "object", properties: {} },
     async run(_i, _ctx) {
@@ -1785,11 +1818,13 @@ const REGISTRY = {
   },
 
   trader_alerts: {
-    policy: "read", // operator-only (no guest_safe): the user's own rules + fired feed
+    policy: "read",
+    user_safe: true, // strictly per-user: every read is keyed by ctx.userId
     desc: "List the user's watchlist alert RULES (symbol, condition, quiet window, enabled) and the most recent alerts that have FIRED. Rule types: 'signal' (the engine emitted bullish/bearish), 'zone' (price came within a chosen % of the computed support/resistance), 'washout' (the engine's ENTER verdict). Use when the user asks what alerts they have set, whether anything fired, or why they did or did not get told about a move.",
     schema: { type: "object", properties: { limit: { type: "number", description: "how many fired alerts to show (default 10, max 50)" } } },
     async run(i, ctx) {
       try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alerts: price alerts are part of the Pro plan — say so plainly and point at /pricing.html rather than inventing rules.]";
         const store = require("./alert-store");
         const uid = (ctx && ctx.userId) || "local-owner";
         const rules = store.listRules(uid);
@@ -1814,6 +1849,7 @@ const REGISTRY = {
 
   trader_alert_create: {
     policy: "action", // creates a per-user alert rule — reversible, touches no money
+    user_safe: true,  // written under ctx.userId; plan-gated on price_alerts below
     desc: "Create a watchlist alert rule for the user. Types: 'signal' (fires when the engine emits a direction — set direction BULLISH/BEARISH/ANY), 'zone' (fires when price comes within proximityPct of the computed support or resistance), 'washout' (fires on the engine's ENTER verdict). cooldownMin is the quiet window after it fires (5-1440, default 60). This places NO orders and moves no money — it only asks to be told when something happens. Confirm the symbol and condition back to the user in plain words after creating it.",
     schema: {
       type: "object",
@@ -1829,6 +1865,7 @@ const REGISTRY = {
     },
     async run(i, ctx) {
       try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alert_create refused: price alerts are part of the Pro plan. Tell the user plainly and point at /pricing.html — do NOT pretend the alert was created.]";
         const store = require("./alert-store");
         const uid = (ctx && ctx.userId) || "local-owner";
         const r = store.saveRule(uid, i || {});
@@ -1845,6 +1882,7 @@ const REGISTRY = {
 
   trader_alert_delete: {
     policy: "action", // removes one of the user's own rules — reversible, no money
+    user_safe: true,  // deletes only within ctx.userId's own store
     desc: "Delete one of the user's alert rules by its id (get ids from trader_alerts). Removes only the rule — no positions, orders, or money are touched.",
     schema: { type: "object", required: ["id"], properties: { id: { type: "string", description: "the rule id from trader_alerts" } } },
     async run(i, ctx) {
@@ -1861,6 +1899,9 @@ const REGISTRY = {
 
   trader_pause: {
     policy: "action", // ONE-WAY safety switch: can stop the autopilot, never start it
+    user_safe: true,  // sets only ctx.userId's own book; NOT capability-gated on
+                      // purpose — stopping is risk-reducing and must never be
+                      // withheld from someone whose account is being traded
     desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. This is deliberately ONE-WAY: it can stop the machine but cannot start or arm it (arming is a gated action in Settings, never something a conversation can do). Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
     schema: { type: "object", properties: {} },
     async run(_i, ctx) {
@@ -1898,7 +1939,11 @@ function capabilityManifest({
         description: entry.desc,
         input_schema: entry.schema,
         policy: entry.policy,
-        operator_required: entry.policy !== "read",
+        // The REAL access tier, matching the runTool gate — not a policy proxy.
+        // (A user_safe action tool is available to any signed-in user, so the old
+        // `policy !== "read"` reading of it would have been wrong.)
+        access: entry.guest_safe === true ? "guest" : entry.user_safe === true ? "signed_in" : "operator",
+        operator_required: entry.guest_safe !== true && entry.user_safe !== true,
         surface_availability: {
           dream_chat: true,
           mcp: true,
@@ -2233,19 +2278,40 @@ async function runTool(name, input, ctx = {}) {
     return result;
   }
 
-  // Non-operators (e.g. public-server guests) may run ONLY guest_safe tools —
-  // the web-only set. This is the enforcement boundary behind the advertised-set
-  // filter: even a crafted call to a read-policy filesystem tool (Read/Grep/
-  // workspace_read/…) is denied for guests, so the public chat can't enumerate or
-  // read local files. Operators (loopback/admin) are unrestricted. (#1213)
-  if (!ctx.operator && entry.guest_safe !== true) {
-    const result = _outcome("denied", name, {
-      reason_code: "operator_required",
-      policy: entry.policy,
-      error: `'${name}' (${entry.policy}) requires operator access`,
-    });
-    await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
-    return result;
+  // THREE ACCESS TIERS (#1213, extended for hosted users).
+  //
+  //   guest_safe  — anyone, signed in or not (the web-only set)
+  //   user_safe   — a SIGNED-IN user, and only over their OWN per-user state
+  //   (neither)   — operator only (loopback / operator token)
+  //
+  // The middle tier exists because the hosted site has no operators: `operator`
+  // means un-proxied loopback or the operator token, so on unisona.ai every real
+  // customer was denied every non-guest tool — including tools about their own
+  // account. A tool may only be marked `user_safe` when the data it returns is
+  // scoped by ctx.userId; anything reading a SHARED store (e.g. the autopilot's
+  // single un-attributed trade ledger) must stay operator-only, or one user's
+  // question would answer with another's book.
+  //
+  // Plan entitlements are NOT enforced here — a tool whose feature is plan-gated
+  // checks its own capability (see _hasCapability), so chat can never become a
+  // way around the plan matrix.
+  if (!ctx.operator) {
+    const signedIn = Boolean(ctx.userId);
+    const allowed = entry.guest_safe === true || (entry.user_safe === true && signedIn);
+    if (!allowed) {
+      // A user_safe tool refused purely for want of a session gets the honest
+      // reason (sign in), not the misleading "operator access" one.
+      const reasonCode = entry.user_safe === true ? "sign_in_required" : "operator_required";
+      const result = _outcome("denied", name, {
+        reason_code: reasonCode,
+        policy: entry.policy,
+        error: reasonCode === "sign_in_required"
+          ? `'${name}' needs you to be signed in — it reads your own account state`
+          : `'${name}' (${entry.policy}) requires operator access`,
+      });
+      await _logToolExecution(name, input, "denied", reasonCode, startTime, ctx);
+      return result;
+    }
   }
 
   // Per-faculty tool gating for capability evals (#2777). Burnell et al. §4.3: if a
@@ -2345,6 +2411,16 @@ async function runTool(name, input, ctx = {}) {
   }
 }
 
+// Which tools a caller may SEE. Mirrors the runTool gate exactly (guest_safe →
+// anyone; user_safe → signed in; otherwise operator), so the advertised surface
+// never offers a model a tool its own execution gate would refuse. (#1213 tiers)
+function _visibleToolNames({ operator = false, signedIn = false } = {}) {
+  return TOOL_NAMES.filter((name) => {
+    const e = REGISTRY[name];
+    return operator || e.guest_safe === true || (e.user_safe === true && signedIn);
+  });
+}
+
 // ── native Anthropic tool schemas (same single source of truth as the preamble) ──
 // Renders the registry as `tools` for the Messages API. Cloud models (Haiku/Sonnet)
 // emit native `tool_use` blocks, so they don't need the free-text preamble — they get
@@ -2352,9 +2428,8 @@ async function runTool(name, input, ctx = {}) {
 // (web-only) tools so a public-server guest's model never even sees the filesystem/
 // shell/mutating tools (runTool still enforces guest_safe regardless — this just keeps
 // the advertised surface honest). (#1213)
-function anthropicTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function anthropicTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,
@@ -2366,9 +2441,8 @@ function anthropicTools({ operator = false } = {}) {
 // (chat/completions `tools`). OpenAI-compatible providers (GPT, Grok) emit native
 // `tool_calls`, so they use this instead of the free-text preamble. Operator filter
 // matches anthropicTools — runTool still enforces policy regardless.
-function openaiTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function openaiTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       type: "function",
       function: {
@@ -2383,7 +2457,7 @@ function openaiTools({ operator = false } = {}) {
 // accepts an OpenAPI-subset schema; our schemas are already that subset, but we strip
 // any keys Gemini rejects (e.g. additionalProperties) defensively. One element with all
 // declarations, matching Gemini's expected shape.
-function geminiTools({ operator = false } = {}) {
+function geminiTools({ operator = false, signedIn = false } = {}) {
   const clean = (schema) => {
     if (!schema || typeof schema !== "object") return schema;
     const { additionalProperties, $schema, ...rest } = schema;
@@ -2394,8 +2468,7 @@ function geminiTools({ operator = false } = {}) {
     }
     return rest;
   };
-  const functionDeclarations = TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+  const functionDeclarations = _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,
