@@ -1682,6 +1682,200 @@ const REGISTRY = {
       }
     },
   },
+
+  // ── The desk, readable from chat ────────────────────────────────────────────
+  // Users expect the assistant to know its OWN trading system, not just the market.
+  // These expose the autopilot's config + arming state, its realized record, what it
+  // DECLINED (the skip log — the thing an import-based journal can never have), and
+  // the user's alert rules; plus three NON-FINANCIAL capabilities (create/delete an
+  // alert, pause the trader).
+  //
+  // The money boundary is unchanged and deliberate: nothing here places, sizes, or
+  // ARMS an order — Act stays behind lib/trading-guard.js + the ADR-0020 gates. Note
+  // `trader_pause` is intentionally ONE-WAY: chat can stop the machine, never start
+  // it. Stopping is risk-reducing and wants to be sayable fast; arming is a
+  // deliberate, gated act that keeps its own UI + approval path.
+  trader_config: {
+    policy: "read", // operator-only (no guest_safe): the operator's own machine state
+    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const mode = require("./trader-mode").get(uid);
+        const c = require("./auto-trader").cfg();
+        const halt = require("./trading-guard").haltFile();
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const live = process.env.TRADER_LIVE === "1";
+        const mins = (ms) => Math.round((Number(ms) || 0) / 60000);
+        const book = mode === "off"
+          ? "OFF — the autopilot opens nothing and closes nothing; positions and their broker stops are the user's to manage"
+          : mode === "champion"
+            ? "Champion — the diversified allocation book, rebalanced on a schedule (the intraday trader is paused while this runs)"
+            : "Intraday — washout entries and zone-ladder exits on liquid ETFs";
+        const sizing = c.riskPct > 0
+          ? `${c.riskPct}% of equity risked per trade (qty = equity x riskPct / (entry - stop))`
+          : `${c.positionPct}% average position size (notional sizing)`;
+        return [
+          `ACTIVE BOOK: ${book}`,
+          `ARMING: autonomous execution ${autoExec ? "ARMED (TRADER_AUTO_EXECUTE=1)" : "OFF — it decides and journals, but places nothing"} - real-money orders ${live ? "ARMED (TRADER_LIVE=1)" : "DRY RUN (TRADER_LIVE unset, so no real order can reach a broker)"}.`,
+          halt ? `HALT FILE PRESENT (${halt}) — every order is refused while it exists.` : "No kill-switch or pause file present.",
+          `SIZING: ${sizing}. Hard caps: ${c.maxPositionPct}% per position, ${c.maxGrossPct}% gross exposure (the remainder stays in cash), max ${c.maxConcurrent} concurrent positions, max ${c.maxNewPerScan} new entries per scan.`,
+          `STOPS: ${c.atrStops ? `ATR-based from the signal's own trade plan, clamped to ${c.atrStopMinPct}-${c.atrStopMaxPct}%` : `flat ${c.stopPct}%`}, placed at the broker on entry - ${c.maxLossPct}% hard max-loss backstop - ${c.zoneExit ? "zone-ladder exits armed" : "zone-ladder exits off"}.`,
+          `BRAKES: halts NEW entries at -${c.maxDailyLossPct}% day P&L - ${mins(c.cooldownMs)}min re-entry cooldown per symbol (${c.stopCooldownDays} trading day after a stop fill; ${c.stopBreaker} stop fills in a day trips the breaker) - ${mins(c.minHoldMs)}min minimum hold before a signal exit - ${c.requirePersist ? `a direction must hold ${c.persistScans} consecutive scans` : "no persistence filter"} - ${c.allowShorts ? "SHORTS ENABLED" : "longs only (a bearish signal can only close a long, never open a short)"}.`,
+        ].join("\n");
+      } catch (e) {
+        return `[trader_config error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_journal: {
+    policy: "read", // operator-only (no guest_safe): the account's realized record
+    desc: "Read the autopilot's REALIZED record from its append-only exit ledger: total realized P&L, the daily curve's max drawdown with its dates, win rate (both the headline and the honest risk-exit-only number), expectancy per trade, profit factor, average MFE/MAE, and the per-exit-path breakdown. Use when the user asks how the trader is doing, how their week/month went, which exits make or lose money, or whether the stops are too tight. HONESTY CONTRACT, relay it: numbers are broker-CONFIRMED fills only; profit-taking exit paths can only ever close winners so their ~100% win rates are structural (never quote them as skill); and the disclosures line (collapsed re-decisions, excluded rejected attempts, externally-closed positions valued at the last mark) must be passed on, not hidden.",
+    schema: { type: "object", properties: {} },
+    async run(_i, _ctx) {
+      try {
+        const rec = require("./track-record").getTrackRecord();
+        const book = (rec.books && rec.books.intraday) || {};
+        const s = book.stats || {};
+        if (!s.trades) return "[trader_journal: no broker-confirmed round-trips in the ledger yet — say so honestly; nothing is being withheld, there is simply nothing booked.]";
+        const dd = book.maxDrawdown || {};
+        const ex = s.excursions || {};
+        const money = (n) => (typeof n === "number" ? `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}` : "n/a");
+        const reasons = Object.entries(book.byReason || {})
+          .sort((a, b) => b[1].trades - a[1].trades)
+          .map(([k, r]) => `  ${k}: ${r.trades} trades, ${r.winRate}% win${r.profitOnly ? " (STRUCTURAL — this path only closes winners)" : ""}, ${money(r.pnl)}`)
+          .join("\n");
+        const d = book.disclosures || {};
+        return [
+          `Window: ${String(book.firstExitAt || "").slice(0, 10)} to ${String(book.lastExitAt || "").slice(0, 10)} - ${s.trades} confirmed round-trips.`,
+          `Realized: ${money(s.totalRealized)} - expectancy ${money(s.expectancy)}/trade - profit factor ${s.profitFactor === null ? "infinite" : s.profitFactor}.`,
+          `Max drawdown: ${money(-(dd.amount || 0))}${dd.peakDate ? ` (${dd.peakDate} to ${dd.troughDate})` : ""} — report this beside the profit, never after it.`,
+          `Win rate: ${s.winRate}% overall; ${s.riskExitWinRate}% over the ${s.riskExitTrades} exits that COULD have lost — the second number is the honest one.`,
+          ex.nMfe ? `Average excursion while open: +${ex.avgMfePct}% best / ${ex.avgMaePct}% worst (n=${ex.nMfe}).` : "Excursion (MFE/MAE) data is still accruing — do not invent it.",
+          `Exit paths:\n${reasons}`,
+          `Disclosures: ${d.duplicateExitsCollapsed || 0} re-decision rows collapsed, ${d.failedAttemptsExcluded || 0} broker-rejected attempts excluded (they realized nothing), ${d.estimatedTrades || 0} external closes valued at the last observed mark.`,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[trader_journal error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_skips: {
+    policy: "read", // operator-only (no guest_safe): the account's own decision log
+    desc: "Read the SKIP LOG — every opportunity the autopilot DECLINED and why, grouped by decline reason with counts and how many distinct symbols each touched (numbers in a reason are normalized, so '81% > cap 80%' and '83% > cap 80%' are one family). Use when the user asks why the trader isn't trading, why it passed on a symbol, or what its risk rules are actually blocking — most 'it isn't working' is the trader correctly declining. These are COUNTS ONLY: never imply a skipped trade would have made or lost money, because it was never priced.",
+    schema: { type: "object", properties: {} },
+    async run(_i, _ctx) {
+      try {
+        const sk = require("./trader-scorecard").breakdown("skip");
+        const groups = Object.entries(sk.groups || {});
+        if (!groups.length) return "[trader_skips: the skip log is empty — nothing has been declined in the recorded window.]";
+        // Grouping normalizes digits to '#' so "81% > cap 80%" and "83% > cap 80%"
+        // collapse into one family; render that as N so the reason reads as English.
+        const rows = groups.slice(0, 12)
+          .map(([k, g]) => `  ${g.count}x - ${String(k).replace(/#/g, "N")} (${g.symbols} symbol${g.symbols === 1 ? "" : "s"})`)
+          .join("\n");
+        return `The autopilot declined ${sk.totalSkips} opportunities in the recorded window:\n${rows}\n(Counts only — a declined trade was never priced, so no P&L can be claimed for it either way.)`;
+      } catch (e) {
+        return `[trader_skips error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alerts: {
+    policy: "read", // operator-only (no guest_safe): the user's own rules + fired feed
+    desc: "List the user's watchlist alert RULES (symbol, condition, quiet window, enabled) and the most recent alerts that have FIRED. Rule types: 'signal' (the engine emitted bullish/bearish), 'zone' (price came within a chosen % of the computed support/resistance), 'washout' (the engine's ENTER verdict). Use when the user asks what alerts they have set, whether anything fired, or why they did or did not get told about a move.",
+    schema: { type: "object", properties: { limit: { type: "number", description: "how many fired alerts to show (default 10, max 50)" } } },
+    async run(i, ctx) {
+      try {
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rules = store.listRules(uid);
+        const feed = store.readFeed(uid, Math.min(Math.max(Number(i && i.limit) || 10, 1), 50));
+        const rl = rules.length
+          ? rules.map((r) => {
+            const when = r.type === "signal" ? `${String(r.direction || "any").toLowerCase()} signal`
+              : r.type === "zone" ? `within ${r.proximityPct}% of ${r.zone}`
+                : "washout confirmed (ENTER verdict)";
+            return `  ${r.symbol}: ${when} - ${r.cooldownMin}min quiet${r.enabled === false ? " - DISABLED" : ""} (id ${r.id})`;
+          }).join("\n")
+          : "  (none set)";
+        const fl = feed.length
+          ? feed.map((a) => `  ${String(a.ts).slice(0, 16).replace("T", " ")} - ${a.message}`).join("\n")
+          : "  (nothing has fired yet)";
+        return `Alert rules (${rules.length} of ${store.MAX_RULES_PER_USER}):\n${rl}\n\nRecently fired:\n${fl}`;
+      } catch (e) {
+        return `[trader_alerts error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_create: {
+    policy: "action", // creates a per-user alert rule — reversible, touches no money
+    desc: "Create a watchlist alert rule for the user. Types: 'signal' (fires when the engine emits a direction — set direction BULLISH/BEARISH/ANY), 'zone' (fires when price comes within proximityPct of the computed support or resistance), 'washout' (fires on the engine's ENTER verdict). cooldownMin is the quiet window after it fires (5-1440, default 60). This places NO orders and moves no money — it only asks to be told when something happens. Confirm the symbol and condition back to the user in plain words after creating it.",
+    schema: {
+      type: "object",
+      required: ["symbol", "type"],
+      properties: {
+        symbol: { type: "string", description: "ticker, e.g. SPY" },
+        type: { type: "string", enum: ["signal", "zone", "washout"], description: "rule type" },
+        direction: { type: "string", enum: ["BULLISH", "BEARISH", "ANY"], description: "signal rules only (default ANY)" },
+        zone: { type: "string", enum: ["support", "resistance"], description: "zone rules only (default support)" },
+        proximityPct: { type: "number", description: "zone rules only: how close, in % (0.1-5, default 0.5)" },
+        cooldownMin: { type: "number", description: "quiet window in minutes after firing (5-1440, default 60)" },
+      },
+    },
+    async run(i, ctx) {
+      try {
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const r = store.saveRule(uid, i || {});
+        if (!r.ok) return `[trader_alert_create refused: ${r.error}${r.cap ? ` (limit ${r.cap} rules)` : ""} — relay the refusal honestly, do not retry blindly.]`;
+        const w = r.rule.type === "signal" ? `a ${String(r.rule.direction).toLowerCase()} signal`
+          : r.rule.type === "zone" ? `price within ${r.rule.proximityPct}% of ${r.rule.zone}`
+            : "a confirmed washout (ENTER verdict)";
+        return `Alert created: ${r.rule.symbol} — ${w}, quiet for ${r.rule.cooldownMin} minutes after it fires (id ${r.rule.id}). It is evaluated on the live scan; nothing is traded by it.`;
+      } catch (e) {
+        return `[trader_alert_create error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_delete: {
+    policy: "action", // removes one of the user's own rules — reversible, no money
+    desc: "Delete one of the user's alert rules by its id (get ids from trader_alerts). Removes only the rule — no positions, orders, or money are touched.",
+    schema: { type: "object", required: ["id"], properties: { id: { type: "string", description: "the rule id from trader_alerts" } } },
+    async run(i, ctx) {
+      try {
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const ok = store.deleteRule(uid, (i && i.id) || "");
+        return ok ? `Alert rule ${i.id} deleted.` : `[trader_alert_delete: no rule with id ${i && i.id} — list them with trader_alerts rather than guessing.]`;
+      } catch (e) {
+        return `[trader_alert_delete error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_pause: {
+    policy: "action", // ONE-WAY safety switch: can stop the autopilot, never start it
+    desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. This is deliberately ONE-WAY: it can stop the machine but cannot start or arm it (arming is a gated action in Settings, never something a conversation can do). Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (before === "off") return "The autopilot is already OFF — it is opening and closing nothing. Existing positions and their broker stops are unchanged and remain yours to manage.";
+        if (!traderMode.set(uid, "off")) return "[trader_pause: the mode switch refused the change — report the failure honestly rather than claiming it stopped.]";
+        return `Autopilot PAUSED (was: ${before}). It will open no new positions and will not close anything further; this takes effect on the next scan, within about a minute. Open positions and their broker-side protective stops stay in place and are now yours to manage. Restarting it is a deliberate action in Settings — chat can stop the trader but cannot start it.`;
+      } catch (e) {
+        return `[trader_pause error: ${e.message}]`;
+      }
+    },
+  },
 };
 
 const TOOL_NAMES = Object.keys(REGISTRY);
