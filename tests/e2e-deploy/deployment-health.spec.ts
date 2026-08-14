@@ -74,15 +74,45 @@ test.describe('providers — the outage this suite exists for', () => {
     expect(body.summary?.total).toBe(Object.keys(providers).length);
   });
 
-  liveOnly('at least one provider is actually usable — chat has a model', async ({ request }) => {
-    // The outage in one assertion. Zero available providers means every chat
-    // turn falls through to the offline reply, which is indistinguishable to a
-    // user from the product being broken.
+  liveOnly('at least one provider is configured', async ({ request }) => {
+    // Necessary but NOT sufficient — see the dispatch test below.
     const body = await getJson(request, '/api/providers/status');
     const usable = Object.entries(body.providers || {})
       .filter(([, p]: [string, any]) => p.available === true)
       .map(([name]) => name);
     expect(usable.length, `no provider is available — chat cannot answer. summary=${JSON.stringify(body.summary)}`).toBeGreaterThan(0);
+  });
+
+  liveOnly('chat actually ANSWERS — a real turn reaches a real model', async ({ request }) => {
+    // The assertion that matters, and the one the first draft of this suite was
+    // missing. `available: true` is the registry's OPINION of its own config; it
+    // is not evidence that a model answered.
+    //
+    // Caught live on 2026-08-14: with Vertex env set, /api/providers/status
+    // reported gemini available=true and this suite would have called the
+    // deployment healthy — while every real turn 403'd (BILLING_DISABLED, the
+    // billing account was closed) and fell through to the offline reply. A
+    // config-shaped check cannot see that. Only a turn can.
+    const res = await request.post('/api/dream/chat/stream', {
+      data: { message: 'Reply with exactly: deployment ok', history: [] },
+      timeout: 90_000,
+    });
+    expect(res.status(), 'the chat endpoint must accept the turn').toBe(200);
+    const body = await res.text();
+
+    // The server streams SSE; a real answer produces token events.
+    expect(body, 'the stream should contain token events').toContain('"type":"token"');
+    const spoken = [...body.matchAll(/"type":"token","text":"((?:[^"\\]|\\.)*)"/g)]
+      .map((m) => m[1].replace(/\\"/g, '"').replace(/\\n/g, '\n'))
+      .join('');
+    expect(spoken.trim().length, 'the model should say something').toBeGreaterThan(0);
+
+    // The offline fallback is a 200 with tokens too — it is the product telling
+    // the user it has no model. Treat it as the failure it is.
+    expect(
+      spoken,
+      `chat fell through to the OFFLINE FALLBACK — no model answered. Check /api/providers/status and the service journal for provider errors (e.g. gemini_status_403). Reply was: ${spoken.slice(0, 200)}`
+    ).not.toMatch(/no local model is running|No model is available right now/i);
   });
 });
 
