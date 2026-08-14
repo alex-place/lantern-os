@@ -1,6 +1,6 @@
 {
   "name": "lantern-os",
-  "version": "1.15.2",
+  "version": "1.15.3",
   "private": true,
   "main": "index.js",
   "description": "Lantern OS ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â Dream Journal",
@@ -25,7 +25,8 @@
     "test:greenpath": "playwright test --config tests/playwright-greenpath.config.ts",
     "creator-intelligence": "node scripts/creator-intelligence-loop.js --forever",
     "lint:consolidate": "node scripts/consolidation-lint.js",
-    "lint:consolidate:json": "node scripts/consolidation-lint.js --json"
+    "lint:consolidate:json": "node scripts/consolidation-lint.js --json",
+    "test:deploy": "playwright test --config tests/playwright-deploy.config.ts"
   },
   "engines": {
     "node": ">=20"

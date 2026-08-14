@@ -46,11 +46,74 @@ const FAMILY = {
   TLT: ['TLT', 1], TBT: ['TLT', -1], TBF: ['TLT', -1],
 };
 
+// ── RISK BUCKETS (2026-08-13) ────────────────────────────────────────────────
+// The concurrency cap counts SYMBOLS, but risk is carried by DIRECTION. On
+// 2026-08-13 the book held SOXS, SQQQ and SPXS simultaneously — three different
+// families, so the direction-lock (which only blocks OPPOSING exposure) allowed
+// all three, and the cap counted them as three independent slots. They are one
+// bet: "the market falls", held in triplicate. The market rallied and all three
+// lost together (-5.1%, -3.0%, -1.4%).
+//
+// There is a structural reason this recurs: IBS buys whatever sits at the bottom
+// of its session range, and in a rally that is ALWAYS the inverse ETFs. So the
+// engine drifts into concentrated short exposure precisely when it is most
+// wrong. Bucketing makes that exposure countable.
+//
+// Equity-correlated families collapse to equity_long / equity_short. Precious
+// metals move together and get their own bucket. Everything else (bonds, an
+// unknown symbol) is its own bucket — correlation we cannot assert, we do not.
+const EQUITY_FAMILIES = new Set([
+  'SPY', 'QQQ', 'IWM', 'SOX', 'DIA',                                  // broad + semis
+  'XLK', 'XLF', 'XLE', 'XLV', 'XLI', 'XLU', 'XLY', 'XLP',             // sectors
+  'EEM', 'EFA',                                                        // international
+]);
+const METALS = new Set(['GLD', 'SLV', 'GDX']);
+
+/** Which correlated risk bucket an instrument belongs to. */
+function riskBucket(sym) {
+  const { family, sign } = instrumentSign(sym);
+  if (METALS.has(family)) return 'metals';
+  if (EQUITY_FAMILIES.has(family)) return sign < 0 ? 'equity_short' : 'equity_long';
+  return family;                                    // bonds, unknowns: own bucket
+}
+
+/** Count of REAL positions per risk bucket. Dust is excluded for the same reason
+ *  familyExposure excludes it: an untradeable stub is not exposure. */
+function bucketCounts(positions) {
+  const out = {};
+  for (const p of (positions || [])) {
+    if (Math.abs(Number(p.qty) || 0) < 1) continue;
+    const b = riskBucket(p.symbol);
+    out[b] = (out[b] || 0) + 1;
+  }
+  return out;
+}
+
 /** { family, sign } for an instrument; unknowns are their own +1 family. */
 function instrumentSign(sym) {
   const s = String(sym || '').toUpperCase();
   const hit = FAMILY[s];
   return hit ? { family: hit[0], sign: hit[1] } : { family: s, sign: 1 };
+}
+
+// The 1x instrument that carries each family's ACTUAL market signal. A levered
+// or inverse wrapper is a derivative of this price series; any market-semantic
+// computation (washout, regime, trend) done on the wrapper's own bars is either
+// amplified or MIRRORED. The mirror case is the dangerous one: a -3x wrapper's
+// session low is the underlying's session high, so "SOXS washed out" read off
+// SOXS bars means "semis at their session HIGH" (#3295 — measured at the fire
+// moments: median underlying IBS 0.90, 94% in the top third, 0% actually washed
+// out). The same class of bug was hit before in the lab: regime derived from
+// SQQQ's own SMA-200 inverted the gate and "silently made every inverse-ETF
+// result meaningless" (spy_engine_backtest.js header).
+const FAMILY_PROXY = {
+  SPY: 'SPY', QQQ: 'QQQ', IWM: 'IWM', SOX: 'SMH', DIA: 'DIA', GLD: 'GLD', TLT: 'TLT',
+};
+
+/** The 1x proxy whose bars carry the family's market signal (null if unknown). */
+function underlyingProxy(sym) {
+  const { family } = instrumentSign(sym);
+  return FAMILY_PROXY[family] || null;
 }
 
 /** Net direction per family from live positions: { FAMILY: -1|1 } (0 net → absent).
@@ -89,4 +152,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, instrumentSign, familyExposure, conflicts };
+module.exports = { FAMILY, instrumentSign, underlyingProxy, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };

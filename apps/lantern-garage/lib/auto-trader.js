@@ -34,6 +34,35 @@ function logTrade(rec) {
       ...rec,
     }) + '\n');
   } catch (_e) { /* logging must never break trading */ }
+  // Converge stage (#3286). Every entry is a falsifiable claim and every exit is
+  // the market's answer, so the pair belongs in the convergence store — which sat
+  // at 0 bytes while the trader took 118 entries over 24 sessions. Hooked HERE, at
+  // the single ledger write point, so no path can bypass it: the reconstructed
+  // `closed_externally` exits are graded too, and a future exit site inherits it.
+  // Fire-and-forget by design — a record must never delay or break a trade.
+  try {
+    if (rec && (rec.event === 'entry' || rec.event === 'exit')) {
+      const tc = require('./trader-convergence');
+      const p = rec.event === 'entry' ? tc.recordEntryHypothesis(rec) : tc.recordExitOutcome(rec);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  } catch (_e) { /* convergence emission is best-effort, always */ }
+  // A CONFIRMED exit explains the position leaving the book, so the flat reading
+  // is no longer suspect (#3282). Hooked here, at the single ledger write point,
+  // so no exit path can miss it.
+  //
+  // ONLY A REAL FILL COUNTS. A `reconstructed` row is itself INFERRED from the
+  // same absence the veto exists to distrust — letting it clear the veto would
+  // be circular, and would defeat the fix precisely in the dropout case: the
+  // sweep would invent an exit, that invention would license a fresh entry, and
+  // the position would double exactly as it did on 2026-08-13. An estimate
+  // cannot corroborate itself.
+  try {
+    if (rec && rec.event === 'exit' && rec.symbol
+      && (rec.status === 'filled' || rec.source === 'fill')) {
+      _lastConfirmedHold.delete(String(rec.symbol).toUpperCase());
+    }
+  } catch (_e) { /* never break logging */ }
 }
 
 /**
@@ -191,6 +220,9 @@ function cfg() {
     dustPct: n('TRADER_DUST_PCT', 0.1),
     // Minimum reward:risk, measured against the FLOORED stop. 0 disables.
     minEntryRr: n('TRADER_MIN_ENTRY_RR', 1),
+    // Max simultaneous positions sharing ONE correlated risk bucket
+    // (equity_long / equity_short / metals / per-symbol). 0 disables.
+    maxPerBucket: n('TRADER_MAX_PER_BUCKET', 0),
     // Trail past R2 instead of selling AT it (lab 2026-08-08, Monday-config
     // gate: OOS +0.733%/trade vs +0.328 selling at R2, both windows, WR flat).
     // A mark through R2 upgrades the runner to a ratcheting floor at
@@ -375,6 +407,53 @@ function _noteStopFill(ts) {
 function _breakerTripped(now, k) {
   return k > 0 && _stopFillsDay === _etDate(now) && _stopFillsCount >= k;
 }
+// STOP ATTRIBUTION THRESHOLD (#3281). A position that leaves the book outside our
+// own exit path is reported only as an absence — "protective stop, manual close,
+// or another engine" — so a stop-out arriving that way armed neither counter
+// above. Treat the close as a stop when it gave up at least this fraction of its
+// stop distance. 0.9 covers the real case (SQQQ left at -2.88% against a 3% stop,
+// 96%) with room for the mark lagging the trigger tick, while still ignoring an
+// ordinary small-loss exit.
+//
+// Read per call, like cfg(), so the lab can sweep it without a reload. <= 0
+// disables attribution entirely and restores the pre-#3281 behaviour — note the
+// explicit > 0 guard at the use site: a bare `loss <= -(pct * 0)` is `loss <= 0`,
+// which attributes EVERY loss. That inversion is the whole reason the check is
+// spelled out rather than folded into the arithmetic.
+// LAST CONFIRMED HOLDING (#3282). sym -> ms when the broker last reported a
+// non-zero position in it.
+//
+// The `already long` guard trusts a single position snapshot. On 2026-08-13 the
+// feed dropped SOXS for two scans — 11:13 held, 11:14 and 11:15 ABSENT, 11:16
+// held again — with no exit of any kind on record. During the gap the engine
+// evaluated SOXS as a fresh candidate and opened a full-size tier-A+ entry on
+// top of the 1,490 shares it already had, taking the position to 3,057.8: twice
+// the intended maximum, behind a stop sized for part of it. It happened to earn
+// +$4,218; a double-size loss was equally available.
+//
+// A position leaving the book is normally EXPLAINED — our exit fills, or the
+// external-close sweep reconstructs one. An absence with no exit row at all is
+// the dropout signature, so this map is cleared by any exit row for the symbol
+// (see logTrade) and otherwise stands as the reason to distrust a flat reading.
+const _lastConfirmedHold = new Map();
+// How long a confirmed holding keeps vetoing an unexplained flat reading. Long
+// enough to cover a real dropout (the live one lasted 3.5 minutes), short enough
+// that a symbol can never be barred indefinitely by stale state.
+function _flatConfirmMs() {
+  const raw = process.env.TRADER_FLAT_CONFIRM_SEC;
+  if (raw == null || String(raw).trim() === '') return 600000;   // 10 min
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v * 1000 : 600000;
+}
+function _stopAttribFrac() {
+  const raw = process.env.TRADER_STOP_ATTRIB_FRAC;
+  // An EMPTY value means "unset", not 0. `Number('')` is 0, so a stray
+  // `TRADER_STOP_ATTRIB_FRAC=` line in .env would otherwise silently switch a
+  // tail defense off — the same silent-inert failure this whole fix is about.
+  if (raw == null || String(raw).trim() === '') return 0.9;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : 0.9;
+}
 function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
 function _nextTradingDates(dateStr, n) {
   // dateStr + n trading days (weekend-skipping; holidays just widen the block,
@@ -483,6 +562,9 @@ function _saveState() {
       stopDistPct: Object.fromEntries(_stopDistPct),
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
+      // A restart DURING a dropout must not hand back a clean slate and let the
+      // doubling through on the next scan (#3282).
+      lastConfirmedHold: Object.fromEntries(_lastConfirmedHold),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -507,6 +589,10 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
+    for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
+      const t = Number(v);
+      if (Number.isFinite(t)) _lastConfirmedHold.set(k, t);
+    }
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -589,7 +675,7 @@ async function closeLong(bridge, userId, sym, qty, hp, reason, out, now, { exten
  *      momentum is dying / about to die" before the full bearish signal would fire.
  * Closed symbols are removed from `heldQty` so the entry loop doesn't re-touch them.
  */
-async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set() }) {
+async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended = false, workingSells = new Set(), exclude = new Set(), protectiveOnly = false }) {
   // SUB-SHARE DUST NEVER EXITS (2026-08-10). A fractional-only order can never
   // fill on this API — the 0.8-share SOXS split remnant sprayed 3 error orders
   // at IBKR after EVERY restart (the failure-freeze is per-process-lifecycle in
@@ -737,7 +823,10 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
         const e9 = ema9[ema9.length - 1];
         const last = closes[closes.length - 1];
         const r = rsi(closes);
-        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55)) {
+        // protectiveOnly (extended hours): momentum_died is a SIGNAL read, and
+        // MACD/EMA/RSI over thin pre-market bars is noise — never dump a
+        // position on it outside regular hours.
+        if (m && m.histogram < 0 && last < e9 && (r == null || r < 55) && !protectiveOnly) {
           await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
           delete heldQty[sym]; continue;
         }
@@ -791,12 +880,35 @@ async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended =
  * @param {object} deps   { bridge, userId, now?, caps? }
  * @returns {Promise<{executed:Array, skipped:Array, enabled:boolean, reason?:string}>}
  */
+/**
+ * EXTENDED-HOURS PROTECTIVE MODE (`protectiveOnly`, 2026-08-12).
+ *
+ * Between 16:00 and 09:30 the scan loop is idle, so a winner's trailing floor is
+ * never evaluated: on 2026-08-12 SOXS sat at +$3,617 exactly on its R2 target,
+ * riding a trail that could not ratchet, and gave back into the after-hours
+ * session with nothing but the -3% GTC stop underneath it. 17.5 hours of every
+ * weekday the book was unmanaged.
+ *
+ * This mode runs the loop in pre/after-hours for MANAGEMENT ONLY:
+ *   - NO entries. IBS is a position-within-session-range signal and the extended
+ *     session has almost no range, so the signal is undefined there, and nothing
+ *     in the lab covers extended-hours entries.
+ *   - Only PRICE-THRESHOLD exits: r2_trail, zone floors, peak_giveback,
+ *     trailing_stop, targets, max_loss. Each protects a gain or caps a loss at a
+ *     level decided during regular hours.
+ *   - NO signal-derived exits (momentum_died, the bearish signal_exit): a read
+ *     computed off three thin pre-market bars is noise, and acting on it would
+ *     dump a six-figure position into a wide spread.
+ *
+ * Orders still route as marketable LIMIT + outsideRth (closeLong's `extended`
+ * path), never naked market orders into a thin book.
+ */
 async function runAutoTrade(scan, opts = {}) {
   const prev = _actingUser;
   _actingUser = (opts && opts.userId) || null;
   try { return await _runAutoTradeInner(scan, opts); } finally { _actingUser = prev; }
 }
-async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [] } = {}) {
+async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [], protectiveOnly = false } = {}) {
   // Position partitioning: symbols owned by ANOTHER engine (the overnight sleeve book)
   // are completely off-limits — no exits, no re-protect stops, no signal-sells, no
   // entries. Each engine manages only its own positions; the caller (trading.js)
@@ -816,20 +928,46 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // scan even when there are no new ENTER signals.
   const account = await bridge.getIBKRAccount(userId).catch(() => null);
   if (!account || !(account.equity > 0)) { out.reason = 'account/equity unavailable'; return out; }
-  const positions = await bridge.getIBKRPositions(userId).catch(() => []);
+  // null = the FETCH FAILED (never [] — "the call errored" and "you hold nothing"
+  // are opposite facts, and collapsing them made an API error read as a flat book).
+  const positions = await bridge.getIBKRPositions(userId).catch(() => null);
+  const _positionsOk = Array.isArray(positions);
+  // NEVER TRADE BLIND. Without a readable book the engine sees no holdings, so the
+  // entry loop's `already long` guard cannot fire and it would happily re-buy a
+  // symbol it is already carrying. Same contract as the account fetch above: no
+  // broker truth, no orders. Exits are skipped too — the broker-side protective
+  // stops are what guard the book in this state.
+  if (!_positionsOk) { out.reason = 'positions unavailable — standing down this scan (never trade blind)'; return out; }
   const heldQty = {};
   const heldPos = {}; // full position (for realized-P&L logging on exit)
   let _openedThisScan = 0;   // entries placed during THIS scan (heldPos is a start-of-scan snapshot)
+  const _bucketOpenedThisScan = {};   // correlated-risk bucket -> entries placed this scan
   let _grossThisScan = 0;    // notional placed during THIS scan — the gross brake has the same
                              // start-of-scan-snapshot blind spot the concurrency cap had
                              // (2026-08-07): without it, two same-scan entries each compared
                              // against the stale pre-scan gross and stacked past the cap
                              // (probed to 126% of budget; audit 2026-08-08).
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+  // Every symbol the broker CONFIRMS we hold refreshes its timestamp (#3282). If
+  // one later vanishes with no exit row to explain it, this is what tells the
+  // entry gate the flat reading is a feed dropout rather than an opportunity.
+  for (const [k, q] of Object.entries(heldQty)) if (Math.abs(q) > 0) _lastConfirmedHold.set(k, now);
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
+  // OWNERSHIP FILTER (2026-08-13). heldPos is EVERY position in the account,
+  // including other books' (champion holds XMMO/SPMO, the overnight sleeve holds
+  // its own). Snapshotting them made the sweep below "reconstruct" their exits as
+  // ours: on 2026-08-13 it logged SPMO -$199 and XMMO -$107 into the day-trader's
+  // ledger. Only track symbols this engine actually scans — the scan's own signal
+  // set is that list — plus anything we already have engine state for (ladder /
+  // entry timestamp), so a position opened before a restart is still reconciled.
+  const _ourSyms = new Set([
+    ...signals.map((x) => String(x && x.symbol || '').toUpperCase()),
+    ..._zoneLadder.keys(), ..._entryAt.keys(),
+  ].filter(Boolean));
   for (const [k, p] of Object.entries(heldPos)) {
     if (!(Number(heldQty[k]) > 0)) continue;
+    if (_ourSyms.size && !_ourSyms.has(k)) continue;   // another engine's position
     _lastPos.set(k, {
       qty: Number(p.qty) || 0,
       entry: p.avg_entry_price ?? p.avg_fill_price ?? null,
@@ -858,7 +996,26 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // is marked status:'reconstructed' + estimated:true and is deliberately excluded
   // from the scorecard's `confirmed` view. An estimate that is labelled beats a loss
   // that is silently dropped.
-  for (const sym of [..._lastPos.keys()]) {
+  // TRUST GUARD (2026-08-13). This sweep infers "closed" from ABSENCE, so it is
+  // only as sound as the snapshot. Two ways the snapshot lies:
+  //   (a) the fetch failed — now null, never an empty array;
+  //   (b) IBKR returned an EMPTY/partial book at the open. Observed live on
+  //       2026-08-13 09:30: every tracked position vanished for one cycle and the
+  //       sweep invented four exits (SOXS double-counted at +$4,174 on top of its
+  //       real +$2,740 fill; SQQQ "closed" while 1,566 shares were still held),
+  //       inflating the day's ledger to +$7,305 against a broker equity that had
+  //       FALLEN $4,634.
+  // Absence is only evidence of a close when we can see the rest of the book. A
+  // genuine simultaneous multi-symbol external close is vanishingly rare — real
+  // stop fills arrive through _reconcileFills, which runs first and marks them.
+  const _vanished = [..._lastPos.keys()].filter((k) => !(Number(heldQty[k]) > 0));
+  const _snapshotSuspect = !_positionsOk
+    || (positions.length === 0 && _lastPos.size > 0)
+    || (_vanished.length >= 3 && _vanished.length > positions.length);
+  if (_snapshotSuspect && _vanished.length) {
+    out.skipped.push({ symbol: '*', why: `external-close sweep deferred: ${_vanished.length} position(s) absent from a ${_positionsOk ? positions.length + '-row' : 'FAILED'} snapshot — treating as unreadable, not closed` });
+  }
+  for (const sym of (_snapshotSuspect ? [] : [..._lastPos.keys()])) {
     if (Number(heldQty[sym]) > 0) continue;           // still held → nothing to reconcile
     if (exclude.has(sym)) { _lastPos.delete(sym); continue; }  // another engine owns it
     const snap = _lastPos.get(sym) || {};
@@ -878,13 +1035,44 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const qty = Number(snap.qty);
     if (!(qty > 0) || !Number.isFinite(entry) || !Number.isFinite(mark)) continue;  // can't value it → don't invent a number
     const pnl = _round2((mark - entry) * qty);
+    const _lossPct = entry > 0 ? ((mark - entry) / entry) * 100 : 0;
+    // ── STOP ATTRIBUTION (#3281) ─────────────────────────────────────────────
+    // The tail-defense counters — the per-symbol re-entry cooldown and the daily
+    // circuit breaker — armed ONLY in _reconcileFills, which needs a broker stop
+    // fill it can see. A stop-out that surfaces here instead, as an absence, armed
+    // nothing. Live 2026-08-13: SQQQ stopped out at 10:29:35 for -$1,674.06 and was
+    // re-entered at 10:29:38 — three seconds — and the day ended with
+    // stopCooldownThrough {} and stopFills {day:null,count:0} after a real stop
+    // fired. Both defenses were inert all session.
+    //
+    // We cannot KNOW this was the stop; the reason string says so ("protective
+    // stop, manual close, or another engine"). But a position that left the book
+    // having given up essentially its whole stop distance is a stop-out for every
+    // purpose these two counters exist to serve, whoever pulled the trigger.
+    // SQQQ left at -2.88% against a 3% stop — 96% of the distance.
+    //
+    // Deliberately asymmetric: arming costs one symbol one day of re-entry, while
+    // NOT arming costs an immediate re-entry into the position that just stopped.
+    const _attribFrac = _stopAttribFrac();
+    const _stopPct = Number(_stopDistPct.get(sym)) || cfg().stopMinPct || 0;
+    const _looksLikeStop = _attribFrac > 0 && _stopPct > 0
+      && _lossPct <= -(_stopPct * _attribFrac);
     logTrade({
       event: 'exit', symbol: sym, qty, entry, exit: mark,
-      pnl, pnl_pct: entry > 0 ? ((mark - entry) / entry) * 100 : null,
+      pnl, pnl_pct: entry > 0 ? _lossPct : null,
       reason: 'closed_externally (position left the book with no autopilot exit — protective stop, manual close, or another engine)',
       status: 'reconstructed', estimated: true,
+      // Auditable: why this close was (or was not) treated as a stop-out.
+      stop_attributed: _looksLikeStop,
+      stop_dist_pct: _stopPct || null,
       ...fillLedger.excursionFields(entry, _peak.get(sym), _trough.get(sym), _stopDistPct.get(sym)),
     });
+    if (_looksLikeStop) {
+      const _cdDays = cfg().stopCooldownDays;
+      if (_cdDays > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(now), _cdDays));
+      _noteStopFill(now);        // feeds the daily circuit breaker
+      _saveState();              // survive a restart between the stop and the re-entry
+    }
   }
 
   // Fetch the account's working orders ONCE. Two uses: (1) re-protect naked longs, and
@@ -893,7 +1081,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // stack another sell on those, so a lagging position snapshot can't make the loop sell
   // `held` again and blow through flat into a short. Survives restarts (broker-side state),
   // unlike the in-memory cooldown. Excludes protective STP sells (every long has one).
-  const _openOrders = _ordersEarly;
+  let _openOrders = _ordersEarly;
   const workingSells = new Set((_openOrders || [])
     .filter((o) => /sell/i.test(o.side || '') && !/stp|stop/i.test(o.orderType || '') && /submit|pending|presubmit|working|needs?[_-]?confirm|accepted/i.test(o.status || ''))
     .map((o) => String(o.symbol || '').toUpperCase()));
@@ -987,6 +1175,23 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   //    stop was consumed/cancelled while the position stayed open) gets a fresh GTC
   //    SELL STP. Runs every scan so a long is never left unprotected. ──
   try {
+    // EMPTY ORDERS != NO STOPS (2026-08-12). Every re-protect decision below reads
+    // ONE orders fetch. IBKR's CPAPI intermittently answers /iserver/account/orders
+    // with an empty array (cold endpoint, session re-auth, maintenance window) —
+    // and an empty list makes hasStop() false for EVERY symbol, so the pass
+    // concludes the whole book is naked and stacks a duplicate GTC stop on each
+    // position. That is precisely the mechanism behind the 2026-07-27 incident
+    // (488 resting stop-sells, 95,561 shares against 3,772 held). The correct
+    // reading of "no orders came back while positions exist" is UNKNOWN, not
+    // UNPROTECTED: skip the pass and re-check next scan (~60s), by which point
+    // the fetch has recovered. A genuinely naked position stays naked one extra
+    // scan; a duplicate stop is an oversell that can flip the account short.
+    // A truly empty book (no positions) is unambiguous and still passes through.
+    const _heldCount = Object.values(heldPos).filter((p) => (Number(p.qty) || 0) > 0).length;
+    const _ordersUnknown = _heldCount > 0 && (!Array.isArray(_openOrders) || _openOrders.length === 0);
+    if (_ordersUnknown) {
+      (out.skipped = out.skipped || []).push({ symbol: '*', why: `re-protect deferred: broker returned 0 orders while holding ${_heldCount} position(s) — treating as UNKNOWN, not unprotected` });
+    }
     // Status vocabulary: this guard originally matched only IBKR's NATIVE words
     // (PreSubmitted/Submitted/Pending), but the normalized order shape the bridge and
     // Alpaca return says 'open' / 'accepted' / 'new'. So hasStop() never matched, the
@@ -1020,7 +1225,46 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
       /inactive|reject|needs?[_-]?confirm/i.test(o.status || '')).length;
+    // STOP-SIZE RECONCILIATION (2026-08-13). hasStop() asks "is there a stop?"
+    // but never "is it the RIGHT SIZE?". After a partial exit the original stop
+    // keeps its old quantity: live today GLD held 66 shares behind a 147-share
+    // stop. Had it triggered it would have sold 81 shares we do not own — an
+    // oversell opening an unintended SHORT, or (per IBKR's oversell protection,
+    // seen on the QQQ race this morning) an outright rejection leaving the
+    // position naked. Both unacceptable.
+    //
+    // A stop whose size does not match the position is not protection. Cancel it
+    // here; the pass below then places a correctly-sized one. The failure cap is
+    // untouched: a deliberate cancel is lifecycle, not a failed placement
+    // (2026-08-12 hardening).
+    const _stopQtyFor = (sym) => (_openOrders || [])
+      .filter((o) => String(o.symbol || '').toUpperCase() === sym
+        && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
+        && /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''))
+      .reduce((a, o) => a + (Number(o.qty) || 0), 0);
+    if (!_ordersUnknown) {
+      for (const [sym, p] of Object.entries(heldPos)) {
+        if (exclude.has(sym)) continue;
+        const _held = Math.abs(Number(p.qty) || 0);
+        if (_held < 1) continue;                  // dust cannot carry a stop at all
+        const _stopQty = _stopQtyFor(sym);
+        const _want = Math.floor(_held);          // whole-share stops (2026-08-10)
+        if (_stopQty > 0 && _stopQty !== _want) {
+          await cancelRestingStops(bridge, userId, sym);
+          (out.stopResized = out.stopResized || []).push({ symbol: sym, was: _stopQty, want: _want });
+          logTrade({ event: 'stop_resize', symbol: sym, stop_qty_was: _stopQty, held: _held, want: _want,
+            reason: _stopQty > _want ? 'oversized stop would oversell' : 'undersized stop leaves part of the position naked' });
+        }
+      }
+      // Re-read orders after any cancel, so the pass below does not still see the
+      // stop it just removed and wrongly conclude the position is protected.
+      if ((out.stopResized || []).length) {
+        const _fresh = await bridge.getIBKROpenOrders(userId).catch(() => null);
+        if (Array.isArray(_fresh)) _openOrders = _fresh;
+      }
+    }
     for (const [sym, p] of Object.entries(heldPos)) {
+      if (_ordersUnknown) break;                  // orders fetch unreadable this scan — never re-protect blind
       if (exclude.has(sym)) continue;             // overnight-owned: its own engine protects/exits it
       const qty = Number(p.qty) || 0;
       if (qty > 0 && !hasStop(sym) && attemptsFor(sym) >= REPROTECT_MAX_ATTEMPTS) {
@@ -1054,7 +1298,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
   // ── Manage held longs on their own merits (trailing stop / take-profit / momentum
   //    death) — runs every scan, independent of new ENTER signals. This is what stops
   //    a winner from peaking and giving it all back. ──
-  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude }); } catch (_e) { /* fail-soft */ }
+  try { await manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, extended, workingSells, exclude, protectiveOnly }); } catch (_e) { /* fail-soft */ }
   // manageHeldExits updates every held position's peak; persist NOW so the common
   // early-return paths below (exits-only mode, no ENTER signals) don't drop it.
   _saveState();
@@ -1092,7 +1336,14 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     } catch (_e) { entryBars = {}; }
   }
 
-  for (const s of enters) {
+  // protectiveOnly (extended hours): manage what we hold, open nothing new.
+  // IBS is position-within-session-range; the extended session has almost no
+  // range, so the entry signal is undefined there and unbacked by any lab gate.
+  const _entryCandidates = protectiveOnly ? [] : enters;
+  if (protectiveOnly && enters.length) {
+    out.skipped.push({ symbol: '*', why: `extended hours: protective exits only — ${enters.length} entry signal(s) not taken` });
+  }
+  for (const s of _entryCandidates) {
     const sym = String(s.symbol).toUpperCase();
     const price = Number(s.entry_price) || 0;
     const held = heldQty[sym] || 0;
@@ -1129,6 +1380,11 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     //    and open an unintended short (this is what put JPM/META short). ──
     if (exclude.has(sym)) { out.skipped.push({ ...record, why: 'overnight-book position — managed by its own engine' }); continue; }
     if (!bullish) {
+      // protectiveOnly (extended hours): the bearish read driving signal_exit is
+      // computed off the same thin extended-session bars — skip it. Price
+      // thresholds (trail/floor/max-loss) in manageHeldExits still run, and the
+      // broker stop is untouched.
+      if (protectiveOnly) { out.skipped.push({ ...record, why: 'extended hours: protective exits only — signal exit suppressed' }); continue; }
       if (held >= 1) {
         // (held >= 1, not > 0: a sub-share split remnant can never fill a sell on
         // this API — same rule as manageHeldExits' dust guard, 2026-08-10.)
@@ -1182,6 +1438,29 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
     const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
     if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // UNEXPLAINED FLAT = FEED DROPOUT, NOT AN OPPORTUNITY (#3282).
+    //
+    // `already long` above trusts one position snapshot. On 2026-08-13 the feed
+    // dropped SOXS for two scans (11:13 held, 11:14 and 11:15 absent, 11:16 held)
+    // and wrote no exit row of any kind. In the gap this loop saw `held === 0`,
+    // treated SOXS as a fresh candidate, and opened a full-size tier-A+ entry on
+    // top of the 1,490 shares already there — 3,057.8 total, twice the intended
+    // maximum, behind a stop sized for part of it.
+    //
+    // A position genuinely leaving the book is EXPLAINED: our exit fills, or the
+    // external-close sweep reconstructs one. Either clears _lastConfirmedHold.
+    // A confirmed holding still sitting here means nothing explained the absence,
+    // so the flat reading is not evidence we can open against.
+    //
+    // Bounded by _flatConfirmMs so stale state can never bar a symbol forever.
+    {
+      const _confAt = _lastConfirmedHold.get(sym);
+      const _ttl = _flatConfirmMs();
+      if (!(held > 0) && _confAt && _ttl > 0 && (now - _confAt) <= _ttl) {
+        out.skipped.push({ ...record, why: `position feed shows flat but a holding was confirmed ${Math.round((now - _confAt) / 1000)}s ago with no exit on record — treating as a feed dropout, not a re-entry` });
+        continue;
+      }
+    }
     // DIRECTION LOCK (lib/direction-lock.js): an inverse ETF is an economic short on
     // its underlying — never open a position whose direction opposes existing family
     // exposure (e.g. buying SQQQ while long TQQQ/QQQ, or vice versa). Closing is never
@@ -1374,6 +1653,29 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         continue;
       }
     }
+    // CORRELATED-RISK CAP (2026-08-13). The concurrency cap counts SYMBOLS; risk
+    // is carried by DIRECTION. Live that day the book held SOXS + SQQQ + SPXS —
+    // three families, so the direction-lock (which only blocks OPPOSING
+    // exposure) permitted all three and the cap counted three independent slots.
+    // They were one bet, "the market falls", held in triplicate; the market
+    // rallied and they lost together for -$1,431 while a single position would
+    // have lost a third of that.
+    //
+    // Structural, not bad luck: IBS buys whatever sits at the bottom of its
+    // session range, and in a rally that is always the inverse ETFs — so the
+    // engine concentrates short exactly when it is most wrong. Counting by
+    // bucket bounds that. Positions opened THIS scan count too (same
+    // start-of-scan-snapshot blind spot the concurrency cap had).
+    if (c.maxPerBucket > 0) {
+      const { riskBucket, bucketCounts } = require('./direction-lock');
+      const _bucket = riskBucket(sym);
+      const _counts = bucketCounts(Object.values(heldPos));
+      const _inBucket = (_counts[_bucket] || 0) + (_bucketOpenedThisScan[_bucket] || 0);
+      if (_inBucket >= c.maxPerBucket) {
+        out.skipped.push({ ...record, why: `correlated-risk cap: ${_inBucket} position(s) already in '${_bucket}' (max ${c.maxPerBucket})` });
+        continue;
+      }
+    }
     if (c.maxGrossPct > 0 && c.maxGrossPct < 100) {
       const _gross = _grossThisScan + Object.values(heldPos).reduce((a, p) => a + Math.abs(Number(p.market_value) || (Number(p.qty) || 0) * (Number(p.current_price) || 0)), 0);
       const _budget = account.equity * (c.maxGrossPct / 100);
@@ -1464,7 +1766,8 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       console.warn(`[Trading] entry BLOCKED ${sym} x${qty} — ${r.status}: ${String(why).slice(0, 180)}`);
     }
     out.executed.push(exec);
-    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1; _grossThisScan += qty * price;
+    if (r && (r.status === 'placed' || r.status === 'dry_run')) { _lastOrderAt.set(sym, now); if (r.status === 'placed') { _entryAt.set(sym, now); opened += 1; _openedThisScan += 1;
+      try { const _b = require('./direction-lock').riskBucket(sym); _bucketOpenedThisScan[_b] = (_bucketOpenedThisScan[_b] || 0) + 1; } catch (_e) { /* bucketing is advisory */ } _grossThisScan += qty * price;
       // CSP SHADOW BOOK (#3219, observer only — never places orders): record the
       // paper cash-secured-put leg for this same signal, paired by symbol+ts.
       // Fire-and-forget: the chain fetch must never delay or break the scan.
@@ -1509,6 +1812,42 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       });
     }
   }
+  // ── SESSION RECORD (#3286) ─────────────────────────────────────────────────
+  // One row per trading day, at/after the close. The ledger held every trade but
+  // nothing held the SESSION — no closing equity anywhere — so verifying a day's
+  // P&L meant reconstructing yesterday's equity from bar closes. That
+  // reconstruction is what exposed #3283; the check that should have caught it
+  // years earlier, equity(today) − equity(yesterday), was simply unanswerable.
+  //
+  // Written from the same computeDayPnl the panel uses, so the stored figures
+  // are the ones actually shown, and idempotence is checked against the ledger
+  // (not memory) so a restart cannot double-write the date.
+  try {
+    const _sr = require('./session-record');
+    const _ledger = fs.existsSync(TRADES_LOG) ? fs.readFileSync(TRADES_LOG, 'utf8') : '';
+    if (_sr.shouldWriteSession(_ledger, now)) {
+      // OWNERSHIP FILTER — heldPos is EVERY position in the account, not this
+      // engine's. Champion holds XMMO/SPMO and the overnight sleeve holds its
+      // own; feeding them in would put another book's positions into this
+      // book's carried_out, open_risk and Day P&L. That is exactly the leak
+      // that made the 2026-08-13 sweep reconstruct SPMO/XMMO exits as ours
+      // (#3277). Same `_ourSyms` set that fix introduced.
+      const _mine = Object.values(heldPos).filter((p) => {
+        const k = String(p && p.symbol || '').toUpperCase();
+        if (!(Math.abs(Number(p && p.qty) || 0) > 0)) return false;
+        return !_ourSyms.size || _ourSyms.has(k);
+      });
+      const _dp = await require('./day-pnl').computeDayPnl({
+        positions: _mine,
+        ledgerText: _ledger,
+        now,
+        getQuotes: (syms) => require('./market-data-yahoo').getQuotes(syms),
+      }).catch(() => ({}));
+      logTrade(_sr.buildSessionRecord({
+        ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
+      }));
+    }
+  } catch (_e) { /* observability only — never breaks the scan */ }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
   return out;
@@ -1549,6 +1888,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

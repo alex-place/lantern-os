@@ -254,6 +254,59 @@ Notes:
 - Static assets (`public/`) are served from disk — no restart needed for HTML/JS/CSS-only changes.
 - Live hotfixes applied directly to `/opt/lantern-os/...` will conflict with a pull
   until the same change lands in `master`. Prefer landing a PR, then pulling.
+- **The server writes to tracked files** (bar caches, `data/csf_memory/raw.jsonl`), so a
+  checkout can fight live data. `sudo git stash push -m "runtime state"` before switching
+  and `sudo git stash pop` after — force-checking-out discards real data.
+- Deploying a **tag** instead of `master` leaves the clone in detached HEAD; that is normal
+  (`sudo git fetch --tags origin && sudo git checkout vX.Y.Z`).
+- Run `npm install` only when dependencies actually changed:
+  `git diff <old-tag>..<new-tag> -- package.json apps/lantern-garage/package.json`.
+
+## Verifying a deploy — do not skip this
+
+A green build says the code is correct. It says **nothing** about whether this machine is
+serving. On 2026-08-14 the host ran with **zero AI providers configured** — every chat turn
+fell through to the offline reply — while CI was green the entire time, because every other
+suite boots its own server with correct test env and is structurally incapable of catching a
+broken deployment.
+
+Run the deployment suite against the live host after every deploy:
+
+```bash
+DEPLOY_BASE_URL=https://unisona.ai \
+DEPLOY_EXPECT_LIVE=1 \
+DEPLOY_EXPECT_VERSION=1.15.3 \
+npm run test:deploy
+```
+
+It asserts the host names its own build, **at least one provider is actually usable** (that
+outage, in one line), the key surfaces serve real content, and per-account trading data still
+refuses an anonymous caller. `.github/workflows/deployment-verify.yml` runs the same suite
+hourly and after every release tag, so the next one is found by us rather than by a user.
+
+Manual equivalents:
+
+```bash
+curl -s https://unisona.ai/api/version | head -c 200
+curl -s https://unisona.ai/api/providers/status | python3 -m json.tool | head -30
+```
+
+### "Feature X is dead in production" — check in this order
+
+1. `/api/version` — is it serving, and is it the tag you think?
+2. `/api/providers/status` — `summary.available: 0` means chat has no model. This is a
+   **configuration** problem on the host, not a code regression.
+3. `sudo systemctl show lantern.service -p Environment --no-pager | tr ' ' '\n'` — is the
+   config actually present? Remember there is **no `.env` file**; everything comes from the
+   drop-ins above.
+4. `sudo journalctl -u lantern.service -n 100 --no-pager` — erroring on start?
+5. Only then suspect the code.
+
+> Gemini reports `hasKey` from either wire (an AI-Studio key **or** `GEMINI_USE_VERTEX` +
+> `VERTEX_PROJECT`). Before v1.15.3 the status page only understood the key wire, so this
+> keyless host reported `no_key` for a provider that dispatched fine — a working provider
+> reading as a broken one. If you see that pattern on an older build, check the deployed tag
+> before chasing the provider.
 
 ## Provisioning from scratch
 

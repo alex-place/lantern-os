@@ -156,7 +156,21 @@ npm run test:auth                              # from repo ROOT (specs are repo-
 # Greenpath release gate (#2545): 10 demo accounts × full signup→trade→chat→Pro
 # journey; RED blocks the first-50 invites. See docs/GREENPATH-GATE.md.
 npm run test:greenpath                         # from repo ROOT; GREENPATH_ACCOUNTS=2 to smoke
+
+# Deployment verify — does the product WORK where it's deployed? Unlike every
+# other suite, this one boots NO server: it points at one that is already
+# running, so it can fail on CONFIGURATION, not just code. Added after the
+# 2026-08-14 outage where GCE served with zero providers (chat had no model)
+# while CI was fully green. See docs/ops/gce-cloud-deploy-runbook.md.
+npm run test:deploy                            # local :8080, structural tier
+DEPLOY_BASE_URL=https://unisona.ai DEPLOY_EXPECT_LIVE=1 npm run test:deploy   # live host
 ```
+
+**Verification rule (post-2026-08-14):** a release is not verified because the
+build is green — it is verified when the key features answer *on the machine
+that serves them*. `key-feature-gate` in `release.yml` blocks a tag on the
+structural half; `.github/workflows/deployment-verify.yml` runs the serving half
+against production hourly and after every release.
 
 ### Python services
 
@@ -241,8 +255,20 @@ on top of CSF.
 ### Cloud vs local
 
 - **Local:** server binds to `127.0.0.1:4177`
-- **Cloud (Railway):** `apps/lantern-garage/cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. Railway auto-deploys from `master`.
-- **Static UI:** deployed from `gh-pages` branch via GitHub Actions; source in `apps/lantern-garage/public/`.
+- **Production (GCE):** the VM `lantern-app` runs `server.js` directly under
+  `lantern.service` (`PORT=8080`, `LANTERN_GARAGE_HOST=0.0.0.0`), fronted by a
+  Cloudflare tunnel → `unisona.ai`. **There is no auto-deploy** — shipping is a
+  manual tag checkout on the box; see [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
+  Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
+  **not** from a `.env` file (there is none on the host).
+- **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not
+  used by any current deployment** (verified 2026-08-14: no Railway config exists
+  anywhere in the repo). Earlier revisions of this file claimed "Railway
+  auto-deploys from master" — that was never true of the current stack.
+- **Static UI:** deployed from `gh-pages` branch via GitHub Actions
+  (`.github/workflows/deploy.yml`, `peaceiris/actions-gh-pages`); source in
+  `apps/lantern-garage/public/`. **This is the marketing/static surface only** —
+  it is not the app origin.
 
 ### Configuration
 

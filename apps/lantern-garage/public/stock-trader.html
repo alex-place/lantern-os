@@ -1029,7 +1029,7 @@
   </style>
   <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders <span class="tp-badge" id="tpOrdCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
     <button class="tp-tab" role="tab" id="tptab-book" aria-selected="false" aria-controls="tp-book" data-tab="book" onclick="tpTab('book');loadBook()" title="The capital allocator — one evidence-driven budget over the trader sleeves. Each sleeve earns capital only as its own live ledger proves an edge">Book</button>
@@ -4659,11 +4659,37 @@ async function alDeleteRule(id){
 // screen (dimmed, tooltip says why) and explain ONCE what happened + the fix,
 // instead of rendering an auth failure or backend outage as a $0.00 account.
 let _staleKind = null;
+// Last time the account panel rendered REAL server data. The watchdog below is
+// the backstop: any future failure mode we have not thought of still surfaces,
+// because it is driven by "how old is what you're looking at", not by guessing
+// the cause. Belt and braces after a silent 35-minute freeze.
+let _lastGoodPoll = Date.now();
+const STALE_AFTER_MS = 90_000;                 // 3 missed 30s polls
+setInterval(() => {
+  if (window.GUEST && !window.DEMO_ACCT) return;
+  if (Date.now() - _lastGoodPoll > STALE_AFTER_MS && !_staleKind) {
+    _accountDegraded('unreachable', 'no account update for ' + Math.round((Date.now() - _lastGoodPoll) / 1000) + 's');
+  }
+}, 30_000);
 function _accountDegraded(kind, reason){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = '0.45'; el.title = kind === 'session'
     ? 'Session expired — figures frozen at the last update. Sign in again to resume.'
-    : 'Trading backend unreachable — figures frozen at the last update.' + (reason ? ' (' + reason + ')' : ''); }
+    : 'Account data unreachable — figures frozen at the last update.' + (reason ? ' (' + reason + ')' : ''); }
+  // A dimmed panel is easy to miss on a dark theme — the 2026-08-13 freeze looked
+  // completely normal. State it in words, IN the summary row itself. Anchored to
+  // #tpSummary because that is the element carrying the numbers the user reads;
+  // the first attempt hung this off #hDayPnl, which does not exist on this
+  // layout, so the badge silently never rendered (caught in browser test).
+  const host = el || document.getElementById('tpSummary');
+  if (host && !document.getElementById('staleBadge')) {
+    const b = document.createElement('span');
+    b.id = 'staleBadge';
+    b.style.cssText = 'align-self:center;margin-right:10px;padding:2px 7px;border-radius:4px;background:#f59e0b;color:#1a1a1a;font-size:10px;font-weight:800;letter-spacing:.05em';
+    b.textContent = kind === 'session' ? '⚠ STALE — SIGN IN' : '⚠ STALE';
+    b.title = 'These figures are NOT live' + (reason ? ' — ' + reason : '') + '.';
+    host.insertBefore(b, host.firstChild);
+  }
   const pe = document.getElementById('hDayPnl');
   if (pe && !el?.innerHTML) { pe.textContent = '—'; pe.className = 'v'; }
   if (_staleKind !== kind) {   // announce each distinct degradation once, not per poll
@@ -4676,7 +4702,32 @@ function _accountDegraded(kind, reason){
 function _accountFresh(){
   const el = document.getElementById('tpSummary');
   if (el) { el.style.opacity = ''; el.title = ''; }
+  const b = document.getElementById('staleBadge');
+  if (b && b.parentNode) b.parentNode.removeChild(b);
   _staleKind = null;
+  _lastGoodPoll = Date.now();
+}
+// Realized P&L tooltip. The panel figure is TODAY's realized — it starts at $0
+// every session. When trades that closed today were opened on an earlier day,
+// the cash they returned is larger (or smaller) than what they earned today;
+// `realized_booked` is that cash and naming it prevents "where did my profit
+// go", without putting a non-today number in a today row.
+function _realizedTip(a){
+  const base = 'Realized by trades closed TODAY — starts at $0 each session and counts only today\'s move.';
+  const booked = Number(a && a.realized_booked);
+  const adj = Number(a && a.pnl_carry_adjustment) || 0;
+  if (!adj || !isFinite(booked)) return base;
+  return base + ` Those trades returned $${fmt(booked, 2)} of cash in total, but $${fmt(Math.abs(adj), 2)} of that was earned on earlier days and was already in yesterday's balance.`;
+}
+// Day P&L tooltip.
+function _dayPnlTip(a){
+  const base = 'How much the account made TODAY — today\'s move only, across both closed and open positions. Realized + Unrealized above add up to this.';
+  const adj = Number(a && a.pnl_carry_adjustment) || 0;
+  if (!adj) return base;
+  const amt = '$' + fmt(Math.abs(adj), 2);
+  return base + (adj > 0
+    ? ` Excludes ${amt} that carried positions had already earned before today.`
+    : ` Carried positions came into today down ${amt}, which is not counted against today.`);
 }
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -4694,9 +4745,18 @@ function renderTpSummary(a){
     // large short open). Labeling cash "Account balance" made a losing account look rich.
     cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.') +
     cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.') +
-    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today)) +
-    cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized)) +
-    cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today)) +
+    // EVERY figure in this row means TODAY, so the row can be read straight down:
+    //     Realized + Unrealized = Day P&L
+    // Mixing bases broke that. Realized used to be whole-lot (a position held
+    // three days banked all three days' gain the moment it closed), so on
+    // 2026-08-13 the row read +$2,144.95 and +$5,508.18 summing to +$2,533.54.
+    // Per-position "since entry" P&L still exists — it is the Unrealized column
+    // in the positions table, beside a Day column that sums to this one.
+    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)) +
+    cell('Unrealized P&L', signed(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
+      cls(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
+      'Today\'s move on the positions still open. A position carried from an earlier day counts only from yesterday\'s close — its full since-entry P&L is the Unrealized column in the table below.') +
+    cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
     cell('Buying power', money(a.buying_power));
 }
 // #2437: one-click exits. Flatten = market order for the opposite side, full size.
@@ -4722,17 +4782,35 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   if(!q) return false;
   if(!skipConfirm && !_twoStep(btn, 'Confirm ✕', ()=>flattenPosition(symbol, side, qty, true, btn))) return false;
   try{
-    const r = await fetch('/api/trading/orders/place', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market' })
-    });
-    const result = await r.json();
-    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||r.statusText)); return false; }
+    let result = await _placeFlatten(symbol, exitSide, q, false);
+    // Normally warnings never reach this page: the server verifies a sell
+    // reduces the held position and auto-accepts IBKR's disclosure warnings
+    // (the engine's own exit policy since 2026-07-27). This confirm exists ONLY
+    // for the unverifiable case — the position feed is unreadable, or the qty
+    // does not match the book — where a human really is the last check.
+    if(!(result && result.status==='placed') && exitSide==='sell'
+       && /acceptWarnings/i.test(String(result&&(result.reason||result.error)||''))){
+      const warnText = String(result.reason||result.error).replace(/;?\s*re-submit with acceptWarnings:true[^;]*/i,'').trim();
+      if(window.confirm('IBKR raised warnings for SELL '+q+' '+symbol+' and the position could not be verified as covering this sell (feed unreadable or size mismatch):\n\n'+warnText
+        +'\n\nConfirm only if you are sure you hold at least '+q+' shares.')){
+        result = await _placeFlatten(symbol, exitSide, q, true);
+      }
+    }
+    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
     const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
   }catch(e){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+e.message); return false; }
+}
+// One flatten POST. acceptWarnings goes on the wire ONLY after the user has read
+// and confirmed IBKR's warning text above — never on the first attempt.
+async function _placeFlatten(symbol, exitSide, q, acceptWarnings){
+  const r = await fetch('/api/trading/orders/place', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market', ...(acceptWarnings?{acceptWarnings:true}:{}) })
+  });
+  try{ return await r.json(); }catch(_e){ return { status:'error', error:r.statusText||'bad response' }; }
 }
 async function flattenAll(btn){
   if(!_lastPositions.length) return;
@@ -4754,15 +4832,19 @@ function renderPositionsTable(positions){
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
   el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button></div>`+
     `<table class="tp-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
+    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th title="Today's move on this position — what it contributed to Day P&L. For a position carried from an earlier day this is measured from yesterday's close, not from your entry.">Day P&L</th><th title="Since entry — the position's whole life, however many days it has been held.">Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
       const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
       const c=pnl>=0?'var(--green)':'var(--red)';
+      // Day column: today's slice, which is what sums to the header's Day P&L.
+      // Carried positions differ from Unrealized here — that gap IS the point.
+      const dpnl=p.day_pnl, dc=(dpnl||0)>=0?'var(--green)':'var(--red)';
       return `<tr>
         <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>
         <td class="tp-side ${side==='short'?'short':'long'}">${side==='short'?'Short':'Long'}</td>
         <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
+        <td style="color:${dpnl==null?'var(--muted)':dc}"${p.day_basis?` title="basis: ${p.day_basis==='prev_close'?'carried — measured from yesterday\'s close':p.day_basis==='entry'?'opened today — measured from entry':p.day_basis==='no_session'?'no session yet today':'prev close unavailable — shown since entry'}"`:''}>${dpnl==null?'—':(dpnl>=0?'+':'')+fmt(dpnl,2)}</td>
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
         <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
@@ -4983,22 +5065,51 @@ function _fmtOrderTime(s){
   const day=d.toLocaleDateString('en-US',tz), today=new Date().toLocaleDateString('en-US',tz);
   return day===today ? time : d.toLocaleDateString('en-US',{...tz,month:'short',day:'numeric'})+' '+time;
 }
+// A WORKING order belongs on the Orders tab. The old list omitted `submitted`
+// (the ledger rows' status) and `presubmitted` (IBKR's overnight state), so the
+// operator's four resting pre-open sells — including a duplicate that needed
+// CANCELING — rendered under Order history while Orders said "None"
+// ("the orders and order history are flipped", 2026-08-14). One vocabulary,
+// shared by both tables and by the cancel-button decision.
+function _isWorkingOrder(o){
+  return ['new','accepted','pending','open','partially_filled','submitted','presubmitted','pending_new','working','held']
+    .includes(String((o&&o.status)||'').toLowerCase());
+}
+// Cancel ONE working order (DELETE /api/trading/orders/:id — the route has
+// existed since 2026-07-26; no UI ever called it, so a wrong resting order
+// could only be killed from IBKR's own portal). Two-step confirm like Flatten.
+// "Change" on IBKR is cancel-and-replace: cancel here, re-place from the ticket.
+async function cancelOrder(id, btn){
+  if(!id) return;
+  if(!_twoStep(btn, 'Confirm ✕', ()=>cancelOrder(id, btn))) return;
+  try{
+    const r = await fetch('/api/trading/orders/'+encodeURIComponent(id), { method:'DELETE' });
+    const j = await r.json().catch(()=>({}));
+    if(j && j.ok) _alertToast('✓ Canceled '+id+(j.broker?' ('+j.broker+')':''));
+    else _alertToast('⚠ Cancel failed: '+((j && j.error) || r.statusText || r.status));
+  }catch(e){ _alertToast('⚠ Cancel failed: '+e.message); }
+  await loadOrders();
+}
 function renderOrders(orders){
   const openEl=document.getElementById('tp-orders'), histEl=document.getElementById('tp-history');
   const arr=Array.isArray(orders)?orders:[];
-  const row=(o)=>`<tr>
+  const row=(o,withActions)=>`<tr>
     <td><span class="tp-sym" onclick="focusTicker('${o.symbol}')">${o.symbol}</span></td>
     <td class="tp-side ${o.side==='buy'?'long':'short'}">${(o.side||'').toUpperCase()}</td>
     <td>${o.qty}</td><td>${o.type||'market'}</td><td>${o.limit_price?'$'+fmt(o.limit_price,2):'—'}</td>
-    <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}</td>
-    <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td></tr>`;
-  const tbl=(rows)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
-  const isOpen=(o)=>['new','accepted','pending','open','partially_filled'].includes((o.status||'').toLowerCase());
-  if(openEl) openEl.innerHTML = tbl(arr.filter(isOpen).map(row).join(''));
+    <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}${o.operator_account?' <span style="color:var(--text2)">(op)</span>':''}</td>
+    <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td>${withActions?`<td>${o.id?`<button class="tp-flat-btn" onclick="cancelOrder('${String(o.id).replace(/[^A-Za-z0-9-]/g,'')}',this)" title="Cancel this working order. To change it: cancel, then re-place from the ticket.">✕ Cancel</button>`:''}</td>`:''}</tr>`;
+  const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th>${withActions?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
+  const working = arr.filter(_isWorkingOrder);
+  // Count badge, same convention as Positions (operator ask #3309: "it should
+  // show how many orders there are just like positions"). Working orders only —
+  // history is not a number anyone needs at a glance.
+  const oc=document.getElementById('tpOrdCount'); if(oc) oc.textContent = working.length;
+  if(openEl) openEl.innerHTML = tbl(working.map(o=>row(o,true)).join(''), true);
   // Show the full fetched history (up to the 500 the API returns), not just the
   // 30 most recent — capping here was the visible half of "not all trades saved":
   // a busy session closes dozens in an hour, so 30 rows hid most of the day.
-  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,500).map(row).join(''));
+  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!_isWorkingOrder(o)).slice(0,500).map(o=>row(o,false)).join(''), false);
 }
 
 // Day P&L from the actual per-position day move: Σ (last − prevClose)·qty, where
@@ -5039,6 +5150,14 @@ async function loadPortfolio(){
     // (2) SAY what happened and what fixes it, once, instead of zeroing.
     // A session expiry does NOT self-heal — re-signing-in is the only cure.
     if (r.status === 401 || r.status === 403) { _accountDegraded('session'); return; }
+    // THE SILENT FREEZE (2026-08-13). An expired session does not always answer
+    // 401: the auth funnel REDIRECTS to the login page, i.e. HTTP 200 with an
+    // HTML body. That sailed past the status check, r.json() threw, and the bare
+    // catch below swallowed it — leaving a normal-looking screen frozen at the
+    // last good render for 35 minutes mid-session, with no dim and no toast.
+    // A non-JSON body from this endpoint means "not signed in", full stop.
+    const _ct = r.headers.get('content-type') || '';
+    if (r.redirected || !/json/i.test(_ct)) { _accountDegraded('session'); return; }
     const d  = await r.json();
     if (d && (d.error === 'auth_required' || d.error === 'forbidden')) { _accountDegraded('session'); return; }
     if (d && d.available === false) { _accountDegraded('backend', d.reason); return; }
@@ -5069,7 +5188,14 @@ async function loadPortfolio(){
     // height back to the charts (#2301). Re-expands the moment there's equity or a
     // position. Trade actions stay available; they just stop dominating.
     document.body.classList.toggle('acct-empty', !(a.equity>0) && (d.positions||[]).length===0);
-  }catch(e){}
+    _lastGoodPoll = Date.now();
+  }catch(e){
+    // NEVER SWALLOW. Whatever went wrong — network blip, server restart, a body
+    // that would not parse, a render throw — the figures on screen are now stale
+    // and the user must be told. Silence here is what produced the 2026-08-13
+    // freeze; an empty catch on the panel that reports money is not acceptable.
+    _accountDegraded('unreachable', e && e.message);
+  }
 }
 
 async function loadMarketStatus(){
