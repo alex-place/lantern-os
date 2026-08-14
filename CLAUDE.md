@@ -257,8 +257,11 @@ on top of CSF.
 - **Local:** server binds to `127.0.0.1:4177`
 - **Production (GCE):** the VM `lantern-app` runs `server.js` directly under
   `lantern.service` (`PORT=8080`, `LANTERN_GARAGE_HOST=0.0.0.0`), fronted by a
-  Cloudflare tunnel → `unisona.ai`. **There is no auto-deploy** — shipping is a
-  manual tag checkout on the box; see [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
+  Cloudflare tunnel → `unisona.ai`. Deployment is **release-gated, not push-gated**:
+  a systemd timer on the box polls `releases/latest` every 15 min and rolls the new
+  tag, so **publishing a GitHub Release is a production deploy** — while merging to
+  `master` moves nothing until a Release is cut (ship an unreleased `master` with the
+  manual pull in the runbook). See [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
   Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
   **not** from a `.env` file (there is none on the host).
 - **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not
