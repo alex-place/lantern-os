@@ -1029,7 +1029,7 @@
   </style>
   <div class="tp-tabs" role="tablist" aria-label="Positions, orders, and order history">
     <button class="tp-tab active" role="tab" id="tptab-positions" aria-selected="true" aria-controls="tp-positions" data-tab="positions" onclick="tpTab('positions')" title="What you hold right now, with live unrealized P&L">Positions <span class="tp-badge" id="tpPosCount">0</span></button>
-    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders</button>
+    <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders <span class="tp-badge" id="tpOrdCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
     <button class="tp-tab" role="tab" id="tptab-book" aria-selected="false" aria-controls="tp-book" data-tab="book" onclick="tpTab('book');loadBook()" title="The capital allocator — one evidence-driven budget over the trader sleeves. Each sleeve earns capital only as its own live ledger proves an edge">Book</button>
@@ -5082,7 +5082,12 @@ function renderOrders(orders){
     <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}${o.operator_account?' <span style="color:var(--text2)">(op)</span>':''}</td>
     <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td>${withActions?`<td>${o.id?`<button class="tp-flat-btn" onclick="cancelOrder('${String(o.id).replace(/[^A-Za-z0-9-]/g,'')}',this)" title="Cancel this working order. To change it: cancel, then re-place from the ticket.">✕ Cancel</button>`:''}</td>`:''}</tr>`;
   const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th>${withActions?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
-  if(openEl) openEl.innerHTML = tbl(arr.filter(_isWorkingOrder).map(o=>row(o,true)).join(''), true);
+  const working = arr.filter(_isWorkingOrder);
+  // Count badge, same convention as Positions (operator ask #3309: "it should
+  // show how many orders there are just like positions"). Working orders only —
+  // history is not a number anyone needs at a glance.
+  const oc=document.getElementById('tpOrdCount'); if(oc) oc.textContent = working.length;
+  if(openEl) openEl.innerHTML = tbl(working.map(o=>row(o,true)).join(''), true);
   // Show the full fetched history (up to the 500 the API returns), not just the
   // 30 most recent — capping here was the visible half of "not all trades saved":
   // a busy session closes dozens in an hour, so 30 rows hid most of the day.
