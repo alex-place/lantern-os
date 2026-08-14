@@ -31,7 +31,7 @@ test('a lot opened AND closed today counts in full', async () => {
     row({ ts: '2026-08-13T14:30:00Z', event: 'exit', symbol: 'IWM', qty: 100, entry: 300, exit: 302, pnl: 200 }),
   ].join('\n');
   const r = await computeDayPnl({ positions: [], ledgerText: ledger, now: Date.parse('2026-08-13T15:00:00Z'), getQuotes: quoter([]) });
-  assert.strictEqual(r.realized_attributable, 200);
+  assert.strictEqual(r.realized_today, 200);
   assert.strictEqual(r.pnl_carry_adjustment, 0, 'nothing was carried, so nothing to strip');
   assert.strictEqual(r.pnl_today, 200);
 });
@@ -47,8 +47,8 @@ test('a CARRIED lot contributes only its move since yesterday’s close', async 
     positions: [], ledgerText: ledger, now: NOW,
     getQuotes: quoter([quote('SQQQ', 98, 100)]),
   });
-  assert.strictEqual(r.realized_today, 800, 'the broker sense of realized stays whole');
-  assert.strictEqual(r.realized_attributable, -200, 'only today’s leg counts toward the day');
+  assert.strictEqual(r.realized_booked, 800, 'the cash the trade returned is still reported');
+  assert.strictEqual(r.realized_today, -200, 'only today’s leg counts toward the day');
   assert.strictEqual(r.pnl_carry_adjustment, 1000, 'the pre-today gain that was double-counted');
   assert.strictEqual(r.pnl_today, -200);
 });
@@ -71,7 +71,7 @@ test('sold and RE-ENTERED the same day: first lot carried, second lot today', as
     getQuotes: quoter([quote('GLD', 400.40, 404.66)]),
   });
   // carried leg: (400.40 − 404.66) × 265 = −1128.90 ; today's lot: +86.26
-  assert.ok(Math.abs(r.realized_attributable - (-1128.90 + 86.26)) < 0.02, `got ${r.realized_attributable}`);
+  assert.ok(Math.abs(r.realized_today - (-1128.90 + 86.26)) < 0.02, `got ${r.realized_today}`);
 });
 
 test('carried lots already CLOSED still get a quote — they are not in positions', async () => {
@@ -87,7 +87,7 @@ test('carried lots already CLOSED still get a quote — they are not in position
     getQuotes: async (syms) => { asked = syms; return [quote('TLT', 82.57, 82.05)]; },
   });
   assert.deepStrictEqual(asked, ['TLT'], 'the closed carried symbol must be quoted');
-  assert.ok(Math.abs(r.realized_attributable - 52) < 0.02, `(82.57−82.05)×100 = 52, got ${r.realized_attributable}`);
+  assert.ok(Math.abs(r.realized_today - 52) < 0.02, `(82.57−82.05)×100 = 52, got ${r.realized_today}`);
 });
 
 test('no prevClose → falls back to the whole lot AND says so', async () => {
@@ -96,7 +96,7 @@ test('no prevClose → falls back to the whole lot AND says so', async () => {
     row({ ts: '2026-08-13T14:30:00Z', event: 'exit', symbol: 'ZZZZ', qty: 10, entry: 5, exit: 9, pnl: 40 }),
   ].join('\n');
   const r = await computeDayPnl({ positions: [], ledgerText: ledger, now: NOW, getQuotes: quoter([]) });
-  assert.strictEqual(r.realized_attributable, 40, 'no basis to strip with → keep it whole');
+  assert.strictEqual(r.realized_today, 40, 'no basis to strip with → keep it whole');
   assert.strictEqual(r.degraded, true);
   assert.match(r.pnl_basis, /prevClose unavailable/);
 });
@@ -117,7 +117,7 @@ test('superseded rows are excluded (the phantom-exit repair stays repaired)', as
     row({ ts: '2026-08-13T14:30:00Z', event: 'exit', symbol: 'IWM', qty: 10, entry: 300, exit: 301, pnl: 10 }),
   ].join('\n');
   const r = await computeDayPnl({ positions: [], ledgerText: ledger, now: Date.parse('2026-08-13T15:00:00Z'), getQuotes: quoter([]) });
-  assert.strictEqual(r.realized_today, 10, 'the superseded phantom must not reappear');
+  assert.strictEqual(r.realized_booked, 10, 'the superseded phantom must not reappear');
 });
 
 test('weekend/pre-open: carried OPEN positions contribute $0, not Friday’s move', async () => {
@@ -192,9 +192,94 @@ test('2026-08-13 end of day: +$2,533.54, not the +$7,653.13 the header showed', 
     getQuotes: quoter(quotes),
   });
 
-  assert.ok(Math.abs(r.realized_today - 2144.95) < 0.05, `realized stays whole: ${r.realized_today}`);
+  assert.ok(Math.abs(r.realized_booked - 2144.95) < 0.05, `cash banked: ${r.realized_booked}`);
   assert.ok(Math.abs(r.unrealized_today - 5508.18) < 0.05, `unrealized: ${r.unrealized_today}`);
   assert.ok(Math.abs(r.pnl_carry_adjustment - 5119.60) < 1.0, `carry stripped: ${r.pnl_carry_adjustment}`);
   assert.ok(Math.abs(r.pnl_today - 2533.54) < 1.0, `TRUE day P&L: ${r.pnl_today}`);
   assert.ok(r.pnl_today < 7653.13 - 5000, 'must not print the double-counted header figure');
+  // the panel figure: today's realized, which is NOT the +$2,144.95 cash banked
+  assert.ok(Math.abs(r.realized_today - (-2974.64)) < 1.0, `panel realized: ${r.realized_today}`);
+});
+
+// ── the day-panel invariant ───────────────────────────────────────────────
+// "showing +2k, +5k and having it add up to 1.7k wont seem right to the users"
+// — the panel is only readable if every figure in it means the same thing.
+test('Realized + Unrealized == Day P&L, exactly, in every shape', async () => {
+  const shapes = [
+    {
+      name: 'carried lots closed today + positions opened today',
+      now: Date.parse('2026-08-13T20:10:00Z'),
+      ledger: [
+        row({ ts: '2026-08-12T14:00:00Z', event: 'entry', symbol: 'SOXS', qty: 2929, entry: 39.50 }),
+        row({ ts: '2026-08-13T13:35:00Z', event: 'exit', symbol: 'SOXS', qty: 2929, entry: 39.50, exit: 40.4353, pnl: 2753.62 }),
+        row({ ts: '2026-08-13T14:06:00Z', event: 'entry', symbol: 'SPXS', qty: 2467, entry: 23.529 }),
+      ].join('\n'),
+      positions: [{ symbol: 'SPXS', qty: 2467, current_price: 23.53, unrealized_pl: -15.74 }],
+      quotes: [quote('SOXS', 40.4353, 40.6794)],
+    },
+    {
+      name: 'a carried position still OPEN (mixed bases in one book)',
+      now: Date.parse('2026-08-13T18:00:00Z'),
+      ledger: [
+        row({ ts: '2026-08-11T14:00:00Z', event: 'entry', symbol: 'GLD', qty: 100, entry: 390 }),
+        row({ ts: '2026-08-13T14:00:00Z', event: 'entry', symbol: 'IWM', qty: 50, entry: 300 }),
+      ].join('\n'),
+      positions: [
+        { symbol: 'GLD', qty: 100, current_price: 402, unrealized_pl: 1200 },
+        { symbol: 'IWM', qty: 50, current_price: 303, unrealized_pl: 150 },
+      ],
+      quotes: [quote('GLD', 402, 404)],
+    },
+    {
+      name: 'nothing carried at all',
+      now: Date.parse('2026-08-13T18:00:00Z'),
+      ledger: [
+        row({ ts: '2026-08-13T14:00:00Z', event: 'entry', symbol: 'DIA', qty: 10, entry: 536 }),
+        row({ ts: '2026-08-13T17:00:00Z', event: 'exit', symbol: 'DIA', qty: 10, entry: 536, exit: 537, pnl: 10 }),
+      ].join('\n'),
+      positions: [],
+      quotes: [],
+    },
+  ];
+  for (const s of shapes) {
+    const r = await computeDayPnl({ positions: s.positions, ledgerText: s.ledger, now: s.now, getQuotes: quoter(s.quotes) });
+    assert.ok(Math.abs((r.realized_today + r.unrealized_today) - r.pnl_today) < 0.02,
+      `${s.name}: ${r.realized_today} + ${r.unrealized_today} != ${r.pnl_today}`);
+    // and the panel reconciles against the table, row by row
+    const rowSum = r.per_position.reduce((t, p) => t + p.day_pnl, 0);
+    assert.ok(Math.abs(rowSum - r.unrealized_today) < 0.02,
+      `${s.name}: per-position day P&L must sum to the header (${rowSum} vs ${r.unrealized_today})`);
+  }
+});
+
+test('realized starts at $0 on a fresh session, before any exit', async () => {
+  const ledger = row({ ts: '2026-08-12T14:00:00Z', event: 'entry', symbol: 'GLD', qty: 10, entry: 400 });
+  const r = await computeDayPnl({
+    positions: [{ symbol: 'GLD', qty: 10, current_price: 401, unrealized_pl: 10 }],
+    ledgerText: ledger, now: Date.parse('2026-08-13T13:35:00Z'),   // 09:35 ET, just open
+    getQuotes: quoter([quote('GLD', 401, 401)]),
+  });
+  assert.strictEqual(r.realized_today, 0, 'no exits yet today → $0, never yesterday\'s');
+  assert.strictEqual(r.realized_booked, 0);
+});
+
+test('per-position day P&L states its basis, so a carried row is explainable', async () => {
+  const ledger = [
+    row({ ts: '2026-08-11T14:00:00Z', event: 'entry', symbol: 'GLD', qty: 100, entry: 390 }),
+    row({ ts: '2026-08-13T14:00:00Z', event: 'entry', symbol: 'IWM', qty: 50, entry: 300 }),
+  ].join('\n');
+  const r = await computeDayPnl({
+    positions: [
+      { symbol: 'GLD', qty: 100, current_price: 402, unrealized_pl: 1200 },
+      { symbol: 'IWM', qty: 50, current_price: 303, unrealized_pl: 150 },
+    ],
+    ledgerText: ledger, now: Date.parse('2026-08-13T18:00:00Z'),
+    getQuotes: quoter([quote('GLD', 402, 404)]),
+  });
+  const gld = r.per_position.find((p) => p.symbol === 'GLD');
+  const iwm = r.per_position.find((p) => p.symbol === 'IWM');
+  assert.strictEqual(gld.day_basis, 'prev_close');
+  assert.strictEqual(gld.day_pnl, -200, 'carried: (402 − 404) × 100, not the +1200 it is up since entry');
+  assert.strictEqual(iwm.day_basis, 'entry');
+  assert.strictEqual(iwm.day_pnl, 150, 'opened today: since entry');
 });

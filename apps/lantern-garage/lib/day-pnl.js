@@ -33,10 +33,22 @@
  * entry 400.28 sits within $0.60 of today's 401.05, and SOXS's 39.50 within
  * $0.60 of today's 38.92.)
  *
- * realized_today is deliberately left whole — a broker's "realized" means the
- * cash the closed trades actually banked, and that is a real quantity. Only
- * the Day P&L sum uses the attributable slice, and `pnl_carry_adjustment`
- * reports the difference so the two can be reconciled on screen.
+ * WHAT THE DAY PANEL SHOWS. Every P&L figure in a day panel has to mean the
+ * same thing or the row cannot be read: `realized_today` is therefore TODAY's
+ * realized (starts at $0 each session, only accrues today's moves), and
+ * `unrealized_today` is today's move on the open book, so
+ *
+ *     Realized + Unrealized == Day P&L
+ *
+ * holds by construction — the invariant trader-agent.js already documented and
+ * the IBKR path never satisfied. Showing whole-lot realized beside it produced
+ * "+$2,144.95 and +$5,508.18 add up to +$2,533.54", which reads as a broken
+ * widget rather than as two different questions.
+ *
+ * The banked figure is not lost: `realized_booked` carries the cash the closed
+ * trades actually returned, and `pnl_carry_adjustment` is the difference. Each
+ * open position also reports its own `day_pnl` in `per_position`, so the panel
+ * still reconciles against the positions table line by line.
  */
 
 const etDay = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
@@ -186,19 +198,26 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   // Hence: today-opened → since entry; carried → since prevClose.
   let unreal = 0;
   let unrealDegraded = false;
+  const perPosition = [];   // what each open position contributed TODAY
   for (const p of positions) {
     const sym = String(p.symbol).toUpperCase();
     const qty = Number(p.qty) || 0;
     const cur = Number(p.current_price) || 0;
     const isCarried = lastEntryDay.get(sym) !== today;
     const pc = prevClose.get(sym);
-    if (isCarried && !live) continue;                       // no session → carried moved $0
-    if (isCarried && pc > 0 && cur > 0 && qty) {
-      unreal += (cur - pc) * qty;                           // carried: today's move
+    let contrib = 0;
+    let basis = 'entry';
+    if (isCarried && !live) {
+      basis = 'no_session';                                 // no session → carried moved $0
+    } else if (isCarried && pc > 0 && cur > 0 && qty) {
+      contrib = (cur - pc) * qty;                           // carried: today's move
+      basis = 'prev_close';
     } else {
-      unreal += Number(p.unrealized_pl) || 0;               // opened today: since entry
-      if (isCarried) unrealDegraded = true;
+      contrib = Number(p.unrealized_pl) || 0;               // opened today: since entry
+      if (isCarried) { basis = 'since_entry_fallback'; unrealDegraded = true; }
     }
+    unreal += contrib;
+    perPosition.push({ symbol: sym, day_pnl: Math.round(contrib * 100) / 100, day_basis: basis });
   }
 
   const round = (n) => Math.round(n * 100) / 100;
@@ -211,10 +230,17 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   basis += '; excludes commissions';
 
   return {
-    realized_today: anyExit ? round(realizedFull) : 0,   // broker sense: cash banked
-    realized_attributable: round(realizedAttr),          // the slice that moved today
+    // TODAY's realized — starts at $0 every session and only ever accrues moves
+    // that happened today. This is what the day panel shows, so that
+    // Realized + Unrealized == Day P&L is true by construction.
+    realized_today: round(realizedAttr),
+    // The cash the closed trades actually banked, carried gains included. A real
+    // quantity, just not a "today" one — kept for the tooltip and for anything
+    // that needs broker-sense realized.
+    realized_booked: anyExit ? round(realizedFull) : 0,
     pnl_carry_adjustment: round(realizedFull - realizedAttr),
     unrealized_today: round(unreal),
+    per_position: perPosition,
     pnl_today: pnlToday,
     pnl_basis: basis,
     degraded: realizedDegraded || unrealDegraded,
