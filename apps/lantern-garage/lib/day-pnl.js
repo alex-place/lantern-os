@@ -111,51 +111,66 @@ function prevCloseFromBarsFactory(barsDir) {
   const fs = require('fs');
   const path = require('path');
   const memo = new Map();
-  return (sym, now = Date.now()) => {
+
+  // One read. Returns { close } on success, { retriable } on a suspicious read
+  // (torn rewrite), { retriable: false } when the answer is a settled "no"
+  // (file absent — retrying cannot help).
+  const readOnce = (s, today) => {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(barsDir, s + '-5m.jsonl'), 'utf8');
+    } catch (_e) { return { close: null, retriable: false }; }   // no cache file
+    const rows = text.split('\n');
+    let bestDay = null;
+    const dayBars = [];
+    for (let i = rows.length - 1; i >= 0; i--) {           // newest-first
+      if (!rows[i].trim()) continue;
+      let b; try { b = JSON.parse(rows[i]); } catch (_e) { continue; }
+      const t = b.t || b.ts || b.time;
+      if (!t) continue;
+      const d = etDay(t);
+      if (d >= today) continue;                            // skip today's prints
+      if (bestDay == null) bestDay = d;
+      if (d !== bestDay) break;                            // left the last prior session
+      dayBars.push(b);
+    }
+    // TORN-READ GUARD (live 2026-08-14 04:47): the collector REWRITES these
+    // files; a read mid-rewrite sees a truncated view ending weeks back, and
+    // the factory served GLD's JULY close (372.19) as "yesterday". A prior
+    // session more than 7 calendar days old cannot be the last trading day —
+    // the read is unreliable, and worth retrying: rewrites complete in
+    // milliseconds.
+    if (bestDay != null) {
+      const ageDays = (Date.parse(today) - Date.parse(bestDay)) / 86400000;
+      if (!(ageDays >= 0 && ageDays <= 7)) return { close: null, retriable: true };
+    }
+    if (dayBars.length) {
+      dayBars.sort((a, b) => Date.parse(a.t || a.ts || a.time) - Date.parse(b.t || b.ts || b.time));
+      // STRICTLY before 16:00 ET: bars are stamped at their START, so a 16:00
+      // bar is the first POST-auction bar (GLD's read 398.71 vs the true
+      // 15:55-bar close 399.59). The official close is the last bar that
+      // BEGINS inside the session.
+      const regular = dayBars.filter((b) => etClock(b.t || b.ts || b.time).min < 960);
+      const pick = (regular.length ? regular : dayBars).pop();
+      const c = Number(pick.c ?? pick.close);
+      if (c > 0) return { close: c, retriable: false };
+    }
+    return { close: null, retriable: true };               // empty view — likely torn
+  };
+
+  return async (sym, now = Date.now()) => {
     const s = String(sym || '').toUpperCase();
     const today = etDay(now);
     const key = s + '|' + today;
     if (memo.has(key)) return memo.get(key);
     let out = null;
-    try {
-      const rows = fs.readFileSync(path.join(barsDir, s + '-5m.jsonl'), 'utf8').split('\n');
-      let bestDay = null;
-      const dayBars = [];
-      for (let i = rows.length - 1; i >= 0; i--) {           // newest-first
-        if (!rows[i].trim()) continue;
-        let b; try { b = JSON.parse(rows[i]); } catch (_e) { continue; }
-        const t = b.t || b.ts || b.time;
-        if (!t) continue;
-        const d = etDay(t);
-        if (d >= today) continue;                            // skip today's prints
-        if (bestDay == null) bestDay = d;
-        if (d !== bestDay) break;                            // left the last prior session
-        dayBars.push(b);
-      }
-      // TORN-READ GUARD (live 2026-08-14 04:47): the collector REWRITES these
-      // files; a read mid-rewrite sees a truncated view ending weeks back, and
-      // the factory served GLD's JULY close (372.19) as "yesterday". A prior
-      // session more than 7 calendar days old cannot be the last trading day —
-      // treat the read as unreliable and return null (caller falls back to the
-      // quote-derived reference), and DO NOT memoize, so the next call re-reads
-      // the (by then rewritten) file instead of pinning the poison all day.
-      if (bestDay != null) {
-        const ageDays = (Date.parse(today) - Date.parse(bestDay)) / 86400000;
-        if (!(ageDays >= 0 && ageDays <= 7)) { return null; }
-      }
-      if (dayBars.length) {
-        dayBars.sort((a, b) => Date.parse(a.t || a.ts || a.time) - Date.parse(b.t || b.ts || b.time));
-        // STRICTLY before 16:00 ET: bars are stamped at their START, so a 16:00
-        // bar is the first POST-auction bar (GLD's read 398.71 vs the true
-        // 15:55-bar close 399.59). The official close is the last bar that
-        // BEGINS inside the session.
-        const regular = dayBars.filter((b) => etClock(b.t || b.ts || b.time).min < 960);
-        const pick = (regular.length ? regular : dayBars).pop();
-        const c = Number(pick.c ?? pick.close);
-        if (c > 0) out = c;
-      }
-    } catch (_e) { /* no cache for this symbol → null */ }
-    if (out != null) memo.set(key, out);   // only certain answers are pinned
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = readOnce(s, today);
+      if (r.close != null) { out = r.close; break; }
+      if (!r.retriable) break;                             // settled "no": don't spin
+      await new Promise((res) => setTimeout(res, 120));    // let the rewrite finish
+    }
+    if (out != null) memo.set(key, out);                   // only certain answers are pinned
     return out;
   };
 }
