@@ -120,7 +120,7 @@ test('superseded rows are excluded (the phantom-exit repair stays repaired)', as
   assert.strictEqual(r.realized_booked, 10, 'the superseded phantom must not reappear');
 });
 
-test('weekend/pre-open: carried OPEN positions contribute $0, not Friday’s move', async () => {
+test('WEEKEND: carried OPEN positions contribute $0, not Friday’s move (weekday pre-market now counts)', async () => {
   const ledger = row({ ts: '2026-08-12T14:00:00Z', event: 'entry', symbol: 'GLD', qty: 10, entry: 400 });
   const sunday = Date.parse('2026-08-16T15:00:00Z');
   const r = await computeDayPnl({
@@ -128,7 +128,7 @@ test('weekend/pre-open: carried OPEN positions contribute $0, not Friday’s mov
     ledgerText: ledger, now: sunday, getQuotes: quoter([quote('GLD', 410, 405)]),
   });
   assert.strictEqual(r.pnl_today, 0);
-  assert.match(r.pnl_basis, /no session today/);
+  assert.match(r.pnl_basis, /no trading day underway/);
 });
 
 test('an open position entered TODAY uses since-entry unrealized', async () => {
