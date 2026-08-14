@@ -158,8 +158,26 @@ function computeScorecard(exits) {
   };
 }
 
-/** Read + parse the exit rows from a trades log (fail-soft → []). */
-function readExits(logPath = DEFAULT_LOG) {
+// PER-USER LEDGER (#3275). The autopilot now stamps each row with the account it
+// traded for. Rows written BEFORE that existed carry no `user`; every one of them
+// was written by the autopilot on the operator's own accounts, so they are read as
+// the house book (HOUSE_USER) rather than being silently dropped or — worse —
+// shown to whoever asks next.
+const HOUSE_USER = 'local-owner';
+function rowUser(r) { return (r && r.user) || HOUSE_USER; }
+
+/**
+ * Keep only rows belonging to `user`. `null`/undefined means NO filter (the
+ * whole book) — used by operator-side callers and by the existing tests.
+ */
+function forUser(rows, user) {
+  if (!user) return rows;
+  const want = String(user);
+  return (rows || []).filter((r) => rowUser(r) === want);
+}
+
+/** Read + parse the exit rows from a trades log (fail-soft → []); optional user filter. */
+function readExits(logPath = DEFAULT_LOG, user = null) {
   let text = '';
   try { text = fs.readFileSync(logPath, 'utf8'); } catch (_e) { return []; }
   const out = [];
@@ -168,15 +186,15 @@ function readExits(logPath = DEFAULT_LOG) {
     let d; try { d = JSON.parse(line); } catch (_e) { continue; }
     if (d && d.event === 'exit') out.push(d);
   }
-  return out;
+  return forUser(out, user);
 }
 
 /**
  * Full scorecard from disk: a `confirmed` view (broker-accepted fills only — the
  * honest realized number) and an `all` view (every exit decision, incl. unconfirmed).
  */
-function scorecard(logPath = DEFAULT_LOG) {
-  const exits = readExits(logPath);
+function scorecard(logPath = DEFAULT_LOG, user = null) {
+  const exits = readExits(logPath, user);
   const confirmed = exits.filter((e) => CONFIRMED.has(String(e.status || '').toLowerCase()));
   return {
     generatedAt: new Date().toISOString(),
@@ -186,8 +204,8 @@ function scorecard(logPath = DEFAULT_LOG) {
   };
 }
 
-/** Read + parse rows of one event type from a trades log (fail-soft → []). */
-function readEvents(event, logPath = DEFAULT_LOG) {
+/** Read + parse rows of one event type from a trades log (fail-soft → []); optional user filter. */
+function readEvents(event, logPath = DEFAULT_LOG, user = null) {
   let text = '';
   try { text = fs.readFileSync(logPath, 'utf8'); } catch (_e) { return []; }
   const out = [];
@@ -196,7 +214,7 @@ function readEvents(event, logPath = DEFAULT_LOG) {
     let d; try { d = JSON.parse(line); } catch (_e) { continue; }
     if (d && d.event === event) out.push(d);
   }
-  return out;
+  return forUser(out, user);
 }
 
 // ── Breakdown slices (#3240) — the journal-analytics data layer ───────────────
@@ -249,9 +267,9 @@ const BREAKDOWN_KEYS = ['symbol', 'hour', 'reason', 'skip'];
  * fills; all = every exit decision). `by=skip` slices the skip log instead: every
  * declined opportunity grouped by its (number-normalized) decline reason.
  */
-function breakdown(by, logPath = DEFAULT_LOG) {
-  if (by === 'skip') return breakdownFromRows(by, null, readEvents('skip', logPath));
-  return breakdownFromRows(by, readExits(logPath), null);
+function breakdown(by, logPath = DEFAULT_LOG, user = null) {
+  if (by === 'skip') return breakdownFromRows(by, null, readEvents('skip', logPath, user));
+  return breakdownFromRows(by, readExits(logPath, user), null);
 }
 
 /**
@@ -326,5 +344,6 @@ function skipBreakdownFromRows(skips) {
 
 module.exports = {
   computeScorecard, readExits, readEvents, scorecard, breakdown, breakdownFromRows,
-  reasonFamily, preparedRows, etParts, slimStats, CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG,
+  reasonFamily, preparedRows, etParts, slimStats, forUser, rowUser,
+  CONFIRMED, BREAKDOWN_KEYS, DEFAULT_LOG, HOUSE_USER,
 };

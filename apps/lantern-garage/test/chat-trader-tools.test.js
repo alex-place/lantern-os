@@ -37,8 +37,10 @@ fs.writeFileSync(process.env.TRADER_TRADES_LOG, [
 const reg = require("../lib/tool-runner");
 const traderMode = require("../lib/trader-mode");
 
-const OPERATOR = { operator: true, userId: "chat-tools-test" };
-const NEW_TOOLS = ["trader_config", "trader_journal", "trader_skips", "trader_alerts", "trader_alert_create", "trader_alert_delete", "trader_pause"];
+// The operator IS the house account (routes and tools resolve an id-less owner box
+// to 'local-owner'), so the operator's journal is the pre-attribution book.
+const OPERATOR = { operator: true, userId: "local-owner" };
+const NEW_TOOLS = ["trader_config", "trader_journal", "trader_skips", "trader_alerts", "trader_alert_create", "trader_alert_delete", "trader_pause", "trader_start"];
 
 let failures = 0;
 const check = (name, fn) => {
@@ -51,14 +53,14 @@ const check = (name, fn) => {
 const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
 
 (async () => {
-  await check("all seven tools are registered, reads as read and capabilities as actions", () => {
+  await check("all eight tools are registered, reads as read and capabilities as actions", () => {
     const tools = reg.capabilityManifest().tools;
     const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
     for (const n of NEW_TOOLS) assert.ok(byName[n], `${n} missing from the manifest`);
     for (const n of ["trader_config", "trader_journal", "trader_skips", "trader_alerts"]) {
       assert.strictEqual(byName[n].policy, "read", `${n} must be a read tool`);
     }
-    for (const n of ["trader_alert_create", "trader_alert_delete", "trader_pause"]) {
+    for (const n of ["trader_alert_create", "trader_alert_delete", "trader_pause", "trader_start"]) {
       assert.strictEqual(byName[n].policy, "action", `${n} must be an action tool`);
     }
   });
@@ -69,10 +71,28 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     assert.deepStrictEqual(offenders, [], `chat must expose no order/arming tool, found: ${offenders.join(", ")}`);
   });
 
-  await check("trader_pause is ONE-WAY: nothing in chat can start or arm the trader", () => {
-    const names = reg.capabilityManifest().tools.map((t) => t.name);
-    const starters = names.filter((n) => /(start|resume|enable|unpause|trader_mode_set)/i.test(n));
-    assert.deepStrictEqual(starters, [], `found a tool that could start the trader: ${starters.join(", ")}`);
+  await check("starting is Pilot-gated while stopping never is (the safety asymmetry)", async () => {
+    const proNoPilot = { operator: false, userId: "sa-pro", role: "deep_dreamer" };
+    const started = await run("trader_start", { book: "intraday" }, proNoPilot);
+    assert.ok(/Pilot plan/.test(started.result), "a Pro user cannot arm the autonomous trader");
+    assert.ok(/do NOT claim the trader was started/.test(started.result));
+    assert.strictEqual(traderMode.get("sa-pro"), "off", "the refused start must not have changed the book");
+    const paused = await run("trader_pause", {}, proNoPilot);
+    assert.strictEqual(paused.status, "executed", "stopping is never gated");
+  });
+
+  await check("trader_start arms the named book and never touches server-side arming", async () => {
+    const pilot = { operator: false, userId: "sa-pilot", role: "pilot" };
+    const r = await run("trader_start", { book: "intraday" }, pilot);
+    assert.ok(/ARMED/.test(r.result));
+    assert.strictEqual(traderMode.get("sa-pilot"), "stock", "'intraday' maps to the store's historical name");
+    assert.ok(/real-money orders are OFF/.test(r.result), "must state that real orders are not armed server-side");
+    assert.ok(!/TRADER_LIVE=1/.test(String(process.env.TRADER_LIVE)), "the tool must never set the server arming flag");
+    const champ = await run("trader_start", { book: "champion" }, pilot);
+    assert.ok(/Champion/.test(champ.result));
+    assert.strictEqual(traderMode.get("sa-pilot"), "champion", "switching books works");
+    const junk = await run("trader_start", { book: "yolo" }, pilot);
+    assert.ok(/must be 'intraday' or 'champion'/.test(junk.result), "an unknown book is refused, not guessed");
   });
 
   await check("trader_config reports the active book, arming state, caps and brakes", async () => {
@@ -132,7 +152,7 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     const r = await run("trader_pause");
     assert.ok(/PAUSED \(was: stock\)/.test(r.result));
     assert.ok(/protective stops stay in place/.test(r.result), "must tell the user their stops remain");
-    assert.ok(/cannot start it/.test(r.result), "must state the one-way property");
+    assert.ok(/does NOT flatten/.test(r.result), "must be explicit that pausing is not closing");
     assert.strictEqual(traderMode.get(OPERATOR.userId), "off", "the mode really changed");
     const again = await run("trader_pause");
     assert.ok(/already OFF/.test(again.result), "pausing twice is safe and says so");
@@ -156,12 +176,42 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     }
   });
 
-  await check("TIER: the shared un-attributed ledger stays operator-only", async () => {
-    for (const n of ["trader_journal", "trader_skips"]) {
-      const r = await run(n, {}, PRO);
-      assert.strictEqual(r.status, "denied", `${n} reads the shared house ledger — it must NOT cross the tier`);
-      assert.strictEqual(r.reason_code, "operator_required");
-    }
+  await check("PER-USER LEDGER: one account's journal never answers with another's", async () => {
+    // Two accounts trade the same window; each must see only its own book.
+    fs.appendFileSync(process.env.TRADER_TRADES_LOG, [
+      { ts: "2026-08-11T16:00:00.000Z", user: "alice", event: "exit", symbol: "TQQQ", qty: 5, entry: 90, pnl: 500, reason: "zone_r1", status: "filled" },
+      { ts: "2026-08-11T16:05:00.000Z", user: "alice", event: "skip", symbol: "SOXL", reason: "cooldown active" },
+      { ts: "2026-08-11T16:10:00.000Z", user: "bob", event: "exit", symbol: "TZA", qty: 5, entry: 20, pnl: -70, reason: "stop", status: "filled" },
+    ].map((r) => JSON.stringify(r)).join("\n") + "\n");
+    require("../lib/track-record")._resetCache();
+
+    const alice = await run("trader_journal", {}, { operator: false, userId: "alice", role: "deep_dreamer" });
+    assert.ok(/\$500\.00/.test(alice.result), "alice sees her own winner");
+    assert.ok(!/\$85\.00/.test(alice.result), "alice must NOT see the house book's total");
+    assert.ok(!/-\$70/.test(alice.result), "alice must NOT see bob's loss");
+
+    const bob = await run("trader_journal", {}, { operator: false, userId: "bob", role: "deep_dreamer" });
+    assert.ok(/-\$70\.00/.test(bob.result), "bob sees his own loss");
+    assert.ok(!/\$500/.test(bob.result), "bob must NOT see alice's winner");
+
+    const aliceSkips = await run("trader_skips", {}, { operator: false, userId: "alice", role: "deep_dreamer" });
+    assert.ok(/cooldown/.test(aliceSkips.result), "alice sees her own decline");
+    const bobSkips = await run("trader_skips", {}, { operator: false, userId: "bob", role: "deep_dreamer" });
+    assert.ok(/nothing declined/i.test(bobSkips.result), "bob declined nothing and is told so, not handed alice's");
+
+    // A user with no rows at all gets an honest empty, never a substitute.
+    const stranger = await run("trader_journal", {}, { operator: false, userId: "stranger", role: "deep_dreamer" });
+    assert.ok(/no broker-confirmed round-trips/.test(stranger.result));
+    assert.ok(/Do not substitute anyone else's results/.test(stranger.result));
+  });
+
+  await check("PER-USER LEDGER: legacy un-stamped rows read as the house book, not as anyone's", async () => {
+    const { readExits, HOUSE_USER } = require("../lib/trader-scorecard");
+    const house = readExits(process.env.TRADER_TRADES_LOG, HOUSE_USER);
+    assert.ok(house.length >= 3, "the pre-attribution rows belong to the house book");
+    assert.ok(house.every((r) => !r.user), "…and they are exactly the rows with no stamped account");
+    const everything = readExits(process.env.TRADER_TRADES_LOG);
+    assert.ok(everything.length > house.length, "an unfiltered read still returns the whole book for operator-side callers");
   });
 
   await check("TIER: a signed-out caller gets 'sign in', not a misleading 'operator' reason", async () => {
@@ -204,7 +254,8 @@ const run = (name, args = {}, ctx = OPERATOR) => reg.runTool(name, args, ctx);
     const signed = anth({ signedIn: true });
     assert.ok(!guest.includes("trader_alerts"), "a signed-out model must not even SEE the per-user tools");
     assert.ok(signed.includes("trader_alerts") && signed.includes("trader_pause"), "a signed-in model sees its per-user tools");
-    assert.ok(!signed.includes("trader_journal"), "the shared-ledger tools stay out of the signed-in set");
+    assert.ok(signed.includes("trader_journal") && signed.includes("trader_start"), "per-user journal and arming are in the signed-in set");
+    assert.ok(!signed.includes("trader_positions"), "tools that read the live broker account stay operator-only");
     assert.ok(!signed.includes("workspace_read"), "the signed-in tier must not leak filesystem tools");
   });
 

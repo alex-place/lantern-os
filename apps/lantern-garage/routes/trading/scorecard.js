@@ -17,6 +17,11 @@
 
 const { scorecard, breakdown, breakdownFromRows, BREAKDOWN_KEYS } = require('../../lib/trader-scorecard');
 const championDemo = require('../../lib/champion-demo');
+const { getEffectiveUserId } = require('../../lib/session-identity');
+const { internalUserId } = require('../../lib/request-auth');
+
+// PER-USER (#3275) — see routes/trading/track-record.js for the scoping rule.
+const scopeFor = (req) => getEffectiveUserId(req) || internalUserId(req) || 'local-owner';
 
 module.exports = async function scorecardRoutes(req, res, url, ctx) {
   if (url.pathname !== '/api/trading/scorecard' || req.method !== 'GET') return false;
@@ -36,11 +41,11 @@ module.exports = async function scorecardRoutes(req, res, url, ctx) {
         sendJson(res, { ...breakdownFromRows(by, exits, skips), demo: true, source: 'champion-demo' }, 200);
         return true;
       }
-      sendJson(res, breakdown(by), 200);
+      sendJson(res, breakdown(by, undefined, scopeFor(req)), 200);
       return true;
     }
     if (demo) { sendJson(res, { error: 'demo_requires_by', supported: BREAKDOWN_KEYS }, 400); return true; }
-    sendJson(res, scorecard(), 200);
+    sendJson(res, scorecard(undefined, scopeFor(req)), 200);
   } catch (e) {
     sendJson(res, { error: 'scorecard_failed', message: e.message }, 500);
   }

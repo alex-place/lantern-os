@@ -1723,7 +1723,7 @@ const REGISTRY = {
     policy: "read",
     user_safe: true, // signed-in: the active book is read for THEIR uid; the rest is the
                      // strategy contract that governs their account (public in the guide)
-    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing. YOUR OWN LIMITS, state them rather than offering what you cannot do: you can PAUSE the autopilot (trader_pause) but you can NEVER start, arm, or change its settings — arming and every knob above live only in Settings, by deliberate human action. If you were not given a tool for the realized trade journal, say it is not available to you here instead of promising to fetch it or inferring results from the arming state.",
+    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing. YOUR OWN LIMITS, state them rather than offering what you cannot do: you can START the autopilot (trader_start, Pilot only) and PAUSE it (trader_pause), but you can NEVER change any risk knob above — sizing, caps, stops, brakes and the server-side real-money arming live only in Settings and server config, by deliberate human action. Never infer results from the arming state; read the journal for that.",
     schema: { type: "object", properties: {} },
     async run(_i, ctx) {
       try {
@@ -1757,20 +1757,18 @@ const REGISTRY = {
   },
 
   trader_journal: {
-    // OPERATOR-ONLY, deliberately NOT user_safe: the autopilot writes ONE shared
-    // ledger with no per-user attribution (rows carry ts/event/symbol/qty/entry/
-    // pnl/reason/status — no userId), so serving it to a hosted user would answer
-    // their question with the house book. Per-user attribution in the ledger is the
-    // prerequisite for opening this up; a gate flag alone would be a data leak.
     policy: "read",
+    user_safe: true, // per-user since #3275 — the ledger stamps the account each row
+                     // was traded for, and this reads ONLY ctx.userId's rows
     desc: "Read the autopilot's REALIZED record from its append-only exit ledger: total realized P&L, the daily curve's max drawdown with its dates, win rate (both the headline and the honest risk-exit-only number), expectancy per trade, profit factor, average MFE/MAE, and the per-exit-path breakdown. Use when the user asks how the trader is doing, how their week/month went, which exits make or lose money, or whether the stops are too tight. HONESTY CONTRACT, relay it: numbers are broker-CONFIRMED fills only; profit-taking exit paths can only ever close winners so their ~100% win rates are structural (never quote them as skill); and the disclosures line (collapsed re-decisions, excluded rejected attempts, externally-closed positions valued at the last mark) must be passed on, not hidden.",
     schema: { type: "object", properties: {} },
-    async run(_i, _ctx) {
+    async run(_i, ctx) {
       try {
-        const rec = require("./track-record").getTrackRecord();
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rec = require("./track-record").getTrackRecord(undefined, uid);
         const book = (rec.books && rec.books.intraday) || {};
         const s = book.stats || {};
-        if (!s.trades) return "[trader_journal: no broker-confirmed round-trips in the ledger yet — say so honestly; nothing is being withheld, there is simply nothing booked.]";
+        if (!s.trades) return "[trader_journal: THIS USER'S ledger holds no broker-confirmed round-trips yet — say so honestly; nothing is withheld, their autopilot simply has not closed a trade. Do not substitute anyone else's results.]";
         const dd = book.maxDrawdown || {};
         const ex = s.excursions || {};
         const money = (n) => (typeof n === "number" ? `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}` : "n/a");
@@ -1795,16 +1793,16 @@ const REGISTRY = {
   },
 
   trader_skips: {
-    // OPERATOR-ONLY for the same reason as trader_journal — the skip log lives in
-    // that same un-attributed shared ledger.
     policy: "read",
+    user_safe: true, // per-user since #3275, same as trader_journal
     desc: "Read the SKIP LOG — every opportunity the autopilot DECLINED and why, grouped by decline reason with counts and how many distinct symbols each touched (numbers in a reason are normalized, so '81% > cap 80%' and '83% > cap 80%' are one family). Use when the user asks why the trader isn't trading, why it passed on a symbol, or what its risk rules are actually blocking — most 'it isn't working' is the trader correctly declining. These are COUNTS ONLY: never imply a skipped trade would have made or lost money, because it was never priced.",
     schema: { type: "object", properties: {} },
-    async run(_i, _ctx) {
+    async run(_i, ctx) {
       try {
-        const sk = require("./trader-scorecard").breakdown("skip");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const sk = require("./trader-scorecard").breakdown("skip", undefined, uid);
         const groups = Object.entries(sk.groups || {});
-        if (!groups.length) return "[trader_skips: the skip log is empty — nothing has been declined in the recorded window.]";
+        if (!groups.length) return "[trader_skips: nothing declined on THIS USER'S account in the recorded window.]";
         // Grouping normalizes digits to '#' so "81% > cap 80%" and "83% > cap 80%"
         // collapse into one family; render that as N so the reason reads as English.
         const rows = groups.slice(0, 12)
@@ -1897,12 +1895,52 @@ const REGISTRY = {
     },
   },
 
+  trader_start: {
+    policy: "action", // ARMS the user's own autopilot book (operator decision, 2026-08-12)
+    user_safe: true,  // sets only ctx.userId's own book; capability-gated on ai_trader
+    desc: "ARM the autopilot on the user's own account by selecting which book runs: 'intraday' (washout entries + zone-ladder exits on liquid ETFs) or 'champion' (the diversified allocation book, rebalanced on a schedule). One account runs ONE book; selecting one pauses the other. Use only on an EXPLICIT, unambiguous instruction to start/turn on/arm the trader — never infer it from interest, a question, or a hypothetical. Before calling, tell the user in plain words what will happen: the autopilot will open and close positions on their connected account from the next scan, sized by the risk rules, with a protective stop placed at the broker on every entry. After calling, relay the returned state verbatim, INCLUDING whether real-money orders are actually armed server-side — selecting a book does not by itself make orders real. They can stop it any time with trader_pause.",
+    schema: {
+      type: "object",
+      required: ["book"],
+      properties: { book: { type: "string", enum: ["intraday", "champion"], description: "which book to run on this account" } },
+    },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "ai_trader")) return "[trader_start refused: the autonomous trader is part of the Pilot plan. Say so plainly and point at /pricing.html — do NOT claim the trader was started.]";
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const want = String((i && i.book) || "").toLowerCase();
+        // The tool's vocabulary is the product's ('intraday'), the store's is
+        // historical ('stock') — map rather than leak the internal name.
+        const mode = want === "champion" ? "champion" : want === "intraday" ? "stock" : null;
+        if (!mode) return "[trader_start refused: book must be 'intraday' or 'champion'. Ask which one rather than picking for them.]";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (!traderMode.set(uid, mode)) return "[trader_start: the mode switch refused the change — report the failure honestly rather than claiming it started.]";
+        const live = process.env.TRADER_LIVE === "1";
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const halt = require("./trading-guard").haltFile();
+        const label = mode === "champion" ? "Champion (diversified allocation book)" : "Intraday (washout entries, zone-ladder exits)";
+        return [
+          `Autopilot ARMED on this account: ${label}${before === "off" ? "" : ` (was: ${before})`}. It begins acting on the next scan, within about a minute, and places a protective stop at the broker on every entry.`,
+          halt
+            ? `BUT a halt file is present (${halt}) — while it exists every order is refused, so nothing will actually be placed. Say this plainly.`
+            : autoExec && live
+              ? "Autonomous execution and real-money orders are both armed server-side, so these will be REAL orders."
+              : `Server-side arming is incomplete — autonomous execution is ${autoExec ? "ON" : "OFF"} and real-money orders are ${live ? "ON" : "OFF"}, so it will decide and journal but ${live ? "" : "NOT "}place real orders. Do not tell the user real money is at stake unless both are ON.`,
+          "They can stop it at any time by asking to pause the trader.",
+        ].join("\n");
+      } catch (e) {
+        return `[trader_start error: ${e.message}]`;
+      }
+    },
+  },
+
   trader_pause: {
-    policy: "action", // ONE-WAY safety switch: can stop the autopilot, never start it
+    policy: "action", // the safety direction: always available, never plan-gated
     user_safe: true,  // sets only ctx.userId's own book; NOT capability-gated on
                       // purpose — stopping is risk-reducing and must never be
                       // withheld from someone whose account is being traded
-    desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. This is deliberately ONE-WAY: it can stop the machine but cannot start or arm it (arming is a gated action in Settings, never something a conversation can do). Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
+    desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. Always available: unlike starting it (trader_start, which is a Pilot capability), stopping is never gated, because someone whose account is being traded must always be able to stop it. Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
     schema: { type: "object", properties: {} },
     async run(_i, ctx) {
       try {
@@ -1911,7 +1949,7 @@ const REGISTRY = {
         const before = traderMode.get(uid);
         if (before === "off") return "The autopilot is already OFF — it is opening and closing nothing. Existing positions and their broker stops are unchanged and remain yours to manage.";
         if (!traderMode.set(uid, "off")) return "[trader_pause: the mode switch refused the change — report the failure honestly rather than claiming it stopped.]";
-        return `Autopilot PAUSED (was: ${before}). It will open no new positions and will not close anything further; this takes effect on the next scan, within about a minute. Open positions and their broker-side protective stops stay in place and are now yours to manage. Restarting it is a deliberate action in Settings — chat can stop the trader but cannot start it.`;
+        return `Autopilot PAUSED (was: ${before}). It will open no new positions and will not close anything further; this takes effect on the next scan, within about a minute. Open positions and their broker-side protective stops stay in place and are now yours to manage — pausing does NOT flatten anything. Ask to start it again whenever you want.`;
       } catch (e) {
         return `[trader_pause error: ${e.message}]`;
       }
