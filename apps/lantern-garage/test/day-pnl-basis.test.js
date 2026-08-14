@@ -76,13 +76,17 @@ test('no prevClose available → honest fallback to since-entry (never zero, nev
   assert.strictEqual(r.degraded, true, 'the fallback must be declared, not silent');
 });
 
-// The session gate: carried positions contribute $0 when today's ET session
-// hasn't traded (weekend or pre-open) — quotes still carry the LAST session's
-// chg_pct then, so a prevClose-derived "move" would be Friday's move re-badged
-// as today (the +$1,359.77 Sunday header, reported twice).
-test('the session gate: weekend and pre-open are NOT a trading session; 09:30+ weekday is', () => {
+// The trading-day gate: carried positions contribute $0 only when TODAY cannot
+// have its own prints — weekends and the dead overnight window. The phantom the
+// gate guards (the +$1,359.77 Sunday header: Friday's move re-badged as today)
+// only occurs on non-trading days; on a weekday from ~04:00 ET the quote chart
+// has rolled to today, prevClose is genuinely yesterday's close, and pre-market
+// moves ARE today's P&L. Gating those out froze the panel against a moving book
+// ("the premarket is already open why doesnt it show the p/l", 2026-08-14).
+test('the gate: weekends and overnight are dead; a weekday from 04:00 ET is LIVE, pre-market included', () => {
   assert.strictEqual(sessionTradedToday(Date.parse('2026-08-09T17:34:00Z')), false, 'Sunday');
-  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T12:00:00Z')), false, 'Monday 08:00 ET pre-open');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T07:00:00Z')), false, 'Monday 03:00 ET — chart may still describe Friday');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T12:00:00Z')), true, 'Monday 08:00 ET pre-market — today IS underway');
   assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T13:31:00Z')), true, 'Monday 09:31 ET');
   assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T22:00:00Z')), true, 'Monday 18:00 ET — today DID trade');
 });
@@ -97,7 +101,49 @@ test('carried + no session today = $0 contribution even with a stale chg_pct ava
   assert.ok((p.current_price - stalePrevClose) * p.qty > 300, 'the naive figure is exactly the reported phantom');
   const r = await computeDayPnl({ positions: [p], ledgerText: ledger, now: sunday, getQuotes: quoter([quote('IWM', 301.92, stalePrevClose)]) });
   assert.strictEqual(r.unrealized_today, 0);
-  assert.match(r.pnl_basis, /no session today/);
+  assert.match(r.pnl_basis, /no trading day underway/);
+});
+
+test('weekday PRE-MARKET: a carried position\'s overnight move COUNTS, measured from yesterday\'s close', async () => {
+  // Friday 08:00 ET. GLD carried from Thursday; IBKR marks it 399.68 → 398.20
+  // pre-market. The panel must show −$1.48/sh × qty as today's move, not $0.
+  const friday0800 = Date.parse('2026-08-14T12:00:00Z');
+  const ledger = entry('GLD', '2026-08-13T14:00:00Z');
+  const p = { symbol: 'GLD', qty: 290, current_price: 398.20, unrealized_pl: -458.20 };
+  const r = await computeDayPnl({
+    positions: [p], ledgerText: ledger, now: friday0800,
+    getQuotes: quoter([quote('GLD', 398.20, 399.68)]),   // prevClose = Thursday's close
+  });
+  assert.ok(Math.abs(r.unrealized_today - (398.20 - 399.68) * 290) < 0.01,
+    `pre-market move vs yesterday close, got ${r.unrealized_today}`);
+  assert.match(r.pnl_basis, /pre-market marks/, 'the basis names the pre-market state');
+});
+
+test('overnight dead zone (03:00 ET weekday): still $0 — the chart may describe yesterday', async () => {
+  const friday0300 = Date.parse('2026-08-14T07:00:00Z');
+  const ledger = entry('GLD', '2026-08-13T14:00:00Z');
+  const p = { symbol: 'GLD', qty: 290, current_price: 399.68, unrealized_pl: 100 };
+  const r = await computeDayPnl({
+    positions: [p], ledgerText: ledger, now: friday0300,
+    getQuotes: quoter([quote('GLD', 399.68, 404.66)]),   // stale: still Thursday's chg
+  });
+  assert.strictEqual(r.unrealized_today, 0, 'no prints yet → no move to attribute');
+});
+
+test('a carried lot EXITED pre-market attributes only its pre-market leg (protective-mode shape)', async () => {
+  // The 04:05-style protective exit: carried GLD sold at 04:05+ ET. Realized
+  // must be exit − yesterday close, not exit − entry.
+  const friday0800 = Date.parse('2026-08-14T12:00:00Z');
+  const ledger = [
+    entry('GLD', '2026-08-13T14:00:00Z'),
+    row({ ts: '2026-08-14T08:05:00Z', event: 'exit', symbol: 'GLD', qty: 290, entry: 399.78, exit: 398.90, pnl: -255.20 }),
+  ].join('\n');
+  const r = await computeDayPnl({
+    positions: [], ledgerText: ledger, now: friday0800,
+    getQuotes: quoter([quote('GLD', 398.90, 399.68)]),
+  });
+  assert.ok(Math.abs(r.realized_today - (398.90 - 399.68) * 290) < 0.01,
+    `pre-market exit vs yesterday close, got ${r.realized_today}`);
 });
 
 test('weekend shape: no ET fills today + flat marks = Day P&L ~ 0', async () => {

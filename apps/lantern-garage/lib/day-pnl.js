@@ -59,11 +59,34 @@ function etClock(now) {
   return { dow: d.getDay(), min: d.getHours() * 60 + d.getMinutes() };
 }
 
-/** Regular session has begun (ET weekday, at/after 09:30). */
-function sessionTradedToday(now) {
+/**
+ * Can TODAY have its own prints yet? (ET weekday, at/after 04:00.)
+ *
+ * This gate decides whether a carried position's move-since-yesterday counts as
+ * today's P&L. It was originally 09:30, which silenced six real hours: on a
+ * trading day the pre-market IS today — IBKR marks the book all night, and the
+ * operator watched a moving book over a frozen panel ("the premarket is already
+ * open why doesnt it show the p/l").
+ *
+ * The phantom the gate exists for only ever occurs on NON-trading days: on a
+ * Sunday the quote source still describes Friday's session, so prevClose-based
+ * "moves" re-badge Friday's move as today (the +$1,359.77 Sunday header).
+ * On a weekday from ~04:00 ET, Yahoo's 1d chart has rolled to today —
+ * latestPrint returns live pre-market prints and chartPreviousClose is
+ * YESTERDAY's close — so the same arithmetic is simply correct.
+ *
+ * 04:00, not midnight: between 00:00 and ~04:00 ET no new prints exist and the
+ * chart may still describe yesterday, which is the weekend shape again.
+ * Known limitation (pre-existing at 09:30 too): a weekday market HOLIDAY passes
+ * this gate while quotes describe the prior session — we carry no exchange
+ * calendar. The engine does not trade holidays, so the exposure is display-only.
+ */
+function tradingDayLive(now) {
   const { dow, min } = etClock(now);
-  return dow >= 1 && dow <= 5 && min >= 570;
+  return dow >= 1 && dow <= 5 && min >= 240;
 }
+// Back-compat alias (older callers/tests import the original name).
+const sessionTradedToday = tradingDayLive;
 
 /**
  * One pass over the ledger.
@@ -208,7 +231,7 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
     let contrib = 0;
     let basis = 'entry';
     if (isCarried && !live) {
-      basis = 'no_session';                                 // no session → carried moved $0
+      basis = 'no_session';   // weekend/overnight: quotes still describe the PRIOR session
     } else if (isCarried && pc > 0 && cur > 0 && qty) {
       contrib = (cur - pc) * qty;                           // carried: today's move
       basis = 'prev_close';
@@ -225,7 +248,11 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
 
   let basis = 'realized(ET ledger fills) + unrealized change today'
     + ' (entry basis for today-opened, prevClose for carried — both terms)';
-  if (!live) basis += ' (no session today — carried positions contribute $0)';
+  if (!live) basis += ' (no trading day underway — carried positions contribute $0)';
+  else {
+    const { min } = etClock(now);
+    if (min < 570) basis += ' (pre-market marks)';   // real, current, just thinner liquidity
+  }
   if (realizedDegraded || unrealDegraded) basis += ' (prevClose unavailable for some carried lots — shown since entry)';
   basis += '; excludes commissions';
 
@@ -247,4 +274,4 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   };
 }
 
-module.exports = { computeDayPnl, scanLedger, exitOpenedToday, sessionTradedToday, etDay };
+module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay };
