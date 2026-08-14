@@ -174,6 +174,43 @@ test('bar-cache prevClose = last PRIOR session, official close — not post prin
   assert.strictEqual(get('MISSING', friday), null, 'no cache → null, caller falls back');
 });
 
+test('the 16:00-STAMPED bar is the first post-auction bar, not the close (GLD 398.71 vs 399.59)', () => {
+  const dir = barsDirWith('GLD', [
+    { t: '2026-08-13T19:55:00Z', c: 399.59 },  // 15:55 ET — last bar BEGINNING in-session
+    { t: '2026-08-13T20:00:00Z', c: 398.71 },  // 16:00 ET — starts AT the close = post bar
+    { t: '2026-08-14T12:00:00Z', c: 398.96 },
+  ]);
+  const get = prevCloseFromBarsFactory(dir);
+  assert.strictEqual(get('GLD', Date.parse('2026-08-14T12:30:00Z')), 399.59,
+    'bars are start-stamped: minute 960 is already outside the session');
+});
+
+test('TORN READ: a truncated view ending weeks back returns null, never a stale close', () => {
+  // The collector rewrites bar files; a read mid-rewrite saw GLD end at July 15
+  // and the factory served 372.19 as "yesterday's close" (live 2026-08-14).
+  const dir = barsDirWith('GLD', [
+    { t: '2026-07-15T19:55:00Z', c: 372.19 },
+    { t: '2026-07-15T20:10:00Z', c: 372.23 },
+  ]);
+  const get = prevCloseFromBarsFactory(dir);
+  assert.strictEqual(get('GLD', Date.parse('2026-08-14T12:30:00Z')), null,
+    'a "last session" 30 days old is a torn read, not a reference');
+});
+
+test('a torn read is not memoized — the next call sees the finished rewrite', () => {
+  const dir = barsDirWith('GLD', [
+    { t: '2026-07-15T19:55:00Z', c: 372.19 },  // truncated view first
+  ]);
+  const get = prevCloseFromBarsFactory(dir);
+  const friday = Date.parse('2026-08-14T12:30:00Z');
+  assert.strictEqual(get('GLD', friday), null, 'first read: truncated → null');
+  // the rewrite completes between polls
+  fsx.appendFileSync(pathx.join(dir, 'GLD-5m.jsonl'),
+    '\n' + JSON.stringify({ t: '2026-08-13T19:55:00Z', c: 399.59 }));
+  assert.strictEqual(get('GLD', friday), 399.59, 'second read must see the real file, not a pinned null');
+  assert.strictEqual(get('GLD', friday), 399.59, 'good answers ARE memoized');
+});
+
 test('the 04:42 shape end-to-end: stale quote reference loses to the bar cache', async () => {
   // getQuotes returns the not-yet-rolled quote (price = Thursday post print,
   // chg vs WEDNESDAY). Without the bar cache this books Thursday's move as
