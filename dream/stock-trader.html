@@ -4689,17 +4689,27 @@ function _accountFresh(){
   _staleKind = null;
   _lastGoodPoll = Date.now();
 }
-// Day P&L tooltip. When carried lots were closed today, `pnl_carry_adjustment`
-// is the pre-today gain the server stripped out of the day figure; naming the
-// amount is what turns "these three numbers don't add up" into an explanation.
+// Realized P&L tooltip. The panel figure is TODAY's realized — it starts at $0
+// every session. When trades that closed today were opened on an earlier day,
+// the cash they returned is larger (or smaller) than what they earned today;
+// `realized_booked` is that cash and naming it prevents "where did my profit
+// go", without putting a non-today number in a today row.
+function _realizedTip(a){
+  const base = 'Realized by trades closed TODAY — starts at $0 each session and counts only today\'s move.';
+  const booked = Number(a && a.realized_booked);
+  const adj = Number(a && a.pnl_carry_adjustment) || 0;
+  if (!adj || !isFinite(booked)) return base;
+  return base + ` Those trades returned $${fmt(booked, 2)} of cash in total, but $${fmt(Math.abs(adj), 2)} of that was earned on earlier days and was already in yesterday's balance.`;
+}
+// Day P&L tooltip.
 function _dayPnlTip(a){
-  const base = 'How much the account made TODAY — today\'s move only, across both closed and open positions.';
+  const base = 'How much the account made TODAY — today\'s move only, across both closed and open positions. Realized + Unrealized above add up to this.';
   const adj = Number(a && a.pnl_carry_adjustment) || 0;
   if (!adj) return base;
   const amt = '$' + fmt(Math.abs(adj), 2);
   return base + (adj > 0
-    ? ` Realized P&L includes ${amt} that accrued on carried positions BEFORE today (already counted in yesterday's equity); Day P&L excludes it.`
-    : ` Carried positions were down ${amt} coming into today, so Day P&L is higher than Realized suggests.`);
+    ? ` Excludes ${amt} that carried positions had already earned before today.`
+    : ` Carried positions came into today down ${amt}, which is not counted against today.`);
 }
 function renderTpSummary(a){
   const el=document.getElementById('tpSummary'); if(!el) return;
@@ -4717,17 +4727,17 @@ function renderTpSummary(a){
     // large short open). Labeling cash "Account balance" made a losing account look rich.
     cell('Account value', money(a.equity), '', 'Net liquidation value — what the account is actually worth (cash + positions). Tracks your P&L.') +
     cell('Cash', money(a.cash), '', 'Total cash, including short-sale proceeds. In a margin account with open shorts this is HIGHER than the account is worth — see Account value.') +
-    // Realized + Unrealized deliberately does NOT equal Day P&L. Realized is the
-    // cash closed trades banked, counted whole; Day P&L counts only what moved
-    // TODAY, so a lot carried in from an earlier day contributes just its move
-    // since yesterday's close — the rest was already inside yesterday's equity.
-    // On 2026-08-13 that gap was $5,119.60 and the header read +$7,653.13 for a
-    // +$2,533.54 day (#3283). The tooltip names the gap so it reads as arithmetic
-    // rather than as a broken widget.
-    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today),
-      'Cash banked by trades closed today, counted in full — including any gain that accrued on earlier days. That is why it does not simply add up to Day P&L.') +
-    cell('Unrealized P&L', signed(a.unrealized), cls(a.unrealized),
-      'Mark-to-market on the positions still open, measured since entry.') +
+    // EVERY figure in this row means TODAY, so the row can be read straight down:
+    //     Realized + Unrealized = Day P&L
+    // Mixing bases broke that. Realized used to be whole-lot (a position held
+    // three days banked all three days' gain the moment it closed), so on
+    // 2026-08-13 the row read +$2,144.95 and +$5,508.18 summing to +$2,533.54.
+    // Per-position "since entry" P&L still exists — it is the Unrealized column
+    // in the positions table, beside a Day column that sums to this one.
+    cell('Realized P&L', signed(a.realized_today), cls(a.realized_today), _realizedTip(a)) +
+    cell('Unrealized P&L', signed(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
+      cls(a.unrealized_today != null ? a.unrealized_today : a.unrealized),
+      'Today\'s move on the positions still open. A position carried from an earlier day counts only from yesterday\'s close — its full since-entry P&L is the Unrealized column in the table below.') +
     cell('Day P&L', signed(a.pnl_today), cls(a.pnl_today), _dayPnlTip(a)) +
     cell('Buying power', money(a.buying_power));
 }
@@ -4786,15 +4796,19 @@ function renderPositionsTable(positions){
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
   el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button></div>`+
     `<table class="tp-table"><thead><tr>
-    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th>Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
+    <th>Symbol</th><th>Side</th><th>Qty</th><th>Avg fill</th><th>Last</th><th title="Today's move on this position — what it contributed to Day P&L. For a position carried from an earlier day this is measured from yesterday's close, not from your entry.">Day P&L</th><th title="Since entry — the position's whole life, however many days it has been held.">Unrealized P&L</th><th>P&L %</th><th>Trade value</th><th>Market value</th><th></th></tr></thead><tbody>`+
     positions.map(p=>{
       const side=(p.side||'long').toLowerCase();
       const pnl=p.unrealized_pl||0, pct=p.pnl_pct||0;
       const c=pnl>=0?'var(--green)':'var(--red)';
+      // Day column: today's slice, which is what sums to the header's Day P&L.
+      // Carried positions differ from Unrealized here — that gap IS the point.
+      const dpnl=p.day_pnl, dc=(dpnl||0)>=0?'var(--green)':'var(--red)';
       return `<tr>
         <td><span class="tp-sym" onclick="focusTicker('${p.symbol}')">${p.symbol}</span></td>
         <td class="tp-side ${side==='short'?'short':'long'}">${side==='short'?'Short':'Long'}</td>
         <td>${p.qty}</td><td>$${fmt(p.avg_entry_price,2)}</td><td>$${fmt(p.current_price,2)}</td>
+        <td style="color:${dpnl==null?'var(--muted)':dc}"${p.day_basis?` title="basis: ${p.day_basis==='prev_close'?'carried — measured from yesterday\'s close':p.day_basis==='entry'?'opened today — measured from entry':p.day_basis==='no_session'?'no session yet today':'prev close unavailable — shown since entry'}"`:''}>${dpnl==null?'—':(dpnl>=0?'+':'')+fmt(dpnl,2)}</td>
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
         <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
