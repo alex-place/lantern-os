@@ -56,7 +56,12 @@ const PROVIDER_KEY_ALLOWLIST = [
 const PROVIDER_CONFIGS = {
   anthropic: { key: "ANTHROPIC_API_KEY", model: "claude-sonnet-5" },
   openai: { key: "OPENAI_API_KEY", model: "gpt-4o-mini" },
-  gemini: { key: "GEMINI_API_KEY", model: "gemini-2.5-flash" },
+  // Gemini has TWO wires (lib/gemini-transport.js): an AI-Studio API key, or Vertex
+  // AI on the machine's ADC — which needs no key at all. altKeys keeps this in step
+  // with lib/provider-cache.js PROVIDERS; without them a Vertex-only deployment
+  // (exactly how GCE runs) dispatches fine while this page reports "no_key", which
+  // is how a working provider got mistaken for a broken one.
+  gemini: { key: "GEMINI_API_KEY", altKeys: ["GOOGLE_API_KEY", "GEMINI_USE_VERTEX", "VERTEX_PROJECT"], model: "gemini-2.5-flash" },
   mistral: { key: "MISTRAL_API_KEY", model: "mistral-large-latest" },
   deepseek: { key: "DEEPSEEK_API_KEY", model: "deepseek-chat" },
   cohere: { key: "COHERE_API_KEY", model: "command-a-plus-05-2026" },
@@ -291,8 +296,11 @@ module.exports = async function providerRoutes(req, res, url, deps) {
       // process booted with; inRegistry is what the OS has. A key in the registry
       // the process did NOT start with = the #1233 mismatch (early dispatch sees
       // nothing even though the UI would otherwise say "connected").
-      const inProcessEnv = !!process.env[cfg.key];
-      const startedWithKey = !!_envAtStartup[cfg.key];
+      // A provider is credentialled if its primary key OR any alternate wire is
+      // configured (e.g. Gemini via Vertex ADC, which has no key).
+      const _anySet = (src) => !!src[cfg.key] || (cfg.altKeys || []).some((k) => !!src[k]);
+      const inProcessEnv = _anySet(process.env);
+      const startedWithKey = _anySet(_envAtStartup);
       const reg = _probeRegistry(cfg.key);
       const mismatch = reg.present && !startedWithKey;
       // Validity, not just presence: fold in the last real dispatch outcome so a
