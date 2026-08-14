@@ -13,8 +13,18 @@ const { applyM1Gate } = require("./m1-gate");
 
 // Resolve to repo root (same base file-queue's readers use), so writes land
 // where readJsonl("data/convergence/records.jsonl") would read them.
+//
+// CONVERGENCE_RECORDS_FILE redirects the store. This exists because the path was
+// previously unredirectable: once the stock autopilot began emitting a record per
+// entry/exit (#3286), every test that drove runAutoTrade wrote its FIXTURES into
+// the live store — 51 fake records ("GLD long 19 @ 100.00", "NVDA @ 180.00",
+// "X @ 100.00") landed in production from a single test run on 2026-08-14. A
+// learning store silently seeded with invented trades is worse than an empty one,
+// because nothing downstream can tell the difference.
 const RECORDS_REL = "data/convergence/records.jsonl";
-const RECORDS_PATH = path.resolve(__dirname, "..", "..", "..", RECORDS_REL);
+const RECORDS_PATH = process.env.CONVERGENCE_RECORDS_FILE
+  ? path.resolve(process.env.CONVERGENCE_RECORDS_FILE)
+  : path.resolve(__dirname, "..", "..", "..", RECORDS_REL);
 
 function _id() {
   return `cr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
