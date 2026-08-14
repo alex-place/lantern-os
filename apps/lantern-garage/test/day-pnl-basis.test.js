@@ -12,13 +12,20 @@
  *    since-entry unrealized re-counts every prior day's move each new day.
  *    Correct: today-opened → mark − entry; carried → mark − prevClose.
  *
- * Pure mirrors of the production expressions in routes/trading/market.js.
+ * These drove the REAL module (lib/day-pnl.js) as of #3283. They were mirrors
+ * of expressions inlined in routes/trading/market.js — which is precisely how
+ * the realized term kept its whole-lot basis while the mirrors stayed green.
+ * A test that re-implements the code under test cannot fail with it.
  */
 
 const test = require('node:test');
 const assert = require('node:assert');
+const { computeDayPnl, sessionTradedToday, etDay } = require('../lib/day-pnl');
 
-const etDay = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+const row = (o) => JSON.stringify(o);
+const quote = (ticker, price, prev) => ({ ticker, price, chg_pct: ((price - prev) / prev) * 100 });
+const quoter = (list) => async (syms) => list.filter((q) => syms.includes(q.ticker));
+const entry = (sym, ts) => row({ ts, event: 'entry', symbol: sym, qty: 1, entry: 1 });
 
 test('a Friday 19:36 ET fill still belongs to Friday after midnight UTC', () => {
   const fill = Date.parse('2026-08-07T23:36:08Z');          // 19:36 ET Friday
@@ -32,68 +39,79 @@ test('a Friday 19:36 ET fill still belongs to Friday after midnight UTC', () => 
   assert.strictEqual(etDay(fridayEvening), '2026-08-07', 'evening is still the same ET session');
 });
 
-// Mirror of the per-position contribution rule.
-function contribution(p, enteredToday, prevClose) {
-  const qty = Number(p.qty) || 0, cur = Number(p.current_price) || 0;
-  if (!enteredToday && prevClose > 0 && cur > 0 && qty) return (cur - prevClose) * qty;
-  return Number(p.unrealized_pl) || 0;
-}
-
-test('a position opened TODAY contributes its move since entry', () => {
-  const p = { qty: 39, current_price: 723.0, unrealized_pl: (723.0 - 721.68) * 39 };
-  assert.ok(Math.abs(contribution(p, true, 719.0) - 51.48) < 0.01);
+test('a Friday fill is still counted at 20:01 ET, not dropped by the UTC roll', async () => {
+  const friday2001 = Date.parse('2026-08-08T00:01:00Z');
+  const ledger = [
+    entry('QQQ', '2026-08-07T14:00:00Z'),
+    row({ ts: '2026-08-07T23:36:08Z', event: 'exit', symbol: 'QQQ', qty: 10, entry: 100, exit: 90, pnl: -654.42 }),
+  ].join('\n');
+  const r = await computeDayPnl({ positions: [], ledgerText: ledger, now: friday2001, getQuotes: quoter([]) });
+  assert.strictEqual(r.realized_today, -654.42, 'the session\'s realized loss must survive the evening');
 });
 
-test('a CARRIED position contributes only today\'s move, not its whole life', () => {
+test('a position opened TODAY contributes its move since entry', async () => {
+  const now = Date.parse('2026-08-10T18:00:00Z');   // Monday 14:00 ET
+  const ledger = entry('QQQ', '2026-08-10T14:00:00Z');
+  const p = { symbol: 'QQQ', qty: 39, current_price: 723.0, unrealized_pl: (723.0 - 721.68) * 39 };
+  const r = await computeDayPnl({ positions: [p], ledgerText: ledger, now, getQuotes: quoter([quote('QQQ', 723.0, 719.0)]) });
+  assert.ok(Math.abs(r.unrealized_today - 51.48) < 0.01, `got ${r.unrealized_today}`);
+});
+
+test('a CARRIED position contributes only today\'s move, not its whole life', async () => {
   // IWM carried from Friday: entered 300.59, prev close 301.56, mark 302.10.
-  const p = { qty: 191, current_price: 302.10, unrealized_pl: (302.10 - 300.59) * 191 }; // +288 since entry
-  const c = contribution(p, false, 301.56);
-  assert.ok(Math.abs(c - (302.10 - 301.56) * 191) < 0.01, 'only the +0.54 move today counts');
-  assert.ok(c < Number(p.unrealized_pl), 'must not re-count Friday\'s gain on Saturday');
+  const now = Date.parse('2026-08-10T18:00:00Z');   // Monday 14:00 ET
+  const ledger = entry('IWM', '2026-08-07T14:00:00Z');
+  const p = { symbol: 'IWM', qty: 191, current_price: 302.10, unrealized_pl: (302.10 - 300.59) * 191 }; // +288 since entry
+  const r = await computeDayPnl({ positions: [p], ledgerText: ledger, now, getQuotes: quoter([quote('IWM', 302.10, 301.56)]) });
+  assert.ok(Math.abs(r.unrealized_today - (302.10 - 301.56) * 191) < 0.01, 'only the +0.54 move today counts');
+  assert.ok(r.unrealized_today < Number(p.unrealized_pl), 'must not re-count Friday\'s gain on Monday');
 });
 
-test('no prevClose available → honest fallback to since-entry (never zero, never invented)', () => {
-  const p = { qty: 10, current_price: 100, unrealized_pl: 40 };
-  assert.strictEqual(contribution(p, false, 0), 40);
+test('no prevClose available → honest fallback to since-entry (never zero, never invented)', async () => {
+  const now = Date.parse('2026-08-10T18:00:00Z');
+  const ledger = entry('ZZZZ', '2026-08-07T14:00:00Z');
+  const p = { symbol: 'ZZZZ', qty: 10, current_price: 100, unrealized_pl: 40 };
+  const r = await computeDayPnl({ positions: [p], ledgerText: ledger, now, getQuotes: quoter([]) });
+  assert.strictEqual(r.unrealized_today, 40);
+  assert.strictEqual(r.degraded, true, 'the fallback must be declared, not silent');
 });
 
-// Mirror of the session gate: carried positions contribute $0 when today's ET
-// session hasn't traded (weekend or pre-open) — quotes still carry the LAST
-// session's chg_pct then, so a prevClose-derived "move" would be Friday's move
-// re-badged as today (the +$1,359.77 Sunday header, reported twice).
-function sessionTradedToday(etNow) {
-  const d = etNow.getDay(), mins = etNow.getHours() * 60 + etNow.getMinutes();
-  return d >= 1 && d <= 5 && mins >= 570;
-}
-
+// The session gate: carried positions contribute $0 when today's ET session
+// hasn't traded (weekend or pre-open) — quotes still carry the LAST session's
+// chg_pct then, so a prevClose-derived "move" would be Friday's move re-badged
+// as today (the +$1,359.77 Sunday header, reported twice).
 test('the session gate: weekend and pre-open are NOT a trading session; 09:30+ weekday is', () => {
-  const et = (s) => new Date(new Date(s).toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  assert.strictEqual(sessionTradedToday(et('2026-08-09T17:34:00Z')), false, 'Sunday');
-  assert.strictEqual(sessionTradedToday(et('2026-08-10T12:00:00Z')), false, 'Monday 08:00 ET pre-open');
-  assert.strictEqual(sessionTradedToday(et('2026-08-10T13:31:00Z')), true, 'Monday 09:31 ET');
-  assert.strictEqual(sessionTradedToday(et('2026-08-10T22:00:00Z')), true, 'Monday 18:00 ET — today DID trade');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-09T17:34:00Z')), false, 'Sunday');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T12:00:00Z')), false, 'Monday 08:00 ET pre-open');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T13:31:00Z')), true, 'Monday 09:31 ET');
+  assert.strictEqual(sessionTradedToday(Date.parse('2026-08-10T22:00:00Z')), true, 'Monday 18:00 ET — today DID trade');
 });
 
-test('carried + no session today = $0 contribution even with a stale chg_pct available', () => {
+test('carried + no session today = $0 contribution even with a stale chg_pct available', async () => {
   // Sunday: quote still says +0.6% (Friday's change) → naive prevClose credits
   // Friday's move. The gate must zero it regardless of what quotes claim.
-  const p = { qty: 191, current_price: 301.92, unrealized_pl: 245.39 };
+  const sunday = Date.parse('2026-08-09T17:34:00Z');
+  const ledger = entry('IWM', '2026-08-07T14:00:00Z');
+  const p = { symbol: 'IWM', qty: 191, current_price: 301.92, unrealized_pl: 245.39 };
   const stalePrevClose = 301.92 / 1.006;
-  const naive = (p.current_price - stalePrevClose) * p.qty;
-  assert.ok(naive > 300, 'the naive figure is exactly the reported phantom');
-  const gated = 0;   // production: carried && !sessionTradedToday → skip
-  assert.strictEqual(gated, 0);
+  assert.ok((p.current_price - stalePrevClose) * p.qty > 300, 'the naive figure is exactly the reported phantom');
+  const r = await computeDayPnl({ positions: [p], ledgerText: ledger, now: sunday, getQuotes: quoter([quote('IWM', 301.92, stalePrevClose)]) });
+  assert.strictEqual(r.unrealized_today, 0);
+  assert.match(r.pnl_basis, /no session today/);
 });
 
-test('weekend shape: no ET fills today + flat marks = Day P&L ~ 0', () => {
+test('weekend shape: no ET fills today + flat marks = Day P&L ~ 0', async () => {
   // Saturday: realized(today ET)=0; carried positions mark == Friday close.
+  const saturday = Date.parse('2026-08-08T16:00:00Z');
+  const ledger = [entry('IWM', '2026-08-07T14:00:00Z'), entry('SMH', '2026-08-07T14:00:00Z')].join('\n');
   const positions = [
-    { qty: 191, current_price: 301.56, unrealized_pl: 185 },
-    { qty: 153, current_price: 187.97, unrealized_pl: 78 },
+    { symbol: 'IWM', qty: 191, current_price: 301.56, unrealized_pl: 185 },
+    { symbol: 'SMH', qty: 153, current_price: 187.97, unrealized_pl: 78 },
   ];
-  const prevClose = { 0: 301.56, 1: 187.97 };
-  let unreal = 0;
-  positions.forEach((p, i) => { unreal += contribution(p, false, prevClose[i]); });
-  const dayPnl = 0 + unreal;
-  assert.ok(Math.abs(dayPnl) < 0.01, 'a non-trading day reads ~$0, not the open positions\' lifetime P&L');
+  const r = await computeDayPnl({
+    positions, ledgerText: ledger, now: saturday,
+    getQuotes: quoter([quote('IWM', 301.56, 301.56), quote('SMH', 187.97, 187.97)]),
+  });
+  assert.strictEqual(r.realized_today, 0);
+  assert.ok(Math.abs(r.pnl_today) < 0.01, 'a non-trading day reads ~$0, not the open positions\' lifetime P&L');
 });
