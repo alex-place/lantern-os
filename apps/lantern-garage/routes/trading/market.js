@@ -262,11 +262,21 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               now: Date.now(),
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
             });
-            ibkrAccount.realized_today = _d.realized_today;
+            ibkrAccount.realized_today = _d.realized_today;         // today's slice — panel figure
+            ibkrAccount.realized_booked = _d.realized_booked;       // cash the closed trades banked
+            ibkrAccount.unrealized_today = _d.unrealized_today;     // today's move on the open book
             ibkrAccount.pnl_today = _d.pnl_today;
             ibkrAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
             ibkrAccount.pnl_pct = ibkrAccount.equity ? (_d.pnl_today / ibkrAccount.equity) * 100 : 0;
             ibkrAccount.pnl_basis = _d.pnl_basis;
+            // Per-position day contribution, so the panel reconciles against the
+            // table row by row — the check that caught the summary/table mismatch
+            // before, now available for the "today" basis too.
+            const _dayBySym = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
+            for (const p of ibkrPositions) {
+              const _x = _dayBySym.get(String(p.symbol).toUpperCase());
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
+            }
           } catch (_e) { /* keep the broker figures if the ledger isn't readable */ }
         }
         sendJson(res, { positions: ibkrPositions, account: ibkrAccount }, 200);
@@ -302,10 +312,17 @@ module.exports = async function marketRoutes(req, res, url, ctx) {
               getQuotes: (syms) => require('../../lib/market-data-yahoo').getQuotes(syms),
             });
             opAccount.realized_today = _d.realized_today;
+            opAccount.realized_booked = _d.realized_booked;
+            opAccount.unrealized_today = _d.unrealized_today;
             opAccount.pnl_today = _d.pnl_today;
             opAccount.pnl_carry_adjustment = _d.pnl_carry_adjustment;
             opAccount.pnl_pct = opAccount.equity ? (_d.pnl_today / opAccount.equity) * 100 : 0;
             opAccount.pnl_basis = 'operator view: ' + _d.pnl_basis;
+            const _opDay = new Map((_d.per_position || []).map((x) => [x.symbol, x]));
+            for (const p of opPositions) {
+              const _x = _opDay.get(String(p.symbol).toUpperCase());
+              if (_x) { p.day_pnl = _x.day_pnl; p.day_basis = _x.day_basis; }
+            }
           } catch (_e) { /* ledger unreadable → keep the broker figures */ }
           // Flagged so the UI can never silently present the operator book as
           // the viewer's own account.
