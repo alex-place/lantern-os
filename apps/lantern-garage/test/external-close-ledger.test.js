@@ -22,9 +22,21 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ext-close-"));
 const LOG = path.join(dir, "trades.jsonl");
 const STATE = path.join(dir, "state.json");
 
-// Seed the pre-restart snapshot: we last saw 100 NVDA, entered 180, marked 170.
+// Seed the pre-restart snapshot: we last saw 100 NVDA, entered 180, marked 170,
+// alongside an ANCHOR position the broker still reports.
+//
+// The anchor is required, not decorative. Since #3277 the sweep DEFERS when the
+// position snapshot looks unreadable — an empty book while we believe we hold
+// something is a feed dropout, not a simultaneous close of everything. That
+// guard exists because on 2026-08-13 a single empty snapshot invented four
+// exits and inflated the day's ledger to +$7,305 against equity that had FALLEN
+// $4,634. With a broker returning [] these tests were asserting on a path that
+// can no longer run, and had been failing since that fix landed.
 fs.writeFileSync(STATE, JSON.stringify({
-  lastPos: { NVDA: { qty: 100, entry: 180, mark: 170, ts: Date.now() } },
+  lastPos: {
+    NVDA: { qty: 100, entry: 180, mark: 170, ts: Date.now() },
+    ANCH: { qty: 10, entry: 50, mark: 50, ts: Date.now() },
+  },
 }));
 
 process.env.TRADER_TRADES_LOG = LOG;
@@ -34,10 +46,13 @@ delete process.env.TRADER_AUTO_EXECUTE;
 
 const { runAutoTrade } = require("../lib/auto-trader");
 
-// Broker truth: the account is alive, and NVDA is GONE (its stop filled).
+// Broker truth: the account is alive, the rest of the book is READABLE, and
+// NVDA is GONE (its stop filled). A visible remainder is what makes NVDA's
+// absence evidence of a close rather than of a dropout.
+const ANCHOR = { symbol: "ANCH", qty: 10, avg_entry_price: 50, current_price: 50, market_value: 500, unrealized_pl: 0 };
 const bridge = {
   getIBKRAccount: async () => ({ equity: 100000, mode: "paper" }),
-  getIBKRPositions: async () => [],
+  getIBKRPositions: async () => [{ ...ANCHOR }],
   getIBKROpenOrders: async () => [],
 };
 
@@ -84,7 +99,10 @@ test("an unconfirmed exit of our own is NOT reconstructed on top of", async () =
   const LOG2 = path.join(dir2, "trades.jsonl");
   const STATE2 = path.join(dir2, "state.json");
   fs.writeFileSync(STATE2, JSON.stringify({
-    lastPos: { SHOP: { qty: 100, entry: 125, mark: 124, ts: Date.now() } },
+    lastPos: {
+      SHOP: { qty: 100, entry: 125, mark: 124, ts: Date.now() },
+      ANCH: { qty: 10, entry: 50, mark: 50, ts: Date.now() },
+    },
     exitStatus: { SHOP: "needs_confirmation" },
   }));
   process.env.TRADER_TRADES_LOG = LOG2;

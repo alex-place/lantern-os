@@ -376,6 +376,28 @@ function _noteStopFill(ts) {
 function _breakerTripped(now, k) {
   return k > 0 && _stopFillsDay === _etDate(now) && _stopFillsCount >= k;
 }
+// STOP ATTRIBUTION THRESHOLD (#3281). A position that leaves the book outside our
+// own exit path is reported only as an absence — "protective stop, manual close,
+// or another engine" — so a stop-out arriving that way armed neither counter
+// above. Treat the close as a stop when it gave up at least this fraction of its
+// stop distance. 0.9 covers the real case (SQQQ left at -2.88% against a 3% stop,
+// 96%) with room for the mark lagging the trigger tick, while still ignoring an
+// ordinary small-loss exit.
+//
+// Read per call, like cfg(), so the lab can sweep it without a reload. <= 0
+// disables attribution entirely and restores the pre-#3281 behaviour — note the
+// explicit > 0 guard at the use site: a bare `loss <= -(pct * 0)` is `loss <= 0`,
+// which attributes EVERY loss. That inversion is the whole reason the check is
+// spelled out rather than folded into the arithmetic.
+function _stopAttribFrac() {
+  const raw = process.env.TRADER_STOP_ATTRIB_FRAC;
+  // An EMPTY value means "unset", not 0. `Number('')` is 0, so a stray
+  // `TRADER_STOP_ATTRIB_FRAC=` line in .env would otherwise silently switch a
+  // tail defense off — the same silent-inert failure this whole fix is about.
+  if (raw == null || String(raw).trim() === '') return 0.9;
+  const v = Number(raw);
+  return Number.isFinite(v) ? v : 0.9;
+}
 function _etDate(ts) { return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); }
 function _nextTradingDates(dateStr, n) {
   // dateStr + n trading days (weekend-skipping; holidays just widen the block,
@@ -936,13 +958,44 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const qty = Number(snap.qty);
     if (!(qty > 0) || !Number.isFinite(entry) || !Number.isFinite(mark)) continue;  // can't value it → don't invent a number
     const pnl = _round2((mark - entry) * qty);
+    const _lossPct = entry > 0 ? ((mark - entry) / entry) * 100 : 0;
+    // ── STOP ATTRIBUTION (#3281) ─────────────────────────────────────────────
+    // The tail-defense counters — the per-symbol re-entry cooldown and the daily
+    // circuit breaker — armed ONLY in _reconcileFills, which needs a broker stop
+    // fill it can see. A stop-out that surfaces here instead, as an absence, armed
+    // nothing. Live 2026-08-13: SQQQ stopped out at 10:29:35 for -$1,674.06 and was
+    // re-entered at 10:29:38 — three seconds — and the day ended with
+    // stopCooldownThrough {} and stopFills {day:null,count:0} after a real stop
+    // fired. Both defenses were inert all session.
+    //
+    // We cannot KNOW this was the stop; the reason string says so ("protective
+    // stop, manual close, or another engine"). But a position that left the book
+    // having given up essentially its whole stop distance is a stop-out for every
+    // purpose these two counters exist to serve, whoever pulled the trigger.
+    // SQQQ left at -2.88% against a 3% stop — 96% of the distance.
+    //
+    // Deliberately asymmetric: arming costs one symbol one day of re-entry, while
+    // NOT arming costs an immediate re-entry into the position that just stopped.
+    const _attribFrac = _stopAttribFrac();
+    const _stopPct = Number(_stopDistPct.get(sym)) || cfg().stopMinPct || 0;
+    const _looksLikeStop = _attribFrac > 0 && _stopPct > 0
+      && _lossPct <= -(_stopPct * _attribFrac);
     logTrade({
       event: 'exit', symbol: sym, qty, entry, exit: mark,
-      pnl, pnl_pct: entry > 0 ? ((mark - entry) / entry) * 100 : null,
+      pnl, pnl_pct: entry > 0 ? _lossPct : null,
       reason: 'closed_externally (position left the book with no autopilot exit — protective stop, manual close, or another engine)',
       status: 'reconstructed', estimated: true,
+      // Auditable: why this close was (or was not) treated as a stop-out.
+      stop_attributed: _looksLikeStop,
+      stop_dist_pct: _stopPct || null,
       ...fillLedger.excursionFields(entry, _peak.get(sym), _trough.get(sym), _stopDistPct.get(sym)),
     });
+    if (_looksLikeStop) {
+      const _cdDays = cfg().stopCooldownDays;
+      if (_cdDays > 0) _stopCooldownThrough.set(sym, _nextTradingDates(_etDate(now), _cdDays));
+      _noteStopFill(now);        // feeds the daily circuit breaker
+      _saveState();              // survive a restart between the stop and the re-entry
+    }
   }
 
   // Fetch the account's working orders ONCE. Two uses: (1) re-protect naked longs, and
