@@ -1673,14 +1673,25 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
     const _sr = require('./session-record');
     const _ledger = fs.existsSync(TRADES_LOG) ? fs.readFileSync(TRADES_LOG, 'utf8') : '';
     if (_sr.shouldWriteSession(_ledger, now)) {
+      // OWNERSHIP FILTER — heldPos is EVERY position in the account, not this
+      // engine's. Champion holds XMMO/SPMO and the overnight sleeve holds its
+      // own; feeding them in would put another book's positions into this
+      // book's carried_out, open_risk and Day P&L. That is exactly the leak
+      // that made the 2026-08-13 sweep reconstruct SPMO/XMMO exits as ours
+      // (#3277). Same `_ourSyms` set that fix introduced.
+      const _mine = Object.values(heldPos).filter((p) => {
+        const k = String(p && p.symbol || '').toUpperCase();
+        if (!(Math.abs(Number(p && p.qty) || 0) > 0)) return false;
+        return !_ourSyms.size || _ourSyms.has(k);
+      });
       const _dp = await require('./day-pnl').computeDayPnl({
-        positions: Object.values(heldPos),
+        positions: _mine,
         ledgerText: _ledger,
         now,
         getQuotes: (syms) => require('./market-data-yahoo').getQuotes(syms),
       }).catch(() => ({}));
       logTrade(_sr.buildSessionRecord({
-        ledgerText: _ledger, now, account, positions: Object.values(heldPos), dayPnl: _dp,
+        ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
       }));
     }
   } catch (_e) { /* observability only — never breaks the scan */ }
