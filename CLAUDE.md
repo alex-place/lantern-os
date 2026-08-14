@@ -255,8 +255,20 @@ on top of CSF.
 ### Cloud vs local
 
 - **Local:** server binds to `127.0.0.1:4177`
-- **Cloud (Railway):** `apps/lantern-garage/cloud-server.js` is the entrypoint; binds to `0.0.0.0` when `PORT` env var is set. Railway auto-deploys from `master`.
-- **Static UI:** deployed from `gh-pages` branch via GitHub Actions; source in `apps/lantern-garage/public/`.
+- **Production (GCE):** the VM `lantern-app` runs `server.js` directly under
+  `lantern.service` (`PORT=8080`, `LANTERN_GARAGE_HOST=0.0.0.0`), fronted by a
+  Cloudflare tunnel → `unisona.ai`. **There is no auto-deploy** — shipping is a
+  manual tag checkout on the box; see [docs/ops/gce-cloud-deploy-runbook.md](docs/ops/gce-cloud-deploy-runbook.md).
+  Config comes from systemd drop-ins in `/etc/systemd/system/lantern.service.d/`,
+  **not** from a `.env` file (there is none on the host).
+- **`cloud-server.js`** is a 7-line shim for a `PORT`-injecting PaaS. It is **not
+  used by any current deployment** (verified 2026-08-14: no Railway config exists
+  anywhere in the repo). Earlier revisions of this file claimed "Railway
+  auto-deploys from master" — that was never true of the current stack.
+- **Static UI:** deployed from `gh-pages` branch via GitHub Actions
+  (`.github/workflows/deploy.yml`, `peaceiris/actions-gh-pages`); source in
+  `apps/lantern-garage/public/`. **This is the marketing/static surface only** —
+  it is not the app origin.
 
 ### Configuration
 

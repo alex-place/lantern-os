@@ -42,15 +42,23 @@ implementation of one loop stage.
 
 ## 2. System context & entrypoints
 
+> **Accuracy note (2026-08-14).** This table was re-grounded against the running
+> system after it was found describing a deployment that does not exist. Removed:
+> a "Cloud (Railway)" origin (no Railway config exists anywhere in the repo) and a
+> `:5050` trader dashboard child process (deleted — `server.js` says so in-line;
+> trading runs in-process now). Added: the real production origin. Line-number
+> citations drift with the file — treat them as approximate and grep for the
+> symbol instead.
+
 | Surface | Entrypoint | Bind | Notes |
 |---|---|---|---|
 | Local web server | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `127.0.0.1:4177` | Default; loopback only (`server.js:69-70`) |
-| Cloud (Railway) | [`apps/lantern-garage/cloud-server.js`](../apps/lantern-garage/cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim: sets `PORT` so `server.js` binds public |
+| **Production origin** (GCE) | [`apps/lantern-garage/server.js`](../apps/lantern-garage/server.js) | `0.0.0.0:8080` | VM `lantern-app`; `PORT`/`LANTERN_GARAGE_HOST` set by `lantern.service`, fronted by a Cloudflare tunnel → `unisona.ai`. **Manual deploy** (tag checkout) — see the [GCE runbook](ops/gce-cloud-deploy-runbook.md) |
+| Generic PaaS shim | [`apps/lantern-garage/cloud-server.js`](../apps/lantern-garage/cloud-server.js) | `0.0.0.0:$PORT` | 7-line shim for a `PORT`-injecting host. **Not used by any current deployment** — production runs `server.js` directly (verified 2026-08-14: no Railway config exists in the repo) |
 | Dev (hot-reload) | same server, port **4178** | `127.0.0.1:4178` | Dual-boot; current branch worktree |
 | Static UI | `gh-pages` branch (GitHub Actions) | — | Source in `apps/lantern-garage/public/` |
-| MCP server | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | `:8771` | Spawned by `server.js:307` |
-| MCP OAuth | `src/mcp_server/server_oauth.py` | `:8772` | Spawned by `server.js:331` |
-| Trader dashboard | (child process) | `:5050` | Spawned by `server.js:357` |
+| MCP server | [`src/mcp_server/server.py`](../src/mcp_server/server.py) | `:8771` | Spawned by `server.js` (~`:617`) |
+| MCP OAuth | `src/mcp_server/server_oauth.py` | `:8772` | Spawned by `server.js` (~`:626`) |
 
 The same `server.js` is the **single Node entrypoint** for local and cloud; the host is chosen at
 startup — `process.env.PORT ? "0.0.0.0" : "127.0.0.1"` ([`server.js:70`](../apps/lantern-garage/server.js)).
