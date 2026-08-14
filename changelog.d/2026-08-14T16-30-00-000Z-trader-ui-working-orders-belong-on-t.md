@@ -1,0 +1,3 @@
+### Fixed
+
+- trader-ui: working orders belong on the Orders tab, and can now be CANCELED there. The tab filter didn't recognize `submitted`/`presubmitted` as working, so resting pre-open sells — including a duplicate that needed killing — rendered under Order history while Orders said "None" ("the orders and order history are flipped"). Every working row now carries a ✕ Cancel button (two-step confirm → the DELETE route that existed since July with no UI caller); operator-book rows are marked `(op)`. To change an order: cancel, then re-place from the ticket (IBKR modify is cancel-and-replace). watch.html's copy of the filter got the same vocabulary

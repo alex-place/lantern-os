@@ -5047,22 +5047,46 @@ function _fmtOrderTime(s){
   const day=d.toLocaleDateString('en-US',tz), today=new Date().toLocaleDateString('en-US',tz);
   return day===today ? time : d.toLocaleDateString('en-US',{...tz,month:'short',day:'numeric'})+' '+time;
 }
+// A WORKING order belongs on the Orders tab. The old list omitted `submitted`
+// (the ledger rows' status) and `presubmitted` (IBKR's overnight state), so the
+// operator's four resting pre-open sells — including a duplicate that needed
+// CANCELING — rendered under Order history while Orders said "None"
+// ("the orders and order history are flipped", 2026-08-14). One vocabulary,
+// shared by both tables and by the cancel-button decision.
+function _isWorkingOrder(o){
+  return ['new','accepted','pending','open','partially_filled','submitted','presubmitted','pending_new','working','held']
+    .includes(String((o&&o.status)||'').toLowerCase());
+}
+// Cancel ONE working order (DELETE /api/trading/orders/:id — the route has
+// existed since 2026-07-26; no UI ever called it, so a wrong resting order
+// could only be killed from IBKR's own portal). Two-step confirm like Flatten.
+// "Change" on IBKR is cancel-and-replace: cancel here, re-place from the ticket.
+async function cancelOrder(id, btn){
+  if(!id) return;
+  if(!_twoStep(btn, 'Confirm ✕', ()=>cancelOrder(id, btn))) return;
+  try{
+    const r = await fetch('/api/trading/orders/'+encodeURIComponent(id), { method:'DELETE' });
+    const j = await r.json().catch(()=>({}));
+    if(j && j.ok) _alertToast('✓ Canceled '+id+(j.broker?' ('+j.broker+')':''));
+    else _alertToast('⚠ Cancel failed: '+((j && j.error) || r.statusText || r.status));
+  }catch(e){ _alertToast('⚠ Cancel failed: '+e.message); }
+  await loadOrders();
+}
 function renderOrders(orders){
   const openEl=document.getElementById('tp-orders'), histEl=document.getElementById('tp-history');
   const arr=Array.isArray(orders)?orders:[];
-  const row=(o)=>`<tr>
+  const row=(o,withActions)=>`<tr>
     <td><span class="tp-sym" onclick="focusTicker('${o.symbol}')">${o.symbol}</span></td>
     <td class="tp-side ${o.side==='buy'?'long':'short'}">${(o.side||'').toUpperCase()}</td>
     <td>${o.qty}</td><td>${o.type||'market'}</td><td>${o.limit_price?'$'+fmt(o.limit_price,2):'—'}</td>
-    <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}</td>
-    <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td></tr>`;
-  const tbl=(rows)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
-  const isOpen=(o)=>['new','accepted','pending','open','partially_filled'].includes((o.status||'').toLowerCase());
-  if(openEl) openEl.innerHTML = tbl(arr.filter(isOpen).map(row).join(''));
+    <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}${o.operator_account?' <span style="color:var(--text2)">(op)</span>':''}</td>
+    <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td>${withActions?`<td>${o.id?`<button class="tp-flat-btn" onclick="cancelOrder('${String(o.id).replace(/[^A-Za-z0-9-]/g,'')}',this)" title="Cancel this working order. To change it: cancel, then re-place from the ticket.">✕ Cancel</button>`:''}</td>`:''}</tr>`;
+  const tbl=(rows,withActions)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th>${withActions?'<th></th>':''}</tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
+  if(openEl) openEl.innerHTML = tbl(arr.filter(_isWorkingOrder).map(o=>row(o,true)).join(''), true);
   // Show the full fetched history (up to the 500 the API returns), not just the
   // 30 most recent — capping here was the visible half of "not all trades saved":
   // a busy session closes dozens in an hour, so 30 rows hid most of the day.
-  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!isOpen(o)).slice(0,500).map(row).join(''));
+  if(histEl) histEl.innerHTML = tbl(arr.filter(o=>!_isWorkingOrder(o)).slice(0,500).map(o=>row(o,false)).join(''), false);
 }
 
 // Day P&L from the actual per-position day move: Σ (last − prevClose)·qty, where
