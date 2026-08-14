@@ -237,7 +237,29 @@ sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-unisona
 
 ## Updating the running app
 
-No auto-deploy. To ship `master` (or a merged PR) to the box:
+**The box self-updates on published Releases — but *only* on Releases.** A systemd
+timer (`lantern-release-deploy.timer`, `enabled` + `active`, every 15 min) polls
+`releases/latest`; when the tag changes it checks it out, installs prod deps, and
+restarts `lantern.service`. Canonical units live in [`ops/gce/`](../../ops/gce/);
+the running script is `/usr/local/bin/lantern-release-deploy.sh` and the
+last-deployed tag is `/var/lib/lantern/deployed-release.tag`.
+
+Consequences worth knowing before you publish anything:
+
+- **Publishing a GitHub Release *is* a production deploy.** Prod rolls within ~15
+  minutes, unattended. Cut a prerelease tag (any tag with a hyphen, e.g.
+  `v1.16.0-rc1`) if you want artifacts without moving prod — those never become
+  `latest`.
+- **Merging to `master` does *not* move the box.** Only a published Release does.
+  So the manual pull below is still how you ship an unreleased `master` to prod.
+
+```bash
+# Check what the box thinks it is running, and when it next polls:
+gcloud compute ssh lantern-app --zone=us-central1-a --project=project-2f747c41-d0f3-4de9-b48 \
+  --command='cat /var/lib/lantern/deployed-release.tag; systemctl list-timers lantern-release-deploy.timer --no-pager'
+```
+
+To ship `master` (or a merged PR) to the box ahead of a Release:
 
 ```bash
 export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth application-default print-access-token)
