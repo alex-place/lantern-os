@@ -26,18 +26,27 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         // verifying the order state on the broker afterward.)
         const id = m[1];
         const isAlpacaId = /[a-f0-9]{8}-[a-f0-9]{4}/i.test(id);
-        let ok = false; let broker = null;
-        const tryAlpaca = async () => {
+        let ok = false; let broker = null; let cancelUid = null;
+        // TRUTHY-OBJECT BUG (live 2026-08-14): bridge.cancelIBKROrder returns
+        // { ok:false } when the account has no broker/session — an OBJECT, which
+        // this route treated as a boolean. {ok:false} is truthy, so a FAILED
+        // own-account cancel reported success, the toast said "✓ Canceled", the
+        // operator fallback never ran, and the duplicate SPXS kept resting at
+        // IBKR. Every result is now normalized through okOf().
+        const okOf = (r) => r === true || !!(r && r.ok === true);
+        const tryAlpaca = async (u) => {
           const alpaca = require('../../lib/alpaca-adapter');
-          return alpaca.available(uid) ? alpaca.cancelOrder(uid, id).catch(() => false) : false;
+          return alpaca.available(u) ? okOf(await alpaca.cancelOrder(u, id).catch(() => false)) : false;
         };
-        const tryIbkr = async () => bridge ? bridge.cancelIBKROrder?.(uid, id).catch(() => false) : false;
-        if (isAlpacaId) { ok = await tryAlpaca(); broker = ok ? 'alpaca' : null; }
-        else { ok = await tryIbkr(); broker = ok ? 'ibkr' : null; }
+        const tryIbkr = async (u) => (bridge && bridge.cancelIBKROrder
+          ? okOf(await bridge.cancelIBKROrder(u, id).catch(() => false)) : false);
+        if (isAlpacaId) { ok = await tryAlpaca(uid); broker = ok ? 'alpaca' : null; }
+        else { ok = await tryIbkr(uid); broker = ok ? 'ibkr' : null; }
         if (!ok) { // cross-broker fallback, tried honestly
-          ok = isAlpacaId ? await tryIbkr() : await tryAlpaca();
+          ok = isAlpacaId ? await tryIbkr(uid) : await tryAlpaca(uid);
           if (ok) broker = isAlpacaId ? 'ibkr' : 'alpaca';
         }
+        if (ok) cancelUid = uid;
         // ADMIN OPERATOR-VIEW CANCEL FALLBACK (2026-08-14). The operator-view
         // Orders tab lists the operator book's orders; its cancel button must be
         // able to cancel them, or the tab shows a duplicate sell it cannot act
@@ -48,19 +57,39 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
             const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
             const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
             if (isAdminFn(req) && uid !== OPERATOR_UID) {
-              ok = await (bridge && bridge.cancelIBKROrder ? bridge.cancelIBKROrder(OPERATOR_UID, id).catch(() => false) : false);
+              ok = await tryIbkr(OPERATOR_UID);
               if (ok) broker = 'ibkr-operator';
               else {
-                const alpaca = require('../../lib/alpaca-adapter');
-                if (alpaca.available(OPERATOR_UID)) {
-                  ok = await alpaca.cancelOrder(OPERATOR_UID, id).catch(() => false);
-                  if (ok) broker = 'alpaca-operator';
-                }
+                ok = await tryAlpaca(OPERATOR_UID);
+                if (ok) broker = 'alpaca-operator';
               }
+              if (ok) cancelUid = OPERATOR_UID;
             }
           } catch (_e) { /* auth module absent → no fallback */ }
         }
-        sendJson(res, ok ? { ok: true, canceled: id, broker } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
+        // VERIFY, don't trust (this route's own history: a cancel once "succeeded"
+        // against the wrong broker, "caught by verifying the order state on the
+        // broker afterward" — and today's truthy-object bug produced the same
+        // false toast by another road). A cancel only counts when the order is
+        // no longer WORKING on the account that canceled it. One retry covers
+        // IBKR's cancel-acknowledgement lag.
+        let verified = null;
+        if (ok && broker && /ibkr/.test(broker) && bridge && bridge.getIBKROpenOrders) {
+          const stillWorking = async () => {
+            const open = await bridge.getIBKROpenOrders(cancelUid).catch(() => null);
+            if (!Array.isArray(open)) return null;           // unreadable → unknown
+            const row = open.find((o) => String(o && o.orderId) === String(id));
+            return !!(row && /submit|presubmit|pending(?!cancel)|open|accepted|new|working|held/i.test(String(row.status || '')));
+          };
+          let w = await stillWorking();
+          if (w === true) { await new Promise((r2) => setTimeout(r2, 700)); w = await stillWorking(); }
+          verified = w === null ? null : !w;
+          if (verified === false) {
+            sendJson(res, { ok: false, error: 'cancel_not_confirmed', order_id: id, broker, detail: 'the broker accepted the cancel request but the order is still working — check the Orders tab and retry' }, 502);
+            return true;
+          }
+        }
+        sendJson(res, ok ? { ok: true, canceled: id, broker, ...(verified === null ? {} : { verified }) } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
       } catch (error) {
         sendJson(res, { ok: false, error: error.message }, 500);
       }
