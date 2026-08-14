@@ -25,7 +25,7 @@ const assert = require('node:assert');
 
 const ordersRoutes = require('../routes/trading/orders');
 
-async function drive(payload, { positions } = {}) {
+async function drive(payload, { positions, openOrders } = {}) {
   const captured = { orderReq: null, response: null, code: null };
   const ctx = {
     sendJson: (_res, body, code) => { captured.response = body; captured.code = code; },
@@ -34,6 +34,7 @@ async function drive(payload, { positions } = {}) {
       placeIBKROrder: async (_uid, orderReq) => { captured.orderReq = orderReq; return { status: 'error', error: 'stub' }; },
       // absent option → feed unreadable (throws), the conservative default
       getIBKRPositions: async () => { if (positions === undefined) throw new Error('feed down'); return positions; },
+      getIBKROpenOrders: async () => (openOrders === undefined ? [] : openOrders),
     },
     traderAgent: null,
     tradingMemory: { recordNewOrders: async () => {} },
@@ -128,4 +129,92 @@ test('dust cannot certify a sell: 0.8 held does not cover a 1-share sell', async
     { positions: [{ symbol: 'SOXS', qty: 0.8 }] },
   );
   assert.strictEqual(c.orderReq.acceptWarnings, false, 'held < 1 share cannot cover any whole-share sell');
+});
+
+// ── the two 04:34 live failures (2026-08-14, the operator's pre-open trim) ───
+
+test('FRACTIONAL FLATTEN: selling the raw 3057.8 against 3057.8 held auto-accepts (both floor)', async () => {
+  // The UI sends the position's raw qty; the bridge floors it before placing.
+  // Verification judged the UNfloored request (3057.8 ≤ 3057 → false) and
+  // bounced the operator's SOXS flatten to the popup for no reason.
+  const c = await drive(
+    { ticker: 'SOXS', side: 'sell', qty: 3057.8, type: 'market' },
+    { positions: [{ symbol: 'SOXS', qty: 3057.8 }] },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true, 'the sell that will actually be sent is floor(3057.8)=3057, fully covered');
+});
+
+test('A RESTING SELL COUNTS: the second identical flatten must NOT auto-accept', async () => {
+  // Pre-market market orders REST until the auction, so the position list does
+  // not update. The operator clicked Flatten SPXS twice; the second submit was
+  // auto-accepted against the unchanged position — a 2,467-share oversell in
+  // two installments (order ids 1765890034/35, live).
+  const c = await drive(
+    { ticker: 'SPXS', side: 'sell', qty: 2467, type: 'market' },
+    {
+      positions: [{ symbol: 'SPXS', qty: 2467 }],
+      openOrders: [{ symbol: 'SPXS', side: 'SELL', qty: 2467, orderType: 'Market', status: 'Submitted' }],
+    },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, false, 'held 2467 minus resting 2467 leaves nothing to cover a second sell');
+});
+
+test('a PARTIAL resting sell leaves the remainder auto-acceptable', async () => {
+  const c = await drive(
+    { ticker: 'SPXS', side: 'sell', qty: 1000, type: 'market' },
+    {
+      positions: [{ symbol: 'SPXS', qty: 2467 }],
+      openOrders: [{ symbol: 'SPXS', side: 'SELL', qty: 1400, orderType: 'Limit', status: 'PreSubmitted' }],
+    },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true, '2467 − 1400 resting = 1067 available covers 1000');
+});
+
+test('protective STOPS do not count against availability — every position carries one', async () => {
+  const c = await drive(
+    { ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' },
+    {
+      positions: [{ symbol: 'SQQQ', qty: 1614 }],
+      openOrders: [{ symbol: 'SQQQ', side: 'SELL', qty: 1614, orderType: 'Stop', status: 'PreSubmitted' }],
+    },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true, 'counting the stop would make every flatten unverifiable');
+});
+
+test('other symbols\' resting sells never bleed into availability', async () => {
+  const c = await drive(
+    { ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' },
+    {
+      positions: [{ symbol: 'SQQQ', qty: 1614 }],
+      openOrders: [{ symbol: 'SPXS', side: 'SELL', qty: 2467, orderType: 'Market', status: 'Submitted' }],
+    },
+  );
+  assert.strictEqual(c.orderReq.acceptWarnings, true);
+});
+
+test('open-orders feed unreadable → cannot verify → no auto-accept (blind rule extends)', async () => {
+  const c = await drive(
+    { ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' },
+    {
+      positions: [{ symbol: 'SQQQ', qty: 1614 }],
+      openOrders: null,   // stub returns null → not an array
+    },
+  );
+  // getIBKROpenOrders returning a non-array is treated as zero resting — but a
+  // THROW must refuse. Drive the throw:
+  const captured = { orderReq: null };
+  const ctx = {
+    sendJson: () => {},
+    collectRequestBody: async () => JSON.stringify({ ticker: 'SQQQ', side: 'sell', qty: 1614, type: 'market' }),
+    bridge: {
+      placeIBKROrder: async (_u, o) => { captured.orderReq = o; return { status: 'error', error: 'stub' }; },
+      getIBKRPositions: async () => [{ symbol: 'SQQQ', qty: 1614 }],
+      getIBKROpenOrders: async () => { throw new Error('orders feed down'); },
+    },
+    traderAgent: null, tradingMemory: { recordNewOrders: async () => {} }, tradingStore: {},
+    getEffectiveUserId: () => 'test-user',
+  };
+  await ordersRoutes({ method: 'POST', headers: {}, socket: {} }, {}, new URL('http://127.0.0.1/api/trading/orders/place'), ctx);
+  assert.strictEqual(captured.orderReq.acceptWarnings, false, 'an unreadable orders feed is the dropout shape — human check stays');
+  void c;
 });

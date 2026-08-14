@@ -1,0 +1,3 @@
+### Fixed
+
+- trader-ui: flatten verification now counts resting sells and floors fractional quantities. Pre-market market orders rest until the auction, so the position list doesn't update — a second Flatten click was auto-accepted against the unchanged position, submitting a duplicate 2,467-share SPXS sell (an oversell in two installments). Availability is now held minus resting non-stop sells, mirroring the engine's own workingSells guard; protective stops don't count. And the check judges the floored qty the bridge will actually send, so a fractional position (SOXS 3,057.8) no longer bounces to the popup

@@ -192,7 +192,32 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           if (!Array.isArray(pos)) return false;
           const p = pos.find((x) => String(x && x.symbol).toUpperCase() === String(ticker).toUpperCase());
           const held = Math.abs(Number(p && p.qty) || 0);
-          return held >= 1 && Number(qty) <= Math.floor(held);
+          if (held < 1) return false;
+          // RESTING SELLS COUNT AGAINST THE POSITION (live 2026-08-14 04:34).
+          // The operator flattened SPXS, the position list did not update
+          // (pre-market market orders REST until the auction), so they clicked
+          // again — and this check re-verified against the unchanged position
+          // and auto-accepted a DUPLICATE 2,467-share sell: an oversell in two
+          // installments. The engine's own exit path has exactly this guard
+          // (its workingSells set); the manual path now has it too. Protective
+          // STOPS deliberately do not count: every position always carries one,
+          // and counting it would make every flatten unverifiable.
+          let resting = 0;
+          const open = await bridge.getIBKROpenOrders(uidX);
+          for (const o of (Array.isArray(open) ? open : [])) {
+            if (String(o && o.symbol).toUpperCase() !== String(ticker).toUpperCase()) continue;
+            if (!/sell/i.test(o.side || '')) continue;
+            if (/stp|stop/i.test(o.orderType || o.type || '')) continue;
+            if (!/submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || '')) continue;
+            resting += Number(o.qty) || 0;
+          }
+          const available = Math.floor(held) - resting;
+          // FLOOR THE REQUEST TOO (same morning): the UI sends the position's
+          // raw fractional qty (SOXS 3057.8); the bridge floors it before
+          // placing, so verification must judge the sell that will actually be
+          // sent — floor(3057.8)=3057 against 3057 available is risk-reducing.
+          const wanted = Math.floor(Number(qty));
+          return wanted >= 1 && wanted <= available;
         } catch (_e) { return false; }   // cannot verify -> cannot auto-accept
       };
       if (stopLoss != null && Number(stopLoss) <= 0) {
