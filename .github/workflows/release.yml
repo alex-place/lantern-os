@@ -107,11 +107,71 @@ jobs:
       - name: Run auth E2E
         run: npm run test:auth
 
+  # KEY-FEATURE GATE (added after the 2026-08-14 zero-providers outage). The auth
+  # gate above proves the code works; this proves the SHIPPED SURFACES answer —
+  # key pages serve real content, the provider registry does not contradict
+  # itself, and per-account data still refuses an anonymous caller. It runs the
+  # same suite that verifies production (tests/e2e-deploy), against a server
+  # booted here, in its structural tier: DEPLOY_EXPECT_LIVE is deliberately NOT
+  # set, because CI has no API keys and "a provider is usable" is a statement
+  # about a deployment, not about a build. That half is asserted against the live
+  # host by .github/workflows/deployment-verify.yml once the tag is out.
+  key-feature-gate:
+    name: Key-feature gate (deployment suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install root deps (Playwright runner)
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install app deps (server under test)
+        working-directory: apps/lantern-garage
+        run: npm ci --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Boot the server under test
+        working-directory: apps/lantern-garage
+        env:
+          LANTERN_GARAGE_PORT: "8080"
+          TRADER_AUTOSCAN: "0"
+        run: |
+          node server.js > /tmp/keyfeature-server.log 2>&1 &
+          # Readiness must wait for the LAST subsystem to come up, not the first.
+          # /api/version answers well before the trading routes are mounted, and
+          # probing only that produced a genuinely flaky gate — two specs failing
+          # on the cold first attempt and passing on retry. Poll a trading route
+          # as well, so the suite starts against a fully warm server.
+          for i in $(seq 1 45); do
+            if curl -sf -m 2 http://127.0.0.1:8080/api/version >/dev/null \
+               && curl -sf -m 5 http://127.0.0.1:8080/api/trading/market-status >/dev/null; then
+              echo "server ready after ~$((i * 2))s"; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::server never became ready"; tail -40 /tmp/keyfeature-server.log; exit 1
+
+      - name: Verify key features
+        env:
+          DEPLOY_BASE_URL: http://127.0.0.1:8080
+        run: npm run test:deploy
+
+      - name: Server log on failure
+        if: failure()
+        run: tail -60 /tmp/keyfeature-server.log || true
+
   # ── Create GitHub Release ─────────────────────────────────────────────────────
   github-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build, e2e-gate]
+    needs: [build, e2e-gate, key-feature-gate]
 
     steps:
       - uses: actions/checkout@v7

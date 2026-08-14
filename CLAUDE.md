@@ -156,7 +156,21 @@ npm run test:auth                              # from repo ROOT (specs are repo-
 # Greenpath release gate (#2545): 10 demo accounts × full signup→trade→chat→Pro
 # journey; RED blocks the first-50 invites. See docs/GREENPATH-GATE.md.
 npm run test:greenpath                         # from repo ROOT; GREENPATH_ACCOUNTS=2 to smoke
+
+# Deployment verify — does the product WORK where it's deployed? Unlike every
+# other suite, this one boots NO server: it points at one that is already
+# running, so it can fail on CONFIGURATION, not just code. Added after the
+# 2026-08-14 outage where GCE served with zero providers (chat had no model)
+# while CI was fully green. See docs/ops/gce-cloud-deploy-runbook.md.
+npm run test:deploy                            # local :8080, structural tier
+DEPLOY_BASE_URL=https://unisona.ai DEPLOY_EXPECT_LIVE=1 npm run test:deploy   # live host
 ```
+
+**Verification rule (post-2026-08-14):** a release is not verified because the
+build is green — it is verified when the key features answer *on the machine
+that serves them*. `key-feature-gate` in `release.yml` blocks a tag on the
+structural half; `.github/workflows/deployment-verify.yml` runs the serving half
+against production hourly and after every release.
 
 ### Python services
 

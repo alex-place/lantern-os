@@ -1,0 +1,84 @@
+name: Deployment verify
+
+# Does the product actually WORK where it is deployed?
+#
+# Written after the 2026-08-14 outage: the GCE host ran with zero providers
+# configured, so every chat turn fell through to the offline reply. CI was fully
+# green throughout — because every other suite boots its own server with correct
+# test env, which is structurally incapable of catching a broken deployment.
+#
+# This workflow points the deployment suite at a RUNNING host and asserts the key
+# features answer there. It is the only check in the repo that can fail because
+# of configuration rather than code.
+#
+#   • after a release tag  — verify what we just shipped is actually serving
+#   • hourly               — an outage is found by us, not by a user
+#   • manually             — any base URL, e.g. a staging host
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Base URL to verify"
+        required: true
+        default: "https://unisona.ai"
+      expect_version:
+        description: "Optional semver the deployment must report (e.g. 1.15.3)"
+        required: false
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  schedule:
+    # Hourly. Cheap (a handful of HTTP calls) and turns a silent outage into a
+    # notification within the hour.
+    - cron: "17 * * * *"
+
+concurrency:
+  group: deployment-verify-${{ github.event.inputs.base_url || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify live deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Install root deps (Playwright runner)
+        run: npm ci --ignore-scripts --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify the deployment
+        env:
+          DEPLOY_BASE_URL: ${{ github.event.inputs.base_url || 'https://unisona.ai' }}
+          # The serving assertions (at least one provider usable) only mean
+          # something against a real deployment — this is that context.
+          DEPLOY_EXPECT_LIVE: "1"
+          DEPLOY_EXPECT_VERSION: ${{ github.event.inputs.expect_version }}
+        run: npm run test:deploy
+
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-verify-traces
+          path: test-results/
+          retention-days: 7
+
+      - name: Explain a failure
+        if: failure()
+        run: |
+          echo "::error::The live deployment failed verification — this is a CONFIG or OUTAGE signal, not a code regression."
+          echo "Most likely causes, in the order they have actually happened:"
+          echo "  1. No provider configured on the host (chat has no model). Check /api/providers/status."
+          echo "     lantern.service reads its env from /etc/systemd/system/lantern.service.d/*.conf"
+          echo "  2. The service is down or serving an older tag. Check /api/version."
+          echo "  3. A gate regressed and per-account data is readable anonymously."
+          echo "See docs/ops/gce-cloud-deploy-runbook.md for the deploy + verify runbook."
