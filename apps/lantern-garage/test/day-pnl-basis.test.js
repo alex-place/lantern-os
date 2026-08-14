@@ -146,6 +146,66 @@ test('a carried lot EXITED pre-market attributes only its pre-market leg (protec
     `pre-market exit vs yesterday close, got ${r.realized_today}`);
 });
 
+// ── prevClose from the bar cache (the 04:42 live failure) ────────────────────
+// Yahoo's 1d chart rolls per-symbol at an undocumented hour; at 04:42 ET it was
+// still serving WEDNESDAY as "previous close" (SPXS day showed −$1,186 against
+// a 24.04 reference). The bar cache is ours and deterministic.
+const { prevCloseFromBarsFactory } = require('../lib/day-pnl');
+const fsx = require('fs');
+const osx = require('os');
+const pathx = require('path');
+
+function barsDirWith(sym, bars) {
+  const dir = fsx.mkdtempSync(pathx.join(osx.tmpdir(), 'bars-'));
+  fsx.writeFileSync(pathx.join(dir, sym + '-5m.jsonl'), bars.map((b) => JSON.stringify(b)).join('\n'));
+  return dir;
+}
+
+test('bar-cache prevClose = last PRIOR session, official close — not post prints, not today', () => {
+  const dir = barsDirWith('SOXS', [
+    { t: '2026-08-12T19:55:00Z', c: 40.68 },   // Wednesday 15:55 ET
+    { t: '2026-08-13T19:55:00Z', c: 39.78 },   // Thursday 15:55 ET — THE official close
+    { t: '2026-08-13T21:00:00Z', c: 40.05 },   // Thursday 17:00 ET post print — belongs to Friday's move
+    { t: '2026-08-14T12:00:00Z', c: 40.12 },   // Friday 08:00 ET pre — today, must be skipped
+  ]);
+  const get = prevCloseFromBarsFactory(dir);
+  const friday = Date.parse('2026-08-14T12:30:00Z');
+  assert.strictEqual(get('SOXS', friday), 39.78, 'Thursday 16:00 close, not the 17:00 post print');
+  assert.strictEqual(get('MISSING', friday), null, 'no cache → null, caller falls back');
+});
+
+test('the 04:42 shape end-to-end: stale quote reference loses to the bar cache', async () => {
+  // getQuotes returns the not-yet-rolled quote (price = Thursday post print,
+  // chg vs WEDNESDAY). Without the bar cache this books Thursday's move as
+  // today; with it, today's move is measured from Thursday's true close.
+  const friday0800 = Date.parse('2026-08-14T12:00:00Z');
+  const dir = barsDirWith('SPXS', [
+    { t: '2026-08-13T19:55:00Z', c: 23.55 },   // Thursday close
+  ]);
+  const ledger = entry('SPXS', '2026-08-13T14:00:00Z');
+  const p = { symbol: 'SPXS', qty: 2467, current_price: 23.56, unrealized_pl: 60 };
+  const r = await computeDayPnl({
+    positions: [p], ledgerText: ledger, now: friday0800,
+    getQuotes: quoter([quote('SPXS', 23.56, 24.0583)]),          // stale: references Wednesday
+    getPrevClose: prevCloseFromBarsFactory(dir),
+  });
+  assert.ok(Math.abs(r.unrealized_today - (23.56 - 23.55) * 2467) < 0.01,
+    `must use Thursday's close (got ${r.unrealized_today}, stale ref would give ${((23.56 - 24.0583) * 2467).toFixed(0)})`);
+});
+
+test('bar cache empty for the symbol → quote-derived reference still works (fallback intact)', async () => {
+  const friday0800 = Date.parse('2026-08-14T12:00:00Z');
+  const dir = fsx.mkdtempSync(pathx.join(osx.tmpdir(), 'bars-empty-'));
+  const ledger = entry('GLD', '2026-08-13T14:00:00Z');
+  const p = { symbol: 'GLD', qty: 290, current_price: 398.20, unrealized_pl: -458 };
+  const r = await computeDayPnl({
+    positions: [p], ledgerText: ledger, now: friday0800,
+    getQuotes: quoter([quote('GLD', 398.20, 399.68)]),
+    getPrevClose: prevCloseFromBarsFactory(dir),
+  });
+  assert.ok(Math.abs(r.unrealized_today - (398.20 - 399.68) * 290) < 0.01, `got ${r.unrealized_today}`);
+});
+
 test('weekend shape: no ET fills today + flat marks = Day P&L ~ 0', async () => {
   // Saturday: realized(today ET)=0; carried positions mark == Friday close.
   const saturday = Date.parse('2026-08-08T16:00:00Z');

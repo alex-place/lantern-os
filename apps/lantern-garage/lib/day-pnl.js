@@ -89,6 +89,63 @@ function tradingDayLive(now) {
 const sessionTradedToday = tradingDayLive;
 
 /**
+ * prevClose from OUR OWN bar cache — the reference Yahoo cannot give reliably.
+ *
+ * Live 2026-08-14, 04:42 ET: the panel showed SPXS day −$1,186, implying a
+ * reference close of 24.04 — WEDNESDAY's close. Yahoo's 1d chart had not rolled
+ * to Friday yet, so `chartPreviousClose` pointed one session back and the
+ * "today move" was Thursday's move re-badged. The roll time is per-symbol and
+ * undocumented; a clock gate cannot fix a data-roll problem.
+ *
+ * We hold the truth locally: the bar cache has every session's prints. The
+ * reference for "today's move" is the LAST PRIOR SESSION's official close —
+ * last bar at/before 16:00 ET of the newest cached day before today (the cache
+ * also holds extended-hours bars, and post-market drift belongs to the NEXT
+ * day's move, same as IBKR's own dpl convention).
+ *
+ * Returns a lookup (sym, now) -> close|null. Fail-soft null on any gap; the
+ * caller falls back to the quote-derived reference, then to since-entry.
+ * Memoized per (sym, ET-day): the answer cannot change within a day.
+ */
+function prevCloseFromBarsFactory(barsDir) {
+  const fs = require('fs');
+  const path = require('path');
+  const memo = new Map();
+  return (sym, now = Date.now()) => {
+    const s = String(sym || '').toUpperCase();
+    const today = etDay(now);
+    const key = s + '|' + today;
+    if (memo.has(key)) return memo.get(key);
+    let out = null;
+    try {
+      const rows = fs.readFileSync(path.join(barsDir, s + '-5m.jsonl'), 'utf8').split('\n');
+      let bestDay = null;
+      const dayBars = [];
+      for (let i = rows.length - 1; i >= 0; i--) {           // newest-first
+        if (!rows[i].trim()) continue;
+        let b; try { b = JSON.parse(rows[i]); } catch (_e) { continue; }
+        const t = b.t || b.ts || b.time;
+        if (!t) continue;
+        const d = etDay(t);
+        if (d >= today) continue;                            // skip today's prints
+        if (bestDay == null) bestDay = d;
+        if (d !== bestDay) break;                            // left the last prior session
+        dayBars.push(b);
+      }
+      if (dayBars.length) {
+        dayBars.sort((a, b) => Date.parse(a.t || a.ts || a.time) - Date.parse(b.t || b.ts || b.time));
+        const regular = dayBars.filter((b) => etClock(b.t || b.ts || b.time).min <= 960);
+        const pick = (regular.length ? regular : dayBars).pop();
+        const c = Number(pick.c ?? pick.close);
+        if (c > 0) out = c;
+      }
+    } catch (_e) { /* no cache for this symbol → null */ }
+    memo.set(key, out);
+    return out;
+  };
+}
+
+/**
  * One pass over the ledger.
  *   entryTsBySym  sym -> [ms] of TODAY's entry rows (ascending)
  *   lastEntryDay  sym -> ET date of its most recent entry row (any day)
@@ -171,7 +228,7 @@ function exitOpenedToday(entryTsBySym, exit) {
  * @param {number}   o.now         ms epoch
  * @param {Function} o.getQuotes   async (symbols[]) -> [{ticker, price, chg_pct}]
  */
-async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now(), getQuotes } = {}) {
+async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now(), getQuotes, getPrevClose } = {}) {
   const today = etDay(now);
   const live = sessionTradedToday(now);
   const { entryTsBySym, lastEntryDay, exits, realizedFull, anyExit } = scanLedger(ledgerText, now);
@@ -187,9 +244,21 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
     ...carriedExits.map((e) => e.symbol),
   ]);
   const prevClose = new Map();
-  if (need.size && typeof getQuotes === 'function') {
+  // Reference preference: OUR bar cache first (the last prior session's official
+  // close — immune to Yahoo's undocumented per-symbol chart roll, which at 04:42
+  // ET was still serving Wednesday as "previous close"), quote-derived second.
+  if (need.size && typeof getPrevClose === 'function') {
+    for (const sym of need) {
+      try {
+        const c = await getPrevClose(sym, now);
+        if (Number(c) > 0) prevClose.set(sym, Number(c));
+      } catch (_e) { /* fall through to the quote-derived reference */ }
+    }
+  }
+  const stillNeed = [...need].filter((s) => !prevClose.has(s));
+  if (stillNeed.length && typeof getQuotes === 'function') {
     try {
-      for (const q of (await getQuotes([...need])) || []) {
+      for (const q of (await getQuotes(stillNeed)) || []) {
         if (q && Number(q.price) > 0 && Number.isFinite(Number(q.chg_pct)) && (1 + Number(q.chg_pct) / 100) !== 0) {
           prevClose.set(String(q.ticker).toUpperCase(), Number(q.price) / (1 + Number(q.chg_pct) / 100));
         }
@@ -274,4 +343,4 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   };
 }
 
-module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay };
+module.exports = { computeDayPnl, scanLedger, exitOpenedToday, tradingDayLive, sessionTradedToday, etDay, prevCloseFromBarsFactory };
