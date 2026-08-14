@@ -166,6 +166,17 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         sendJson(res, { status: 'error', error: 'ticker, side (buy/sell), and positive qty are required' }, 400);
         return true;
       }
+      // acceptWarnings (2026-08-14): IBKR raises disclosure/size warnings and the
+      // manual Flatten path dead-ended on them — the bridge supports the flag but
+      // this route never forwarded it, so the operator could not trim the 3x carry
+      // ("Couldn't flatten SOXS: re-submit with acceptWarnings:true"). The UI now
+      // resubmits WITH the flag after showing the human IBKR's own warning text.
+      // SELLS ONLY, and never defaulted on: a buy that draws warnings must keep
+      // surfacing them (P0-8), and this endpoint takes arbitrary user qty — an
+      // auto-accepted oversell warning could blow through flat into a short. The
+      // engine's own exit path reconciles qty to the held position first; here the
+      // human IS the reconciliation, so the warning text must reach them.
+      const acceptWarnings = payload.acceptWarnings === true && String(side).toLowerCase() === 'sell';
       if (stopLoss != null && Number(stopLoss) <= 0) {
         sendJson(res, { status: 'error', error: 'stopLoss must be a positive number' }, 400);
         return true;
@@ -178,7 +189,7 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // one-click Alpaca account (ADR-0027), then the legacy env agent. First match
       // that isn't null wins. Every path is HARD-GATED inside its own placeOrder.
       const uid = getEffectiveUserId(req);
-      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit };
+      const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings };
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
