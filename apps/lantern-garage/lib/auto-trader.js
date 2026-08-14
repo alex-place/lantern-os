@@ -19,6 +19,19 @@ function logTrade(rec) {
     fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
     fs.appendFileSync(TRADES_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n');
   } catch (_e) { /* logging must never break trading */ }
+  // Converge stage (#3286). Every entry is a falsifiable claim and every exit is
+  // the market's answer, so the pair belongs in the convergence store — which sat
+  // at 0 bytes while the trader took 118 entries over 24 sessions. Hooked HERE, at
+  // the single ledger write point, so no path can bypass it: the reconstructed
+  // `closed_externally` exits are graded too, and a future exit site inherits it.
+  // Fire-and-forget by design — a record must never delay or break a trade.
+  try {
+    if (rec && (rec.event === 'entry' || rec.event === 'exit')) {
+      const tc = require('./trader-convergence');
+      const p = rec.event === 'entry' ? tc.recordEntryHypothesis(rec) : tc.recordExitOutcome(rec);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+  } catch (_e) { /* convergence emission is best-effort, always */ }
 }
 
 /**
@@ -1646,6 +1659,31 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       });
     }
   }
+  // ── SESSION RECORD (#3286) ─────────────────────────────────────────────────
+  // One row per trading day, at/after the close. The ledger held every trade but
+  // nothing held the SESSION — no closing equity anywhere — so verifying a day's
+  // P&L meant reconstructing yesterday's equity from bar closes. That
+  // reconstruction is what exposed #3283; the check that should have caught it
+  // years earlier, equity(today) − equity(yesterday), was simply unanswerable.
+  //
+  // Written from the same computeDayPnl the panel uses, so the stored figures
+  // are the ones actually shown, and idempotence is checked against the ledger
+  // (not memory) so a restart cannot double-write the date.
+  try {
+    const _sr = require('./session-record');
+    const _ledger = fs.existsSync(TRADES_LOG) ? fs.readFileSync(TRADES_LOG, 'utf8') : '';
+    if (_sr.shouldWriteSession(_ledger, now)) {
+      const _dp = await require('./day-pnl').computeDayPnl({
+        positions: Object.values(heldPos),
+        ledgerText: _ledger,
+        now,
+        getQuotes: (syms) => require('./market-data-yahoo').getQuotes(syms),
+      }).catch(() => ({}));
+      logTrade(_sr.buildSessionRecord({
+        ledgerText: _ledger, now, account, positions: Object.values(heldPos), dayPnl: _dp,
+      }));
+    }
+  } catch (_e) { /* observability only — never breaks the scan */ }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
   _saveState();
   return out;
