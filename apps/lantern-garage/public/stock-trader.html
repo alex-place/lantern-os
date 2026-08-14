@@ -4764,17 +4764,35 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   if(!q) return false;
   if(!skipConfirm && !_twoStep(btn, 'Confirm ✕', ()=>flattenPosition(symbol, side, qty, true, btn))) return false;
   try{
-    const r = await fetch('/api/trading/orders/place', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market' })
-    });
-    const result = await r.json();
-    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||r.statusText)); return false; }
+    let result = await _placeFlatten(symbol, exitSide, q, false);
+    // IBKR disclosure/size warnings dead-ended the flatten (live 2026-08-14: the
+    // operator could not trim SOXS/SPXS/SQQQ — "re-submit with acceptWarnings").
+    // Sells only, and never silent: the human reads IBKR's own warning text and
+    // decides. This is the manual mirror of the engine's exit policy (2026-07-27:
+    // risk-reducing sells accept warnings; entries never do).
+    if(!(result && result.status==='placed') && exitSide==='sell'
+       && /acceptWarnings/i.test(String(result&&(result.reason||result.error)||''))){
+      const warnText = String(result.reason||result.error).replace(/;?\s*re-submit with acceptWarnings:true[^;]*/i,'').trim();
+      if(window.confirm('IBKR raised warnings for SELL '+q+' '+symbol+':\n\n'+warnText
+        +'\n\nConfirm to resubmit accepting these warnings. (This is a risk-reducing exit.)')){
+        result = await _placeFlatten(symbol, exitSide, q, true);
+      }
+    }
+    if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
     const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
   }catch(e){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+e.message); return false; }
+}
+// One flatten POST. acceptWarnings goes on the wire ONLY after the user has read
+// and confirmed IBKR's warning text above — never on the first attempt.
+async function _placeFlatten(symbol, exitSide, q, acceptWarnings){
+  const r = await fetch('/api/trading/orders/place', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ ticker:symbol, side:exitSide, qty:q, type:'market', ...(acceptWarnings?{acceptWarnings:true}:{}) })
+  });
+  try{ return await r.json(); }catch(_e){ return { status:'error', error:r.statusText||'bad response' }; }
 }
 async function flattenAll(btn){
   if(!_lastPositions.length) return;
