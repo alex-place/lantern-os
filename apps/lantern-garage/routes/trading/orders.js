@@ -38,6 +38,28 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           ok = isAlpacaId ? await tryIbkr() : await tryAlpaca();
           if (ok) broker = isAlpacaId ? 'ibkr' : 'alpaca';
         }
+        // ADMIN OPERATOR-VIEW CANCEL FALLBACK (2026-08-14). The operator-view
+        // Orders tab lists the operator book's orders; its cancel button must be
+        // able to cancel them, or the tab shows a duplicate sell it cannot act
+        // on. Same admin-only pattern as placement; the adapters still refuse
+        // ids that do not belong to the resolved account.
+        if (!ok) {
+          try {
+            const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+            const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+            if (isAdminFn(req) && uid !== OPERATOR_UID) {
+              ok = await (bridge && bridge.cancelIBKROrder ? bridge.cancelIBKROrder(OPERATOR_UID, id).catch(() => false) : false);
+              if (ok) broker = 'ibkr-operator';
+              else {
+                const alpaca = require('../../lib/alpaca-adapter');
+                if (alpaca.available(OPERATOR_UID)) {
+                  ok = await alpaca.cancelOrder(OPERATOR_UID, id).catch(() => false);
+                  if (ok) broker = 'alpaca-operator';
+                }
+              }
+            }
+          } catch (_e) { /* auth module absent → no fallback */ }
+        }
         sendJson(res, ok ? { ok: true, canceled: id, broker } : { ok: false, error: 'cancel_failed', order_id: id }, ok ? 200 : 502);
       } catch (error) {
         sendJson(res, { ok: false, error: error.message }, 500);
@@ -77,7 +99,24 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // Prefer the connected IBKR account's own orders (working + filled) so the
       // Orders / Order-history tabs reflect the autopilot's trades — the legacy
       // agent/ledger only knew manual orders, so history showed "None".
-      const ibkr = await bridge.getIBKROpenOrders(uid).catch(() => null);
+      let ibkr = await bridge.getIBKROpenOrders(uid).catch(() => null);
+      // ADMIN OPERATOR-VIEW READ FALLBACK (2026-08-14). Account, positions and
+      // PLACEMENT all fall back to the operator book for an admin with no linked
+      // broker — this read never did. Live consequence at 04:50: the operator's
+      // four flatten sells (including a DUPLICATE SPXS the resting-sell guard
+      // exists to catch) were resting at IBKR, and the Orders tab said "None" —
+      // the one screen that could cancel the duplicate showed nothing to cancel.
+      let _opView = false;
+      if (!(Array.isArray(ibkr) && ibkr.length)) {
+        try {
+          const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+          const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+          if (isAdminFn(req) && uid !== OPERATOR_UID) {
+            const op = await bridge.getIBKROpenOrders(OPERATOR_UID).catch(() => null);
+            if (Array.isArray(op) && op.length) { ibkr = op; _opView = true; }
+          }
+        } catch (_e) { /* auth module absent → no fallback */ }
+      }
       if (Array.isArray(ibkr) && ibkr.length) {
         const norm = (s) => {
           const x = String(s || '').toLowerCase();
@@ -99,6 +138,9 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           limit_price: o.orderType === 'STP' || o.orderType === 'LMT' ? o.price : null,
           status: norm(o.status), filled_avg_price: o.avgPrice || 0,
           filled_at: tstr(o.time), created_at: tstr(o.time),
+          // Flagged like the account/positions fallback, so the UI can never
+          // silently present the operator book as the viewer's own orders.
+          ...(_opView ? { operator_account: true } : {}),
         }));
         sendJson(res, orders, 200);
         return true;
