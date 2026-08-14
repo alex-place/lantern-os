@@ -132,15 +132,30 @@ function prevCloseFromBarsFactory(barsDir) {
         if (d !== bestDay) break;                            // left the last prior session
         dayBars.push(b);
       }
+      // TORN-READ GUARD (live 2026-08-14 04:47): the collector REWRITES these
+      // files; a read mid-rewrite sees a truncated view ending weeks back, and
+      // the factory served GLD's JULY close (372.19) as "yesterday". A prior
+      // session more than 7 calendar days old cannot be the last trading day —
+      // treat the read as unreliable and return null (caller falls back to the
+      // quote-derived reference), and DO NOT memoize, so the next call re-reads
+      // the (by then rewritten) file instead of pinning the poison all day.
+      if (bestDay != null) {
+        const ageDays = (Date.parse(today) - Date.parse(bestDay)) / 86400000;
+        if (!(ageDays >= 0 && ageDays <= 7)) { return null; }
+      }
       if (dayBars.length) {
         dayBars.sort((a, b) => Date.parse(a.t || a.ts || a.time) - Date.parse(b.t || b.ts || b.time));
-        const regular = dayBars.filter((b) => etClock(b.t || b.ts || b.time).min <= 960);
+        // STRICTLY before 16:00 ET: bars are stamped at their START, so a 16:00
+        // bar is the first POST-auction bar (GLD's read 398.71 vs the true
+        // 15:55-bar close 399.59). The official close is the last bar that
+        // BEGINS inside the session.
+        const regular = dayBars.filter((b) => etClock(b.t || b.ts || b.time).min < 960);
         const pick = (regular.length ? regular : dayBars).pop();
         const c = Number(pick.c ?? pick.close);
         if (c > 0) out = c;
       }
     } catch (_e) { /* no cache for this symbol → null */ }
-    memo.set(key, out);
+    if (out != null) memo.set(key, out);   // only certain answers are pinned
     return out;
   };
 }
