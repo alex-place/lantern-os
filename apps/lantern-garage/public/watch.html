@@ -4221,7 +4221,7 @@ function renderOrders(orders){
     <td style="color:${o.status==='filled'?'var(--green)':o.status==='canceled'?'var(--red)':'var(--amber)'}">${o.status||''}</td>
     <td style="color:var(--text2)">${_fmtOrderTime(o.filled_at||o.created_at)}</td></tr>`;
   const tbl=(rows)=> rows.length ? `<table class="tp-table"><thead><tr><th>Symbol</th><th>Side</th><th>Qty</th><th>Type</th><th>Limit</th><th>Status</th><th>Time</th></tr></thead><tbody>${rows}</tbody></table>` : '<div class="tp-empty">None</div>';
-  const isOpen=(o)=>['new','accepted','pending','open','partially_filled'].includes((o.status||'').toLowerCase());
+  const isOpen=(o)=>['new','accepted','pending','open','partially_filled','submitted','presubmitted','pending_new','working','held'].includes((o.status||'').toLowerCase());   // parity with stock-trader _isWorkingOrder (2026-08-14: 'submitted' rows are WORKING, not history)
   if(openEl) openEl.innerHTML = tbl(arr.filter(isOpen).map(row).join(''));
   // Show the full fetched history (up to the 500 the API returns), not just the
   // 30 most recent — capping here was the visible half of "not all trades saved":
