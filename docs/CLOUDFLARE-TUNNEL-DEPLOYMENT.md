@@ -9,8 +9,12 @@
 > **Deprecated — not the production path.** This guide describes the legacy model: a
 > `cloudflared` tunnel from Cloudflare's edge to `server.js` running on the **local fleet
 > host** (port 4177). Per **[ADR-0018 (Accepted)](adr/0018-web-tier-split-and-cloud-multi-tenancy.md)**,
-> the production origin is now a **GCE VM** running `server.js`, with Cloudflare kept only as
-> the **edge/CDN** in front of it. Deploy and operate production via the
+> the production origin is now a **GCE VM** running `server.js`. Cloudflare is **not** merely an
+> edge/CDN in front of it: production is reached through a *different, live* Cloudflare Tunnel
+> (`cloudflared-unisona.service`, running **on the VM**, → `http://localhost:8080`). What is dead
+> is **this** tunnel — the one to the local fleet host on 4177. Do not read "the Cloudflare tunnel
+> is unused" from this page; that is true only of the local-PC tunnel described below.
+> Deploy and operate production via the
 > **[GCE Cloud Deploy Runbook](ops/gce-cloud-deploy-runbook.md)** — do not point live DNS at a
 > local tunnel. This tunnel remains usable for **local dev exposure or as a fallback** only;
 > the steps below are retained for that purpose and for historical reference.

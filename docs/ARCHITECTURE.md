@@ -242,7 +242,12 @@ Each of these is a candidate ADR or follow-up issue spawned from this writeup.
 - **Patreon OAuth** optionally gates the whole site; currently the login *requirement* is behind a
   feature flag (`patreon_auth`) — guests browse, admin/trade stay gated. See
   [PATREON-OAUTH.md](PATREON-OAUTH.md) and the auth-flag memory.
-- **Production origin is a GCE VM** running `server.js`, fronted by Cloudflare (edge/CDN) — see
+- **Production origin is a GCE VM** running `server.js`, reached through a **Cloudflare Tunnel**
+  (`cloudflared-unisona.service` on the VM, `tunnel run --token`, → `http://localhost:8080`) — not
+  edge-to-origin proxying. Verified 2026-08-14: the only firewall rule for `:8080`
+  (`lantern-app-8080`) permits a **single** source IP, so Cloudflare's edge cannot reach the origin
+  directly; `cloudflared` logs show it serving `unisona.ai` from Cloudflare edge IPs. Practical
+  consequence: the tunnel dials **outbound**, so moving hosts needs no DNS or origin change — see
   [ADR-0018](adr/0018-web-tier-split-and-cloud-multi-tenancy.md) + the
   [GCE deploy runbook](ops/gce-cloud-deploy-runbook.md). The legacy **Cloudflare tunnel → local
   4177** path ([CLOUDFLARE-TUNNEL-DEPLOYMENT.md](CLOUDFLARE-TUNNEL-DEPLOYMENT.md)) is
