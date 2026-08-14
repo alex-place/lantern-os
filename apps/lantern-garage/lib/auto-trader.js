@@ -32,6 +32,22 @@ function logTrade(rec) {
       if (p && typeof p.catch === 'function') p.catch(() => {});
     }
   } catch (_e) { /* convergence emission is best-effort, always */ }
+  // A CONFIRMED exit explains the position leaving the book, so the flat reading
+  // is no longer suspect (#3282). Hooked here, at the single ledger write point,
+  // so no exit path can miss it.
+  //
+  // ONLY A REAL FILL COUNTS. A `reconstructed` row is itself INFERRED from the
+  // same absence the veto exists to distrust — letting it clear the veto would
+  // be circular, and would defeat the fix precisely in the dropout case: the
+  // sweep would invent an exit, that invention would license a fresh entry, and
+  // the position would double exactly as it did on 2026-08-13. An estimate
+  // cannot corroborate itself.
+  try {
+    if (rec && rec.event === 'exit' && rec.symbol
+      && (rec.status === 'filled' || rec.source === 'fill')) {
+      _lastConfirmedHold.delete(String(rec.symbol).toUpperCase());
+    }
+  } catch (_e) { /* never break logging */ }
 }
 
 /**
@@ -389,6 +405,31 @@ function _breakerTripped(now, k) {
 // explicit > 0 guard at the use site: a bare `loss <= -(pct * 0)` is `loss <= 0`,
 // which attributes EVERY loss. That inversion is the whole reason the check is
 // spelled out rather than folded into the arithmetic.
+// LAST CONFIRMED HOLDING (#3282). sym -> ms when the broker last reported a
+// non-zero position in it.
+//
+// The `already long` guard trusts a single position snapshot. On 2026-08-13 the
+// feed dropped SOXS for two scans — 11:13 held, 11:14 and 11:15 ABSENT, 11:16
+// held again — with no exit of any kind on record. During the gap the engine
+// evaluated SOXS as a fresh candidate and opened a full-size tier-A+ entry on
+// top of the 1,490 shares it already had, taking the position to 3,057.8: twice
+// the intended maximum, behind a stop sized for part of it. It happened to earn
+// +$4,218; a double-size loss was equally available.
+//
+// A position leaving the book is normally EXPLAINED — our exit fills, or the
+// external-close sweep reconstructs one. An absence with no exit row at all is
+// the dropout signature, so this map is cleared by any exit row for the symbol
+// (see logTrade) and otherwise stands as the reason to distrust a flat reading.
+const _lastConfirmedHold = new Map();
+// How long a confirmed holding keeps vetoing an unexplained flat reading. Long
+// enough to cover a real dropout (the live one lasted 3.5 minutes), short enough
+// that a symbol can never be barred indefinitely by stale state.
+function _flatConfirmMs() {
+  const raw = process.env.TRADER_FLAT_CONFIRM_SEC;
+  if (raw == null || String(raw).trim() === '') return 600000;   // 10 min
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v * 1000 : 600000;
+}
 function _stopAttribFrac() {
   const raw = process.env.TRADER_STOP_ATTRIB_FRAC;
   // An EMPTY value means "unset", not 0. `Number('')` is 0, so a stray
@@ -506,6 +547,9 @@ function _saveState() {
       stopDistPct: Object.fromEntries(_stopDistPct),
       stopCooldownThrough: Object.fromEntries(_stopCooldownThrough),
       stopFills: { day: _stopFillsDay, count: _stopFillsCount },   // breaker survives restarts
+      // A restart DURING a dropout must not hand back a clean slate and let the
+      // doubling through on the next scan (#3282).
+      lastConfirmedHold: Object.fromEntries(_lastConfirmedHold),
       savedAt: Date.now(),
     }));
   } catch (_e) { /* best-effort — a write failure must never break a scan */ }
@@ -530,6 +574,10 @@ function _loadState() {
     for (const [k, v] of Object.entries(o.stopDistPct || {})) _stopDistPct.set(k, v);
     for (const [k, v] of Object.entries(o.stopCooldownThrough || {})) _stopCooldownThrough.set(k, v);
     if (o.stopFills && o.stopFills.day) { _stopFillsDay = o.stopFills.day; _stopFillsCount = Number(o.stopFills.count) || 0; }
+    for (const [k, v] of Object.entries(o.lastConfirmedHold || {})) {
+      const t = Number(v);
+      if (Number.isFinite(t)) _lastConfirmedHold.set(k, t);
+    }
   } catch (_e) { /* no snapshot yet / unreadable → start fresh */ }
 }
 _loadState();
@@ -875,6 +923,10 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
                              // against the stale pre-scan gross and stacked past the cap
                              // (probed to 126% of budget; audit 2026-08-08).
   for (const p of (positions || [])) { const k = String(p.symbol).toUpperCase(); heldQty[k] = Number(p.qty) || 0; heldPos[k] = p; }
+  // Every symbol the broker CONFIRMS we hold refreshes its timestamp (#3282). If
+  // one later vanishes with no exit row to explain it, this is what tells the
+  // entry gate the flat reading is a feed dropout rather than an opportunity.
+  for (const [k, q] of Object.entries(heldQty)) if (Math.abs(q) > 0) _lastConfirmedHold.set(k, now);
   // Snapshot every long we can still see, so a position that VANISHES before the next
   // scan can be reconstructed into the ledger (see the external-close sweep below).
   // OWNERSHIP FILTER (2026-08-13). heldPos is EVERY position in the account,
@@ -1361,6 +1413,29 @@ async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {},
       || held * (Number(heldPos[sym] && heldPos[sym].current_price) || price || 0));
     const _isDustHolding = held > 0 && c.dustPct > 0 && _heldMv < account.equity * (c.dustPct / 100);
     if (held > 0 && !_isDustHolding) { out.skipped.push({ ...record, why: 'already long' }); continue; }
+    // UNEXPLAINED FLAT = FEED DROPOUT, NOT AN OPPORTUNITY (#3282).
+    //
+    // `already long` above trusts one position snapshot. On 2026-08-13 the feed
+    // dropped SOXS for two scans (11:13 held, 11:14 and 11:15 absent, 11:16 held)
+    // and wrote no exit row of any kind. In the gap this loop saw `held === 0`,
+    // treated SOXS as a fresh candidate, and opened a full-size tier-A+ entry on
+    // top of the 1,490 shares already there — 3,057.8 total, twice the intended
+    // maximum, behind a stop sized for part of it.
+    //
+    // A position genuinely leaving the book is EXPLAINED: our exit fills, or the
+    // external-close sweep reconstructs one. Either clears _lastConfirmedHold.
+    // A confirmed holding still sitting here means nothing explained the absence,
+    // so the flat reading is not evidence we can open against.
+    //
+    // Bounded by _flatConfirmMs so stale state can never bar a symbol forever.
+    {
+      const _confAt = _lastConfirmedHold.get(sym);
+      const _ttl = _flatConfirmMs();
+      if (!(held > 0) && _confAt && _ttl > 0 && (now - _confAt) <= _ttl) {
+        out.skipped.push({ ...record, why: `position feed shows flat but a holding was confirmed ${Math.round((now - _confAt) / 1000)}s ago with no exit on record — treating as a feed dropout, not a re-entry` });
+        continue;
+      }
+    }
     // DIRECTION LOCK (lib/direction-lock.js): an inverse ETF is an economic short on
     // its underlying — never open a position whose direction opposes existing family
     // exposure (e.g. buying SQQQ while long TQQQ/QQQ, or vice versa). Closing is never
@@ -1788,6 +1863,6 @@ function _logSkips(skipped) {
 }
 
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
-function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _saveState(); }
+function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
 
 module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
