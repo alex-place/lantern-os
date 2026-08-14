@@ -40,6 +40,23 @@ const { emitConvergenceRecord } = require('./convergence-records');
 const n2 = (v) => (Number.isFinite(Number(v)) ? Number(v).toFixed(2) : '?');
 
 /**
+ * A redirected trade ledger with a NON-redirected record store is a test rig,
+ * and emitting would write fixtures into the live convergence memory.
+ *
+ * This is not hypothetical: the first test run after #3286 shipped put 51
+ * invented trades into production — "GLD long 19 @ 100.00", "NVDA @ 180.00",
+ * "X @ 100.00" — indistinguishable downstream from real ones. Relying on every
+ * future test to remember CONVERGENCE_RECORDS_FILE is exactly the kind of
+ * discipline that fails silently, so the default is refusal: redirect the ledger
+ * and you must redirect the records too, or nothing is written.
+ *
+ * Checked per call rather than cached, because tests set these vars at runtime.
+ */
+function _wouldPolluteLiveStore() {
+  return !!process.env.TRADER_TRADES_LOG && !process.env.CONVERGENCE_RECORDS_FILE;
+}
+
+/**
  * symbol -> the open claim, so an exit can be graded against what was actually
  * predicted (target1, and the record it answers).
  *
@@ -60,6 +77,7 @@ const openHypotheses = new Map();
  * Returns the emitted record (with `.id`) or null.
  */
 async function recordEntryHypothesis(entry = {}) {
+  if (_wouldPolluteLiveStore()) return null;
   const sym = String(entry.symbol || '').toUpperCase();
   if (!sym) return null;
   const px = Number(entry.entry);
@@ -70,10 +88,18 @@ async function recordEntryHypothesis(entry = {}) {
   const upPct = t1 > 0 ? ((t1 - px) / px) * 100 : null;
   const dnPct = stop > 0 ? ((stop - px) / px) * 100 : null;
 
+  // A claim is only falsifiable if it names a real level. With no target1 the
+  // old text read "reaches target1 0.00", which is not a hypothesis anyone can
+  // grade — say what is actually being claimed instead.
+  const goal = t1 > 0
+    ? `reaches target1 ${n2(t1)}${upPct != null ? ` (${upPct >= 0 ? '+' : ''}${upPct.toFixed(1)}%)` : ''}`
+    : 'closes profitably (no target1 set)';
+  const risk = stop > 0
+    ? ` before its stop ${n2(stop)}${dnPct != null ? ` (${dnPct.toFixed(1)}%)` : ''}`
+    : ' (no protective stop recorded)';
   const hypothesis = `${sym} long ${entry.qty ?? '?'} @ ${n2(px)}`
     + ` (tier ${entry.tier || '?'}, p_win ${entry.p_win != null ? Number(entry.p_win).toFixed(3) : '?'}):`
-    + ` reaches target1 ${n2(t1)}${upPct != null ? ` (${upPct >= 0 ? '+' : ''}${upPct.toFixed(1)}%)` : ''}`
-    + ` before its stop ${n2(stop)}${dnPct != null ? ` (${dnPct.toFixed(1)}%)` : ''}`;
+    + ` ${goal}${risk}`;
 
   // The measured inputs the decision was actually made on — so a later reader
   // can tell a good call from a lucky one.
@@ -111,6 +137,7 @@ async function recordEntryHypothesis(entry = {}) {
  * claim verified=true.
  */
 async function recordExitOutcome(exit = {}, openedArg = null) {
+  if (_wouldPolluteLiveStore()) return null;
   const sym = String(exit.symbol || '').toUpperCase();
   if (!sym) return null;
   // Prefer the claim we actually made; fall back to the exit row's own entry
