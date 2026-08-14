@@ -635,7 +635,12 @@ class UnifiedAgentConnector:
         replies = {
             "lantern": f"The flame holds steady. '{snippet}...' You can always come home safe. What light did you bring back?",
             "blinkbug": f"[STATIC] '{snippet}...' [GLITCH] Windows XP door detected. Hidden lore? Unhinged energy rising. What did the CRT show you?",
-            "keystone": f"I can't answer that right now — no local model is running (Ollama/Ouro on :11434) and the cloud providers are unreachable, so there's no LLM to handle '{snippet}...'. Start a local model or set a cloud API key, then resend. (Keystone is a technical assistant, not a dream narrator.)",
+            # Deliberately short, and careful about WHY. The old wording claimed the
+            # cloud providers were "unreachable" — during the 2026-08-14 outage they
+            # were reachable and correctly configured, and refused the call
+            # (BILLING_DISABLED). Saying "no provider accepted the request" covers
+            # unreachable, unconfigured, and refused without asserting which.
+            "keystone": "No model is available right now — nothing is serving locally and no cloud provider accepted the request. Start a local model or set a provider key, then resend.",
             "waterfall": f"'{snippet}...' flows like water. What feeling wants to move through?",
             "xenon": f"'{snippet}...' charts a course. Where does this dream point — and who walks with you?",
             "founder": f"'{snippet}...' carries a wish. What are you protecting, and where do you need to return?",
