@@ -13,7 +13,9 @@ const { AGENT_PERSONAS, DREAM_DOORS, selectAgent, parseBangCommand, verifyRespon
 const { modelFor: defaultModelFor, isAllowedModel, GEMINI_FALLBACK_MODELS, escalatedModelFor } = require("./provider-models");
 const { readRecentDreams, normalizeDreamerUser } = require("./dreamer-store");
 const { appendConversationEntry } = require("./conversation-store");
-const { getEffectiveUserId } = require("./session-identity");
+// getSessionRole rides along so plan-gated chat tools (user_safe tier) can check
+// the caller's plan without re-reading the session themselves (#1213 tiers).
+const { getEffectiveUserId, getSessionRole } = require("./session-identity");
 const { getProviderState, recordProviderSuccess, recordProviderFailure } = require("./provider-cache");
 const { swarmOrchestrate } = require("./swarm-orchestrator");
 const { emitConvergenceRecord } = require("./convergence-records");
@@ -2358,7 +2360,7 @@ async function handleStreamChat(req, url, res) {
               let toolAnswer = "";
               const MAX_TOOL_ITERS = Number(process.env.CHAT_MAX_TOOL_ITERS) || 10;  // #2755 raised + configurable (local)
               for (let iter = 0; iter < MAX_TOOL_ITERS && tc; iter++) {
-                const result = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req) });
+                const result = await toolRunner.runTool(tc.name, tc.input, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req) });
                 const out = result.ok ? result.result : (result.error || `ERROR(${result.reason || "error"})`);
                 sse.writeData(res, { type: "tool", name: tc.name, input: tc.input,
                   ok: result.ok, status: result.status, reason: result.reason_code || null,
@@ -2485,7 +2487,7 @@ async function handleStreamChat(req, url, res) {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
-        const tools = toolRunner.geminiTools({ operator });
+        const tools = toolRunner.geminiTools({ operator, signedIn: Boolean(getEffectiveUserId(req)) });
         if (tools[0] && tools[0].functionDeclarations.length) {
           const geminiModelName = modelFor("gemini");
           const generationConfig = { maxOutputTokens: 4096, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } }; // #1210 room for tools + answer; thinkingBudget:0 stops 2.5-flash buffering a long silent thinking phase that starves the SSE reader (vertex_empty_response)
@@ -2518,7 +2520,7 @@ async function handleStreamChat(req, url, res) {
               _stepSystem = `${systemPrompt}\n\nUpdated long-term memory (relevant to the current step):\n${String(fresh).slice(0, 1200)}`;
             }
           };
-          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
+          const { toolCalls, stopReason } = await runToolLoop(adapter, { sse, res, onBeforeTurn, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel + #3065 per-step memory
           // #3066: the loop hit its step cap with the model still calling tools, so it never
           // produced a final answer — the user would get an EMPTY bubble. Run one last
           // tool-free turn that forces it to answer from what it already gathered.
@@ -2721,7 +2723,7 @@ async function handleStreamChat(req, url, res) {
           const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
           const { isOperatorRequest } = require("./request-auth");
           const operator = isOperatorRequest(req);
-          let tools = toolRunner.anthropicTools({ operator });
+          let tools = toolRunner.anthropicTools({ operator, signedIn: Boolean(getEffectiveUserId(req)) });
           // If the user has connected their Indeed account, attach Indeed's official
           // remote MCP server so Claude can search real Indeed jobs on their behalf
           // (Anthropic executes it server-side via the MCP-connector beta). Gated on a
@@ -2753,7 +2755,7 @@ async function handleStreamChat(req, url, res) {
               mcpServers: indeedMcpServers, // Indeed connector (null unless connected)
               onMcpTool: (name, server) => sse.writeData(res, { type: "tool", phase: "call", name, input: { via: server || "indeed" } }),
             }));
-            const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
+            const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
             const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
             await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "anthropic", model: claudeModel, agent: doneAgentName } }).catch(() => {});
             recordProviderSuccess("anthropic");
@@ -2926,7 +2928,7 @@ async function handleStreamChat(req, url, res) {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
-        const tools = toolRunner.openaiTools({ operator });
+        const tools = toolRunner.openaiTools({ operator, signedIn: Boolean(getEffectiveUserId(req)) });
         if (tools.length) {
           const openaiModelName = modelFor("openai");
           const decode = serving.applyOpenAIDecodeParams({});
@@ -2936,7 +2938,7 @@ async function handleStreamChat(req, url, res) {
             host: "api.openai.com", apiKey: openaiKey, model: openaiModelName,
             messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "openai", model: openaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("openai");
@@ -3063,7 +3065,7 @@ async function handleStreamChat(req, url, res) {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
-        const tools = toolRunner.openaiTools({ operator });
+        const tools = toolRunner.openaiTools({ operator, signedIn: Boolean(getEffectiveUserId(req)) });
         if (tools.length) {
           const xaiModelName = modelFor("xai");
           const decode = serving.applyXAIDecodeParams({}); // grok rejects penalty params (#2531)
@@ -3073,7 +3075,7 @@ async function handleStreamChat(req, url, res) {
             host: "api.x.ai", apiKey: xaiKey, model: xaiModelName,
             messages, tools, decode, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "grok", model: xaiModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("xai");
@@ -3183,7 +3185,7 @@ async function handleStreamChat(req, url, res) {
         const toolRunner = require("./stream-chat/mcp-tools").augment(require("./tool-runner"));
         const { isOperatorRequest } = require("./request-auth");
         const operator = isOperatorRequest(req);
-        const tools = toolRunner.openaiTools({ operator });
+        const tools = toolRunner.openaiTools({ operator, signedIn: Boolean(getEffectiveUserId(req)) });
         if (tools.length) {
           const cohereModelName = modelFor("cohere");
           const messages = buildProviderMessages(systemPrompt, compacted, message);
@@ -3192,7 +3194,7 @@ async function handleStreamChat(req, url, res) {
             host: COHERE_HOST, path: COHERE_PATH, apiKey: cohereKey, model: cohereModelName,
             messages, tools, onToken: (t) => { fullReply += t; sendToken(t); },
           }));
-          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
+          const { toolCalls } = await runToolLoop(adapter, { sse, res, runTool: (n, i) => toolRunner.runTool(n, i, { operator, userId: getEffectiveUserId(req), role: getSessionRole(req), approvals: parsed.approvals }) }); // #2756 unified loop + #2752 parallel
           const { cleanText, suggestions } = doorsOrFallback(fullReply, true);
           await logConversation({ recordedAt: new Date().toISOString(), surface: "dream-chat-stream", role: "lantern", text: cleanText.slice(0, maxConversationTextLength), meta: { provider: "cohere", model: cohereModelName, agent: doneAgentName } }).catch(() => {});
           recordProviderSuccess("cohere");

@@ -9,9 +9,10 @@
  * broker), so there is NO public/demo variant of these endpoints: rules and
  * fires are personal data.
  *
- *   GET    /api/trading/alerts/rules          → { rules, cap }
+ *   GET    /api/trading/alerts/rules          → { rules, cap, prefs, email }
  *   POST   /api/trading/alerts/rules          → create/update  { rule } | { error }
  *   DELETE /api/trading/alerts/rules/<id>     → { ok }
+ *   POST   /api/trading/alerts/prefs          → { ok, prefs }   (#3249 delivery opt-in)
  *   GET    /api/trading/alerts/feed?limit=50  → { alerts }
  */
 
@@ -21,6 +22,18 @@ const { internalUserId } = require('../../lib/request-auth');
 
 const userOf = (req) => getEffectiveUserId(req) || internalUserId(req) || null;
 
+/** Why email delivery would (not) work for this user — the UI explains itself. */
+function emailAvailability(userId) {
+  try {
+    const { mailerConfigured } = require('../../lib/mailer');
+    if (!mailerConfigured()) return { possible: false, why: 'mailer_unconfigured' };
+    const { getProfile } = require('../../lib/user-profiles');
+    const p = getProfile(userId);
+    if (!p || !String(p.email || '').includes('@')) return { possible: false, why: 'no_email' };
+    return { possible: true };
+  } catch (_e) { return { possible: false, why: 'unknown' }; }
+}
+
 module.exports = async function alertsRoutes(req, res, url, ctx) {
   if (!url.pathname.startsWith('/api/trading/alerts/')) return false;
   const { sendJson, collectRequestBody } = ctx;
@@ -29,7 +42,20 @@ module.exports = async function alertsRoutes(req, res, url, ctx) {
 
   try {
     if (url.pathname === '/api/trading/alerts/rules' && req.method === 'GET') {
-      sendJson(res, { rules: store.listRules(userId), cap: store.MAX_RULES_PER_USER }, 200);
+      sendJson(res, {
+        rules: store.listRules(userId),
+        cap: store.MAX_RULES_PER_USER,
+        prefs: store.getPrefs(userId),
+        email: emailAvailability(userId),   // #3249: the UI explains why email is (un)available
+      }, 200);
+      return true;
+    }
+    if (url.pathname === '/api/trading/alerts/prefs' && req.method === 'POST') {
+      const body = await collectRequestBody(req, 2 * 1024);
+      let input;
+      try { input = JSON.parse(body || '{}'); } catch (_e) { sendJson(res, { error: 'invalid_json' }, 400); return true; }
+      const r = store.setPrefs(userId, input);
+      sendJson(res, r, r.ok ? 200 : 400);
       return true;
     }
     if (url.pathname === '/api/trading/alerts/rules' && req.method === 'POST') {

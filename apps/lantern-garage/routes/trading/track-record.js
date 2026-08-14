@@ -14,6 +14,14 @@
 
 const { getTrackRecord, buildBookFromRows } = require('../../lib/track-record');
 const championDemo = require('../../lib/champion-demo');
+const { getEffectiveUserId } = require('../../lib/session-identity');
+const { internalUserId } = require('../../lib/request-auth');
+
+// PER-USER (#3275): the record is scoped to the requesting account, so a user's
+// journal answers with THEIR trades. An id-less request on an owner box is the
+// owner (same convention as routes/trading/mode.js), and legacy rows with no
+// stamped account read as that same house book.
+const scopeFor = (req) => getEffectiveUserId(req) || internalUserId(req) || 'local-owner';
 
 module.exports = async function trackRecordRoutes(req, res, url, ctx) {
   if (url.pathname !== '/api/trading/track-record' || req.method !== 'GET') return false;
@@ -35,7 +43,7 @@ module.exports = async function trackRecordRoutes(req, res, url, ctx) {
       }, 200);
       return true;
     }
-    sendJson(res, getTrackRecord(), 200);
+    sendJson(res, getTrackRecord(undefined, scopeFor(req)), 200);
   } catch (e) {
     sendJson(res, { error: 'track_record_failed', message: e.message }, 500);
   }

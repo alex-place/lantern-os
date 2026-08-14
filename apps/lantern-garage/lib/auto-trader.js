@@ -14,10 +14,25 @@ const { macd, rsi, emaSeries } = require('./signal-engine/indicators');
 const TRADES_LOG = process.env.TRADER_TRADES_LOG
   ? path.resolve(process.env.TRADER_TRADES_LOG)
   : path.join(__dirname, '..', '..', '..', 'data', 'lantern-garage', 'trading', 'autopilot-trades.jsonl');
+// PER-USER ATTRIBUTION. The autopilot drives every connected account, but the
+// ledger was one undifferentiated book: a row said WHAT was traded and never FOR
+// WHOM, so one user's journal could only ever be answered with everyone's. Each
+// row now carries the account it was traded for.
+//
+// A module scalar (rather than threading userId through ~15 logTrade call sites)
+// is safe because the account loop is SEQUENTIAL — routes/trading.js awaits each
+// account's pass before starting the next — and every entry point sets it inside
+// a try/finally that restores the previous value.
+let _actingUser = null;
 function logTrade(rec) {
   try {
     fs.mkdirSync(path.dirname(TRADES_LOG), { recursive: true });
-    fs.appendFileSync(TRADES_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + '\n');
+    fs.appendFileSync(TRADES_LOG, JSON.stringify({
+      ts: new Date().toISOString(),
+      // `user` first so an explicit rec.user (e.g. a backfill) still wins.
+      ...(_actingUser ? { user: _actingUser } : {}),
+      ...rec,
+    }) + '\n');
   } catch (_e) { /* logging must never break trading */ }
   // Converge stage (#3286). Every entry is a falsifiable claim and every exit is
   // the market's answer, so the pair belongs in the convergence store — which sat
@@ -829,7 +844,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
  * positions + one open-orders call per tick against the LOCAL gateway. All the
  * anti-churn gates (min-hold, exit debounce, oversell guard) apply unchanged.
  */
-async function fastExitTick({ bridge, userId, now = Date.now(), extended = false, excludeSymbols = [] } = {}) {
+async function fastExitTick(opts = {}) {
+  const prev = _actingUser;
+  _actingUser = (opts && opts.userId) || null;
+  try { return await _fastExitTickInner(opts); } finally { _actingUser = prev; }
+}
+async function _fastExitTickInner({ bridge, userId, now = Date.now(), extended = false, excludeSymbols = [] } = {}) {
   const c = cfg();
   if (!c.enabled && !c.manageExits) return { reason: 'disarmed' };
   if (!bridge || !userId) return { reason: 'no bridge/userId' };
@@ -883,7 +903,12 @@ async function fastExitTick({ bridge, userId, now = Date.now(), extended = false
  * Orders still route as marketable LIMIT + outsideRth (closeLong's `extended`
  * path), never naked market orders into a thin book.
  */
-async function runAutoTrade(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [], protectiveOnly = false } = {}) {
+async function runAutoTrade(scan, opts = {}) {
+  const prev = _actingUser;
+  _actingUser = (opts && opts.userId) || null;
+  try { return await _runAutoTradeInner(scan, opts); } finally { _actingUser = prev; }
+}
+async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps = {}, extended = false, excludeSymbols = [], protectiveOnly = false } = {}) {
   // Position partitioning: symbols owned by ANOTHER engine (the overnight sleeve book)
   // are completely off-limits — no exits, no re-protect stops, no signal-sells, no
   // entries. Each engine manages only its own positions; the caller (trading.js)

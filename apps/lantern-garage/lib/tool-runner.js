@@ -135,6 +135,30 @@ function _userHeaders(ctx) {
   return ctx && ctx.userId ? { "x-keystone-user": encodeURIComponent(String(ctx.userId)) } : null;
 }
 
+/**
+ * Does this caller's PLAN include `capability` (lib/plan-matrix)?
+ *
+ * user_safe tools reach per-user stores directly, bypassing the route-level
+ * entitlement gate in server.js — so a plan-gated feature must re-check here or
+ * chat becomes a way around the plan matrix. Role comes from the session when the
+ * caller passed it, else from the stored profile. Operators (loopback/admin box)
+ * pass. Fails CLOSED: any error or unknown role means "no".
+ */
+function _hasCapability(ctx, capability) {
+  try {
+    if (ctx && ctx.operator) return true;
+    let role = ctx && ctx.role;
+    if (!role && ctx && ctx.userId) {
+      const p = require("./user-profiles").getProfile(ctx.userId);
+      role = p && p.role;
+    }
+    if (!role) return false;
+    return require("./plan-matrix").roleHasCapability(role, capability);
+  } catch (_e) {
+    return false;
+  }
+}
+
 // ── portfolio-tool formatting (portfolio_analysis / portfolio_whatif /
 // propose_rebalance) — shared so all three speak the same evidence language. ──
 function _pfPct(x, dp = 1) {
@@ -1682,6 +1706,255 @@ const REGISTRY = {
       }
     },
   },
+
+  // ── The desk, readable from chat ────────────────────────────────────────────
+  // Users expect the assistant to know its OWN trading system, not just the market.
+  // These expose the autopilot's config + arming state, its realized record, what it
+  // DECLINED (the skip log — the thing an import-based journal can never have), and
+  // the user's alert rules; plus three NON-FINANCIAL capabilities (create/delete an
+  // alert, pause the trader).
+  //
+  // The money boundary is unchanged and deliberate: nothing here places, sizes, or
+  // ARMS an order — Act stays behind lib/trading-guard.js + the ADR-0020 gates. Note
+  // `trader_pause` is intentionally ONE-WAY: chat can stop the machine, never start
+  // it. Stopping is risk-reducing and wants to be sayable fast; arming is a
+  // deliberate, gated act that keeps its own UI + approval path.
+  trader_config: {
+    policy: "read",
+    user_safe: true, // signed-in: the active book is read for THEIR uid; the rest is the
+                     // strategy contract that governs their account (public in the guide)
+    desc: "Read the stock autopilot's LIVE configuration and arming state: which book is active (off / intraday day-trader / Champion allocation book), whether autonomous execution and real-money orders are armed, whether a kill-switch or pause file is present, and the risk knobs it actually runs with — risk per trade, position and gross-exposure caps, concurrency, protective-stop basis, max-loss backstop, daily-loss breaker, cooldowns, and the persistence filter. Use when the user asks what the trader is set to, whether it is running or armed, how big it sizes, where its stops sit, or WHY it might not be trading. This reports the machine's real state; it is never a recommendation and it changes nothing. YOUR OWN LIMITS, state them rather than offering what you cannot do: you can START the autopilot (trader_start, Pilot only) and PAUSE it (trader_pause), but you can NEVER change any risk knob above — sizing, caps, stops, brakes and the server-side real-money arming live only in Settings and server config, by deliberate human action. Never infer results from the arming state; read the journal for that.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const mode = require("./trader-mode").get(uid);
+        const c = require("./auto-trader").cfg();
+        const halt = require("./trading-guard").haltFile();
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const live = process.env.TRADER_LIVE === "1";
+        const mins = (ms) => Math.round((Number(ms) || 0) / 60000);
+        const book = mode === "off"
+          ? "OFF — the autopilot opens nothing and closes nothing; positions and their broker stops are the user's to manage"
+          : mode === "champion"
+            ? "Champion — the diversified allocation book, rebalanced on a schedule (the intraday trader is paused while this runs)"
+            : "Intraday — washout entries and zone-ladder exits on liquid ETFs";
+        const sizing = c.riskPct > 0
+          ? `${c.riskPct}% of equity risked per trade (qty = equity x riskPct / (entry - stop))`
+          : `${c.positionPct}% average position size (notional sizing)`;
+        return [
+          `ACTIVE BOOK: ${book}`,
+          `ARMING: autonomous execution ${autoExec ? "ARMED (TRADER_AUTO_EXECUTE=1)" : "OFF — it decides and journals, but places nothing"} - real-money orders ${live ? "ARMED (TRADER_LIVE=1)" : "DRY RUN (TRADER_LIVE unset, so no real order can reach a broker)"}.`,
+          halt ? `HALT FILE PRESENT (${halt}) — every order is refused while it exists.` : "No kill-switch or pause file present.",
+          `SIZING: ${sizing}. Hard caps: ${c.maxPositionPct}% per position, ${c.maxGrossPct}% gross exposure (the remainder stays in cash), max ${c.maxConcurrent} concurrent positions, max ${c.maxNewPerScan} new entries per scan.`,
+          `STOPS: ${c.atrStops ? `ATR-based from the signal's own trade plan, clamped to ${c.atrStopMinPct}-${c.atrStopMaxPct}%` : `flat ${c.stopPct}%`}, placed at the broker on entry - ${c.maxLossPct}% hard max-loss backstop - ${c.zoneExit ? "zone-ladder exits armed" : "zone-ladder exits off"}.`,
+          `BRAKES: halts NEW entries at -${c.maxDailyLossPct}% day P&L - ${mins(c.cooldownMs)}min re-entry cooldown per symbol (${c.stopCooldownDays} trading day after a stop fill; ${c.stopBreaker} stop fills in a day trips the breaker) - ${mins(c.minHoldMs)}min minimum hold before a signal exit - ${c.requirePersist ? `a direction must hold ${c.persistScans} consecutive scans` : "no persistence filter"} - ${c.allowShorts ? "SHORTS ENABLED" : "longs only (a bearish signal can only close a long, never open a short)"}.`,
+        ].join("\n");
+      } catch (e) {
+        return `[trader_config error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_journal: {
+    policy: "read",
+    user_safe: true, // per-user since #3275 — the ledger stamps the account each row
+                     // was traded for, and this reads ONLY ctx.userId's rows
+    desc: "Read the autopilot's REALIZED record from its append-only exit ledger: total realized P&L, the daily curve's max drawdown with its dates, win rate (both the headline and the honest risk-exit-only number), expectancy per trade, profit factor, average MFE/MAE, and the per-exit-path breakdown. Use when the user asks how the trader is doing, how their week/month went, which exits make or lose money, or whether the stops are too tight. HONESTY CONTRACT, relay it: numbers are broker-CONFIRMED fills only; profit-taking exit paths can only ever close winners so their ~100% win rates are structural (never quote them as skill); and the disclosures line (collapsed re-decisions, excluded rejected attempts, externally-closed positions valued at the last mark) must be passed on, not hidden.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rec = require("./track-record").getTrackRecord(undefined, uid);
+        const book = (rec.books && rec.books.intraday) || {};
+        const s = book.stats || {};
+        if (!s.trades) return "[trader_journal: THIS USER'S ledger holds no broker-confirmed round-trips yet — say so honestly; nothing is withheld, their autopilot simply has not closed a trade. Do not substitute anyone else's results.]";
+        const dd = book.maxDrawdown || {};
+        const ex = s.excursions || {};
+        const money = (n) => (typeof n === "number" ? `${n < 0 ? "-" : ""}$${Math.abs(n).toFixed(2)}` : "n/a");
+        const reasons = Object.entries(book.byReason || {})
+          .sort((a, b) => b[1].trades - a[1].trades)
+          .map(([k, r]) => `  ${k}: ${r.trades} trades, ${r.winRate}% win${r.profitOnly ? " (STRUCTURAL — this path only closes winners)" : ""}, ${money(r.pnl)}`)
+          .join("\n");
+        const d = book.disclosures || {};
+        return [
+          `Window: ${String(book.firstExitAt || "").slice(0, 10)} to ${String(book.lastExitAt || "").slice(0, 10)} - ${s.trades} confirmed round-trips.`,
+          `Realized: ${money(s.totalRealized)} - expectancy ${money(s.expectancy)}/trade - profit factor ${s.profitFactor === null ? "infinite" : s.profitFactor}.`,
+          `Max drawdown: ${money(-(dd.amount || 0))}${dd.peakDate ? ` (${dd.peakDate} to ${dd.troughDate})` : ""} — report this beside the profit, never after it.`,
+          `Win rate: ${s.winRate}% overall; ${s.riskExitWinRate}% over the ${s.riskExitTrades} exits that COULD have lost — the second number is the honest one.`,
+          ex.nMfe ? `Average excursion while open: +${ex.avgMfePct}% best / ${ex.avgMaePct}% worst (n=${ex.nMfe}).` : "Excursion (MFE/MAE) data is still accruing — do not invent it.",
+          `Exit paths:\n${reasons}`,
+          `Disclosures: ${d.duplicateExitsCollapsed || 0} re-decision rows collapsed, ${d.failedAttemptsExcluded || 0} broker-rejected attempts excluded (they realized nothing), ${d.estimatedTrades || 0} external closes valued at the last observed mark.`,
+        ].filter(Boolean).join("\n");
+      } catch (e) {
+        return `[trader_journal error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_skips: {
+    policy: "read",
+    user_safe: true, // per-user since #3275, same as trader_journal
+    desc: "Read the SKIP LOG — every opportunity the autopilot DECLINED and why, grouped by decline reason with counts and how many distinct symbols each touched (numbers in a reason are normalized, so '81% > cap 80%' and '83% > cap 80%' are one family). Use when the user asks why the trader isn't trading, why it passed on a symbol, or what its risk rules are actually blocking — most 'it isn't working' is the trader correctly declining. These are COUNTS ONLY: never imply a skipped trade would have made or lost money, because it was never priced.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const sk = require("./trader-scorecard").breakdown("skip", undefined, uid);
+        const groups = Object.entries(sk.groups || {});
+        if (!groups.length) return "[trader_skips: nothing declined on THIS USER'S account in the recorded window.]";
+        // Grouping normalizes digits to '#' so "81% > cap 80%" and "83% > cap 80%"
+        // collapse into one family; render that as N so the reason reads as English.
+        const rows = groups.slice(0, 12)
+          .map(([k, g]) => `  ${g.count}x - ${String(k).replace(/#/g, "N")} (${g.symbols} symbol${g.symbols === 1 ? "" : "s"})`)
+          .join("\n");
+        return `The autopilot declined ${sk.totalSkips} opportunities in the recorded window:\n${rows}\n(Counts only — a declined trade was never priced, so no P&L can be claimed for it either way.)`;
+      } catch (e) {
+        return `[trader_skips error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alerts: {
+    policy: "read",
+    user_safe: true, // strictly per-user: every read is keyed by ctx.userId
+    desc: "List the user's watchlist alert RULES (symbol, condition, quiet window, enabled) and the most recent alerts that have FIRED. Rule types: 'signal' (the engine emitted bullish/bearish), 'zone' (price came within a chosen % of the computed support/resistance), 'washout' (the engine's ENTER verdict). Use when the user asks what alerts they have set, whether anything fired, or why they did or did not get told about a move.",
+    schema: { type: "object", properties: { limit: { type: "number", description: "how many fired alerts to show (default 10, max 50)" } } },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alerts: price alerts are part of the Pro plan — say so plainly and point at /pricing.html rather than inventing rules.]";
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const rules = store.listRules(uid);
+        const feed = store.readFeed(uid, Math.min(Math.max(Number(i && i.limit) || 10, 1), 50));
+        const rl = rules.length
+          ? rules.map((r) => {
+            const when = r.type === "signal" ? `${String(r.direction || "any").toLowerCase()} signal`
+              : r.type === "zone" ? `within ${r.proximityPct}% of ${r.zone}`
+                : "washout confirmed (ENTER verdict)";
+            return `  ${r.symbol}: ${when} - ${r.cooldownMin}min quiet${r.enabled === false ? " - DISABLED" : ""} (id ${r.id})`;
+          }).join("\n")
+          : "  (none set)";
+        const fl = feed.length
+          ? feed.map((a) => `  ${String(a.ts).slice(0, 16).replace("T", " ")} - ${a.message}`).join("\n")
+          : "  (nothing has fired yet)";
+        return `Alert rules (${rules.length} of ${store.MAX_RULES_PER_USER}):\n${rl}\n\nRecently fired:\n${fl}`;
+      } catch (e) {
+        return `[trader_alerts error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_create: {
+    policy: "action", // creates a per-user alert rule — reversible, touches no money
+    user_safe: true,  // written under ctx.userId; plan-gated on price_alerts below
+    desc: "Create a watchlist alert rule for the user. Types: 'signal' (fires when the engine emits a direction — set direction BULLISH/BEARISH/ANY), 'zone' (fires when price comes within proximityPct of the computed support or resistance), 'washout' (fires on the engine's ENTER verdict). cooldownMin is the quiet window after it fires (5-1440, default 60). This places NO orders and moves no money — it only asks to be told when something happens. Confirm the symbol and condition back to the user in plain words after creating it.",
+    schema: {
+      type: "object",
+      required: ["symbol", "type"],
+      properties: {
+        symbol: { type: "string", description: "ticker, e.g. SPY" },
+        type: { type: "string", enum: ["signal", "zone", "washout"], description: "rule type" },
+        direction: { type: "string", enum: ["BULLISH", "BEARISH", "ANY"], description: "signal rules only (default ANY)" },
+        zone: { type: "string", enum: ["support", "resistance"], description: "zone rules only (default support)" },
+        proximityPct: { type: "number", description: "zone rules only: how close, in % (0.1-5, default 0.5)" },
+        cooldownMin: { type: "number", description: "quiet window in minutes after firing (5-1440, default 60)" },
+      },
+    },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "price_alerts")) return "[trader_alert_create refused: price alerts are part of the Pro plan. Tell the user plainly and point at /pricing.html — do NOT pretend the alert was created.]";
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const r = store.saveRule(uid, i || {});
+        if (!r.ok) return `[trader_alert_create refused: ${r.error}${r.cap ? ` (limit ${r.cap} rules)` : ""} — relay the refusal honestly, do not retry blindly.]`;
+        const w = r.rule.type === "signal" ? `a ${String(r.rule.direction).toLowerCase()} signal`
+          : r.rule.type === "zone" ? `price within ${r.rule.proximityPct}% of ${r.rule.zone}`
+            : "a confirmed washout (ENTER verdict)";
+        return `Alert created: ${r.rule.symbol} — ${w}, quiet for ${r.rule.cooldownMin} minutes after it fires (id ${r.rule.id}). It is evaluated on the live scan; nothing is traded by it.`;
+      } catch (e) {
+        return `[trader_alert_create error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_alert_delete: {
+    policy: "action", // removes one of the user's own rules — reversible, no money
+    user_safe: true,  // deletes only within ctx.userId's own store
+    desc: "Delete one of the user's alert rules by its id (get ids from trader_alerts). Removes only the rule — no positions, orders, or money are touched.",
+    schema: { type: "object", required: ["id"], properties: { id: { type: "string", description: "the rule id from trader_alerts" } } },
+    async run(i, ctx) {
+      try {
+        const store = require("./alert-store");
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const ok = store.deleteRule(uid, (i && i.id) || "");
+        return ok ? `Alert rule ${i.id} deleted.` : `[trader_alert_delete: no rule with id ${i && i.id} — list them with trader_alerts rather than guessing.]`;
+      } catch (e) {
+        return `[trader_alert_delete error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_start: {
+    policy: "action", // ARMS the user's own autopilot book (operator decision, 2026-08-12)
+    user_safe: true,  // sets only ctx.userId's own book; capability-gated on ai_trader
+    desc: "ARM the autopilot on the user's own account by selecting which book runs: 'intraday' (washout entries + zone-ladder exits on liquid ETFs) or 'champion' (the diversified allocation book, rebalanced on a schedule). One account runs ONE book; selecting one pauses the other. Use only on an EXPLICIT, unambiguous instruction to start/turn on/arm the trader — never infer it from interest, a question, or a hypothetical. Before calling, tell the user in plain words what will happen: the autopilot will open and close positions on their connected account from the next scan, sized by the risk rules, with a protective stop placed at the broker on every entry. After calling, relay the returned state verbatim, INCLUDING whether real-money orders are actually armed server-side — selecting a book does not by itself make orders real. They can stop it any time with trader_pause.",
+    schema: {
+      type: "object",
+      required: ["book"],
+      properties: { book: { type: "string", enum: ["intraday", "champion"], description: "which book to run on this account" } },
+    },
+    async run(i, ctx) {
+      try {
+        if (!_hasCapability(ctx, "ai_trader")) return "[trader_start refused: the autonomous trader is part of the Pilot plan. Say so plainly and point at /pricing.html — do NOT claim the trader was started.]";
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const want = String((i && i.book) || "").toLowerCase();
+        // The tool's vocabulary is the product's ('intraday'), the store's is
+        // historical ('stock') — map rather than leak the internal name.
+        const mode = want === "champion" ? "champion" : want === "intraday" ? "stock" : null;
+        if (!mode) return "[trader_start refused: book must be 'intraday' or 'champion'. Ask which one rather than picking for them.]";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (!traderMode.set(uid, mode)) return "[trader_start: the mode switch refused the change — report the failure honestly rather than claiming it started.]";
+        const live = process.env.TRADER_LIVE === "1";
+        const autoExec = process.env.TRADER_AUTO_EXECUTE === "1";
+        const halt = require("./trading-guard").haltFile();
+        const label = mode === "champion" ? "Champion (diversified allocation book)" : "Intraday (washout entries, zone-ladder exits)";
+        return [
+          `Autopilot ARMED on this account: ${label}${before === "off" ? "" : ` (was: ${before})`}. It begins acting on the next scan, within about a minute, and places a protective stop at the broker on every entry.`,
+          halt
+            ? `BUT a halt file is present (${halt}) — while it exists every order is refused, so nothing will actually be placed. Say this plainly.`
+            : autoExec && live
+              ? "Autonomous execution and real-money orders are both armed server-side, so these will be REAL orders."
+              : `Server-side arming is incomplete — autonomous execution is ${autoExec ? "ON" : "OFF"} and real-money orders are ${live ? "ON" : "OFF"}, so it will decide and journal but ${live ? "" : "NOT "}place real orders. Do not tell the user real money is at stake unless both are ON.`,
+          "They can stop it at any time by asking to pause the trader.",
+        ].join("\n");
+      } catch (e) {
+        return `[trader_start error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_pause: {
+    policy: "action", // the safety direction: always available, never plan-gated
+    user_safe: true,  // sets only ctx.userId's own book; NOT capability-gated on
+                      // purpose — stopping is risk-reducing and must never be
+                      // withheld from someone whose account is being traded
+    desc: "PAUSE the autopilot — set the active book to OFF so it opens no new positions and closes nothing further. Use when the user says stop/pause/turn it off/halt trading. Always available: unlike starting it (trader_start, which is a Pilot capability), stopping is never gated, because someone whose account is being traded must always be able to stop it. Existing positions and their broker-side protective stops REMAIN in place and become the user's to manage — say that explicitly. Takes effect on the next scan, within about a minute.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const uid = (ctx && ctx.userId) || "local-owner";
+        const traderMode = require("./trader-mode");
+        const before = traderMode.get(uid);
+        if (before === "off") return "The autopilot is already OFF — it is opening and closing nothing. Existing positions and their broker stops are unchanged and remain yours to manage.";
+        if (!traderMode.set(uid, "off")) return "[trader_pause: the mode switch refused the change — report the failure honestly rather than claiming it stopped.]";
+        return `Autopilot PAUSED (was: ${before}). It will open no new positions and will not close anything further; this takes effect on the next scan, within about a minute. Open positions and their broker-side protective stops stay in place and are now yours to manage — pausing does NOT flatten anything. Ask to start it again whenever you want.`;
+      } catch (e) {
+        return `[trader_pause error: ${e.message}]`;
+      }
+    },
+  },
 };
 
 const TOOL_NAMES = Object.keys(REGISTRY);
@@ -1704,7 +1977,11 @@ function capabilityManifest({
         description: entry.desc,
         input_schema: entry.schema,
         policy: entry.policy,
-        operator_required: entry.policy !== "read",
+        // The REAL access tier, matching the runTool gate — not a policy proxy.
+        // (A user_safe action tool is available to any signed-in user, so the old
+        // `policy !== "read"` reading of it would have been wrong.)
+        access: entry.guest_safe === true ? "guest" : entry.user_safe === true ? "signed_in" : "operator",
+        operator_required: entry.guest_safe !== true && entry.user_safe !== true,
         surface_availability: {
           dream_chat: true,
           mcp: true,
@@ -2039,19 +2316,40 @@ async function runTool(name, input, ctx = {}) {
     return result;
   }
 
-  // Non-operators (e.g. public-server guests) may run ONLY guest_safe tools —
-  // the web-only set. This is the enforcement boundary behind the advertised-set
-  // filter: even a crafted call to a read-policy filesystem tool (Read/Grep/
-  // workspace_read/…) is denied for guests, so the public chat can't enumerate or
-  // read local files. Operators (loopback/admin) are unrestricted. (#1213)
-  if (!ctx.operator && entry.guest_safe !== true) {
-    const result = _outcome("denied", name, {
-      reason_code: "operator_required",
-      policy: entry.policy,
-      error: `'${name}' (${entry.policy}) requires operator access`,
-    });
-    await _logToolExecution(name, input, "denied", "operator_required", startTime, ctx);
-    return result;
+  // THREE ACCESS TIERS (#1213, extended for hosted users).
+  //
+  //   guest_safe  — anyone, signed in or not (the web-only set)
+  //   user_safe   — a SIGNED-IN user, and only over their OWN per-user state
+  //   (neither)   — operator only (loopback / operator token)
+  //
+  // The middle tier exists because the hosted site has no operators: `operator`
+  // means un-proxied loopback or the operator token, so on unisona.ai every real
+  // customer was denied every non-guest tool — including tools about their own
+  // account. A tool may only be marked `user_safe` when the data it returns is
+  // scoped by ctx.userId; anything reading a SHARED store (e.g. the autopilot's
+  // single un-attributed trade ledger) must stay operator-only, or one user's
+  // question would answer with another's book.
+  //
+  // Plan entitlements are NOT enforced here — a tool whose feature is plan-gated
+  // checks its own capability (see _hasCapability), so chat can never become a
+  // way around the plan matrix.
+  if (!ctx.operator) {
+    const signedIn = Boolean(ctx.userId);
+    const allowed = entry.guest_safe === true || (entry.user_safe === true && signedIn);
+    if (!allowed) {
+      // A user_safe tool refused purely for want of a session gets the honest
+      // reason (sign in), not the misleading "operator access" one.
+      const reasonCode = entry.user_safe === true ? "sign_in_required" : "operator_required";
+      const result = _outcome("denied", name, {
+        reason_code: reasonCode,
+        policy: entry.policy,
+        error: reasonCode === "sign_in_required"
+          ? `'${name}' needs you to be signed in — it reads your own account state`
+          : `'${name}' (${entry.policy}) requires operator access`,
+      });
+      await _logToolExecution(name, input, "denied", reasonCode, startTime, ctx);
+      return result;
+    }
   }
 
   // Per-faculty tool gating for capability evals (#2777). Burnell et al. §4.3: if a
@@ -2151,6 +2449,16 @@ async function runTool(name, input, ctx = {}) {
   }
 }
 
+// Which tools a caller may SEE. Mirrors the runTool gate exactly (guest_safe →
+// anyone; user_safe → signed in; otherwise operator), so the advertised surface
+// never offers a model a tool its own execution gate would refuse. (#1213 tiers)
+function _visibleToolNames({ operator = false, signedIn = false } = {}) {
+  return TOOL_NAMES.filter((name) => {
+    const e = REGISTRY[name];
+    return operator || e.guest_safe === true || (e.user_safe === true && signedIn);
+  });
+}
+
 // ── native Anthropic tool schemas (same single source of truth as the preamble) ──
 // Renders the registry as `tools` for the Messages API. Cloud models (Haiku/Sonnet)
 // emit native `tool_use` blocks, so they don't need the free-text preamble — they get
@@ -2158,9 +2466,8 @@ async function runTool(name, input, ctx = {}) {
 // (web-only) tools so a public-server guest's model never even sees the filesystem/
 // shell/mutating tools (runTool still enforces guest_safe regardless — this just keeps
 // the advertised surface honest). (#1213)
-function anthropicTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function anthropicTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,
@@ -2172,9 +2479,8 @@ function anthropicTools({ operator = false } = {}) {
 // (chat/completions `tools`). OpenAI-compatible providers (GPT, Grok) emit native
 // `tool_calls`, so they use this instead of the free-text preamble. Operator filter
 // matches anthropicTools — runTool still enforces policy regardless.
-function openaiTools({ operator = false } = {}) {
-  return TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+function openaiTools({ operator = false, signedIn = false } = {}) {
+  return _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       type: "function",
       function: {
@@ -2189,7 +2495,7 @@ function openaiTools({ operator = false } = {}) {
 // accepts an OpenAPI-subset schema; our schemas are already that subset, but we strip
 // any keys Gemini rejects (e.g. additionalProperties) defensively. One element with all
 // declarations, matching Gemini's expected shape.
-function geminiTools({ operator = false } = {}) {
+function geminiTools({ operator = false, signedIn = false } = {}) {
   const clean = (schema) => {
     if (!schema || typeof schema !== "object") return schema;
     const { additionalProperties, $schema, ...rest } = schema;
@@ -2200,8 +2506,7 @@ function geminiTools({ operator = false } = {}) {
     }
     return rest;
   };
-  const functionDeclarations = TOOL_NAMES
-    .filter((name) => operator || REGISTRY[name].guest_safe === true)
+  const functionDeclarations = _visibleToolNames({ operator, signedIn })
     .map((name) => ({
       name,
       description: REGISTRY[name].desc,

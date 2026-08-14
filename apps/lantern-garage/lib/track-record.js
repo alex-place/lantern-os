@@ -84,13 +84,17 @@ function buildBookFromRows(exits, { label = 'Intraday book' } = {}) {
   };
 }
 
-/** Full snapshot from a ledger path — everything derived, nothing invented. */
-function buildTrackRecord(logPath = DEFAULT_LOG) {
+/**
+ * Full snapshot from a ledger path — everything derived, nothing invented.
+ * `user` scopes it to one account's rows (#3275); null means the whole book.
+ */
+function buildTrackRecord(logPath = DEFAULT_LOG, user = null) {
   return {
     generatedAt: new Date().toISOString(),
     confirmedOnly: true,
+    scopedTo: user || 'all-accounts',
     books: {
-      intraday: buildBookFromRows(readExits(logPath), { label: 'Intraday book' }),
+      intraday: buildBookFromRows(readExits(logPath, user), { label: 'Intraday book' }),
       champion: {
         label: 'Champion book',
         status: 'pending',
@@ -116,15 +120,23 @@ function snapshotPathFor(logPath) {
   return path.join(path.dirname(logPath), 'track-record-snapshot.json');
 }
 
-function getTrackRecord(logPath = DEFAULT_LOG) {
+function getTrackRecord(logPath = DEFAULT_LOG, user = null) {
   const now = Date.now();
-  if (_cache.value && _cache.key === logPath && now - _cache.at < TTL_MS) return _cache.value;
-  const snap = buildTrackRecord(logPath);
-  _cache = { at: now, key: logPath, value: snap };
-  try {
-    fs.mkdirSync(path.dirname(snapshotPathFor(logPath)), { recursive: true });
-    fs.writeFileSync(snapshotPathFor(logPath), JSON.stringify(snap, null, 2));
-  } catch (_e) { /* persistence is best-effort; the endpoint still serves */ }
+  // The cache key includes the user — otherwise one account's snapshot would be
+  // served to the next caller, which is precisely the bug this scoping fixes.
+  const key = `${logPath}::${user || '*'}`;
+  if (_cache.value && _cache.key === key && now - _cache.at < TTL_MS) return _cache.value;
+  const snap = buildTrackRecord(logPath, user);
+  _cache = { at: now, key, value: snap };
+  // Persist only the WHOLE-book snapshot. Writing per-user snapshots to one path
+  // would have each account overwrite the last — an artifact that lies about whose
+  // record it holds.
+  if (!user) {
+    try {
+      fs.mkdirSync(path.dirname(snapshotPathFor(logPath)), { recursive: true });
+      fs.writeFileSync(snapshotPathFor(logPath), JSON.stringify(snap, null, 2));
+    } catch (_e) { /* persistence is best-effort; the endpoint still serves */ }
+  }
   return snap;
 }
 
