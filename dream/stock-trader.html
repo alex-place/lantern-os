@@ -4765,16 +4765,16 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   if(!skipConfirm && !_twoStep(btn, 'Confirm ✕', ()=>flattenPosition(symbol, side, qty, true, btn))) return false;
   try{
     let result = await _placeFlatten(symbol, exitSide, q, false);
-    // IBKR disclosure/size warnings dead-ended the flatten (live 2026-08-14: the
-    // operator could not trim SOXS/SPXS/SQQQ — "re-submit with acceptWarnings").
-    // Sells only, and never silent: the human reads IBKR's own warning text and
-    // decides. This is the manual mirror of the engine's exit policy (2026-07-27:
-    // risk-reducing sells accept warnings; entries never do).
+    // Normally warnings never reach this page: the server verifies a sell
+    // reduces the held position and auto-accepts IBKR's disclosure warnings
+    // (the engine's own exit policy since 2026-07-27). This confirm exists ONLY
+    // for the unverifiable case — the position feed is unreadable, or the qty
+    // does not match the book — where a human really is the last check.
     if(!(result && result.status==='placed') && exitSide==='sell'
        && /acceptWarnings/i.test(String(result&&(result.reason||result.error)||''))){
       const warnText = String(result.reason||result.error).replace(/;?\s*re-submit with acceptWarnings:true[^;]*/i,'').trim();
-      if(window.confirm('IBKR raised warnings for SELL '+q+' '+symbol+':\n\n'+warnText
-        +'\n\nConfirm to resubmit accepting these warnings. (This is a risk-reducing exit.)')){
+      if(window.confirm('IBKR raised warnings for SELL '+q+' '+symbol+' and the position could not be verified as covering this sell (feed unreadable or size mismatch):\n\n'+warnText
+        +'\n\nConfirm only if you are sure you hold at least '+q+' shares.')){
         result = await _placeFlatten(symbol, exitSide, q, true);
       }
     }
