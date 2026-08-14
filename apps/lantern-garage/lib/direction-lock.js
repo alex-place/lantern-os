@@ -96,6 +96,26 @@ function instrumentSign(sym) {
   return hit ? { family: hit[0], sign: hit[1] } : { family: s, sign: 1 };
 }
 
+// The 1x instrument that carries each family's ACTUAL market signal. A levered
+// or inverse wrapper is a derivative of this price series; any market-semantic
+// computation (washout, regime, trend) done on the wrapper's own bars is either
+// amplified or MIRRORED. The mirror case is the dangerous one: a -3x wrapper's
+// session low is the underlying's session high, so "SOXS washed out" read off
+// SOXS bars means "semis at their session HIGH" (#3295 — measured at the fire
+// moments: median underlying IBS 0.90, 94% in the top third, 0% actually washed
+// out). The same class of bug was hit before in the lab: regime derived from
+// SQQQ's own SMA-200 inverted the gate and "silently made every inverse-ETF
+// result meaningless" (spy_engine_backtest.js header).
+const FAMILY_PROXY = {
+  SPY: 'SPY', QQQ: 'QQQ', IWM: 'IWM', SOX: 'SMH', DIA: 'DIA', GLD: 'GLD', TLT: 'TLT',
+};
+
+/** The 1x proxy whose bars carry the family's market signal (null if unknown). */
+function underlyingProxy(sym) {
+  const { family } = instrumentSign(sym);
+  return FAMILY_PROXY[family] || null;
+}
+
 /** Net direction per family from live positions: { FAMILY: -1|1 } (0 net → absent).
  *  positions: [{ symbol, qty }] — negative qty (a real short) flips the sign.
  *  Sub-share DUST (|qty| < 1) is ignored: IBKR structurally cannot trade a
@@ -132,4 +152,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, instrumentSign, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
+module.exports = { FAMILY, instrumentSign, underlyingProxy, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };

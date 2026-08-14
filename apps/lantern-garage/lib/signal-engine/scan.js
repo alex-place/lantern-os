@@ -113,6 +113,52 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
   return "NEUTRAL";
 }
 
+/**
+ * POLARITY (#3295 root cause). Every market-semantic signal above is computed on
+ * the symbol's OWN bars — correct for a 1x instrument, inverted for a -3x
+ * wrapper, whose intraday bars mirror its underlying. Measured at the fire
+ * moments (47 fires, 22 sessions): when an inverse wrapper's session IBS read
+ * "washed out", the UNDERLYING sat at median IBS 0.90 — its session HIGH — 94%
+ * in the top third, 0% actually washed out. And the stronger the underlying's
+ * session, the more certain the wrapper "washout" existed (93% of up>0.3%
+ * sessions vs 36% otherwise). So the polarity-blind signal silently converted
+ * "buy the market's dip" into "short the market at its session high", firing
+ * hardest on the strongest up-days: an anti-trend accumulation machine nobody
+ * designed. Outcome over 2010-2026: −268R across 2,493 wrapper entries, negative
+ * under every causal condition (gap, 5d, SMA-200 regime), while the same signal
+ * on 1x instruments is +825R and positive under all of them.
+ *
+ * The rule: a BULLISH verdict on a negative-sign instrument is an ECONOMIC
+ * SHORT, so it must state its thesis on the true instrument — the underlying at
+ * its session TOP (IBS ≥ 1−max), not the wrapper at its bottom — and short
+ * entries are only tradable at all behind TRADER_SHORT_EDGE=1, because no
+ * measured short edge exists. BEARISH verdicts pass through untouched: they
+ * feed the EXIT path, and a held wrapper must remain exitable.
+ *
+ * This is the entry-side twin of the lab lesson already in
+ * spy_engine_backtest.js ("regime from SQQQ's own SMA-200 inverts the gate"),
+ * and it is written against direction-lock's sign map so any future instrument
+ * with a sign — new inverse products, short futures (#3218) — inherits it.
+ */
+function applyPolarity(sym, direction, opts = {}) {
+  if (direction !== "BULLISH") return { direction, veto: null };
+  const { family, sign } = require("../direction-lock").instrumentSign(sym);
+  if (sign >= 0) return { direction, veto: null };
+  const ibsMax = Number(opts.ibsMax ?? (Number(process.env.TRADER_IBS_MAX) || 0.15));
+  const shortEdge = opts.shortEdge ?? (process.env.TRADER_SHORT_EDGE === "1");
+  if (!shortEdge) {
+    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; measured -268R over 2,493 wrapper entries, #3295)` };
+  }
+  const u = opts.underlyingIbs;
+  if (u == null) {
+    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying unreadable, no thesis to state` };
+  }
+  if (u < 1 - ibsMax) {
+    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying mid-range (IBS ${u.toFixed(2)}); a wrapper washout is not a market washout` };
+  }
+  return { direction, veto: null };   // explicit short: underlying at its session top
+}
+
 // Deterministic composite gate — ported from agents.py `riley_strategy_gate`
 // (proximity gate → context-aware RSI adjustment → structure/candle/touch
 // boosts → total_score → PERFECT/GOOD/WAIT/NO). Returns a 0..100 confidence.
@@ -302,7 +348,16 @@ async function scanAll(watchlist) {
     const rsiVal = rsi(_closes15) ?? 50;
     // closes feed the ZONE_TREND_DIR override — without them the trend can't be
     // judged and deriveDirection silently falls back to pure mean-reversion.
-    const direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
+    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
+    // Polarity: a BULLISH verdict on a negative-sign wrapper is an economic
+    // short and must be judged on the UNDERLYING's bars (see applyPolarity).
+    {
+      const _proxy = require("../direction-lock").underlyingProxy(t);
+      const _uBars = _proxy && _proxy !== t && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
+      const _pol = applyPolarity(t, direction, { underlyingIbs: _uBars ? sessionIbs(_uBars) : null });
+      if (_pol.veto) logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
+      direction = _pol.direction;
+    }
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
     const gate = rileyGate({ sr, rsiVal, thresholds, struct, candle, direction, trending });
@@ -437,4 +492,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, sessionIbs, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, applyPolarity, gateAllows, rileyGate, candleGrade, convergenceVerdict };
