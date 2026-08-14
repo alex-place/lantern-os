@@ -36,7 +36,7 @@ const grab = (re) => {
 const src = [/^function _isWorkingOrder\(/, /^function renderOrders\(/].map(grab).join('\n');
 
 function render(orders) {
-  const els = { 'tp-orders': { innerHTML: '' }, 'tp-history': { innerHTML: '' } };
+  const els = { 'tp-orders': { innerHTML: '' }, 'tp-history': { innerHTML: '' }, 'tpOrdCount': { textContent: '' } };
   const sandbox = {
     document: { getElementById: (id) => els[id] },
     fmt: (v, d) => Number(v).toFixed(d),
@@ -46,7 +46,7 @@ function render(orders) {
   const fn = new Function(...Object.keys(sandbox), src + '\nreturn { renderOrders, _isWorkingOrder };');
   const api = fn(...Object.values(sandbox));
   api.renderOrders(orders);
-  return { open: els['tp-orders'].innerHTML, hist: els['tp-history'].innerHTML, api };
+  return { open: els['tp-orders'].innerHTML, hist: els['tp-history'].innerHTML, badge: els['tpOrdCount'].textContent, api };
 }
 
 const ORDERS = [
@@ -90,6 +90,12 @@ test('operator-book rows are marked (op) so the viewer knows whose orders these 
 test('a row with no id renders without a broken button', () => {
   const { open } = render([{ symbol: 'X', side: 'sell', qty: 1, type: 'market', status: 'submitted' }]);
   assert.ok(!/cancelOrder\(/.test(open), 'no id → no cancel call to nowhere');
+});
+
+test('the tab badge counts WORKING orders only — "3 exits resting" reads as Orders ③ (#3309)', () => {
+  const { badge } = render(ORDERS);
+  assert.strictEqual(badge, 3, 'the 2 SPXS + 1 SQQQ working rows; filled/canceled/inactive never counted');
+  assert.strictEqual(render([]).badge, 0, 'an empty book reads 0, matching the Positions badge convention');
 });
 
 test('_isWorkingOrder vocabulary covers every broker/ledger working status', () => {
