@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: the entry signal is now polarity-aware — a -3x wrapper mirrors its underlying, so `sessionIbs` on the wrapper's own bars read "washed out" precisely when the market sat at its session HIGH (median underlying IBS 0.90 at the 47 measured fire moments; the wrapper "washout" existed on 93% of up-sessions vs 36% otherwise). The polarity-blind signal was silently running short-the-rip, hardest on the strongest up-days (−268R over 2,493 wrapper entries, 2010–2026). A BULLISH verdict on a negative-sign instrument is now judged as the economic short it is: thesis stated on the underlying at its session top, tradable only behind `TRADER_SHORT_EDGE=1` (default off — no measured short edge). Exits untouched; 1x signals untouched
