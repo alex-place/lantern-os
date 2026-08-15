@@ -626,6 +626,32 @@ _loadState();
  * histogram that is rising (turning) passes: that's the stabilization we want to buy.
  * Pure + testable; fail-open (insufficient data → NOT a knife, don't block entries).
  */
+// OPERATOR HOLD PIN (#3318). "Keep GLD" was not expressible: the operator
+// trimmed the carry to GLD-only pre-open 2026-08-14 and the engine
+// signal-exited it nine minutes into the session. A pinned symbol keeps every
+// PROTECTIVE mechanism — stop, ladder banking, breaker — but signal-derived
+// exits (signal_exit, momentum_died) are suppressed with an honest skip row.
+// Sources, unioned: TRADER_PIN env (SYM1,SYM2) and pins.json next to the trade
+// ledger ({"pins":["GLD"]}) — the file is re-read (2s mtime cache) so a pin
+// works MID-SESSION without a restart, and a UI toggle can write it later.
+const PIN_FILE = process.env.TRADER_PIN_FILE
+  ? path.resolve(process.env.TRADER_PIN_FILE)
+  : path.join(path.dirname(TRADES_LOG), 'pins.json');
+let _pinCache = { at: 0, set: new Set() };
+function _isPinned(sym) {
+  const now = Date.now();
+  if (now - _pinCache.at > 2000) {
+    const set = new Set(String(process.env.TRADER_PIN || '')
+      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean));
+    try {
+      const j = JSON.parse(fs.readFileSync(PIN_FILE, 'utf8'));
+      for (const s of (Array.isArray(j) ? j : (j && j.pins) || [])) set.add(String(s).toUpperCase());
+    } catch (_e) { /* no pin file → env only */ }
+    _pinCache = { at: now, set };
+  }
+  return _pinCache.set.has(String(sym || '').toUpperCase());
+}
+
 function isFallingKnife(closes) {
   if (!Array.isArray(closes) || closes.length < 36) return false;   // need 2 MACD reads
   const now = macd(closes);
@@ -847,8 +873,12 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
         // MACD/EMA/RSI over thin pre-market bars is noise — never dump a
         // position on it outside regular hours.
         if (m && m.histogram < 0 && last < e9 && (r == null || r < 55) && !protectiveOnly) {
-          await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
-          delete heldQty[sym]; continue;
+          if (_isPinned(sym)) {
+            out.skipped.push({ symbol: sym, why: 'pinned — momentum_died suppressed by operator (#3318); stop/ladder still protect' });
+          } else {
+            await closeLong(bridge, userId, sym, qty, p, `momentum_died (MACD hist<0, <EMA9${r != null ? `, RSI ${Math.round(r)}` : ''})`, out, now, { extended, refPrice: cur });
+            delete heldQty[sym]; continue;
+          }
         }
       }
     }
@@ -1413,6 +1443,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         // exit on a STRONG bearish read, (3) require it to persist across scans.
         const entryAt = _entryAt.get(sym) || 0;
         if (entryAt && now - entryAt < c.minHoldMs) { out.skipped.push({ ...record, why: `min-hold (${Math.round((now - entryAt) / 60000)}<${Math.round(c.minHoldMs / 60000)}min) — stop still protects` }); continue; }
+        if (_isPinned(sym)) { out.skipped.push({ ...record, why: 'pinned — signal_exit suppressed by operator (#3318); stop/ladder still protect' }); continue; }
         if (c.zoneExit && _zoneLadder.has(sym)) { out.skipped.push({ ...record, why: 'zone ladder owns this exit (#3165) — R1/R2/floor + broker stop' }); continue; }
         if ((s.convergence.p_win || 0) < c.exitMinPwin) { out.skipped.push({ ...record, why: `bearish too weak to exit (p_win ${s.convergence.p_win} < ${c.exitMinPwin})` }); continue; }
         if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${c.persistScans} consecutive bearish scans (persistence)` }); continue; }
