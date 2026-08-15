@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: every entry now arms a ladder that owns its exit. The ladder previously armed only for a 9-symbol fossil allowlist AND only under a resistance zone — SOXL (2026-08-14) got neither, so a near-perfect bottom entry was scratched by the first weak scan at +$72 of a $1,036 move. Blue sky now arms at the plan targets; zones unchanged (#3165). The obvious "tighten R1 to k×ATR" fix was swept 2000→2026 (37,518 trades, fit/holdout) and FALSIFIED — every tightened variant loses both windows on total income, monotonically — so it ships default-off behind `TRADER_LADDER_VOL_MULT` with the table in the code

@@ -386,6 +386,14 @@ async function main() {
       if (_res1 && (_res1.level - price) / Math.max(_provRisk, 1e-9) < Number(process.env.BT_MIN_R1R)) { regimeBlocked++; continue; }
     }
     let tr = Number(process.env.BT_TARGET_R) || (convergence && convergence.target_r) || 2;
+    // BT_TGT_ATR_MULT (lab for #3285, 2026-08-14): VOLATILITY-SCALED target —
+    // target distance = mult x ATR14(daily), expressed as tr in R units so the
+    // rest of the exit machinery is untouched. Decouples the target from the
+    // stop floor: a 3%-stop DIA no longer needs a 6% move to bank.
+    if (Number(process.env.BT_TGT_ATR_MULT) > 0) {
+      const _a14 = atr(bars.slice(Math.max(0, i - 15), i + 1));
+      if (_a14 > 0 && riskAbs > 0) tr = Math.max(0.3, Math.min(3, (Number(process.env.BT_TGT_ATR_MULT) * _a14) / riskAbs));
+    }
     // BT_ADAPTIVE_TGT: target = p-th percentile of the LAST 40 completed trades' MFE
     // (this symbol, walk-forward — only history that existed at entry time; falls back
     // to the plan target until 12 trades exist). BT_ADAPTIVE_PCT sets the percentile.
