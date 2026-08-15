@@ -262,8 +262,23 @@ function cfg() {
     supEntrySyms: new Set(String(process.env.TRADER_SUP_ENTRY_SYMBOLS || 'SPY,QQQ,GLD,SMH,TLT,SQQQ,SOXS,SPXS')
       .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     zoneExit: process.env.TRADER_ZONE_EXIT !== '0',
-    zoneExitSyms: new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'SPY,QQQ,SSO,GLD,SMH,TLT,SQQQ,SOXS,SPXS')
-      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
+    // LADDER FOR EVERY ENTRY (#3285, 2026-08-14). The 9-symbol allowlist was a
+    // fossil from before the 27-symbol watchlist: SOXL/XLK/IWM/DIA/TQQQ and the
+    // sectors could never arm a ladder at all, so their exits fell through to
+    // first-weak-scan scratches. Live cost, 2026-08-14: a SOXL re-entry 0.08%
+    // off the session low — bounce +3.83% — was scratched at +$72 of a $1,036
+    // move. Default is now ALL entered symbols; set TRADER_ZONE_EXIT_SYMBOLS to
+    // a list only to restrict deliberately.
+    zoneExitSyms: (String(process.env.TRADER_ZONE_EXIT_SYMBOLS || 'all').trim().toLowerCase() === 'all')
+      ? 'all'
+      : new Set(String(process.env.TRADER_ZONE_EXIT_SYMBOLS)
+        .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
+    // EXPERIMENTAL vol-scaled rung tightening — FALSIFIED at defaults by the
+    // two-window sweep (37,518 trades: every ATR multiple and the MFE-adaptive
+    // variant lose BOTH windows on total income vs plan targets; monotonic —
+    // nearer full-exit targets amputate the winners' tail). OFF (0) by default;
+    // kept only for a future re-test with a partial-bank runner structure.
+    ladderVolMult: n('TRADER_LADDER_VOL_MULT', 0),
     enabled: process.env.TRADER_AUTO_EXECUTE === '1',
     // ── Exit management (trailing stop / take-profit / momentum death) ──────────
     trailPct: n('TRADER_TRAIL_PCT', DEFAULTS.trailPct),
@@ -1716,13 +1731,46 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         exec.stop = { price: stop, status: sr && sr.status, order_id: sr && sr.order_id };
       }
     }
-    if (r && r.status === 'placed' && c.zoneExit && c.zoneExitSyms.has(sym)) {
-      // Arm the zone ladder (#3165): the two nearest resistance zones above entry
-      // that clear c.tgtMinR. No qualifying zone above -> blue sky, no ladder; the
-      // generic exits (trail/target) manage it instead of banking a scratch at a
-      // level that was never more than noise.
+    if (r && r.status === 'placed' && c.zoneExit
+      && (c.zoneExitSyms === 'all' || c.zoneExitSyms.has(sym))) {
+      // Arm the ladder for EVERY entry (#3285, 2026-08-15). What actually failed
+      // on 2026-08-14 was OWNERSHIP, not target distance: with no ladder armed
+      // (blue sky + the fossil allowlist), the first weak scan owned the exit and
+      // a SOXL entered 0.08% off the session low was scratched at +0.25% of a
+      // +3.83% bounce. Blue sky now arms rungs at the PLAN targets — the same
+      // distances the two-window lab validated — so every entry gets the
+      // R1/R2/trail structure and signal_exit is pre-empted (#3165), everywhere.
+      //
+      // TIGHTENING THE RUNGS IS FALSIFIED. The obvious "make R1 reachable" fix
+      // (rungs at k x daily-ATR) was swept 2000→2026, 10 symbols, 37,518 trades,
+      // fit 2000-14 / holdout 2015-26, judged on total income:
+      //
+      //     base (plan targets)  fit  +852.0   holdout +1612.1   <- winner
+      //     atr x1.5             fit  +664.7   holdout +1046.4
+      //     atr x1.0             fit  +371.5   holdout  +728.8
+      //     atr x0.75            fit  +250.4   holdout  +635.6
+      //     MFE-p75 adaptive     fit  +516.4   holdout +1115.7
+      //
+      // Monotonic: the nearer the full-exit target, the more income dies — the
+      // winners' tail pays for everything (the limit-entry lesson, exit-side).
+      // TRADER_LADDER_VOL_MULT>0 keeps the tightened mode available for a future
+      // re-test with a partial-bank runner structure; it is OFF by default.
       const res = _resAbove;
-      if (res[0]) _zoneLadder.set(sym, { r1: res[0].level, r1top: res[0].top || res[0].level, r2: res[1] ? res[1].level : 0, broke: false });
+      const pl0 = s.plan || {};
+      let _fbR1 = Number(pl0.target1) > price ? Number(pl0.target1) : price * 1.03;
+      let _fbR2 = Number(pl0.target2) > _fbR1 ? Number(pl0.target2) : price * 1.051;
+      if (c.ladderVolMult > 0) {           // experimental, falsified at defaults — see table above
+        const _atr15 = Number(s.atr) || 0;
+        const _dayVolPct = Math.min(6, Math.max(0.6, (_atr15 > 0 && price > 0)
+          ? (_atr15 / price) * Math.sqrt(26) * 100 : 1.2));
+        _fbR1 = price * (1 + (c.ladderVolMult * _dayVolPct) / 100);
+        _fbR2 = price * (1 + (1.7 * c.ladderVolMult * _dayVolPct) / 100);
+      }
+      const _r1 = res[0] ? Number(res[0].level) : _fbR1;              // zone first — #3165 unchanged
+      let _r2 = res[1] ? Number(res[1].level) : Math.max(_fbR2, _r1 * 1.004);
+      if (!(_r2 > _r1)) _r2 = _r1 * 1.004;                            // rungs must ascend
+      const _r1top = res[0] ? (res[0].top || res[0].level) : _r1;
+      _zoneLadder.set(sym, { r1: _r1, r1top: _r1top, r2: _r2, broke: false });
     }
     if (r && r.status === 'placed') {
       const pl = s.plan || {};
