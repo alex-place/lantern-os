@@ -215,6 +215,11 @@ function cfg() {
     // Max simultaneous open positions. Truncates the left tail (worst days are
     // concurrency x stop width). 0 disables.
     maxConcurrent: n('TRADER_MAX_CONCURRENT', 2),
+    // #3317: the last slot(s) are reserved for conviction — sub-threshold
+    // signals fill only up to (cap − reserve). 0 disables. Not lab-gateable
+    // (no p_win on daily bars); every refusal writes an audit row instead.
+    slotReserve: n('TRADER_SLOT_RESERVE', 1),
+    slotReservePwin: n('TRADER_SLOT_RESERVE_PWIN', 0.55),
     // Positions below this % of equity are DUST and never consume a
     // concurrency slot (nor do unclosable ones). 0 counts every row.
     dustPct: n('TRADER_DUST_PCT', 0.1),
@@ -1665,6 +1670,25 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       }).length;
       if (_openN >= c.maxConcurrent) {
         out.skipped.push({ ...record, why: `concurrent cap: ${_openN} positions open (max ${c.maxConcurrent})` });
+        continue;
+      }
+      // SLOT RESERVE BY CONVICTION (#3317, 2026-08-15). Slots were first-come-
+      // first-served, so weak signals could starve strong ones: on 2026-08-14
+      // five slots were held largely by sub-0.50 probes when SMH fired at 0.61
+      // and was refused — it ran +0.82% to the close. Week of 8/11: the sub-0.50
+      // cohort netted −$516 (n=11) while ≥0.50 entries made money; 21 cap-blocks
+      // in 4 sessions. The LAST slot is now reserved for conviction: a signal
+      // below TRADER_SLOT_RESERVE_PWIN may fill up to (cap − reserve); only
+      // ≥threshold signals may take the final slot(s).
+      //
+      // NOT lab-gated — the daily harness has no p_win dimension, so honesty
+      // demands the opposite discipline: every refusal logs its own audit row
+      // (symbol, p_win, what was held), so the live ledger accumulates the
+      // counterfactual and the rule can be judged on real data. Kill:
+      // TRADER_SLOT_RESERVE=0.
+      if (c.slotReserve > 0 && (Number(record.p_win) || 0) < c.slotReservePwin
+        && _openN >= c.maxConcurrent - c.slotReserve) {
+        out.skipped.push({ ...record, why: `slot reserve: ${_openN}/${c.maxConcurrent} open and the last ${c.slotReserve} slot(s) are reserved for p_win ≥ ${c.slotReservePwin} — this signal is ${(Number(record.p_win) || 0).toFixed(3)}` });
         continue;
       }
     }
