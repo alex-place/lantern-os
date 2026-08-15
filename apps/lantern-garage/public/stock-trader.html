@@ -4789,7 +4789,7 @@ async function dustClear(symbol, btn){
     });
     const j = await r.json().catch(()=>({}));
     if(j && j.ok){
-      _alertToast(`✓ Dust order accepted for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — fractional sells DO work`);
+      _alertToast(`${j.session_note?'⏳':'✓'} Dust order accepted for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — fractional sells DO work${j.session_note?' — '+j.session_note:''}`);
     }else{
       _alertToast(`⚠ ${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
     }
@@ -4817,7 +4817,9 @@ async function flattenPosition(symbol, side, qty, skipConfirm, btn){
       }
     }
     if(!(result && result.status==='placed')){ _alertToast('⚠ Couldn’t flatten '+symbol+': '+(result.reason||result.error||'order not placed')); return false; }
-    const fill=result.fill_price?` @ $${result.fill_price}`:''; _alertToast(`✓ Flattened ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}`);
+    const fill=result.fill_price?` @ ${result.fill_price}`:'';
+    // 'Placed' is not 'filled' outside RTH — say which one happened (#3326).
+    _alertToast(`${result.session_note?'⏳ Order placed for':'✓ Flattened'} ${symbol}${fill}${result.mode==='paper'?' (paper)':''}${result.operator_account?' (operator account)':''}${result.session_note?' — '+result.session_note:''}`);
     journalLog({ symbol, side:exitSide, qty:q, type:'market', source:'flatten' });   // #2446
     await Promise.all([loadOrders(), loadPortfolio()]);
     return true;
