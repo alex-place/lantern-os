@@ -4776,6 +4776,26 @@ function _twoStep(btn, confirmText, action){
   _armedTimer=setTimeout(()=>{ if(btn){ btn.textContent=btn.dataset.orig||btn.textContent; btn.classList.remove('armed'); } _armedBtn=null; }, 4000);
   return false;
 }
+// Dust probe (#3325). Two-step confirm like Flatten, then report the broker's
+// verdict VERBATIM — a rejection is a real result here, not a failure to hide.
+// Whatever IBKR answers settles a constraint that has been folklore since
+// 2026-07-28.
+async function dustClear(symbol, btn){
+  if(!_twoStep(btn, 'Confirm ✕', ()=>dustClear(symbol, btn))) return;
+  try{
+    const r = await fetch('/api/trading/orders/dust-clear', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ticker: symbol })
+    });
+    const j = await r.json().catch(()=>({}));
+    if(j && j.ok){
+      _alertToast(`✓ Dust order accepted for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — fractional sells DO work`);
+    }else{
+      _alertToast(`⚠ ${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
+    }
+  }catch(e){ _alertToast('⚠ Dust probe failed: '+e.message); }
+  await Promise.all([loadOrders(), loadPortfolio()]);
+}
 async function flattenPosition(symbol, side, qty, skipConfirm, btn){
   const exitSide = String(side).toLowerCase()==='short' ? 'buy' : 'sell';
   const q = Math.abs(Number(qty)||0);
@@ -4848,7 +4868,7 @@ function renderPositionsTable(positions){
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
         <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
-        <td>${Math.abs(p.qty||0)<1?`<span style="color:var(--muted);font-size:11px" title="Sub-share remnant: IBKR rejects fractional orders via the API (floors to 0), so this cannot be sold from here. It is excluded from every risk gate. To remove it: IBKR Client Portal → enable Fractional Trading → close the position there.">dust</span>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
+        <td>${Math.abs(p.qty||0)<1?`<button class="tp-flat-btn" onclick="dustClear('${p.symbol}',this)" title="Sub-share remnant. The normal exit path floors every quantity, so floor(${Math.abs(p.qty||0)})=0 and it cannot be expressed. This sends the EXACT held quantity, unfloored, and reports IBKR's verdict — if the broker refuses, clear it in Client Portal (enable Fractional Trading, then close there).">✕ Clear dust</button>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // ── Advisor tab: deterministic portfolio suggestions (no LLM, no orders) ──

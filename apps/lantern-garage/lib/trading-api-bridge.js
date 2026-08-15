@@ -140,7 +140,7 @@ class TradingAPIBridge {
    * needs TRADER_ALLOW_LIVE_ACCOUNT=1). Returns the same normalized shape the UI
    * already consumes: { status:'placed'|'dry_run'|'error', order_id, ticker, … }.
    */
-  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings }) {
+  async placeIBKROrder(userId, { ticker, side, qty, type, limitPrice, stopPrice, timeInForce, stopLoss, takeProfit, equity, outsideRth, acceptWarnings, allowFractional }) {
     const client = this.ibkrForUser(userId);
     if (!client) return null;                 // not connected → caller falls back
     const status = await client.getStatus();
@@ -160,8 +160,18 @@ class TradingAPIBridge {
     // canceled orders while +44% ran to +50% unrealized). Floor to whole shares;
     // the sub-share remainder (<1 share of dust) is left and reported in `reason`
     // rather than silently blocking the entire exit.
+    // allowFractional (#3325): send the quantity UNFLOORED. The floor above rests
+    // on 2026-07-28 evidence, and that inference has since been over-applied — the
+    // ledger's own history shows the account HOLDING fractional size (the first
+    // fractional row is a SELL of 838.8, which requires holding 838.8), so
+    // fractional fills reached this account by some path (paper-engine fill or a
+    // corporate action; SOXS has reverse-split history). "Rejected a month ago"
+    // is not "impossible now", and the floor makes the claim untestable by
+    // construction. This flag exists ONLY for the operator-driven dust probe,
+    // which the route restricts to sub-1-share SELLs; nothing else may set it,
+    // and the engine's own paths never do.
     let fracNote = null;
-    if (!Number.isInteger(Number(qty))) {
+    if (!Number.isInteger(Number(qty)) && !allowFractional) {
       const floored = Math.floor(Number(qty));
       fracNote = `qty floored ${qty} -> ${floored} (IBKR rejects fractional orders; ~${(Number(qty) - floored).toFixed(4)} sh dust remains)`;
       qty = floored;
