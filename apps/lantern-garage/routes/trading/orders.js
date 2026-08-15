@@ -7,6 +7,27 @@
  * bindings arrive via the ctx object built in trading.js.
  */
 
+// SESSION STATE, ET (#3326). Manual orders were built as plain MARKET orders,
+// which simply do not execute outside regular hours — IBKR needs a LIMIT with
+// outsideRth. The ENGINE has known this since 2026-08-12 (its extended-hours
+// exits are marketable limits at ±0.2% with outsideRth:true); the manual paths
+// never learned it, so every operator Flatten placed pre-market sat until the
+// 09:30 auction, and the dust probe's "accepted" order went Inactive at the
+// broker instead of working. Same order, different fate, purely because a human
+// pressed the button.
+//   rth      weekday 09:30-16:00 — market orders are fine
+//   extended weekday 04:00-09:30 / 16:00-20:00 — LMT + outsideRth required
+//   closed   otherwise — nothing executes; the order queues to the next session
+function _sessionState(now = Date.now()) {
+  const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const dow = d.getDay();
+  const min = d.getHours() * 60 + d.getMinutes();
+  if (dow < 1 || dow > 5) return 'closed';
+  if (min >= 570 && min < 960) return 'rth';
+  if (min >= 240 && min < 1200) return 'extended';
+  return 'closed';
+}
+
 module.exports = async function ordersRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent, tradingMemory, tradingStore, getEffectiveUserId } = ctx;
 
@@ -148,11 +169,31 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         return true;
       }
 
-      const r = await bridge.placeIBKROrder(acct, {
-        ticker: sym, side: 'sell', qty: held, type: 'market',
+      // Same extended-hours conversion as /orders/place (#3326): the first probe
+      // returned "accepted" and then sat Inactive at the broker, because a market
+      // order outside RTH does not work. Price a marketable limit when we can.
+      const _dSess = _sessionState();
+      const _dOrder = { ticker: sym, side: 'sell', qty: held, type: 'market',
         acceptWarnings: true,        // risk-reducing by construction
-        allowFractional: true,       // THE probe: unfloored
-      }).catch((e) => ({ status: 'error', reason: e.message }));
+        allowFractional: true };     // THE probe: unfloored
+      let _dNote = null;
+      if (_dSess !== 'rth') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([sym]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* fall through to market */ }
+        if (px > 0 && _dSess === 'extended') {
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.998 * 100) / 100;
+          _dOrder.outsideRth = true;
+          _dNote = `extended hours: marketable limit @ ${_dOrder.limitPrice} with outsideRth`;
+        } else {
+          _dNote = 'market closed: the order QUEUES until the next session — it will not fill tonight';
+        }
+      }
+      const r = await bridge.placeIBKROrder(acct, _dOrder)
+        .catch((e) => ({ status: 'error', reason: e.message }));
 
       const placed = !!(r && r.status === 'placed');
       // Recorded either way — the point is the evidence, not the fill.
@@ -164,11 +205,23 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         });
       } catch (_e) { /* logging must never break the probe */ }
 
+      // Record it like any other order, so it appears in the Orders tab instead
+      // of vanishing — the first probe was accepted by the broker and then had
+      // no row anywhere, which is indistinguishable from "nothing happened".
+      if (placed && r.order_id) {
+        try {
+          await tradingMemory.recordNewOrders([{
+            id: r.order_id, symbol: sym, side: 'sell', qty: held,
+            status: 'submitted', order_type: _dOrder.type,
+          }]);
+        } catch (_e) { /* the order is placed; bookkeeping must not fail it */ }
+      }
       sendJson(res, {
         ok: placed, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
         broker_status: (r && r.status) || null,
         broker_says: (r && (r.reason || r.error)) || null,   // verbatim — this IS the finding
         operator_account: acct === OPERATOR_UID && uid !== OPERATOR_UID,
+        session: _dSess, session_note: _dNote,
       }, placed ? 200 : 502);
     } catch (error) {
       sendJson(res, { ok: false, error: error.message }, 500);
@@ -387,6 +440,32 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         _autoAccepted = 'risk_reducing_sell';
       }
       const orderReq = { ticker, side, qty, type, limitPrice, timeInForce, stopLoss, takeProfit, acceptWarnings };
+      // EXTENDED-HOURS CONVERSION (#3326). A MARKET order does not execute
+      // outside RTH, so a manual Flatten placed pre-market just sat there — the
+      // operator saw "✓ Flattened" and a position that never left. The engine
+      // already converts (marketable LMT + outsideRth); do the same here so a
+      // human's order behaves like the engine's. Marketable = cross the spread
+      // by 0.2% in the direction of the trade, matching auto-trader's constant.
+      let _sessionNote = null;
+      const _sess = _sessionState();
+      if (_sess !== 'rth' && String(type || 'market').toLowerCase() === 'market') {
+        let px = 0;
+        try {
+          const q = await require('../../lib/market-data-yahoo').getQuotes([ticker]);
+          px = Number(q && q[0] && q[0].price) || 0;
+        } catch (_e) { /* no quote → cannot price a limit */ }
+        if (px > 0 && _sess === 'extended') {
+          const isBuy = String(side).toLowerCase() === 'buy';
+          orderReq.type = 'limit';
+          orderReq.limitPrice = Math.round(px * (isBuy ? 1.002 : 0.998) * 100) / 100;
+          orderReq.outsideRth = true;
+          _sessionNote = `extended hours: sent as a marketable limit @ ${orderReq.limitPrice} with outsideRth (a market order would not execute until 09:30)`;
+        } else if (_sess === 'closed') {
+          _sessionNote = 'market closed: this order QUEUES and will not fill until the next session opens';
+        } else {
+          _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
+        }
+      }
       const alpaca = require('../../lib/alpaca-adapter');
       const { preferredBroker } = require('../../lib/broker-facade');
       // Broker precedence: connected IBKR → Alpaca (the user's own OAuth account,
@@ -445,6 +524,10 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
       // than a human, the response says so — the journal and any audit can tell
       // the two apart.
       if (_autoAccepted) result.auto_warnings = _autoAccepted;
+      // The session caveat rides on the response so the toast can tell the truth
+      // about WHEN this order will act — "placed" and "will fill" are different
+      // claims, and conflating them is what made a pre-market Flatten look done.
+      if (_sessionNote) { result.session = _sess; result.session_note = _sessionNote; }
       if (result && result.status === 'placed') {
         await tradingMemory.recordNewOrders([{
           id: result.order_id,
