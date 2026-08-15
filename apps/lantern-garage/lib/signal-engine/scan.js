@@ -258,9 +258,26 @@ function candleGrade(candle) {
 // the direction and weights it lightly (WEIGHTS.news), so one headline can nudge
 // but never dominate the TA evidence.
 function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment = 0, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend }) {
+  // ECONOMIC direction for MARKET-semantic evidence (#3298 findings 1-2).
+  // "SOXS BULLISH" is an economic SHORT. Two inputs compare against the MARKET
+  // and were scored in wrapper space — inverted for every signed instrument:
+  //   - regime alignment: a wrapper long in a BULLISH market scored as ALIGNED
+  //     (it is opposed) — on 2026-08-13 this upweighted p_win for shorts taken
+  //     INTO the rally, one sized tier A+;
+  //   - news: bullish-underlying news supported a wrapper long (it argues
+  //     against it). Flipping the SIGN of news for sign<0 instruments makes the
+  //     EV layer's "signed to the direction" arithmetic come out economic.
+  // Price-space evidence (zones, candles, structure, MACD on own bars) is
+  // CORRECT in wrapper space and stays untouched. Unreachable for entries while
+  // #3296 vetoes wrapper longs — this is the layer that would mis-score them
+  // the day TRADER_SHORT_EDGE ever opens.
+  const _sign = require("../direction-lock").instrumentSign(t).sign;
+  const _ecoDir = _sign < 0
+    ? (direction === "BULLISH" ? "BEARISH" : direction === "BEARISH" ? "BULLISH" : direction)
+    : direction;
   const evInput = {
     direction,
-    news_sentiment,
+    news_sentiment: _sign < 0 ? -news_sentiment : news_sentiment,
     volume_ratio,          // Tier-1: volume-spike confirmation
     macd_hist,             // Tier-1: MACD histogram (momentum)
     ma_signal,             // Tier-1: price vs MA (momentum)
@@ -273,11 +290,11 @@ function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, ne
     structure_conf: struct.strength,
     pattern_grade: candleGrade(candle),
     trend_aligned:
-      (direction === "BULLISH" && marketStatus.market === "BULLISH") ||
-      (direction === "BEARISH" && marketStatus.market === "BEARISH"),
+      (_ecoDir === "BULLISH" && marketStatus.market === "BULLISH") ||
+      (_ecoDir === "BEARISH" && marketStatus.market === "BEARISH"),
     trend_conflicts:
-      (direction === "BULLISH" && marketStatus.market === "BEARISH") ||
-      (direction === "BEARISH" && marketStatus.market === "BULLISH"),
+      (_ecoDir === "BULLISH" && marketStatus.market === "BEARISH") ||
+      (_ecoDir === "BEARISH" && marketStatus.market === "BULLISH"),
     target_r: targetR(t),
   };
   try {
