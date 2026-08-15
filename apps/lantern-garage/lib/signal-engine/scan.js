@@ -91,12 +91,21 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
   //   TRADER_IBS_MODE=or    IBS adds entries on top of the zone/RSI logic
   //   unset/off             no behavior change
   const _ibsMax = Number(process.env.TRADER_IBS_MAX) || 0.15;
+  // MORNING DEPTH (pilot 2026-08-15, 23 sessions, DEFAULT OFF pending the
+  // two-window bar): first-touch IBS fires 0.4-2.3% above the coming low in
+  // morning drift, while genuine 09:45-09:55 washout bounces are DEEP by
+  // nature. Requiring IBS <= TRADER_IBS_MAX_MORNING before 11:00 ET doubled
+  // pilot income (+23.4% vs +11.0% total, n 260 vs 273) and still caught the
+  // 8/10 SLV +3.28%/GLD +1.64% fast-path winners at 09:45. Unset = off.
+  const _mMax = Number(process.env.TRADER_IBS_MAX_MORNING);
+  const _etm = (opts.etMin != null) ? opts.etMin : (() => { const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" })); return d.getHours() * 60 + d.getMinutes(); })();
+  const _ibsMaxEff = (_mMax > 0 && _etm < 660) ? _mMax : _ibsMax;
   const _ibsMode = String(process.env.TRADER_IBS_MODE || "off");
   if (_ibsMode === "only") {
     const v = opts.ibs;
-    return (v != null && v <= _ibsMax) ? "BULLISH" : "NEUTRAL";
+    return (v != null && v <= _ibsMaxEff) ? "BULLISH" : "NEUTRAL";
   }
-  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMax) return "BULLISH";
+  if (_ibsMode === "or" && opts.ibs != null && opts.ibs <= _ibsMaxEff) return "BULLISH";
   const trendDir = opts.trendDir ?? (process.env.ZONE_TREND_DIR === "1");
   const up = trendDir && _isUptrend(opts.closes);
   if (sr.in_zone) {
