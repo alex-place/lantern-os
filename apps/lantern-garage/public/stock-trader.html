@@ -4828,7 +4828,7 @@ async function flattenAll(btn){
 function renderPositionsTable(positions){
   const el=document.getElementById('tp-positions'); if(!el) return;
   _lastPositions = positions||[];
-  const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).length;
+  const pc=document.getElementById('tpPosCount'); if(pc) pc.textContent=(positions||[]).filter(p=>Math.abs(Number(p.qty)||0)>=1).length;   // dust is not a position (#3298 rider)
   if(!positions || !positions.length){ el.innerHTML='<div class="tp-empty">No open positions</div>'; return; }
   el.innerHTML = `<div class="tp-actions"><button class="tp-flatten-all" onclick="flattenAll(this)" title="Market-close every open position">✕ Close all</button></div>`+
     `<table class="tp-table"><thead><tr>
@@ -4848,7 +4848,7 @@ function renderPositionsTable(positions){
         <td style="color:${c}">${pnl>=0?'+':''}${fmt(pnl,2)}</td>
         <td style="color:${c}">${pct>=0?'+':''}${fmt(pct,2)}%</td>
         <td>$${fmt((p.avg_entry_price||0)*Math.abs(p.qty||0),2)}</td><td>$${fmt(p.market_value,2)}</td>
-        <td><button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button></td></tr>`;
+        <td>${Math.abs(p.qty||0)<1?`<span style="color:var(--muted);font-size:11px" title="Sub-share remnant: IBKR rejects fractional orders via the API (floors to 0), so this cannot be sold from here. It is excluded from every risk gate. To remove it: IBKR Client Portal → enable Fractional Trading → close the position there.">dust</span>`:`<button class="tp-flat-btn" onclick="flattenPosition('${p.symbol}','${side}',${Math.abs(p.qty||0)},false,this)" title="Market-close this position">✕ Flatten</button>`}</td></tr>`;
     }).join('') + '</tbody></table>';
 }
 // ── Advisor tab: deterministic portfolio suggestions (no LLM, no orders) ──

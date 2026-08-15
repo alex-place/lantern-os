@@ -220,6 +220,16 @@ function cfg() {
     // (no p_win on daily bars); every refusal writes an audit row instead.
     slotReserve: n('TRADER_SLOT_RESERVE', 1),
     slotReservePwin: n('TRADER_SLOT_RESERVE_PWIN', 0.55),
+    // EOD DE-CARRY (#3298 finding 3). Stops cannot protect through a gap, and a
+    // 3x wrapper carries 3x the overnight exposure at equal notional — 64% of
+    // the 2026-08-13→14 give-back happened before any stop could act. The
+    // operator ran this policy by hand twice (pre-open trim, weekend flat);
+    // this automates it: leveraged holdings are flattened into the close.
+    eodDecarry: process.env.TRADER_EOD_DECARRY !== '0',
+    decarryMin: n('TRADER_DECARRY_MIN', 950),                       // 15:50 ET
+    decarrySyms: new Set(String(process.env.TRADER_DECARRY_SYMBOLS
+      || 'TQQQ,SQQQ,SOXL,SOXS,SPXL,SPXS,TNA,TZA')
+      .split(',').map((x) => x.trim().toUpperCase()).filter(Boolean)),
     // Positions below this % of equity are DUST and never consume a
     // concurrency slot (nor do unclosable ones). 0 counts every row.
     dustPct: n('TRADER_DUST_PCT', 0.1),
@@ -747,6 +757,25 @@ async function manageHeldExits({ bridge, userId, heldPos, heldQty, c, now, out, 
 
     // Oversell guard: an exit sell is already resting for this symbol → don't stack another.
     if (workingSells.has(sym)) continue;
+
+    // EOD DE-CARRY (#3298 finding 3): from 15:50 ET, leveraged holdings go flat
+    // into the close — stops cannot protect through a gap, and 3x carries 3x the
+    // overnight exposure at equal notional (64% of the 8/13→14 give-back was the
+    // gap). The operator's pin overrides: a pinned symbol is a deliberate carry.
+    if (c.eodDecarry && c.decarrySyms.has(sym) && qty >= 1 && !extended) {
+      const _dm = (() => { const d = new Date(new Date(now).toLocaleString('en-US', { timeZone: 'America/New_York' })); return d.getHours() * 60 + d.getMinutes(); })();
+      if (_dm >= c.decarryMin && _dm < 960) {
+        if (_isPinned(sym)) {
+          out.skipped.push({ symbol: sym, why: 'pinned — eod_decarry suppressed by operator (#3318); carrying overnight deliberately' });
+        } else {
+          const _ea = _exitAt.get(sym) || 0;
+          if (!(_ea && (now - _ea) < c.exitReattemptMs)) {
+            await closeLong(bridge, userId, sym, qty, p, 'eod_decarry (leveraged overnight gap risk #3298) — flat into the close', out, now, { extended, refPrice: cur });
+            delete heldQty[sym]; continue;
+          }
+        }
+      }
+    }
 
     const lossPct = ((cur - entry) / entry) * 100;   // signed P&L% (negative = losing)
 
