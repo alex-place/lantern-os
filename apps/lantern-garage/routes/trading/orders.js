@@ -97,6 +97,85 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
     }
   }
 
+  // POST /api/trading/orders/dust-clear  { ticker }
+  //
+  // THE DUST PROBE (#3325). A sub-1-share remnant cannot be closed through the
+  // normal path: the bridge floors every quantity, so floor(0.8)=0 and the exit
+  // is unexpressible. That floor was inferred from 2026-07-28 (a 838.8 sell the
+  // broker cancelled 28 times) and has been treated as settled fact ever since —
+  // but the SAME ledger shows the account HOLDING fractional size, so fractional
+  // fills reached it somehow (paper-engine fill, or a corporate action; SOXS has
+  // reverse-split history). The floor makes that claim untestable by
+  // construction. This endpoint sends the EXACT held quantity, unfloored, and
+  // reports the broker's verdict verbatim — a measurement, not a workaround.
+  //
+  // Deliberately NOT a flag on /orders/place: this is the only way to set
+  // allowFractional, and it is boxed in on every side —
+  //   • SELL only, and only the position's own quantity (no caller-supplied qty)
+  //   • sub-1-share ONLY: >=1 is refused, so it can never become a general
+  //     fractional-order path or touch a real position
+  //   • verified against the live book first — no position, no order
+  //   • admin only, operator-driven; the engine never calls it
+  // Whatever IBKR answers is recorded either way, so the constraint stops being
+  // folklore and becomes evidence.
+  if (url.pathname === '/api/trading/orders/dust-clear' && req.method === 'POST') {
+    try {
+      const isAdminFn = (ctx && ctx.isAdmin) || require('../../lib/auth-middleware').isAdmin;
+      if (!isAdminFn(req)) { sendJson(res, { ok: false, error: 'admin_only' }, 403); return true; }
+      const body = await collectRequestBody(req);
+      const { ticker } = body ? JSON.parse(body) : {};
+      if (!ticker) { sendJson(res, { ok: false, error: 'ticker required' }, 400); return true; }
+      const sym = String(ticker).toUpperCase();
+
+      // Resolve the holding on the account that actually owns it (admin → operator).
+      const uid = getEffectiveUserId(req);
+      const OPERATOR_UID = process.env.TRADER_OPERATOR_UID || 'local-owner';
+      let acct = uid;
+      let pos = (await bridge.getIBKRPositions(uid).catch(() => null)) || [];
+      let row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+      if (!row && uid !== OPERATOR_UID) {
+        pos = (await bridge.getIBKRPositions(OPERATOR_UID).catch(() => null)) || [];
+        row = Array.isArray(pos) ? pos.find((p) => String(p && p.symbol).toUpperCase() === sym) : null;
+        if (row) acct = OPERATOR_UID;
+      }
+      if (!row) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+
+      const held = Math.abs(Number(row.qty) || 0);
+      if (!(held > 0)) { sendJson(res, { ok: false, error: 'not_held', ticker: sym }, 404); return true; }
+      if (held >= 1) {
+        sendJson(res, { ok: false, error: 'not_dust', ticker: sym, held,
+          detail: 'this endpoint only ever sends sub-1-share remnants — use Flatten for a real position' }, 400);
+        return true;
+      }
+
+      const r = await bridge.placeIBKROrder(acct, {
+        ticker: sym, side: 'sell', qty: held, type: 'market',
+        acceptWarnings: true,        // risk-reducing by construction
+        allowFractional: true,       // THE probe: unfloored
+      }).catch((e) => ({ status: 'error', reason: e.message }));
+
+      const placed = !!(r && r.status === 'placed');
+      // Recorded either way — the point is the evidence, not the fill.
+      try {
+        require('../../lib/trading-store').appendLogEntry({
+          ts: new Date().toISOString(), kind: 'dust_clear_probe', symbol: sym, qty: held,
+          account: acct === OPERATOR_UID ? 'operator' : 'self',
+          result: r && r.status, reason: (r && (r.reason || r.error)) || null,
+        });
+      } catch (_e) { /* logging must never break the probe */ }
+
+      sendJson(res, {
+        ok: placed, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
+        broker_status: (r && r.status) || null,
+        broker_says: (r && (r.reason || r.error)) || null,   // verbatim — this IS the finding
+        operator_account: acct === OPERATOR_UID && uid !== OPERATOR_UID,
+      }, placed ? 200 : 502);
+    } catch (error) {
+      sendJson(res, { ok: false, error: error.message }, 500);
+    }
+    return true;
+  }
+
   // GET /api/trading/orders
   // Broker truth from Alpaca (#1714): every order the account submitted —
   // autonomous (Σ₀ engine) AND manual — so the Orders / Order-history tabs
