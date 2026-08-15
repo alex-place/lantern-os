@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: p_win's market-semantic evidence is scored in ECONOMIC space (#3298 findings 1–2) — a wrapper long in a bull market was rated regime-ALIGNED (it is opposed; this upweighted the 2026-08-13 shorts taken into the rally, one to tier A+), and bullish-underlying news supported a wrapper long (it argues against it). Regime alignment now uses direction × instrumentSign and news flips sign for signed instruments; price-space evidence (zones, candles, structure) stays wrapper-space by design. Currently unreachable for entries (#3296 vetoes wrapper longs) — this closes the layer that would mis-score them if TRADER_SHORT_EDGE ever opens
