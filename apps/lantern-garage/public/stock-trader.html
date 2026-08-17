@@ -844,25 +844,13 @@
       border-top:1px solid var(--border); border-radius:14px 14px 0 0; box-shadow:0 -10px 28px rgba(0,0,0,.45); animation:otSlideUp .2s ease; }
   }
 
-  /* ── The Book (capital allocator) panel — index.html's gothic display face on the
-        title, trader-native table styling for the rest ─────────────────────────── */
-  .book-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px 6px}
-  .book-title{font-family:"Century Gothic","Franklin Gothic Heavy","Arial Rounded MT Bold","Segoe UI Black","Segoe UI",system-ui,sans-serif;
-    font-weight:700;font-size:14px;letter-spacing:.08em;color:var(--text0)}
-  .book-sub{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
-  .book-regime{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--border)}
-  .book-regime.up{color:var(--green)} .book-regime.dn{color:var(--red,#f87171)}
-  .book-pill{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;border:1px solid var(--border);color:var(--text2)}
-  .book-pill.on{color:var(--green);border-color:var(--green)}
-  .book-why{font-family:var(--mono);font-size:10px;color:var(--text2);margin-top:2px;max-width:420px;white-space:normal}
-  .book-bar{display:inline-block;width:90px;height:7px;border-radius:4px;background:rgba(255,255,255,.06);vertical-align:middle;overflow:hidden}
-  .book-bar div{height:100%;background:var(--blue);border-radius:4px}
-  .book-cap{font-family:var(--mono);font-size:9.5px;color:var(--text2);margin-left:6px}
-  .book-note{font-family:var(--mono);font-size:12px;color:var(--text2);padding:14px}
-  /* Tier gating (operator tiering 2026-07-26): the Book is an internal/staff surface;
-     the Advisor is a Pro ($20) feature. Tabs stay out of the DOM's visible flow until
-     auth-gate stamps the plan classes on <body>. Server-side gates back these up. */
-  #tptab-book{display:none} body.is-admin #tptab-book{display:inline-block}
+  /* The Book (capital-allocator) panel and its .book-* styles were removed with the
+     tab (#3330): the overnight allocator is no longer armed, so the panel showed a
+     live-looking sleeve budget that nothing acted on. /api/trading/allocator and the
+     allocator itself are untouched — re-arming is a UI change, not a rebuild. */
+  /* Tier gating (operator tiering 2026-07-26): the Advisor is a Pro ($20) feature.
+     Tabs stay out of the DOM's visible flow until auth-gate stamps the plan classes
+     on <body>. Server-side gates back these up. */
   #tptab-advisor{display:none}
   body.is-pro-plus #tptab-advisor, body.is-admin #tptab-advisor{display:inline-block}
   .trade-lock{position:fixed;inset:52px 0 0 0;z-index:1500;display:flex;align-items:center;justify-content:center;
@@ -1032,7 +1020,6 @@
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders <span class="tp-badge" id="tpOrdCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-advisor" aria-selected="false" aria-controls="tp-advisor" data-tab="advisor" onclick="tpTab('advisor');loadAdvisor()" title="Deterministic portfolio suggestions — measured risk, a rebalance proposal, and a contribution planner. Computed math over your actual holdings; no AI, no orders placed">Advisor</button>
-    <button class="tp-tab" role="tab" id="tptab-book" aria-selected="false" aria-controls="tp-book" data-tab="book" onclick="tpTab('book');loadBook()" title="The capital allocator — one evidence-driven budget over the trader sleeves. Each sleeve earns capital only as its own live ledger proves an edge">Book</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');loadJournal()" title="The journal — realized results by day, the equity curve with drawdown, where exits happened, and every trade the autopilot declined with its reason">Journal</button>
     <button class="tp-tab" role="tab" id="tptab-alerts" aria-selected="false" aria-controls="tp-alerts" data-tab="alerts" onclick="tpTab('alerts');loadAlerts()" title="Engine alerts on your watchlist — a signal fired, a price reached a zone, a washout setup confirmed. The scan runs every minute; alerts tell you what it saw.">Alerts</button>
   </div>
@@ -1042,7 +1029,6 @@
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-advisor" role="tabpanel" aria-labelledby="tptab-advisor" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-book" role="tabpanel" aria-labelledby="tptab-book" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-alerts" role="tabpanel" aria-labelledby="tptab-alerts" tabindex="0" hidden></div>
   </div>
@@ -4886,43 +4872,10 @@ function setAdvisorObjective(o,v){
   loadAdvisor(true);
 }
 
-// ── The Book: capital-allocator panel (read-only mirror of /api/trading/allocator) ──
-let _bookLoaded = 0;
-async function loadBook(force){
-  const el = document.getElementById('tp-book'); if(!el) return;
-  if(!force && Date.now() - _bookLoaded < 60000 && el.innerHTML) return;   // 1-min cache
-  el.innerHTML = '<div class="book-note">Loading the book…</div>';
-  try{
-    const d = await (await fetch('/api/trading/allocator')).json();
-    if(d.error) { el.innerHTML = '<div class="book-note">Allocator unavailable — '+String(d.error).replace(/[<>&"]/g,'')+'</div>'; return; }
-    _bookLoaded = Date.now();
-    const money = (v)=> v==null?'—':'$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0});
-    const NAME = { intraday:'Intraday scanner', overnight:'Overnight sleeves', options:'Options bridge' };
-    const bEsc = (x)=> String(x==null?'':x).replace(/[&<>"]/g, (c)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-    const rows = Object.entries(d.sleeves||{}).map(([k,s])=>{
-      const st = s.proven ? '<span class="book-pill on">proven</span>' : '<span class="book-pill">collecting</span>';
-      const ev = s.evidence||{};
-      return `<tr>
-        <td style="text-align:left"><b>${NAME[k]||k}</b><div class="book-why">${bEsc(s.why)}</div></td>
-        <td>${st}</td><td>${ev.n||0}</td>
-        <td><b>${s.pct}%</b></td><td>${money(s.usd)}</td>
-        <td><div class="book-bar"><div style="width:${Math.min(100,(s.pct/(d.caps&&d.caps[k]||100))*100)}%"></div></div><span class="book-cap">cap ${(d.caps&&d.caps[k])||'—'}%</span></td>
-      </tr>`;
-    }).join('');
-    el.innerHTML = `
-      <div class="book-head">
-        <span class="book-title">THE BOOK</span>
-        <span class="book-sub">one evidence-driven budget over the trader sleeves — capital is EARNED by each sleeve's own live ledger</span>
-        <span class="book-regime ${d.regime==='down'?'dn':'up'}">regime: ${d.regime||'—'}</span>
-        <button class="nav-link" style="margin-left:auto" onclick="loadBook(true)">↻</button>
-      </div>
-      <div class="scrollx"><table class="tp-table">
-        <tr><th style="text-align:left">Sleeve</th><th>Status</th><th>Ledger n</th><th>Budget</th><th>Dollars</th><th>vs cap</th></tr>
-        ${rows}
-        <tr><td style="text-align:left"><b>Cash</b><div class="book-why">unallocated until the ledgers prove more edge</div></td><td></td><td></td><td><b>${d.cash_pct}%</b></td><td>${money(d.equity*d.cash_pct/100)}</td><td></td></tr>
-      </table></div>`;
-  }catch(e){ el.innerHTML = '<div class="book-note">Allocator unavailable — '+e.message+'</div>'; }
-}
+// The Book (capital-allocator) panel was removed with its tab (#3330) — the overnight
+// allocator is no longer armed, and a live-looking sleeve budget nothing acts on is
+// worse than no readout. /api/trading/allocator still exists and still serves; only
+// this read-only mirror is gone, so re-arming means re-adding a panel, not a system.
 
 async function loadAdvisor(force){
   const el=document.getElementById('tp-advisor'); if(!el) return;
