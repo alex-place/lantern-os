@@ -22,7 +22,7 @@
       }
     })();
   </script>
-  <title>Documents &amp; Knowledge Center — unisona.ai</title>
+  <title>Guide — unisona.ai</title>
   <link rel="stylesheet" href="/css/site.css">
   <link rel="stylesheet" href="/css/narrator.css">
   <style>
@@ -263,6 +263,75 @@
     .doc-card:hover .doc-del { opacity: 1; }
     .doc-del:hover { background: rgb(220,38,38); }
     .doc-empty { color: var(--muted); font-size: 0.88rem; padding: 28px 4px; }
+
+    /* ── The guide (#3332) ────────────────────────────────────────────────────
+       Tokens only (--bg/--surface/--border/--text/--muted/--accent/--radius) so
+       light and dark both come for free from site.css — no hard-coded colours. */
+    .gd-layout { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 40px; margin-top: 26px; }
+    .gd-toc { position: sticky; top: 78px; align-self: start; max-height: calc(100vh - 100px); overflow-y: auto; }
+    .gd-toc-h { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+                color: var(--muted); margin: 0 0 8px; }
+    .gd-toc a { display: block; padding: 5px 10px; font-size: 0.86rem; color: var(--muted);
+                text-decoration: none; border-left: 2px solid var(--border); line-height: 1.35; }
+    .gd-toc a:hover { color: var(--text); border-left-color: var(--accent); background: var(--surface); }
+    .gd-toc a.active { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+    .gd-sec { padding: 8px 0 34px; scroll-margin-top: 76px; }
+    .gd-sec + .gd-sec { border-top: 1px solid var(--border); padding-top: 32px; }
+    .gd-sec h2 { font-size: 1.5rem; margin: 0 0 12px; }
+    .gd-sec h3 { font-size: 1.02rem; margin: 26px 0 8px; }
+    .gd-sec p { line-height: 1.65; margin: 0 0 12px; }
+    .gd-lead { font-size: 1.06rem; color: var(--text); }
+    .gd-fine { font-size: 0.85rem; color: var(--muted); }
+    .gd-sec code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em;
+                   background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; }
+
+    .gd-list, .gd-steps { margin: 0 0 14px; padding-left: 22px; }
+    .gd-list li, .gd-steps li { line-height: 1.62; margin-bottom: 7px; }
+    .gd-steps li { padding-left: 3px; }
+
+    .gd-note { border-left: 3px solid var(--accent); background: var(--surface);
+               border-radius: 0 var(--radius, 8px) var(--radius, 8px) 0;
+               padding: 12px 16px; margin: 16px 0; line-height: 1.6; font-size: 0.93rem; }
+    .gd-note.gd-warn { border-left-color: #f59e0b; }
+
+    .gd-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr)); gap: 14px; margin: 16px 0 4px; }
+    .gd-card { background: var(--surface); border: 1px solid var(--border);
+               border-radius: var(--radius, 10px); padding: 16px 18px; }
+    .gd-card-i { font-size: 1.35rem; line-height: 1; }
+    .gd-card h3 { margin: 8px 0 6px; font-size: 1rem; }
+    .gd-card p { font-size: 0.9rem; color: var(--muted); margin: 0 0 10px; line-height: 1.55; }
+    .gd-go { font-size: 0.85rem; color: var(--accent); text-decoration: none; font-weight: 600; }
+    .gd-go:hover { text-decoration: underline; }
+
+    .gd-tag { display: inline-block; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.06em;
+              text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent);
+              border-radius: 999px; padding: 0 6px; margin-left: 4px; vertical-align: 1px; }
+
+    /* Tables scroll inside their own box — the page body must never scroll sideways. */
+    .gd-table-wrap { overflow-x: auto; margin: 12px 0 16px; }
+    .gd-table { width: 100%; border-collapse: collapse; font-size: 0.91rem; min-width: 460px; }
+    .gd-table th, .gd-table td { text-align: left; vertical-align: top; padding: 9px 12px;
+                                 border-bottom: 1px solid var(--border); line-height: 1.55; }
+    .gd-table th { font-size: 0.74rem; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+
+    .gd-gloss, .gd-faq { margin: 8px 0 0; }
+    .gd-gloss dt, .gd-faq dt { font-weight: 650; margin-top: 14px; }
+    .gd-gloss dd, .gd-faq dd { margin: 4px 0 0; padding-left: 0; color: var(--muted); line-height: 1.6; }
+
+    /* Phones: the sticky rail becomes a normal block above the text. A 208px
+       column beside body copy is unreadable under ~900px. */
+    @media (max-width: 900px) {
+      /* minmax(0,1fr), not 1fr: a plain 1fr track has min-width:auto, so the
+         comparison tables' min-width:460px stretched the whole column past a
+         375px screen instead of scrolling inside their own wrapper. */
+      .gd-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+      .gd-toc { position: static; max-height: none; display: flex; flex-wrap: wrap; gap: 4px;
+                padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+      .gd-toc-h { width: 100%; margin-bottom: 4px; }
+      .gd-toc a { border-left: none; border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; }
+      .gd-toc a.active { border-color: var(--accent); }
+    }
   </style>
 </head>
 <body>
@@ -273,54 +342,414 @@
 
   <!-- ── Hero ── -->
   <div class="kc-hero">
-    <div class="kc-eyebrow">Documents &amp; Knowledge</div>
-    <h1>Everything, in one place</h1>
-    <p>Start with the essentials, then search and filter the full library — every guide,
-       research note, architecture decision, and report we publish.</p>
+    <div class="kc-eyebrow">Guide</div>
+    <h1>How Unisona works</h1>
+    <p>Written for someone brand new — to Unisona, to AI assistants, and to trading.
+       No prior knowledge assumed. Every term is explained the first time it appears.</p>
   </div>
 
-  <!-- ── Start here (curated essential pages + docs) ── -->
-  <section class="section">
-    <div class="section-head">
-      <div class="label">Start here</div>
-      <h2>The essentials</h2>
-      <p>A few quick ways to get started — no account or API key required.</p>
+  <!-- ── The guide: sticky contents + body ── -->
+  <div class="gd-layout">
+    <nav class="gd-toc" aria-label="Guide contents">
+      <p class="gd-toc-h">On this page</p>
+      <a href="#what-is-it">What Unisona is</a>
+      <a href="#what-it-does">What it does</a>
+      <a href="#start">Getting started</a>
+      <a href="#chat">Using the chat</a>
+      <a href="#trader">Using the trader</a>
+      <a href="#broker">Connecting a broker</a>
+      <a href="#keys">API keys, explained</a>
+      <a href="#glossary">Trading words, in plain English</a>
+      <a href="#trouble">If something goes wrong</a>
+      <a href="#documents">Reference library</a>
+    </nav>
+
+    <div class="gd-body">
+
+      <!-- 1 ── What it is ───────────────────────────────────────────────── -->
+      <section class="gd-sec" id="what-is-it">
+        <h2>What Unisona is</h2>
+        <p class="gd-lead">Unisona is an AI assistant that remembers your work, and a stock-market
+          terminal, in one place. You talk to it in plain English; it can look things up, read and
+          write documents, and — if you want — watch the market with you.</p>
+        <p>Two things make it unusual, and both are worth understanding before you start:</p>
+        <ul class="gd-list">
+          <li><b>It keeps its memory on your side.</b> Your chats, notes and watchlist are stored as
+            plain files rather than locked inside someone else's product. You can run the whole thing
+            on your own computer if you'd rather.</li>
+          <li><b>It isn't tied to one AI model.</b> Unisona is a system that <i>uses</i> AI models,
+            not a wrapper around a single one. Which model answers you is a setting you control, and
+            swapping it doesn't cost you your history.</li>
+        </ul>
+        <div class="gd-note gd-warn">
+          <b>What it is not.</b> Unisona does not predict the market, and nothing in it is financial
+          advice. The trading side is a tool for watching, reasoning and recording — its own results
+          are an open question we measure in public rather than a claim we make. Never trade money
+          you can't afford to lose.
+        </div>
+      </section>
+
+      <!-- 2 ── What it does ─────────────────────────────────────────────── -->
+      <section class="gd-sec" id="what-it-does">
+        <h2>What it does</h2>
+        <p>Four surfaces. You can use any one of them and ignore the rest.</p>
+        <div class="gd-cards">
+          <div class="gd-card">
+            <span class="gd-card-i">💬</span>
+            <h3>Chat</h3>
+            <p>The main way you use Unisona. Ask questions, get help writing, have it search the web,
+              read your files, or explain what the market is doing. It remembers earlier
+              conversations, so you don't re-explain yourself every time.</p>
+            <a class="gd-go" href="#chat">How to use it →</a>
+          </div>
+          <div class="gd-card">
+            <span class="gd-card-i">📈</span>
+            <h3>Trader</h3>
+            <p>A live chart terminal. Watch prices, read charts, and — once you connect a brokerage
+              account — place orders. It starts in <b>paper</b> mode, which means practice money.</p>
+            <a class="gd-go" href="#trader">How to use it →</a>
+          </div>
+          <div class="gd-card">
+            <span class="gd-card-i">👁</span>
+            <h3>Watchlist</h3>
+            <p>The list of symbols you care about, down the left side of the trader. Everything else —
+              charts, alerts, what the assistant talks about — follows from this list.</p>
+            <a class="gd-go" href="#trader">How to use it →</a>
+          </div>
+          <div class="gd-card">
+            <span class="gd-card-i">🔔</span>
+            <h3>Alerts</h3>
+            <p>Tell Unisona to watch for something and it will message you when it happens — on the
+              site and by email — so you don't have to sit and stare at a screen.
+              <span class="gd-tag">Pro</span></p>
+            <a class="gd-go" href="#alerts">How to use it →</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3 ── Getting started ──────────────────────────────────────────── -->
+      <section class="gd-sec" id="start">
+        <h2>Getting started</h2>
+
+        <h3>1. Make an account</h3>
+        <p>Go to <a href="/auth.html">the sign-in page</a> and either continue with Google or create
+          an account with an email address and password. You'll get a confirmation email — click the
+          link in it to prove the address is yours. That verification matters later: Unisona will
+          only email you alerts at an address you've confirmed.</p>
+
+        <h3>2. Pick a plan (you can start free)</h3>
+        <p>There are three, and the free one is a real product rather than a trial.</p>
+        <div class="gd-table-wrap">
+          <table class="gd-table">
+            <thead><tr><th>Plan</th><th>Price</th><th>What you get</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>Free</b></td><td>$0</td>
+                <td>Chat with memory, your own charts and watchlist, a paper (practice) trading
+                  account, and a view of a live demo account. If you connect your <i>own</i>
+                  brokerage account, you can trade through it on the free plan too.</td>
+              </tr>
+              <tr>
+                <td><b>Pro</b></td><td>$20/mo</td>
+                <td>Everything above, plus the full trading terminal, alerts and an automatic trade
+                  journal, portfolio analysis in chat, paper options orders, wide multi-model
+                  research, the Creator Suite, and the ability to plug in your own AI provider keys.</td>
+              </tr>
+              <tr>
+                <td><b>Pilot</b></td><td>$200/mo</td>
+                <td>Everything above, plus the autonomous AI trader (it acts on its own signals
+                  rather than only showing them to you) and a say in what gets built next.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="gd-fine">Current plans and exact wording live on <a href="/pricing.html">the pricing
+          page</a> — that page is the authority if anything here drifts.</p>
+
+        <h3>3. Your first five minutes</h3>
+        <ol class="gd-steps">
+          <li>Open <a href="/chat.html">Chat</a> and ask it something real — <i>"explain what a stock
+            index is"</i>, or <i>"summarise this document"</i> with a file attached. That's the whole
+            interface; there's nothing to configure.</li>
+          <li>Open <a href="/stock-trader.html">Trader</a>. You'll see a chart in the middle and a
+            list of symbols on the left. Click any symbol to load its chart.</li>
+          <li>Add something you care about: <b>+ Add symbol</b> at the top of the left rail, type a
+            ticker (say <code>AAPL</code>), pick it from the results.</li>
+          <li>Go back to Chat and ask <i>"what's on my watchlist, and does anything look weak
+            today?"</i> It already knows your list — you don't have to tell it.</li>
+        </ol>
+        <div class="gd-note">
+          You have not risked any money at this point, and you can't accidentally. Trading requires a
+          brokerage account you connect on purpose — see <a href="#broker">Connecting a broker</a>.
+        </div>
+      </section>
+
+      <!-- 4 ── Chat ─────────────────────────────────────────────────────── -->
+      <section class="gd-sec" id="chat">
+        <h2>Using the chat</h2>
+        <p>Type in the box at the bottom and press Enter. That's it. A few things worth knowing:</p>
+
+        <h3>It can actually do things, not just talk</h3>
+        <p>When it needs information it doesn't have, it uses a <b>tool</b> — a real action, like
+          searching the web, reading a file you uploaded, fetching a live stock price, or checking
+          your watchlist. You'll see a small marker in the reply (for example <code>🔧
+          trader_watchlist</code>) telling you which tool ran. That marker is your receipt: it means
+          the answer came from looking something up, not from memory.</p>
+
+        <h3>It knows your market setup</h3>
+        <p>If you ask anything about trading, the assistant already has your watchlist, current
+          prices, and the trading engine's own read on each symbol. Ask <i>"should I be worried about
+          SMH?"</i> and it will reason from the same numbers the terminal is showing you, and tell
+          you when its figures were taken.</p>
+        <p><b>It will not place orders.</b> Ask it to buy something and it will decline and point you
+          at the trader. Deciding to trade is yours; the assistant's job is to help you think.</p>
+
+        <h3>Getting better answers</h3>
+        <ul class="gd-list">
+          <li>Say what you want to end up with. "Explain X to someone who's never traded" beats
+            "explain X".</li>
+          <li>Give it the material. Upload the file, paste the error, name the ticker.</li>
+          <li>Push back. If an answer is too vague or too technical, say so — it will adjust.</li>
+          <li>Ask it where something came from. A good answer can tell you.</li>
+        </ul>
+
+        <h3>Choosing which AI answers</h3>
+        <p>The picker above the message box switches models. Different models have different
+          strengths and speeds; your conversation carries across when you switch. On Pro you can also
+          add your own provider keys — see <a href="#keys">API keys</a>.</p>
+      </section>
+
+      <!-- 5 ── Trader ───────────────────────────────────────────────────── -->
+      <section class="gd-sec" id="trader">
+        <h2>Using the trader</h2>
+
+        <h3>The layout</h3>
+        <ul class="gd-list">
+          <li><b>Left rail</b> — your watchlist, and behind the second tab, your alerts.</li>
+          <li><b>Middle</b> — the chart or charts. The dropdown in the toolbar chooses how many you
+            see at once.</li>
+          <li><b>Right</b> — the order ticket, where a trade is actually placed.</li>
+          <li><b>Bottom</b> — your positions, orders, order history, and the journal.</li>
+        </ul>
+
+        <h3>Reading the chart</h3>
+        <p>The default view is a <b>candlestick</b> chart. Each candle covers one slice of time (five
+          minutes by default — change it with the timeframe dropdown). One candle tells you four
+          things at once:</p>
+        <ul class="gd-list">
+          <li>The thick body spans the <b>open</b> and <b>close</b> — where price started and ended
+            in that slice.</li>
+          <li>The thin lines above and below (the <b>wicks</b>) reach the <b>high</b> and <b>low</b>.</li>
+          <li>Colour tells you direction: closed higher than it opened, or lower.</li>
+          <li>The bars along the bottom are <b>volume</b> — how many shares changed hands. Big volume
+            means a lot of people acted; it makes a move more meaningful.</li>
+        </ul>
+        <p>Price runs up the right edge, time along the bottom. Hover anywhere to read the exact
+          values under your cursor.</p>
+
+        <h3>The watchlist</h3>
+        <p><b>+ Add symbol</b> to add, the <b>✕</b> on a row to remove, and drag rows to reorder.
+          Click a symbol to make it the active one — the chart, the details panel underneath, and the
+          order ticket all follow. Your list is saved to your account, so it's there on your phone
+          too.</p>
+
+        <h3 id="alerts">Alerts <span class="gd-tag">Pro</span></h3>
+        <p>Switch the left rail to <b>Alerts</b>. Press <b>+ New alert</b> and choose:</p>
+        <ul class="gd-list">
+          <li><b>A signal fires</b> — the engine's own read on that symbol turns bullish or bearish.</li>
+          <li><b>Price reaches a zone</b> — price comes within a set percentage of a support or
+            resistance level (see the <a href="#glossary">glossary</a>).</li>
+          <li><b>Washout confirmed</b> — the engine's stricter "this setup is real" verdict.</li>
+        </ul>
+        <p><b>Stay quiet for</b> is how long an alert waits before it's allowed to fire again, so one
+          jumpy morning doesn't send you thirty messages. Leave <b>Email me when it fires</b> ticked
+          and you'll get an email as well as an on-screen notice; untick it for on-screen only. You
+          can pause an alert with its checkbox or delete it with the ✕.</p>
+
+        <h3>Paper versus live — the important distinction</h3>
+        <div class="gd-table-wrap">
+          <table class="gd-table">
+            <thead><tr><th></th><th>Paper</th><th>Live</th></tr></thead>
+            <tbody>
+              <tr><td><b>Money</b></td><td>Simulated. None of it is real.</td><td>Real. Losses are real.</td></tr>
+              <tr><td><b>Needs</b></td><td>Nothing — it's on by default.</td><td>Your own brokerage account, connected on purpose.</td></tr>
+              <tr><td><b>For</b></td><td>Learning the terminal, testing an idea, seeing how a strategy behaves.</td><td>When you've done the above and decided.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The badge in the toolbar always tells you which mode you're in. Check it before you press
+          anything. Paper trading is genuinely useful — the mechanics are identical, so you can learn
+          every button without a single dollar at risk.</p>
+
+        <h3>What the autopilot does and doesn't decide</h3>
+        <p>Unisona has a scanning engine that reviews your watchlist about once a minute and forms a
+          view on each symbol: a direction, a confidence, the levels it thinks matter, and a
+          suggested stop and target. On Free and Pro, <b>that is all it does</b> — it shows you what
+          it sees, and every order is placed by you.</p>
+        <p>The <b>autonomous trader</b>, which acts on those signals by itself, is a Pilot-plan
+          feature and is off unless you deliberately turn it on. Even then it works only through a
+          broker account you connected yourself.</p>
+        <div class="gd-note gd-warn">
+          An engine having high confidence is not the same as being right. Confidence describes how
+          well the current picture matches a pattern it recognises — not the odds of making money.
+          Treat it as one more input.
+        </div>
+      </section>
+
+      <!-- 6 ── Broker ───────────────────────────────────────────────────── -->
+      <section class="gd-sec" id="broker">
+        <h2>Connecting a broker</h2>
+        <p>A <b>broker</b> (or brokerage) is the licensed company that actually holds your money and
+          executes your trades — Unisona never does. To place a real order you connect an account you
+          already have. Two are supported.</p>
+
+        <h3>Before you start</h3>
+        <ul class="gd-list">
+          <li>You need an account with the broker already open. That's their signup, not ours.</li>
+          <li>Start with a <b>paper</b> account at the broker. Both options below offer one free.</li>
+          <li>Everything happens in <a href="/settings.html">Settings → Connections</a>.</li>
+        </ul>
+
+        <h3>Alpaca (simplest — paper only)</h3>
+        <p>Alpaca is an online broker with a good practice mode. Unisona connects to Alpaca
+          <b>paper accounts only</b>, which makes it the safest place to start.</p>
+        <ol class="gd-steps">
+          <li>Sign up at <code>alpaca.markets</code> and sign in.</li>
+          <li>Switch to <b>Paper Trading</b> (there's a toggle — make sure you're not in the live
+            account).</li>
+          <li>Find <b>API Keys</b> and generate a new key. You'll be shown two strings: a <b>key
+            ID</b> and a <b>secret key</b>.</li>
+          <li><b>Copy the secret immediately.</b> Brokers show it once. If you lose it, delete the key
+            and make a new one — that's normal and costs nothing.</li>
+          <li>Paste both into Settings → Connections → Alpaca, and save.</li>
+        </ol>
+
+        <h3>Interactive Brokers (IBKR — paper or live)</h3>
+        <p>IBKR is a large traditional broker. Unisona supports both its paper and live accounts,
+          which means it's also the one where a mistake can cost real money. Use its paper account
+          until you're comfortable.</p>
+        <ol class="gd-steps">
+          <li>In Settings → Connections, choose IBKR and follow the steps shown there — the exact
+            flow depends on how your IBKR account is set up, so the page walks you through the
+            current one rather than us printing a version here that goes stale.</li>
+          <li>Choose the <b>paper</b> account when asked, unless you have specifically decided
+            otherwise.</li>
+          <li>Confirm the account number shown in Unisona matches the one you intended. A paper
+            account number looks different from a live one — check it.</li>
+        </ol>
+
+        <h3>Disconnecting</h3>
+        <p>The same Settings page removes stored keys. Do that if you stop using Unisona, if you
+          think a key leaked, or any time you're unsure — reconnecting takes two minutes.</p>
+      </section>
+
+      <!-- 7 ── Keys ─────────────────────────────────────────────────────── -->
+      <section class="gd-sec" id="keys">
+        <h2>API keys, explained</h2>
+        <p>If you've never used one: an <b>API key</b> is a long random string that acts as a password
+          for programs instead of people. When you give Unisona a key for another service, you're
+          saying "this app may act as me over there".</p>
+
+        <h3>Where they show up here</h3>
+        <ul class="gd-list">
+          <li><b>Broker keys</b> — let Unisona read your positions and place the orders you ask for.</li>
+          <li><b>AI provider keys</b> <span class="gd-tag">Pro</span> — let you use your own account
+            with an AI company, billed to you directly, instead of Unisona's.</li>
+        </ul>
+        <p>Neither is required to start. You can use the chat and the paper trader without ever
+          entering a key.</p>
+
+        <h3>Treat them like passwords, because they are</h3>
+        <ul class="gd-list">
+          <li>Don't paste a key into a chat message, a screenshot, a support email, or a public issue
+            — including into Unisona's own chat box.</li>
+          <li>Use a paper/read-only key when the service offers one.</li>
+          <li>If a key might have leaked, revoke it at the provider. Revoking is instant and free;
+            recovering a drained account is neither.</li>
+          <li>Rotate them occasionally — delete the old, create a new, paste it in.</li>
+        </ul>
+
+        <h3>What Unisona does with them</h3>
+        <p>Keys are stored encrypted, scoped to your account, and used only to make the requests you
+          asked for. They're never shown back to you in full, and they're never sent to an AI model.
+          Deleting a connection deletes the stored key.</p>
+      </section>
+
+      <!-- 8 ── Glossary ─────────────────────────────────────────────────── -->
+      <section class="gd-sec" id="glossary">
+        <h2>Trading words, in plain English</h2>
+        <dl class="gd-gloss">
+          <dt>Ticker (symbol)</dt><dd>The short code for something you can trade. <code>AAPL</code> is Apple.</dd>
+          <dt>Share</dt><dd>One unit of ownership in a company.</dd>
+          <dt>ETF</dt><dd>A single ticker that holds a basket of many things. <code>SPY</code> tracks the 500 largest US companies, so buying it spreads your money across all of them.</dd>
+          <dt>Position</dt><dd>Something you currently own. "A position in AAPL" means you hold some Apple.</dd>
+          <dt>Order</dt><dd>An instruction to buy or sell. A <b>market</b> order says "now, at whatever the price is". A <b>limit</b> order says "only at this price or better" — it may never fill.</dd>
+          <dt>Fill</dt><dd>An order actually being executed.</dd>
+          <dt>P&amp;L</dt><dd>Profit and loss. <b>Unrealised</b> is on paper while you still hold it; <b>realised</b> is locked in once you've sold.</dd>
+          <dt>Day P&amp;L</dt><dd>How much you're up or down today specifically.</dd>
+          <dt>Stop (stop-loss)</dt><dd>A price at which you've decided to sell to cap a loss. Deciding it before you buy is the single most useful habit in this list.</dd>
+          <dt>Target</dt><dd>The price at which you plan to take a profit.</dd>
+          <dt>Support</dt><dd>A price level where buyers have repeatedly stepped in — a floor price has bounced off before.</dd>
+          <dt>Resistance</dt><dd>The opposite: a level where selling has repeatedly appeared, a ceiling.</dd>
+          <dt>Volume</dt><dd>How much was traded. High volume means a move had real participation.</dd>
+          <dt>Volatility</dt><dd>How much price jumps around. High volatility means bigger moves in both directions.</dd>
+          <dt>VIX</dt><dd>A widely-watched measure of expected volatility in the US market. Low is calm, high is fearful.</dd>
+          <dt>Extended hours</dt><dd>Trading before the market opens or after it closes. Fewer people are trading, so prices move more erratically.</dd>
+          <dt>Paper trading</dt><dd>Practice with simulated money and real prices.</dd>
+          <dt>Long / short</dt><dd><b>Long</b> is owning something, hoping it rises. <b>Short</b> is betting it falls — riskier, because a rise has no ceiling.</dd>
+          <dt>Drawdown</dt><dd>How far an account has fallen from its highest point. The number that tells you what a strategy actually felt like to live through.</dd>
+        </dl>
+      </section>
+
+      <!-- 9 ── Troubleshooting ──────────────────────────────────────────── -->
+      <section class="gd-sec" id="trouble">
+        <h2>If something goes wrong</h2>
+        <dl class="gd-faq">
+          <dt>The chart is empty or the prices look stale.</dt>
+          <dd>Markets close. Outside trading hours you're seeing the last prices from the previous
+            session, which is expected — the toolbar shows whether the session is open. If it's
+            mid-session and still stale, reload the page.</dd>
+
+          <dt>I signed in but the trader sends me to the Watch page.</dt>
+          <dd>The full terminal is a Pro feature. Watch is the free version — real charts, watchlist
+            and news. <a href="/pricing.html">Pricing</a> has the details.</dd>
+
+          <dt>My alert didn't email me.</dt>
+          <dd>Check, in order: is the alert enabled (the checkbox)?; is <b>Email me when it fires</b>
+            ticked on that alert?; is your email address confirmed?; and has its quiet window elapsed?
+            Alerts only go to verified addresses. Also check your spam folder once and mark it
+            "not spam" so later ones arrive.</dd>
+
+          <dt>I connected my broker but positions are empty.</dt>
+          <dd>Usually one of three things: the connection is to a paper account with nothing in it,
+            the keys were pasted with a stray space, or the broker takes a few minutes to activate a
+            brand-new key. Re-check the account number shown in Settings against the one you meant.</dd>
+
+          <dt>The assistant won't place a trade for me.</dt>
+          <dd>That's deliberate and can't be turned off. It can research, explain and analyse; placing
+            orders is done by you in the trader.</dd>
+
+          <dt>An answer looks wrong.</dt>
+          <dd>Say so in the chat and ask where the number came from. If a tool marker (🔧) is shown,
+            the figure came from a live lookup; if not, treat it more carefully. You can also report
+            it with the camera button in the header, which attaches a screenshot.</dd>
+
+          <dt>Something else.</dt>
+          <dd>The <a href="/faq.html">FAQ</a> covers accounts, privacy, pricing and self-hosting. The
+            reference library below has the technical documentation.</dd>
+        </dl>
+      </section>
     </div>
-    <div class="link-grid essentials">
-      <a class="link-card tile-cyan" href="/faq.html">
-        <span class="icon">❓</span>
-        <h3>Frequently asked questions</h3>
-        <p>Quick answers about accounts, privacy, pricing, running it yourself, and what Unisona can (and can't) do.</p>
-        <span class="go">Read the FAQ →</span>
-      </a>
-      <a class="link-card tile-rose" href="/whats-new.html">
-        <span class="icon">★</span>
-        <h3>What's new</h3>
-        <p>Release notes for Unisona <span data-app-version>1.14.1</span> and everything before it.</p>
-        <span class="go">See the releases →</span>
-      </a>
-      <a class="link-card tile-green" href="/repo/QUICKSTART.md">
-        <span class="icon">🚀</span>
-        <h3>Quick Start</h3>
-        <p>Get Unisona running on your own computer in a few minutes.</p>
-        <span class="go">Read the guide →</span>
-      </a>
-      <a class="link-card tile-violet" href="/repo/README.md">
-        <span class="icon">📖</span>
-        <h3>What is Unisona?</h3>
-        <p>The plain-English overview — what it does and the ideas behind it.</p>
-        <span class="go">Learn more →</span>
-      </a>
-    </div>
-  </section>
+  </div>
 
   <!-- ── Document library (unified, searchable + filterable) ── -->
   <section class="section" id="documents">
     <div class="section-head">
       <div class="label">Library</div>
-      <h2>Documents</h2>
-      <p>Product guides, architecture decisions, and research — newest first. Type to filter
-         live, pick a category, or switch to <strong>For builders</strong> for the internals.
+      <h2>Reference library</h2>
+      <p>Past the guide above: the full technical documentation — product guides, architecture
+         decisions, and research, newest first. You don't need any of this to use Unisona. Type to
+         filter live, pick a category, or switch to <strong>For builders</strong> for the internals.
          Press Enter to ask Unisona's grounding search for an answer instead of a document.</p>
     </div>
 
@@ -1354,6 +1783,45 @@
 
 <script src="/js/theme-toggle.js"></script>
 <script src="/js/site-chrome.js" defer></script>
+<script>
+/* Guide contents: highlight the section you're actually reading (#3332).
+   "Last heading that has passed the reading line" — computed from rects rather
+   than IntersectionObserver visibility. Visibility is the wrong question here:
+   these sections are taller than the viewport, so several are on screen at once
+   and "the first visible one" kept the previous section lit after jumping to the
+   next. Reads are batched into rAF, so scrolling stays cheap; without JS the TOC
+   is still a working list of links. */
+(function () {
+  var links = Array.prototype.slice.call(document.querySelectorAll('.gd-toc a[href^="#"]'));
+  if (!links.length) return;
+  var items = links.map(function (a) {
+    return { a: a, el: document.getElementById(a.getAttribute('href').slice(1)) };
+  }).filter(function (i) { return i.el; });
+  if (!items.length) return;
+
+  var LINE = 90;          // px from the top of the viewport; just under the sticky nav
+  var queued = false, current = null;
+
+  function sync() {
+    queued = false;
+    var best = items[0];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].el.getBoundingClientRect().top - LINE <= 0) best = items[i]; else break;
+    }
+    // At the very bottom the last section may never reach the line — claim it anyway.
+    if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) best = items[items.length - 1];
+    if (best === current) return;
+    if (current) current.a.classList.remove('active');
+    best.a.classList.add('active');
+    current = best;
+  }
+  function onScroll() { if (!queued) { queued = true; requestAnimationFrame(sync); } }
+
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  sync();
+})();
+</script>
 <script>
 /* ── Document library: unified live filter + category chips + dynamic PDF rows ──
    Every markdown/ADR card is static HTML (so build_knowledge_index.py keeps
