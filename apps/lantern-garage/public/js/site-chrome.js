@@ -29,9 +29,11 @@
     // quick-links footer. /explore.html still resolves; it just isn't nav-level.
     // The Knowledge Center takes the freed slot: before #3107 it had no depth-1
     // entry at all, leaving the docs surface two clicks deep and effectively
-    // undiscoverable from the home page. Labelled "Docs" to fit the nav bar; the
-    // page itself keeps its full name.
-    { href: "/knowledgecenter.html", label: "Docs" },
+    // undiscoverable from the home page. Labelled "Guide" (was "Docs", #3332):
+    // the page is a beginner walkthrough of what unisona is and how to use it
+    // now, not a documentation index, and "Docs" sent people looking for API
+    // reference. The href is unchanged, so every existing link still resolves.
+    { href: "/knowledgecenter.html", label: "Guide" },
   ];
 
   // Footer-only entries: real surfaces that don't earn a slot in the top nav but
