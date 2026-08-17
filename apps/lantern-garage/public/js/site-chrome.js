@@ -23,7 +23,6 @@
   var NAV_LINKS = [
     { href: "/chat.html", label: "Chat" },
     { href: "/stock-trader.html", label: "Trader" },
-    { href: "/budget.html", label: "Budget" },
     { href: "/work.html", label: "Work" },
     // Explore dropped from the chrome (operator, 2026-08-01) — the dashboard it
     // fronted duplicates the Trader surface, and its only unique job was the
@@ -38,10 +37,14 @@
   // Footer-only entries: real surfaces that don't earn a slot in the top nav but
   // must stay click-reachable. Create used to hang off kalshi-terminal.html's
   // hand-rolled footer; when the four per-page footers were folded into this one
-  // it would otherwise have been orphaned outright.
+  // it would otherwise have been orphaned outright. Budget joined them (operator,
+  // 2026-08-16, #3328): the personal-budget tool is a side utility, not one of the
+  // four things the product is about, so it lost its top-nav slot — the page and
+  // its route are untouched, so /budget.html and any saved link still work.
   var FOOTER_EXTRA_LINKS = [
     { href: "/create.html", label: "Create" },
     { href: "/explore.html", label: "Explore" },
+    { href: "/budget.html", label: "Budget" },
   ];
 
   function navHtml() {
