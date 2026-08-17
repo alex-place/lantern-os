@@ -895,6 +895,9 @@
   <button id="patternsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
     onclick="togglePatternMenu(this)"
     title="Choose which overlays and detected patterns to show — each is an independent, remembered opt-in. Detections are only shown when the deterministic engine actually finds them.">◱ Patterns ▾</button>
+  <button id="indicatorsToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
+    onclick="toggleIndicatorMenu(this)"
+    title="Add technical indicators — moving averages and bands on the price, RSI/MACD/ATR and friends in their own strip below it. Each one's periods and colour are yours and are remembered.">∿ Indicators ▾</button>
   <span class="hgroup-sep" aria-hidden="true"></span>
   <select id="chartTfSelect" class="chart-ctrl" aria-label="Chart timeframe" onchange="changeTimeframe(this.value)" title="Bar interval — how much time each candle covers">
     <option value="1m">1m</option>
@@ -1641,6 +1644,307 @@ function timeAxisTicks(bars, maxTicks){
   return ticks;
 }
 
+/* ── Indicators (#3333) ──────────────────────────────────────────────────────
+   Two layers, one registry.
+
+     overlay — drawn on the price pane, in price units (moving averages, bands)
+     pane    — drawn in its own strip under the price, on its own scale (RSI, MACD…)
+
+   Every formula below is the standard public definition (Wilder, Appel, Lane,
+   Bollinger, Donchian, Keltner) implemented from the definition. Nothing is
+   copied from another product's source.
+
+   The maths are PURE: bars in → array of numbers (or null) out, one entry per bar,
+   with `null` wherever there isn't enough history yet so index i always lines up
+   with bars[i]. Drawing skips nulls, which is what makes the warm-up period simply
+   not appear rather than render as a spike from zero. */
+
+const _iNum = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+const _iSrc = (bars, src) => bars.map(b => _iNum(
+  src === 'open' ? b.open : src === 'high' ? b.high : src === 'low' ? b.low :
+  src === 'hl2' ? ((_iNum(b.high) + _iNum(b.low)) / 2) :
+  src === 'hlc3' ? ((_iNum(b.high) + _iNum(b.low) + _iNum(b.close)) / 3) : b.close));
+
+function _iSMA(src, p){
+  const out = new Array(src.length).fill(null);
+  let sum = 0, cnt = 0;
+  for(let i=0;i<src.length;i++){
+    const v = src[i];
+    if(v==null){ sum=0; cnt=0; continue; }        // a gap restarts the window
+    sum += v; cnt++;
+    if(cnt > p){ sum -= src[i-p]; cnt = p; }
+    if(cnt === p) out[i] = sum/p;
+  }
+  return out;
+}
+function _iEMA(src, p){
+  const out = new Array(src.length).fill(null), k = 2/(p+1);
+  let prev = null, seed = 0, cnt = 0;
+  for(let i=0;i<src.length;i++){
+    const v = src[i]; if(v==null) continue;
+    if(prev==null){                                // seed on the first p values (SMA), as Wilder does
+      seed += v; cnt++;
+      if(cnt===p){ prev = seed/p; out[i]=prev; }
+      continue;
+    }
+    prev = v*k + prev*(1-k); out[i]=prev;
+  }
+  return out;
+}
+function _iWMA(src, p){
+  const out = new Array(src.length).fill(null), denom = p*(p+1)/2;
+  for(let i=p-1;i<src.length;i++){
+    let s=0, ok=true;
+    for(let j=0;j<p;j++){ const v=src[i-j]; if(v==null){ ok=false; break; } s += v*(p-j); }
+    if(ok) out[i]=s/denom;
+  }
+  return out;
+}
+/** Wilder's smoothing (used by RSI/ATR/ADX) — an EMA with k = 1/p. */
+function _iWilder(vals, p){
+  const out = new Array(vals.length).fill(null);
+  let prev=null, seed=0, cnt=0;
+  for(let i=0;i<vals.length;i++){
+    const v=vals[i]; if(v==null) continue;
+    if(prev==null){ seed+=v; cnt++; if(cnt===p){ prev=seed/p; out[i]=prev; } continue; }
+    prev = (prev*(p-1)+v)/p; out[i]=prev;
+  }
+  return out;
+}
+function _iStdev(src, p){
+  const out = new Array(src.length).fill(null);
+  for(let i=p-1;i<src.length;i++){
+    let s=0, ss=0, ok=true;
+    for(let j=0;j<p;j++){ const v=src[i-j]; if(v==null){ ok=false; break; } s+=v; ss+=v*v; }
+    if(!ok) continue;
+    const m=s/p, varr=Math.max(0, ss/p - m*m);
+    out[i]=Math.sqrt(varr);
+  }
+  return out;
+}
+function _iTrueRange(bars){
+  return bars.map((b,i)=>{
+    const h=_iNum(b.high), l=_iNum(b.low), pc = i? _iNum(bars[i-1].close) : null;
+    if(h==null||l==null) return null;
+    return pc==null ? (h-l) : Math.max(h-l, Math.abs(h-pc), Math.abs(l-pc));
+  });
+}
+function _iATR(bars, p){ return _iWilder(_iTrueRange(bars), p); }
+
+function _iRSI(bars, p, src){
+  const s=_iSrc(bars, src||'close');
+  const gains=new Array(s.length).fill(null), losses=new Array(s.length).fill(null);
+  for(let i=1;i<s.length;i++){
+    if(s[i]==null||s[i-1]==null) continue;
+    const d=s[i]-s[i-1];
+    gains[i]=Math.max(0,d); losses[i]=Math.max(0,-d);
+  }
+  const ag=_iWilder(gains,p), al=_iWilder(losses,p);
+  return s.map((_,i)=>{
+    if(ag[i]==null||al[i]==null) return null;
+    if(al[i]===0) return 100;
+    const rs=ag[i]/al[i];
+    return 100 - 100/(1+rs);
+  });
+}
+function _iMACD(bars, fast, slow, signal, src){
+  const s=_iSrc(bars, src||'close');
+  const f=_iEMA(s,fast), sl=_iEMA(s,slow);
+  const macd=s.map((_,i)=> (f[i]==null||sl[i]==null)? null : f[i]-sl[i]);
+  const sig=_iEMA(macd, signal);
+  const hist=macd.map((v,i)=> (v==null||sig[i]==null)? null : v-sig[i]);
+  return { macd, signal: sig, hist };
+}
+function _iStoch(bars, kP, dP){
+  const k=new Array(bars.length).fill(null);
+  for(let i=kP-1;i<bars.length;i++){
+    let hi=-Infinity, lo=Infinity, ok=true;
+    for(let j=0;j<kP;j++){
+      const h=_iNum(bars[i-j].high), l=_iNum(bars[i-j].low);
+      if(h==null||l==null){ ok=false; break; }
+      if(h>hi) hi=h; if(l<lo) lo=l;
+    }
+    const c=_iNum(bars[i].close);
+    if(!ok||c==null||hi===lo) continue;
+    k[i]=((c-lo)/(hi-lo))*100;
+  }
+  return { k, d: _iSMA(k, dP) };
+}
+function _iOBV(bars){
+  const out=new Array(bars.length).fill(null);
+  let acc=0, started=false;
+  for(let i=1;i<bars.length;i++){
+    const c=_iNum(bars[i].close), pc=_iNum(bars[i-1].close), v=_iNum(bars[i].volume)||0;
+    if(c==null||pc==null) continue;
+    acc += c>pc ? v : c<pc ? -v : 0;
+    out[i]=acc; started=true;
+  }
+  return started? out : out;
+}
+function _iADX(bars, p){
+  const plusDM=new Array(bars.length).fill(null), minusDM=new Array(bars.length).fill(null);
+  for(let i=1;i<bars.length;i++){
+    const h=_iNum(bars[i].high), l=_iNum(bars[i].low),
+          ph=_iNum(bars[i-1].high), pl=_iNum(bars[i-1].low);
+    if(h==null||l==null||ph==null||pl==null) continue;
+    const up=h-ph, dn=pl-l;
+    plusDM[i]  = (up>dn && up>0) ? up : 0;
+    minusDM[i] = (dn>up && dn>0) ? dn : 0;
+  }
+  const tr=_iWilder(_iTrueRange(bars), p), pdm=_iWilder(plusDM,p), mdm=_iWilder(minusDM,p);
+  const pdi=[], mdi=[], dx=[];
+  for(let i=0;i<bars.length;i++){
+    if(tr[i]==null||!tr[i]||pdm[i]==null||mdm[i]==null){ pdi[i]=null; mdi[i]=null; dx[i]=null; continue; }
+    pdi[i]=100*pdm[i]/tr[i]; mdi[i]=100*mdm[i]/tr[i];
+    const sum=pdi[i]+mdi[i];
+    dx[i]= sum? 100*Math.abs(pdi[i]-mdi[i])/sum : 0;
+  }
+  return { adx: _iWilder(dx,p), pdi, mdi };
+}
+function _iCCI(bars, p){
+  const tp=_iSrc(bars,'hlc3'), sma=_iSMA(tp,p), out=new Array(bars.length).fill(null);
+  for(let i=p-1;i<bars.length;i++){
+    if(sma[i]==null) continue;
+    let md=0, ok=true;
+    for(let j=0;j<p;j++){ const v=tp[i-j]; if(v==null){ ok=false; break; } md+=Math.abs(v-sma[i]); }
+    if(!ok) continue;
+    md/=p;
+    out[i]= md? (tp[i]-sma[i])/(0.015*md) : 0;
+  }
+  return out;
+}
+function _iMFI(bars, p){
+  const tp=_iSrc(bars,'hlc3'), out=new Array(bars.length).fill(null);
+  const pos=new Array(bars.length).fill(0), neg=new Array(bars.length).fill(0);
+  for(let i=1;i<bars.length;i++){
+    if(tp[i]==null||tp[i-1]==null) continue;
+    const flow=tp[i]*(_iNum(bars[i].volume)||0);
+    if(tp[i]>tp[i-1]) pos[i]=flow; else if(tp[i]<tp[i-1]) neg[i]=flow;
+  }
+  for(let i=p;i<bars.length;i++){
+    let sp=0,sn=0;
+    for(let j=0;j<p;j++){ sp+=pos[i-j]; sn+=neg[i-j]; }
+    out[i] = sn===0 ? 100 : 100 - 100/(1 + sp/sn);
+  }
+  return out;
+}
+function _iBB(bars, p, mult, src){
+  const s=_iSrc(bars, src||'close'), mid=_iSMA(s,p), sd=_iStdev(s,p);
+  return { mid,
+    upper: mid.map((m,i)=> (m==null||sd[i]==null)? null : m+mult*sd[i]),
+    lower: mid.map((m,i)=> (m==null||sd[i]==null)? null : m-mult*sd[i]) };
+}
+function _iDonchian(bars, p){
+  const up=new Array(bars.length).fill(null), lo=new Array(bars.length).fill(null);
+  for(let i=p-1;i<bars.length;i++){
+    let hi=-Infinity, low=Infinity, ok=true;
+    for(let j=0;j<p;j++){
+      const h=_iNum(bars[i-j].high), l=_iNum(bars[i-j].low);
+      if(h==null||l==null){ ok=false; break; }
+      if(h>hi) hi=h; if(l<low) low=l;
+    }
+    if(ok){ up[i]=hi; lo[i]=low; }
+  }
+  return { upper:up, lower:lo, mid: up.map((u,i)=> (u==null||lo[i]==null)?null:(u+lo[i])/2) };
+}
+function _iKeltner(bars, p, mult){
+  const mid=_iEMA(_iSrc(bars,'close'), p), atr=_iATR(bars, p);
+  return { mid,
+    upper: mid.map((m,i)=> (m==null||atr[i]==null)? null : m+mult*atr[i]),
+    lower: mid.map((m,i)=> (m==null||atr[i]==null)? null : m-mult*atr[i]) };
+}
+
+// ── Registry ────────────────────────────────────────────────────────────────
+// kind: 'overlay' draws in price units on the price pane; 'pane' gets its own strip.
+// params: [{k, label, def, min, max, step}] — rendered generically by the editor,
+// so adding an indicator never means touching the settings UI.
+const IND_DEFS = {
+  sma:      { name:'SMA',            kind:'overlay', params:[{k:'p',label:'Period',def:20,min:1,max:400}], color:'#38bdf8' },
+  ema:      { name:'EMA',            kind:'overlay', params:[{k:'p',label:'Period',def:21,min:1,max:400}], color:'#a78bfa' },
+  wma:      { name:'WMA',            kind:'overlay', params:[{k:'p',label:'Period',def:20,min:1,max:400}], color:'#f472b6' },
+  bb:       { name:'Bollinger Bands',kind:'overlay', params:[{k:'p',label:'Period',def:20,min:2,max:400},{k:'m',label:'Std dev',def:2,min:0.1,max:5,step:0.1}], color:'#60a5fa' },
+  donchian: { name:'Donchian',       kind:'overlay', params:[{k:'p',label:'Period',def:20,min:2,max:400}], color:'#34d399' },
+  keltner:  { name:'Keltner',        kind:'overlay', params:[{k:'p',label:'Period',def:20,min:2,max:400},{k:'m',label:'ATR mult',def:2,min:0.1,max:6,step:0.1}], color:'#fbbf24' },
+  rsi:      { name:'RSI',            kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:100}], color:'#a78bfa', band:[0,100], guides:[30,70] },
+  macd:     { name:'MACD',           kind:'pane',    params:[{k:'f',label:'Fast',def:12,min:1,max:200},{k:'s',label:'Slow',def:26,min:2,max:400},{k:'g',label:'Signal',def:9,min:1,max:100}], color:'#38bdf8' },
+  stoch:    { name:'Stochastic',     kind:'pane',    params:[{k:'p',label:'%K',def:14,min:1,max:100},{k:'d',label:'%D',def:3,min:1,max:50}], color:'#f472b6', band:[0,100], guides:[20,80] },
+  atr:      { name:'ATR',            kind:'pane',    params:[{k:'p',label:'Period',def:14,min:1,max:200}], color:'#fbbf24' },
+  adx:      { name:'ADX / DMI',      kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:100}], color:'#34d399', band:[0,100], guides:[25] },
+  cci:      { name:'CCI',            kind:'pane',    params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#60a5fa', guides:[-100,100] },
+  mfi:      { name:'MFI',            kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:100}], color:'#fb923c', band:[0,100], guides:[20,80] },
+  obv:      { name:'OBV',            kind:'pane',    params:[], color:'#94a3b8' },
+};
+
+/** Compute one configured indicator → { series:[{values,color,width,dash}], hist?, band?, guides? } */
+function indCompute(cfg, bars){
+  const d = IND_DEFS[cfg.id]; if(!d) return null;
+  const P = (k) => Number(cfg.params && cfg.params[k] != null ? cfg.params[k] : (d.params.find(x=>x.k===k)||{}).def);
+  const c = cfg.color || d.color;
+  const W = cfg.width || 1.4;
+  switch(cfg.id){
+    case 'sma': return { series:[{values:_iSMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'ema': return { series:[{values:_iEMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'wma': return { series:[{values:_iWMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'bb': { const b=_iBB(bars,P('p'),P('m'));
+      return { series:[{values:b.upper,color:c,width:1},{values:b.mid,color:c,width:1,dash:[4,3]},{values:b.lower,color:c,width:1}] }; }
+    case 'donchian': { const b=_iDonchian(bars,P('p'));
+      return { series:[{values:b.upper,color:c,width:1},{values:b.mid,color:c,width:1,dash:[4,3]},{values:b.lower,color:c,width:1}] }; }
+    case 'keltner': { const b=_iKeltner(bars,P('p'),P('m'));
+      return { series:[{values:b.upper,color:c,width:1},{values:b.mid,color:c,width:1,dash:[4,3]},{values:b.lower,color:c,width:1}] }; }
+    case 'rsi': return { series:[{values:_iRSI(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
+    case 'macd': { const m=_iMACD(bars,P('f'),P('s'),P('g'));
+      return { series:[{values:m.macd,color:c,width:W},{values:m.signal,color:'#fb923c',width:1}], hist:m.hist, guides:[0] }; }
+    case 'stoch': { const s=_iStoch(bars,P('p'),P('d'));
+      return { series:[{values:s.k,color:c,width:W},{values:s.d,color:'#fbbf24',width:1}], band:d.band, guides:d.guides }; }
+    case 'atr': return { series:[{values:_iATR(bars,P('p')), color:c, width:W}] };
+    case 'adx': { const a=_iADX(bars,P('p'));
+      return { series:[{values:a.adx,color:c,width:W},{values:a.pdi,color:'#4ade80',width:1},{values:a.mdi,color:'#f87171',width:1}], band:d.band, guides:d.guides }; }
+    case 'cci': return { series:[{values:_iCCI(bars,P('p')), color:c, width:W}], guides:d.guides };
+    case 'mfi': return { series:[{values:_iMFI(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
+    case 'obv': return { series:[{values:_iOBV(bars), color:c, width:W}] };
+  }
+  return null;
+}
+/** Short label for the legend, e.g. "EMA 21" or "MACD 12/26/9". */
+function indLabel(cfg){
+  const d=IND_DEFS[cfg.id]; if(!d) return cfg.id;
+  const vals=d.params.map(p=> (cfg.params&&cfg.params[p.k]!=null)? cfg.params[p.k] : p.def);
+  return vals.length ? d.name+' '+vals.join('/') : d.name;
+}
+
+// ── Per-user state ──────────────────────────────────────────────────────────
+// A flat list, so the same indicator can appear more than once (EMA 9 + EMA 21 +
+// EMA 200 is the whole point). Persisted per browser profile alongside the other
+// chart preferences. A stored entry naming an indicator we no longer ship is
+// dropped on load rather than blanking the chart.
+let chartIndicators = (()=>{
+  try{
+    const raw=JSON.parse(localStorage.getItem('trader.indicators')||'[]');
+    return Array.isArray(raw) ? raw.filter(x=>x && IND_DEFS[x.id]).slice(0,12) : [];
+  }catch(_e){ return []; }
+})();
+function saveIndicators(){
+  try{ localStorage.setItem('trader.indicators', JSON.stringify(chartIndicators)); }catch(_e){}
+}
+const indOverlays = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='overlay');
+const indPanes    = ()=> chartIndicators.filter(c=>IND_DEFS[c.id] && IND_DEFS[c.id].kind==='pane');
+
+/** Draw one polyline over an index→x, value→y mapping, skipping null runs. */
+function _indStroke(ctx, values, xOf, yOf, color, width, dash){
+  ctx.beginPath();
+  let open=false;
+  for(let i=0;i<values.length;i++){
+    const v=values[i];
+    if(v==null||!Number.isFinite(v)){ open=false; continue; }
+    const px=xOf(i), py=yOf(v);
+    if(!open){ ctx.moveTo(px,py); open=true; } else ctx.lineTo(px,py);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=width||1.4;
+  if(dash) ctx.setLineDash(dash);
+  ctx.stroke();
+  if(dash) ctx.setLineDash([]);
+}
+
 // ── Candlestick / line chart renderer ────────────────────────────────────────
 // Draws the bars in the [0,pw]x[0,ph] plot area, then a price axis (right
 // gutter, AXIS_W) and a time axis (bottom strip, AXIS_H) plus a small
@@ -1659,8 +1963,18 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
 
   const pw  = Math.max(0, w - AXIS_W);
   const ph  = Math.max(0, h - AXIS_H);
+  // Sub-pane indicators (#3333) take their strip off the BOTTOM of the plot, so the
+  // price pane shrinks rather than the panes overlapping the candles. Each strip is
+  // capped so that on a small tile the price series still owns most of the height —
+  // below ~48px a pane is unreadable, so we stop adding them instead of shrinking
+  // everything into mush.
+  const _panes = indPanes();
+  const _paneMax = Math.floor(ph * 0.5);
+  const _paneH = _panes.length ? Math.max(34, Math.min(78, Math.floor(_paneMax / _panes.length))) : 0;
+  const _paneN = _paneH >= 34 ? Math.min(_panes.length, Math.floor(_paneMax / _paneH)) : 0;
+  const priceH = Math.max(0, ph - _paneN * _paneH);
   const rng = rMax - rMin;
-  const y   = p => ((rMax-p)/rng)*ph;
+  const y   = p => ((rMax-p)/rng)*priceH;
 
   // Price axis, TradingView-style: fit nice 1/2/5-ladder ticks inside the
   // visible range (labels only ever land on clean .00/.10/.20/.50 values).
@@ -1681,7 +1995,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     ctx.stroke();
     ctx.fillStyle = CHART_AXIS_COLOR();
     ctx.textAlign = 'left';
-    const edge = yy < 8 ? 'top' : (yy > ph-8 ? 'bottom' : 'middle');
+    const edge = yy < 8 ? 'top' : (yy > priceH-8 ? 'bottom' : 'middle');
     ctx.textBaseline = edge;
     ctx.fillText(fmt(price, priceDec), pw+4, yy);
   }
@@ -1731,7 +2045,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // bars past the top/bottom without painting over the axes.
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, 0, pw, ph);
+    ctx.rect(0, 0, pw, priceH);
     ctx.clip();
     // ── Feed-glitch wick sanitizer (#trader-candles v2) ──────────────────────
     // Yahoo ships bars with tiny bodies and monstrous ONE-SIDED wicks (measured
@@ -1760,14 +2074,14 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
     // to SEE it. Skipped gracefully when the feed ships no volume (e.g. indices).
     const maxVol = Math.max(0, ...bars.map(b=>Number(b.volume)||0));
     if(maxVol > 0){
-      const bandH = ph * 0.16;                     // bottom ~16% of the plot
+      const bandH = priceH * 0.16;                 // bottom ~16% of the PRICE pane
       const bw2 = Math.max(1, Math.min(slotW*0.6, 14));
       for(let i=0;i<n;i++){
         const b=bars[i], v=Number(b.volume)||0; if(!v) continue;
         const x=i*slotW + slotW/2;
         const hgt=(v/maxVol)*bandH;
         ctx.fillStyle=_chartRgba(b.close>=b.open ? CHART_CANDLE_UP : CHART_CANDLE_DOWN, .28);
-        ctx.fillRect(x-bw2/2, ph-hgt, bw2, hgt);
+        ctx.fillRect(x-bw2/2, priceH-hgt, bw2, hgt);
       }
       // ── VWAP overlay (#2436) — cumulative Σ(typical·vol)/Σ(vol) over the visible
       // window. THE intraday reference line; amber so it never collides with the
@@ -1823,13 +2137,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       // red when down — with a vertical gradient fill fading to transparent.
       const up = bars[n-1].close >= bars[0].close;
       const lc = up ? CHART_CANDLE_UP : CHART_CANDLE_DOWN;
-      const grad = ctx.createLinearGradient(0, 0, 0, ph);
+      const grad = ctx.createLinearGradient(0, 0, 0, priceH);
       grad.addColorStop(0, _chartRgba(lc, .26));
       grad.addColorStop(1, _chartRgba(lc, 0));
       ctx.beginPath();
-      ctx.moveTo(pts[0][0], ph);
+      ctx.moveTo(pts[0][0], priceH);
       for(const [x,yy] of pts) ctx.lineTo(x,yy);
-      ctx.lineTo(pts[n-1][0], ph);
+      ctx.lineTo(pts[n-1][0], priceH);
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
@@ -1882,7 +2196,91 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         }
       }
     }
+
+    // ── Overlay indicators (#3333) — price units, inside the price clip so a
+    // zoomed-in scale pushes a moving average off the top without painting the axis.
+    const _xOfIdx = (i)=> i*slotW + slotW/2;
+    for(const cfg of indOverlays()){
+      const out = indCompute(cfg, bars); if(!out) continue;
+      for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, y, s.color, s.width, s.dash);
+    }
     ctx.restore();
+
+    // ── Sub-panes (#3333) — each on its own scale, sharing the price pane's x
+    // mapping so a candle and its RSI reading line up vertically. Drawn after the
+    // price clip is released, each inside its own.
+    if(_paneN > 0){
+      const legend = [];
+      for(let pi=0; pi<_paneN; pi++){
+        const cfg = _panes[pi];
+        const out = indCompute(cfg, bars); if(!out) continue;
+        const top = priceH + pi*_paneH, bot = top + _paneH;
+        // scale: a fixed band when the indicator has one (RSI 0-100), else fit the data
+        let lo, hi;
+        if(out.band){ lo=out.band[0]; hi=out.band[1]; }
+        else{
+          lo=Infinity; hi=-Infinity;
+          for(const s of out.series) for(const v of s.values){ if(v==null||!Number.isFinite(v)) continue; if(v<lo) lo=v; if(v>hi) hi=v; }
+          if(out.hist) for(const v of out.hist){ if(v==null||!Number.isFinite(v)) continue; if(v<lo) lo=v; if(v>hi) hi=v; }
+          if(!Number.isFinite(lo)||!Number.isFinite(hi)) continue;
+          if(hi===lo){ hi=lo+1; lo-=1; }
+          const pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
+        }
+        const yOf = (v)=> top + (1-(v-lo)/(hi-lo))*_paneH;
+
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, top, pw, _paneH); ctx.clip();
+        // separator above the strip
+        ctx.strokeStyle=CHART_GRID_COLOR(); ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(0, Math.round(top)+0.5); ctx.lineTo(pw, Math.round(top)+0.5); ctx.stroke();
+        // reference guides (RSI 30/70, MACD 0, …)
+        for(const g of (out.guides||[])){
+          if(g<lo||g>hi) continue;
+          const gy=Math.round(yOf(g))+0.5;
+          ctx.strokeStyle=CHART_GRID_COLOR(); ctx.setLineDash([2,3]);
+          ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(pw,gy); ctx.stroke(); ctx.setLineDash([]);
+        }
+        if(out.hist){
+          const zero = yOf(Math.max(lo, Math.min(hi, 0)));
+          const bw = Math.max(1, Math.min(6, slotW*0.6));
+          for(let i=0;i<out.hist.length;i++){
+            const v=out.hist[i]; if(v==null||!Number.isFinite(v)) continue;
+            const vy=yOf(v);
+            ctx.fillStyle=_chartRgba(v>=0?CHART_CANDLE_UP:CHART_CANDLE_DOWN,.55);
+            ctx.fillRect(_xOfIdx(i)-bw/2, Math.min(vy,zero), bw, Math.max(1,Math.abs(zero-vy)));
+          }
+        }
+        for(const s of out.series) _indStroke(ctx, s.values, _xOfIdx, yOf, s.color, s.width, s.dash);
+        // scale ends in the gutter, so a pane is readable without a full axis
+        ctx.fillStyle=CHART_AXIS_COLOR(); ctx.font=CHART_AXIS_FONT; ctx.textAlign='left';
+        ctx.restore();
+        ctx.textBaseline='top';    ctx.fillText(fmt(hi, Math.abs(hi)>=100?0:2), pw+4, top+1);
+        ctx.textBaseline='bottom'; ctx.fillText(fmt(lo, Math.abs(lo)>=100?0:2), pw+4, bot-1);
+        // name + latest value, top-left of its own strip
+        let last=null;
+        for(let i=out.series[0].values.length-1;i>=0;i--){ const v=out.series[0].values[i]; if(v!=null&&Number.isFinite(v)){ last=v; break; } }
+        ctx.fillStyle=out.series[0].color; ctx.textAlign='left'; ctx.textBaseline='top';
+        ctx.fillText(indLabel(cfg)+(last!=null? '  '+fmt(last, Math.abs(last)>=100?0:2) : ''), 3, top+2);
+      }
+    }
+
+    // ── Price-pane legend (#3333) — one line per overlay with its latest value, so
+    // "which line is which" is answerable without opening the picker.
+    const _ovs = indOverlays();
+    if(_ovs.length){
+      ctx.font=CHART_AXIS_FONT; ctx.textAlign='left'; ctx.textBaseline='top';
+      let ly = 2;
+      for(const cfg of _ovs){
+        const out=indCompute(cfg,bars); if(!out) continue;
+        const vals=out.series[0].values;
+        let last=null;
+        for(let i=vals.length-1;i>=0;i--){ if(vals[i]!=null&&Number.isFinite(vals[i])){ last=vals[i]; break; } }
+        ctx.fillStyle=out.series[0].color;
+        ctx.fillText(indLabel(cfg)+(last!=null? '  '+fmt(last,2) : '  —'), 34, ly);
+        ly += 11;
+        if(ly > priceH-12) break;                 // never let the legend eat the chart
+      }
+    }
   }
 }
 
@@ -4224,6 +4622,128 @@ function _closePatternMenu(){
   if(_patMenuEl){ _patMenuEl.hidden = true; }
   ['patternsToggle','fsPatternsToggle'].forEach(id=>{ const b=document.getElementById(id); if(b) b.setAttribute('aria-expanded','false'); });
 }
+/* ── Indicator picker (#3333) ────────────────────────────────────────────────
+   Same chrome as the Patterns menu (.pat-menu vocabulary, fixed-positioned under
+   its trigger, flips up when there is no room below) so the toolbar has one menu
+   look. Adding is a click; each ADDED row expands into a generic settings editor
+   built from IND_DEFS[].params, which is why a new indicator needs no UI work. */
+let _indMenuEl = null, _indEditing = null;
+function _buildIndMenu(){
+  if(_indMenuEl) return _indMenuEl;
+  const m = document.createElement('div');
+  m.className='pat-menu'; m.id='indMenu'; m.hidden=true;
+  m.setAttribute('role','dialog'); m.setAttribute('aria-label','Chart indicators');
+  document.body.appendChild(m);
+  document.addEventListener('click',(e)=>{
+    if(m.hidden) return;
+    if(m.contains(e.target)) return;
+    if(e.target.closest && e.target.closest('#indicatorsToggle')) return;
+    _closeIndMenu();
+  });
+  document.addEventListener('keydown',(e)=>{ if(e.key==='Escape' && !m.hidden) _closeIndMenu(); });
+  _indMenuEl = m; return m;
+}
+function _closeIndMenu(){
+  if(_indMenuEl) _indMenuEl.hidden=true;
+  _indEditing=null;
+  const b=document.getElementById('indicatorsToggle'); if(b) b.setAttribute('aria-expanded','false');
+}
+function _indMenuHtml(){
+  const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  let h='<div class="pat-menu-note">Active — click one to change its settings</div>';
+  if(!chartIndicators.length) h+='<div class="pat-menu-note" style="opacity:.7">None yet. Add one below.</div>';
+  chartIndicators.forEach((cfg,idx)=>{
+    const d=IND_DEFS[cfg.id]; if(!d) return;
+    const open=_indEditing===idx;
+    h+='<div class="pat-menu-item ind-active" data-idx="'+idx+'" style="align-items:center" onclick="indEdit('+idx+',event)">'
+      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(cfg.color||d.color)+'"></span>'
+      +'<span style="flex:1;min-width:0">'+esc(indLabel(cfg))+'</span>'
+      +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
+      +'aria-label="Remove '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();indRemove('+idx+')">✕</button></div>';
+    if(open){
+      h+='<div style="padding:4px 8px 8px;display:flex;flex-direction:column;gap:6px">';
+      for(const p of d.params){
+        const v=(cfg.params&&cfg.params[p.k]!=null)?cfg.params[p.k]:p.def;
+        h+='<label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)">'
+          +'<span style="flex:1">'+esc(p.label)+'</span>'
+          +'<input type="number" value="'+esc(v)+'" min="'+p.min+'" max="'+p.max+'" step="'+(p.step||1)+'" '
+          +'style="width:74px;background:var(--bg3);border:1px solid var(--border);border-radius:5px;color:var(--text0);padding:3px 6px;font:inherit" '
+          +'oninput="indSetParam('+idx+',\''+p.k+'\',this.value)"></label>';
+      }
+      h+='<label style="display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--text2)">'
+        +'<span style="flex:1">Colour</span>'
+        +'<input type="color" value="'+esc(cfg.color||d.color)+'" style="width:74px;height:24px;background:none;border:1px solid var(--border);border-radius:5px;padding:0" '
+        +'oninput="indSetColor('+idx+',this.value)"></label></div>';
+    }
+  });
+  h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">Add an indicator</div>';
+  for(const [id,d] of Object.entries(IND_DEFS)){
+    h+='<div class="pat-menu-item ind-add" data-add="'+id+'" onclick="indAdd(\''+id+'\')">'
+      +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(d.color)+'"></span>'
+      +'<span style="flex:1">'+esc(d.name)+'</span>'
+      +'<span class="pat-count" style="background:none;color:var(--text2)">'+(d.kind==='pane'?'pane':'chart')+'</span></div>';
+  }
+  if(chartIndicators.length){
+    h+='<div class="pat-menu-foot"><button type="button" onclick="indClear()">Remove all</button></div>';
+  }
+  return h;
+}
+function _indRefresh(){
+  if(_indMenuEl && !_indMenuEl.hidden) _indMenuEl.innerHTML=_indMenuHtml();
+  _setIndicatorsBtn();
+  saveIndicators();
+  _indRerender();
+}
+/* Force every chart to repaint. renderZoneLadder short-circuits when its inputs
+   look unchanged, and an indicator edit changes none of them — so `force` is what
+   makes a period change actually appear. */
+function _indRerender(){
+  (wlPrices||[]).forEach(t=> renderZoneLadder(t.ticker, zonesData[t.ticker]||{}, t.price, null, null, true));
+  try{ renderFullscreenChart(); }catch(_e){}
+}
+function indAdd(id){
+  if(!IND_DEFS[id]) return;
+  if(chartIndicators.length>=12) return;          // a bounded list keeps the render loop honest
+  chartIndicators.push({ id, params:{}, color:IND_DEFS[id].color });
+  _indEditing=chartIndicators.length-1;
+  _indRefresh();
+}
+function indRemove(i){ chartIndicators.splice(i,1); _indEditing=null; _indRefresh(); }
+function indClear(){ chartIndicators=[]; _indEditing=null; _indRefresh(); }
+function indEdit(i,e){ if(e) e.stopPropagation(); _indEditing = _indEditing===i ? null : i; _indRefresh(); }
+function indSetParam(i,k,v){
+  const cfg=chartIndicators[i]; if(!cfg) return;
+  const d=IND_DEFS[cfg.id], spec=d.params.find(p=>p.k===k); if(!spec) return;
+  let n=Number(v); if(!Number.isFinite(n)) return;
+  n=Math.min(spec.max, Math.max(spec.min, n));    // clamp: a period of 0 or 1e9 must not reach the maths
+  cfg.params=cfg.params||{}; cfg.params[k]=n;
+  saveIndicators(); _setIndicatorsBtn(); _indRerender();
+}
+function indSetColor(i,v){
+  const cfg=chartIndicators[i]; if(!cfg) return;
+  cfg.color=String(v); saveIndicators(); _setIndicatorsBtn(); _indRerender();
+}
+function _setIndicatorsBtn(){
+  const b=document.getElementById('indicatorsToggle'); if(!b) return;
+  const n=chartIndicators.length;
+  b.textContent = n ? `∿ Indicators (${n}) ▾` : '∿ Indicators ▾';
+  b.classList.toggle('on', n>0);
+}
+function toggleIndicatorMenu(btn){
+  const m=_buildIndMenu();
+  if(!m.hidden){ _closeIndMenu(); return; }
+  m.innerHTML=_indMenuHtml();
+  m.hidden=false;
+  const r=btn.getBoundingClientRect();
+  m.style.visibility='hidden';
+  const mw=m.offsetWidth||230, mh=m.offsetHeight||0;
+  let left=Math.min(r.left, window.innerWidth-mw-8);
+  let top=r.bottom+4;
+  if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-4);
+  m.style.left=Math.max(8,left)+'px'; m.style.top=top+'px'; m.style.visibility='visible';
+  btn.setAttribute('aria-expanded','true');
+}
+
 function togglePatternMenu(btn){
   const m = _buildPatternMenu();
   if(!m.hidden){ _closePatternMenu(); return; }
@@ -5440,6 +5960,7 @@ function startDashboard(){
   // from localStorage at init).
   ['chartTfSelect','fsChartTfSelect'].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=chartTimeframe; });
   _setPatternsBtn();            // reflect the remembered patterns-overlay state on its toggle
+  _setIndicatorsBtn();          // …and the remembered indicator count (#3333)
   syncRangeButtons(chartTimeframe);
   initFooterResize();
   initWlInfoResize();
