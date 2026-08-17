@@ -16,10 +16,15 @@
  * the trader's own history usable, and invented rows make it unusable while
  * looking fine.
  *
- * Two independent defences, both pinned here:
+ * Defences pinned here:
  *   1. CONVERGENCE_RECORDS_FILE redirects the store.
  *   2. A redirected TRADER_TRADES_LOG without a redirected store means "test
  *      rig" — emit nothing rather than trust every future test to remember.
+ *   3. (#3293) A TEST PROCESS is auto-redirected off the live store even when it
+ *      sets no env at all. #3292 stopped the ONE trader emitter from trusting each
+ *      test to opt in; #3293 centralized the store path in convergence-records.js
+ *      so EVERY emitter (dream-chat, keystone-runtime, surprise-intervene) is
+ *      refused the live store under `node --test` (NODE_TEST_CONTEXT) / NODE_ENV=test.
  */
 
 const { test } = require('node:test');
@@ -57,10 +62,32 @@ test('CONVERGENCE_RECORDS_FILE redirects the store away from production', () => 
   } finally { restore(); }
 });
 
-test('without the override the store resolves to the real repo path', () => {
+test('without the override, only a NON-test process resolves to the real repo path (#3293)', () => {
   const { cr, restore } = freshRequire({ CONVERGENCE_RECORDS_FILE: undefined });
   try {
-    assert.match(cr.RECORDS_PATH, /data[\\/]convergence[\\/]records\.jsonl$/);
+    // The pure resolver with a clean (production-like) env → the live store.
+    assert.match(cr.resolveRecordsPath({}), /data[\\/]convergence[\\/]records\.jsonl$/);
+    // But THIS process is a test process, so the module-resolved path is redirected OFF the
+    // live store even though no env override was set — that is the #3293 fix.
+    assert.doesNotMatch(cr.RECORDS_PATH, /data[\\/]convergence[\\/]records\.jsonl$/);
+    assert.ok(cr.RECORDS_PATH.startsWith(os.tmpdir()), 'test store lives under the OS temp dir');
+  } finally { restore(); }
+});
+
+test('a test process is redirected off the live store, and emit never touches it (#3293)', async () => {
+  // No env override at all — the bare test process must still be refused the live store.
+  const { cr, restore } = freshRequire({ CONVERGENCE_RECORDS_FILE: undefined });
+  const live = path.resolve(__dirname, '..', '..', '..', 'data', 'convergence', 'records.jsonl');
+  const liveBefore = fs.existsSync(live) ? fs.readFileSync(live, 'utf-8') : '';
+  try {
+    assert.strictEqual(cr.resolveRecordsPath({ NODE_TEST_CONTEXT: 'child-v8' }).startsWith(os.tmpdir()), true);
+    assert.strictEqual(cr.resolveRecordsPath({ NODE_ENV: 'test' }).startsWith(os.tmpdir()), true);
+    // A generic (non-trader) emit — the class of record that leaked as "hello there" -> "Hi!".
+    const rec = await cr.emitConvergenceRecord({ hypothesis: 'iso probe #3293', result: 'temp only', reasoner: 'lantern', confidence: 0.7 });
+    assert.ok(rec && rec.id, 'the real emitter still runs');
+    const liveAfter = fs.existsSync(live) ? fs.readFileSync(live, 'utf-8') : '';
+    assert.strictEqual(liveAfter, liveBefore, 'emit must not append to the live convergence store');
+    assert.ok(fs.readFileSync(cr.RECORDS_PATH, 'utf-8').includes('iso probe #3293'), 'row landed in the redirected store');
   } finally { restore(); }
 });
 
