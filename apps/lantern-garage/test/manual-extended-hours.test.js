@@ -93,11 +93,13 @@ test('a BUY crosses UP, not down', async () => {
   assert.ok(c.order.limitPrice > 100, `buy must be marketable upward: ${c.order.limitPrice}`);
 });
 
-test('WEEKEND: no conversion, but the response says the order only QUEUES', async () => {
-  const c = await place(SELL, { now: SUN });
-  assert.strictEqual(c.order.type, 'market', 'nothing executes on a Sunday — a limit would not help');
+test('WEEKEND: the session is reported as closed', async () => {
+  // NOTE: this test originally asserted the order stayed a plain market order
+  // and that the note said it "QUEUES". Both were wrong — see #3327: TIF=DAY
+  // expires on a session-less day, so nothing queued. The conversion behavior
+  // is now pinned by the GTC tests at the bottom of this file.
+  const c = await place(SELL, { now: SUN, price: 40.20 });
   assert.strictEqual(c.body.session, 'closed');
-  assert.match(c.body.session_note, /QUEUES/);
 });
 
 test('an explicit LIMIT from the caller is never rewritten', async () => {
@@ -110,4 +112,40 @@ test('no quote available: stays market and SAYS it will not fill', async () => {
   const c = await place(SELL, { now: PRE, price: 0 });
   assert.strictEqual(c.order.type, 'market');
   assert.match(c.body.session_note, /no quote available/);
+});
+
+// ── closed-market orders must actually SURVIVE to the next session (#3327) ──
+// The prior code said "queues" and shipped TIF=DAY, which expires at the end of
+// a day that had no session. Live proof: the 0.8-share SOXS dust order was
+// accepted Saturday, reported as queued, and by Monday 11:38 the position was
+// untouched with no order anywhere. Nothing rested; the claim was false.
+
+test('WEEKEND: order becomes a marketable GTC limit that survives to the open', async () => {
+  const c = await place(SELL, { now: SUN, price: 40.20 });
+  assert.strictEqual(c.order.timeInForce, 'gtc', 'DAY would expire before Monday');
+  assert.strictEqual(c.order.type, 'limit', 'a resting order needs a price');
+  assert.ok(c.order.limitPrice < 40.20, `sell limit must be marketable: ${c.order.limitPrice}`);
+  assert.match(c.body.session_note, /GTC limit/);
+  assert.match(c.body.session_note, /DAY order would expire/);
+});
+
+test('WEEKEND buy rests above the market, not below', async () => {
+  const c = await place({ ...SELL, side: 'buy' }, { now: SUN, price: 100 });
+  assert.strictEqual(c.order.timeInForce, 'gtc');
+  assert.ok(c.order.limitPrice > 100, `buy limit must be marketable upward: ${c.order.limitPrice}`);
+});
+
+test('WEEKEND with no quote: stays market and WARNS it may expire — never claims it queues', async () => {
+  const c = await place(SELL, { now: SUN, price: 0 });
+  assert.strictEqual(c.order.type, 'market');
+  assert.match(c.body.session_note, /may expire unfilled/);
+  assert.doesNotMatch(c.body.session_note, /QUEUES/);
+});
+
+test('RTH and extended paths are unchanged by the GTC rule', async () => {
+  const rth = await place(SELL, { now: RTH, price: 40.20 });
+  assert.strictEqual(rth.order.timeInForce, undefined, 'RTH keeps the bridge default');
+  const ext = await place(SELL, { now: PRE, price: 40.20 });
+  assert.strictEqual(ext.order.timeInForce, undefined, 'extended relies on outsideRth, not GTC');
+  assert.strictEqual(ext.order.outsideRth, true);
 });

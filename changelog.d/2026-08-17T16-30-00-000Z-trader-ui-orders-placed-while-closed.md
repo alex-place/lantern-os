@@ -1,0 +1,3 @@
+### Fixed
+
+- trader-ui: orders placed while the market is closed now actually survive to the next open. The bridge defaults non-stop orders to TIF=DAY, and a DAY order placed on a session-less day expires rather than queueing — so the "market closed: the order QUEUES" note was false. Live proof: the 0.8-share SOXS dust order was accepted Saturday, reported as queued, and by Monday the position was untouched with no order anywhere. Closed-market orders are now marketable GTC limits that rest and fill at the open; with no quote available the response says the order may expire instead of claiming it queues
