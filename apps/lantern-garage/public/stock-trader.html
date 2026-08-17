@@ -335,14 +335,14 @@
      space below, and no chart bleeding under the footer. Rows/cols set in JS. */
   .main.main-fixed{overflow:hidden}
   .cards-grid.grid-fixed{height:100%;gap:8px}
-  /* Square in the fixed layouts too (#3138). The tracks are sized in JS to the largest
-     square that fits the deck (see applyGridCols), so aspect-ratio here is the guarantee
-     rather than the mechanism — and every panel in a layout is identically sized (#3139). */
-  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1;aspect-ratio:1/1}
-  .cards-grid.grid-fixed{justify-content:center;align-content:center}
-  /* Phones keep the stacked, height-filling layout: a square panel in a single narrow
-     column wastes the little vertical room a phone has. */
-  .cards-grid.grid-fixed.grid-narrow .card{aspect-ratio:auto}
+  /* Fixed layouts FILL the deck. The square cell (#3138) kept every panel identically
+     shaped, but sizing the tracks to min(width/cols, height/rows) left the deck's longer
+     axis as dead space — 437px of a 936px deck on a single chart, and the same gap in
+     every other layout. Equal 1fr tracks keep panels identical to each other (the #3139
+     guarantee) AND use the whole area; aspect-ratio:auto overrides the square .card rule
+     so the panel takes the cell's shape. */
+  .cards-grid.grid-fixed .card{display:flex;flex-direction:column;min-height:0;grid-column:auto!important;opacity:1;aspect-ratio:auto}
+  .cards-grid.grid-fixed{justify-content:stretch;align-content:stretch}
   .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
   /* Drag-to-reorder chart slots (multi-chart layouts) */
   .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
@@ -2386,23 +2386,15 @@ function applyGridCols(){
     const cols = narrow ? 1 : (SLOT_COLS[shown] || Math.ceil(Math.sqrt(shown)));
     const rows = Math.ceil(shown / cols);
     grid.classList.toggle('grid-narrow', narrow);
-    if(narrow){
-      // Phone: stack and fill the height. A square panel in one narrow column would
-      // waste the little vertical room a phone has.
-      grid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-      grid.style.gridTemplateRows    = `repeat(${rows},minmax(0,1fr))`;
-    } else {
-      // Square panels, all identical (#3138/#3139). `1fr` tracks stretched each cell to
-      // whatever shape the deck happened to be, so panels were wide rectangles that
-      // changed shape with the window, the chat rail, and the order panel. Size the
-      // track to the largest square that fits instead, and centre the block.
-      const gap = parseFloat(getComputedStyle(grid).gap) || 8;
-      const availW = grid.clientWidth  - gap * (cols - 1);
-      const availH = grid.clientHeight - gap * (rows - 1);
-      const cell = Math.max(180, Math.floor(Math.min(availW / cols, availH / rows)));
-      grid.style.gridTemplateColumns = `repeat(${cols},${cell}px)`;
-      grid.style.gridTemplateRows    = `repeat(${rows},${cell}px)`;
-    }
+    // Fill the deck, don't inscribe a square in it. Pixel-sized square tracks (#3138)
+    // left the deck's longer axis empty: a single chart on a 936×499 deck drew a 499×499
+    // panel and wasted 437px of width, 4-up wasted the same 438px, and the wide layouts
+    // wasted the height instead (3-up drew 306 of 499). Equal 1fr fractions still make
+    // every panel identical to its neighbours — the size-drift guarantee from #3139 —
+    // while using the whole area. minmax(0,…) lets a track shrink below its content so a
+    // small deck stays inside .main-fixed's overflow:hidden instead of clipping a panel.
+    grid.style.gridTemplateColumns = `repeat(${cols},minmax(0,1fr))`;
+    grid.style.gridTemplateRows    = `repeat(${rows},minmax(0,1fr))`;
     grid.classList.add('grid-fixed');
     grid.classList.toggle('grid-single', shown === 1);
     if(main) main.classList.add('main-fixed');
