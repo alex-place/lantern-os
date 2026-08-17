@@ -149,23 +149,104 @@ function deriveDirection(sr, rsiVal, thresholds, opts = {}) {
  * and it is written against direction-lock's sign map so any future instrument
  * with a sign — new inverse products, short futures (#3218) — inherits it.
  */
+// Same ledger the engine writes (TRADER_TRADES_LOG override honored, so tests
+// never touch production). Own writer rather than requiring auto-trader, which
+// would create a scan<->auto-trader require cycle.
+const _VETO_LOG = process.env.TRADER_TRADES_LOG
+  ? require("path").resolve(process.env.TRADER_TRADES_LOG)
+  : require("path").join(__dirname, "..", "..", "..", "..", "data", "lantern-garage", "trading", "autopilot-trades.jsonl");
+function _logVeto(rec) {
+  try {
+    const fs = require("fs"), path = require("path");
+    fs.mkdirSync(path.dirname(_VETO_LOG), { recursive: true });
+    fs.appendFileSync(_VETO_LOG, JSON.stringify({ ts: new Date().toISOString(), ...rec }) + "\n");
+  } catch (_e) { /* never break the scan */ }
+}
+
+/**
+ * SPY TAPE CONTEXT at this instant, from SPY's own 15m session bars — the
+ * causal inputs (#3343). Everything here is knowable at the fire; nothing
+ * peeks at the close. Returned nulls mean "unreadable", never "zero".
+ *   tape    SPY % from today's session open
+ *   mom30   SPY % over the last two 15m bars (~30 min)
+ *   ll      SPY made a lower low: last 2 bars' low < prior 2 bars' low
+ */
+function spyTapeContext(spyBars15) {
+  const bars = Array.isArray(spyBars15) ? spyBars15 : [];
+  if (!bars.length) return { tape: null, mom30: null, ll: null };
+  const day = String(bars[bars.length - 1].timestamp || "").slice(0, 10);
+  const s = bars.filter((b) => String(b.timestamp || "").slice(0, 10) === day && Number(b.close) > 0);
+  if (s.length < 2) return { tape: null, mom30: null, ll: null };
+  const open = Number(s[0].open) || Number(s[0].close);
+  const last = Number(s[s.length - 1].close);
+  const tape = open > 0 ? ((last - open) / open) * 100 : null;
+  const back = s[Math.max(0, s.length - 3)];
+  const mom30 = Number(back.close) > 0 ? ((last - Number(back.close)) / Number(back.close)) * 100 : null;
+  const n = s.length;
+  const ll = n >= 4
+    ? Math.min(Number(s[n - 1].low), Number(s[n - 2].low)) < Math.min(Number(s[n - 3].low), Number(s[n - 4].low))
+    : null;
+  return { tape, mom30, ll };
+}
+
+/**
+ * POLARITY (#3296) — a BULLISH verdict on a negative-sign instrument is an
+ * ECONOMIC SHORT and is judged as one. #3343 makes the veto CONDITIONAL:
+ *
+ *   TRADER_SHORT_EDGE=0        never (the #3296 default — measured -268R
+ *                              unconditional over 16y, #3295)
+ *   TRADER_SHORT_EDGE=falling  allow while SPY is FALLING at the fire —
+ *                              tape <= -TRADER_SHORT_TAPE_PCT (default 0.3)
+ *                              OR mom30 <= -TRADER_SHORT_MOM_PCT (default 0.15).
+ *                              Pilot (18 sessions, causal only): SPY-falling
+ *                              fires +3.92%/100% (n=3) vs SPY-rising -0.20%
+ *                              (n=26) and SPY-up>0.3% -1.17% (n=19).
+ *   TRADER_SHORT_EDGE=1        allow whenever the underlying is at its top
+ *                              (the original explicit-short thesis)
+ *
+ * The operator's objection that forced this: a veto blocking 100% of inverse
+ * entries "pretty much removed inverses from the watchlist with extra steps".
+ * On 2026-08-17 (SPY grind -0.45%, low at 15:55) the only two winners the tape
+ * offered were SOXS +2.90% and SQQQ +1.80% — both vetoed. A blanket ban was
+ * over-applying evidence that said "unconditional wrappers lose", not "every
+ * wrapper entry loses".
+ *
+ * Every vetoed fire is logged as `polarity_veto` with the full causal context
+ * (tape, mom30, ll, uIbs), so live data accumulates the counterfactual on
+ * exactly the conditions the lab is judging.
+ */
 function applyPolarity(sym, direction, opts = {}) {
   if (direction !== "BULLISH") return { direction, veto: null };
   const { family, sign } = require("../direction-lock").instrumentSign(sym);
   if (sign >= 0) return { direction, veto: null };
   const ibsMax = Number(opts.ibsMax ?? (Number(process.env.TRADER_IBS_MAX) || 0.15));
-  const shortEdge = opts.shortEdge ?? (process.env.TRADER_SHORT_EDGE === "1");
-  if (!shortEdge) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; measured -268R over 2,493 wrapper entries, #3295)` };
+  const mode = String(opts.shortEdge ?? process.env.TRADER_SHORT_EDGE ?? "0").toLowerCase();
+  const ctx = opts.spy || { tape: null, mom30: null, ll: null };
+  const ctxStr = `spy tape ${ctx.tape == null ? "?" : ctx.tape.toFixed(2) + "%"}, mom30 ${ctx.mom30 == null ? "?" : ctx.mom30.toFixed(2) + "%"}, ll ${ctx.ll == null ? "?" : ctx.ll}`;
+  if (mode === "0" || mode === "" || mode === "false") {
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; ${ctxStr})` };
   }
+  if (mode === "falling") {
+    const tapePct = Number(process.env.TRADER_SHORT_TAPE_PCT) || 0.3;
+    const momPct = Number(process.env.TRADER_SHORT_MOM_PCT) || 0.15;
+    if (ctx.tape == null && ctx.mom30 == null) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — SPY tape unreadable, cannot certify a falling market` };
+    }
+    const falling = (ctx.tape != null && ctx.tape <= -tapePct) || (ctx.mom30 != null && ctx.mom30 <= -momPct);
+    if (!falling) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — SPY not falling at the fire (${ctxStr}); shorts into a flat/rising tape measured -1.17% (#3343)` };
+    }
+    return { direction, ctx, veto: null, allowed: `falling tape (${ctxStr})` };
+  }
+  // mode "1": the explicit-short thesis — underlying at its session top
   const u = opts.underlyingIbs;
   if (u == null) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying unreadable, no thesis to state` };
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — underlying unreadable, no thesis to state` };
   }
   if (u < 1 - ibsMax) {
-    return { direction: "NEUTRAL", veto: `economic short on ${family} via ${sym} — underlying mid-range (IBS ${u.toFixed(2)}); a wrapper washout is not a market washout` };
+    return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — underlying mid-range (IBS ${u.toFixed(2)}); a wrapper washout is not a market washout` };
   }
-  return { direction, veto: null };   // explicit short: underlying at its session top
+  return { direction, ctx, veto: null, allowed: `underlying at session top (IBS ${u.toFixed(2)})` };
 }
 
 // Deterministic composite gate — ported from agents.py `riley_strategy_gate`
@@ -380,8 +461,31 @@ async function scanAll(watchlist) {
     {
       const _proxy = require("../direction-lock").underlyingProxy(t);
       const _uBars = _proxy && _proxy !== t && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
-      const _pol = applyPolarity(t, direction, { underlyingIbs: _uBars ? sessionIbs(_uBars) : null });
-      if (_pol.veto) logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
+      const _uIbs = _uBars ? sessionIbs(_uBars) : null;
+      const _spyCtx = spyTapeContext(bars15.SPY && bars15.SPY.bars);
+      const _pol = applyPolarity(t, direction, { underlyingIbs: _uIbs, spy: _spyCtx });
+      if (_pol.veto) {
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
+        // INSTRUMENT THE COUNTERFACTUAL (#3343). A vetoed fire is a trade the
+        // engine chose not to take; the ledger must know it existed, with the
+        // exact causal context the conditional is judged on, so the live table
+        // ("shorts into a falling tape: +3.92%, into a rising tape: -0.20%") keeps
+        // growing on real data. Fire-and-forget through the trade ledger's own
+        // writer so it lives beside entries and exits, not in a side file.
+        try {
+          _logVeto({
+            event: "polarity_veto", symbol: t, price: Number(price) || null,
+            wrapper_ibs: (() => { const v = sessionIbs(b15); return v == null ? null : +v.toFixed(3); })(),
+            underlying: _proxy || null, underlying_ibs: _uIbs == null ? null : +_uIbs.toFixed(3),
+            spy_tape: _spyCtx.tape == null ? null : +_spyCtx.tape.toFixed(3),
+            spy_mom30: _spyCtx.mom30 == null ? null : +_spyCtx.mom30.toFixed(3),
+            spy_lower_low: _spyCtx.ll,
+            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+          });
+        } catch (_e) { /* instrumentation must never break the scan */ }
+      } else if (_pol.allowed) {
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — economic short ALLOWED: ${_pol.allowed}` });
+      }
       direction = _pol.direction;
     }
     const struct = checkMarketStructureShift(b15, direction);
@@ -518,4 +622,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, sessionIbs, applyPolarity, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict };

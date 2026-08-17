@@ -77,11 +77,22 @@ async function main() {
   // INVERTS the gate for inverse ETFs (SQQQ above its SMA-200 = market falling),
   // which silently made every inverse-ETF result meaningless.
   const regimeByDate = new Map();
+  const spyFallingByDate = new Map();
   {
     const spyBars = SYM === "SPY" ? bars : await spyDailyBars(fromYear - 1, "SPY");
     const spyCloses = spyBars.map((b) => b.close);
     for (let k = 0; k < spyBars.length; k++) {
       const s2 = sma(spyCloses.slice(0, k + 1), 200);
+      // BT_SHORT_FALLING (lab for #3343): the daily analog of "SPY falling at the
+      // fire". Intraday momentum does not exist on daily bars; the CAUSAL proxy is
+      // the prior session's close-to-close move plus today's gap, both known at
+      // the next-bar-open fill. spyFallingByDate[date] = prior day <= -0.3% OR
+      // gap <= -0.15%.
+      if (k >= 1) {
+        const _pd = (spyBars[k].close - spyBars[k - 1].close) / spyBars[k - 1].close * 100;
+        const _gap = spyBars[k + 1] ? (spyBars[k + 1].open - spyBars[k].close) / spyBars[k].close * 100 : 0;
+        spyFallingByDate.set(spyBars[k + 1] ? spyBars[k + 1].timestamp.slice(0, 10) : "", _pd <= -0.3 || _gap <= -0.15);
+      }
       regimeByDate.set(spyBars[k].timestamp.slice(0, 10),
         s2 == null ? "NEUTRAL" : spyCloses[k] > s2 ? "BULLISH" : "BEARISH");
     }
@@ -288,6 +299,12 @@ async function main() {
         : (process.env.BT_MEANREV_SHORT === "1" && rsiVal >= thresholds.overbought ? "BEARISH" : "NEUTRAL");
       if (direction === "BEARISH" && process.env.BT_SHORT_REGIME === "1"
           && (regimeByDate.get(bars[i].timestamp.slice(0, 10)) || "NEUTRAL") !== "BEARISH") direction = "NEUTRAL";
+    }
+    // BT_SHORT_FALLING=1: on NEGATIVE-SIGN symbols (SOXS/SQQQ/SPXS/TZA), take the
+    // BULLISH (=economic short) entry ONLY on a SPY-falling date; =veto blocks all.
+    if (process.env.BT_SHORT_FALLING && direction === "BULLISH" && instrumentSign(SYM).sign < 0) {
+      const _fall = spyFallingByDate.get(bars[i + 1] ? bars[i + 1].timestamp.slice(0, 10) : "") === true;
+      if (process.env.BT_SHORT_FALLING === "veto" || !_fall) { regimeBlocked++; continue; }
     }
     if (direction === "NEUTRAL") continue;
     const struct = checkMarketStructureShift(win, direction);
