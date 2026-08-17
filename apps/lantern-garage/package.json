@@ -69,7 +69,7 @@
     "express-session": "^1.19.0",
     "google-auth-library": "^11.0.0",
     "lantern-os": "file:../..",
-    "mammoth": "^1.12.0",
+    "mammoth": "^1.12.1",
     "nodemailer": "^9.0.5",
     "pdf-parse": "^1.1.1",
     "pptxgenjs": "^4.0.1",
