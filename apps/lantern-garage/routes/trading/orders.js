@@ -188,8 +188,21 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           _dOrder.limitPrice = Math.round(px * 0.998 * 100) / 100;
           _dOrder.outsideRth = true;
           _dNote = `extended hours: marketable limit @ ${_dOrder.limitPrice} with outsideRth`;
+        } else if (px > 0) {
+          // CLOSED MARKET NEEDS GTC (#3327). The previous note claimed the order
+          // "QUEUES until the next session" — it did not. The bridge defaults
+          // non-STP orders to TIF=DAY, and a DAY order placed on a day with no
+          // session EXPIRES at that day's end rather than surviving to the next
+          // open. Live proof: the 0.8-share SOXS dust order was accepted Saturday,
+          // reported as queued, and by Monday 11:38 the position was untouched
+          // with no order anywhere. A marketable GTC limit genuinely survives the
+          // weekend and executes at the open.
+          _dOrder.type = 'limit';
+          _dOrder.limitPrice = Math.round(px * 0.98 * 100) / 100;   // deeply marketable: fills at the open print
+          _dOrder.timeInForce = 'gtc';
+          _dNote = `market closed: GTC limit @ ${_dOrder.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
         } else {
-          _dNote = 'market closed: the order QUEUES until the next session — it will not fill tonight';
+          _dNote = 'market closed and no quote available to price a resting order — try again during market hours';
         }
       }
       const r = await bridge.placeIBKROrder(acct, _dOrder)
@@ -461,7 +474,17 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           orderReq.outsideRth = true;
           _sessionNote = `extended hours: sent as a marketable limit @ ${orderReq.limitPrice} with outsideRth (a market order would not execute until 09:30)`;
         } else if (_sess === 'closed') {
-          _sessionNote = 'market closed: this order QUEUES and will not fill until the next session opens';
+          // Same DAY-expiry trap as the dust path (#3327): "queues" was false —
+          // TIF=DAY on a closed day expires unfilled. Make it genuinely rest.
+          if (px > 0) {
+            const isBuy = String(side).toLowerCase() === 'buy';
+            orderReq.type = 'limit';
+            orderReq.limitPrice = Math.round(px * (isBuy ? 1.02 : 0.98) * 100) / 100;
+            orderReq.timeInForce = 'gtc';
+            _sessionNote = `market closed: GTC limit @ ${orderReq.limitPrice} — rests until the next open and fills there (a DAY order would expire unfilled)`;
+          } else {
+            _sessionNote = 'market closed and no quote available to price a resting order — this order may expire unfilled; place it during market hours';
+          }
         } else {
           _sessionNote = 'extended hours: no quote available to price a limit — sent as market, which will not fill until 09:30';
         }
