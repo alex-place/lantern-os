@@ -1,0 +1,3 @@
+### Changed
+
+- trader: the polarity veto is conditional, not a delist. `TRADER_SHORT_EDGE=falling` allows a wrapper (economic short) entry only while SPY is falling at the fire (tape ≤ −0.3% or 30-min momentum ≤ −0.15%, both causal); `=0` (default) keeps the blanket veto; `=1` the explicit-short thesis. Every vetoed fire is now logged as `polarity_veto` with the full causal context (SPY tape/mom30/lower-low, underlying IBS), so the counterfactual accumulates on live data. Two-window lab of the daily analog: falling cuts the loss (−43/−67R vs −99/−177R unconditional) but does NOT beat the veto (0R) in either window; the intraday bucket is n=3 across 2 sessions. Default stays off — this ships the instrument and the knob, not a verdict
