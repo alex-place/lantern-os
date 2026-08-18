@@ -60,6 +60,24 @@
   .card{border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.22)}
   .card:hover{box-shadow:0 4px 18px rgba(0,0,0,.3)}
   .chart-ctrl,.wl-add-btn,.wl-sort{border-radius:7px}
+  /* #3357: order pills sit ON the chart, top-left, so the card stops spending a
+     footer row on them. pointer-events are explicit: the pills take clicks, the
+     wrapper does not, so an armed drawing tool still owns the rest of the plot. */
+  .chart-order-pills{position:absolute;top:6px;left:6px;display:flex;gap:4px;z-index:3;pointer-events:none}
+  .chart-order-pills button{pointer-events:auto;font-family:var(--mono);font-size:10.5px;font-weight:700;
+    letter-spacing:.04em;padding:3px 9px;border-radius:5px;border:1px solid var(--border);cursor:pointer;
+    background:color-mix(in srgb, var(--bg0,#0b0d12) 72%, transparent);backdrop-filter:blur(3px);
+    transition:background .12s,border-color .12s,color .12s}
+  /* Scoped to the wrapper on purpose: .btn-buy/.btn-sell are declared LATER in this
+     sheet, so a bare .pill-buy would lose the cascade at equal specificity and the
+     pills would render in the default text colour. */
+  .chart-order-pills .pill-buy{color:var(--green)}
+  .chart-order-pills .pill-sell{color:var(--red)}
+  .chart-order-pills .pill-buy:hover{background:rgba(0,212,170,.22);border-color:rgba(0,212,170,.6);color:var(--green)}
+  .chart-order-pills .pill-sell:hover{background:rgba(255,95,109,.22);border-color:rgba(255,95,109,.6);color:var(--red)}
+  /* An armed drawing tool must not be interrupted by an accidental order. */
+  body.drawing-armed .chart-order-pills{display:none}
+  @media (max-width:580px){ .chart-order-pills button{font-size:12px;padding:5px 12px} }
   .btn-buy,.btn-sell{border-radius:8px;padding-top:7px;padding-bottom:7px}
   .tp-tab{border-radius:6px 6px 0 0}
   .hstat{border-radius:7px}
@@ -3025,10 +3043,12 @@ function buildCard(ticker, d){
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
-  </div>
-  <div class="order-ticket">
-    <button class="${emph.buy}" id="buy-${ticker}" title="${emph.title}" onclick="openOrderTicket('${ticker}','buy')">BUY</button>
-    <button class="${emph.sell}" id="sell-${ticker}" title="${emph.title}" onclick="openOrderTicket('${ticker}','sell')">SELL</button>
+    <!-- #3357: BUY/SELL overlay the chart top-left (TradingView-style) instead of a
+         full-width footer row, which cost every card in the deck a strip of chart. -->
+    <div class="chart-order-pills">
+      <button class="${emph.sell} pill-sell" id="sell-${ticker}" title="${emph.title}" onclick="event.stopPropagation();openOrderTicket('${ticker}','sell')">SELL</button>
+      <button class="${emph.buy} pill-buy" id="buy-${ticker}" title="${emph.title}" onclick="event.stopPropagation();openOrderTicket('${ticker}','buy')">BUY</button>
+    </div>
   </div>
 </div>`;
 }
@@ -3083,8 +3103,10 @@ function updateCardMeta(ticker, d){
   const emph = emphasisAttrs(dir, conf);
   const buyEl = document.getElementById('buy-'+ticker);
   const sellEl = document.getElementById('sell-'+ticker);
-  if(buyEl){ buyEl.className = emph.buy; buyEl.title = emph.title; }
-  if(sellEl){ sellEl.className = emph.sell; sellEl.title = emph.title; }
+  // Whole-className assignment would drop the pill-* classes the overlay pills carry
+  // (#3357), silently losing their colour on the first signal update after render.
+  if(buyEl){ buyEl.className = emph.buy + (buyEl.classList.contains('pill-buy') ? ' pill-buy' : ''); buyEl.title = emph.title; }
+  if(sellEl){ sellEl.className = emph.sell + (sellEl.classList.contains('pill-sell') ? ' pill-sell' : ''); sellEl.title = emph.title; }
 }
 
 // ── Render all cards ─────────────────────────────────────────────────────────
