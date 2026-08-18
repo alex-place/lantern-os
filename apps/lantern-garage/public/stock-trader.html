@@ -700,8 +700,11 @@
      the guest/read-only view never gets (openOrderPanel is !GUEST) — so the guest
      layout never shifts (the old bug: it shifted while the panel stayed invisible). */
   /* #3355: the ticket is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
-  body.ot-open .footer{ padding-right: calc(var(--ticket-w,340px) + 16px); }
-  @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
+  /* #3355: the ticket and chat are dock COLUMNS now, not overlays floating over the
+     footer, so reserving room for them here subtracts width twice. This padding was
+     the real cause of the positions table stopping short: 356px of right padding on a
+     512px footer left a 156px content box, which is why width:100% on the rows -- even
+     inline -- changed nothing. The grid already reserves those columns. */
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
   /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
      right dock. A tinted backdrop covers the app (tap it to close); the panel slides
@@ -959,11 +962,9 @@
      it — the same mechanism the order ticket uses. When both rails are open, reserve
      room for both and the chat sits to the left of the ticket. */
   /* #3355: the chat is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
-  body.dc-open .footer{ padding-right: calc(var(--chat-w,360px) + 16px); }
   body.dc-open.ot-open .main{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
-  body.dc-open.ot-open .footer{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
   body.ot-open .dc-bg{ right: var(--ticket-w,340px); }
-  @media (max-width:760px){ body.dc-open .main, body.dc-open .footer{ padding-right:0; } body.ot-open .dc-bg{ right:0; } }
+  @media (max-width:760px){ body.ot-open .dc-bg{ right:0; } }
 
   .dc-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .dc-head .dc-title{font-size:14px;font-weight:600;color:var(--text0);display:flex;align-items:center;gap:7px}
