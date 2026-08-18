@@ -116,13 +116,15 @@
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
   /* #3355: charts first, then the dock, then the always-visible icon rail. The dock's
      column collapses to 0 when closed, so a closed dock costs the chart nothing. */
-  .layout{display:grid;grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
-  body.leftdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px}
-  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) var(--ticket-w,320px) 0 44px}
-  body.ticket-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 var(--dockr-w,320px) 44px}
-  body.ticket-closed.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 0 44px}
-  body.leftdock-closed.ticket-closed.rightdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) 0 0 44px}
-  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 44px}
+  /* Each column's width is its OWN variable, zeroed by its own body class. Enumerating
+     the combinations was wrong: `body.leftdock-closed` and `body.ticket-closed` have equal
+     specificity, so with both set the later rule won and re-expanded the left column --
+     closing the chat left its 360px behind. Per-flag variables cannot collide. */
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,320px)}
+  .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  body.leftdock-closed{--col-l:0px}
+  body.ticket-closed{--col-t:0px}
+  body.rightdock-closed{--col-r:0px}
   /* -- Docks (#3355 v2) -----------------------------------------------------
      TradingView's shape: a permanent drawing rail hard left, a collapsible left
      panel for chat, the charts, then a right column holding a switchable widget
@@ -335,8 +337,13 @@
   .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
   /* The footer is narrower now that the docks own real columns, so its tables scroll
      inside their pane instead of being clipped at the edge (#3355 follow-up). */
-  .tp-pane{overflow-x:auto}
-  .tp-pane .tp-table{min-width:max-content}
+  /* NOTE: the footer's rows sit at a 156px content width inside a 512px footer, so the
+     positions table cannot reach the right edge. It is NOT a width-cascade problem --
+     an inline width:100% on .tp-body does not move it either, so the containing block
+     itself is 156px. Left unfixed rather than papered over; the scroll below at least
+     keeps the far columns reachable instead of clipped. */
+  .tp-pane{overflow-x:auto;width:100%}
+  .tp-pane .tp-table{min-width:max-content;width:100%}
   .tp-pane{display:none}
   .tp-pane.active{display:block}
   /* positions / orders table */
