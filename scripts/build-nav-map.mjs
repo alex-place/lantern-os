@@ -17,7 +17,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PUBLIC_DIR = path.join(REPO_ROOT, 'apps', 'lantern-garage', 'public');
 const OUT_FILE = path.join(REPO_ROOT, 'tests', 'e2e-sitemap', 'nav-map.json');
@@ -94,8 +96,35 @@ function sharedNavTargets() {
       ...[...block[1].matchAll(/href:\s*"\/?([a-zA-Z0-9_-]+\.html)"/g)].map((m) => m[1]),
     );
   }
-  return [...new Set(targets)];
+  // Drop surfaces the shipped nav-config hides (see HIDDEN_NAV): site-chrome.js still
+  // emits the link, but auth-gate.js sets display:none on it, so it is not clickable.
+  return [...new Set(targets)].filter((t) => !HIDDEN_NAV.has(t));
 }
+
+/**
+ * Nav paths the shipped nav-config marks hidden (feature-flags.getNavMap — the same
+ * source /api/nav-config serves). An EXTENSION surface whose gating flag is off is
+ * default-hidden: site-chrome.js renders its header/footer link, then auth-gate.js
+ * hides it (scoped to `nav a[href], .site-footer a[href]`). So it is NOT click-reachable
+ * through the shared chrome even though it lives in NAV_LINKS/FOOTER_EXTRA_LINKS.
+ * Counting it made the map claim /create.html reachable while the live nav hides it,
+ * failing sitemap-nav.spec.js (#3177). Read the runtime's own source of truth so the
+ * generated map and the shipped nav can't drift again.
+ */
+function hiddenNavPaths() {
+  try {
+    const { getNavMap } = require(path.join(REPO_ROOT, 'apps', 'lantern-garage', 'lib', 'feature-flags.js'));
+    return new Set(
+      Object.entries(getNavMap())
+        .filter(([, v]) => v && v.hidden)
+        .map(([k]) => k.replace(/^\//, '')),
+    );
+  } catch (err) {
+    process.stderr.write(`[nav-map] nav-config hidden flags unavailable (${err.message}); counting all shared-nav links\n`);
+    return new Set();
+  }
+}
+const HIDDEN_NAV = hiddenNavPaths();
 
 const SHARED_NAV = sharedNavTargets();
 
@@ -193,6 +222,9 @@ const map = {
   knowledgeCenterPath: shortestPath(graph, depth, ROOT_PAGE, 'knowledgecenter.html'),
   excludedEdges: NON_NAV_EDGES,
   sharedNavTargets: SHARED_NAV,
+  // Surfaces present in NAV_LINKS/FOOTER_EXTRA_LINKS but hidden by nav-config, so not
+  // counted as click-reachable (#3177). Kept in the map for auditability.
+  navConfigHidden: [...HIDDEN_NAV].sort(),
 };
 
 fs.mkdirSync(path.dirname(OUT_FILE), { recursive: true });
