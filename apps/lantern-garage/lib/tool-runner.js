@@ -1355,9 +1355,16 @@ const REGISTRY = {
       if (!t) return "[trader_signal error: a ticker is required]";
       try {
         const zx = await _localTradingGet("/api/trading/zones", 9000, _userHeaders(ctx));
+        // The endpoint distinguishes "the scan has no data yet" from "this symbol
+        // isn't watched", and so must we: reporting a cold cache as "the autopilot
+        // is not watching SPY" is a false statement about the user's own setup, in
+        // the one tool whose whole job is not contradicting the autopilot.
+        if (zx && zx.available === false) {
+          return `[trader_signal: the trader has no scan data loaded right now${zx.reason ? ` (${zx.reason})` : ""}. This is about the ENGINE, not ${t} — do not tell the user ${t} is unwatched. Use trader_quote for price and technicals, and say the engine's own read is unavailable at the moment.]`;
+        }
         const z = (zx && zx.zones && zx.zones[t]) || null;
         if (!z) {
-          return `[trader_signal: the engine has no current read on ${t}. It only scans the watchlist, so for an off-list symbol use trader_quote for price/technicals and say plainly that the autopilot is not watching it.]`;
+          return `[trader_signal: the engine is scanning, but has no read on ${t} — it only scans the watchlist. For an off-list symbol use trader_quote for price/technicals and say plainly that the autopilot is not watching it.]`;
         }
         const s = z.last_signal || {};
         const c = s.convergence || {};
