@@ -17,6 +17,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 
+const AT = require('../lib/auto-trader');   // real STOP_WORKING/STOP_TERMINAL for the eval scope
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'lib', 'auto-trader.js'), 'utf8');
 
 // Reconstruct the guard exactly as the module defines it, so the test tracks the real
@@ -25,7 +26,13 @@ function buildHasStop(openOrders) {
   const m = SRC.match(/const hasStop = \(sym\) =>[\s\S]*?\);/);
   assert.ok(m, 'hasStop predicate not found in auto-trader.js');
   // eslint-disable-next-line no-new-func
-  return new Function('_openOrders', `const hasStop = ${m[0].replace(/^const hasStop = /, '').replace(/;$/, '')}; return hasStop;`)(openOrders);
+  // The predicate now references the module-level STOP_WORKING vocabulary (#3352),
+  // which does not exist in this synthetic scope — so inject the REAL constants
+  // rather than paraphrasing them here. Scraping the source still tracks the live
+  // predicate; only its dependency is supplied.
+  return new Function('_openOrders', 'STOP_WORKING', 'STOP_TERMINAL',
+    `const hasStop = ${m[0].replace(/^const hasStop = /, '').replace(/;$/, '')}; return hasStop;`
+  )(openOrders, AT._STOP_WORKING, AT._STOP_TERMINAL);
 }
 
 const STOP = (status, key = 'type') => ({ symbol: 'TSLA', side: 'sell', status, [key]: 'stop' });

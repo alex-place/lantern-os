@@ -317,11 +317,40 @@ function cfg() {
 
 /** Cancel any working orders for a symbol (chiefly a protective stop) so a stale
  *  stop can't fire on a flat/closed position and open an unintended short. */
+// STOP-ORDER STATUS VOCABULARY (#3352). Three sites ask "what state is this stop
+// in?" and each carried its own regex. The dangerous one was the accumulation
+// cap, which recognised FAILURE by an ALLOWLIST (inactive/reject/needs_confirm).
+// A status in NEITHER vocabulary — an empty/absent status field, or any term the
+// broker uses that we have not seen — is invisible to both checks: not working,
+// so the re-protect pass places another; not a known failure, so the cap never
+// trips. Unbounded. Live 2026-08-18 04:00: QQQ carried 1,200 shares of resting
+// stops against 80 held and SPY 1,125 against 75 — exactly 15 duplicates each,
+// while the cap sat at 3. Had one triggered, IBKR either sells shares we do not
+// own (a short, on a longs-only strategy) or rejects and leaves the position
+// naked.
+//
+// So classify by COMPLEMENT, never by allowlist: a stop is WORKING, or it is
+// TERMINAL (cancelled/filled — lifecycle, not failure, per the 2026-08-10
+// hardening that stopped counting our own cancel-first exits), or it is a FAILED
+// placement. Unknown statuses land in the last bucket, which is the safe side:
+// the cap stops adding and the ledger says why.
+const STOP_WORKING = /submit|pending|presubmit|open|accepted|new|working|held/i;
+const STOP_TERMINAL = /cancel|fill|done|expire/i;
+/** A stop order that exists but never protected anything (incl. unknown status). */
+const isFailedStop = (status) => {
+  const v = String(status || '');
+  return !STOP_WORKING.test(v) && !STOP_TERMINAL.test(v);
+};
+
 async function cancelRestingStops(bridge, userId, sym) {
   try {
     const orders = await bridge.getIBKROpenOrders(userId);
     for (const o of (orders || [])) {
-      if (String(o.symbol || '').toUpperCase() === sym && o.orderId && /submit|pending|presubmit/i.test(o.status || '')) {
+      // Cancel WORKING and PARKED stops alike: the resize path calls this to clear
+      // duplicates, and a parked/unknown-status duplicate it fails to remove is
+      // precisely what accumulated 15 deep. Terminal rows (cancelled/filled) are
+      // skipped — cancelling those is a no-op that only burns API calls.
+      if (String(o.symbol || '').toUpperCase() === sym && o.orderId && !STOP_TERMINAL.test(String(o.status || ''))) {
         await bridge.cancelIBKROrder(userId, o.orderId);
       }
     }
@@ -1282,7 +1311,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const hasStop = (sym) => (_openOrders || []).some((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
-      /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''));
+      STOP_WORKING.test(o.status || ''));
     // ACCUMULATION CAP. A stop that never transmits (IBKR parks it 'Inactive' when an
     // order warning goes unconfirmed) is not protection, so hasStop() correctly ignores
     // it — but then this pass retries every scan forever: 2026-07-27 left 972 inert
@@ -1303,7 +1332,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const attemptsFor = (sym) => (_openOrders || []).filter((o) =>
       String(o.symbol || '').toUpperCase() === sym &&
       /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '') &&
-      /inactive|reject|needs?[_-]?confirm/i.test(o.status || '')).length;
+      isFailedStop(o.status)).length;
     // STOP-SIZE RECONCILIATION (2026-08-13). hasStop() asks "is there a stop?"
     // but never "is it the RIGHT SIZE?". After a partial exit the original stop
     // keeps its old quantity: live today GLD held 66 shares behind a 147-share
@@ -1319,7 +1348,7 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const _stopQtyFor = (sym) => (_openOrders || [])
       .filter((o) => String(o.symbol || '').toUpperCase() === sym
         && /stp|stop/i.test(o.orderType || o.type || '') && /sell/i.test(o.side || '')
-        && /submit|pending|presubmit|open|accepted|new|working|held/i.test(o.status || ''))
+        && STOP_WORKING.test(o.status || ''))
       .reduce((a, o) => a + (Number(o.qty) || 0), 0);
     if (!_ordersUnknown) {
       for (const [sym, p] of Object.entries(heldPos)) {
@@ -2022,4 +2051,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
 
-module.exports = { runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
