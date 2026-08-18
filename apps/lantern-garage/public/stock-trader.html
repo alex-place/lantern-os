@@ -5072,9 +5072,9 @@ function alDeliveryRow(prefs, email){
   let emailBit;
   if(email.possible || prefs.email){
     emailBit='<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(prefs.email?'checked':'')+' onchange="alToggleEmail(this.checked)" aria-label="Email me fired alerts"> Email me</label>'
-      +(email.possible?'':' <span class="jr-flag">(currently undeliverable — '+(email.why==='mailer_unconfigured'?'no mailer configured on this server':'no email on your account')+')</span>');
+      +(email.possible?'':' <span class="jr-flag">(currently undeliverable — '+(email.why==='mailer_unconfigured'?'no mailer configured on this server':email.why==='email_unverified'?'your email address isn’t confirmed yet':'no email on your account')+')</span>');
   }else{
-    emailBit='<span title="'+(email.why==='mailer_unconfigured'?'This server has no mailer configured':'Your account has no email address')+'">Email — unavailable ('+(email.why==='mailer_unconfigured'?'no mailer on this server':'no email on your account')+')</span>';
+    emailBit='<span title="'+(email.why==='mailer_unconfigured'?'This server has no mailer configured':'Your account has no email address')+'">Email — unavailable ('+(email.why==='mailer_unconfigured'?'no mailer on this server':email.why==='email_unverified'?'confirm your email address first':'no email on your account')+')</span>';
   }
   return '<p class="jr-note" style="margin:6px 0 0">Delivery: <b style="color:var(--text1)">In-app feed</b> (always) · '+emailBit+' · Push — not built yet (#3249); capped at 6 emails/hour so a bug can\'t spam you.</p>';
 }
@@ -5104,10 +5104,16 @@ function alRender(pane, rules, cap, feed, prefs, email){
   html+='<div class="jr-card"><h4>Your rules</h4>';
   if(!rules.length){ html+='<p class="jr-note">No rules yet — add one above. The scan checks them every minute during market hours.</p>'; }
   else{
-    html+='<table class="jr-table"><thead><tr><th>Symbol</th><th>When</th><th class="num">Quiet</th><th class="num">On</th><th class="num"></th></tr></thead><tbody>';
+    html+='<table class="jr-table"><thead><tr><th>Symbol</th><th>When</th><th class="num">Quiet</th><th class="num">On</th><th class="num" title="Email me when this particular rule fires">✉</th><th class="num"></th></tr></thead><tbody>';
     for(const r of rules){
       html+='<tr><td>'+jrEsc(r.symbol)+'</td><td>'+jrEsc(alTypeDesc(r))+'</td><td class="num">'+r.cooldownMin+'m</td>'
         +'<td class="num"><input type="checkbox" '+(r.enabled!==false?'checked':'')+' aria-label="Enable rule for '+jrEsc(r.symbol)+'" onchange="alToggleRule(\''+jrEsc(r.id)+'\')"></td>'
+        // Per-rule email mute. Only meaningful once the account has opted in, so it
+        // is disabled (and says why) rather than hidden — a control that silently
+        // does nothing is worse than one that explains itself.
+        +'<td class="num"><input type="checkbox" '+(r.email!==false?'checked':'')+(prefs.email?'':' disabled')
+        +' title="'+(prefs.email?'Email me when THIS rule fires':'Turn on “Email me” below first')+'"'
+        +' aria-label="Email me when the '+jrEsc(r.symbol)+' rule fires" onchange="alToggleRuleEmail(\''+jrEsc(r.id)+'\')"></td>'
         +'<td class="num"><button type="button" class="jr-chip" aria-label="Delete rule for '+jrEsc(r.symbol)+'" onclick="alDeleteRule(\''+jrEsc(r.id)+'\')">✕</button></td></tr>';
     }
     html+='</tbody></table>';
@@ -5146,6 +5152,14 @@ async function alSaveRule(){
 async function alToggleRule(id){
   const r=alRules.find(x=>x.id===id); if(!r) return;
   r.enabled=r.enabled===false;
+  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+  loadAlerts(true);
+}
+// Mute ONE rule's email without touching the account-level opt-in, which is what
+// the delivery email has always told people they could do (#3329 onto #3249).
+async function alToggleRuleEmail(id){
+  const r=alRules.find(x=>x.id===id); if(!r) return;
+  r.email = r.email===false;
   try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
   loadAlerts(true);
 }

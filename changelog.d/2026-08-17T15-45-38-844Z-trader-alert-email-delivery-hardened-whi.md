@@ -1,0 +1,3 @@
+### Fixed
+
+- trader: alert email delivery hardened while reconciling two parallel implementations. Emails now go only to CONFIRMED addresses (an unverified address could previously be mailed, so signing up with a stranger's address and pointing alerts at it would have mailed them); a single noisy rule can be muted without turning the account's alert emails off, which the delivery email had promised since it shipped but nothing implemented; and the email carries a real link — the manage-link sentence previously ended in a colon with nothing after it, because neither the Resend nor the SMTP transport ever put the link field in the message (#3249, #3329)

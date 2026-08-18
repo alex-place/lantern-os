@@ -66,6 +66,13 @@ function normalizeRule(input) {
     id: /^[a-z0-9]{6,24}$/.test(String(r.id || '')) ? String(r.id) : ('al' + Math.random().toString(36).slice(2, 10)),
     symbol, type,
     enabled: r.enabled !== false,
+    // Per-rule email mute (#3329 reconciled onto #3249). The account-level
+    // prefs.email opt-in above is the master switch and stays OFF by default;
+    // this only lets a user silence ONE noisy rule's email while keeping the
+    // others. Default "not muted", because muting is the exception. Note the
+    // delivery email already promised this ("mute this one from the Alerts
+    // tab") before anything implemented it.
+    email: r.email !== false,
     cooldownMin: Math.min(1440, Math.max(5, Number(r.cooldownMin) || 60)),
     createdAt: r.createdAt || new Date().toISOString(),
     lastFiredAt: r.lastFiredAt || null,
