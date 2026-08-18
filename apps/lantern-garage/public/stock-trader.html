@@ -171,6 +171,16 @@
   .rail-sep{height:1px;background:var(--border);margin:4px 2px}
 
   /* Drawing rail: grouped tool buttons, then the utility toggles. */
+  /* Category button: the tool icon, plus a chevron that appears on hover for the
+     flyout. Two hit targets in one 34px slot, the way TradingView's rail works. */
+  .dr-cat{position:relative;display:flex;align-items:center;flex:0 0 auto}
+  .dr-cat .dr-btn{width:34px;height:30px}
+  .dr-cat.on .dr-btn{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dr-more{position:absolute;right:-1px;top:0;height:30px;width:11px;display:flex;align-items:center;
+    justify-content:center;background:none;border:0;color:var(--text2);font-size:10px;line-height:1;
+    cursor:pointer;opacity:0;transition:opacity .12s;border-radius:0 5px 5px 0}
+  .dr-cat:hover .dr-more,.dr-more:focus-visible,.dr-more[aria-expanded="true"]{opacity:1}
+  .dr-more:hover{color:var(--text0);background:var(--bg3)}
   .dr-btn{width:34px;height:30px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
     font-size:13px;cursor:pointer;flex:0 0 auto}
@@ -178,6 +188,44 @@
   .dr-btn.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
   .dr-sep{height:1px;background:var(--border);margin:4px 3px;flex:0 0 auto}
   .dr-btn.util[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+
+  /* Flyout: the category's tools, grouped, each with ? / shortcut / favourite. */
+  .dr-flyout{position:fixed;z-index:1400;min-width:250px;max-height:76vh;overflow-y:auto;
+    background:var(--bg1);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);padding:5px}
+  .dr-flyout[hidden]{display:none}
+  .dr-fly-group{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text2);padding:7px 9px 3px}
+  .dr-fly-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer}
+  .dr-fly-item:hover{background:var(--bg2)}
+  .dr-fly-item.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
+  .dr-fly-ico{width:17px;text-align:center;color:var(--text1);flex:0 0 auto}
+  .dr-fly-name{flex:1;font-size:12.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dr-fly-q,.dr-fly-key,.dr-fly-star{background:none;border:0;cursor:pointer;color:var(--text2);
+    font-family:var(--mono);line-height:1;padding:2px 3px;border-radius:4px;flex:0 0 auto}
+  .dr-fly-q{font-size:10px;width:16px;height:16px;border:1px solid var(--border);border-radius:50%}
+  .dr-fly-key{font-size:9.5px;min-width:30px;text-align:right}
+  .dr-fly-star{font-size:12px}
+  .dr-fly-star.on{color:var(--amber,#f5a623)}
+  .dr-fly-q:hover,.dr-fly-key:hover,.dr-fly-star:hover{color:var(--text0);background:var(--bg3)}
+  .dr-fly-why{font-size:12px;line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
+  .dr-fly-meta{font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 9px 8px;margin:0}
+  .dr-fly-foot{display:flex;gap:6px;padding:6px 8px 3px;border-top:1px solid var(--border)}
+  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px;border-radius:5px;
+    border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
+  .dr-fly-foot button:hover{background:var(--bg3);color:var(--text0)}
+
+  /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
+  .fav-bar{position:fixed;left:80px;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
+    padding:3px 4px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .fav-bar[hidden]{display:none}
+  .fav-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 3px;user-select:none;touch-action:none}
+  .fav-grip:active{cursor:grabbing}
+  .fav-btn{width:28px;height:26px;display:flex;align-items:center;justify-content:center;background:none;
+    border:1px solid transparent;border-radius:5px;color:var(--text2);font-size:12.5px;cursor:pointer}
+  .fav-btn:hover{color:var(--text0);background:var(--bg3)}
+  .fav-btn.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
 
   /* Compact watchlist rows -- TradingView fits far more symbols per screen. */
   /* Row compaction lives on the source rules above (.wl-item / .tb-badge) — an
@@ -3756,27 +3804,108 @@ const CHART_NOTE_BG = () =>
 
 // pts: how many clicks commit the shape. drag:true collects a freehand path.
 // text:true prompts for a label. group drives the picker's sections.
-const DRAW_TOOLS = {
-  l:     { name: 'Trend line',        pts: 2, group: 'Lines', icon: '/' },
-  ray:   { name: 'Ray',               pts: 2, group: 'Lines', icon: '↗' },
-  xline: { name: 'Extended line',     pts: 2, group: 'Lines', icon: '↔' },
-  h:     { name: 'Horizontal line',   pts: 1, group: 'Lines', icon: '—' },
-  hray:  { name: 'Horizontal ray',    pts: 1, group: 'Lines', icon: '⊢' },
-  v:     { name: 'Vertical line',     pts: 1, group: 'Lines', icon: '|' },
-  arrow: { name: 'Arrow',             pts: 2, group: 'Lines', icon: '➚' },
-  chan:  { name: 'Parallel channel',  pts: 3, group: 'Lines', icon: '⫽' },
-  fib:   { name: 'Fib retracement',   pts: 2, group: 'Fibonacci', icon: '⋯' },
-  fibx:  { name: 'Fib extension',     pts: 3, group: 'Fibonacci', icon: '⋰' },
-  rect:  { name: 'Rectangle',         pts: 2, group: 'Patterns', icon: '▭' },
-  ell:   { name: 'Ellipse',           pts: 2, group: 'Patterns', icon: '◯' },
-  tri:   { name: 'Triangle',          pts: 3, group: 'Patterns', icon: '△' },
-  pos:   { name: 'Long position',     pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target', icon: '⬆' },
-  poss:  { name: 'Short position',    pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target', icon: '⬇' },
-  meas:  { name: 'Measure',           pts: 2, group: 'Forecasting', icon: '📏' },
-  pen:   { name: 'Brush',             pts: 0, group: 'Notes', drag: true, icon: '✎' },
-  text:  { name: 'Text',              pts: 1, group: 'Notes', text: true, icon: 'T' },
-  note:  { name: 'Note',              pts: 1, group: 'Notes', text: true, icon: '🗒' },
-};
+/* -- Drawing tool catalogue (#3354/#3355) ------------------------------------
+   TradingView's model, which is a CATEGORY per rail button rather than one button
+   per tool: each button shows the tool you last used in that category, clicking it
+   arms that tool, and the chevron on its right edge opens the category's flyout.
+   Picking from the flyout arms the tool AND becomes the button's new default, so the
+   rail adapts to how you actually draw.
+
+   DRAW_CATS is the source of truth; DRAW_TOOLS below is the flat map the renderer,
+   the hit-tester and the commit path already read, derived from it so there is one
+   catalogue and not two. `k` is the default shortcut; `why` is the ? blurb. */
+const DRAW_CATS = [
+  { id:'cursor', name:'Cursors', groups:[
+    { name:'Cursors', tools:[
+      ['cross',  { name:'Cross',        icon:'✛', cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
+      ['dot',    { name:'Dot',          icon:'·', cursor:true,             why:'A small dot cursor — the same navigation as Cross with a less intrusive pointer.' }],
+      ['pointer',{ name:'Arrow',        icon:'➤', cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
+    ]},
+    { name:'Editing', tools:[
+      ['eraser', { name:'Eraser',       icon:'⌫', erase:true,   k:'Alt+E', why:'Click any drawing to delete it. Stays armed so you can clear several in a row.' }],
+    ]},
+  ]},
+  { id:'lines', name:'Lines', groups:[
+    { name:'Lines', tools:[
+      ['l',      { name:'Trend line',       icon:'/',  pts:2, k:'Alt+T', why:'A line between two points. The workhorse: connect two highs or two lows to see the slope the market is respecting.' }],
+      ['ray',    { name:'Ray',              icon:'↗',  pts:2,            why:'Starts at your first click and continues forever in the direction of the second — the past stays clean, the level projects forward.' }],
+      ['info',   { name:'Info line',        icon:'⇢',  pts:2,            why:'A trend line that also reports the price change, percent move and bar count between its two ends.' }],
+      ['xline',  { name:'Extended line',    icon:'↔',  pts:2,            why:'Extends indefinitely in BOTH directions, so the line stays visible however far you scroll into the past or future.' }],
+      ['angle',  { name:'Trend angle',      icon:'∠',  pts:2,            why:'A trend line that shows the angle it makes with the horizontal — useful for comparing how steep two moves were.' }],
+      ['h',      { name:'Horizontal line',  icon:'—',  pts:1, k:'Alt+H', why:'A price level across the whole chart. The simplest way to mark support, resistance or a target.' }],
+      ['hray',   { name:'Horizontal ray',   icon:'⊢',  pts:1, k:'Alt+J', why:'A price level that starts where you click and only projects to the right — it does not claim history it was not there for.' }],
+      ['v',      { name:'Vertical line',    icon:'|',  pts:1, k:'Alt+V', why:'Marks a moment in time: an open, a print, an earnings release.' }],
+      ['crossline',{ name:'Cross line',     icon:'✚',  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
+    ]},
+    { name:'Channels', tools:[
+      ['chan',   { name:'Parallel channel', icon:'⫽',  pts:3,            why:'Two parallel lines: draw the trend with the first two clicks, the third sets the channel width.' }],
+      ['flat',   { name:'Flat top/bottom',  icon:'⊏',  pts:3,            why:'A channel with one horizontal edge — the shape of an ascending or descending triangle.' }],
+    ]},
+    { name:'Pitchforks', tools:[
+      ['fork',   { name:'Pitchfork',        icon:'⑂',  pts:3,            why:'Andrews pitchfork: three points define a median line with two parallel tines that often act as support and resistance.' }],
+    ]},
+  ]},
+  { id:'patterns', name:'Chart patterns', groups:[
+    { name:'Shapes', tools:[
+      ['rect',   { name:'Rectangle',        icon:'▭',  pts:2, k:'Alt+R', why:'Boxes a zone — a range, a consolidation, an order block.' }],
+      ['ell',    { name:'Ellipse',          icon:'◯',  pts:2,            why:'Circles an area of interest without implying the hard edges a rectangle does.' }],
+      ['tri',    { name:'Triangle',         icon:'△',  pts:3,            why:'Three free points — wedges, pennants, and any three-touch shape.' }],
+    ]},
+    { name:'Patterns', tools:[
+      ['abcd',   { name:'ABCD pattern',     icon:'Ⅲ',  pts:4,            why:'Four points labelled A-B-C-D, the base measured-move pattern.' }],
+      ['xabcd',  { name:'XABCD pattern',    icon:'Ⅴ',  pts:5,            why:'Five points for harmonic patterns — Gartley, Bat, Butterfly and friends.' }],
+      ['hs',     { name:'Head and shoulders',icon:'⩙', pts:5,            why:'Five points: left shoulder, head, right shoulder and the two neckline anchors.' }],
+    ]},
+  ]},
+  { id:'fib', name:'Fibonacci', groups:[
+    { name:'Fibonacci', tools:[
+      ['fib',    { name:'Fib retracement',  icon:'⋯',  pts:2, k:'Alt+F', why:'Draw from a swing low to a swing high and it marks the 23.6 / 38.2 / 50 / 61.8 / 78.6% pullback levels.' }],
+      ['fibx',   { name:'Fib extension',    icon:'⋰',  pts:3,            why:'Three points project where a move may END — the 1.272, 1.618 and 2.618 targets beyond the prior high.' }],
+      ['fibchan',{ name:'Fib channel',      icon:'∥',  pts:3,            why:'Fibonacci levels drawn parallel to a trend rather than horizontally.' }],
+      ['fibtime',{ name:'Fib time zone',    icon:'⦀',  pts:2,            why:'Vertical lines at Fibonacci intervals — projects WHEN a turn may be due rather than where.' }],
+    ]},
+  ]},
+  { id:'forecast', name:'Forecasting', groups:[
+    { name:'Positions', tools:[
+      ['pos',    { name:'Long position',    icon:'⬆',  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
+      ['poss',   { name:'Short position',   icon:'⬇',  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
+    ]},
+    { name:'Measure', tools:[
+      ['meas',   { name:'Measure',          icon:'📏', pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
+      ['range',  { name:'Price range',      icon:'↕',  pts:2,            why:'Measures price only — how far a move travelled, ignoring how long it took.' }],
+      ['drange', { name:'Date range',       icon:'↔',  pts:2,            why:'Measures time only — how many bars and how long a move lasted.' }],
+      ['fcast',  { name:'Forecast',         icon:'⤳',  pts:3,            why:'Sketch a path you expect price to take, so you can compare it against what actually happens.' }],
+    ]},
+  ]},
+  { id:'brushes', name:'Brushes', groups:[
+    { name:'Brushes', tools:[
+      ['pen',    { name:'Brush',            icon:'✎',  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
+      ['hl',     { name:'Highlighter',      icon:'🖍', pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
+    ]},
+    { name:'Arrows', tools:[
+      ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
+    ]},
+  ]},
+  { id:'text', name:'Text and notes', groups:[
+    { name:'Text', tools:[
+      ['text',   { name:'Text',             icon:'T',  pts:1, text:true, k:'Alt+X', why:'Free text anchored to a point on the chart. Moves with the bar it was placed on.' }],
+      ['note',   { name:'Note',             icon:'🗒', pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
+      ['callout',{ name:'Callout',          icon:'💬', pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
+      ['plabel', { name:'Price label',      icon:'🏷', pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
+    ]},
+  ]},
+];
+
+/* Flat map derived from the catalogue — what the renderer, hit-tester and commit
+   path read. One catalogue, two views; adding a tool above is enough. */
+const DRAW_TOOLS = (() => {
+  const out = {};
+  for (const cat of DRAW_CATS)
+    for (const g of cat.groups)
+      for (const [id, t] of g.tools)
+        out[id] = Object.assign({ group: cat.name, cat: cat.id, sub: g.name, pts: 1 }, t);
+  return out;
+})();
 
 const _drawings = (() => { try { return JSON.parse(localStorage.getItem('trader.drawings') || '{}'); } catch (e) { return {}; } })();
 function _saveDrawings() { try { localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); } catch (e) {} }
@@ -5596,43 +5725,222 @@ function toggleTicketDock() {
   _ticketOpen = !_ticketOpen; _saveDocks(); _applyDocks();
 }
 
-/* Drawing rail. Tool groups on top, utility toggles under them -- the split
-   TradingView uses. Rendered from DRAW_TOOLS so the rail, the toolbar menu and the
-   canvas all read one registry. */
+/* -- Drawing rail (#3354) ----------------------------------------------------
+   One button per CATEGORY, showing that category's current tool. Click arms it;
+   the chevron on the right edge opens the flyout. Picking from the flyout arms the
+   tool and makes it that button's default, which is what makes the rail learn your
+   habits instead of staying a fixed list. Per-category defaults, favourites and
+   custom shortcuts all persist. */
 const DRAW_UTILS = {
   magnet: { icon: '🧲', label: 'Magnet — snap anchors to the nearest OHLC value' },
   keep:   { icon: '⇉', label: 'Keep drawing — stay in the tool after each object' },
   lock:   { icon: '🔒', label: 'Lock drawings — no accidental edits or deletes' },
   hide:   { icon: '👁', label: 'Hide drawings' },
 };
-let drawUtil = (() => { try { return JSON.parse(_lsGet('trader.drawUtil', '{}')) || {}; } catch (e) { return {}; } })();
+const _dj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+const _ds = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+let drawUtil     = _dj('trader.drawUtil', {});
+let drawDefaults = _dj('trader.drawDefaults', {});    // catId -> toolId
+let drawFavs     = _dj('trader.drawFavs', []);        // [toolId]
+let drawKeys     = _dj('trader.drawKeys', {});        // toolId -> "Alt+T"
+
+const _catDefault = (cat) => {
+  const stored = drawDefaults[cat.id];
+  if (stored && DRAW_TOOLS[stored] && DRAW_TOOLS[stored].cat === cat.id) return stored;
+  return cat.groups[0].tools[0][0];
+};
+const _shortcutOf = (id) => drawKeys[id] || (DRAW_TOOLS[id] && DRAW_TOOLS[id].k) || '';
 function drawUtilOn(k) { return drawUtil[k] === true; }
 function toggleDrawUtil(k) {
-  drawUtil[k] = !drawUtilOn(k);
-  _lsSet('trader.drawUtil', JSON.stringify(drawUtil));
-  renderDrawRail();
-  if (typeof _indRerender === 'function') _indRerender();
+  drawUtil[k] = !drawUtilOn(k); _ds('trader.drawUtil', drawUtil);
+  renderDrawRail(); if (typeof _indRerender === 'function') _indRerender();
 }
+
+const _esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 function renderDrawRail() {
   const rail = document.getElementById('drawRail'); if (!rail) return;
-  const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const groups = {};
-  for (const [id, d] of Object.entries(DRAW_TOOLS)) (groups[d.group] = groups[d.group] || []).push([id, d]);
-  let h = '<button class="dr-btn' + (_drawTool ? '' : ' on') + '" type="button" title="Cursor — pan and zoom the chart" onclick="setDrawTool(\'\')">✛</button><span class="dr-sep"></span>';
-  for (const g of Object.keys(groups)) {
-    for (const [id, d] of groups[g]) {
-      h += '<button class="dr-btn' + (_drawTool === id ? ' on' : '') + '" type="button" data-tool="' + id + '"'
-        + ' title="' + esc(d.name) + ' — ' + (d.drag ? 'drag' : d.pts + ' click' + (d.pts > 1 ? 's' : '')) + '"'
-        + ' onclick="setDrawTool(\'' + id + '\');renderDrawRail()">' + (d.icon || '·') + '</button>';
-    }
-    h += '<span class="dr-sep"></span>';
+  let h = '';
+  for (const cat of DRAW_CATS) {
+    const id = _catDefault(cat), t = DRAW_TOOLS[id];
+    const on = _drawTool === id || (t.cursor && !_drawTool);
+    h += '<div class="dr-cat' + (on ? ' on' : '') + '" data-cat="' + cat.id + '">'
+      +   '<button class="dr-btn" type="button" title="' + _esc(t.name) + (_shortcutOf(id) ? ' (' + _shortcutOf(id) + ')' : '')
+      +     '" onclick="pickDrawTool(\'' + id + '\')">' + t.icon + '</button>'
+      +   '<button class="dr-more" type="button" aria-haspopup="true" aria-expanded="false"'
+      +     ' aria-label="' + _esc(cat.name) + ' — more tools" title="More ' + _esc(cat.name.toLowerCase())
+      +     '" onclick="event.stopPropagation();toggleDrawFlyout(\'' + cat.id + '\',this)">›</button>'
+      + '</div>';
   }
-  for (const [k, u] of Object.entries(DRAW_UTILS)) {
-    h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false') + '"'
-      + ' title="' + esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
-  }
-  h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol" onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
+  h += '<span class="dr-sep"></span>';
+  for (const [k, u] of Object.entries(DRAW_UTILS))
+    h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false')
+      + '" title="' + _esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
+  h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol"'
+    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
   rail.innerHTML = h;
+  renderFavBar();
+}
+
+/* Arm a tool and remember it as its category's default. */
+function pickDrawTool(id) {
+  const t = DRAW_TOOLS[id]; if (!t) return;
+  drawDefaults[t.cat] = id; _ds('trader.drawDefaults', drawDefaults);
+  setDrawTool(t.cursor ? '' : id);            // cursor tools mean "no drawing tool armed"
+  _closeDrawFlyout(); renderDrawRail();
+}
+
+let _flyoutEl = null, _flyoutCat = null;
+function _closeDrawFlyout() {
+  if (_flyoutEl) _flyoutEl.hidden = true;
+  _flyoutCat = null;
+  document.querySelectorAll('.dr-more[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+function _buildFlyout() {
+  if (_flyoutEl) return _flyoutEl;
+  const el = document.createElement('div');
+  el.className = 'dr-flyout'; el.id = 'drawFlyout'; el.hidden = true;
+  el.setAttribute('role', 'menu');
+  document.body.appendChild(el);
+  document.addEventListener('click', (e) => {
+    if (el.hidden) return;
+    if (el.contains(e.target) || (e.target.closest && e.target.closest('.dr-more'))) return;
+    _closeDrawFlyout();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) _closeDrawFlyout(); });
+  _flyoutEl = el; return el;
+}
+function toggleDrawFlyout(catId, btn) {
+  const el = _buildFlyout();
+  if (!el.hidden && _flyoutCat === catId) { _closeDrawFlyout(); return; }
+  const cat = DRAW_CATS.find(c => c.id === catId); if (!cat) return;
+  _flyoutCat = catId;
+  let h = '';
+  for (const g of cat.groups) {
+    h += '<div class="dr-fly-group">' + _esc(g.name) + '</div>';
+    for (const [id, t] of g.tools) {
+      const fav = drawFavs.includes(id), key = _shortcutOf(id);
+      h += '<div class="dr-fly-item' + (_drawTool === id ? ' on' : '') + '" role="menuitem" tabindex="0"'
+        + ' onclick="pickDrawTool(\'' + id + '\')">'
+        + '<span class="dr-fly-ico">' + t.icon + '</span>'
+        + '<span class="dr-fly-name">' + _esc(t.name) + '</span>'
+        + '<button class="dr-fly-q" type="button" title="What is this?" aria-label="About ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();showToolInfo(\'' + id + '\')">?</button>'
+        + '<button class="dr-fly-key" type="button" title="Click to set a shortcut" aria-label="Shortcut for ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();assignToolKey(\'' + id + '\')">' + (key ? _esc(key) : '＋') + '</button>'
+        + '<button class="dr-fly-star' + (fav ? ' on' : '') + '" type="button" aria-pressed="' + (fav ? 'true' : 'false')
+        +   '" title="Favourite — show on the chart shortcut bar" aria-label="Favourite ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + (fav ? '★' : '☆') + '</button>'
+        + '</div>';
+    }
+  }
+  el.innerHTML = h; el.hidden = false;
+  const r = btn.getBoundingClientRect();
+  el.style.visibility = 'hidden';
+  const eh = el.offsetHeight, ew = el.offsetWidth;
+  // Prefer the right of the button; flip to its left if that overflows; never go
+  // negative -- on a viewport narrower than the flyout both candidates are off-screen.
+  const wantLeft = (r.right + 4 + ew > window.innerWidth) ? (r.left - ew - 4) : (r.right + 4);
+  el.style.left = Math.max(8, Math.min(wantLeft, Math.max(8, window.innerWidth - ew - 8))) + 'px';
+  el.style.top = Math.max(8, Math.min(r.top, Math.max(8, window.innerHeight - eh - 8))) + 'px';
+  el.style.visibility = 'visible';
+  btn.setAttribute('aria-expanded', 'true');
+}
+
+function showToolInfo(id) {
+  const t = DRAW_TOOLS[id]; if (!t) return;
+  const el = _buildFlyout();
+  const key = _shortcutOf(id);
+  el.innerHTML = '<div class="dr-fly-group">' + _esc(t.name) + '</div>'
+    + '<p class="dr-fly-why">' + _esc(t.why || '') + '</p>'
+    + '<p class="dr-fly-meta">' + (t.drag ? 'Drag to draw' : (t.pts || 1) + ' click' + ((t.pts || 1) > 1 ? 's' : ''))
+    +   (key ? ' &middot; ' + _esc(key) : '') + (t.hint ? ' &middot; ' + _esc(t.hint) : '') + '</p>'
+    + '<div class="dr-fly-foot"><button type="button" onclick="pickDrawTool(\'' + id + '\')">Use it</button>'
+    + '<button type="button" onclick="toggleDrawFlyout(\'' + t.cat + '\',document.querySelector(\'.dr-cat[data-cat=&quot;' + t.cat + '&quot;] .dr-more\'))">Back</button></div>';
+}
+
+function toggleDrawFav(id) {
+  const i = drawFavs.indexOf(id);
+  if (i >= 0) drawFavs.splice(i, 1); else drawFavs.push(id);
+  _ds('trader.drawFavs', drawFavs);
+  const cat = DRAW_TOOLS[id] && DRAW_TOOLS[id].cat;
+  const btn = document.querySelector('.dr-cat[data-cat="' + cat + '"] .dr-more');
+  if (btn) { _flyoutCat = null; toggleDrawFlyout(cat, btn); }   // re-render the open flyout
+  renderFavBar();
+}
+
+/* Shortcut capture: the next key you press becomes the tool's shortcut. Escape
+   cancels, Backspace clears. Stored per tool, and checked before the defaults. */
+let _keyCapture = null;
+function assignToolKey(id) {
+  _keyCapture = id;
+  const el = _buildFlyout();
+  el.innerHTML = '<div class="dr-fly-group">Shortcut for ' + _esc(DRAW_TOOLS[id].name) + '</div>'
+    + '<p class="dr-fly-why">Press the key combination you want. Escape cancels, Backspace clears it.</p>';
+}
+document.addEventListener('keydown', (e) => {
+  if (_keyCapture) {
+    e.preventDefault(); e.stopPropagation();
+    const id = _keyCapture; _keyCapture = null;
+    if (e.key === 'Escape') { _closeDrawFlyout(); return; }
+    if (e.key === 'Backspace') { delete drawKeys[id]; _ds('trader.drawKeys', drawKeys); _closeDrawFlyout(); renderDrawRail(); return; }
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) { _keyCapture = id; return; }   // wait for the real key
+    const combo = ((e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + e.key).toUpperCase();
+    drawKeys[id] = combo; _ds('trader.drawKeys', drawKeys);
+    _closeDrawFlyout(); renderDrawRail();
+    return;
+  }
+  // Fire a tool's shortcut, unless the user is typing into something.
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+  // Compare the WHOLE combo case-insensitively. Uppercasing only the key half left
+  // 'Alt+H' vs 'ALT+H' unequal, so no shortcut ever fired.
+  const combo = ((e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.key || '')).toUpperCase();
+  for (const id of Object.keys(DRAW_TOOLS)) {
+    if (_shortcutOf(id).toUpperCase() === combo) { e.preventDefault(); pickDrawTool(id); return; }
+  }
+});
+
+/* Favourites bar: the starred tools, floating over the chart, draggable. Position
+   persists so it stays where you parked it. */
+function renderFavBar() {
+  let bar = document.getElementById('favBar');
+  // Clearing the last favourite must also clear the CONTENT, not just hide the bar --
+  // otherwise the next favourite flashes the old buttons before the re-render lands.
+  if (!drawFavs.length) { if (bar) { bar.hidden = true; bar.innerHTML = ''; } return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'favBar'; bar.className = 'fav-bar';
+    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Favourite drawing tools');
+    document.body.appendChild(bar);
+    const pos = _dj('trader.favBarPos', null);
+    if (pos) { bar.style.left = pos.x + 'px'; bar.style.top = pos.y + 'px'; }
+    let drag = null;
+    bar.addEventListener('pointerdown', (e) => {
+      if (!e.target.classList.contains('fav-grip')) return;
+      const r = bar.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      bar.setPointerCapture && bar.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const x = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - drag.dx));
+      const y = Math.max(56, Math.min(window.innerHeight - 40, e.clientY - drag.dy));
+      bar.style.left = x + 'px'; bar.style.top = y + 'px';
+    });
+    document.addEventListener('pointerup', () => {
+      if (!drag) return; drag = null;
+      const r = bar.getBoundingClientRect();
+      _ds('trader.favBarPos', { x: Math.round(r.left), y: Math.round(r.top) });
+    });
+  }
+  bar.hidden = false;
+  bar.innerHTML = '<span class="fav-grip" title="Drag to move">⠿</span>'
+    + drawFavs.filter(id => DRAW_TOOLS[id]).map(id =>
+        '<button class="fav-btn' + (_drawTool === id ? ' on' : '') + '" type="button" title="' + _esc(DRAW_TOOLS[id].name)
+        + (_shortcutOf(id) ? ' (' + _shortcutOf(id) + ')' : '') + '" onclick="pickDrawTool(\'' + id + '\')">'
+        + DRAW_TOOLS[id].icon + '</button>').join('');
 }
 
 /* Adopt the existing ticket + chat markup rather than rebuilding them: same handlers,
