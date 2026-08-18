@@ -235,6 +235,26 @@ sudo chmod 600 /etc/systemd/system/cloudflared-unisona.service
 sudo systemctl daemon-reload && sudo systemctl enable --now cloudflared-unisona
 ```
 
+## When production is deliberately offline
+
+`ops/production-status.json` is the switch. Set `"paused": true` (with a reason and a
+date) and the **hourly** `deployment-verify` schedule stops running; release runs and
+manual `workflow_dispatch` runs are never paused, because there someone is explicitly
+asserting that a host should be serving.
+
+This exists because an alarm that is permanently red is not an alarm. On 2026-08-14 the
+GCP project was suspended for billing, production went dark, and the hourly check failed
+every hour for four days — correctly, and to no one. If the host is going to stay down
+(local-only piloting, a planned migration, a cost pause), pause the schedule and say why,
+rather than letting the red become background noise people learn to scroll past.
+
+```bash
+# pause                       # then commit — the reason and date are the point
+python -c "import json;p='ops/production-status.json';d=json.load(open(p));d['paused']=True;json.dump(d,open(p,'w'),indent=2)"
+```
+
+Unpause by flipping it back to `false`; the next hourly tick resumes.
+
 ## Updating the running app
 
 **The box self-updates on published Releases — but *only* on Releases.** A systemd

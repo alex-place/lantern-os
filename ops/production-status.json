@@ -1,0 +1,7 @@
+{
+  "paused": true,
+  "host": "https://unisona.ai",
+  "since": "2026-08-14",
+  "reason": "GCP project suspended for billing (account 011FE3-BF0509-681F1C is closed), so the GCE VM and its Cloudflare tunnel are down. Piloting locally for now — production being offline is INTENTIONAL, not a regression.",
+  "unpause": "Set paused to false when a host is serving again. The hourly deployment-verify schedule resumes on the next tick; release and manual runs are never paused."
+}
