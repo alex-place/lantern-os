@@ -121,3 +121,15 @@ test('every filter chip matches a category the generator emits', () => {
     assert.ok(cardCats.has(cat), `chip "${cat}" matches no card — a dead filter`);
   }
 });
+
+test('the "no account required" FAQ link is actually public (#3161)', () => {
+  // The hero invites a signed-out visitor to /faq.html under "no account or API key
+  // required". That promise only holds if faq.html is un-gated in BOTH the server
+  // allowlist and its client-side twin — otherwise the first card bounces to /auth.html.
+  assert.match(HTML, /href="\/faq\.html"/, 'the Knowledge Center still links the FAQ');
+  const pages = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'routes', 'pages.js'), 'utf8');
+  assert.match(pages, /["']\/faq\.html["']\s*:/, 'faq.html must be in PUBLIC_PAGES (server serves it to guests)');
+  const authGate = fs.readFileSync(path.join(REPO, 'apps', 'lantern-garage', 'public', 'js', 'auth-gate.js'), 'utf8');
+  const publicLine = (authGate.match(/const PUBLIC\s*=\s*\[[^\]]*\]/) || [''])[0];
+  assert.match(publicLine, /['"]\/faq\.html['"]/, 'faq.html must be in the auth-gate.js PUBLIC allowlist (client twin)');
+});

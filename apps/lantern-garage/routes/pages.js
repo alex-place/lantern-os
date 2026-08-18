@@ -28,6 +28,11 @@ const PUBLIC_PAGES = {
   // board); joining/start/stop are auth-gated server-side in routes/trading/champion.js.
   "/contest.html":        "contest.html",
   "/knowledgecenter.html":"knowledgecenter.html",
+  // The FAQ is a pre-signup help page — the Knowledge Center hero links it under
+  // "no account or API key required", and it's exactly what a prospect reads before
+  // deciding to sign up. Gating it 302'd guests to /auth.html, contradicting that
+  // promise (#3161) — same bounce that got pricing un-gated in #2610.
+  "/faq.html":            "faq.html",
   "/ibkr-setup-guide.html":"ibkr-setup-guide.html", // IBKR connect how-to (public help)
   // Primary interface: the chat must be reachable without a Patreon login so the
   // "no account needed" promise holds (#739). chat.html handles the guest
