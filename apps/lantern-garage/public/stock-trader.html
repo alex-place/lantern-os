@@ -3726,6 +3726,11 @@ function openOrderTicket(ticker, side){
   otSide = side; otOrderType = 'market';
   setOrderSymbol(ticker);
   openOrderPanel();
+  // The ticket is a dock COLUMN now. openOrderPanel only sets the old overlay flag, so
+  // with the column closed a BUY/SELL click filled a 0px-wide panel and looked dead.
+  if (typeof _ticketOpen !== 'undefined' && (!_ticketOpen || !_rightOpen)) {
+    _ticketOpen = true; _rightOpen = true; _saveDocks(); _applyDocks();
+  }
 }
 
 function closeOrderTicket(){
@@ -4031,7 +4036,7 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
     const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / L2));
     return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
   };
-  let best = -1, bestD = (tol == null ? 9 : tol);
+  let best = -1, bestD = (tol == null ? 14 : tol);
   list.forEach((d, i) => {
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
@@ -4251,7 +4256,7 @@ document.addEventListener('pointerdown', (e) => {
     }
   }
   // 2. otherwise select whatever is under the pointer, and start a body drag
-  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 9);
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
   if (hit) {
     _selDraw = { tk, i: hit.i };
     const d = _drawings[tk][hit.i];
@@ -4297,7 +4302,7 @@ document.addEventListener('contextmenu', (e) => {
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
   const tk = _canvasTicker(canvas); if (!tk) return;
-  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 9);
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
   if (!hit) return;
   e.preventDefault(); e.stopPropagation();
   _selDraw = { tk, i: hit.i }; _refreshTicker(tk);
@@ -4962,8 +4967,19 @@ document.addEventListener('mousemove', function(e){
   // the pan hand -- which is why picking Cross appeared to do nothing before. A drawing
   // tool armed also shows a crosshair, since you are aiming at an anchor, not grabbing.
   const _cur = (typeof drawDefaults !== 'undefined' && drawDefaults.cursor) || 'cross';
-  const _plotCursor = _drawTool ? 'crosshair'
+  let _plotCursor = _drawTool ? 'crosshair'
     : _cur === 'dot' ? 'cell' : _cur === 'pointer' ? 'default' : _cur === 'eraser' ? 'not-allowed' : 'crosshair';
+  // Over a drawing with no tool armed, show that it can be grabbed -- the affordance
+  // TradingView gives and the reason clicking drawings felt like it did nothing.
+  if (!_drawTool && x < w - AXIS_W && y < h - AXIS_H) {
+    try {
+      const _tk = _canvasTicker(target.canvas);
+      if (_tk && (_drawings[_tk] || []).length) {
+        const _a = _drawAnchor(target.canvas, e.clientX, e.clientY);
+        if (_a && _hitDrawing(_tk, _a.data, _a.xPx, _a.yPx, _a.pw, _a.ph, 14)) _plotCursor = 'move';
+      }
+    } catch (_e) { /* hover feedback must never break the crosshair */ }
+  }
   ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
   _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
