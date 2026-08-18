@@ -116,62 +116,86 @@
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
   /* #3355: charts first, then the dock, then the always-visible icon rail. The dock's
      column collapses to 0 when closed, so a closed dock costs the chart nothing. */
-  .layout{display:grid;grid-template-columns:1fr var(--dock-w,300px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
-  body.dock-closed .layout{grid-template-columns:1fr 0 44px}
-
-  /* -- Right dock (#3355) ---------------------------------------------------
-     One panel visible at a time. The rail is a real tablist and stays put, so a
-     closed dock is still one click from any panel. Panels are grid children, not
-     fixed overlays -- that is what lets the chart actually reclaim the width
-     instead of hiding under something. */
-  .dock{grid-column:2;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+  .layout{display:grid;grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  body.leftdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) var(--dockr-w,320px) 44px}
+  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 44px}
+  body.leftdock-closed.rightdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) 0 44px}
+  /* -- Docks (#3355 v2) -----------------------------------------------------
+     TradingView's shape: a permanent drawing rail hard left, a collapsible left
+     panel for chat, the charts, then a right column holding a switchable widget
+     panel with the order ticket stacked under it, and the widget rail hard right.
+     Panels are grid children, so collapsing one really does hand the chart its
+     pixels back rather than growing under an overlay. */
+  .draw-rail{grid-column:1;grid-row:2 / span 2;display:flex;flex-direction:column;gap:2px;
+    padding:6px 5px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
+  .dockL{grid-column:2;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+    min-width:0;overflow:hidden;background:var(--bg1);border-right:1px solid var(--border)}
+  .dockR{grid-column:4;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-left:1px solid var(--border)}
-  body.dock-closed .dock{border-left:none}
-  .dock-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;z-index:40}
-  body.dock-closed .dock-resize{display:none}
+  body.leftdock-closed .dockL,
+  body.rightdock-closed .dockR{border:none}
+  body.leftdock-closed .dockL > *,
+  body.rightdock-closed .dockR > *{display:none}
+  .dockL-resize{position:absolute;right:-3px;top:0;bottom:0;width:7px;z-index:40}
+  .dockR-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;z-index:40}
+  body.leftdock-closed .dockL-resize, body.rightdock-closed .dockR-resize{display:none}
+
   .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
   .dock-panel[hidden]{display:none}
-  .dock-head{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);flex:0 0 auto}
-  .dock-title{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);flex:1}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);flex:0 0 auto}
+  .dock-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);flex:1}
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
   .dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .dock-body .wl-info{flex:0 0 auto}
 
-  /* Icon rail -- always visible, never collapses. */
-  .dock-rail{grid-column:3;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
+  /* Order ticket: a sibling row under the widget panel, so both are open at once. */
+  .ticket-dock{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;
+    height:var(--ticket-h,320px);border-top:1px solid var(--border);position:relative}
+  .ticket-dock .dock-body{overflow-y:auto}
+  .ticket-grip{position:absolute;top:-4px;left:0;right:0;height:9px;cursor:ns-resize;z-index:20}
+  .ticket-grip::before{content:"";position:absolute;left:50%;top:4px;transform:translateX(-50%);
+    width:42px;height:3px;border-radius:3px;background:var(--border)}
+  .ticket-grip:hover::before{background:var(--accent)}
+  body.ticket-closed .ticket-dock{display:none}
+
+  /* Rails */
+  .dock-rail{grid-column:5;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
     padding:8px 6px;background:var(--bg1);border-left:1px solid var(--border)}
   .dock-tab{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
     font-size:14px;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
   .dock-tab:hover{color:var(--text0);background:var(--bg3)}
-  .dock-tab[aria-selected="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
-  body.dock-closed .dock-tab[aria-selected="true"]{color:var(--text2);border-color:transparent;background:none}
+  .dock-tab[aria-selected="true"],.dock-tab[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .rail-sep{height:1px;background:var(--border);margin:4px 2px}
 
-  /* The watchlist body keeps its own styling; it just lives here now. */
-  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
-  .dock-body .wl-info{flex:0 0 auto}
+  /* Drawing rail: grouped tool buttons, then the utility toggles. */
+  .dr-btn{width:34px;height:30px;display:flex;align-items:center;justify-content:center;
+    background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
+    font-size:13px;cursor:pointer;flex:0 0 auto}
+  .dr-btn:hover{color:var(--text0);background:var(--bg3)}
+  .dr-btn.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dr-sep{height:1px;background:var(--border);margin:4px 3px;flex:0 0 auto}
+  .dr-btn.util[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
 
-  /* Drawing palette inside the dock: grouped, same vocabulary as the menu. */
-  .dockdraw-group{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
-    color:var(--text2);padding:8px 10px 4px}
-  .dockdraw-item{display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;font-size:12px;color:var(--text1)}
-  .dockdraw-item:hover{background:var(--bg2);color:var(--text0)}
-  .dockdraw-item.on{background:var(--bg3);color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}
-  .dockdraw-hint{margin-left:auto;font-family:var(--mono);font-size:9.5px;color:var(--text2)}
-  .dockdraw-foot{padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px}
-  .dockdraw-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px 6px;border-radius:5px;
-    border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
-  .dockdraw-foot button:hover{background:var(--bg3);color:var(--text0)}
+  /* Compact watchlist rows -- TradingView fits far more symbols per screen. */
+  /* Row compaction lives on the source rules above (.wl-item / .tb-badge) — an
+     override placed earlier in this sheet would lose to them at equal specificity. */
 
-  /* Phone: the dock becomes a bottom sheet rather than a squeezed column. */
+  /* Phone: rails stay, both docks become bottom sheets. */
   @media (max-width:760px){
-    .layout, body.dock-closed .layout{grid-template-columns:1fr 0 0}
+    .layout, body.leftdock-closed .layout, body.rightdock-closed .layout,
+    body.leftdock-closed.rightdock-closed .layout{grid-template-columns:0 0 minmax(0,1fr) 0 0}
+    .draw-rail{position:fixed;left:0;top:52px;bottom:auto;z-index:60;flex-direction:row;
+      grid-column:auto;grid-row:auto;border-right:none;border-bottom:1px solid var(--border);max-width:100vw}
     .dock-rail{position:fixed;right:0;top:52px;z-index:60;flex-direction:row;gap:2px;
       grid-column:auto;grid-row:auto;border-left:none;border-bottom:1px solid var(--border)}
-    .dock{position:fixed;left:0;right:0;bottom:0;top:auto;height:62vh;z-index:1200;
-      grid-column:auto;grid-row:auto;border-left:none;border-top:1px solid var(--border);
+    .dockL,.dockR{position:fixed;left:0;right:0;bottom:0;top:auto;height:62vh;z-index:1200;
+      grid-column:auto;grid-row:auto;border:none;border-top:1px solid var(--border);
       border-radius:14px 14px 0 0;box-shadow:0 -10px 28px rgba(0,0,0,.45)}
-    body.dock-closed .dock{display:none}
+    body.leftdock-closed .dockL,body.rightdock-closed .dockR{display:none}
+    .ticket-dock{height:auto}
   }
 
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
@@ -229,9 +253,9 @@
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
-  .main{grid-column:1;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
+  .main{grid-column:3;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
-  .footer{position:relative;grid-column:1;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
@@ -311,14 +335,14 @@
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:10px 26px 10px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(30px,1fr) auto auto auto;align-items:center;gap:5px;padding:4px 20px 4px 8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.2}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
   .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:10px;font-weight:700;border-color:rgba(255,255,255,.08)}
-  .tb-badge{width:24px;height:24px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
+  .tb-badge{width:17px;height:17px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
   .tb-badge svg{width:15px;height:15px;display:block}
   .tb-badge.tb-glyph{font-size:12px;font-weight:600;text-shadow:none}
   .wl-logo.mono{display:flex;align-items:center;justify-content:center;padding:0;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35)}
@@ -1087,54 +1111,76 @@
      right (TradingView's model). The watchlist moved here from the left column, which is
      what frees the chart area; the order ticket and chat become panels of the same dock
      instead of two independently-positioned fixed overlays. -->
-<div class="dock" id="dock" role="region" aria-label="Side panels">
-  <div class="col-resize dock-resize" id="dockResize" role="separator" aria-orientation="vertical" aria-label="Resize the side panel" tabindex="0" title="Drag to resize"></div>
+<!-- #3355 v2 — TradingView's actual shape. LEFT: an always-visible drawing rail, then a
+     collapsible left dock (chat). RIGHT: a widget panel (watchlist / alerts / details) with
+     the order ticket stacked UNDER it so both are open at once, then the widget rail. -->
 
-  <section class="dock-panel" id="dockp-watchlist" role="tabpanel" aria-labelledby="docktab-watchlist">
-    <header class="dock-head"><span class="dock-title">Watchlist</span>
-      <button class="dock-x" type="button" onclick="closeDock()" aria-label="Close panel" title="Close">✕</button></header>
-    <div class="dock-body">
-        <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
-        <div class="wl-add">
-          <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
-          <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
-            <option value="">⇅</option>
-            <option value="chg">Δ%</option>
-            <option value="rvol">RVOL</option>
-          </select>
-        </div>
-        <div id="wlList"></div>
-        <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
-        <div id="wlInfo" class="wl-info"></div>
-    </div>
-  </section>
+<!-- Far-left drawing rail: grouped tools on top, the utility toggles under them, exactly
+     the split TradingView uses (tools, then magnet / keep-drawing / lock / hide / remove). -->
+<nav class="draw-rail" id="drawRail" role="toolbar" aria-label="Drawing tools" aria-orientation="vertical"></nav>
 
-  <section class="dock-panel" id="dockp-draw" role="tabpanel" aria-labelledby="docktab-draw" hidden>
-    <header class="dock-head"><span class="dock-title">Drawing tools</span>
-      <button class="dock-x" type="button" onclick="closeDock()" aria-label="Close panel" title="Close">✕</button></header>
-    <div class="dock-body" id="dockDrawBody"></div>
-  </section>
-
-  <section class="dock-panel" id="dockp-chat" role="tabpanel" aria-labelledby="docktab-chat" hidden>
+<!-- Left dock: chat lives here. Collapsible; its column goes to 0 and the chart takes it. -->
+<div class="dockL" id="dockL" role="region" aria-label="Left panel">
+  <div class="col-resize dockL-resize" id="dockLResize" role="separator" aria-orientation="vertical" aria-label="Resize the left panel" tabindex="0" title="Drag to resize"></div>
+  <section class="dock-panel" id="dockp-chat" role="tabpanel" aria-labelledby="ltab-chat">
     <header class="dock-head"><span class="dock-title">Unisona</span>
-      <button class="dock-x" type="button" onclick="closeDock()" aria-label="Close panel" title="Close">✕</button></header>
+      <button class="dock-x" type="button" onclick="closeLeftDock()" aria-label="Close panel" title="Close">✕</button></header>
     <div class="dock-body" id="dockChatBody"></div>
-  </section>
-
-  <section class="dock-panel" id="dockp-ticket" role="tabpanel" aria-labelledby="docktab-ticket" hidden>
-    <header class="dock-head"><span class="dock-title">Order</span>
-      <button class="dock-x" type="button" onclick="closeDock()" aria-label="Close panel" title="Close">✕</button></header>
-    <div class="dock-body" id="dockTicketBody"></div>
   </section>
 </div>
 
-<!-- Icon rail: the tablist that switches the dock. Always visible, so a closed dock is
-     still one click from any panel. -->
-<nav class="dock-rail" role="tablist" aria-label="Side panel switcher" aria-orientation="vertical">
-  <button class="dock-tab" id="docktab-watchlist" role="tab" data-panel="watchlist" aria-controls="dockp-watchlist" aria-selected="true"  onclick="setDockPanel('watchlist')" title="Watchlist">☰</button>
-  <button class="dock-tab" id="docktab-draw"      role="tab" data-panel="draw"      aria-controls="dockp-draw"      aria-selected="false" onclick="setDockPanel('draw')"      title="Drawing tools">✏</button>
-  <button class="dock-tab" id="docktab-chat"      role="tab" data-panel="chat"      aria-controls="dockp-chat"      aria-selected="false" onclick="setDockPanel('chat')"      title="Ask Unisona">💬</button>
-  <button class="dock-tab" id="docktab-ticket"    role="tab" data-panel="ticket"    aria-controls="dockp-ticket"    aria-selected="false" onclick="setDockPanel('ticket')"    title="Order ticket">⇅</button>
+<!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
+<div class="dockR" id="dockR" role="region" aria-label="Right panels">
+  <div class="col-resize dockR-resize" id="dockRResize" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0" title="Drag to resize"></div>
+
+  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
+    <header class="dock-head"><span class="dock-title">Watchlist</span>
+      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body">
+      <div class="wl-add">
+        <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
+        <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
+          <option value="">⇅</option>
+          <option value="chg">Δ%</option>
+          <option value="rvol">RVOL</option>
+        </select>
+      </div>
+      <div id="wlList"></div>
+      <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
+      <div id="wlInfo" class="wl-info"></div>
+    </div>
+  </section>
+
+  <section class="dock-panel rw-panel" id="rwp-alerts" role="tabpanel" aria-labelledby="rtab-alerts" hidden>
+    <header class="dock-head"><span class="dock-title">Alerts</span>
+      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body" id="rwAlertsBody"></div>
+  </section>
+
+  <section class="dock-panel rw-panel" id="rwp-details" role="tabpanel" aria-labelledby="rtab-details" hidden>
+    <header class="dock-head"><span class="dock-title">Details</span>
+      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body" id="rwDetailsBody"></div>
+  </section>
+
+  <!-- Order ticket: its own row under the widget panel, independently closable. -->
+  <div class="ticket-dock" id="ticketDock">
+    <div class="ticket-grip" id="ticketGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the order ticket" tabindex="0" title="Drag to resize"></div>
+    <header class="dock-head"><span class="dock-title">Order</span>
+      <button class="dock-x" type="button" onclick="toggleTicketDock()" aria-label="Close the order ticket" title="Close">✕</button></header>
+    <div class="dock-body" id="dockTicketBody"></div>
+  </div>
+</div>
+
+<!-- Right widget rail — TradingView's right-hand switcher. -->
+<nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
+  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">☰</button>
+  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">🔔</button>
+  <button class="dock-tab" id="rtab-details"   role="tab" data-rw="details"   aria-controls="rwp-details"   aria-selected="false" onclick="setRightWidget('details')"   title="Symbol details">ⓘ</button>
+  <span class="rail-sep"></span>
+  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">⇅</button>
+  <span class="rail-sep"></span>
+  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">💬</button>
 </nav>
 </div><!-- /layout -->
 
@@ -3711,25 +3757,25 @@ const CHART_NOTE_BG = () =>
 // pts: how many clicks commit the shape. drag:true collects a freehand path.
 // text:true prompts for a label. group drives the picker's sections.
 const DRAW_TOOLS = {
-  l:     { name: 'Trend line',        pts: 2, group: 'Lines' },
-  ray:   { name: 'Ray',               pts: 2, group: 'Lines' },
-  xline: { name: 'Extended line',     pts: 2, group: 'Lines' },
-  h:     { name: 'Horizontal line',   pts: 1, group: 'Lines' },
-  hray:  { name: 'Horizontal ray',    pts: 1, group: 'Lines' },
-  v:     { name: 'Vertical line',     pts: 1, group: 'Lines' },
-  arrow: { name: 'Arrow',             pts: 2, group: 'Lines' },
-  chan:  { name: 'Parallel channel',  pts: 3, group: 'Lines' },
-  fib:   { name: 'Fib retracement',   pts: 2, group: 'Fibonacci' },
-  fibx:  { name: 'Fib extension',     pts: 3, group: 'Fibonacci' },
-  rect:  { name: 'Rectangle',         pts: 2, group: 'Patterns' },
-  ell:   { name: 'Ellipse',           pts: 2, group: 'Patterns' },
-  tri:   { name: 'Triangle',          pts: 3, group: 'Patterns' },
-  pos:   { name: 'Long position',     pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
-  poss:  { name: 'Short position',    pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
-  meas:  { name: 'Measure',           pts: 2, group: 'Forecasting' },
-  pen:   { name: 'Brush',             pts: 0, group: 'Notes', drag: true },
-  text:  { name: 'Text',              pts: 1, group: 'Notes', text: true },
-  note:  { name: 'Note',              pts: 1, group: 'Notes', text: true },
+  l:     { name: 'Trend line',        pts: 2, group: 'Lines', icon: '/' },
+  ray:   { name: 'Ray',               pts: 2, group: 'Lines', icon: '↗' },
+  xline: { name: 'Extended line',     pts: 2, group: 'Lines', icon: '↔' },
+  h:     { name: 'Horizontal line',   pts: 1, group: 'Lines', icon: '—' },
+  hray:  { name: 'Horizontal ray',    pts: 1, group: 'Lines', icon: '⊢' },
+  v:     { name: 'Vertical line',     pts: 1, group: 'Lines', icon: '|' },
+  arrow: { name: 'Arrow',             pts: 2, group: 'Lines', icon: '➚' },
+  chan:  { name: 'Parallel channel',  pts: 3, group: 'Lines', icon: '⫽' },
+  fib:   { name: 'Fib retracement',   pts: 2, group: 'Fibonacci', icon: '⋯' },
+  fibx:  { name: 'Fib extension',     pts: 3, group: 'Fibonacci', icon: '⋰' },
+  rect:  { name: 'Rectangle',         pts: 2, group: 'Patterns', icon: '▭' },
+  ell:   { name: 'Ellipse',           pts: 2, group: 'Patterns', icon: '◯' },
+  tri:   { name: 'Triangle',          pts: 3, group: 'Patterns', icon: '△' },
+  pos:   { name: 'Long position',     pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target', icon: '⬆' },
+  poss:  { name: 'Short position',    pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target', icon: '⬇' },
+  meas:  { name: 'Measure',           pts: 2, group: 'Forecasting', icon: '📏' },
+  pen:   { name: 'Brush',             pts: 0, group: 'Notes', drag: true, icon: '✎' },
+  text:  { name: 'Text',              pts: 1, group: 'Notes', text: true, icon: 'T' },
+  note:  { name: 'Note',              pts: 1, group: 'Notes', text: true, icon: '🗒' },
 };
 
 const _drawings = (() => { try { return JSON.parse(localStorage.getItem('trader.drawings') || '{}'); } catch (e) { return {}; } })();
@@ -5501,112 +5547,133 @@ function toggleDrawMenu(btn){
   btn.setAttribute('aria-expanded','true');
 }
 
-/* -- Right dock (#3355) ------------------------------------------------------
-   One panel at a time. The rail is the tablist; clicking the panel you are
-   already on closes the dock, which is how every editor sidebar behaves. Choice
-   and width persist, so the desk you left is the desk you come back to. */
-const DOCK_PANELS = ['watchlist', 'draw', 'chat', 'ticket'];
-let _dockPanel = (() => {
-  // #3356: the dock opens on chat by default; a stored choice always wins.
-  try { const v = localStorage.getItem('trader.dockPanel'); return DOCK_PANELS.includes(v) ? v : 'chat'; }
-  catch (e) { return 'chat'; }
-})();
-let _dockOpen = (() => { try { return localStorage.getItem('trader.dockOpen') !== '0'; } catch (e) { return true; } })();
+/* -- Docks (#3355 v2) ---------------------------------------------------------
+   Left: chat. Right: a switchable widget panel (watchlist / alerts / details) with
+   the order ticket stacked under it, so both are open together -- which is the whole
+   point of the right column and what TradingView does. Each side collapses on its own
+   and hands its column back to the chart. */
+const RW_PANELS = ['watchlist', 'alerts', 'details'];
+const _lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
+const _lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
-function _saveDock() {
-  try {
-    localStorage.setItem('trader.dockPanel', _dockPanel);
-    localStorage.setItem('trader.dockOpen', _dockOpen ? '1' : '0');
-  } catch (e) {}
-}
-function _applyDock() {
-  document.body.classList.toggle('dock-closed', !_dockOpen);
-  for (const name of DOCK_PANELS) {
-    const panel = document.getElementById('dockp-' + name);
-    const tab = document.getElementById('docktab-' + name);
-    const on = _dockOpen && name === _dockPanel;
+let _rwPanel = RW_PANELS.includes(_lsGet('trader.rwPanel', '')) ? _lsGet('trader.rwPanel', '') : 'watchlist';
+let _leftOpen = _lsGet('trader.leftOpen', '1') !== '0';
+let _rightOpen = _lsGet('trader.rightOpen', '1') !== '0';
+let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
+
+function _applyDocks() {
+  document.body.classList.toggle('leftdock-closed', !_leftOpen);
+  document.body.classList.toggle('rightdock-closed', !_rightOpen);
+  document.body.classList.toggle('ticket-closed', !_ticketOpen);
+  for (const n of RW_PANELS) {
+    const panel = document.getElementById('rwp-' + n), tab = document.getElementById('rtab-' + n);
+    const on = _rightOpen && n === _rwPanel;
     if (panel) { if (on) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', ''); }
-    if (tab) tab.setAttribute('aria-selected', (_dockOpen && name === _dockPanel) ? 'true' : 'false');
+    if (tab) tab.setAttribute('aria-selected', on ? 'true' : 'false');
   }
-  if (_dockPanel === 'draw' && _dockOpen) renderDockDraw();
-  // The deck's pixel-sized tracks are computed from the available width, so a dock
-  // change has to re-tile or the charts keep the old geometry (#3138/#3333).
+  const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', _leftOpen ? 'true' : 'false');
+  const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && _ticketOpen) ? 'true' : 'false');
+  if (_rwPanel === 'alerts' && _rightOpen && typeof loadAlerts === 'function') loadAlerts();
+  // Pixel-sized deck tracks: a column change has to re-tile or the charts keep the old geometry.
   if (typeof applyGridCols === 'function') applyGridCols();
   if (typeof _indRerender === 'function') _indRerender();
 }
-function setDockPanel(name) {
-  if (!DOCK_PANELS.includes(name)) return;
-  if (_dockOpen && _dockPanel === name) { _dockOpen = false; }   // click the active tab to close
-  else { _dockPanel = name; _dockOpen = true; }
-  _saveDock(); _applyDock();
+function _saveDocks() {
+  _lsSet('trader.rwPanel', _rwPanel); _lsSet('trader.leftOpen', _leftOpen ? '1' : '0');
+  _lsSet('trader.rightOpen', _rightOpen ? '1' : '0'); _lsSet('trader.ticketOpen', _ticketOpen ? '1' : '0');
 }
-function closeDock() { _dockOpen = false; _saveDock(); _applyDock(); }
-function openDock(name) { if (name) _dockPanel = name; _dockOpen = true; _saveDock(); _applyDock(); }
+function setRightWidget(name) {
+  if (!RW_PANELS.includes(name)) return;
+  if (_rightOpen && _rwPanel === name) _rightOpen = false; else { _rwPanel = name; _rightOpen = true; }
+  _saveDocks(); _applyDocks();
+}
+function closeRightWidget() { _rightOpen = false; _saveDocks(); _applyDocks(); }
+function toggleLeftDock() { _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
+function closeLeftDock() { _leftOpen = false; _saveDocks(); _applyDocks(); }
+function toggleTicketDock() {
+  // Reopening the ticket must also reopen the column it lives in, or the button lies.
+  if (!_ticketOpen && !_rightOpen) _rightOpen = true;
+  _ticketOpen = !_ticketOpen; _saveDocks(); _applyDocks();
+}
 
-/* The drawing palette, rendered into its dock panel from the same DRAW_TOOLS
-   registry the toolbar menu uses -- one source, two surfaces. */
-function renderDockDraw() {
-  const host = document.getElementById('dockDrawBody');
-  if (!host) return;
+/* Drawing rail. Tool groups on top, utility toggles under them -- the split
+   TradingView uses. Rendered from DRAW_TOOLS so the rail, the toolbar menu and the
+   canvas all read one registry. */
+const DRAW_UTILS = {
+  magnet: { icon: '🧲', label: 'Magnet — snap anchors to the nearest OHLC value' },
+  keep:   { icon: '⇉', label: 'Keep drawing — stay in the tool after each object' },
+  lock:   { icon: '🔒', label: 'Lock drawings — no accidental edits or deletes' },
+  hide:   { icon: '👁', label: 'Hide drawings' },
+};
+let drawUtil = (() => { try { return JSON.parse(_lsGet('trader.drawUtil', '{}')) || {}; } catch (e) { return {}; } })();
+function drawUtilOn(k) { return drawUtil[k] === true; }
+function toggleDrawUtil(k) {
+  drawUtil[k] = !drawUtilOn(k);
+  _lsSet('trader.drawUtil', JSON.stringify(drawUtil));
+  renderDrawRail();
+  if (typeof _indRerender === 'function') _indRerender();
+}
+function renderDrawRail() {
+  const rail = document.getElementById('drawRail'); if (!rail) return;
   const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const tk = (typeof fullscreenTicker !== 'undefined' && fullscreenTicker) || activeTicker;
-  const nOn = (tk && _drawings[tk] && _drawings[tk].length) || 0;
   const groups = {};
   for (const [id, d] of Object.entries(DRAW_TOOLS)) (groups[d.group] = groups[d.group] || []).push([id, d]);
-  let h = '';
+  let h = '<button class="dr-btn' + (_drawTool ? '' : ' on') + '" type="button" title="Cursor — pan and zoom the chart" onclick="setDrawTool(\'\')">✛</button><span class="dr-sep"></span>';
   for (const g of Object.keys(groups)) {
-    h += '<div class="dockdraw-group">' + esc(g) + '</div>';
     for (const [id, d] of groups[g]) {
-      h += '<div class="dockdraw-item' + (_drawTool === id ? ' on' : '') + '" data-tool="' + id + '"'
-        + ' role="button" tabindex="0" onclick="setDockDrawTool(\'' + id + '\')">'
-        + '<span>' + esc(d.name) + '</span>'
-        + '<span class="dockdraw-hint">' + (d.drag ? 'drag' : d.pts + ' click' + (d.pts > 1 ? 's' : '')) + '</span></div>';
+      h += '<button class="dr-btn' + (_drawTool === id ? ' on' : '') + '" type="button" data-tool="' + id + '"'
+        + ' title="' + esc(d.name) + ' — ' + (d.drag ? 'drag' : d.pts + ' click' + (d.pts > 1 ? 's' : '')) + '"'
+        + ' onclick="setDrawTool(\'' + id + '\');renderDrawRail()">' + (d.icon || '·') + '</button>';
     }
+    h += '<span class="dr-sep"></span>';
   }
-  h += '<div class="dockdraw-group">' + (nOn ? nOn + ' on ' + esc(tk || '') : 'Nothing drawn')
-    + ' &middot; alt-click to delete</div>';
-  h += '<div class="dockdraw-foot"><button type="button" onclick="setDockDrawTool(\'\')">Stop</button>'
-    + (nOn ? '<button type="button" onclick="setDrawTool(\'clear\');renderDockDraw()">Clear</button>' : '') + '</div>';
-  host.innerHTML = h;
+  for (const [k, u] of Object.entries(DRAW_UTILS)) {
+    h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false') + '"'
+      + ' title="' + esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
+  }
+  h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol" onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
+  rail.innerHTML = h;
 }
-function setDockDrawTool(id) { setDrawTool(id); renderDockDraw(); }
 
-/* Move the existing ticket + chat bodies into their dock panels rather than
-   rebuilding them: they keep their own markup, handlers and state, and stop being
-   independently-positioned fixed overlays. */
+/* Adopt the existing ticket + chat markup rather than rebuilding them: same handlers,
+   same state, they just stop being independently-positioned fixed overlays. */
 function _adoptIntoDock() {
-  const pairs = [['dockTicketBody', '.ot-modal'], ['dockChatBody', '.dc-modal']];
-  for (const [hostId, sel] of pairs) {
+  for (const [hostId, sel] of [['dockTicketBody', '.ot-modal'], ['dockChatBody', '.dc-modal']]) {
     const host = document.getElementById(hostId), node = document.querySelector(sel);
     if (host && node && !host.contains(node)) host.appendChild(node);
   }
 }
+document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); renderDrawRail(); _applyDocks(); });
 
-document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); _applyDock(); });
-
-/* Drag the dock's edge to resize. Bounds keep the chart usable and the panel legible. */
-(function initDockResize() {
-  const grip = document.getElementById('dockResize');
-  if (!grip) return;
-  let dragging = false;
-  const apply = (px) => {
-    const w = Math.max(220, Math.min(560, px));
-    document.documentElement.style.setProperty('--dock-w', w + 'px');
-    try { localStorage.setItem('trader.dockW', String(w)); } catch (e) {}
+/* Column + ticket resizing. Bounds keep the chart usable and the panels legible. */
+(function initDockResizers() {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const bind = (gripId, onMove) => {
+    const grip = document.getElementById(gripId); if (!grip) return;
+    let on = false;
+    grip.addEventListener('pointerdown', (e) => {
+      on = true; document.body.classList.add('resizing-col');
+      grip.setPointerCapture && grip.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    document.addEventListener('pointermove', (e) => { if (on) onMove(e); });
+    document.addEventListener('pointerup', () => {
+      if (!on) return;
+      on = false; document.body.classList.remove('resizing-col');
+      if (typeof applyGridCols === 'function') applyGridCols();
+      if (typeof _indRerender === 'function') _indRerender();
+    });
   };
-  try { const s = parseInt(localStorage.getItem('trader.dockW') || '', 10); if (s) apply(s); } catch (e) {}
-  const move = (e) => { if (dragging) apply(window.innerWidth - (e.clientX || 0) - 44); };
-  grip.addEventListener('pointerdown', (e) => {
-    dragging = true; document.body.classList.add('resizing-col');
-    grip.setPointerCapture && grip.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  });
-  document.addEventListener('pointermove', move);
-  document.addEventListener('pointerup', () => {
-    if (!dragging) return;
-    dragging = false; document.body.classList.remove('resizing-col');
-    if (typeof applyGridCols === 'function') applyGridCols();
-    if (typeof _indRerender === 'function') _indRerender();
+  const setVar = (name, key, px) => {
+    document.documentElement.style.setProperty(name, px + 'px'); _lsSet(key, String(px));
+  };
+  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-h', 'trader.ticketH']]) {
+    const s = parseInt(_lsGet(key, ''), 10); if (s) document.documentElement.style.setProperty(name, s + 'px');
+  }
+  bind('dockLResize', (e) => setVar('--dockl-w', 'trader.dockLW', clamp((e.clientX || 0) - 44, 220, 560)));
+  bind('dockRResize', (e) => setVar('--dockr-w', 'trader.dockRW', clamp(window.innerWidth - (e.clientX || 0) - 44, 240, 620)));
+  bind('ticketGrip', (e) => {
+    const box = document.getElementById('dockR').getBoundingClientRect();
+    setVar('--ticket-h', 'trader.ticketH', clamp(box.bottom - (e.clientY || 0), 140, Math.max(180, box.height - 160)));
   });
 })();
 
