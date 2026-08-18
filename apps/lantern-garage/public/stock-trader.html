@@ -1830,6 +1830,174 @@ function _iKeltner(bars, p, mult){
     lower: mid.map((m,i)=> (m==null||atr[i]==null)? null : m-mult*atr[i]) };
 }
 
+function _iHMA(src, p){
+  // Hull MA: WMA(2*WMA(n/2) - WMA(n), sqrt(n)) — Hull's published definition.
+  const half=Math.max(1,Math.round(p/2)), sq=Math.max(1,Math.round(Math.sqrt(p)));
+  const a=_iWMA(src,half), b=_iWMA(src,p);
+  const raw=src.map((_,i)=> (a[i]==null||b[i]==null)? null : 2*a[i]-b[i]);
+  return _iWMA(raw, sq);
+}
+function _iVWMA(bars, p){
+  const out=new Array(bars.length).fill(null);
+  for(let i=p-1;i<bars.length;i++){
+    let pv=0, v=0, ok=true;
+    for(let j=0;j<p;j++){
+      const c=_iNum(bars[i-j].close), vol=_iNum(bars[i-j].volume);
+      if(c==null||vol==null){ ok=false; break; }
+      pv+=c*vol; v+=vol;
+    }
+    if(ok && v>0) out[i]=pv/v;
+  }
+  return out;
+}
+function _iDEMA(src,p){ const e=_iEMA(src,p), e2=_iEMA(e.map(v=>v==null?null:v),p);
+  return src.map((_,i)=> (e[i]==null||e2[i]==null)? null : 2*e[i]-e2[i]); }
+function _iTEMA(src,p){ const e=_iEMA(src,p), e2=_iEMA(e,p), e3=_iEMA(e2,p);
+  return src.map((_,i)=> (e[i]==null||e2[i]==null||e3[i]==null)? null : 3*e[i]-3*e2[i]+e3[i]); }
+function _iPSAR(bars, step, maxStep){
+  // Wilder's parabolic SAR. Long/short flip on penetration; AF steps on a new extreme.
+  const out=new Array(bars.length).fill(null);
+  if(bars.length<2) return out;
+  let up=true, af=step, ep=_iNum(bars[0].high), sar=_iNum(bars[0].low);
+  for(let i=1;i<bars.length;i++){
+    const h=_iNum(bars[i].high), lo=_iNum(bars[i].low);
+    if(h==null||lo==null) continue;
+    sar = sar + af*(ep-sar);
+    if(up){
+      if(lo<sar){ up=false; sar=ep; ep=lo; af=step; }
+      else if(h>ep){ ep=h; af=Math.min(maxStep, af+step); }
+    } else {
+      if(h>sar){ up=true; sar=ep; ep=h; af=step; }
+      else if(lo<ep){ ep=lo; af=Math.min(maxStep, af+step); }
+    }
+    out[i]=sar;
+  }
+  return out;
+}
+function _iSupertrend(bars, p, mult){
+  const atr=_iATR(bars,p), hl2=_iSrc(bars,'hl2');
+  const line=new Array(bars.length).fill(null), dir=new Array(bars.length).fill(null);
+  let prevUp=null, prevDn=null, trendUp=true;
+  for(let i=0;i<bars.length;i++){
+    if(atr[i]==null||hl2[i]==null) continue;
+    const c=_iNum(bars[i].close), pc=i?_iNum(bars[i-1].close):null;
+    let up=hl2[i]-mult*atr[i], dn=hl2[i]+mult*atr[i];
+    if(prevUp!=null && pc!=null && pc>prevUp) up=Math.max(up,prevUp);
+    if(prevDn!=null && pc!=null && pc<prevDn) dn=Math.min(dn,prevDn);
+    if(c!=null){
+      if(prevDn!=null && c>prevDn) trendUp=true;
+      else if(prevUp!=null && c<prevUp) trendUp=false;
+    }
+    line[i]=trendUp?up:dn; dir[i]=trendUp?1:-1;
+    prevUp=up; prevDn=dn;
+  }
+  return { line, dir };
+}
+function _iEnvelope(src,p,pct){
+  const m=_iSMA(src,p);
+  return { mid:m, upper:m.map(v=>v==null?null:v*(1+pct/100)), lower:m.map(v=>v==null?null:v*(1-pct/100)) };
+}
+function _iWilliamsR(bars,p){
+  const out=new Array(bars.length).fill(null);
+  for(let i=p-1;i<bars.length;i++){
+    let hi=-Infinity, lo=Infinity, ok=true;
+    for(let j=0;j<p;j++){ const h=_iNum(bars[i-j].high), l=_iNum(bars[i-j].low);
+      if(h==null||l==null){ok=false;break;} if(h>hi)hi=h; if(l<lo)lo=l; }
+    const c=_iNum(bars[i].close);
+    if(ok&&c!=null&&hi!==lo) out[i]=((hi-c)/(hi-lo))*-100;
+  }
+  return out;
+}
+function _iROC(bars,p){
+  const s=_iSrc(bars,'close');
+  return s.map((v,i)=> (i<p||v==null||s[i-p]==null||!s[i-p])? null : ((v-s[i-p])/s[i-p])*100);
+}
+function _iMomentum(bars,p){
+  const s=_iSrc(bars,'close');
+  return s.map((v,i)=> (i<p||v==null||s[i-p]==null)? null : v-s[i-p]);
+}
+function _iTRIX(bars,p){
+  const s=_iSrc(bars,'close');
+  const t=_iEMA(_iEMA(_iEMA(s,p),p),p);
+  return t.map((v,i)=> (i===0||v==null||t[i-1]==null||!t[i-1])? null : ((v-t[i-1])/t[i-1])*100);
+}
+// StochRSI over a window where RSI never moves is 0/0 — genuinely undefined. We emit
+// null (the renderer draws a gap) rather than 0, because 0 would read as 'oversold' at
+// the very top of a rally. Only reachable on synthetic/flat input; real RSI moves.
+function _iStochRSI(bars,p,kP,dP){
+  const r=_iRSI(bars,p);
+  const k=new Array(r.length).fill(null);
+  for(let i=kP-1;i<r.length;i++){
+    let hi=-Infinity, lo=Infinity, ok=true;
+    for(let j=0;j<kP;j++){ const v=r[i-j]; if(v==null){ok=false;break;} if(v>hi)hi=v; if(v<lo)lo=v; }
+    if(ok&&hi!==lo&&r[i]!=null) k[i]=((r[i]-lo)/(hi-lo))*100;
+  }
+  return { k, d:_iSMA(k,dP) };
+}
+function _iCMF(bars,p){
+  const out=new Array(bars.length).fill(null);
+  for(let i=p-1;i<bars.length;i++){
+    let mfv=0, vol=0, ok=true;
+    for(let j=0;j<p;j++){
+      const b=bars[i-j], h=_iNum(b.high), l=_iNum(b.low), c=_iNum(b.close), v=_iNum(b.volume)||0;
+      if(h==null||l==null||c==null){ok=false;break;}
+      const mult = (h===l)? 0 : ((c-l)-(h-c))/(h-l);
+      mfv += mult*v; vol += v;
+    }
+    if(ok&&vol>0) out[i]=mfv/vol;
+  }
+  return out;
+}
+function _iAD(bars){
+  const out=new Array(bars.length).fill(null);
+  let acc=0;
+  for(let i=0;i<bars.length;i++){
+    const h=_iNum(bars[i].high), l=_iNum(bars[i].low), c=_iNum(bars[i].close), v=_iNum(bars[i].volume)||0;
+    if(h==null||l==null||c==null) continue;
+    acc += ((h===l)?0:(((c-l)-(h-c))/(h-l)))*v;
+    out[i]=acc;
+  }
+  return out;
+}
+function _iAwesome(bars){
+  const hl2=_iSrc(bars,'hl2'), f=_iSMA(hl2,5), s=_iSMA(hl2,34);
+  return hl2.map((_,i)=> (f[i]==null||s[i]==null)? null : f[i]-s[i]);
+}
+function _iAroon(bars,p){
+  const up=new Array(bars.length).fill(null), dn=new Array(bars.length).fill(null);
+  for(let i=p;i<bars.length;i++){
+    let hi=-Infinity, lo=Infinity, hIdx=0, lIdx=0, ok=true;
+    for(let j=0;j<=p;j++){
+      const h=_iNum(bars[i-j].high), l=_iNum(bars[i-j].low);
+      if(h==null||l==null){ok=false;break;}
+      if(h>hi){hi=h;hIdx=j;} if(l<lo){lo=l;lIdx=j;}
+    }
+    if(!ok) continue;
+    up[i]=((p-hIdx)/p)*100; dn[i]=((p-lIdx)/p)*100;
+  }
+  return { up, dn };
+}
+function _iPPO(bars,fast,slow,sig){
+  const s=_iSrc(bars,'close'), f=_iEMA(s,fast), sl=_iEMA(s,slow);
+  const ppo=s.map((_,i)=> (f[i]==null||sl[i]==null||!sl[i])? null : ((f[i]-sl[i])/sl[i])*100);
+  return { ppo, signal:_iEMA(ppo,sig) };
+}
+function _iCMO(bars,p){
+  const s=_iSrc(bars,'close'), out=new Array(s.length).fill(null);
+  for(let i=p;i<s.length;i++){
+    let up=0, dn=0, ok=true;
+    for(let j=0;j<p;j++){
+      const a=s[i-j], b=s[i-j-1];
+      if(a==null||b==null){ok=false;break;}
+      const d=a-b; if(d>0) up+=d; else dn-=d;
+    }
+    if(ok && (up+dn)>0) out[i]=((up-dn)/(up+dn))*100;
+  }
+  return out;
+}
+function _iStdevPane(bars,p){ return _iStdev(_iSrc(bars,'close'), p); }
+
+
 // ── Registry ────────────────────────────────────────────────────────────────
 // kind: 'overlay' draws in price units on the price pane; 'pane' gets its own strip.
 // params: [{k, label, def, min, max, step}] — rendered generically by the editor,
@@ -1849,6 +2017,25 @@ const IND_DEFS = {
   cci:      { name:'CCI',            kind:'pane',    params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#60a5fa', guides:[-100,100] },
   mfi:      { name:'MFI',            kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:100}], color:'#fb923c', band:[0,100], guides:[20,80] },
   obv:      { name:'OBV',            kind:'pane',    params:[], color:'#94a3b8' },
+  hma:      { name:'Hull MA',        kind:'overlay', params:[{k:'p',label:'Period',def:21,min:2,max:400}], color:'#22d3ee' },
+  vwma:     { name:'VWMA',           kind:'overlay', params:[{k:'p',label:'Period',def:20,min:2,max:400}], color:'#c084fc' },
+  dema:     { name:'DEMA',           kind:'overlay', params:[{k:'p',label:'Period',def:21,min:2,max:400}], color:'#f59e0b' },
+  tema:     { name:'TEMA',           kind:'overlay', params:[{k:'p',label:'Period',def:21,min:2,max:400}], color:'#84cc16' },
+  psar:     { name:'Parabolic SAR',  kind:'overlay', params:[{k:'s',label:'Step',def:0.02,min:0.001,max:0.2,step:0.001},{k:'m',label:'Max step',def:0.2,min:0.01,max:1,step:0.01}], color:'#f472b6' },
+  supert:   { name:'Supertrend',     kind:'overlay', params:[{k:'p',label:'ATR period',def:10,min:1,max:100},{k:'m',label:'Multiplier',def:3,min:0.1,max:10,step:0.1}], color:'#34d399' },
+  env:      { name:'Envelope',       kind:'overlay', params:[{k:'p',label:'Period',def:20,min:2,max:400},{k:'m',label:'Percent',def:2.5,min:0.1,max:20,step:0.1}], color:'#94a3b8' },
+  wr:       { name:'Williams %R',    kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:100}], color:'#f472b6', band:[-100,0], guides:[-80,-20] },
+  roc:      { name:'Rate of change', kind:'pane',    params:[{k:'p',label:'Period',def:12,min:1,max:200}], color:'#38bdf8', guides:[0] },
+  mom:      { name:'Momentum',       kind:'pane',    params:[{k:'p',label:'Period',def:10,min:1,max:200}], color:'#a78bfa', guides:[0] },
+  trix:     { name:'TRIX',           kind:'pane',    params:[{k:'p',label:'Period',def:15,min:2,max:100}], color:'#fbbf24', guides:[0] },
+  stochrsi: { name:'Stochastic RSI', kind:'pane',    params:[{k:'p',label:'RSI period',def:14,min:2,max:100},{k:'d',label:'%D',def:3,min:1,max:50}], color:'#60a5fa', band:[0,100], guides:[20,80] },
+  cmf:      { name:'Chaikin money flow', kind:'pane', params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#34d399', guides:[0] },
+  ad:       { name:'Accum/Dist',     kind:'pane',    params:[], color:'#94a3b8' },
+  ao:       { name:'Awesome osc.',   kind:'pane',    params:[], color:'#fb923c', guides:[0] },
+  aroon:    { name:'Aroon',          kind:'pane',    params:[{k:'p',label:'Period',def:25,min:2,max:200}], color:'#4ade80', band:[0,100], guides:[50] },
+  ppo:      { name:'PPO',            kind:'pane',    params:[{k:'f',label:'Fast',def:12,min:1,max:200},{k:'s',label:'Slow',def:26,min:2,max:400},{k:'g',label:'Signal',def:9,min:1,max:100}], color:'#38bdf8', guides:[0] },
+  cmo:      { name:'Chande momentum',kind:'pane',    params:[{k:'p',label:'Period',def:14,min:2,max:200}], color:'#f87171', band:[-100,100], guides:[-50,50] },
+  stdev:    { name:'Std deviation',  kind:'pane',    params:[{k:'p',label:'Period',def:20,min:2,max:200}], color:'#c084fc' },
 };
 
 /** Compute one configured indicator → { series:[{values,color,width,dash}], hist?, band?, guides? } */
@@ -1878,6 +2065,29 @@ function indCompute(cfg, bars){
     case 'cci': return { series:[{values:_iCCI(bars,P('p')), color:c, width:W}], guides:d.guides };
     case 'mfi': return { series:[{values:_iMFI(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
     case 'obv': return { series:[{values:_iOBV(bars), color:c, width:W}] };
+    case 'hma': return { series:[{values:_iHMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'vwma': return { series:[{values:_iVWMA(bars, P('p')), color:c, width:W}] };
+    case 'dema': return { series:[{values:_iDEMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'tema': return { series:[{values:_iTEMA(_iSrc(bars,'close'), P('p')), color:c, width:W}] };
+    case 'psar': return { series:[{values:_iPSAR(bars, P('s'), P('m')), color:c, width:W, dots:true}] };
+    case 'supert': return { series:[{values:_iSupertrend(bars, P('p'), P('m')).line, color:c, width:W}] };
+    case 'env': { const e=_iEnvelope(_iSrc(bars,'close'), P('p'), P('m'));
+      return { series:[{values:e.upper,color:c,width:1},{values:e.mid,color:c,width:1,dash:[4,3]},{values:e.lower,color:c,width:1}] }; }
+    case 'wr': return { series:[{values:_iWilliamsR(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
+    case 'roc': return { series:[{values:_iROC(bars,P('p')), color:c, width:W}], guides:d.guides };
+    case 'mom': return { series:[{values:_iMomentum(bars,P('p')), color:c, width:W}], guides:d.guides };
+    case 'trix': return { series:[{values:_iTRIX(bars,P('p')), color:c, width:W}], guides:d.guides };
+    case 'stochrsi': { const s=_iStochRSI(bars,P('p'),P('p'),P('d'));
+      return { series:[{values:s.k,color:c,width:W},{values:s.d,color:'#fbbf24',width:1}], band:d.band, guides:d.guides }; }
+    case 'cmf': return { series:[{values:_iCMF(bars,P('p')), color:c, width:W}], guides:d.guides };
+    case 'ad': return { series:[{values:_iAD(bars), color:c, width:W}] };
+    case 'ao': return { series:[{values:_iAwesome(bars), color:c, width:W}], guides:d.guides };
+    case 'aroon': { const a=_iAroon(bars,P('p'));
+      return { series:[{values:a.up,color:'#4ade80',width:W},{values:a.dn,color:'#f87171',width:1}], band:d.band, guides:d.guides }; }
+    case 'ppo': { const x=_iPPO(bars,P('f'),P('s'),P('g'));
+      return { series:[{values:x.ppo,color:c,width:W},{values:x.signal,color:'#fb923c',width:1}], guides:d.guides }; }
+    case 'cmo': return { series:[{values:_iCMO(bars,P('p')), color:c, width:W}], band:d.band, guides:d.guides };
+    case 'stdev': return { series:[{values:_iStdevPane(bars,P('p')), color:c, width:W}] };
   }
   return null;
 }
