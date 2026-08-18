@@ -320,12 +320,28 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
   // Hence: today-opened → since entry; carried → since prevClose.
   let unreal = 0;
   let unrealDegraded = false;
+  let unknownLot = false;   // a held symbol this ledger has no entry row for (#3353)
   const perPosition = [];   // what each open position contributed TODAY
   for (const p of positions) {
     const sym = String(p.symbol).toUpperCase();
     const qty = Number(p.qty) || 0;
     const cur = Number(p.current_price) || 0;
-    const isCarried = lastEntryDay.get(sym) !== today;
+    // THREE states, not two (#3353). `lastEntryDay.get(sym) !== today` was true
+    // both for "entered on a prior day" (genuinely carried) and for "this ledger
+    // has never heard of the symbol" — absence of evidence read as evidence of
+    // absence. Any surface whose ledger did not write the entries then charges a
+    // position opened TODAY with the whole overnight gap. Live 2026-08-18 on
+    // :4178, whose engine scans but never trades: SMH (opened 09:30 @575.22) read
+    // -$5,573 against a true -$1,798, and GLD (11:29 @399.76) read -$1,720
+    // against +$47 — the header overstated the day by ~$3,200 on the surface the
+    // operator was actually watching.
+    //
+    // A ledger that never recorded the entry cannot certify the lot as carried.
+    // Fall back to what IS known — the broker's own since-entry figure — and
+    // DECLARE it, exactly as the missing-prevClose path already does.
+    const _entryDay = lastEntryDay.get(sym);
+    const isUnknownLot = _entryDay === undefined;
+    const isCarried = !isUnknownLot && _entryDay !== today;
     const pc = prevClose.get(sym);
     let contrib = 0;
     let basis = 'entry';
@@ -337,6 +353,7 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
     } else {
       contrib = Number(p.unrealized_pl) || 0;               // opened today: since entry
       if (isCarried) { basis = 'since_entry_fallback'; unrealDegraded = true; }
+      else if (isUnknownLot) { basis = 'since_entry_unknown_lot'; unknownLot = true; }
     }
     unreal += contrib;
     perPosition.push({ symbol: sym, day_pnl: Math.round(contrib * 100) / 100, day_basis: basis });
@@ -353,6 +370,7 @@ async function computeDayPnl({ positions = [], ledgerText = '', now = Date.now()
     if (min < 570) basis += ' (pre-market marks)';   // real, current, just thinner liquidity
   }
   if (realizedDegraded || unrealDegraded) basis += ' (prevClose unavailable for some carried lots — shown since entry)';
+  if (unknownLot) basis += ' (some held symbols have no entry row in this ledger — shown since entry, NOT as carried)';
   basis += '; excludes commissions';
 
   return {
