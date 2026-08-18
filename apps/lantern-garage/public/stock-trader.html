@@ -214,9 +214,14 @@
   .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px;border-radius:5px;
     border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
   .dr-fly-foot button:hover{background:var(--bg3);color:var(--text0)}
+  /* Style popup rows for a selected drawing. */
+  .dr-st-row{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;color:var(--text1)}
+  .dr-st-row span{flex:1}
+  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
+  .dr-st-row input[type=range]{width:96px}
 
   /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
-  .fav-bar{position:fixed;left:80px;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
+  .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
     padding:3px 4px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;
     box-shadow:0 6px 20px rgba(0,0,0,.4)}
   .fav-bar[hidden]{display:none}
@@ -2587,11 +2592,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
         const MONO = '9px ui-monospace, Menlo, Consolas, monospace';
         const drawOne = (d, ghost) => {
-          const col = d.color || DRAW_COLOR;
+          // Per-drawing style (colour / width / dash) lives on the object, so it saves with it.
+          const _st = (typeof drawStyleOf === 'function') ? drawStyleOf(d) : {};
+          const col = d.color || _st.color || DRAW_COLOR;
           ctx.save();
           if (ghost) ctx.globalAlpha = 0.55;
           const base = ghost ? 0.55 : 1;
-          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || 1.2; ctx.font = MONO;
+          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || _st.w || 1.2; if (_st.dash) ctx.setLineDash([_st.dash, _st.dash]); ctx.font = MONO;
           const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: y(a.price), ts: a.ts, price: a.price }));
           if (!P.length) { ctx.restore(); return; }
           const tag = (txt, px, py, align) => {
@@ -2766,6 +2773,20 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
           ctx.save(); ctx.fillStyle = DRAW_COLOR;
           for (const a of pend.pts) { ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 3, 0, Math.PI*2); ctx.fill(); }
+          ctx.restore();
+        }
+        // Selection handles: a ring on each anchor of the selected drawing, so what can
+        // be grabbed is visible. Drawn last so nothing paints over them.
+        if (typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === tk && list[_selDraw.i]) {
+          const sd = list[_selDraw.i];
+          const hp = (sd.t === 'pen' && (sd.pts || []).length > 2)
+            ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
+          ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
+          for (const a of hp) {
+            ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#0b0d12'; ctx.fill();
+            ctx.strokeStyle = '#7dd3fc'; ctx.stroke();
+          }
           ctx.restore();
         }
       }
@@ -3973,8 +3994,9 @@ function _drawAnchor(canvas, clientX, clientY) {
   return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4) };
 }
 
-// Delete the drawing nearest the click (within 9px), measured in render space.
-function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
+// Which drawing is under this point? Returns { i, dist, pts } or null. Shared by
+// delete, selection and handle-dragging so all three agree on what you clicked.
+function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   const list = _drawings[tk] || [];
   if (!list.length) return false;
   const rng = data.rMax - data.rMin;
@@ -3988,7 +4010,7 @@ function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
     const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / L2));
     return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
   };
-  let best = -1, bestD = 9;
+  let best = -1, bestD = (tol == null ? 9 : tol);
   list.forEach((d, i) => {
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
@@ -4009,11 +4031,114 @@ function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
     }
     if (dist < bestD) { bestD = dist; best = i; }
   });
-  if (best < 0) return false;
-  list.splice(best, 1);
+  if (best < 0) return null;
+  const P = (list[best].pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
+  return { i: best, dist: bestD, pts: P };
+}
+
+/* Screen-space anchors for one drawing — what the resize handles attach to. */
+function _drawingAnchors(tk, data, idx, pw, ph) {
+  const d = (_drawings[tk] || [])[idx];
+  if (!d || !data || !data.bars || !data.bars.length) return [];
+  const rng = data.rMax - data.rMin; if (rng <= 0) return [];
+  const yOf = pr => ((data.rMax - pr) / rng) * ph;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+  // A brush is a path, not a shape: a handle per point would be unusable, so it gets
+  // its two ends and otherwise moves as a whole.
+  const pts = (d.t === 'pen' && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
+  return pts.map(a => ({ x: xOf(a.ts), y: yOf(a.price), ts: a.ts, price: a.price }));
+}
+
+function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
+  const hit = _hitDrawing(tk, data, xPx, yPx, pw, ph, 9);
+  if (!hit) return false;
+  const list = _drawings[tk] || [];
+  list.splice(hit.i, 1);
   if (!list.length) delete _drawings[tk];
+  if (_selDraw && _selDraw.tk === tk && _selDraw.i === hit.i) _selDraw = null;
   _saveDrawings();
   return true;
+}
+
+/* -- Selection, dragging and per-drawing style (#3354) ------------------------
+   With no tool armed, clicking a drawing selects it: handles appear on its anchors,
+   dragging a handle moves that anchor, dragging the body moves the whole thing, and
+   Delete removes it. Style lives ON the drawing (d.style), so it saves with it. */
+let _selDraw = null;      // { tk, i }
+let _dragDraw = null;     // { tk, i, handle, startPts, x0, y0 }
+const DRAW_STYLE_DEFAULT = { color: '#a78bfa', w: 1.5, dash: 0 };
+const drawStyleOf = (d) => Object.assign({}, DRAW_STYLE_DEFAULT, d && d.style);
+
+function _selGeom(tk) {
+  const canvas = document.getElementById('chart-' + tk);
+  const data = canvas && _crossData[canvas.id];
+  if (!canvas || !data || !data.bars || !data.bars.length) return null;
+  const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = Math.max(0, canvas.clientHeight - AXIS_H);
+  const rng = data.rMax - data.rMin; if (rng <= 0) return null;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  return { canvas, data, pw, ph, n,
+    priceAt: (py) => data.rMax - (py / ph) * rng,
+    tsAt: (px) => n === 1 ? ts0 : ts0 + ((px - slotW/2) / Math.max(1, (n-1)*slotW)) * (ts1 - ts0) };
+}
+function _refreshTicker(tk) {
+  try { renderZoneLadder(tk, zonesData[tk] || {}, (wlPrices.find(x => x.ticker === tk) || {}).price, null, null, true); }
+  catch (e) {}
+}
+function selectDrawing(tk, i) { _selDraw = (i == null) ? null : { tk, i }; _refreshTicker(tk); }
+
+/* Delete/Backspace removes the selection, the way every canvas editor behaves. */
+document.addEventListener('keydown', (e) => {
+  if (!_selDraw) return;
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  e.preventDefault();
+  deleteDrawing(_selDraw.tk, _selDraw.i);
+});
+
+/* Style popup for the selected drawing — colour, width, dash, delete. */
+let _styleEl = null;
+function openDrawingStyle(tk, i, atX, atY) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const st = drawStyleOf(d);
+  if (!_styleEl) {
+    _styleEl = document.createElement('div');
+    _styleEl.className = 'dr-flyout'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
+    document.body.appendChild(_styleEl);
+    document.addEventListener('click', (ev) => {
+      if (!_styleEl || _styleEl.hidden || _styleEl.contains(ev.target)) return;
+      _styleEl.hidden = true;
+    });
+  }
+  const name = (DRAW_TOOLS[d.t] && DRAW_TOOLS[d.t].name) || d.t;
+  _styleEl.innerHTML = '<div class="dr-fly-group">' + name + '</div>'
+    + '<label class="dr-st-row"><span>Colour</span><input type="color" value="' + st.color + '"'
+    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{color:this.value})"></label>'
+    + '<label class="dr-st-row"><span>Width</span><input type="range" min="1" max="6" step="0.5" value="' + st.w + '"'
+    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{w:parseFloat(this.value)})"></label>'
+    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (st.dash ? 'checked' : '')
+    +   ' onchange="setDrawingStyle(\'' + tk + '\',' + i + ',{dash:this.checked?5:0})"></label>'
+    + '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button></div>';
+  _styleEl.hidden = false;
+  const w = _styleEl.offsetWidth || 200, h = _styleEl.offsetHeight || 140;
+  _styleEl.style.left = Math.max(8, Math.min(atX, window.innerWidth - w - 8)) + 'px';
+  _styleEl.style.top = Math.max(8, Math.min(atY, window.innerHeight - h - 8)) + 'px';
+}
+function setDrawingStyle(tk, i, patch) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.style = Object.assign(drawStyleOf(d), patch);
+  _saveDrawings(); _refreshTicker(tk);
+}
+function deleteDrawing(tk, i) {
+  const list = _drawings[tk] || [];
+  list.splice(i, 1);
+  if (!list.length) delete _drawings[tk];
+  _selDraw = null;
+  if (_styleEl) _styleEl.hidden = true;
+  _saveDrawings(); _refreshTicker(tk);
 }
 
 function _commitDrawing(tk, obj) {
@@ -4078,6 +4203,85 @@ document.addEventListener('pointerup', () => {
   // so click-click still works for people who prefer it.
   renderTicker(tk);
 }, true);
+
+/* -- Selecting and editing a placed drawing -----------------------------------
+   With NO tool armed, a press on the plot either grabs a handle of the selected
+   drawing, grabs the body of one, or clears the selection. This is what makes a
+   drawing editable at all: before it, an object could be placed and then never
+   touched again except by alt-click. */
+const _HANDLE_R = 5;
+document.addEventListener('pointerdown', (e) => {
+  if (_drawTool || e.altKey || e.button !== 0) return;      // a tool armed means "draw", not "edit"
+  const lad = e.target.closest && e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  const tk = _canvasTicker(canvas); if (!tk) return;
+
+  // 1. a handle of the already-selected drawing wins over everything
+  if (_selDraw && _selDraw.tk === tk) {
+    const anchors = _drawingAnchors(tk, a.data, _selDraw.i, a.pw, a.ph);
+    for (let k = 0; k < anchors.length; k++) {
+      if (Math.hypot(anchors[k].x - a.xPx, anchors[k].y - a.yPx) <= _HANDLE_R + 4) {
+        const d = _drawings[tk][_selDraw.i];
+        _dragDraw = { tk, i: _selDraw.i, handle: k, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
+        e.stopPropagation(); e.preventDefault();
+        return;
+      }
+    }
+  }
+  // 2. otherwise select whatever is under the pointer, and start a body drag
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 9);
+  if (hit) {
+    _selDraw = { tk, i: hit.i };
+    const d = _drawings[tk][hit.i];
+    _dragDraw = { tk, i: hit.i, handle: -1, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
+    e.stopPropagation(); e.preventDefault();
+    _refreshTicker(tk);
+  } else if (_selDraw) {
+    const had = _selDraw.tk; _selDraw = null; _refreshTicker(had);
+  }
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!_dragDraw) return;
+  const g = _selGeom(_dragDraw.tk); if (!g) return;
+  const r = g.canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const d = (_drawings[_dragDraw.tk] || [])[_dragDraw.i]; if (!d) { _dragDraw = null; return; }
+  if (_dragDraw.handle >= 0) {
+    // Move ONE anchor. A brush maps its two handles to the path's real endpoints.
+    const src = _dragDraw.startPts;
+    let idx = _dragDraw.handle;
+    if (d.t === 'pen' && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
+    d.pts[idx] = { ts: g.tsAt(x), price: g.priceAt(y) };
+  } else {
+    // Move the WHOLE drawing by the pointer delta, in data units so it stays welded
+    // to the bars rather than drifting when the scale changes.
+    const dts = g.tsAt(x) - g.tsAt(_dragDraw.x0);
+    const dpr = g.priceAt(y) - g.priceAt(_dragDraw.y0);
+    d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
+  }
+  _refreshTicker(_dragDraw.tk);
+});
+
+document.addEventListener('pointerup', () => {
+  if (!_dragDraw) return;
+  _saveDrawings();                 // persist only once the drag ends, not per frame
+  _dragDraw = null;
+});
+
+// Right-click a drawing to open its style popup.
+document.addEventListener('contextmenu', (e) => {
+  const lad = e.target.closest && e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  const tk = _canvasTicker(canvas); if (!tk) return;
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 9);
+  if (!hit) return;
+  e.preventDefault(); e.stopPropagation();
+  _selDraw = { tk, i: hit.i }; _refreshTicker(tk);
+  openDrawingStyle(tk, hit.i, e.clientX, e.clientY);
+});
 
 // Capture-phase click so an armed tool wins over the card's own click-to-focus.
 document.addEventListener('click', e => {
@@ -4733,7 +4937,13 @@ document.addEventListener('mousemove', function(e){
   const x = e.clientX-rect.left, y = e.clientY-rect.top;
   const w = rect.width, h = rect.height;
   if(x<0||x>w||y<0||y>h){ ladder.style.cursor=''; _hideXh(ladder); return; }
-  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : 'grab';
+  // The cursor CATEGORY drives the pointer over the plot: Cross means a crosshair, not
+  // the pan hand -- which is why picking Cross appeared to do nothing before. A drawing
+  // tool armed also shows a crosshair, since you are aiming at an anchor, not grabbing.
+  const _cur = (typeof drawDefaults !== 'undefined' && drawDefaults.cursor) || 'cross';
+  const _plotCursor = _drawTool ? 'crosshair'
+    : _cur === 'dot' ? 'cell' : _cur === 'pointer' ? 'default' : _cur === 'eraser' ? 'not-allowed' : 'crosshair';
+  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
   _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
 let _lastXhLadder = null;
@@ -5731,11 +5941,11 @@ function toggleTicketDock() {
    tool and makes it that button's default, which is what makes the rail learn your
    habits instead of staying a fixed list. Per-category defaults, favourites and
    custom shortcuts all persist. */
+// Magnet, keep-drawing and lock were removed (operator, 2026-08-18): three toggles that
+// nothing in the render or commit path actually read. Hide is real -- the drawing pass
+// checks it -- so it stays.
 const DRAW_UTILS = {
-  magnet: { icon: '🧲', label: 'Magnet — snap anchors to the nearest OHLC value' },
-  keep:   { icon: '⇉', label: 'Keep drawing — stay in the tool after each object' },
-  lock:   { icon: '🔒', label: 'Lock drawings — no accidental edits or deletes' },
-  hide:   { icon: '👁', label: 'Hide drawings' },
+  hide: { icon: '👁', label: 'Hide drawings' },
 };
 const _dj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
 const _ds = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
@@ -5825,7 +6035,7 @@ function toggleDrawFlyout(catId, btn) {
         + ' onclick="pickDrawTool(\'' + id + '\')">'
         + '<span class="dr-fly-ico">' + t.icon + '</span>'
         + '<span class="dr-fly-name">' + _esc(t.name) + '</span>'
-        + '<button class="dr-fly-q" type="button" title="What is this?" aria-label="About ' + _esc(t.name) + '"'
+        + '<button class="dr-fly-q" type="button" title="Learn more" aria-label="About ' + _esc(t.name) + '"'
         +   ' onclick="event.stopPropagation();showToolInfo(\'' + id + '\')">?</button>'
         + '<button class="dr-fly-key" type="button" title="Click to set a shortcut" aria-label="Shortcut for ' + _esc(t.name) + '"'
         +   ' onclick="event.stopPropagation();assignToolKey(\'' + id + '\')">' + (key ? _esc(key) : '＋') + '</button>'
