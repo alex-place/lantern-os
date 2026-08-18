@@ -1303,6 +1303,94 @@ const REGISTRY = {
     },
   },
 
+  // ── #3331: the assistant sees what the intraday trader sees ────────────────
+  // The Advisor tab used to be the place you went for "what should I do". Advice is
+  // a conversation, so these three give chat the trader's OWN inputs rather than a
+  // second opinion built from different data: the user's list, the engine's
+  // per-symbol verdict, and the alerts they set. All read-only — none of them can
+  // size, place, or cancel an order, and that is deliberate (ADR-0020 keeps Act
+  // behind the trading guard).
+
+  trader_watchlist: {
+    policy: "read", // operator-only: the watchlist is per-user state
+    desc: "Get the user's OWN trader watchlist — their symbols, in their order, with live price and day change, plus the engine's current read on each (direction, confidence, and whether a position is open). Use this before answering anything about 'my watchlist', 'my symbols', 'what am I watching', or any 'what looks good today' question, so the answer is about THEIR list rather than a generic one. It is also how you notice the user has added or removed symbols.",
+    schema: { type: "object", properties: {} },
+    async run(_i, ctx) {
+      try {
+        const h = _userHeaders(ctx);
+        const [wl, zx] = await Promise.all([
+          _localTradingGet("/api/trading/watchlist-prices", 9000, h).catch(() => null),
+          _localTradingGet("/api/trading/zones", 9000, h).catch(() => null),
+        ]);
+        const rows = Array.isArray(wl) ? wl : (wl && wl.prices) || [];
+        if (!rows.length) return "[trader_watchlist: the watchlist is empty or unavailable. Say so rather than assuming a default list.]";
+        const zones = (zx && zx.zones) || {};
+        const out = rows.map((r) => {
+          const z = zones[r.ticker] || {};
+          const px = r.price == null ? "?" : Number(r.price).toFixed(2);
+          const chg = r.chg_pct == null ? "" : ` ${r.chg_pct >= 0 ? "+" : ""}${r.chg_pct}%`;
+          const dir = z.direction ? ` · engine ${z.direction}${z.confidence != null ? ` ${z.confidence}%` : ""}` : "";
+          const pos = z.position ? " · POSITION OPEN" : "";
+          return `  ${r.ticker} $${px}${chg}${dir}${pos}`;
+        });
+        return [`Watchlist (${rows.length} symbols, in the user's order):`, ...out,
+          "Prices are live from the trader's feed — cite them, and note that the engine read is the same one driving the autopilot."].join("\n");
+      } catch (e) {
+        return `[trader_watchlist error: ${e.message}]`;
+      }
+    },
+  },
+
+  trader_signal: {
+    policy: "read",
+    guest_safe: true, // the engine's public read on a symbol; carries no account data
+    desc: "Get the intraday trader's OWN analysis of one ticker — the same signal the autopilot acts on: direction and confidence, setup quality and structure, the reasons it gives, entry price, the stop/target plan, the Σ₀ convergence verdict (ENTER/HOLD with p_win and expected R), RSI, ATR, relative volume, and the nearest support and resistance. Works for ANY ticker, on the watchlist or not. Use this — not your own charting intuition — whenever the user asks whether to buy, sell, hold, or trim something, so your advice and the autopilot's cannot silently disagree.",
+    schema: {
+      type: "object",
+      properties: { ticker: { type: "string", description: "Ticker symbol, e.g. SPY or NVDA" } },
+      required: ["ticker"],
+    },
+    async run(i, ctx) {
+      const t = String(i.ticker || "").trim().toUpperCase();
+      if (!t) return "[trader_signal error: a ticker is required]";
+      try {
+        const zx = await _localTradingGet("/api/trading/zones", 9000, _userHeaders(ctx));
+        // The endpoint distinguishes "the scan has no data yet" from "this symbol
+        // isn't watched", and so must we: reporting a cold cache as "the autopilot
+        // is not watching SPY" is a false statement about the user's own setup, in
+        // the one tool whose whole job is not contradicting the autopilot.
+        if (zx && zx.available === false) {
+          return `[trader_signal: the trader has no scan data loaded right now${zx.reason ? ` (${zx.reason})` : ""}. This is about the ENGINE, not ${t} — do not tell the user ${t} is unwatched. Use trader_quote for price and technicals, and say the engine's own read is unavailable at the moment.]`;
+        }
+        const z = (zx && zx.zones && zx.zones[t]) || null;
+        if (!z) {
+          return `[trader_signal: the engine is scanning, but has no read on ${t} — it only scans the watchlist. For an off-list symbol use trader_quote for price/technicals and say plainly that the autopilot is not watching it.]`;
+        }
+        const s = z.last_signal || {};
+        const c = s.convergence || {};
+        const p = s.plan || {};
+        const n = (v, d = 2) => (v == null ? "?" : Number(v).toFixed(d));
+        const lines = [
+          `${t} — the trader's current read`,
+          `  Direction: ${z.direction || "none"}${z.confidence != null ? ` (confidence ${z.confidence}%)` : ""}`,
+          `  Setup: quality ${s.quality || "?"}, structure ${s.structure || "?"}`,
+          s.reasons ? `  Why: ${s.reasons}` : null,
+          `  Price now: $${n(s.entry_price)} · support $${n(s.support)} · resistance $${n(s.resistance)}`,
+          (p.stop != null || p.target1 != null)
+            ? `  Plan: stop $${n(p.stop)}, target1 $${n(p.target1)}${p.target2 != null ? `, target2 $${n(p.target2)}` : ""}${p.hold_days != null ? `, hold ~${p.hold_days}d` : ""}` : null,
+          c.decision ? `  Σ₀ verdict: ${c.decision}${c.p_win != null ? ` (p_win ${(c.p_win * 100).toFixed(1)}%` : ""}${c.ev_r != null ? `, EV ${n(c.ev_r)}R)` : c.p_win != null ? ")" : ""}` : null,
+          `  RSI ${s.rsi ?? "?"} · ATR ${n(s.atr)} · rel volume ${s.volume_ratio ?? "?"}x`,
+          s.news && s.news.n ? `  News: ${s.news.label} (${s.news.n} items)` : null,
+          z.position ? "  NOTE: the user already holds a position in this symbol." : null,
+          "This is the engine's evidence, not a recommendation to trade — present it as such, with its confidence.",
+        ].filter(Boolean);
+        return lines.join("\n");
+      } catch (e) {
+        return `[trader_signal error: ${e.message}]`;
+      }
+    },
+  },
+
   trader_positions: {
     policy: "read", // operator-only (no guest_safe): private account data
     desc: "Get the operator's current paper-trading positions and account (equity, cash, buying power, day P&L). Use whenever the user asks about 'my positions', 'my portfolio', 'how am I doing', or their P&L. If the broker isn't connected, report that honestly — never invent holdings.",

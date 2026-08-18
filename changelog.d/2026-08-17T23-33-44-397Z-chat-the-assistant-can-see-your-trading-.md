@@ -1,0 +1,3 @@
+### Added
+
+- chat: the assistant can see your trading desk — your watchlist rides along with every turn (your symbols, your order, live price, the engine's direction, and where you hold), plus two new read-only tools: trader_watchlist and trader_signal, which returns the intraday engine's OWN read on a ticker (direction, setup quality, stop/target plan, the convergence verdict) so its advice and the autopilot's cannot silently disagree. It can read and analyse but never place, size, or cancel an order. The Advisor tab is retired — its deterministic math was already the portfolio_analysis / propose_rebalance / contribution_plan tools, so the tab was a duplicate surface, not a feature (#3331)
