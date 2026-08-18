@@ -114,7 +114,158 @@
   ::-webkit-scrollbar-corner{background:transparent}
   html[data-theme="light"] *{scrollbar-color:rgba(0,0,0,.22) transparent}
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
-  .layout{display:grid;grid-template-columns:var(--sidebar-w,296px) 1fr;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  /* #3355: charts first, then the dock, then the always-visible icon rail. The dock's
+     column collapses to 0 when closed, so a closed dock costs the chart nothing. */
+  /* Each column's width is its OWN variable, zeroed by its own body class. Enumerating
+     the combinations was wrong: `body.leftdock-closed` and `body.ticket-closed` have equal
+     specificity, so with both set the later rule won and re-expanded the left column --
+     closing the chat left its 360px behind. Per-flag variables cannot collide. */
+  :root{--col-l:var(--dockl-w,360px);--col-t:var(--ticket-w,320px);--col-r:var(--dockr-w,320px)}
+  .layout{display:grid;grid-template-columns:44px var(--col-l) minmax(0,1fr) var(--col-t) var(--col-r) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  body.leftdock-closed{--col-l:0px}
+  body.ticket-closed{--col-t:0px}
+  body.rightdock-closed{--col-r:0px}
+  /* -- Docks (#3355 v2) -----------------------------------------------------
+     TradingView's shape: a permanent drawing rail hard left, a collapsible left
+     panel for chat, the charts, then a right column holding a switchable widget
+     panel with the order ticket stacked under it, and the widget rail hard right.
+     Panels are grid children, so collapsing one really does hand the chart its
+     pixels back rather than growing under an overlay. */
+  .draw-rail{grid-column:1;grid-row:2 / span 2;display:flex;flex-direction:column;gap:2px;
+    padding:6px 5px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
+  .dockL{grid-column:2;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+    min-width:0;overflow:hidden;background:var(--bg1);border-right:1px solid var(--border)}
+  .dockR{grid-column:5;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+    min-width:0;overflow:hidden;background:var(--bg1);border-left:1px solid var(--border)}
+  body.leftdock-closed .dockL,
+  body.rightdock-closed .dockR{border:none}
+  body.leftdock-closed .dockL > *,
+  body.rightdock-closed .dockR > *{display:none}
+  .dockL-resize{position:absolute;right:-3px;top:0;bottom:0;width:7px;z-index:40}
+  .dockR-resize{position:absolute;left:-3px;top:0;bottom:0;width:7px;z-index:40}
+  body.leftdock-closed .dockL-resize, body.rightdock-closed .dockR-resize{display:none}
+
+  .dock-panel{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden}
+  .dock-panel[hidden]{display:none}
+  .dock-head{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--border);flex:0 0 auto}
+  .dock-title{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);flex:1}
+  .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
+  .dock-x:hover{color:var(--text0);background:var(--bg3)}
+  .dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+  /* An ADOPTED panel must be fluid. .dc-modal and .ot-modal still carried the fixed
+     widths they needed as right-edge overlays (360px and 340px), so inside a 300px dock
+     column they overflowed and clipped -- and resizing the column did nothing, because
+     their own width never changed. They fill their panel now, in both axes. */
+  .dock-body > .dc-modal, .dock-body > .ot-modal{
+    width:100%;max-width:none;height:100%;min-width:0;flex:1 1 auto;
+    border:none;box-shadow:none;animation:none}
+  .dock-body > .dc-modal{display:flex;flex-direction:column;min-height:0}
+  .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
+  .dock-body .wl-info{flex:0 0 auto}
+
+  /* Order ticket: a sibling row under the widget panel, so both are open at once. */
+  /* Its own column, left of the watchlist and the same size -- not stacked under it. */
+  .ticket-dock{grid-column:4;grid-row:2 / span 2;display:flex;flex-direction:column;min-width:0;
+    overflow:hidden;background:var(--bg1);border-left:1px solid var(--border);position:relative}
+  .ticket-dock .dock-body{overflow-y:auto}
+  .ticket-grip{position:absolute;left:-3px;top:0;bottom:0;width:7px;cursor:ew-resize;z-index:20}
+  .ticket-grip::before{content:"";position:absolute;top:50%;left:2px;transform:translateY(-50%);
+    width:3px;height:42px;border-radius:3px;background:var(--border)}
+    width:42px;height:3px;border-radius:3px;background:var(--border)}
+  .ticket-grip:hover::before{background:var(--accent)}
+  body.ticket-closed .ticket-dock{display:none}
+
+  /* Rails */
+  .dock-rail{grid-column:6;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
+    padding:8px 6px;background:var(--bg1);border-left:1px solid var(--border)}
+  .dock-tab{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+    background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
+    font-size:14px;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+  .dock-tab:hover{color:var(--text0);background:var(--bg3)}
+  .dock-tab[aria-selected="true"],.dock-tab[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .rail-sep{height:1px;background:var(--border);margin:4px 2px}
+
+  /* Drawing rail: grouped tool buttons, then the utility toggles. */
+  /* Category button: the tool icon, plus a chevron that appears on hover for the
+     flyout. Two hit targets in one 34px slot, the way TradingView's rail works. */
+  .dr-cat{position:relative;display:flex;align-items:center;flex:0 0 auto}
+  .dr-cat .dr-btn{width:36px;height:34px;font-size:17px}
+  .dr-cat.on .dr-btn{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dr-more{position:absolute;right:-1px;top:0;height:34px;width:11px;display:flex;align-items:center;
+    justify-content:center;background:none;border:0;color:var(--text2);font-size:10px;line-height:1;
+    cursor:pointer;opacity:0;transition:opacity .12s;border-radius:0 5px 5px 0}
+  .dr-cat:hover .dr-more,.dr-more:focus-visible,.dr-more[aria-expanded="true"]{opacity:1}
+  .dr-more:hover{color:var(--text0);background:var(--bg3)}
+  .dr-btn{width:36px;height:34px;display:flex;align-items:center;justify-content:center;
+    background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
+    font-size:13px;cursor:pointer;flex:0 0 auto}
+  .dr-btn:hover{color:var(--text0);background:var(--bg3)}
+  .dr-btn.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dr-sep{height:1px;background:var(--border);margin:4px 3px;flex:0 0 auto}
+  .dr-btn.util[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+
+  /* Flyout: the category's tools, grouped, each with ? / shortcut / favourite. */
+  .dr-flyout{position:fixed;z-index:1400;min-width:250px;max-height:76vh;overflow-y:auto;
+    background:var(--bg1);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 10px 30px rgba(0,0,0,.45);padding:5px}
+  .dr-flyout[hidden]{display:none}
+  .dr-fly-group{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text2);padding:7px 9px 3px}
+  .dr-fly-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer}
+  .dr-fly-item:hover{background:var(--bg2)}
+  .dr-fly-item.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
+  .dr-fly-ico{width:20px;text-align:center;color:var(--text1);flex:0 0 auto;font-size:15px}
+  .dr-fly-name{flex:1;font-size:12.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dr-fly-q,.dr-fly-key,.dr-fly-star{background:none;border:0;cursor:pointer;color:var(--text2);
+    font-family:var(--mono);line-height:1;padding:2px 3px;border-radius:4px;flex:0 0 auto}
+  .dr-fly-q{font-size:10px;width:16px;height:16px;border:1px solid var(--border);border-radius:50%}
+  .dr-fly-key{font-size:9.5px;min-width:30px;text-align:right}
+  .dr-fly-star{font-size:12px}
+  .dr-fly-star.on{color:var(--amber,#f5a623)}
+  .dr-fly-q:hover,.dr-fly-key:hover,.dr-fly-star:hover{color:var(--text0);background:var(--bg3)}
+  .dr-fly-why{font-size:12px;line-height:1.5;color:var(--text1);padding:2px 9px 6px;margin:0;max-width:270px}
+  .dr-fly-meta{font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 9px 8px;margin:0}
+  .dr-fly-foot{display:flex;gap:6px;padding:6px 8px 3px;border-top:1px solid var(--border)}
+  .dr-fly-foot button{flex:1;font-family:var(--mono);font-size:11px;padding:5px;border-radius:5px;
+    border:1px solid var(--border);background:var(--bg2);color:var(--text1);cursor:pointer}
+  .dr-fly-foot button:hover{background:var(--bg3);color:var(--text0)}
+  /* Style popup rows for a selected drawing. */
+  .dr-st-row{display:flex;align-items:center;gap:8px;padding:5px 9px;font-size:12px;color:var(--text1)}
+  .dr-st-row span{flex:1}
+  .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
+  .dr-st-row input[type=range]{width:96px}
+
+  /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
+  .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
+    width:max-content;max-width:none;padding:3px 4px;background:var(--bg1);border:1px solid var(--border);
+    border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+  .fav-bar[hidden]{display:none}
+  .fav-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 3px;user-select:none;touch-action:none}
+  .fav-grip:active{cursor:grabbing}
+  .fav-btn{width:28px;height:26px;display:flex;align-items:center;justify-content:center;background:none;
+    border:1px solid transparent;border-radius:5px;color:var(--text2);font-size:12.5px;cursor:pointer}
+  .fav-btn:hover{color:var(--text0);background:var(--bg3)}
+  .fav-btn.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+
+  /* Compact watchlist rows -- TradingView fits far more symbols per screen. */
+  /* Row compaction lives on the source rules above (.wl-item / .tb-badge) — an
+     override placed earlier in this sheet would lose to them at equal specificity. */
+
+  /* Phone: rails stay, both docks become bottom sheets. */
+  @media (max-width:760px){
+    .layout, body.leftdock-closed .layout, body.rightdock-closed .layout,
+    body.leftdock-closed.rightdock-closed .layout{grid-template-columns:0 0 minmax(0,1fr) 0 0}
+    .draw-rail{position:fixed;left:0;top:52px;bottom:auto;z-index:60;flex-direction:row;
+      grid-column:auto;grid-row:auto;border-right:none;border-bottom:1px solid var(--border);max-width:100vw}
+    .dock-rail{position:fixed;right:0;top:52px;z-index:60;flex-direction:row;gap:2px;
+      grid-column:auto;grid-row:auto;border-left:none;border-bottom:1px solid var(--border)}
+    .dockL,.dockR{position:fixed;left:0;right:0;bottom:0;top:auto;height:62vh;z-index:1200;
+      grid-column:auto;grid-row:auto;border:none;border-top:1px solid var(--border);
+      border-radius:14px 14px 0 0;box-shadow:0 -10px 28px rgba(0,0,0,.45)}
+    body.leftdock-closed .dockL,body.rightdock-closed .dockR{display:none}
+    .ticket-dock{height:auto}
+  }
+
   /* Vertical drag dividers for the left (watchlist) and right (order ticket) columns.
      A thin ew-resize strip with a centred grip; min/max are enforced in
      initColumnResizers() and the chosen widths persist. #trader-cols */
@@ -170,9 +321,9 @@
      run all the way to the bottom; the footer trading panel sits under the charts. */
   .sidebar{grid-column:1;grid-row:2 / 4;background:var(--bg1);border-right:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;min-height:0;position:relative}
   #wlList{flex:0 1 auto;overflow-y:auto;min-height:0;padding:8px 0}  /* 0-grow: the symbol-info panel docks to the LIST BOTTOM, not the sidebar floor — a short list otherwise left a dead gap between the two (operator, 2026-07-28) */
-  .main{grid-column:2;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
+  .main{grid-column:3;grid-row:2;overflow-y:auto;padding:12px;background:var(--bg0)}
   /* #1712: TradingView-style trading panel — summary row + tabs + table body */
-  .footer{position:relative;grid-column:2;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
+  .footer{position:relative;grid-column:3;grid-row:3;background:var(--bg1);border-top:1px solid var(--border);display:flex;flex-direction:column;min-height:0;height:100%;box-sizing:border-box;padding:0}
   .tp-summary{display:flex;flex-wrap:wrap;gap:6px 26px;padding:10px 16px 9px;border-bottom:1px solid var(--border)}
   .tp-stat{display:flex;flex-direction:column;gap:1px}
   .tp-stat .l{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2)}
@@ -184,6 +335,15 @@
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
   .tp-badge{font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
   .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
+  /* The footer is narrower now that the docks own real columns, so its tables scroll
+     inside their pane instead of being clipped at the edge (#3355 follow-up). */
+  /* NOTE: the footer's rows sit at a 156px content width inside a 512px footer, so the
+     positions table cannot reach the right edge. It is NOT a width-cascade problem --
+     an inline width:100% on .tp-body does not move it either, so the containing block
+     itself is 156px. Left unfixed rather than papered over; the scroll below at least
+     keeps the far columns reachable instead of clipped. */
+  .tp-pane{overflow-x:auto;width:100%}
+  .tp-pane .tp-table{min-width:max-content;width:100%}
   .tp-pane{display:none}
   .tp-pane.active{display:block}
   /* positions / orders table */
@@ -252,14 +412,14 @@
   /* ── Sidebar watchlist ── */
   /* Denser, TradingView-style rows (#1631): symbol + price on one line, change +
      signal on a tight second line. */
-  .wl-item{position:relative;display:grid;grid-template-columns:22px minmax(34px,1fr) auto auto auto;align-items:center;gap:6px;padding:10px 26px 10px 10px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.3}
+  .wl-item{position:relative;display:grid;grid-template-columns:18px minmax(30px,1fr) auto auto auto;align-items:center;gap:5px;padding:4px 20px 4px 8px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);transition:background .15s;line-height:1.2}
   /* Circular brand badge (TradingView-style). Background is chosen adaptively per
      logo (adaptLogoBg): dark by default so colour logos pop, light only for
      dark-monochrome marks (e.g. Intel) that would vanish on dark. */
   .wl-logo{width:24px;height:24px;border-radius:50%;flex:0 0 auto;object-fit:contain;padding:3px;box-sizing:border-box;background:#11161d;border:1px solid rgba(255,255,255,.10);image-rendering:auto}
   .wl-logo.on-light{background:#eef1f4;border-color:rgba(0,0,0,.12)}
   .wl-logo.ph{display:flex;align-items:center;justify-content:center;object-fit:none;padding:0;background:linear-gradient(135deg,#2b3340,#1a2029);color:var(--text1);font-family:var(--mono);font-size:10px;font-weight:700;border-color:rgba(255,255,255,.08)}
-  .tb-badge{width:24px;height:24px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
+  .tb-badge{width:17px;height:17px;border-radius:50%;flex:0 0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-family:var(--mono);font-size:7px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35);overflow:hidden}
   .tb-badge svg{width:15px;height:15px;display:block}
   .tb-badge.tb-glyph{font-size:12px;font-weight:600;text-shadow:none}
   .wl-logo.mono{display:flex;align-items:center;justify-content:center;padding:0;color:#fff;font-family:var(--mono);font-size:8.5px;font-weight:700;letter-spacing:.02em;border:1px solid rgba(255,255,255,.14);text-shadow:0 1px 2px rgba(0,0,0,.35)}
@@ -525,6 +685,10 @@
      container sits under the header on the right edge and is click-through
      (pointer-events:none) so the rest of the terminal stays interactive while
      the ticket is open; only the panel itself captures input. */
+  /* #3355: .ot-bg / .dc-bg are empty shells now — their modals were adopted into dock
+     panels. Kept in the DOM so existing open/close code keeps working, but never shown:
+     an invisible fixed layer over the chart is exactly the kind of thing that eats clicks. */
+  .ot-bg, .dc-bg{display:none!important}
   .ot-bg{position:fixed;top:104px;right:0;bottom:0;z-index:1100;display:flex;align-items:stretch;justify-content:flex-end;pointer-events:none}
   .ot-bg.hidden{display:none}
   .ot-modal{pointer-events:auto;background:var(--bg1);border-left:1px solid var(--border);
@@ -535,9 +699,12 @@
      sit BESIDE the panel instead of hidden under it. Gated on body.ot-open, which
      the guest/read-only view never gets (openOrderPanel is !GUEST) — so the guest
      layout never shifts (the old bug: it shifted while the panel stayed invisible). */
-  body.ot-open .main{ padding-right: calc(var(--ticket-w,340px) + 16px); }
-  body.ot-open .footer{ padding-right: calc(var(--ticket-w,340px) + 16px); }
-  @media (max-width:760px){ body.ot-open .main, body.ot-open .footer{ padding-right: 0; } }
+  /* #3355: the ticket is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
+  /* #3355: the ticket and chat are dock COLUMNS now, not overlays floating over the
+     footer, so reserving room for them here subtracts width twice. This padding was
+     the real cause of the positions table stopping short: 356px of right padding on a
+     512px footer left a 156px content box, which is why width:100% on the rows -- even
+     inline -- changed nothing. The grid already reserves those columns. */
   @media (max-width:760px){ .ot-modal{max-width:100vw} }
   /* Phone: the order ticket is a dismissible BOTTOM SHEET, not a screen-locking
      right dock. A tinted backdrop covers the app (tap it to close); the panel slides
@@ -794,12 +961,10 @@
   /* Reflow the deck + footer to the left so content sits BESIDE the rail, never under
      it — the same mechanism the order ticket uses. When both rails are open, reserve
      room for both and the chat sits to the left of the ticket. */
-  body.dc-open .main{ padding-right: calc(var(--chat-w,360px) + 16px); }
-  body.dc-open .footer{ padding-right: calc(var(--chat-w,360px) + 16px); }
+  /* #3355: the chat is a dock panel now — the grid reserves its column, so padding the chart area as well would double-count the space. */
   body.dc-open.ot-open .main{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
-  body.dc-open.ot-open .footer{ padding-right: calc(var(--chat-w,360px) + var(--ticket-w,340px) + 16px); }
   body.ot-open .dc-bg{ right: var(--ticket-w,340px); }
-  @media (max-width:760px){ body.dc-open .main, body.dc-open .footer{ padding-right:0; } body.ot-open .dc-bg{ right:0; } }
+  @media (max-width:760px){ body.ot-open .dc-bg{ right:0; } }
 
   .dc-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border)}
   .dc-head .dc-title{font-size:14px;font-weight:600;color:var(--text0);display:flex;align-items:center;gap:7px}
@@ -961,23 +1126,7 @@
   <button class="mvt-btn" data-view="positions" role="tab" aria-selected="false" onclick="setMobileView('positions')">Positions</button>
 </div>
 
-<!-- Sidebar -->
-<div class="sidebar" role="complementary" aria-label="AI tradelist">
-  <div class="col-resize col-resize-left" id="sidebarResize" role="separator" aria-orientation="vertical" aria-label="Resize the watchlist column" tabindex="0" title="Drag to resize the watchlist"></div>
-  <div class="wl-add">
-    <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
-    <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
-      <option value="">⇅</option>
-      <option value="chg">Δ%</option>
-      <option value="rvol">RVOL</option>
-    </select>
-  </div>
-  <div id="wlList"></div>
-  <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
-  <div id="wlInfo" class="wl-info"></div>
-</div>
-
-<!-- Main: ticker cards -->
+<!-- Main: charts -->
 <div class="main" role="main" aria-label="Charts">
   <div class="cards-grid" id="cardsGrid"></div>
 </div>
@@ -1036,6 +1185,77 @@
   </div>
 </div>
 
+<!-- #3355: right-hand dock. One panel at a time, switched by the icon rail on the far
+     right (TradingView's model). The watchlist moved here from the left column, which is
+     what frees the chart area; the order ticket and chat become panels of the same dock
+     instead of two independently-positioned fixed overlays. -->
+<!-- #3355 v2 — TradingView's actual shape. LEFT: an always-visible drawing rail, then a
+     collapsible left dock (chat). RIGHT: a widget panel (watchlist / alerts / details) with
+     the order ticket stacked UNDER it so both are open at once, then the widget rail. -->
+
+<!-- Far-left drawing rail: grouped tools on top, the utility toggles under them, exactly
+     the split TradingView uses (tools, then magnet / keep-drawing / lock / hide / remove). -->
+<nav class="draw-rail" id="drawRail" role="toolbar" aria-label="Drawing tools" aria-orientation="vertical"></nav>
+
+<!-- Left dock: chat lives here. Collapsible; its column goes to 0 and the chart takes it. -->
+<div class="dockL" id="dockL" role="region" aria-label="Left panel">
+  <div class="col-resize dockL-resize" id="dockLResize" role="separator" aria-orientation="vertical" aria-label="Resize the left panel" tabindex="0" title="Drag to resize"></div>
+  <section class="dock-panel" id="dockp-chat" role="tabpanel" aria-labelledby="ltab-chat">
+    <header class="dock-head"><span class="dock-title">Unisona</span>
+      <button class="dock-x" type="button" onclick="closeLeftDock()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body" id="dockChatBody"></div>
+  </section>
+</div>
+
+<!-- Order ticket: its OWN grid column, immediately left of the watchlist and the same
+     width. It was nested inside .dockR, where grid-column could not apply because it
+     was not a grid item of .layout -- so it rendered on top of the watchlist. -->
+  <div class="ticket-dock" id="ticketDock">
+    <div class="ticket-grip" id="ticketGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the order ticket" tabindex="0" title="Drag to resize"></div>
+    <header class="dock-head"><span class="dock-title">Order</span>
+      <button class="dock-x" type="button" onclick="toggleTicketDock()" aria-label="Close the order ticket" title="Close">✕</button></header>
+    <div class="dock-body" id="dockTicketBody"></div>
+  </div>
+
+<!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
+<div class="dockR" id="dockR" role="region" aria-label="Right panels">
+  <div class="col-resize dockR-resize" id="dockRResize" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0" title="Drag to resize"></div>
+
+  <section class="dock-panel rw-panel" id="rwp-watchlist" role="tabpanel" aria-labelledby="rtab-watchlist">
+    <header class="dock-head"><span class="dock-title">Watchlist</span>
+      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body">
+      <div class="wl-add">
+        <button class="wl-add-btn" onclick="openSymbolSearch(addWatchlistSymbol,{})" aria-label="Search and add a symbol" title="Search symbols">+ Add symbol</button>
+        <select class="wl-sort" aria-label="Sort watchlist" title="Sort the watchlist" onchange="setWlSort(this.value)">
+          <option value="">⇅</option>
+          <option value="chg">Δ%</option>
+          <option value="rvol">RVOL</option>
+        </select>
+      </div>
+      <div id="wlList"></div>
+      <div class="wl-resize" id="wlResize" role="separator" aria-label="Resize the symbol details panel" tabindex="0" title="Drag to resize"></div>
+      <div id="wlInfo" class="wl-info"></div>
+    </div>
+  </section>
+
+  <section class="dock-panel rw-panel" id="rwp-alerts" role="tabpanel" aria-labelledby="rtab-alerts" hidden>
+    <header class="dock-head"><span class="dock-title">Alerts</span>
+      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
+    <div class="dock-body" id="rwAlertsBody"></div>
+  </section>
+
+</div>
+
+<!-- Right widget rail — TradingView's right-hand switcher. -->
+<nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
+  <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">☰</button>
+  <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">🔔</button>
+  <span class="rail-sep"></span>
+  <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">⇅</button>
+  <span class="rail-sep"></span>
+  <button class="dock-tab" id="ltab-chat" type="button" aria-pressed="true" onclick="toggleLeftDock()" title="Ask Unisona (left panel)">💬</button>
+</nav>
 </div><!-- /layout -->
 
 <!-- Hamburger (sandwich) menu — narrow screens: chart controls + secondary actions
@@ -2393,11 +2613,13 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
         const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
         const MONO = '9px ui-monospace, Menlo, Consolas, monospace';
         const drawOne = (d, ghost) => {
-          const col = d.color || DRAW_COLOR;
+          // Per-drawing style (colour / width / dash) lives on the object, so it saves with it.
+          const _st = (typeof drawStyleOf === 'function') ? drawStyleOf(d) : {};
+          const col = d.color || _st.color || DRAW_COLOR;
           ctx.save();
           if (ghost) ctx.globalAlpha = 0.55;
           const base = ghost ? 0.55 : 1;
-          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || 1.2; ctx.font = MONO;
+          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || _st.w || 1.2; if (_st.dash) ctx.setLineDash([_st.dash, _st.dash]); ctx.font = MONO;
           const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: y(a.price), ts: a.ts, price: a.price }));
           if (!P.length) { ctx.restore(); return; }
           const tag = (txt, px, py, align) => {
@@ -2572,6 +2794,20 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
           ctx.save(); ctx.fillStyle = DRAW_COLOR;
           for (const a of pend.pts) { ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 3, 0, Math.PI*2); ctx.fill(); }
+          ctx.restore();
+        }
+        // Selection handles: a ring on each anchor of the selected drawing, so what can
+        // be grabbed is visible. Drawn last so nothing paints over them.
+        if (typeof _selDraw !== 'undefined' && _selDraw && _selDraw.tk === tk && list[_selDraw.i]) {
+          const sd = list[_selDraw.i];
+          const hp = (sd.t === 'pen' && (sd.pts || []).length > 2)
+            ? [sd.pts[0], sd.pts[sd.pts.length - 1]] : (sd.pts || []);
+          ctx.save(); ctx.lineWidth = 1.5; ctx.setLineDash([]);
+          for (const a of hp) {
+            ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#0b0d12'; ctx.fill();
+            ctx.strokeStyle = '#7dd3fc'; ctx.stroke();
+          }
           ctx.restore();
         }
       }
@@ -3490,6 +3726,11 @@ function openOrderTicket(ticker, side){
   otSide = side; otOrderType = 'market';
   setOrderSymbol(ticker);
   openOrderPanel();
+  // The ticket is a dock COLUMN now. openOrderPanel only sets the old overlay flag, so
+  // with the column closed a BUY/SELL click filled a 0px-wide panel and looked dead.
+  if (typeof _ticketOpen !== 'undefined' && (!_ticketOpen || !_rightOpen)) {
+    _ticketOpen = true; _rightOpen = true; _saveDocks(); _applyDocks();
+  }
 }
 
 function closeOrderTicket(){
@@ -3610,27 +3851,108 @@ const CHART_NOTE_BG = () =>
 
 // pts: how many clicks commit the shape. drag:true collects a freehand path.
 // text:true prompts for a label. group drives the picker's sections.
-const DRAW_TOOLS = {
-  l:     { name: 'Trend line',        pts: 2, group: 'Lines' },
-  ray:   { name: 'Ray',               pts: 2, group: 'Lines' },
-  xline: { name: 'Extended line',     pts: 2, group: 'Lines' },
-  h:     { name: 'Horizontal line',   pts: 1, group: 'Lines' },
-  hray:  { name: 'Horizontal ray',    pts: 1, group: 'Lines' },
-  v:     { name: 'Vertical line',     pts: 1, group: 'Lines' },
-  arrow: { name: 'Arrow',             pts: 2, group: 'Lines' },
-  chan:  { name: 'Parallel channel',  pts: 3, group: 'Lines' },
-  fib:   { name: 'Fib retracement',   pts: 2, group: 'Fibonacci' },
-  fibx:  { name: 'Fib extension',     pts: 3, group: 'Fibonacci' },
-  rect:  { name: 'Rectangle',         pts: 2, group: 'Patterns' },
-  ell:   { name: 'Ellipse',           pts: 2, group: 'Patterns' },
-  tri:   { name: 'Triangle',          pts: 3, group: 'Patterns' },
-  pos:   { name: 'Long position',     pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
-  poss:  { name: 'Short position',    pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
-  meas:  { name: 'Measure',           pts: 2, group: 'Forecasting' },
-  pen:   { name: 'Brush',             pts: 0, group: 'Notes', drag: true },
-  text:  { name: 'Text',              pts: 1, group: 'Notes', text: true },
-  note:  { name: 'Note',              pts: 1, group: 'Notes', text: true },
-};
+/* -- Drawing tool catalogue (#3354/#3355) ------------------------------------
+   TradingView's model, which is a CATEGORY per rail button rather than one button
+   per tool: each button shows the tool you last used in that category, clicking it
+   arms that tool, and the chevron on its right edge opens the category's flyout.
+   Picking from the flyout arms the tool AND becomes the button's new default, so the
+   rail adapts to how you actually draw.
+
+   DRAW_CATS is the source of truth; DRAW_TOOLS below is the flat map the renderer,
+   the hit-tester and the commit path already read, derived from it so there is one
+   catalogue and not two. `k` is the default shortcut; `why` is the ? blurb. */
+const DRAW_CATS = [
+  { id:'cursor', name:'Cursors', groups:[
+    { name:'Cursors', tools:[
+      ['cross',  { name:'Cross',        icon:'✛', cursor:true,  k:'Alt+C', why:'The normal chart cursor: pan, zoom and read the crosshair. Nothing is drawn.' }],
+      ['dot',    { name:'Dot',          icon:'·', cursor:true,             why:'A small dot cursor — the same navigation as Cross with a less intrusive pointer.' }],
+      ['pointer',{ name:'Arrow',        icon:'➤', cursor:true,             why:'A plain arrow pointer. Use it when the crosshair lines get in the way of reading candles.' }],
+    ]},
+    { name:'Editing', tools:[
+      ['eraser', { name:'Eraser',       icon:'⌫', erase:true,   k:'Alt+E', why:'Click any drawing to delete it. Stays armed so you can clear several in a row.' }],
+    ]},
+  ]},
+  { id:'lines', name:'Lines', groups:[
+    { name:'Lines', tools:[
+      ['l',      { name:'Trend line',       icon:'/',  pts:2, k:'Alt+T', why:'A line between two points. The workhorse: connect two highs or two lows to see the slope the market is respecting.' }],
+      ['ray',    { name:'Ray',              icon:'↗',  pts:2,            why:'Starts at your first click and continues forever in the direction of the second — the past stays clean, the level projects forward.' }],
+      ['info',   { name:'Trend line with stats',        icon:'⇢',  pts:2,            why:'A trend line that also reports the price change, percent move and bar count between its two ends.' }],
+      ['xline',  { name:'Extended line',    icon:'↔',  pts:2,            why:'Extends indefinitely in BOTH directions, so the line stays visible however far you scroll into the past or future.' }],
+      ['angle',  { name:'Trend line with angle',      icon:'∠',  pts:2,            why:'A trend line that shows the angle it makes with the horizontal — useful for comparing how steep two moves were.' }],
+      ['h',      { name:'Horizontal line',  icon:'—',  pts:1, k:'Alt+H', why:'A price level across the whole chart. The simplest way to mark support, resistance or a target.' }],
+      ['hray',   { name:'Horizontal ray',   icon:'⊢',  pts:1, k:'Alt+J', why:'A price level that starts where you click and only projects to the right — it does not claim history it was not there for.' }],
+      ['v',      { name:'Vertical line',    icon:'|',  pts:1, k:'Alt+V', why:'Marks a moment in time: an open, a print, an earnings release.' }],
+      ['crossline',{ name:'Cross line',     icon:'✚',  pts:1,            why:'A horizontal and a vertical line through one point — marks a price AND the time it happened.' }],
+    ]},
+    { name:'Channels', tools:[
+      ['chan',   { name:'Parallel channel', icon:'⫽',  pts:3,            why:'Two parallel lines: draw the trend with the first two clicks, the third sets the channel width.' }],
+      ['flat',   { name:'Flat top/bottom channel',  icon:'⊏',  pts:3,            why:'A channel with one horizontal edge — the shape of an ascending or descending triangle.' }],
+    ]},
+    { name:'Pitchforks', tools:[
+      ['fork',   { name:'Andrews pitchfork',        icon:'⑂',  pts:3,            why:'Andrews pitchfork: three points define a median line with two parallel tines that often act as support and resistance.' }],
+    ]},
+  ]},
+  { id:'patterns', name:'Chart patterns', groups:[
+    { name:'Shapes', tools:[
+      ['rect',   { name:'Rectangle',        icon:'▭',  pts:2, k:'Alt+R', why:'Boxes a zone — a range, a consolidation, an order block.' }],
+      ['ell',    { name:'Ellipse',          icon:'◯',  pts:2,            why:'Circles an area of interest without implying the hard edges a rectangle does.' }],
+      ['tri',    { name:'Triangle',         icon:'△',  pts:3,            why:'Three free points — wedges, pennants, and any three-touch shape.' }],
+    ]},
+    { name:'Patterns', tools:[
+      ['abcd',   { name:'ABCD measured move',     icon:'Ⅲ',  pts:4,            why:'Four points labelled A-B-C-D, the base measured-move pattern.' }],
+      ['xabcd',  { name:'XABCD harmonic',    icon:'Ⅴ',  pts:5,            why:'Five points for harmonic patterns — Gartley, Bat, Butterfly and friends.' }],
+      ['hs',     { name:'Head and shoulders',icon:'⩙', pts:5,            why:'Five points: left shoulder, head, right shoulder and the two neckline anchors.' }],
+    ]},
+  ]},
+  { id:'fib', name:'Fibonacci', groups:[
+    { name:'Fibonacci', tools:[
+      ['fib',    { name:'Fib retracement',  icon:'⋯',  pts:2, k:'Alt+F', why:'Draw from a swing low to a swing high and it marks the 23.6 / 38.2 / 50 / 61.8 / 78.6% pullback levels.' }],
+      ['fibx',   { name:'Fib extension',    icon:'⋰',  pts:3,            why:'Three points project where a move may END — the 1.272, 1.618 and 2.618 targets beyond the prior high.' }],
+      ['fibchan',{ name:'Fib channel',      icon:'∥',  pts:3,            why:'Fibonacci levels drawn parallel to a trend rather than horizontally.' }],
+      ['fibtime',{ name:'Fib time zones',    icon:'⦀',  pts:2,            why:'Vertical lines at Fibonacci intervals — projects WHEN a turn may be due rather than where.' }],
+    ]},
+  ]},
+  { id:'forecast', name:'Forecasting', groups:[
+    { name:'Positions', tools:[
+      ['pos',    { name:'Long position',    icon:'⬆',  pts:3, hint:'click entry, then stop, then target', why:'Entry, stop and target in three clicks; shows the risk/reward in R — the same unit the trader\'s own plan uses.' }],
+      ['poss',   { name:'Short position',   icon:'⬇',  pts:3, hint:'click entry, then stop, then target', why:'The same as Long position, mirrored for a short.' }],
+    ]},
+    { name:'Measure', tools:[
+      ['meas',   { name:'Measure',          icon:'📏', pts:2, k:'Alt+M', why:'Reports the price change, percentage and number of bars between two points.' }],
+      ['range',  { name:'Price range',      icon:'↕',  pts:2,            why:'Measures price only — how far a move travelled, ignoring how long it took.' }],
+      ['drange', { name:'Date range',       icon:'↔',  pts:2,            why:'Measures time only — how many bars and how long a move lasted.' }],
+      ['fcast',  { name:'Forecast',         icon:'⤳',  pts:3,            why:'Sketch a path you expect price to take, so you can compare it against what actually happens.' }],
+    ]},
+  ]},
+  { id:'brushes', name:'Brushes', groups:[
+    { name:'Brushes', tools:[
+      ['pen',    { name:'Brush',            icon:'✎',  pts:0, drag:true, k:'Alt+B', why:'Freehand drawing — drag to draw. For circling things quickly when a shape tool would be fussy.' }],
+      ['hl',     { name:'Highlighter',      icon:'🖍', pts:0, drag:true,            why:'A thick, translucent freehand stroke for shading an area rather than outlining it.' }],
+    ]},
+    { name:'Arrows', tools:[
+      ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
+    ]},
+  ]},
+  { id:'text', name:'Text and notes', groups:[
+    { name:'Text', tools:[
+      ['text',   { name:'Text',             icon:'T',  pts:1, text:true, k:'Alt+X', why:'Free text anchored to a point on the chart. Moves with the bar it was placed on.' }],
+      ['note',   { name:'Note',             icon:'🗒', pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
+      ['callout',{ name:'Callout',          icon:'💬', pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
+      ['plabel', { name:'Price label',      icon:'🏷', pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
+    ]},
+  ]},
+];
+
+/* Flat map derived from the catalogue — what the renderer, hit-tester and commit
+   path read. One catalogue, two views; adding a tool above is enough. */
+const DRAW_TOOLS = (() => {
+  const out = {};
+  for (const cat of DRAW_CATS)
+    for (const g of cat.groups)
+      for (const [id, t] of g.tools)
+        out[id] = Object.assign({ group: cat.name, cat: cat.id, sub: g.name, pts: 1 }, t);
+  return out;
+})();
 
 const _drawings = (() => { try { return JSON.parse(localStorage.getItem('trader.drawings') || '{}'); } catch (e) { return {}; } })();
 function _saveDrawings() { try { localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); } catch (e) {} }
@@ -3698,8 +4020,9 @@ function _drawAnchor(canvas, clientX, clientY) {
   return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4) };
 }
 
-// Delete the drawing nearest the click (within 9px), measured in render space.
-function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
+// Which drawing is under this point? Returns { i, dist, pts } or null. Shared by
+// delete, selection and handle-dragging so all three agree on what you clicked.
+function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   const list = _drawings[tk] || [];
   if (!list.length) return false;
   const rng = data.rMax - data.rMin;
@@ -3713,7 +4036,7 @@ function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
     const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / L2));
     return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
   };
-  let best = -1, bestD = 9;
+  let best = -1, bestD = (tol == null ? 14 : tol);
   list.forEach((d, i) => {
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
@@ -3734,11 +4057,114 @@ function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
     }
     if (dist < bestD) { bestD = dist; best = i; }
   });
-  if (best < 0) return false;
-  list.splice(best, 1);
+  if (best < 0) return null;
+  const P = (list[best].pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
+  return { i: best, dist: bestD, pts: P };
+}
+
+/* Screen-space anchors for one drawing — what the resize handles attach to. */
+function _drawingAnchors(tk, data, idx, pw, ph) {
+  const d = (_drawings[tk] || [])[idx];
+  if (!d || !data || !data.bars || !data.bars.length) return [];
+  const rng = data.rMax - data.rMin; if (rng <= 0) return [];
+  const yOf = pr => ((data.rMax - pr) / rng) * ph;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+  // A brush is a path, not a shape: a handle per point would be unusable, so it gets
+  // its two ends and otherwise moves as a whole.
+  const pts = (d.t === 'pen' && d.pts.length > 2) ? [d.pts[0], d.pts[d.pts.length - 1]] : (d.pts || []);
+  return pts.map(a => ({ x: xOf(a.ts), y: yOf(a.price), ts: a.ts, price: a.price }));
+}
+
+function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
+  const hit = _hitDrawing(tk, data, xPx, yPx, pw, ph, 9);
+  if (!hit) return false;
+  const list = _drawings[tk] || [];
+  list.splice(hit.i, 1);
   if (!list.length) delete _drawings[tk];
+  if (_selDraw && _selDraw.tk === tk && _selDraw.i === hit.i) _selDraw = null;
   _saveDrawings();
   return true;
+}
+
+/* -- Selection, dragging and per-drawing style (#3354) ------------------------
+   With no tool armed, clicking a drawing selects it: handles appear on its anchors,
+   dragging a handle moves that anchor, dragging the body moves the whole thing, and
+   Delete removes it. Style lives ON the drawing (d.style), so it saves with it. */
+let _selDraw = null;      // { tk, i }
+let _dragDraw = null;     // { tk, i, handle, startPts, x0, y0 }
+const DRAW_STYLE_DEFAULT = { color: '#a78bfa', w: 1.5, dash: 0 };
+const drawStyleOf = (d) => Object.assign({}, DRAW_STYLE_DEFAULT, d && d.style);
+
+function _selGeom(tk) {
+  const canvas = document.getElementById('chart-' + tk);
+  const data = canvas && _crossData[canvas.id];
+  if (!canvas || !data || !data.bars || !data.bars.length) return null;
+  const pw = Math.max(0, canvas.clientWidth - AXIS_W), ph = Math.max(0, canvas.clientHeight - AXIS_H);
+  const rng = data.rMax - data.rMin; if (rng <= 0) return null;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  return { canvas, data, pw, ph, n,
+    priceAt: (py) => data.rMax - (py / ph) * rng,
+    tsAt: (px) => n === 1 ? ts0 : ts0 + ((px - slotW/2) / Math.max(1, (n-1)*slotW)) * (ts1 - ts0) };
+}
+function _refreshTicker(tk) {
+  try { renderZoneLadder(tk, zonesData[tk] || {}, (wlPrices.find(x => x.ticker === tk) || {}).price, null, null, true); }
+  catch (e) {}
+}
+function selectDrawing(tk, i) { _selDraw = (i == null) ? null : { tk, i }; _refreshTicker(tk); }
+
+/* Delete/Backspace removes the selection, the way every canvas editor behaves. */
+document.addEventListener('keydown', (e) => {
+  if (!_selDraw) return;
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+  if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+  e.preventDefault();
+  deleteDrawing(_selDraw.tk, _selDraw.i);
+});
+
+/* Style popup for the selected drawing — colour, width, dash, delete. */
+let _styleEl = null;
+function openDrawingStyle(tk, i, atX, atY) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const st = drawStyleOf(d);
+  if (!_styleEl) {
+    _styleEl = document.createElement('div');
+    _styleEl.className = 'dr-flyout'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
+    document.body.appendChild(_styleEl);
+    document.addEventListener('click', (ev) => {
+      if (!_styleEl || _styleEl.hidden || _styleEl.contains(ev.target)) return;
+      _styleEl.hidden = true;
+    });
+  }
+  const name = (DRAW_TOOLS[d.t] && DRAW_TOOLS[d.t].name) || d.t;
+  _styleEl.innerHTML = '<div class="dr-fly-group">' + name + '</div>'
+    + '<label class="dr-st-row"><span>Colour</span><input type="color" value="' + st.color + '"'
+    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{color:this.value})"></label>'
+    + '<label class="dr-st-row"><span>Width</span><input type="range" min="1" max="6" step="0.5" value="' + st.w + '"'
+    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{w:parseFloat(this.value)})"></label>'
+    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (st.dash ? 'checked' : '')
+    +   ' onchange="setDrawingStyle(\'' + tk + '\',' + i + ',{dash:this.checked?5:0})"></label>'
+    + '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button></div>';
+  _styleEl.hidden = false;
+  const w = _styleEl.offsetWidth || 200, h = _styleEl.offsetHeight || 140;
+  _styleEl.style.left = Math.max(8, Math.min(atX, window.innerWidth - w - 8)) + 'px';
+  _styleEl.style.top = Math.max(8, Math.min(atY, window.innerHeight - h - 8)) + 'px';
+}
+function setDrawingStyle(tk, i, patch) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.style = Object.assign(drawStyleOf(d), patch);
+  _saveDrawings(); _refreshTicker(tk);
+}
+function deleteDrawing(tk, i) {
+  const list = _drawings[tk] || [];
+  list.splice(i, 1);
+  if (!list.length) delete _drawings[tk];
+  _selDraw = null;
+  if (_styleEl) _styleEl.hidden = true;
+  _saveDrawings(); _refreshTicker(tk);
 }
 
 function _commitDrawing(tk, obj) {
@@ -3803,6 +4229,85 @@ document.addEventListener('pointerup', () => {
   // so click-click still works for people who prefer it.
   renderTicker(tk);
 }, true);
+
+/* -- Selecting and editing a placed drawing -----------------------------------
+   With NO tool armed, a press on the plot either grabs a handle of the selected
+   drawing, grabs the body of one, or clears the selection. This is what makes a
+   drawing editable at all: before it, an object could be placed and then never
+   touched again except by alt-click. */
+const _HANDLE_R = 5;
+document.addEventListener('pointerdown', (e) => {
+  if (_drawTool || e.altKey || e.button !== 0) return;      // a tool armed means "draw", not "edit"
+  const lad = e.target.closest && e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  const tk = _canvasTicker(canvas); if (!tk) return;
+
+  // 1. a handle of the already-selected drawing wins over everything
+  if (_selDraw && _selDraw.tk === tk) {
+    const anchors = _drawingAnchors(tk, a.data, _selDraw.i, a.pw, a.ph);
+    for (let k = 0; k < anchors.length; k++) {
+      if (Math.hypot(anchors[k].x - a.xPx, anchors[k].y - a.yPx) <= _HANDLE_R + 4) {
+        const d = _drawings[tk][_selDraw.i];
+        _dragDraw = { tk, i: _selDraw.i, handle: k, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
+        e.stopPropagation(); e.preventDefault();
+        return;
+      }
+    }
+  }
+  // 2. otherwise select whatever is under the pointer, and start a body drag
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
+  if (hit) {
+    _selDraw = { tk, i: hit.i };
+    const d = _drawings[tk][hit.i];
+    _dragDraw = { tk, i: hit.i, handle: -1, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
+    e.stopPropagation(); e.preventDefault();
+    _refreshTicker(tk);
+  } else if (_selDraw) {
+    const had = _selDraw.tk; _selDraw = null; _refreshTicker(had);
+  }
+});
+
+document.addEventListener('pointermove', (e) => {
+  if (!_dragDraw) return;
+  const g = _selGeom(_dragDraw.tk); if (!g) return;
+  const r = g.canvas.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const d = (_drawings[_dragDraw.tk] || [])[_dragDraw.i]; if (!d) { _dragDraw = null; return; }
+  if (_dragDraw.handle >= 0) {
+    // Move ONE anchor. A brush maps its two handles to the path's real endpoints.
+    const src = _dragDraw.startPts;
+    let idx = _dragDraw.handle;
+    if (d.t === 'pen' && src.length > 2) idx = _dragDraw.handle === 0 ? 0 : src.length - 1;
+    d.pts[idx] = { ts: g.tsAt(x), price: g.priceAt(y) };
+  } else {
+    // Move the WHOLE drawing by the pointer delta, in data units so it stays welded
+    // to the bars rather than drifting when the scale changes.
+    const dts = g.tsAt(x) - g.tsAt(_dragDraw.x0);
+    const dpr = g.priceAt(y) - g.priceAt(_dragDraw.y0);
+    d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
+  }
+  _refreshTicker(_dragDraw.tk);
+});
+
+document.addEventListener('pointerup', () => {
+  if (!_dragDraw) return;
+  _saveDrawings();                 // persist only once the drag ends, not per frame
+  _dragDraw = null;
+});
+
+// Right-click a drawing to open its style popup.
+document.addEventListener('contextmenu', (e) => {
+  const lad = e.target.closest && e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  const tk = _canvasTicker(canvas); if (!tk) return;
+  const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
+  if (!hit) return;
+  e.preventDefault(); e.stopPropagation();
+  _selDraw = { tk, i: hit.i }; _refreshTicker(tk);
+  openDrawingStyle(tk, hit.i, e.clientX, e.clientY);
+});
 
 // Capture-phase click so an armed tool wins over the card's own click-to-focus.
 document.addEventListener('click', e => {
@@ -4458,7 +4963,24 @@ document.addEventListener('mousemove', function(e){
   const x = e.clientX-rect.left, y = e.clientY-rect.top;
   const w = rect.width, h = rect.height;
   if(x<0||x>w||y<0||y>h){ ladder.style.cursor=''; _hideXh(ladder); return; }
-  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : 'grab';
+  // The cursor CATEGORY drives the pointer over the plot: Cross means a crosshair, not
+  // the pan hand -- which is why picking Cross appeared to do nothing before. A drawing
+  // tool armed also shows a crosshair, since you are aiming at an anchor, not grabbing.
+  const _cur = (typeof drawDefaults !== 'undefined' && drawDefaults.cursor) || 'cross';
+  let _plotCursor = _drawTool ? 'crosshair'
+    : _cur === 'dot' ? 'cell' : _cur === 'pointer' ? 'default' : _cur === 'eraser' ? 'not-allowed' : 'crosshair';
+  // Over a drawing with no tool armed, show that it can be grabbed -- the affordance
+  // TradingView gives and the reason clicking drawings felt like it did nothing.
+  if (!_drawTool && x < w - AXIS_W && y < h - AXIS_H) {
+    try {
+      const _tk = _canvasTicker(target.canvas);
+      if (_tk && (_drawings[_tk] || []).length) {
+        const _a = _drawAnchor(target.canvas, e.clientX, e.clientY);
+        if (_a && _hitDrawing(_tk, _a.data, _a.xPx, _a.yPx, _a.pw, _a.ph, 14)) _plotCursor = 'move';
+      }
+    } catch (_e) { /* hover feedback must never break the crosshair */ }
+  }
+  ladder.style.cursor = (x>=w-AXIS_W) ? 'ns-resize' : (y>=h-AXIS_H) ? 'ew-resize' : _plotCursor;
   _updateXh(ladder, target.canvas.id, x, y, w, h);   // live price/time crosshair
 });
 let _lastXhLadder = null;
@@ -5400,6 +5922,321 @@ function toggleDrawMenu(btn){
   m.style.left=Math.max(8,left)+'px'; m.style.top=top+'px'; m.style.visibility='visible';
   btn.setAttribute('aria-expanded','true');
 }
+
+/* -- Docks (#3355 v2) ---------------------------------------------------------
+   Left: chat. Right: a switchable widget panel (watchlist / alerts / details) with
+   the order ticket stacked under it, so both are open together -- which is the whole
+   point of the right column and what TradingView does. Each side collapses on its own
+   and hands its column back to the chart. */
+// Details was removed (operator, 2026-08-18): it was added because TradingView has one,
+// without deciding what ours would show -- and the watchlist's own info panel already
+// carries the symbol, exchange, price, RVOL, technicals and returns it would have held.
+const RW_PANELS = ['watchlist', 'alerts'];
+const _lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
+const _lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+let _rwPanel = RW_PANELS.includes(_lsGet('trader.rwPanel', '')) ? _lsGet('trader.rwPanel', '') : 'watchlist';
+let _leftOpen = _lsGet('trader.leftOpen', '1') !== '0';
+let _rightOpen = _lsGet('trader.rightOpen', '1') !== '0';
+let _ticketOpen = _lsGet('trader.ticketOpen', '1') !== '0';
+
+function _applyDocks() {
+  document.body.classList.toggle('leftdock-closed', !_leftOpen);
+  document.body.classList.toggle('rightdock-closed', !_rightOpen);
+  document.body.classList.toggle('ticket-closed', !_ticketOpen);
+  for (const n of RW_PANELS) {
+    const panel = document.getElementById('rwp-' + n), tab = document.getElementById('rtab-' + n);
+    const on = _rightOpen && n === _rwPanel;
+    if (panel) { if (on) panel.removeAttribute('hidden'); else panel.setAttribute('hidden', ''); }
+    if (tab) tab.setAttribute('aria-selected', on ? 'true' : 'false');
+  }
+  const ct = document.getElementById('ltab-chat'); if (ct) ct.setAttribute('aria-pressed', _leftOpen ? 'true' : 'false');
+  const tt = document.getElementById('rtab-ticket'); if (tt) tt.setAttribute('aria-pressed', (_rightOpen && _ticketOpen) ? 'true' : 'false');
+  if (_rwPanel === 'alerts' && _rightOpen && typeof loadAlerts === 'function') loadAlerts();
+  // Pixel-sized deck tracks: a column change has to re-tile or the charts keep the old geometry.
+  if (typeof applyGridCols === 'function') applyGridCols();
+  if (typeof _indRerender === 'function') _indRerender();
+}
+function _saveDocks() {
+  _lsSet('trader.rwPanel', _rwPanel); _lsSet('trader.leftOpen', _leftOpen ? '1' : '0');
+  _lsSet('trader.rightOpen', _rightOpen ? '1' : '0'); _lsSet('trader.ticketOpen', _ticketOpen ? '1' : '0');
+}
+function setRightWidget(name) {
+  if (!RW_PANELS.includes(name)) return;
+  if (_rightOpen && _rwPanel === name) _rightOpen = false; else { _rwPanel = name; _rightOpen = true; }
+  _saveDocks(); _applyDocks();
+}
+function closeRightWidget() { _rightOpen = false; _saveDocks(); _applyDocks(); }
+function toggleLeftDock() { _leftOpen = !_leftOpen; _saveDocks(); _applyDocks(); }
+function closeLeftDock() { _leftOpen = false; _saveDocks(); _applyDocks(); }
+function toggleTicketDock() {
+  // Reopening the ticket must also reopen the column it lives in, or the button lies.
+  if (!_ticketOpen && !_rightOpen) _rightOpen = true;
+  _ticketOpen = !_ticketOpen; _saveDocks(); _applyDocks();
+}
+
+/* -- Drawing rail (#3354) ----------------------------------------------------
+   One button per CATEGORY, showing that category's current tool. Click arms it;
+   the chevron on the right edge opens the flyout. Picking from the flyout arms the
+   tool and makes it that button's default, which is what makes the rail learn your
+   habits instead of staying a fixed list. Per-category defaults, favourites and
+   custom shortcuts all persist. */
+// Magnet, keep-drawing and lock were removed (operator, 2026-08-18): three toggles that
+// nothing in the render or commit path actually read. Hide is real -- the drawing pass
+// checks it -- so it stays.
+const DRAW_UTILS = {
+  hide: { icon: '👁', label: 'Hide drawings' },
+};
+const _dj = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
+const _ds = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+let drawUtil     = _dj('trader.drawUtil', {});
+let drawDefaults = _dj('trader.drawDefaults', {});    // catId -> toolId
+let drawFavs     = _dj('trader.drawFavs', []);        // [toolId]
+let drawKeys     = _dj('trader.drawKeys', {});        // toolId -> "Alt+T"
+
+const _catDefault = (cat) => {
+  const stored = drawDefaults[cat.id];
+  if (stored && DRAW_TOOLS[stored] && DRAW_TOOLS[stored].cat === cat.id) return stored;
+  return cat.groups[0].tools[0][0];
+};
+const _shortcutOf = (id) => drawKeys[id] || (DRAW_TOOLS[id] && DRAW_TOOLS[id].k) || '';
+function drawUtilOn(k) { return drawUtil[k] === true; }
+function toggleDrawUtil(k) {
+  drawUtil[k] = !drawUtilOn(k); _ds('trader.drawUtil', drawUtil);
+  renderDrawRail(); if (typeof _indRerender === 'function') _indRerender();
+}
+
+const _esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderDrawRail() {
+  const rail = document.getElementById('drawRail'); if (!rail) return;
+  let h = '';
+  for (const cat of DRAW_CATS) {
+    const id = _catDefault(cat), t = DRAW_TOOLS[id];
+    const on = _drawTool === id || (t.cursor && !_drawTool);
+    h += '<div class="dr-cat' + (on ? ' on' : '') + '" data-cat="' + cat.id + '">'
+      +   '<button class="dr-btn" type="button" title="' + _esc(t.name) + (_shortcutOf(id) ? ' (' + _shortcutOf(id) + ')' : '')
+      +     '" onclick="pickDrawTool(\'' + id + '\')">' + t.icon + '</button>'
+      +   '<button class="dr-more" type="button" aria-haspopup="true" aria-expanded="false"'
+      +     ' aria-label="' + _esc(cat.name) + ' — more tools" title="More ' + _esc(cat.name.toLowerCase())
+      +     '" onclick="event.stopPropagation();toggleDrawFlyout(\'' + cat.id + '\',this)">›</button>'
+      + '</div>';
+  }
+  h += '<span class="dr-sep"></span>';
+  for (const [k, u] of Object.entries(DRAW_UTILS))
+    h += '<button class="dr-btn util" type="button" aria-pressed="' + (drawUtilOn(k) ? 'true' : 'false')
+      + '" title="' + _esc(u.label) + '" onclick="toggleDrawUtil(\'' + k + '\')">' + u.icon + '</button>';
+  h += '<span class="dr-sep"></span><button class="dr-btn" type="button" title="Remove all drawings on this symbol"'
+    + ' onclick="setDrawTool(\'clear\');renderDrawRail()">🗑</button>';
+  rail.innerHTML = h;
+  renderFavBar();
+}
+
+/* Arm a tool and remember it as its category's default. */
+function pickDrawTool(id) {
+  const t = DRAW_TOOLS[id]; if (!t) return;
+  drawDefaults[t.cat] = id; _ds('trader.drawDefaults', drawDefaults);
+  setDrawTool(t.cursor ? '' : id);            // cursor tools mean "no drawing tool armed"
+  _closeDrawFlyout(); renderDrawRail();
+}
+
+let _flyoutEl = null, _flyoutCat = null;
+function _closeDrawFlyout() {
+  if (_flyoutEl) _flyoutEl.hidden = true;
+  _flyoutCat = null;
+  document.querySelectorAll('.dr-more[aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+}
+function _buildFlyout() {
+  if (_flyoutEl) return _flyoutEl;
+  const el = document.createElement('div');
+  el.className = 'dr-flyout'; el.id = 'drawFlyout'; el.hidden = true;
+  el.setAttribute('role', 'menu');
+  document.body.appendChild(el);
+  document.addEventListener('click', (e) => {
+    if (el.hidden) return;
+    if (el.contains(e.target) || (e.target.closest && e.target.closest('.dr-more'))) return;
+    _closeDrawFlyout();
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) _closeDrawFlyout(); });
+  _flyoutEl = el; return el;
+}
+function toggleDrawFlyout(catId, btn) {
+  const el = _buildFlyout();
+  if (!el.hidden && _flyoutCat === catId) { _closeDrawFlyout(); return; }
+  const cat = DRAW_CATS.find(c => c.id === catId); if (!cat) return;
+  _flyoutCat = catId;
+  let h = '';
+  for (const g of cat.groups) {
+    h += '<div class="dr-fly-group">' + _esc(g.name) + '</div>';
+    for (const [id, t] of g.tools) {
+      const fav = drawFavs.includes(id), key = _shortcutOf(id);
+      h += '<div class="dr-fly-item' + (_drawTool === id ? ' on' : '') + '" role="menuitem" tabindex="0"'
+        + ' onclick="pickDrawTool(\'' + id + '\')">'
+        + '<span class="dr-fly-ico">' + t.icon + '</span>'
+        + '<span class="dr-fly-name">' + _esc(t.name) + '</span>'
+        + '<button class="dr-fly-q" type="button" title="Learn more" aria-label="About ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();showToolInfo(\'' + id + '\')">?</button>'
+        + '<button class="dr-fly-key" type="button" title="Click to set a shortcut" aria-label="Shortcut for ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();assignToolKey(\'' + id + '\')">' + (key ? _esc(key) : '＋') + '</button>'
+        + '<button class="dr-fly-star' + (fav ? ' on' : '') + '" type="button" aria-pressed="' + (fav ? 'true' : 'false')
+        +   '" title="Favourite — show on the chart shortcut bar" aria-label="Favourite ' + _esc(t.name) + '"'
+        +   ' onclick="event.stopPropagation();toggleDrawFav(\'' + id + '\')">' + (fav ? '★' : '☆') + '</button>'
+        + '</div>';
+    }
+  }
+  el.innerHTML = h; el.hidden = false;
+  const r = btn.getBoundingClientRect();
+  el.style.visibility = 'hidden';
+  const eh = el.offsetHeight, ew = el.offsetWidth;
+  // Prefer the right of the button; flip to its left if that overflows; never go
+  // negative -- on a viewport narrower than the flyout both candidates are off-screen.
+  const wantLeft = (r.right + 4 + ew > window.innerWidth) ? (r.left - ew - 4) : (r.right + 4);
+  el.style.left = Math.max(8, Math.min(wantLeft, Math.max(8, window.innerWidth - ew - 8))) + 'px';
+  el.style.top = Math.max(8, Math.min(r.top, Math.max(8, window.innerHeight - eh - 8))) + 'px';
+  el.style.visibility = 'visible';
+  btn.setAttribute('aria-expanded', 'true');
+}
+
+function showToolInfo(id) {
+  const t = DRAW_TOOLS[id]; if (!t) return;
+  const el = _buildFlyout();
+  const key = _shortcutOf(id);
+  el.innerHTML = '<div class="dr-fly-group">' + _esc(t.name) + '</div>'
+    + '<p class="dr-fly-why">' + _esc(t.why || '') + '</p>'
+    + '<p class="dr-fly-meta">' + (t.drag ? 'Drag to draw' : (t.pts || 1) + ' click' + ((t.pts || 1) > 1 ? 's' : ''))
+    +   (key ? ' &middot; ' + _esc(key) : '') + (t.hint ? ' &middot; ' + _esc(t.hint) : '') + '</p>'
+    + '<div class="dr-fly-foot"><button type="button" onclick="pickDrawTool(\'' + id + '\')">Use it</button>'
+    + '<button type="button" onclick="toggleDrawFlyout(\'' + t.cat + '\',document.querySelector(\'.dr-cat[data-cat=&quot;' + t.cat + '&quot;] .dr-more\'))">Back</button></div>';
+}
+
+function toggleDrawFav(id) {
+  const i = drawFavs.indexOf(id);
+  if (i >= 0) drawFavs.splice(i, 1); else drawFavs.push(id);
+  _ds('trader.drawFavs', drawFavs);
+  const cat = DRAW_TOOLS[id] && DRAW_TOOLS[id].cat;
+  const btn = document.querySelector('.dr-cat[data-cat="' + cat + '"] .dr-more');
+  if (btn) { _flyoutCat = null; toggleDrawFlyout(cat, btn); }   // re-render the open flyout
+  renderFavBar();
+}
+
+/* Shortcut capture: the next key you press becomes the tool's shortcut. Escape
+   cancels, Backspace clears. Stored per tool, and checked before the defaults. */
+let _keyCapture = null;
+function assignToolKey(id) {
+  _keyCapture = id;
+  const el = _buildFlyout();
+  el.innerHTML = '<div class="dr-fly-group">Shortcut for ' + _esc(DRAW_TOOLS[id].name) + '</div>'
+    + '<p class="dr-fly-why">Press the key combination you want. Escape cancels, Backspace clears it.</p>';
+}
+document.addEventListener('keydown', (e) => {
+  if (_keyCapture) {
+    e.preventDefault(); e.stopPropagation();
+    const id = _keyCapture; _keyCapture = null;
+    if (e.key === 'Escape') { _closeDrawFlyout(); return; }
+    if (e.key === 'Backspace') { delete drawKeys[id]; _ds('trader.drawKeys', drawKeys); _closeDrawFlyout(); renderDrawRail(); return; }
+    if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) { _keyCapture = id; return; }   // wait for the real key
+    const combo = ((e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + e.key).toUpperCase();
+    drawKeys[id] = combo; _ds('trader.drawKeys', drawKeys);
+    _closeDrawFlyout(); renderDrawRail();
+    return;
+  }
+  // Fire a tool's shortcut, unless the user is typing into something.
+  const tag = (e.target && e.target.tagName || '').toLowerCase();
+  if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+  // Compare the WHOLE combo case-insensitively. Uppercasing only the key half left
+  // 'Alt+H' vs 'ALT+H' unequal, so no shortcut ever fired.
+  const combo = ((e.ctrlKey ? 'Ctrl+' : '') + (e.altKey ? 'Alt+' : '') + (e.shiftKey ? 'Shift+' : '') + (e.key || '')).toUpperCase();
+  for (const id of Object.keys(DRAW_TOOLS)) {
+    if (_shortcutOf(id).toUpperCase() === combo) { e.preventDefault(); pickDrawTool(id); return; }
+  }
+});
+
+/* Favourites bar: the starred tools, floating over the chart, draggable. Position
+   persists so it stays where you parked it. */
+function renderFavBar() {
+  let bar = document.getElementById('favBar');
+  // Clearing the last favourite must also clear the CONTENT, not just hide the bar --
+  // otherwise the next favourite flashes the old buttons before the re-render lands.
+  if (!drawFavs.length) { if (bar) { bar.hidden = true; bar.innerHTML = ''; } return; }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'favBar'; bar.className = 'fav-bar';
+    bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Favourite drawing tools');
+    document.body.appendChild(bar);
+    const pos = _dj('trader.favBarPos', null);
+    if (pos) { bar.style.left = pos.x + 'px'; bar.style.top = pos.y + 'px'; bar.style.right = 'auto'; }
+    let drag = null;
+    bar.addEventListener('pointerdown', (e) => {
+      if (!e.target.classList.contains('fav-grip')) return;
+      const r = bar.getBoundingClientRect();
+      drag = { dx: e.clientX - r.left, dy: e.clientY - r.top };
+      bar.setPointerCapture && bar.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    document.addEventListener('pointermove', (e) => {
+      if (!drag) return;
+      const x = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - drag.dx));
+      const y = Math.max(56, Math.min(window.innerHeight - 40, e.clientY - drag.dy));
+      bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.right = 'auto';
+    });
+    document.addEventListener('pointerup', () => {
+      if (!drag) return; drag = null;
+      const r = bar.getBoundingClientRect();
+      _ds('trader.favBarPos', { x: Math.round(r.left), y: Math.round(r.top) });
+    });
+  }
+  bar.hidden = false;
+  bar.innerHTML = '<span class="fav-grip" title="Drag to move">⠿</span>'
+    + drawFavs.filter(id => DRAW_TOOLS[id]).map(id =>
+        '<button class="fav-btn' + (_drawTool === id ? ' on' : '') + '" type="button" title="' + _esc(DRAW_TOOLS[id].name)
+        + (_shortcutOf(id) ? ' (' + _shortcutOf(id) + ')' : '') + '" onclick="pickDrawTool(\'' + id + '\')">'
+        + DRAW_TOOLS[id].icon + '</button>').join('');
+}
+
+/* Adopt the existing ticket + chat markup rather than rebuilding them: same handlers,
+   same state, they just stop being independently-positioned fixed overlays. */
+function _adoptIntoDock() {
+  for (const [hostId, sel] of [['dockTicketBody', '.ot-modal'], ['dockChatBody', '.dc-modal']]) {
+    const host = document.getElementById(hostId), node = document.querySelector(sel);
+    if (host && node && !host.contains(node)) host.appendChild(node);
+  }
+}
+document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); renderDrawRail(); _applyDocks(); });
+
+/* Column + ticket resizing. Bounds keep the chart usable and the panels legible. */
+(function initDockResizers() {
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const bind = (gripId, onMove) => {
+    const grip = document.getElementById(gripId); if (!grip) return;
+    let on = false;
+    grip.addEventListener('pointerdown', (e) => {
+      on = true; document.body.classList.add('resizing-col');
+      grip.setPointerCapture && grip.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    document.addEventListener('pointermove', (e) => { if (on) onMove(e); });
+    document.addEventListener('pointerup', () => {
+      if (!on) return;
+      on = false; document.body.classList.remove('resizing-col');
+      if (typeof applyGridCols === 'function') applyGridCols();
+      if (typeof _indRerender === 'function') _indRerender();
+    });
+  };
+  const setVar = (name, key, px) => {
+    document.documentElement.style.setProperty(name, px + 'px'); _lsSet(key, String(px));
+  };
+  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-w', 'trader.ticketW']]) {
+    const s = parseInt(_lsGet(key, ''), 10); if (s) document.documentElement.style.setProperty(name, s + 'px');
+  }
+  bind('dockLResize', (e) => setVar('--dockl-w', 'trader.dockLW', clamp((e.clientX || 0) - 44, 220, 560)));
+  bind('dockRResize', (e) => setVar('--dockr-w', 'trader.dockRW', clamp(window.innerWidth - (e.clientX || 0) - 44, 240, 620)));
+  // The ticket is a column now, so its grip sets a WIDTH from the right edge, past the
+  // watchlist column and the rail.
+  bind('ticketGrip', (e) => {
+    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dockr-w'), 10) || 320;
+    setVar('--ticket-w', 'trader.ticketW', clamp(window.innerWidth - (e.clientX || 0) - railW - wl, 240, 560));
+  });
+})();
+
 
 function togglePatternMenu(btn){
   const m = _buildPatternMenu();

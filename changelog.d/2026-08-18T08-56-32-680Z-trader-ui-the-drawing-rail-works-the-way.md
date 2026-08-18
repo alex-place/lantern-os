@@ -1,0 +1,3 @@
+### Added
+
+- trader-ui: the drawing rail works the way TradingView's does. Seven category buttons — cursors, lines, chart patterns, fibonacci, forecasting, brushes, text — each showing the tool you last used in that category. Clicking arms it; the chevron on its right edge opens a grouped flyout where every tool carries a ? explaining what it is for, an assignable keyboard shortcut, and a favourite star. Picking a tool arms it AND becomes that button's new default, so the rail learns how you draw. Favourites appear on a draggable shortcut bar over the chart. Defaults, favourites, shortcuts and the bar's position all persist. 39 tools, up from 19 (#3354)
