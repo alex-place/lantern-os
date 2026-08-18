@@ -329,6 +329,11 @@
   .cards-grid.grid-fixed{justify-content:stretch;align-content:stretch}
   .cards-grid.grid-fixed .card .zone-ladder{flex:1 1 auto;height:auto!important;min-height:0;margin-bottom:6px}
   /* Drag-to-reorder chart slots (multi-chart layouts) */
+  /* #3354: an armed drawing tool owns the plot — crosshair over the chart, and the
+     card stops advertising grab/pan affordances that no longer respond. */
+  body.drawing-armed .zone-ladder, body.drawing-armed .chart-canvas{cursor:crosshair}
+  body.drawing-armed .card{cursor:crosshair}
+  body.drawing-armed .chart-ctrl.on{box-shadow:0 0 0 1px var(--accent)}
   .drag-handle{cursor:grab;color:var(--tv-text-secondary);font-size:14px;line-height:1;user-select:none;padding:0 2px}
   .drag-handle:active{cursor:grabbing}
   .card.dragging{opacity:.45}
@@ -3628,7 +3633,7 @@ function _saveDrawings() { try { localStorage.setItem('trader.drawings', JSON.st
   if (changed) _saveDrawings();
 })();
 
-let _drawTool = '', _drawPending = null, _penDrag = null;
+let _drawTool = '', _drawPending = null, _penDrag = null, _drawPendingFromDrag = false;
 
 function setDrawTool(v) {
   if (v === 'clear') {
@@ -3642,7 +3647,7 @@ function setDrawTool(v) {
   _drawTool = v; _drawPending = null; _penDrag = null;
   _setDrawBtn();
   if (typeof _closeDrawMenu === 'function') _closeDrawMenu();
-  document.body.style.cursor = v ? 'crosshair' : '';
+  document.body.classList.toggle('drawing-armed', !!v);
 }
 function _setDrawBtn() {
   const b = document.getElementById('drawToggle');
@@ -3722,28 +3727,58 @@ function _commitDrawing(tk, obj) {
 
 // Freehand brush: a drag collects a path. Bound on the deck so it works on every card.
 document.addEventListener('pointerdown', e => {
-  if (_drawTool !== 'pen') return;
+  if (!_drawTool) return;
+  // Drag-to-draw: the brush always, and any TWO-point shape (press, drag, release).
+  // Multi-point tools (triangle, channel, position) still take discrete clicks --
+  // three anchors cannot come from one drag -- so they fall through to the click path.
+  const _spec = DRAW_TOOLS[_drawTool];
+  if (_drawTool !== 'pen' && !(_spec && _spec.pts === 2)) return;
   const lad = e.target.closest('.zone-ladder'); if (!lad) return;
   const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
   const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  _penDrag = { tk: _canvasTicker(canvas), canvas, pts: [{ ts: a.ts, price: a.price }] };
-  _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts };
+  _penDrag = { tk: _canvasTicker(canvas), canvas, tool: _drawTool, moved: false, pts: [{ ts: a.ts, price: a.price }] };
+  // Only the brush claims _drawPending on press. A 2-point tool waits for actual
+  // movement (below) — otherwise a press-release with no drag would wipe the click
+  // handler's half-placed shape and click-click would silently stop working.
+  if (_drawTool === 'pen') _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts };
 }, true);
 document.addEventListener('pointermove', e => {
   if (!_penDrag) return;
   const a = _drawAnchor(_penDrag.canvas, e.clientX, e.clientY); if (!a) return;
-  const last = _penDrag.pts[_penDrag.pts.length - 1];
-  if (Math.abs(a.price - last.price) < 1e-9 && Math.abs(a.ts - last.ts) < 1) return;
-  _penDrag.pts.push({ ts: a.ts, price: a.price });
-  if (_penDrag.pts.length > 400) _penDrag.pts.shift();   // bounded: a long scribble must not bloat storage
+  if (!_penDrag.moved) {
+    _penDrag.moved = true;
+    if (_penDrag.tool !== 'pen') {
+      _penDrag.pts[1] = { ts: a.ts, price: a.price };
+      _drawPending = { tk: _penDrag.tk, t: _penDrag.tool, pts: _penDrag.pts };
+      _drawPendingFromDrag = true;
+    }
+  }
+  if (_penDrag.tool === 'pen') {
+    const last = _penDrag.pts[_penDrag.pts.length - 1];
+    if (Math.abs(a.price - last.price) < 1e-9 && Math.abs(a.ts - last.ts) < 1) return;
+    _penDrag.pts.push({ ts: a.ts, price: a.price });
+    if (_penDrag.pts.length > 400) _penDrag.pts.shift();   // bounded: a long scribble must not bloat storage
+  } else {
+    _penDrag.pts[1] = { ts: a.ts, price: a.price };        // rubber-band the second anchor
+  }
   renderTicker(_penDrag.tk);
 }, true);
 document.addEventListener('pointerup', () => {
   if (!_penDrag) return;
-  const { tk, pts } = _penDrag;
-  _penDrag = null; _drawPending = null;
-  if (pts.length > 1) _commitDrawing(tk, { t: 'pen', pts });
+  const { tk, pts, tool, moved } = _penDrag;
+  _penDrag = null;
+  // Clearing _drawPending is ONLY correct when this gesture owned it. A no-drag press
+  // leaves the click handler's accumulated anchors intact.
+  if (moved || tool === 'pen') { _drawPending = null; _drawPendingFromDrag = false; }
+  if (tool === 'pen') {
+    if (pts.length > 1) _commitDrawing(tk, { t: 'pen', pts });
+  } else if (moved && pts.length === 2) {
+    _commitDrawing(tk, { t: tool, pts });
+    setDrawTool('');                                       // one shape per arm
+  }
+  // A press with no drag is NOT a shape -- it falls through to the click handler,
+  // so click-click still works for people who prefer it.
   renderTicker(tk);
 }, true);
 
@@ -4285,6 +4320,8 @@ function kickZoom(viewKey, dataTicker){
 // zooms the time scale. The factor is exponential in the scroll delta and the
 // result is eased in, so it feels smooth on both a wheel and a trackpad.
 document.addEventListener('wheel', function(e){
+  // #3354: an armed drawing tool owns the plot. Chart pan/zoom/scrub must not fire underneath it, or a multi-point shape fights the chart between clicks.
+  if(_drawTool) return;
   const ladder = e.target.closest('.zone-ladder');
   if(!ladder) return;
   const target = _ladderTarget(ladder);
@@ -4312,6 +4349,7 @@ document.addEventListener('wheel', function(e){
 let _chartDrag = null;
 document.addEventListener('mousedown', function(e){
   if(e.button !== 0) return;
+  if(_drawTool && e.target.closest('.zone-ladder')) return;   // #3354: drawing owns the plot
   // On phones the chart is locked to the selected range — dragging scrubs the crosshair
   // (see the touch handlers below), it never pans or zooms. Disable the drag entirely on
   // narrow screens so the window stays strictly at the chosen timeframe/range.
@@ -4437,6 +4475,7 @@ function _scrubTouch(e){
   _updateXh(_xhTouch.ladder, _xhTouch.canvasId, x, y, rect.width, rect.height);
 }
 document.addEventListener('touchstart', function(e){
+  if(_drawTool) return;                                     // #3354: drawing owns the plot
   if(!isNarrowTrader()) return;
   const ladder = e.target.closest && e.target.closest('.zone-ladder'); if(!ladder) return;
   const target = _ladderTarget(ladder); if(!target) return;
