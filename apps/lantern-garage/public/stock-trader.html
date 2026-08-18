@@ -902,12 +902,9 @@
     <option value="All">All</option>
   </select>
   <span class="hgroup-sep" aria-hidden="true"></span>
-  <select id="drawToolSel" class="chart-ctrl" aria-label="Drawing tools" onchange="setDrawTool(this.value)" title="Draw on charts — click to place; alt-click a drawing to delete; Esc to stop. Persists per symbol.">
-    <option value="">✏ Draw</option>
-    <option value="h">─ Level</option>
-    <option value="l">╱ Trend</option>
-    <option value="clear">🗑 Clear symbol</option>
-  </select>
+  <button id="drawToggle" class="chart-ctrl" type="button" aria-haspopup="true" aria-expanded="false"
+    onclick="toggleDrawMenu(this)"
+    title="Drawing tools — lines, Fibonacci, patterns, position forecasting, brush, text and notes. Click to place; alt-click a drawing to delete; Esc to stop. Saved per symbol.">✏ Draw ▾</button>
   </div><!-- /hgroup -->
   <div class="pulse" id="feedPulse" title="Data pulse — blinks while the price feed is alive"></div>
   <span class="feed-stamp" id="feedStamp" title="Price feed cadence — polls every 3s">LIVE · 3s</span>
@@ -2149,29 +2146,200 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
       ctx.fillStyle = dc;
       ctx.beginPath(); ctx.arc(lx, ly, 2.6, 0, Math.PI*2); ctx.fill();
     }
-    // ── User drawings (#2444): purple levels + trendlines, per-symbol persisted.
+    // -- User drawings (#2444, expanded) --------------------------------------
+    // ONE generic renderer over DRAW_TOOLS: every shape is a list of (ts,price)
+    // anchors, so adding a tool is a spec entry + a case here, never new plumbing.
+    // Anchors live in DATA space, which is what pins a drawing to its bars across
+    // zoom, pan, timeframe and theme changes.
     {
       const tk = _canvasTicker(canvas);
       const list = (tk && _drawings[tk]) || [];
-      if(list.length || (_drawPending && _drawPending.tk===tk)){
-        const ts0=+new Date(bars[0].timestamp), ts1=+new Date(bars[n-1].timestamp)||ts0+1;
-        const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
-        ctx.lineWidth=1.2;
-        for(const d of list){
-          ctx.strokeStyle='#a78bfa';
-          if(d.t==='h'){
-            const yy=y(d.price);
-            ctx.beginPath(); ctx.moveTo(0,yy); ctx.lineTo(pw,yy); ctx.stroke();
-            ctx.fillStyle='#a78bfa'; ctx.font='9px ui-monospace, Menlo, Consolas, monospace';
-            ctx.textAlign='right'; ctx.textBaseline='bottom';
-            ctx.fillText('$'+d.price, pw-3, yy-2);
-          } else if(d.t==='l'){
-            ctx.beginPath(); ctx.moveTo(xOf(d.aTs), y(d.aPrice)); ctx.lineTo(xOf(d.bTs), y(d.bPrice)); ctx.stroke();
+      const pend = (_drawPending && _drawPending.tk === tk) ? _drawPending : null;
+      if (list.length || pend) {
+        const ts0 = +new Date(bars[0].timestamp), ts1 = +new Date(bars[n-1].timestamp) || ts0 + 1;
+        const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+        const MONO = '9px ui-monospace, Menlo, Consolas, monospace';
+        const drawOne = (d, ghost) => {
+          const col = d.color || DRAW_COLOR;
+          ctx.save();
+          if (ghost) ctx.globalAlpha = 0.55;
+          const base = ghost ? 0.55 : 1;
+          ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = d.w || 1.2; ctx.font = MONO;
+          const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: y(a.price), ts: a.ts, price: a.price }));
+          if (!P.length) { ctx.restore(); return; }
+          const tag = (txt, px, py, align) => {
+            ctx.fillStyle = col; ctx.textAlign = align || 'left'; ctx.textBaseline = 'bottom';
+            ctx.fillText(txt, px, py);
+          };
+          const seg = (a, b) => { ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); };
+          const extend = (a, b, both) => {
+            const dx = b.x - a.x, dy = b.y - a.y;
+            if (!dx && !dy) return;
+            const s = both ? { x: a.x - dx*1e4, y: a.y - dy*1e4 } : a;
+            ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.lineTo(b.x + dx*1e4, b.y + dy*1e4); ctx.stroke();
+          };
+          const shade = (fn) => { ctx.globalAlpha = base*0.16; fn(); ctx.globalAlpha = base; };
+          switch (d.t) {
+            case 'h': {
+              const yy = P[0].y;
+              ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
+              tag('$' + fmt(P[0].price, 2), pw - 3, yy - 2, 'right');
+              break;
+            }
+            case 'hray': {
+              const a = P[0];
+              ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
+              tag('$' + fmt(a.price, 2), pw - 3, a.y - 2, 'right');
+              break;
+            }
+            case 'v': {
+              const a = P[0];
+              ctx.beginPath(); ctx.moveTo(a.x, 0); ctx.lineTo(a.x, priceH); ctx.stroke();
+              break;
+            }
+            case 'l': if (P[1]) seg(P[0], P[1]); break;
+            case 'ray': if (P[1]) extend(P[0], P[1], false); break;
+            case 'xline': if (P[1]) extend(P[0], P[1], true); break;
+            case 'arrow': {
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              seg(a, b);
+              const ang = Math.atan2(b.y - a.y, b.x - a.x), hh = 8;
+              ctx.beginPath(); ctx.moveTo(b.x, b.y);
+              ctx.lineTo(b.x - hh*Math.cos(ang - 0.4), b.y - hh*Math.sin(ang - 0.4));
+              ctx.lineTo(b.x - hh*Math.cos(ang + 0.4), b.y - hh*Math.sin(ang + 0.4));
+              ctx.closePath(); ctx.fill();
+              break;
+            }
+            case 'rect': {
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              const rx = Math.min(a.x, b.x), ry = Math.min(a.y, b.y);
+              const rw = Math.abs(b.x - a.x), rh = Math.abs(b.y - a.y);
+              shade(() => ctx.fillRect(rx, ry, rw, rh));
+              ctx.strokeRect(rx, ry, rw, rh);
+              break;
+            }
+            case 'ell': {
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              ctx.beginPath();
+              ctx.ellipse((a.x + b.x)/2, (a.y + b.y)/2, Math.abs(b.x - a.x)/2, Math.abs(b.y - a.y)/2, 0, 0, Math.PI*2);
+              shade(() => ctx.fill());
+              ctx.stroke();
+              break;
+            }
+            case 'tri': {
+              if (!P[2]) break;
+              ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y); ctx.lineTo(P[1].x, P[1].y); ctx.lineTo(P[2].x, P[2].y); ctx.closePath();
+              shade(() => ctx.fill());
+              ctx.stroke();
+              break;
+            }
+            case 'chan': {
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c = P[2];
+              const off = (c.y - (a.y + b.y)/2)*2;
+              seg(a, b);
+              ctx.beginPath(); ctx.moveTo(a.x, a.y + off); ctx.lineTo(b.x, b.y + off); ctx.stroke();
+              shade(() => {
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+                ctx.lineTo(b.x, b.y + off); ctx.lineTo(a.x, a.y + off);
+                ctx.closePath(); ctx.fill();
+              });
+              break;
+            }
+            case 'fib': {
+              if (!P[1]) break;
+              const a = P[0], b = P[1], span = b.price - a.price;
+              const x1 = Math.min(a.x, b.x);
+              for (const lv of FIB_LEVELS) {
+                const pr = a.price + span*lv, yy = y(pr);
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.7);
+                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
+                tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+              }
+              break;
+            }
+            case 'fibx': {
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c = P[2], span = b.price - a.price;
+              const x1 = Math.min(a.x, c.x);
+              for (const lv of FIB_EXT) {
+                const pr = c.price + span*lv, yy = y(pr);
+                ctx.globalAlpha = base*0.8;
+                ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
+                tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+              }
+              break;
+            }
+            case 'pos': case 'poss': {
+              // Forecasting: entry / stop / target, labelled in R -- the same unit the
+              // trader's own plan uses, so a drawn idea and an engine plan compare directly.
+              if (!P[2]) break;
+              const e0 = P[0], st = P[1], tg = P[2];
+              const risk = Math.abs(e0.price - st.price), reward = Math.abs(tg.price - e0.price);
+              const rr = risk > 0 ? reward/risk : 0;
+              const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
+              ctx.globalAlpha = base*0.16;
+              ctx.fillStyle = CHART_CANDLE_UP;
+              ctx.fillRect(x1, Math.min(e0.y, tg.y), x2 - x1, Math.abs(tg.y - e0.y));
+              ctx.fillStyle = CHART_CANDLE_DOWN;
+              ctx.fillRect(x1, Math.min(e0.y, st.y), x2 - x1, Math.abs(st.y - e0.y));
+              ctx.globalAlpha = base;
+              ctx.strokeStyle = col;
+              for (const q of [e0, st, tg]) { ctx.beginPath(); ctx.moveTo(x1, q.y); ctx.lineTo(x2, q.y); ctx.stroke(); }
+              tag((d.t === 'pos' ? 'LONG' : 'SHORT') + '  ' + rr.toFixed(2) + 'R', x1 + 3, tg.y - 2);
+              tag('entry ' + fmt(e0.price, 2), x1 + 3, e0.y - 2);
+              tag('stop ' + fmt(st.price, 2), x1 + 3, st.y - 2);
+              break;
+            }
+            case 'meas': {
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              const dP = b.price - a.price, pct = a.price ? (dP/a.price)*100 : 0;
+              ctx.setLineDash([4, 3]); seg(a, b); ctx.setLineDash([]);
+              shade(() => ctx.fillRect(Math.min(a.x, b.x), Math.min(a.y, b.y), Math.abs(b.x - a.x), Math.abs(b.y - a.y)));
+              tag((dP >= 0 ? '+' : '') + fmt(dP, 2) + '  (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)',
+                  (a.x + b.x)/2, Math.min(a.y, b.y) - 3, 'center');
+              break;
+            }
+            case 'pen': {
+              if (P.length < 2) break;
+              ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
+              for (let q = 1; q < P.length; q++) ctx.lineTo(P[q].x, P[q].y);
+              ctx.stroke();
+              break;
+            }
+            case 'text': {
+              const a = P[0];
+              ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+              ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(d.text || '', a.x + 4, a.y);
+              break;
+            }
+            case 'note': {
+              const a = P[0], txt = d.text || '';
+              ctx.font = '11px ui-monospace, Menlo, Consolas, monospace';
+              const wTxt = Math.min(240, ctx.measureText(txt).width + 14);
+              ctx.fillStyle = CHART_NOTE_BG();
+              ctx.fillRect(a.x + 6, a.y - 10, wTxt, 20);
+              ctx.strokeStyle = col; ctx.strokeRect(a.x + 6, a.y - 10, wTxt, 20);
+              ctx.beginPath(); ctx.arc(a.x, a.y, 2.5, 0, Math.PI*2); ctx.fill();
+              ctx.fillStyle = col; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(txt, a.x + 12, a.y);
+              break;
+            }
           }
-        }
-        if(_drawPending && _drawPending.tk===tk){   // first trendline point: anchor dot
-          ctx.fillStyle='#a78bfa';
-          ctx.beginPath(); ctx.arc(xOf(_drawPending.ts), y(_drawPending.price), 3, 0, Math.PI*2); ctx.fill();
+          ctx.restore();
+        };
+        for (const d of list) drawOne(d, false);
+        if (pend) {
+          if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
+          ctx.save(); ctx.fillStyle = DRAW_COLOR;
+          for (const a of pend.pts) { ctx.beginPath(); ctx.arc(xOf(a.ts), y(a.price), 3, 0, Math.PI*2); ctx.fill(); }
+          ctx.restore();
         }
       }
     }
@@ -3192,75 +3360,215 @@ function renderOrderTicket(){
 }
 
 // ── Drawing tools (#2444) — price levels + trendlines, persisted per symbol ──
-// ✏ Draw select arms a tool: Level = one click places a horizontal line at that
-// price; Trend = two clicks make a segment. Alt-click near a drawing deletes it
-// (armed or not). Esc disarms. Stored in localStorage, rendered inside
-// renderChart so drawings survive zoom/pan/timeframe/theme changes.
-const _drawings=(()=>{ try{ return JSON.parse(localStorage.getItem('trader.drawings')||'{}'); }catch(e){ return {}; } })();
-function _saveDrawings(){ try{ localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); }catch(e){} }
-let _drawTool='', _drawPending=null;   // pending = first click of a trendline
-function setDrawTool(v){
-  if(v==='clear'){
-    const tk=fullscreenTicker||activeTicker;
-    if(tk && _drawings[tk] && _drawings[tk].length && confirm(`Remove all ${_drawings[tk].length} drawing(s) on ${tk}?`)){
+// -- Drawing tools (#2444, expanded) ------------------------------------------
+// A drawing is { t, pts:[{ts,price}], color?, w?, text? }. Anchors are in DATA
+// space (timestamp + price), never pixels, so a drawing stays welded to its bars
+// through zoom, pan, timeframe and theme changes. Adding a tool = one DRAW_TOOLS
+// entry + one case in the renderer; the click/drag plumbing below is generic.
+const DRAW_COLOR = '#a78bfa';
+const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+const FIB_EXT    = [0, 0.618, 1, 1.618, 2.618];
+const CHART_NOTE_BG = () =>
+  (document.documentElement.getAttribute('data-theme') === 'light') ? 'rgba(255,255,255,.92)' : 'rgba(12,15,22,.92)';
+
+// pts: how many clicks commit the shape. drag:true collects a freehand path.
+// text:true prompts for a label. group drives the picker's sections.
+const DRAW_TOOLS = {
+  l:     { name: 'Trend line',        pts: 2, group: 'Lines' },
+  ray:   { name: 'Ray',               pts: 2, group: 'Lines' },
+  xline: { name: 'Extended line',     pts: 2, group: 'Lines' },
+  h:     { name: 'Horizontal line',   pts: 1, group: 'Lines' },
+  hray:  { name: 'Horizontal ray',    pts: 1, group: 'Lines' },
+  v:     { name: 'Vertical line',     pts: 1, group: 'Lines' },
+  arrow: { name: 'Arrow',             pts: 2, group: 'Lines' },
+  chan:  { name: 'Parallel channel',  pts: 3, group: 'Lines' },
+  fib:   { name: 'Fib retracement',   pts: 2, group: 'Fibonacci' },
+  fibx:  { name: 'Fib extension',     pts: 3, group: 'Fibonacci' },
+  rect:  { name: 'Rectangle',         pts: 2, group: 'Patterns' },
+  ell:   { name: 'Ellipse',           pts: 2, group: 'Patterns' },
+  tri:   { name: 'Triangle',          pts: 3, group: 'Patterns' },
+  pos:   { name: 'Long position',     pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
+  poss:  { name: 'Short position',    pts: 3, group: 'Forecasting', hint: 'click entry, then stop, then target' },
+  meas:  { name: 'Measure',           pts: 2, group: 'Forecasting' },
+  pen:   { name: 'Brush',             pts: 0, group: 'Notes', drag: true },
+  text:  { name: 'Text',              pts: 1, group: 'Notes', text: true },
+  note:  { name: 'Note',              pts: 1, group: 'Notes', text: true },
+};
+
+const _drawings = (() => { try { return JSON.parse(localStorage.getItem('trader.drawings') || '{}'); } catch (e) { return {}; } })();
+function _saveDrawings() { try { localStorage.setItem('trader.drawings', JSON.stringify(_drawings)); } catch (e) {} }
+
+// Migrate the two original shapes to the generic anchor form so old saved drawings
+// keep rendering instead of silently vanishing on upgrade.
+(function _migrateDrawings() {
+  let changed = false;
+  for (const tk of Object.keys(_drawings)) {
+    const list = _drawings[tk];
+    if (!Array.isArray(list)) { delete _drawings[tk]; changed = true; continue; }
+    for (const d of list) {
+      if (d.pts) continue;
+      if (d.t === 'h' && d.price != null) { d.pts = [{ ts: 0, price: d.price }]; delete d.price; changed = true; }
+      else if (d.t === 'l' && d.aTs != null) {
+        d.pts = [{ ts: d.aTs, price: d.aPrice }, { ts: d.bTs, price: d.bPrice }];
+        delete d.aTs; delete d.aPrice; delete d.bTs; delete d.bPrice; changed = true;
+      }
+    }
+    _drawings[tk] = list.filter(d => Array.isArray(d.pts) && d.pts.length);
+  }
+  if (changed) _saveDrawings();
+})();
+
+let _drawTool = '', _drawPending = null, _penDrag = null;
+
+function setDrawTool(v) {
+  if (v === 'clear') {
+    const tk = fullscreenTicker || activeTicker;
+    const nOn = (tk && _drawings[tk] && _drawings[tk].length) || 0;
+    if (nOn && confirm('Remove all ' + nOn + ' drawing(s) on ' + tk + '?')) {
       delete _drawings[tk]; _saveDrawings(); renderTicker(tk);
     }
-    v='';
+    v = '';
   }
-  _drawTool=v; _drawPending=null;
-  const s=document.getElementById('drawToolSel'); if(s) s.value=v;
+  _drawTool = v; _drawPending = null; _penDrag = null;
+  _setDrawBtn();
+  if (typeof _closeDrawMenu === 'function') _closeDrawMenu();
+  document.body.style.cursor = v ? 'crosshair' : '';
 }
-function _canvasTicker(canvas){ return canvas.id==='chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/,''); }
-// Delete the drawing nearest the click (within 9px), in the same pixel space it renders in.
-function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph){
-  const list=_drawings[tk]||[]; if(!list.length) return false;
-  const rng=data.rMax-data.rMin; if(rng<=0) return false;
-  const yOf=p=>((data.rMax-p)/rng)*ph;
-  const n=data.bars.length, slotW=pw/n;
-  const ts0=+new Date(data.bars[0].timestamp), ts1=+new Date(data.bars[n-1].timestamp)||ts0+1;
-  const xOf=ts=> n===1? slotW/2 : ((ts-ts0)/(ts1-ts0))*((n-1)*slotW)+slotW/2;
-  const segDist=(px,py,x1,y1,x2,y2)=>{ const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy||1;
-    const t=Math.max(0,Math.min(1,((px-x1)*dx+(py-y1)*dy)/L2));
-    return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)); };
-  let best=-1, bestD=9;
-  list.forEach((d,i)=>{
-    const dist = d.t==='h' ? Math.abs(yOf(d.price)-yPx)
-      : segDist(xPx,yPx,xOf(d.aTs),yOf(d.aPrice),xOf(d.bTs),yOf(d.bPrice));
-    if(dist<bestD){ bestD=dist; best=i; }
+function _setDrawBtn() {
+  const b = document.getElementById('drawToggle');
+  if (!b) return;
+  const d = DRAW_TOOLS[_drawTool];
+  b.textContent = d ? ('✏ ' + d.name + ' ▾') : '✏ Draw ▾';
+  b.classList.toggle('on', !!_drawTool);
+}
+function _canvasTicker(canvas) { return canvas.id === 'chart-fs' ? fullscreenTicker : canvas.id.replace(/^chart-/, ''); }
+
+// Map a pointer position on a chart canvas to a data anchor. Returns null off-plot.
+function _drawAnchor(canvas, clientX, clientY) {
+  const data = _crossData[canvas.id];
+  if (!data || !data.bars || !data.bars.length) return null;
+  const rect = canvas.getBoundingClientRect();
+  const xPx = clientX - rect.left, yPx = clientY - rect.top;
+  const pw = Math.max(0, canvas.clientWidth - AXIS_W);
+  const ph = Math.max(0, canvas.clientHeight - AXIS_H);
+  if (xPx > pw || yPx > ph || xPx < 0 || yPx < 0) return null;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  // invert the renderer's xOf so a click lands on a real time, not a bar index
+  const frac = n === 1 ? 0 : (xPx - slotW/2) / Math.max(1, (n-1)*slotW);
+  const ts = ts0 + Math.max(0, Math.min(1, frac)) * (ts1 - ts0);
+  const price = data.rMax - (yPx / ph) * (data.rMax - data.rMin);
+  return { data, pw, ph, xPx, yPx, ts, price: +price.toFixed(4) };
+}
+
+// Delete the drawing nearest the click (within 9px), measured in render space.
+function _deleteNearestDrawing(tk, data, xPx, yPx, pw, ph) {
+  const list = _drawings[tk] || [];
+  if (!list.length) return false;
+  const rng = data.rMax - data.rMin;
+  if (rng <= 0) return false;
+  const yOf = pr => ((data.rMax - pr) / rng) * ph;
+  const n = data.bars.length, slotW = pw / n;
+  const ts0 = +new Date(data.bars[0].timestamp), ts1 = +new Date(data.bars[n-1].timestamp) || ts0 + 1;
+  const xOf = ts => n === 1 ? slotW/2 : ((ts - ts0)/(ts1 - ts0))*((n-1)*slotW) + slotW/2;
+  const segDist = (px, py, x1, y1, x2, y2) => {
+    const dx = x2 - x1, dy = y2 - y1, L2 = dx*dx + dy*dy || 1;
+    const t = Math.max(0, Math.min(1, ((px - x1)*dx + (py - y1)*dy) / L2));
+    return Math.hypot(px - (x1 + t*dx), py - (y1 + t*dy));
+  };
+  let best = -1, bestD = 9;
+  list.forEach((d, i) => {
+    const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
+    if (!P.length) return;
+    let dist = Infinity;
+    if (d.t === 'h' || d.t === 'hray') dist = Math.abs(P[0].y - yPx);
+    else if (d.t === 'v') dist = Math.abs(P[0].x - xPx);
+    else if (d.t === 'text' || d.t === 'note') dist = Math.hypot(P[0].x - xPx, P[0].y - yPx);
+    else if (d.t === 'pen') {
+      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
+    } else if (d.t === 'rect' || d.t === 'ell' || d.t === 'meas') {
+      const x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
+      const y1 = Math.min(P[0].y, P[1].y), y2 = Math.max(P[0].y, P[1].y);
+      dist = Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
+    } else if (d.t === 'fib' || d.t === 'fibx' || d.t === 'pos' || d.t === 'poss') {
+      for (const a of P) dist = Math.min(dist, Math.abs(a.y - yPx));
+    } else {
+      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
+    }
+    if (dist < bestD) { bestD = dist; best = i; }
   });
-  if(best<0) return false;
-  list.splice(best,1); if(!list.length) delete _drawings[tk];
-  _saveDrawings(); return true;
+  if (best < 0) return false;
+  list.splice(best, 1);
+  if (!list.length) delete _drawings[tk];
+  _saveDrawings();
+  return true;
 }
-// Capture-phase so an armed tool wins over the card's own click-to-focus.
-document.addEventListener('click', e=>{
-  if(!_drawTool && !e.altKey) return;
-  const lad=e.target.closest('.zone-ladder'); if(!lad) return;
-  const canvas=lad.querySelector('.chart-canvas'); if(!canvas) return;
-  const data=_crossData[canvas.id]; if(!data||!data.bars||!data.bars.length) return;
-  const rect=canvas.getBoundingClientRect();
-  const xPx=e.clientX-rect.left, yPx=e.clientY-rect.top;
-  const pw=Math.max(0, canvas.clientWidth-AXIS_W), ph=Math.max(0, canvas.clientHeight-AXIS_H);
-  if(xPx>pw||yPx>ph) return;                                  // axis strips: hands off
-  const tk=_canvasTicker(canvas); if(!tk) return;
-  const price=data.rMax-(yPx/ph)*(data.rMax-data.rMin);
-  const n=data.bars.length, slotW=pw/n;
-  const idx=Math.max(0,Math.min(n-1,Math.round(xPx/slotW-0.5)));
-  const ts=+new Date(data.bars[idx].timestamp);
-  if(e.altKey){                                               // delete (works with tool off)
-    if(_deleteNearestDrawing(tk,data,xPx,yPx,pw,ph)){ e.stopPropagation(); e.preventDefault(); renderTicker(tk); }
+
+function _commitDrawing(tk, obj) {
+  (_drawings[tk] = _drawings[tk] || []).push(obj);
+  _saveDrawings();
+  _drawPending = null;
+}
+
+// Freehand brush: a drag collects a path. Bound on the deck so it works on every card.
+document.addEventListener('pointerdown', e => {
+  if (_drawTool !== 'pen') return;
+  const lad = e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  _penDrag = { tk: _canvasTicker(canvas), canvas, pts: [{ ts: a.ts, price: a.price }] };
+  _drawPending = { tk: _penDrag.tk, t: 'pen', pts: _penDrag.pts };
+}, true);
+document.addEventListener('pointermove', e => {
+  if (!_penDrag) return;
+  const a = _drawAnchor(_penDrag.canvas, e.clientX, e.clientY); if (!a) return;
+  const last = _penDrag.pts[_penDrag.pts.length - 1];
+  if (Math.abs(a.price - last.price) < 1e-9 && Math.abs(a.ts - last.ts) < 1) return;
+  _penDrag.pts.push({ ts: a.ts, price: a.price });
+  if (_penDrag.pts.length > 400) _penDrag.pts.shift();   // bounded: a long scribble must not bloat storage
+  renderTicker(_penDrag.tk);
+}, true);
+document.addEventListener('pointerup', () => {
+  if (!_penDrag) return;
+  const { tk, pts } = _penDrag;
+  _penDrag = null; _drawPending = null;
+  if (pts.length > 1) _commitDrawing(tk, { t: 'pen', pts });
+  renderTicker(tk);
+}, true);
+
+// Capture-phase click so an armed tool wins over the card's own click-to-focus.
+document.addEventListener('click', e => {
+  if (!_drawTool && !e.altKey) return;
+  if (_drawTool === 'pen' && !e.altKey) return;   // brush draws on drag; alt-click still deletes
+  const lad = e.target.closest('.zone-ladder'); if (!lad) return;
+  const canvas = lad.querySelector('.chart-canvas'); if (!canvas) return;
+  const a = _drawAnchor(canvas, e.clientX, e.clientY); if (!a) return;
+  const tk = _canvasTicker(canvas); if (!tk) return;
+
+  if (e.altKey) {                                        // delete works with the tool off
+    if (_deleteNearestDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph)) {
+      e.stopPropagation(); e.preventDefault(); renderTicker(tk);
+    }
     return;
   }
+  const spec = DRAW_TOOLS[_drawTool]; if (!spec) return;
   e.stopPropagation(); e.preventDefault();
-  if(_drawTool==='h'){
-    (_drawings[tk]=_drawings[tk]||[]).push({t:'h', price:+price.toFixed(4)});
-    _saveDrawings();
-  } else if(_drawTool==='l'){
-    if(!_drawPending || _drawPending.tk!==tk){ _drawPending={tk, ts, price:+price.toFixed(4)}; }
-    else {
-      (_drawings[tk]=_drawings[tk]||[]).push({t:'l', aTs:_drawPending.ts, aPrice:_drawPending.price, bTs:ts, bPrice:+price.toFixed(4)});
-      _drawPending=null; _saveDrawings();
+
+  if (!_drawPending || _drawPending.tk !== tk || _drawPending.t !== _drawTool) {
+    _drawPending = { tk, t: _drawTool, pts: [] };
+  }
+  _drawPending.pts.push({ ts: a.ts, price: a.price });
+
+  if (_drawPending.pts.length >= spec.pts) {
+    const obj = { t: _drawTool, pts: _drawPending.pts.slice() };
+    if (spec.text) {
+      const txt = prompt(_drawTool === 'note' ? 'Note text' : 'Text');
+      if (txt == null || !txt.trim()) { _drawPending = null; renderTicker(tk); return; }
+      obj.text = String(txt).slice(0, 160);
     }
+    _commitDrawing(tk, obj);
+    setDrawTool('');                                     // one shape per arm, like TradingView
   }
   renderTicker(tk);
 }, true);
@@ -4761,6 +5069,67 @@ function toggleIndicatorMenu(btn){
   btn.setAttribute('aria-expanded','true');
 }
 
+/* -- Drawing-tool picker -----------------------------------------------------
+   Same .pat-menu chrome as Patterns and Indicators so the toolbar has one menu
+   language. Sections come from DRAW_TOOLS[].group, so a new tool appears here
+   with no UI work. */
+let _drawMenuEl = null;
+function _buildDrawMenu(){
+  if(_drawMenuEl) return _drawMenuEl;
+  const m=document.createElement('div');
+  m.className='pat-menu'; m.id='drawMenu'; m.hidden=true;
+  m.setAttribute('role','dialog'); m.setAttribute('aria-label','Drawing tools');
+  document.body.appendChild(m);
+  document.addEventListener('click',(e)=>{
+    if(m.hidden) return;
+    if(m.contains(e.target)) return;
+    if(e.target.closest && e.target.closest('#drawToggle')) return;
+    _closeDrawMenu();
+  });
+  _drawMenuEl=m; return m;
+}
+function _closeDrawMenu(){
+  if(_drawMenuEl) _drawMenuEl.hidden=true;
+  const b=document.getElementById('drawToggle'); if(b) b.setAttribute('aria-expanded','false');
+}
+function _drawMenuHtml(){
+  const esc=(s)=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const tk = fullscreenTicker || activeTicker;
+  const nOn = (tk && _drawings[tk] && _drawings[tk].length) || 0;
+  const groups={};
+  for(const [id,d] of Object.entries(DRAW_TOOLS)) (groups[d.group]=groups[d.group]||[]).push([id,d]);
+  let h='';
+  for(const g of Object.keys(groups)){
+    h+='<div class="pat-menu-note">'+esc(g)+'</div>';
+    for(const [id,d] of groups[g]){
+      const on = _drawTool===id;
+      h+='<div class="pat-menu-item draw-pick'+(on?' on':'')+'" data-tool="'+id+'" onclick="setDrawTool(\''+id+'\')">'
+        +'<span style="flex:1">'+esc(d.name)+'</span>'
+        +'<span class="pat-count" style="background:none;color:var(--text2)">'+(d.drag?'drag':(d.pts+' click'+(d.pts>1?'s':'')))+'</span></div>';
+    }
+  }
+  h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">'
+    +(nOn? nOn+' drawing'+(nOn>1?'s':'')+' on '+esc(tk||'') : 'Nothing drawn yet')
+    +' · alt-click one to delete</div>';
+  h+='<div class="pat-menu-foot"><button type="button" onclick="setDrawTool(\'\')">Stop drawing</button>'
+    +(nOn?'<button type="button" onclick="setDrawTool(\'clear\')">Clear symbol</button>':'')+'</div>';
+  return h;
+}
+function toggleDrawMenu(btn){
+  const m=_buildDrawMenu();
+  if(!m.hidden){ _closeDrawMenu(); return; }
+  m.innerHTML=_drawMenuHtml();
+  m.hidden=false;
+  const r=btn.getBoundingClientRect();
+  m.style.visibility='hidden';
+  const mw=m.offsetWidth||220, mh=m.offsetHeight||0;
+  let left=Math.min(r.left, window.innerWidth-mw-8);
+  let top=r.bottom+4;
+  if(top+mh > window.innerHeight-8) top=Math.max(8, r.top-mh-4);
+  m.style.left=Math.max(8,left)+'px'; m.style.top=top+'px'; m.style.visibility='visible';
+  btn.setAttribute('aria-expanded','true');
+}
+
 function togglePatternMenu(btn){
   const m = _buildPatternMenu();
   if(!m.hidden){ _closePatternMenu(); return; }
@@ -6065,7 +6434,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     // too tight; layout + timeframe + range stay inline at every width.
     {sel:'#chartTypeSelect',           narrowOnly:true},
     {sel:'#patternsToggle',            narrowOnly:true},
-    {sel:'#drawToolSel',               narrowOnly:true},
+    {sel:'#drawToggle',                narrowOnly:true},
     {sel:'#feedStamp',                 narrowOnly:false},
     {sel:'#ovnToggle',                 narrowOnly:false},
     {sel:'.header a[href*="kalshi"]',  narrowOnly:false},
@@ -6103,7 +6472,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{ await detectGuestMode(
     // Chart controls keep the menu open (adjusted together): the .hgroup cluster on
     // narrow screens AND the always-in-menu type/patterns/draw controls — closing
     // here hid the Patterns popup's anchor, so it opened at 0x0 (operator report).
-    if(e.target.closest('.hgroup, #chartTypeSelect, #patternsToggle, #drawToolSel')) return;
+    if(e.target.closest('.hgroup, #chartTypeSelect, #patternsToggle, #drawToggle, #indicatorsToggle')) return;
     if(e.target.closest('a,button')) close();
   });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') close(); });
