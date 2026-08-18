@@ -171,6 +171,32 @@ function _logVeto(rec) {
  *   mom30   SPY % over the last two 15m bars (~30 min)
  *   ll      SPY made a lower low: last 2 bars' low < prior 2 bars' low
  */
+// The wrapper's OWN drawdown from its session open, in % (negative = it fell).
+// A selection feature (#3349): wrapper washouts that arrive after a SHALLOW
+// fall (> -1.5%) won 67%; after a hard fall (<= -2%) they won 33%. Same
+// session-window discipline as sessionIbs — today's bars only.
+function sessionDrawdownPct(bars15) {
+  const bars = Array.isArray(bars15) ? bars15 : [];
+  if (!bars.length) return null;
+  const day = String(bars[bars.length - 1].timestamp || "").slice(0, 10);
+  const s = bars.filter((b) => String(b.timestamp || "").slice(0, 10) === day && Number(b.close) > 0);
+  if (s.length < 2) return null;
+  const open = Number(s[0].open) || Number(s[0].close);
+  const last = Number(s[s.length - 1].close);
+  return open > 0 ? ((last - open) / open) * 100 : null;
+}
+
+// ET minute-of-day for the LAST bar (the fire instant), not the wall clock —
+// so a replay/test drives it and a live scan reads it identically.
+function barEtMinute(bars15) {
+  const bars = Array.isArray(bars15) ? bars15 : [];
+  if (!bars.length) return null;
+  const ts = bars[bars.length - 1].timestamp;
+  if (!ts) return null;
+  const d = new Date(new Date(ts).toLocaleString("en-US", { timeZone: "America/New_York" }));
+  return d.getHours() * 60 + d.getMinutes();
+}
+
 function spyTapeContext(spyBars15) {
   const bars = Array.isArray(spyBars15) ? spyBars15 : [];
   if (!bars.length) return { tape: null, mom30: null, ll: null };
@@ -225,6 +251,37 @@ function applyPolarity(sym, direction, opts = {}) {
   const ctxStr = `spy tape ${ctx.tape == null ? "?" : ctx.tape.toFixed(2) + "%"}, mom30 ${ctx.mom30 == null ? "?" : ctx.mom30.toFixed(2) + "%"}, ll ${ctx.ll == null ? "?" : ctx.ll}`;
   if (mode === "0" || mode === "" || mode === "false") {
     return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — short entries disabled (TRADER_SHORT_EDGE=0; ${ctxStr})` };
+  }
+  if (mode === "selective") {
+    // #3349 — SELECTION, not a tape veto. Decomposing 49 wrapper IBS fires (24
+    // sessions, causal) by pre-fire features, three separated winners from
+    // losers, and none of them is "SPY falling":
+    //   fire minute        r=+0.44   10-11am 47%/-0.36%  ->  after 1pm 67%/+2.46%
+    //   wrapper drawdown   r=+0.14   fell <=-2%: 33%/-0.81%  ->  fell >-1%: 67%/+1.23%
+    //   underlying tape    r=-0.21   up >=+0.5%: 48%/-0.50%  ->  up 0-0.5%: 56%/+0.77%
+    // Composite (after 11:00 AND wrapper DD > -1.5% AND underlying < +0.5%):
+    // n=13, 62% WR, +1.70% avg (+0.60% leave-one-day-out) vs the 36 that fail it
+    // at 47%/-0.36%. The bet the wrapper washout makes is "the underlying
+    // reverses within the hour" — these are the conditions under which it does.
+    // 16y daily replication agrees on DIRECTION (mild tape is the best bucket)
+    // but cannot see time-of-day; the sample is 13. Every fire — allowed or
+    // vetoed — is logged with all three values so live data settles it.
+    const minMin = Number(process.env.TRADER_SHORT_MIN_ET_MIN) || 660;      // 11:00 ET
+    const maxDD = -(Number(process.env.TRADER_SHORT_MAX_DD_PCT) || 1.5);   // wrapper fell no more than this
+    const maxUTape = Number(process.env.TRADER_SHORT_MAX_UTAPE_PCT) || 0.5; // underlying not ripping
+    const w = opts.wrapperDD, ut = opts.underlyingTape, m = opts.etMin;
+    const selStr = `et ${m == null ? "?" : Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0")}, wrapperDD ${w == null ? "?" : w.toFixed(2) + "%"}, underlying tape ${ut == null ? "?" : ut.toFixed(2) + "%"}`;
+    if (m == null || w == null || ut == null) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection inputs unreadable (${selStr}); cannot certify` };
+    }
+    const fails = [];
+    if (m < minMin) fails.push(`before ${Math.floor(minMin / 60)}:${String(minMin % 60).padStart(2, "0")} (early fires 47%/-0.36%)`);
+    if (w <= maxDD) fails.push(`wrapper already fell ${w.toFixed(2)}% (hard-fall fires 33%/-0.81%)`);
+    if (ut >= maxUTape) fails.push(`underlying ripping ${ut.toFixed(2)}% (rally fires 48%/-0.50%)`);
+    if (fails.length) {
+      return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection failed: ${fails.join("; ")} [${selStr}] (#3349)` };
+    }
+    return { direction, ctx, veto: null, allowed: `selective: late + shallow + mild (${selStr})` };
   }
   if (mode === "falling") {
     const tapePct = Number(process.env.TRADER_SHORT_TAPE_PCT) || 0.3;
@@ -463,7 +520,12 @@ async function scanAll(watchlist) {
       const _uBars = _proxy && _proxy !== t && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
       const _uIbs = _uBars ? sessionIbs(_uBars) : null;
       const _spyCtx = spyTapeContext(bars15.SPY && bars15.SPY.bars);
-      const _pol = applyPolarity(t, direction, { underlyingIbs: _uIbs, spy: _spyCtx });
+      // #3349 selection features — computed for EVERY wrapper fire so the
+      // ledger grows the table whether the mode allows or vetoes.
+      const _wDD = sessionDrawdownPct(b15);
+      const _uTape = _uBars ? sessionDrawdownPct(_uBars) : null;
+      const _etMin = barEtMinute(b15);
+      const _pol = applyPolarity(t, direction, { underlyingIbs: _uIbs, spy: _spyCtx, wrapperDD: _wDD, underlyingTape: _uTape, etMin: _etMin });
       if (_pol.veto) {
         logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — ${_pol.veto}` });
         // INSTRUMENT THE COUNTERFACTUAL (#3343). A vetoed fire is a trade the
@@ -480,11 +542,31 @@ async function scanAll(watchlist) {
             spy_tape: _spyCtx.tape == null ? null : +_spyCtx.tape.toFixed(3),
             spy_mom30: _spyCtx.mom30 == null ? null : +_spyCtx.mom30.toFixed(3),
             spy_lower_low: _spyCtx.ll,
+            // #3349 selection features
+            wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
+            underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
+            et_min: _etMin,
             mode: String(process.env.TRADER_SHORT_EDGE || "0"),
           });
         } catch (_e) { /* instrumentation must never break the scan */ }
       } else if (_pol.allowed) {
         logs.push({ time: nowIso, agent: "sigma0", symbol: t, body: `${t} — economic short ALLOWED: ${_pol.allowed}` });
+        // The ALLOWED side must be recorded too, or the live table only ever
+        // sees the fires the mode refused — half a counterfactual is none.
+        try {
+          _logVeto({
+            event: "polarity_allow", symbol: t, price: Number(price) || null,
+            wrapper_ibs: (() => { const v = sessionIbs(b15); return v == null ? null : +v.toFixed(3); })(),
+            underlying: _proxy || null, underlying_ibs: _uIbs == null ? null : +_uIbs.toFixed(3),
+            spy_tape: _spyCtx.tape == null ? null : +_spyCtx.tape.toFixed(3),
+            spy_mom30: _spyCtx.mom30 == null ? null : +_spyCtx.mom30.toFixed(3),
+            spy_lower_low: _spyCtx.ll,
+            wrapper_dd: _wDD == null ? null : +_wDD.toFixed(3),
+            underlying_tape: _uTape == null ? null : +_uTape.toFixed(3),
+            et_min: _etMin,
+            mode: String(process.env.TRADER_SHORT_EDGE || "0"),
+          });
+        } catch (_e) { /* instrumentation must never break the scan */ }
       }
       direction = _pol.direction;
     }
@@ -622,4 +704,4 @@ async function scanAll(watchlist) {
   };
 }
 
-module.exports = { scanAll, getZones, deriveDirection, sessionIbs, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict };
+module.exports = { scanAll, getZones, deriveDirection, sessionIbs, sessionDrawdownPct, barEtMinute, applyPolarity, spyTapeContext, gateAllows, rileyGate, candleGrade, convergenceVerdict };
