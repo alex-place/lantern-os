@@ -2050,11 +2050,6 @@ function buildCard(ticker, d){
   let pnlHtml = '';
   if(pos){ const cl=pos.pnl_pct>=0?'pnl-pos':'pnl-neg'; pnlHtml=`<span class="pnl-badge ${cl}">${fmtPct(pos.pnl_pct)}</span>`; }
 
-  let watchHtml = '';
-  if(state==='watching'){
-    const near = (d.zones||[])[0];
-    if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-  }
 
   const badge = regimeBadgeInfo(ticker, state);
   const emph = emphasisAttrs(dir, conf);
@@ -2071,7 +2066,7 @@ function buildCard(ticker, d){
       <span class="card-state${badge.cls}" id="state-${ticker}">${badge.text}</span>
     </div>
   </div>
-  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}${watchHtml}</div>
+  <div id="meta-${ticker}">${confHtml}${patternChipHtml(sig)}</div>
   <div class="zone-ladder" id="ladder-${ticker}">
     <canvas class="chart-canvas" id="chart-${ticker}" aria-hidden="true"></canvas>
     <div class="ladder-overlay" id="overlay-${ticker}"></div>
@@ -2126,12 +2121,7 @@ function updateCardMeta(ticker, d){
   const metaEl = document.getElementById('meta-'+ticker);
   if(metaEl){
     const confHtml = sigBadge(d);
-    let watchHtml = '';
-    if(state==='watching'){
-      const near = (d.zones||[])[0];
-      if(near) watchHtml = `<div style="font-family:var(--mono);font-size:10px;color:var(--text2);padding:0 14px 4px">Nearest: ${near.type[0]} $${fmt(near.mid,near.mid>=100?2:4)} · ${near.touches||'?'}T</div>`;
-    }
-    metaEl.innerHTML = confHtml + patternChipHtml(sig) + watchHtml;
+    metaEl.innerHTML = confHtml + patternChipHtml(sig);
   }
 
   // Σ₀-grounded button emphasis tracks the live signal (#1578).
