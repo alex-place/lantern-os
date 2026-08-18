@@ -1210,12 +1210,6 @@
     <div class="dock-body" id="rwAlertsBody"></div>
   </section>
 
-  <section class="dock-panel rw-panel" id="rwp-details" role="tabpanel" aria-labelledby="rtab-details" hidden>
-    <header class="dock-head"><span class="dock-title">Details</span>
-      <button class="dock-x" type="button" onclick="closeRightWidget()" aria-label="Close panel" title="Close">✕</button></header>
-    <div class="dock-body" id="rwDetailsBody"></div>
-  </section>
-
   <!-- Order ticket: its own row under the widget panel, independently closable. -->
   <div class="ticket-dock" id="ticketDock">
     <div class="ticket-grip" id="ticketGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the order ticket" tabindex="0" title="Drag to resize"></div>
@@ -1229,7 +1223,6 @@
 <nav class="dock-rail" role="tablist" aria-label="Right panels" aria-orientation="vertical">
   <button class="dock-tab" id="rtab-watchlist" role="tab" data-rw="watchlist" aria-controls="rwp-watchlist" aria-selected="true"  onclick="setRightWidget('watchlist')" title="Watchlist">☰</button>
   <button class="dock-tab" id="rtab-alerts"    role="tab" data-rw="alerts"    aria-controls="rwp-alerts"    aria-selected="false" onclick="setRightWidget('alerts')"    title="Alerts">🔔</button>
-  <button class="dock-tab" id="rtab-details"   role="tab" data-rw="details"   aria-controls="rwp-details"   aria-selected="false" onclick="setRightWidget('details')"   title="Symbol details">ⓘ</button>
   <span class="rail-sep"></span>
   <button class="dock-tab" id="rtab-ticket" type="button" aria-pressed="true" onclick="toggleTicketDock()" title="Order ticket">⇅</button>
   <span class="rail-sep"></span>
@@ -5891,7 +5884,10 @@ function toggleDrawMenu(btn){
    the order ticket stacked under it, so both are open together -- which is the whole
    point of the right column and what TradingView does. Each side collapses on its own
    and hands its column back to the chart. */
-const RW_PANELS = ['watchlist', 'alerts', 'details'];
+// Details was removed (operator, 2026-08-18): it was added because TradingView has one,
+// without deciding what ours would show -- and the watchlist's own info panel already
+// carries the symbol, exchange, price, RVOL, technicals and returns it would have held.
+const RW_PANELS = ['watchlist', 'alerts'];
 const _lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (e) { return d; } };
 const _lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 
