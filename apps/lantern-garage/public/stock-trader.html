@@ -4637,6 +4637,12 @@ function _indMenuHtml(){
     h+='<div class="pat-menu-item ind-active" data-idx="'+idx+'" style="align-items:center" onclick="indEdit('+idx+',event)">'
       +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(cfg.color||d.color)+'"></span>'
       +'<span style="flex:1;min-width:0">'+esc(indLabel(cfg))+'</span>'
+      // Duplicate lives HERE, on the active row, not by clicking the same add-list entry
+      // twice: EMA 9 + EMA 21 + EMA 200 is a real want, but a second identical click
+      // produced a clone drawing exactly on top of its twin, which nobody meant.
+      +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
+      +'title="Add another '+esc(d.name)+' with its own settings" '
+      +'aria-label="Add another '+esc(d.name)+'" onclick="event.stopPropagation();indDuplicate('+idx+')">+</button>'
       +'<button type="button" class="pat-count" style="border:none;cursor:pointer;background:none;color:var(--text2)" '
       +'aria-label="Remove '+esc(indLabel(cfg))+'" onclick="event.stopPropagation();indRemove('+idx+')">✕</button></div>';
     if(open){
@@ -4655,8 +4661,16 @@ function _indMenuHtml(){
         +'oninput="indSetColor('+idx+',this.value)"></label></div>';
     }
   });
+  // An indicator already on the chart LEAVES this list. The list answers "what can I
+  // still add", so an entry that silently cloned an existing one was both a duplicate
+  // trap and a lie about what the click would do. A second copy is the + above.
+  const onChart = new Set(chartIndicators.map(c=>c.id));
+  const addable = Object.entries(IND_DEFS).filter(([id])=>!onChart.has(id));
   h+='<div class="pat-menu-note" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">Add an indicator</div>';
-  for(const [id,d] of Object.entries(IND_DEFS)){
+  if(!addable.length){
+    h+='<div class="pat-menu-note" style="opacity:.7">All '+Object.keys(IND_DEFS).length+' are on the chart. Press + on one above for a second copy.</div>';
+  }
+  for(const [id,d] of addable){
     h+='<div class="pat-menu-item ind-add" data-add="'+id+'" onclick="indAdd(\''+id+'\')">'
       +'<span style="width:9px;height:9px;border-radius:2px;flex:0 0 auto;background:'+esc(d.color)+'"></span>'
       +'<span style="flex:1">'+esc(d.name)+'</span>'
@@ -4682,9 +4696,33 @@ function _indRerender(){
 }
 function indAdd(id){
   if(!IND_DEFS[id]) return;
+  // Defence in depth behind the filtered list: a stale menu, a double-fire, or a
+  // restored state must not create a clone that draws exactly on top of its twin.
+  if(chartIndicators.some(c=>c.id===id)){
+    _indEditing = chartIndicators.findIndex(c=>c.id===id);   // open its settings instead
+    _indRefresh(); return;
+  }
   if(chartIndicators.length>=12) return;          // a bounded list keeps the render loop honest
   chartIndicators.push({ id, params:{}, color:IND_DEFS[id].color });
   _indEditing=chartIndicators.length-1;
+  _indRefresh();
+}
+/* A deliberate second copy, seeded from the row you pressed + on and nudged so the
+   new line is visibly its own rather than an identical overlay. */
+function indDuplicate(i){
+  const src=chartIndicators[i]; if(!src) return;
+  if(chartIndicators.length>=12) return;
+  const d=IND_DEFS[src.id];
+  const clone={ id:src.id, color:src.color||d.color, params:Object.assign({}, src.params) };
+  const first=d.params[0];
+  if(first){
+    const step=first.step||1;
+    const cur=Number(clone.params[first.k]!=null?clone.params[first.k]:first.def);
+    const next=Number.isFinite(cur)?cur*2:Number(first.def)+step;
+    clone.params[first.k]=Math.min(first.max, Math.max(first.min, Math.round(next/step)*step));
+  }
+  chartIndicators.splice(i+1,0,clone);
+  _indEditing=i+1;
   _indRefresh();
 }
 function indRemove(i){ chartIndicators.splice(i,1); _indEditing=null; _indRefresh(); }
