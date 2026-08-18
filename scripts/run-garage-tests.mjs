@@ -23,6 +23,10 @@
  * but they are still RUN, and if a quarantined test starts passing this exits
  * non-zero and tells you to delete the line. The list can only shrink.
  *
+ * The first CI run then taught us the list needs two kinds of entry: a test can
+ * fail because it is broken, or because of the machine it is on. `env:` entries
+ * cover the second (see parkLists below) and are never ratcheted.
+ *
  * Usage:  node scripts/run-garage-tests.mjs [--quarantine-only] [--concurrency N]
  */
 
@@ -40,14 +44,32 @@ const quarantineOnly = argv.includes('--quarantine-only');
 const ci = Number(argv[argv.indexOf('--concurrency') + 1]) || 4;
 const PER_TEST_TIMEOUT_MS = 90_000;
 
-function quarantined() {
-  if (!existsSync(QUARANTINE)) return new Set();
-  return new Set(
-    readFileSync(QUARANTINE, 'utf8')
-      .split('\n')
-      .map((l) => l.trim())
-      .filter((l) => l && !l.startsWith('#'))
-  );
+/**
+ * Two kinds of parked test, and conflating them breaks the ratchet.
+ *
+ *   plain `name.test.js`      broken — ratcheted. If it starts passing, the build
+ *                             fails until the line is deleted, so the list shrinks.
+ *
+ *   `env: name.test.js`       environment-dependent — skipped, NOT ratcheted. Its
+ *                             result is a property of the machine, not the code:
+ *                             the local-model suites pass on the 8GB dev box and
+ *                             fail on a hosted runner that has no model. Ratcheting
+ *                             those makes the build fail on whichever machine
+ *                             happens to satisfy them — red locally OR red in CI,
+ *                             with no edit that satisfies both.
+ */
+function parkLists() {
+  const broken = new Set();
+  const envDependent = new Set();
+  if (!existsSync(QUARANTINE)) return { broken, envDependent };
+  for (const raw of readFileSync(QUARANTINE, 'utf8').split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = line.match(/^env:\s*(.+)$/);
+    if (m) envDependent.add(m[1].trim());
+    else broken.add(line);
+  }
+  return { broken, envDependent };
 }
 
 function runOne(file) {
@@ -79,15 +101,19 @@ async function runAll(files) {
 }
 
 const all = readdirSync(TEST_DIR).filter((f) => f.endsWith('.test.js')).sort();
-const skip = quarantined();
-const enforced = all.filter((f) => !skip.has(f));
-const parked = all.filter((f) => skip.has(f));
+const { broken, envDependent } = parkLists();
+const enforced = all.filter((f) => !broken.has(f) && !envDependent.has(f));
+const parked = all.filter((f) => broken.has(f));          // ratcheted
+const envParked = all.filter((f) => envDependent.has(f)); // skipped outright
 
-// A quarantine entry naming a file that no longer exists is stale bookkeeping —
-// say so, so the list stays honest as tests are renamed or deleted.
-const ghosts = [...skip].filter((f) => !all.includes(f));
+// An entry naming a file that no longer exists is stale bookkeeping — say so, so
+// the list stays honest as tests are renamed or deleted.
+const ghosts = [...broken, ...envDependent].filter((f) => !all.includes(f));
 
-console.log(`garage suite: ${all.length} files — ${enforced.length} enforced, ${parked.length} quarantined`);
+console.log(
+  `garage suite: ${all.length} files — ${enforced.length} enforced, ` +
+  `${parked.length} quarantined, ${envParked.length} environment-dependent (skipped)`
+);
 
 const enforcedResults = quarantineOnly ? [] : await runAll(enforced);
 const failed = enforcedResults.filter((r) => !r.ok);

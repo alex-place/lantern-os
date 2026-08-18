@@ -30,7 +30,6 @@ pcsf-routing.test.js
 provider-pin-backstop.test.js
 pr-review-intent.test.js
 python-stdout-utf8.test.js
-record-evidence-grounding.test.js
 refinement-2-3.test.js
 tool-approval-gate.test.js
 tool-arg-repair.test.js
@@ -40,3 +39,12 @@ tool-provider-matrix.test.js
 trader-mode.test.js
 watchlist-store-seed.test.js
 web-search-snippet-quality.test.js
+
+# `env:` entries are ENVIRONMENT-DEPENDENT, not broken, and are never ratcheted —
+# their result is a property of the machine. These two pass on the 8GB dev box and
+# fail on a hosted runner: they assert the on-box local-model setup (#2171 / #2173,
+# qwen2.5-coder as the default local coding engine), which CI does not have.
+# Ratcheting them would make the build red on whichever machine satisfies them,
+# with no edit that satisfies both.
+env: local-engine-qwen.test.js
+env: local-model-registry.test.js
