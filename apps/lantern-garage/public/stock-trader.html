@@ -116,13 +116,13 @@
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
   /* #3355: charts first, then the dock, then the always-visible icon rail. The dock's
      column collapses to 0 when closed, so a closed dock costs the chart nothing. */
-  .layout{display:grid;grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  .layout{display:grid;grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
   body.leftdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px}
-  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--ticket-w,320px) 0 44px}
-  body.ticket-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 var(--dockr-w,320px) 44px}
-  body.ticket-closed.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 0 44px}
+  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) var(--ticket-w,320px) 0 44px}
+  body.ticket-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 var(--dockr-w,320px) 44px}
+  body.ticket-closed.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 0 44px}
   body.leftdock-closed.ticket-closed.rightdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) 0 0 44px}
-  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 44px}
+  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,360px) minmax(0,1fr) 0 44px}
   /* -- Docks (#3355 v2) -----------------------------------------------------
      TradingView's shape: a permanent drawing rail hard left, a collapsible left
      panel for chat, the charts, then a right column holding a switchable widget
@@ -150,6 +150,14 @@
   .dock-x{background:none;border:0;color:var(--text2);cursor:pointer;font-size:13px;line-height:1;padding:2px 4px;border-radius:4px}
   .dock-x:hover{color:var(--text0);background:var(--bg3)}
   .dock-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column}
+  /* An ADOPTED panel must be fluid. .dc-modal and .ot-modal still carried the fixed
+     widths they needed as right-edge overlays (360px and 340px), so inside a 300px dock
+     column they overflowed and clipped -- and resizing the column did nothing, because
+     their own width never changed. They fill their panel now, in both axes. */
+  .dock-body > .dc-modal, .dock-body > .ot-modal{
+    width:100%;max-width:none;height:100%;min-width:0;flex:1 1 auto;
+    border:none;box-shadow:none;animation:none}
+  .dock-body > .dc-modal{display:flex;flex-direction:column;min-height:0}
   .dock-body #wlList{flex:1 1 auto;min-height:0;overflow-y:auto}
   .dock-body .wl-info{flex:0 0 auto}
 
