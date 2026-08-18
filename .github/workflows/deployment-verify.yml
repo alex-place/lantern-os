@@ -38,7 +38,37 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    # An alarm that is permanently red stops being an alarm. When production is
+    # deliberately offline (see ops/production-status.json) the HOURLY schedule
+    # would fail every hour forever and train everyone to ignore it — so the
+    # schedule is paused, in the repo, with a reason and a date.
+    #
+    # Explicit intent is never paused: a manual dispatch or a post-release run
+    # still verifies, because there the caller is asserting something should be
+    # serving right now.
+    name: Should we verify?
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: gate
+        run: |
+          paused=$(python3 -c "import json;print(str(json.load(open('ops/production-status.json'))['paused']).lower())" 2>/dev/null || echo false)
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$paused" = "true" ]; then
+            reason=$(python3 -c "import json;print(json.load(open('ops/production-status.json'))['reason'])" 2>/dev/null)
+            since=$(python3 -c "import json;print(json.load(open('ops/production-status.json'))['since'])" 2>/dev/null)
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Scheduled verification PAUSED since ${since} — ${reason}"
+            echo "Unpause by setting \"paused\": false in ops/production-status.json."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
+    needs: preflight
+    if: needs.preflight.outputs.run == 'true'
     name: Verify live deployment
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -81,4 +111,7 @@ jobs:
           echo "     lantern.service reads its env from /etc/systemd/system/lantern.service.d/*.conf"
           echo "  2. The service is down or serving an older tag. Check /api/version."
           echo "  3. A gate regressed and per-account data is readable anonymously."
+          echo "  4. Production is offline ON PURPOSE (e.g. local-only piloting). If so, set"
+          echo "     \"paused\": true in ops/production-status.json so the hourly run stops"
+          echo "     crying wolf — a permanently-red alarm is one nobody reads."
           echo "See docs/ops/gce-cloud-deploy-runbook.md for the deploy + verify runbook."
