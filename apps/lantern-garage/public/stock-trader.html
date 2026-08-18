@@ -116,10 +116,13 @@
   html[data-theme="light"] ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.22);background-clip:padding-box}
   /* #3355: charts first, then the dock, then the always-visible icon rail. The dock's
      column collapses to 0 when closed, so a closed dock costs the chart nothing. */
-  .layout{display:grid;grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
-  body.leftdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) var(--dockr-w,320px) 44px}
+  .layout{display:grid;grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px;grid-template-rows:52px minmax(0,1fr) var(--footer-h, clamp(220px,34vh,460px));height:calc(100vh - 52px)}
+  body.leftdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) var(--ticket-w,320px) var(--dockr-w,320px) 44px}
+  body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) var(--ticket-w,320px) 0 44px}
+  body.ticket-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 var(--dockr-w,320px) 44px}
+  body.ticket-closed.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 0 44px}
+  body.leftdock-closed.ticket-closed.rightdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) 0 0 44px}
   body.rightdock-closed .layout{grid-template-columns:44px var(--dockl-w,300px) minmax(0,1fr) 0 44px}
-  body.leftdock-closed.rightdock-closed .layout{grid-template-columns:44px 0 minmax(0,1fr) 0 44px}
   /* -- Docks (#3355 v2) -----------------------------------------------------
      TradingView's shape: a permanent drawing rail hard left, a collapsible left
      panel for chat, the charts, then a right column holding a switchable widget
@@ -130,7 +133,7 @@
     padding:6px 5px;background:var(--bg1);border-right:1px solid var(--border);overflow-y:auto}
   .dockL{grid-column:2;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-right:1px solid var(--border)}
-  .dockR{grid-column:4;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
+  .dockR{grid-column:5;grid-row:2 / span 2;position:relative;display:flex;flex-direction:column;
     min-width:0;overflow:hidden;background:var(--bg1);border-left:1px solid var(--border)}
   body.leftdock-closed .dockL,
   body.rightdock-closed .dockR{border:none}
@@ -151,17 +154,19 @@
   .dock-body .wl-info{flex:0 0 auto}
 
   /* Order ticket: a sibling row under the widget panel, so both are open at once. */
-  .ticket-dock{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;
-    height:var(--ticket-h,320px);border-top:1px solid var(--border);position:relative}
+  /* Its own column, left of the watchlist and the same size -- not stacked under it. */
+  .ticket-dock{grid-column:4;grid-row:2 / span 2;display:flex;flex-direction:column;min-width:0;
+    overflow:hidden;background:var(--bg1);border-left:1px solid var(--border);position:relative}
   .ticket-dock .dock-body{overflow-y:auto}
-  .ticket-grip{position:absolute;top:-4px;left:0;right:0;height:9px;cursor:ns-resize;z-index:20}
-  .ticket-grip::before{content:"";position:absolute;left:50%;top:4px;transform:translateX(-50%);
+  .ticket-grip{position:absolute;left:-3px;top:0;bottom:0;width:7px;cursor:ew-resize;z-index:20}
+  .ticket-grip::before{content:"";position:absolute;top:50%;left:2px;transform:translateY(-50%);
+    width:3px;height:42px;border-radius:3px;background:var(--border)}
     width:42px;height:3px;border-radius:3px;background:var(--border)}
   .ticket-grip:hover::before{background:var(--accent)}
   body.ticket-closed .ticket-dock{display:none}
 
   /* Rails */
-  .dock-rail{grid-column:5;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
+  .dock-rail{grid-column:6;grid-row:2 / span 2;display:flex;flex-direction:column;gap:4px;
     padding:8px 6px;background:var(--bg1);border-left:1px solid var(--border)}
   .dock-tab{width:32px;height:32px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
@@ -174,14 +179,14 @@
   /* Category button: the tool icon, plus a chevron that appears on hover for the
      flyout. Two hit targets in one 34px slot, the way TradingView's rail works. */
   .dr-cat{position:relative;display:flex;align-items:center;flex:0 0 auto}
-  .dr-cat .dr-btn{width:34px;height:30px}
+  .dr-cat .dr-btn{width:36px;height:34px;font-size:17px}
   .dr-cat.on .dr-btn{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
-  .dr-more{position:absolute;right:-1px;top:0;height:30px;width:11px;display:flex;align-items:center;
+  .dr-more{position:absolute;right:-1px;top:0;height:34px;width:11px;display:flex;align-items:center;
     justify-content:center;background:none;border:0;color:var(--text2);font-size:10px;line-height:1;
     cursor:pointer;opacity:0;transition:opacity .12s;border-radius:0 5px 5px 0}
   .dr-cat:hover .dr-more,.dr-more:focus-visible,.dr-more[aria-expanded="true"]{opacity:1}
   .dr-more:hover{color:var(--text0);background:var(--bg3)}
-  .dr-btn{width:34px;height:30px;display:flex;align-items:center;justify-content:center;
+  .dr-btn{width:36px;height:34px;display:flex;align-items:center;justify-content:center;
     background:none;border:1px solid transparent;border-radius:6px;color:var(--text2);
     font-size:13px;cursor:pointer;flex:0 0 auto}
   .dr-btn:hover{color:var(--text0);background:var(--bg3)}
@@ -199,7 +204,7 @@
   .dr-fly-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer}
   .dr-fly-item:hover{background:var(--bg2)}
   .dr-fly-item.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
-  .dr-fly-ico{width:17px;text-align:center;color:var(--text1);flex:0 0 auto}
+  .dr-fly-ico{width:20px;text-align:center;color:var(--text1);flex:0 0 auto;font-size:15px}
   .dr-fly-name{flex:1;font-size:12.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .dr-fly-q,.dr-fly-key,.dr-fly-star{background:none;border:0;cursor:pointer;color:var(--text2);
     font-family:var(--mono);line-height:1;padding:2px 3px;border-radius:4px;flex:0 0 auto}
@@ -222,8 +227,8 @@
 
   /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
   .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
-    padding:3px 4px;background:var(--bg1);border:1px solid var(--border);border-radius:8px;
-    box-shadow:0 6px 20px rgba(0,0,0,.4)}
+    width:max-content;max-width:none;padding:3px 4px;background:var(--bg1);border:1px solid var(--border);
+    border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.4)}
   .fav-bar[hidden]{display:none}
   .fav-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 3px;user-select:none;touch-action:none}
   .fav-grip:active{cursor:grabbing}
@@ -320,6 +325,10 @@
   .tp-tab.active{color:var(--text0);border-bottom-color:var(--blue)}
   .tp-badge{font-size:11px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:0 5px;margin-left:2px}
   .tp-body{flex:1;min-height:0;overflow-y:auto;padding:6px 12px 10px}
+  /* The footer is narrower now that the docks own real columns, so its tables scroll
+     inside their pane instead of being clipped at the edge (#3355 follow-up). */
+  .tp-pane{overflow-x:auto}
+  .tp-pane .tp-table{min-width:max-content}
   .tp-pane{display:none}
   .tp-pane.active{display:block}
   /* positions / orders table */
@@ -1182,6 +1191,16 @@
   </section>
 </div>
 
+<!-- Order ticket: its OWN grid column, immediately left of the watchlist and the same
+     width. It was nested inside .dockR, where grid-column could not apply because it
+     was not a grid item of .layout -- so it rendered on top of the watchlist. -->
+  <div class="ticket-dock" id="ticketDock">
+    <div class="ticket-grip" id="ticketGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the order ticket" tabindex="0" title="Drag to resize"></div>
+    <header class="dock-head"><span class="dock-title">Order</span>
+      <button class="dock-x" type="button" onclick="toggleTicketDock()" aria-label="Close the order ticket" title="Close">✕</button></header>
+    <div class="dock-body" id="dockTicketBody"></div>
+  </div>
+
 <!-- Right column: widget panel on top, order ticket beneath. BOTH visible. -->
 <div class="dockR" id="dockR" role="region" aria-label="Right panels">
   <div class="col-resize dockR-resize" id="dockRResize" role="separator" aria-orientation="vertical" aria-label="Resize the right panel" tabindex="0" title="Drag to resize"></div>
@@ -1210,13 +1229,6 @@
     <div class="dock-body" id="rwAlertsBody"></div>
   </section>
 
-  <!-- Order ticket: its own row under the widget panel, independently closable. -->
-  <div class="ticket-dock" id="ticketDock">
-    <div class="ticket-grip" id="ticketGrip" role="separator" aria-orientation="horizontal" aria-label="Resize the order ticket" tabindex="0" title="Drag to resize"></div>
-    <header class="dock-head"><span class="dock-title">Order</span>
-      <button class="dock-x" type="button" onclick="toggleTicketDock()" aria-label="Close the order ticket" title="Close">✕</button></header>
-    <div class="dock-body" id="dockTicketBody"></div>
-  </div>
 </div>
 
 <!-- Right widget rail — TradingView's right-hand switcher. -->
@@ -3843,9 +3855,9 @@ const DRAW_CATS = [
     { name:'Lines', tools:[
       ['l',      { name:'Trend line',       icon:'/',  pts:2, k:'Alt+T', why:'A line between two points. The workhorse: connect two highs or two lows to see the slope the market is respecting.' }],
       ['ray',    { name:'Ray',              icon:'↗',  pts:2,            why:'Starts at your first click and continues forever in the direction of the second — the past stays clean, the level projects forward.' }],
-      ['info',   { name:'Info line',        icon:'⇢',  pts:2,            why:'A trend line that also reports the price change, percent move and bar count between its two ends.' }],
+      ['info',   { name:'Trend line with stats',        icon:'⇢',  pts:2,            why:'A trend line that also reports the price change, percent move and bar count between its two ends.' }],
       ['xline',  { name:'Extended line',    icon:'↔',  pts:2,            why:'Extends indefinitely in BOTH directions, so the line stays visible however far you scroll into the past or future.' }],
-      ['angle',  { name:'Trend angle',      icon:'∠',  pts:2,            why:'A trend line that shows the angle it makes with the horizontal — useful for comparing how steep two moves were.' }],
+      ['angle',  { name:'Trend line with angle',      icon:'∠',  pts:2,            why:'A trend line that shows the angle it makes with the horizontal — useful for comparing how steep two moves were.' }],
       ['h',      { name:'Horizontal line',  icon:'—',  pts:1, k:'Alt+H', why:'A price level across the whole chart. The simplest way to mark support, resistance or a target.' }],
       ['hray',   { name:'Horizontal ray',   icon:'⊢',  pts:1, k:'Alt+J', why:'A price level that starts where you click and only projects to the right — it does not claim history it was not there for.' }],
       ['v',      { name:'Vertical line',    icon:'|',  pts:1, k:'Alt+V', why:'Marks a moment in time: an open, a print, an earnings release.' }],
@@ -3853,10 +3865,10 @@ const DRAW_CATS = [
     ]},
     { name:'Channels', tools:[
       ['chan',   { name:'Parallel channel', icon:'⫽',  pts:3,            why:'Two parallel lines: draw the trend with the first two clicks, the third sets the channel width.' }],
-      ['flat',   { name:'Flat top/bottom',  icon:'⊏',  pts:3,            why:'A channel with one horizontal edge — the shape of an ascending or descending triangle.' }],
+      ['flat',   { name:'Flat top/bottom channel',  icon:'⊏',  pts:3,            why:'A channel with one horizontal edge — the shape of an ascending or descending triangle.' }],
     ]},
     { name:'Pitchforks', tools:[
-      ['fork',   { name:'Pitchfork',        icon:'⑂',  pts:3,            why:'Andrews pitchfork: three points define a median line with two parallel tines that often act as support and resistance.' }],
+      ['fork',   { name:'Andrews pitchfork',        icon:'⑂',  pts:3,            why:'Andrews pitchfork: three points define a median line with two parallel tines that often act as support and resistance.' }],
     ]},
   ]},
   { id:'patterns', name:'Chart patterns', groups:[
@@ -3866,8 +3878,8 @@ const DRAW_CATS = [
       ['tri',    { name:'Triangle',         icon:'△',  pts:3,            why:'Three free points — wedges, pennants, and any three-touch shape.' }],
     ]},
     { name:'Patterns', tools:[
-      ['abcd',   { name:'ABCD pattern',     icon:'Ⅲ',  pts:4,            why:'Four points labelled A-B-C-D, the base measured-move pattern.' }],
-      ['xabcd',  { name:'XABCD pattern',    icon:'Ⅴ',  pts:5,            why:'Five points for harmonic patterns — Gartley, Bat, Butterfly and friends.' }],
+      ['abcd',   { name:'ABCD measured move',     icon:'Ⅲ',  pts:4,            why:'Four points labelled A-B-C-D, the base measured-move pattern.' }],
+      ['xabcd',  { name:'XABCD harmonic',    icon:'Ⅴ',  pts:5,            why:'Five points for harmonic patterns — Gartley, Bat, Butterfly and friends.' }],
       ['hs',     { name:'Head and shoulders',icon:'⩙', pts:5,            why:'Five points: left shoulder, head, right shoulder and the two neckline anchors.' }],
     ]},
   ]},
@@ -3876,7 +3888,7 @@ const DRAW_CATS = [
       ['fib',    { name:'Fib retracement',  icon:'⋯',  pts:2, k:'Alt+F', why:'Draw from a swing low to a swing high and it marks the 23.6 / 38.2 / 50 / 61.8 / 78.6% pullback levels.' }],
       ['fibx',   { name:'Fib extension',    icon:'⋰',  pts:3,            why:'Three points project where a move may END — the 1.272, 1.618 and 2.618 targets beyond the prior high.' }],
       ['fibchan',{ name:'Fib channel',      icon:'∥',  pts:3,            why:'Fibonacci levels drawn parallel to a trend rather than horizontally.' }],
-      ['fibtime',{ name:'Fib time zone',    icon:'⦀',  pts:2,            why:'Vertical lines at Fibonacci intervals — projects WHEN a turn may be due rather than where.' }],
+      ['fibtime',{ name:'Fib time zones',    icon:'⦀',  pts:2,            why:'Vertical lines at Fibonacci intervals — projects WHEN a turn may be due rather than where.' }],
     ]},
   ]},
   { id:'forecast', name:'Forecasting', groups:[
@@ -6121,7 +6133,7 @@ function renderFavBar() {
     bar.setAttribute('role', 'toolbar'); bar.setAttribute('aria-label', 'Favourite drawing tools');
     document.body.appendChild(bar);
     const pos = _dj('trader.favBarPos', null);
-    if (pos) { bar.style.left = pos.x + 'px'; bar.style.top = pos.y + 'px'; }
+    if (pos) { bar.style.left = pos.x + 'px'; bar.style.top = pos.y + 'px'; bar.style.right = 'auto'; }
     let drag = null;
     bar.addEventListener('pointerdown', (e) => {
       if (!e.target.classList.contains('fav-grip')) return;
@@ -6133,7 +6145,7 @@ function renderFavBar() {
       if (!drag) return;
       const x = Math.max(0, Math.min(window.innerWidth - 60, e.clientX - drag.dx));
       const y = Math.max(56, Math.min(window.innerHeight - 40, e.clientY - drag.dy));
-      bar.style.left = x + 'px'; bar.style.top = y + 'px';
+      bar.style.left = x + 'px'; bar.style.top = y + 'px'; bar.style.right = 'auto';
     });
     document.addEventListener('pointerup', () => {
       if (!drag) return; drag = null;
@@ -6180,14 +6192,16 @@ document.addEventListener('DOMContentLoaded', () => { _adoptIntoDock(); renderDr
   const setVar = (name, key, px) => {
     document.documentElement.style.setProperty(name, px + 'px'); _lsSet(key, String(px));
   };
-  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-h', 'trader.ticketH']]) {
+  for (const [name, key] of [['--dockl-w', 'trader.dockLW'], ['--dockr-w', 'trader.dockRW'], ['--ticket-w', 'trader.ticketW']]) {
     const s = parseInt(_lsGet(key, ''), 10); if (s) document.documentElement.style.setProperty(name, s + 'px');
   }
   bind('dockLResize', (e) => setVar('--dockl-w', 'trader.dockLW', clamp((e.clientX || 0) - 44, 220, 560)));
   bind('dockRResize', (e) => setVar('--dockr-w', 'trader.dockRW', clamp(window.innerWidth - (e.clientX || 0) - 44, 240, 620)));
+  // The ticket is a column now, so its grip sets a WIDTH from the right edge, past the
+  // watchlist column and the rail.
   bind('ticketGrip', (e) => {
-    const box = document.getElementById('dockR').getBoundingClientRect();
-    setVar('--ticket-h', 'trader.ticketH', clamp(box.bottom - (e.clientY || 0), 140, Math.max(180, box.height - 160)));
+    const railW = 44, wl = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dockr-w'), 10) || 320;
+    setVar('--ticket-w', 'trader.ticketW', clamp(window.innerWidth - (e.clientX || 0) - railW - wl, 240, 560));
   });
 })();
 
