@@ -3,15 +3,15 @@
   "note": "Generated file — do not hand-edit. Run `npm run navmap` after any nav change.",
   "root": "index.html",
   "totals": {
-    "pages": 29,
-    "reachable": 18,
-    "orphaned": 11,
-    "inSitemap": 13
+    "pages": 31,
+    "reachable": 21,
+    "orphaned": 10,
+    "inSitemap": 12
   },
   "graph": {
     "accounts.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -19,8 +19,8 @@
     ],
     "admin-flags.html": [
       "auth.html",
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -31,29 +31,37 @@
       "knowledgecenter.html",
       "terms.html"
     ],
-    "changelog.html": [
+    "budget.html": [
       "chat.html",
-      "create.html",
+      "explore.html",
+      "knowledgecenter.html",
+      "stock-trader.html",
+      "work.html"
+    ],
+    "changelog.html": [
+      "budget.html",
+      "chat.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "chat.html": [
-      "create.html",
+      "budget.html",
       "explore.html",
       "stock-trader.html",
       "work.html"
     ],
     "contest.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "create.html": [
+      "budget.html",
       "chat.html",
       "explore.html",
       "knowledgecenter.html",
@@ -64,8 +72,8 @@
       "create.html"
     ],
     "explore.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "fallout-radio.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
@@ -78,8 +86,8 @@
       "explore.html"
     ],
     "faq.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "pricing.html",
@@ -87,33 +95,33 @@
       "work.html"
     ],
     "ibkr-setup-guide.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "index.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "kalshi-terminal.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "knowledgecenter.html": [
+      "budget.html",
       "changelog.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "faq.html",
       "stock-trader.html",
@@ -121,16 +129,16 @@
       "work.html"
     ],
     "metrics.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "options.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -138,8 +146,8 @@
       "work.html"
     ],
     "orchestration.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "ibkr-setup-guide.html",
       "knowledgecenter.html",
@@ -147,8 +155,8 @@
       "work.html"
     ],
     "pricing.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -156,27 +164,28 @@
     ],
     "reset-password.html": [],
     "settings.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "stock-trader.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
       "options.html",
       "pricing.html",
+      "trader-guide.html",
       "watch.html",
       "work.html"
     ],
     "system-health.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -185,9 +194,14 @@
     "terms.html": [
       "auth.html"
     ],
-    "watch.html": [
+    "trader-guide.html": [
+      "auth.html",
       "chat.html",
-      "create.html",
+      "pricing.html"
+    ],
+    "watch.html": [
+      "budget.html",
+      "chat.html",
       "explore.html",
       "kalshi-terminal.html",
       "knowledgecenter.html",
@@ -196,8 +210,8 @@
       "work.html"
     ],
     "welcome.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "settings.html",
@@ -205,25 +219,25 @@
       "work.html"
     ],
     "whats-new.html": [
+      "budget.html",
       "changelog.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "wide-search.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
       "work.html"
     ],
     "work.html": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "orchestration.html",
@@ -232,8 +246,8 @@
   },
   "depth": {
     "index.html": 0,
+    "budget.html": 1,
     "chat.html": 1,
-    "create.html": 1,
     "explore.html": 1,
     "knowledgecenter.html": 1,
     "stock-trader.html": 1,
@@ -247,16 +261,19 @@
     "whats-new.html": 2,
     "options.html": 2,
     "pricing.html": 2,
+    "trader-guide.html": 2,
     "watch.html": 2,
-    "ibkr-setup-guide.html": 3
+    "ibkr-setup-guide.html": 3,
+    "auth.html": 3,
+    "terms.html": 4
   },
   "byDepth": {
     "0": [
       "index.html"
     ],
     "1": [
+      "budget.html",
       "chat.html",
-      "create.html",
       "explore.html",
       "knowledgecenter.html",
       "stock-trader.html",
@@ -271,17 +288,23 @@
       "orchestration.html",
       "pricing.html",
       "settings.html",
+      "trader-guide.html",
       "watch.html",
       "whats-new.html"
     ],
     "3": [
+      "auth.html",
       "ibkr-setup-guide.html"
+    ],
+    "4": [
+      "terms.html"
     ]
   },
   "reachable": [
+    "auth.html",
+    "budget.html",
     "changelog.html",
     "chat.html",
-    "create.html",
     "explore.html",
     "fallout-radio.html",
     "faq.html",
@@ -294,6 +317,8 @@
     "pricing.html",
     "settings.html",
     "stock-trader.html",
+    "terms.html",
+    "trader-guide.html",
     "watch.html",
     "whats-new.html",
     "work.html"
@@ -301,13 +326,12 @@
   "orphaned": [
     "accounts.html",
     "admin-flags.html",
-    "auth.html",
     "contest.html",
+    "create.html",
     "entry.html",
     "metrics.html",
     "reset-password.html",
     "system-health.html",
-    "terms.html",
     "welcome.html",
     "wide-search.html"
   ],
@@ -315,7 +339,6 @@
     "index.html",
     "changelog.html",
     "chat.html",
-    "create.html",
     "explore.html",
     "faq.html",
     "kalshi-terminal.html",
@@ -327,16 +350,18 @@
     "whats-new.html"
   ],
   "reachableNotInSitemap": [
+    "auth.html",
+    "budget.html",
     "fallout-radio.html",
     "ibkr-setup-guide.html",
     "options.html",
     "orchestration.html",
     "settings.html",
+    "trader-guide.html",
     "watch.html",
     "work.html"
   ],
   "inSitemapNotReachable": [
-    "terms.html",
     "welcome.html"
   ],
   "knowledgeCenterPath": [
@@ -352,9 +377,12 @@
   "sharedNavTargets": [
     "chat.html",
     "stock-trader.html",
+    "budget.html",
     "work.html",
     "knowledgecenter.html",
-    "create.html",
     "explore.html"
+  ],
+  "navConfigHidden": [
+    "create.html"
   ]
 }
