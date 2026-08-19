@@ -66,10 +66,31 @@ from controller import Controller, BOUNDARY, EXPAND, RESOLVED   # noqa: E402
 from run_world_h import HoldController                         # noqa: E402
 from environments.hidden_variable import HiddenVariableWorld   # noqa: E402
 from agents.explorer import Explorer                           # noqa: E402
+from memory import RelationMemory                              # noqa: E402
 
 OUT = os.path.join(os.path.dirname(__file__), "results", "discovery_benchmark.json")
 EPISODES = 3          # a SEQUENCE of hidden rules per seed
 STEPS = 300
+
+
+class MemoryController(HoldController):
+    """The hold controller + RelationMemory as a PRIOR on DESIGN. Starts every episode on the
+    base class -- nothing carried as model state. Memory only re-ranks candidates by their
+    validated history, and each candidate must still explain THIS episode's residual."""
+
+    def __init__(self, world, memory, **kw):
+        super().__init__(world, **kw)
+        self.memory = memory
+
+    def _probe_order(self):
+        """The whole mechanism: probe the remembered-reliable observable FIRST. With early
+        accept, a prior that is right stops the round after one probe instead of four."""
+        items = super()._probe_order()
+        return sorted(items, key=lambda kv: -self.memory.reliability(kv[0]))
+
+    def _design(self, resid):
+        scored = super()._design(resid)
+        return self.memory.rank(scored)
 
 
 class SequenceWorld:
@@ -78,12 +99,15 @@ class SequenceWorld:
     meaningful: the machine that learned z2 in episode 1 keeps z2 and need not re-buy it if
     episode 3 switches z2 on again."""
 
-    def __init__(self, seed, episodes=EPISODES, null=False):
+    def __init__(self, seed, episodes=EPISODES, null=False, repeat=False):
         self.rng = np.random.default_rng(seed)
         self.episodes = []
         for k in range(episodes):
             w = HiddenVariableWorld(seed * 100 + k, switch_at=None if null else 100, n_steps=STEPS,
                                     drift=0.002 if null else 0.0)
+            if repeat and k > 0:
+                # the SAME regularity recurs: pin this episode's true slot to episode 0's
+                w.true_idx = self.episodes[0].true_idx
             self.episodes.append(w)
         self.k = 0
 
@@ -98,7 +122,7 @@ class SequenceWorld:
 def count_experiments(ctrl):
     """Paid measurement calls = probe rounds + acquisitions, from the evidence log.
     Ongoing upkeep is excluded by definition (see header)."""
-    probes = sum(1 for e in ctrl.ev.rows if e["kind"] == "design") * 4     # 4 candidates probed per DESIGN
+    probes = ctrl.probes_paid                                             # probes ACTUALLY bought
     acq = sum(1 for e in ctrl.ev.rows if e["kind"] == "measurement")
     return probes + acq
 
@@ -127,9 +151,10 @@ def evidence_chain(ctrl, true_z):
     return has_boundary and has_design and has_measure and has_expand
 
 
-def run_seed(seed, arm, null=False):
-    sw = SequenceWorld(seed, null=null)
+def run_seed(seed, arm, null=False, repeat=False):
+    sw = SequenceWorld(seed, null=null, repeat=repeat)
     carried = ["x"]; carried_extra = {}
+    mem = RelationMemory()
     disc = 0; false_disc = 0; experiments = 0; chains_ok = 0; mse_sum = 0.0
     for k in range(EPISODES):
         w = sw.episodes[k]
@@ -140,8 +165,11 @@ def run_seed(seed, arm, null=False):
                 if len(xs) >= 8: A.fit(np.array(xs)[:, None], np.array(ys))
             r = A.residuals(np.array(xs[-30:])[:, None], np.array(ys[-30:]))
             mse_sum += float(np.mean(r ** 2)); continue
-        cls = HoldController if arm == "memory+hold" else Controller
-        c = cls(w)
+        if arm == "relmem":
+            c = MemoryController(w, mem)          # base class every episode; memory is a prior only
+        else:
+            cls = HoldController if arm == "memory+hold" else Controller
+            c = cls(w)
         if arm in ("memory", "memory+hold") and len(carried) > 1:
             # carry the expanded class forward: the machine remembers what it learned
             c.A = Explorer(features=list(carried))
@@ -150,6 +178,10 @@ def run_seed(seed, arm, null=False):
         r = c.run()
         experiments += count_experiments(c)
         ok, why = validated(c, w)
+        if arm == "relmem":
+            # the re-test outcome: every observable this episode EXPANDED on gets a verdict
+            for name in c.A.features[1:]:
+                mem.record(name, ok and name == w.truth()["true_z"])
         if ok:
             disc += 1
             if evidence_chain(c, w.truth()["true_z"]): chains_ok += 1
@@ -163,19 +195,23 @@ def run_seed(seed, arm, null=False):
             "per_experiment": (disc / experiments) if experiments else None}
 
 
+def agg(rs):
+    d = sum(r["discoveries"] for r in rs); f = sum(r["false"] for r in rs); e = sum(r["experiments"] for r in rs)
+    ch = sum(r["chains_ok"] for r in rs)
+    return {"discoveries": d, "false": f, "experiments": e, "chains_ok": ch,
+            "per_experiment": (d / e) if e else None, "false_rate": (f / (d + f)) if (d + f) else 0.0,
+            "mean_mse": float(np.mean([r["mean_mse"] for r in rs])),
+            "possible": len(rs) * EPISODES}
+
+
 def main(n_seeds=60):
-    arms = ["a_alone", "one-shot", "memory", "memory+hold"]
+    arms = ["a_alone", "one-shot", "memory", "memory+hold", "relmem"]
     rows = {a: [run_seed(s, a) for s in range(n_seeds)] for a in arms}
+    rep_rows = {a: [run_seed(s, a, repeat=True) for s in range(n_seeds)] for a in ("one-shot", "relmem")}
     null_rows = {a: [run_seed(s, a, null=True) for s in range(n_seeds)] for a in arms if a != "a_alone"}
 
-    def agg(rs):
-        d = sum(r["discoveries"] for r in rs); f = sum(r["false"] for r in rs); e = sum(r["experiments"] for r in rs)
-        ch = sum(r["chains_ok"] for r in rs)
-        return {"discoveries": d, "false": f, "experiments": e, "chains_ok": ch,
-                "per_experiment": (d / e) if e else None, "false_rate": (f / (d + f)) if (d + f) else 0.0,
-                "mean_mse": float(np.mean([r["mean_mse"] for r in rs])),
-                "possible": len(rs) * EPISODES}
     summary = {a: agg(rows[a]) for a in arms}
+    rep_summary = {a: agg(rep_rows[a]) for a in rep_rows}
     null_summary = {a: agg(null_rows[a]) for a in null_rows}
 
     print(f"=== DISCOVERY BENCHMARK: validated regularities per experiment -- {n_seeds} seeds x {EPISODES} episodes ===\n")
@@ -184,25 +220,37 @@ def main(n_seeds=60):
         s = summary[a]
         pe = "undefined" if s["per_experiment"] is None else f"{s['per_experiment']:.4f}"
         print(f"{a:14} {s['discoveries']:>11} {s['possible']:>4} {s['false']:>6} {s['experiments']:>12} {pe:>15} {s['mean_mse']:>9.3f}")
+    print(f"\nREPEAT REGIME (same regularity every episode -- the only place memory CAN pay):")
+    print(f"{'arm':14} {'discovered':>11} {'of':>4} {'false':>6} {'experiments':>12} {'PER EXPERIMENT':>15}")
+    for a, s_ in rep_summary.items():
+        print(f"{a:14} {s_['discoveries']:>11} {s_['possible']:>4} {s_['false']:>6} {s_['experiments']:>12} {s_['per_experiment']:>15.4f}")
     print(f"\nNULL WORLD (no hidden rule; drift only) -- discoveries must be 0:")
     for a, s in null_summary.items():
         print(f"  {a:14} discoveries={s['discoveries']}  false={s['false']}  experiments={s['experiments']}")
 
     os_pe = summary["one-shot"]["per_experiment"] or 0
     mem_pe = summary["memory"]["per_experiment"] or 0
-    D1 = mem_pe >= 1.25 * os_pe
-    D2 = summary["memory+hold"]["false_rate"] < 0.10
+    rel_pe = summary["relmem"]["per_experiment"] or 0
+    rep_os = rep_summary["one-shot"]["per_experiment"] or 0
+    rep_rel = rep_summary["relmem"]["per_experiment"] or 0
+    # D1 is two-sided: relation-memory must PAY where the rule repeats (>=25% over one-shot)
+    # and must NOT HURT where it does not (within 10% of one-shot). Naive memory stays as the
+    # killed comparator.
+    D1 = (rep_rel >= 1.25 * rep_os) and (rel_pe >= 0.90 * os_pe)
+    D2 = summary["relmem"]["false_rate"] < 0.10
     D3 = all(summary[a]["chains_ok"] == summary[a]["discoveries"] for a in arms if a != "a_alone")
     D4 = all(s["discoveries"] == 0 for s in null_summary.values())
-    gates = {"D1_memory_beats_oneshot_25pct": {"PASS": bool(D1), "one_shot": os_pe, "memory": mem_pe,
-                                               "gain_pct": round(100 * (mem_pe / os_pe - 1), 1) if os_pe else None},
+    gates = {"D1_relation_memory_pays_on_repeat_and_no_harm_otherwise": {
+                 "PASS": bool(D1),
+                 "repeat_regime": {"one_shot": rep_os, "relmem": rep_rel, "gain_pct": round(100 * (rep_rel / rep_os - 1), 1) if rep_os else None},
+                 "nonrepeat_regime": {"one_shot": os_pe, "relmem": rel_pe, "naive_memory_KILLED": mem_pe}},
              "D2_false_discovery_lt_10pct": {"PASS": bool(D2), "rate": summary["memory+hold"]["false_rate"]},
              "D3_every_discovery_has_chain": {"PASS": bool(D3)},
              "D4_null_world_zero": {"PASS": bool(D4)},
              "VERDICT": ("KILLED: null world produced discoveries -- the metric counts artifacts" if not D4 else
-                         "KILLED: memory across episodes buys nothing" if not D1 else
+                         "KILLED: relation memory does not pay where the rule repeats, or hurts where it does not" if not D1 else
                          "BENCHMARK STANDS" if (D2 and D3) else "PARTIAL -- see gates")}
-    out = {"n_seeds": n_seeds, "episodes": EPISODES, "summary": summary, "null": null_summary, "gates": gates}
+    out = {"n_seeds": n_seeds, "episodes": EPISODES, "summary": summary, "repeat": rep_summary, "null": null_summary, "gates": gates}
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, default=float)

@@ -13,33 +13,65 @@
       "possible": 180
     },
     "one-shot": {
-      "discoveries": 154,
-      "false": 4,
-      "experiments": 1434,
-      "chains_ok": 154,
-      "per_experiment": 0.10739191073919108,
-      "false_rate": 0.02531645569620253,
-      "mean_mse": 0.8025724016072712,
+      "discoveries": 164,
+      "false": 0,
+      "experiments": 1124,
+      "chains_ok": 164,
+      "per_experiment": 0.14590747330960854,
+      "false_rate": 0.0,
+      "mean_mse": 0.45927016956683,
       "possible": 180
     },
     "memory": {
-      "discoveries": 61,
+      "discoveries": 65,
       "false": 80,
-      "experiments": 1082,
-      "chains_ok": 61,
-      "per_experiment": 0.056377079482439925,
-      "false_rate": 0.5673758865248227,
-      "mean_mse": 2.771084553504863,
+      "experiments": 569,
+      "chains_ok": 65,
+      "per_experiment": 0.11423550087873462,
+      "false_rate": 0.5517241379310345,
+      "mean_mse": 2.571676040996498,
       "possible": 180
     },
     "memory+hold": {
-      "discoveries": 90,
+      "discoveries": 99,
       "false": 0,
-      "experiments": 1373,
-      "chains_ok": 90,
-      "per_experiment": 0.06554989075018208,
+      "experiments": 721,
+      "chains_ok": 99,
+      "per_experiment": 0.13730929264909847,
       "false_rate": 0.0,
-      "mean_mse": 2.080998929833873,
+      "mean_mse": 1.8199479420977316,
+      "possible": 180
+    },
+    "relmem": {
+      "discoveries": 164,
+      "false": 0,
+      "experiments": 1117,
+      "chains_ok": 164,
+      "per_experiment": 0.1468218442256043,
+      "false_rate": 0.0,
+      "mean_mse": 0.4751539692507196,
+      "possible": 180
+    }
+  },
+  "repeat": {
+    "one-shot": {
+      "discoveries": 164,
+      "false": 0,
+      "experiments": 1135,
+      "chains_ok": 164,
+      "per_experiment": 0.1444933920704846,
+      "false_rate": 0.0,
+      "mean_mse": 0.5252509996264997,
+      "possible": 180
+    },
+    "relmem": {
+      "discoveries": 165,
+      "false": 0,
+      "experiments": 947,
+      "chains_ok": 165,
+      "per_experiment": 0.17423442449841606,
+      "false_rate": 0.0,
+      "mean_mse": 0.4699273321223709,
       "possible": 180
     }
   },
@@ -47,40 +79,57 @@
     "one-shot": {
       "discoveries": 0,
       "false": 0,
-      "experiments": 1862,
+      "experiments": 1617,
       "chains_ok": 0,
       "per_experiment": 0.0,
       "false_rate": 0.0,
-      "mean_mse": 0.874499844486795,
+      "mean_mse": 0.5366191336198037,
       "possible": 180
     },
     "memory": {
       "discoveries": 0,
       "false": 0,
-      "experiments": 1862,
+      "experiments": 1617,
       "chains_ok": 0,
       "per_experiment": 0.0,
       "false_rate": 0.0,
-      "mean_mse": 0.874499844486795,
+      "mean_mse": 0.5366191336198037,
       "possible": 180
     },
     "memory+hold": {
       "discoveries": 0,
       "false": 0,
-      "experiments": 1862,
+      "experiments": 1617,
       "chains_ok": 0,
       "per_experiment": 0.0,
       "false_rate": 0.0,
-      "mean_mse": 0.874499844486795,
+      "mean_mse": 0.5366191336198037,
+      "possible": 180
+    },
+    "relmem": {
+      "discoveries": 0,
+      "false": 0,
+      "experiments": 1617,
+      "chains_ok": 0,
+      "per_experiment": 0.0,
+      "false_rate": 0.0,
+      "mean_mse": 0.5366191336198037,
       "possible": 180
     }
   },
   "gates": {
-    "D1_memory_beats_oneshot_25pct": {
+    "D1_relation_memory_pays_on_repeat_and_no_harm_otherwise": {
       "PASS": false,
-      "one_shot": 0.10739191073919108,
-      "memory": 0.056377079482439925,
-      "gain_pct": -47.5
+      "repeat_regime": {
+        "one_shot": 0.1444933920704846,
+        "relmem": 0.17423442449841606,
+        "gain_pct": 20.6
+      },
+      "nonrepeat_regime": {
+        "one_shot": 0.14590747330960854,
+        "relmem": 0.1468218442256043,
+        "naive_memory_KILLED": 0.11423550087873462
+      }
     },
     "D2_false_discovery_lt_10pct": {
       "PASS": true,
@@ -92,6 +141,6 @@
     "D4_null_world_zero": {
       "PASS": true
     },
-    "VERDICT": "KILLED: memory across episodes buys nothing"
+    "VERDICT": "KILLED: relation memory does not pay where the rule repeats, or hurts where it does not"
   }
 }

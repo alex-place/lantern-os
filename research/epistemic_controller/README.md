@@ -23,6 +23,21 @@ and **300 held-out seeds with thresholds frozen**:
 No LLM anywhere: A is least squares, B is three residual-structure tests, the selector is
 explained-variance-per-cost. **The mechanism lives in the controller.**
 
+## Update (2026-08-19) — read [SELF-EXPERIMENT-RESULT.md](SELF-EXPERIMENT-RESULT.md)
+
+Two experiments since: **relation memory** (a re-testable prior on DESIGN) is real but
+sub-threshold — +18.4% discoveries per experiment on 200 holdout seeds against a pre-registered
++25% bar, no harm where the rule does not repeat, zero false discoveries. And **world S**, the
+self experiment (can the machine diagnose a defect in its own experiment-selection policy from
+its own mistake ledger?) is **KILLED**: the strict evidence rule is specific but almost never
+fires, and loosening it makes it fire on both controls.
+
+Building world S found four defects in the controller — including one that had been read as a
+result. World H's earlier headline ("committing on the first window cannot separate two
+explainers; holding the expansion can") was mostly a bug: a failed expansion left the model
+unfitted, so every candidate cleared the bar and the cheapest won. Fixed, one-shot commit gets
+92% and holding gets 98%. That correction is recorded, not overwritten.
+
 ## What broke on the way, in order — this is the useful part
 
 1. **Baseline bug (controller).** An EMA baseline seeded at t=8 froze at ~35× the true nominal

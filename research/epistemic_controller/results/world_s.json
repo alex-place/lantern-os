@@ -1,0 +1,76 @@
+{
+  "n_seeds": 100,
+  "episodes": 6,
+  "H": {
+    "hold": {
+      "proxy_early": 0.20333333333333334,
+      "proxy_late": 0.21,
+      "drops_early": 0.2833333333333333,
+      "drops_late": 0.37666666666666665,
+      "exp_per_disc_early": 7.217557251908397,
+      "exp_per_disc_late": 8.078125,
+      "validated_late": 0.8533333333333334
+    },
+    "self": {
+      "proxy_early": 0.20333333333333334,
+      "proxy_late": 0.20333333333333334,
+      "drops_early": 0.2833333333333333,
+      "drops_late": 0.37666666666666665,
+      "exp_per_disc_early": 7.217557251908397,
+      "exp_per_disc_late": 8.015503875968992,
+      "validated_late": 0.86
+    },
+    "self-loose": {
+      "proxy_early": 0.2,
+      "proxy_late": 0.19666666666666666,
+      "drops_early": 0.28,
+      "drops_late": 0.37666666666666665,
+      "exp_per_disc_early": 7.206106870229007,
+      "exp_per_disc_late": 8.0,
+      "validated_late": 0.8633333333333333
+    }
+  },
+  "controls": {
+    "C1_fired": 0.0,
+    "C2_fired": 0.0,
+    "C1_drops": 0.16666666666666666,
+    "C2_drops": 0.235
+  },
+  "gates": {
+    "S1_baseline_does_not_learn": {
+      "PASS": true,
+      "hold_early": 0.20333333333333334,
+      "hold_late": 0.21
+    },
+    "S2_self_learns": {
+      "PASS": false,
+      "self_early": 0.20333333333333334,
+      "self_late": 0.20333333333333334,
+      "kept": 6,
+      "reverted": 0
+    },
+    "S3_diagnosis_specific": {
+      "PASS": true,
+      "C1_fired": 0.0,
+      "C2_fired": 0.0,
+      "C2_drops_per_episode": 0.235,
+      "C2_null_diagnoses": 147
+    },
+    "S2_S3_loose_variant": {
+      "S2_PASS": false,
+      "S3_PASS": false,
+      "kept": 12,
+      "reverted": 3,
+      "C1_fired": 0.12,
+      "C2_fired": 0.2,
+      "note": "cost reference = median: fires 2x more often and fires on BOTH controls"
+    },
+    "S4_it_pays": {
+      "PASS": false,
+      "hold_late": 8.078125,
+      "self_late": 8.015503875968992,
+      "saving_pct": 0.8
+    }
+  },
+  "verdict": "KILLED: the mistake ledger does not let the scientist repair its own policy"
+}

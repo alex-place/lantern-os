@@ -60,12 +60,7 @@ class HoldController(Controller):
         super().__init__(world, **kw)
         self.hold_steps = hold_steps
         self._hold_left = 0
-        self._excluded = set()
         self.expansions_dropped = 0
-
-    def _design(self, resid):
-        scored = super()._design(resid)
-        return [s for s in scored if s["name"] not in self._excluded] or scored
 
     def run(self):
         out = super().run()
@@ -92,9 +87,10 @@ class HoldController(Controller):
                         bad = self.A.features[-1]
                         eid = self.ev.add("expansion_dropped", t=len(self.xs), dropped=bad, mse=mse, **verdict)
                         self.expansions_dropped += 1
-                        self._excluded.add(bad)
+                        self.excluded.add(bad)                # base-class exclusion: not re-bought
                         self.extra.pop(bad, None)
                         self.A = Explorer(features=[f for f in self.A.features if f != bad])
+                        self.A.fit(self._design_matrix(), np.array(self.ys))   # refit: see controller EXPAND
                         self._held_once = False
                         self._hold_left = 0
                         self._go(DESIGN, [eid], f"expansion on {bad} re-structured on fresh data; dropped and excluded")

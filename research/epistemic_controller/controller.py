@@ -70,6 +70,16 @@ class Controller:
         # measurement (~3) + ongoing upkeep, so a correctly-diagnosed variable is affordable;
         # at 6, 20% of seeds diagnosed correctly and could not pay.
         self.retract_below = 0.94
+        self.probes_paid = 0                # probes actually bought (see _design: sequential + early accept)
+        # Candidates bought and REJECTED this episode (EXPAND did not remove the structure, or a
+        # held expansion was dropped). A tested-and-rejected hypothesis is not re-bought. Found
+        # 2026-08-19 by tracing world S: the shipped controller re-bought the same proxy twice
+        # in one episode and burned its budget doing so.
+        self.excluded = set()
+        # Utility = explained / cost**cost_exponent. Exposed because it is a property of the
+        # SCIENTIST, not of the world: a machine that can diagnose its own selection policy
+        # needs a knob its diagnosis can turn (see run_world_s.py).
+        self.cost_exponent = 1.0
         self.log = log
 
     # ── helpers ───────────────────────────────────────────────────────────────────────────
@@ -95,25 +105,44 @@ class Controller:
         return self.A.residuals(X, y)
 
     # ── the selector: utility = explained residual variance / cost ───────────────────────
+    def _probe_order(self):
+        """The order candidates are probed in, minus anything rejected this episode. The base
+        controller has no prior, so it is the world's fixed order. Subclasses that HAVE a prior
+        override this -- that is the only channel through which a prior can save experiment cost
+        (see _design)."""
+        return [kv for kv in self.world.candidates().items() if kv[0] not in self.excluded]
+
     def _design(self, resid):
         """Score each candidate by how much of the CURRENT structured residual it would explain
         per unit cost, using a cheap probe (a few samples) before committing the budget.
 
         The probe itself costs 1/4 of the full measurement -- buying information about which
         measurement to buy. Decoys correlated with x get explained away by x and score low;
-        the true z explains the residual and scores high. Logged with runner-up scores."""
+        the true z explains the residual and scores high. Logged with runner-up scores.
+
+        PROBING IS SEQUENTIAL WITH EARLY ACCEPT. Candidates are probed in _probe_order() and
+        the round STOPS as soon as one explains at least `retract_below` of the residual --
+        the same bar DESIGN already uses to decide "something explains this". No new constant.
+        Stopping early is what makes probe order matter: a machine that looks in a better order
+        pays for fewer looks. (Before 2026-08-19 every candidate was probed unconditionally,
+        which made order free and cost-invariant -- an instrument that could not measure the
+        thing it was built to measure. The old flat charge is kept as `probes_flat` so the
+        earlier numbers remain reconstructible.)"""
         n = len(resid)
         scored = []
-        for name, cost in self.world.candidates().items():
+        for name, cost in self._probe_order():
             probe = self.world.measure(name, n)
             self.spent += cost * 0.25
+            self.probes_paid += 1
             v = np.array(probe["values"])
             # explained variance of the residual by this observable, after x is already in
             X = np.column_stack([np.ones(n), np.array(self.xs[-n:]), v])
             beta, *_ = np.linalg.lstsq(X, resid, rcond=None)
             r2 = 1 - np.var(resid - X @ beta) / max(np.var(resid), 1e-12)
             scored.append({"name": name, "cost": cost, "explained": float(max(0.0, r2)),
-                           "utility": float(max(0.0, r2) / cost)})
+                           "utility": float(max(0.0, r2) / (cost ** self.cost_exponent))})
+            if r2 >= self.retract_below:
+                break                       # explains it: stop paying to look further
         scored.sort(key=lambda s: -s["utility"])
         return scored
 
@@ -211,6 +240,15 @@ class Controller:
             return True
 
         if self.state == DESIGN:
+            cheapest = min(self.world.candidates().values())
+            if self.spent + cheapest * 0.25 > self.budget:
+                # probes cost real budget. Without this gate a controller that keeps retracting
+                # and re-designing buys probe rounds forever -- measured at 200+ experiments and
+                # 11x the budget on a single episode before the gate existed.
+                eid = self.ev.add("budget", t=t, spent=self.spent, need=cheapest * 0.25, phase="design")
+                self._go(RESOLVED, [eid], "budget exhausted before probing; resolved-with-failure")
+                self.failed_budget = True
+                return True
             scored = self._design(resid)
             # RETRACT: the BOUNDARY call was a hypothesis ("a variable is missing"), and DESIGN
             # is its test. If NO available observable explains the structured residual, the
@@ -220,7 +258,17 @@ class Controller:
             # ~0.77, max 0.89 -- disjoint. So a retraction bar at 0.9 is a property of the
             # evidence, not a tuned knob. A retracted boundary returns to SUSPECT (not NOMINAL:
             # the error is still real) with a recency refit as the parametric repair.
-            best = max(c_["explained"] for c_ in scored)
+            best = max((c_["explained"] for c_ in scored), default=0.0)
+            if best < self.retract_below and self.excluded:
+                # "nothing left explains it" is evidence that an earlier REJECTION was wrong --
+                # a candidate can fail its expansion transiently (bought a few steps after the
+                # switch, the window still straddles the old regime, the auditor still sees
+                # structure). A rejection is a hypothesis too, so before retracting the whole
+                # boundary, re-admit what was rejected and look again.
+                eid = self.ev.add("rejections_cleared", t=t, readmitted=sorted(self.excluded))
+                self.excluded.clear()
+                self._go(DESIGN, [eid], "no candidate left explains it; re-admitting rejected candidates")
+                return True
             if best < self.retract_below:
                 eid = self.ev.add("design", t=t, candidates=scored, chosen=None,
                                   why=f"RETRACT: no candidate explains the residual (best {best:.2f} < {self.retract_below})")
@@ -234,8 +282,9 @@ class Controller:
             eid = self.ev.add("design", t=t, candidates=scored, chosen=scored[0]["name"],
                               why="max explained-residual-variance per cost")
             self._chosen = scored[0]
-            self._go(ACQUIRE, [eid], f"chose {scored[0]['name']} (util {scored[0]['utility']:.3f}, "
-                                     f"runner-up {scored[1]['name']} {scored[1]['utility']:.3f})")
+            runner = (f"runner-up {scored[1]['name']} {scored[1]['utility']:.3f}"
+                      if len(scored) > 1 else "no runner-up: accepted on first probe")
+            self._go(ACQUIRE, [eid], f"chose {scored[0]['name']} (util {scored[0]['utility']:.3f}, {runner})")
             return True
 
         if self.state == ACQUIRE:
@@ -263,10 +312,17 @@ class Controller:
             if not verdict["structured"]:
                 self._go(RESOLVED, [eid], f"expanded class {self.A.features} explains the data")
             else:
-                # the chosen observable did not explain it -- drop it and choose again
+                # the chosen observable did not explain it -- reject it, REFIT the reduced class,
+                # and choose again among what is left. The refit matters: an unfitted explorer
+                # predicts 0, so the next DESIGN would score candidates against the raw y, which
+                # x alone "explains" -- every candidate then clears the bar and the cheapest (the
+                # proxy) wins. That was the shipped behaviour until 2026-08-19.
+                self.excluded.add(name)
                 self.A = Explorer(features=[f for f in self.A.features if f != name])
                 self.extra.pop(name, None)
-                self._go(DESIGN, [eid], f"{name} did not remove structure; choose again")
+                self.A.fit(self._design_matrix(), np.array(self.ys)); self.param_updates_done += 1
+                rid = self.ev.add("expansion_rejected", t=t, rejected=name, cost=self.world.costs[name])
+                self._go(DESIGN, [eid, rid], f"{name} did not remove structure; rejected; choose again")
             return True
 
         if self.state == RESOLVED:
@@ -297,5 +353,6 @@ class Controller:
             "boundary_t": next((tr["t"] for tr in self.transitions if tr["to"] == BOUNDARY), None),
             "chosen": [tr["note"] for tr in self.transitions if tr["to"] == ACQUIRE],
             "failed_budget": self.failed_budget,
+            "probes_paid": self.probes_paid,
             "evidence": self.ev.rows,
         }
