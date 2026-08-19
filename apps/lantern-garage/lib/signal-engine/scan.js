@@ -274,14 +274,42 @@ function applyPolarity(sym, direction, opts = {}) {
     if (m == null || w == null || ut == null) {
       return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection inputs unreadable (${selStr}); cannot certify` };
     }
+    // TIME IS A WEIGHT, NOT A FLOOR (#3356). As a hard floor this was a ban
+    // wearing a filter's clothes: measured over 25 sessions and 8 wrappers,
+    // 72.2% of FIRST fires per symbol/session land in 09:30-10:00 and only 14.6%
+    // at or after 11:00 — so the floor refused ~85% of every actionable wrapper
+    // setup, on an n=13 composite. A gate that strict cannot even accumulate the
+    // evidence needed to judge it: at roughly one reachable fire every two
+    // sessions it would take months to reach a decidable sample. Two live
+    // sessions produced 23 wrapper fires and ZERO decisions.
+    //
+    // The measured effect is on WIN RATE, so express it there. First-fire
+    // outcomes by hour: 10:00-11:00 47%/-0.36% (n=30), 11:00-13:00 54%/+0.42%
+    // (n=13), 13:00+ 67%/+2.46% (n=6). A p_win penalty of that size IS the
+    // calibration, not a fudge — and unlike the floor it lets a strong early
+    // setup clear on its other merits while still pricing the hour.
+    //
+    // The two SETUP checks stay hard: they describe the trade (a wrapper that
+    // already collapsed, an underlying still ripping) rather than the clock.
     const fails = [];
-    if (m < minMin) fails.push(`before ${Math.floor(minMin / 60)}:${String(minMin % 60).padStart(2, "0")} (early fires 47%/-0.36%)`);
     if (w <= maxDD) fails.push(`wrapper already fell ${w.toFixed(2)}% (hard-fall fires 33%/-0.81%)`);
     if (ut >= maxUTape) fails.push(`underlying ripping ${ut.toFixed(2)}% (rally fires 48%/-0.50%)`);
     if (fails.length) {
       return { direction: "NEUTRAL", ctx, veto: `economic short on ${family} via ${sym} — selection failed: ${fails.join("; ")} [${selStr}] (#3349)` };
     }
-    return { direction, ctx, veto: null, allowed: `selective: late + shallow + mild (${selStr})` };
+    // Graded by how far before the old floor the fire lands. Defaults sit at the
+    // conservative end of the measured gap (47% early vs 54-67% late = 7-20pp).
+    const _earlyPp = Number(process.env.TRADER_SHORT_EARLY_PENALTY_PP);
+    const _midPp = Number(process.env.TRADER_SHORT_MID_PENALTY_PP);
+    const earlyPp = Number.isFinite(_earlyPp) ? _earlyPp : 7;   // before 10:00
+    const midPp = Number.isFinite(_midPp) ? _midPp : 4;         // 10:00 -> the old floor
+    let timePenaltyPp = 0;
+    if (m < 600) timePenaltyPp = earlyPp;
+    else if (m < minMin) timePenaltyPp = midPp;
+    const when = timePenaltyPp > 0
+      ? `early (-${timePenaltyPp}pp p_win, was a hard block before #3356)`
+      : 'late';
+    return { direction, ctx, veto: null, timePenaltyPp, allowed: `selective: ${when} + shallow + mild (${selStr})` };
   }
   if (mode === "falling") {
     const tapePct = Number(process.env.TRADER_SHORT_TAPE_PCT) || 0.3;
@@ -520,6 +548,8 @@ async function scanAll(watchlist) {
     let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
     // Polarity: a BULLISH verdict on a negative-sign wrapper is an economic
     // short and must be judged on the UNDERLYING's bars (see applyPolarity).
+      // Declared OUTSIDE the polarity block: the scoring site below consumes it.
+      let _timePenaltyPp = 0;
     {
       const _proxy = require("../direction-lock").underlyingProxy(t);
       const _uBars = _proxy && _proxy !== t && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
@@ -574,6 +604,9 @@ async function scanAll(watchlist) {
         } catch (_e) { /* instrumentation must never break the scan */ }
       }
       direction = _pol.direction;
+      // #3356: carry the time penalty out of the polarity check so the scoring
+      // below can price it. Zero for 1x instruments and for late wrapper fires.
+      _timePenaltyPp = Number(_pol.timePenaltyPp) || 0;
     }
     const struct = checkMarketStructureShift(b15, direction);
     const candle = detectCandlePatterns(b15, direction);
@@ -620,6 +653,26 @@ async function scanAll(watchlist) {
       const secEtf = sectors.sectorFor(t);
       const sector_trend = secEtf && sectorMom[secEtf] != null ? sectorMom[secEtf] : null;
       const convergence = convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, news_sentiment, volume_ratio, macd_hist, ma_signal, earnings_surprise, sector_trend });
+      // APPLY THE TIME WEIGHT (#3356). Subtracted from p_win after scoring rather
+      // than added as a convergence-ev feature, because it applies to exactly one
+      // instrument class (economic shorts) and would otherwise dilute the shared
+      // weight table for every 1x symbol. EV and the decision are re-derived from
+      // the adjusted p_win so the whole verdict stays self-consistent.
+      if (convergence && _timePenaltyPp > 0 && Number.isFinite(convergence.p_win)) {
+        const _before = convergence.p_win;
+        const _after = Math.max(0.05, _before - _timePenaltyPp / 100);
+        const _tr = convergence.target_r || 2;
+        convergence.p_win = Math.round(_after * 10000) / 10000;
+        convergence.p_win_pre_time = _before;
+        convergence.time_penalty_pp = _timePenaltyPp;
+        convergence.ev_r = Math.round((_after * _tr - (1 - _after)) * 1000) / 1000;
+        if (convergence.decision === "ENTER" && (convergence.ev_r < 0.15 || _after < 0.45)) {
+          convergence.decision = "SKIP";
+        }
+        convergence.size_mult = ev.edgeRiskMultiplier(_after, _tr);
+        logs.push({ time: nowIso, agent: "sigma0", symbol: t,
+          body: `${t} — early wrapper fire priced, not blocked: p_win ${_before} -> ${convergence.p_win} (-${_timePenaltyPp}pp), ${convergence.decision} (#3356)` });
+      }
 
       // ── Trend/regime filter (TRADER_REGIME_FILTER, on by default) ──────────────
       // The engine buys oversold DIPS; in a downtrend that's catching a falling knife —

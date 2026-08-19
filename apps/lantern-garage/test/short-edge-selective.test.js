@@ -21,11 +21,14 @@ test('the composite: late + shallow + mild → ALLOWED, with all three values na
   assert.match(r.allowed, /underlying tape 0\.20%/);
 });
 
-test('too EARLY (10:30) → vetoed, names the reason and the measured stat', () => {
+test('too EARLY (10:30) → now PRICED, not vetoed (#3356)', () => {
+  // Was: a hard veto on the clock. That refused ~85% of actionable wrapper
+  // setups (72.2% of first fires land 09:30-10:00), so the mode could never
+  // gather the evidence to judge itself — 23 live fires, zero decisions.
   const r = P({ etMin: 630 });
-  assert.strictEqual(r.direction, 'NEUTRAL');
-  assert.match(r.veto, /before 11:00/);
-  assert.match(r.veto, /47%/);
+  assert.strictEqual(r.direction, 'BULLISH', 'the clock no longer blocks');
+  assert.strictEqual(r.veto, null);
+  assert.strictEqual(r.timePenaltyPp, 4, '10:30 sits in the mid band');
 });
 
 test('wrapper already fell HARD (-2.1%) → vetoed', () => {
@@ -40,20 +43,20 @@ test('underlying RIPPING (+0.8%) → vetoed', () => {
   assert.match(r.veto, /underlying ripping 0\.80%/);
 });
 
-test('multiple failures are ALL narrated — the ledger learns every reason', () => {
+test('SETUP failures are still all narrated — the clock is simply no longer one', () => {
   const r = P({ etMin: 620, wrapperDD: -3, underlyingTape: 1.2 });
-  assert.match(r.veto, /before 11:00/);
   assert.match(r.veto, /wrapper already fell/);
   assert.match(r.veto, /underlying ripping/);
+  assert.doesNotMatch(r.veto, /before 11:00/, 'time is priced, not refused');
 });
 
-test('boundaries: 11:00 exactly passes; -1.5% exactly FAILS (<=); +0.5% exactly FAILS (>=)', () => {
-  assert.strictEqual(P({ etMin: 660 }).direction, 'BULLISH');
-  assert.strictEqual(P({ etMin: 659 }).direction, 'NEUTRAL');
+test('boundaries: the setup checks keep their inclusive edges; the clock grades', () => {
   assert.strictEqual(P({ wrapperDD: -1.5 }).direction, 'NEUTRAL');
   assert.strictEqual(P({ wrapperDD: -1.49 }).direction, 'BULLISH');
   assert.strictEqual(P({ underlyingTape: 0.5 }).direction, 'NEUTRAL');
   assert.strictEqual(P({ underlyingTape: 0.49 }).direction, 'BULLISH');
+  assert.strictEqual(P({ etMin: 660 }).timePenaltyPp, 0, '11:00 is now free, not a cliff');
+  assert.strictEqual(P({ etMin: 659 }).timePenaltyPp, 4, 'one minute earlier costs 4pp, not the trade');
 });
 
 test('unreadable inputs → refuse, never certify blind', () => {
@@ -64,13 +67,15 @@ test('unreadable inputs → refuse, never certify blind', () => {
   }
 });
 
-test('the 2026-08-17 winners: SQQQ 11:15 (late, shallow, mild) passes; SOXS 10:30 fails on time only', () => {
-  // SQQQ fired 11:15, wrapper +0.4% from open (shallow), QQQ +0.08% (mild) → +1.80% that day
-  assert.strictEqual(P({ etMin: 675, wrapperDD: 0.4, underlyingTape: 0.08 }).direction, 'BULLISH');
-  // SOXS fired 10:30 — everything else fine → time veto (the +2.90% we would still miss; honest)
-  const r = P({ etMin: 630, wrapperDD: -0.3, underlyingTape: 0.1 });
-  assert.strictEqual(r.direction, 'NEUTRAL');
-  assert.match(r.veto, /before 11:00/);
+test('the 2026-08-17 winners: BOTH are now reachable (#3356)', () => {
+  // SQQQ 11:15 always passed. SOXS 10:30 used to fail on the clock alone — and
+  // it ran +2.90% that day. Under the weight it is takeable, priced 4pp.
+  const sqqq = P({ etMin: 675, wrapperDD: 0.4, underlyingTape: 0.08 });
+  assert.strictEqual(sqqq.direction, 'BULLISH');
+  assert.strictEqual(sqqq.timePenaltyPp, 0);
+  const soxs = P({ etMin: 630, wrapperDD: -0.3, underlyingTape: 0.1 });
+  assert.strictEqual(soxs.direction, 'BULLISH', 'the +2.90% we used to refuse');
+  assert.strictEqual(soxs.timePenaltyPp, 4);
 });
 
 test('mode is dispatched by env when opts.shortEdge is absent', () => {
