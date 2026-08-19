@@ -2650,6 +2650,194 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           };
           const shade = (fn) => { ctx.globalAlpha = base*0.16; fn(); ctx.globalAlpha = base; };
           switch (d.t) {
+            /* -- the sixteen shapes that were catalogued but never drawn ------------
+               Each one paints with the same helpers the original nineteen use (seg /
+               extend / tag / shade), so they inherit clipping, ghosting and the
+               per-drawing style without special cases. */
+            case 'info': {                       // trend line that reports its own move
+              if (!P[1]) break;
+              seg(P[0], P[1]);
+              const dp = P[1].price - P[0].price, pct = P[0].price ? dp/P[0].price*100 : 0;
+              const bars = Math.abs(Math.round((P[1].x - P[0].x) / Math.max(1, slotW)));
+              const bits = [];
+              if (drawOptOf(d, 'showChange') !== false) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
+              if (drawOptOf(d, 'showPercent') !== false) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
+              if (drawOptOf(d, 'showBars') !== false) bits.push(bars + ' bars');
+              if (bits.length) tag(bits.join('  '), (P[0].x + P[1].x)/2, Math.min(P[0].y, P[1].y) - 3, 'center');
+              break;
+            }
+            case 'angle': {                      // trend line plus the angle it makes
+              if (!P[1]) break;
+              seg(P[0], P[1]);
+              ctx.save(); ctx.setLineDash([3,3]); ctx.globalAlpha = base*0.5;
+              seg(P[0], { x: P[1].x, y: P[0].y });
+              ctx.restore();
+              if (drawOptOf(d, 'showAngle') !== false) {
+                const deg = Math.atan2(P[0].y - P[1].y, P[1].x - P[0].x) * 180/Math.PI;
+                tag(deg.toFixed(1) + '°', P[1].x + 4, P[1].y - 2);
+              }
+              break;
+            }
+            case 'crossline': {                  // one point, both axes
+              const a = P[0];
+              ctx.beginPath(); ctx.moveTo(0, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
+              ctx.beginPath(); ctx.moveTo(a.x, 0); ctx.lineTo(a.x, ph); ctx.stroke();
+              if (drawOptOf(d, 'showLabels') !== false) tag(fmt(a.price, 2), 3, a.y - 2);
+              break;
+            }
+            case 'flat': {                       // channel with one horizontal edge
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+              shade(() => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col;
+                ctx.fillRect(x1, Math.min(a.y, c2.y), x2 - x1, Math.abs(c2.y - a.y)); });
+              seg(a, b);
+              ctx.beginPath(); ctx.moveTo(x1, c2.y); ctx.lineTo(x2, c2.y); ctx.stroke();
+              if (drawOptOf(d, 'midline')) {
+                ctx.save(); ctx.setLineDash([4,3]);
+                ctx.beginPath(); ctx.moveTo(x1, (a.y + c2.y)/2); ctx.lineTo(x2, (a.y + c2.y)/2); ctx.stroke();
+                ctx.restore();
+              }
+              break;
+            }
+            case 'fork': {                       // Andrews pitchfork: median + two tines
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const mid = { x: (b.x + c2.x)/2, y: (b.y + c2.y)/2 };
+              ctx.strokeStyle = drawOptOf(d, 'color') || col;
+              extend(a, mid, false);
+              ctx.strokeStyle = drawOptOf(d, 'fillColor') || col;
+              const dx = mid.x - a.x, dy = mid.y - a.y;
+              for (const t0 of [b, c2]) extend(t0, { x: t0.x + dx, y: t0.y + dy }, false);
+              ctx.strokeStyle = col;
+              break;
+            }
+            case 'abcd': case 'xabcd': case 'hs': {
+              const letters = d.t === 'abcd' ? ['A','B','C','D']
+                : d.t === 'xabcd' ? ['X','A','B','C','D'] : ['LS','H1','HEAD','H2','RS'];
+              for (let q = 1; q < P.length; q++) seg(P[q-1], P[q]);
+              if (drawOptOf(d, 'showPoints') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'labelColor') || col;
+                P.forEach((pt, q) => { if (letters[q]) tag(letters[q], pt.x + 4, pt.y - 3); });
+                ctx.fillStyle = col;
+              }
+              if (drawOptOf(d, 'showRatios') !== false && P.length >= 3) {
+                for (let q = 2; q < P.length; q++) {
+                  const leg1 = Math.abs(P[q-1].price - P[q-2].price), leg2 = Math.abs(P[q].price - P[q-1].price);
+                  if (leg1 > 0) tag((leg2/leg1).toFixed(3), (P[q-1].x + P[q].x)/2, (P[q-1].y + P[q].y)/2 - 3, 'center');
+                }
+              }
+              break;
+            }
+            case 'fibchan': {                    // fib levels parallel to a trend
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const offY = c2.y - b.y;
+              for (const lv of FIB_LEVELS) {
+                ctx.strokeStyle = fibColorOf(d, lv);
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
+                const o = offY*lv;
+                ctx.beginPath(); ctx.moveTo(a.x, a.y + o); ctx.lineTo(b.x, b.y + o); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = fibColorOf(d, lv);
+                  tag((lv*100).toFixed(1) + '%', b.x + 4, b.y + o - 2);
+                }
+              }
+              ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
+              break;
+            }
+            case 'fibtime': {                    // vertical lines at fib intervals
+              if (!P[1]) break;
+              const x0 = P[0].x, unit = P[1].x - P[0].x;
+              if (!unit) break;
+              for (const n0 of [0, 1, 2, 3, 5, 8, 13, 21]) {
+                const xx = x0 + unit*n0;
+                if (xx < 0 || xx > pw) continue;
+                ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, ph); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) tag(String(n0), xx + 3, ph - 3);
+              }
+              break;
+            }
+            case 'range': case 'drange': {       // measure one axis only
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+              const y1 = Math.min(a.y, b.y), y2 = Math.max(a.y, b.y);
+              shade(() => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col;
+                ctx.fillRect(x1, y1, x2 - x1, y2 - y1); });
+              ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+              const dp = b.price - a.price, pct = a.price ? dp/a.price*100 : 0;
+              const bars = Math.abs(Math.round((b.x - a.x) / Math.max(1, slotW)));
+              const bits = [];
+              if (drawOptOf(d, 'showPrice')) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
+              if (drawOptOf(d, 'showPercent')) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
+              if (drawOptOf(d, 'showBars')) bits.push(bars + ' bars');
+              if (bits.length) tag(bits.join('  '), (x1 + x2)/2, y1 - 3, 'center');
+              break;
+            }
+            case 'fcast': {                      // a sketched path, dashed ahead of entry
+              if (!P[1]) break;
+              ctx.save(); ctx.setLineDash([5,4]);
+              for (let q = 1; q < P.length; q++) seg(P[q-1], P[q]);
+              ctx.restore();
+              for (const pt of P) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill(); }
+              const last = P[P.length-1];
+              if (drawOptOf(d, 'showLabels') !== false) tag(fmt(last.price, 2), last.x + 4, last.y - 3);
+              break;
+            }
+            case 'hl': {                         // highlighter: thick, translucent path
+              if (P.length < 2) break;
+              ctx.save();
+              ctx.globalAlpha = base*((drawOptOf(d, 'alpha') || 30)/100);
+              ctx.lineWidth = drawOptOf(d, 'w') || 10;
+              ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+              ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
+              for (let q = 1; q < P.length; q++) ctx.lineTo(P[q].x, P[q].y);
+              ctx.stroke(); ctx.restore();
+              break;
+            }
+            case 'callout': {                    // text bubble with a leader line
+              if (!P[1]) break;
+              const anchor = P[0], box = P[1];
+              if (drawOptOf(d, 'showLeader') !== false) {
+                ctx.save(); ctx.globalAlpha = base*0.7;
+                ctx.strokeStyle = drawOptOf(d, 'lineColor') || col;
+                seg(anchor, box); ctx.restore();
+              }
+              const txt = d.text || 'Note';
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
+              const w0 = ctx.measureText(txt).width + 12, h0 = (drawOptOf(d, 'fontSize') || 12) + 8;
+              if (drawOptOf(d, 'showBg') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'bgColor') || '#151823';
+                ctx.fillRect(box.x, box.y - h0, w0, h0);
+                ctx.strokeRect(box.x, box.y - h0, w0, h0);
+              }
+              ctx.fillStyle = drawOptOf(d, 'color') || col;
+              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(txt, box.x + 6, box.y - h0/2);
+              ctx.font = MONO; ctx.fillStyle = col;
+              break;
+            }
+            case 'plabel': {                     // a price tag pinned to one level
+              const a = P[0];
+              const txt = (d.text ? d.text + '  ' : '') + fmt(a.price, 2);
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
+              const w0 = ctx.measureText(txt).width + 10, h0 = (drawOptOf(d, 'fontSize') || 12) + 6;
+              ctx.save(); ctx.globalAlpha = base*0.5; ctx.setLineDash([4,3]);
+              ctx.beginPath(); ctx.moveTo(0, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
+              ctx.restore();
+              if (drawOptOf(d, 'showBg') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'bgColor') || '#151823';
+                ctx.fillRect(a.x, a.y - h0/2, w0, h0);
+                ctx.strokeRect(a.x, a.y - h0/2, w0, h0);
+              }
+              ctx.fillStyle = drawOptOf(d, 'color') || col;
+              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(txt, a.x + 5, a.y);
+              ctx.font = MONO; ctx.fillStyle = col;
+              break;
+            }
+
             case 'h': {
               const yy = P[0].y;
               ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
