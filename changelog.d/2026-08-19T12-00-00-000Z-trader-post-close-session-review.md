@@ -1,0 +1,3 @@
+### Added
+
+- trader: `TRADER_SESSION_REVIEW=1` adds a post-close session reviewer — one capable-model call at the end of the day that reads the session record, the entries and exits, the skip distribution and the prior five sessions, and flags discontinuities. It has no bridge, no broker and no write path except its own journal, so a wrong finding costs a false flag and nothing else. Validated against 2026-08-18: it independently re-derived three known defects and found a fourth we had missed — the post-stop cooldown fired 20 times on a session reporting `stops_fired: 0`, and that state machine only arms after a stop fill. Default OFF; `experiments/session_review_replay.js` replays it over past sessions
