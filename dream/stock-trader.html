@@ -234,6 +234,104 @@
   .dr-st-row span{flex:1}
   .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
   .dr-st-row input[type=range]{width:96px}
+  .dr-settings{min-width:250px}
+  .dset-tabs{display:flex;gap:2px;padding:2px 6px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+  .dset-tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);
+    font-size:11.5px;padding:4px 2px;cursor:pointer}
+  .dset-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .dset-tab.empty{opacity:.45}
+  .dset-tab:hover{color:var(--text0)}
+  /* Quick-action row raised over a selected drawing. */
+  /* Selection toolbar -- a compact strip of real controls, not a row of glyphs. */
+  .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:1px;padding:3px 5px;
+    background:var(--bg1);border:1px solid var(--border);border-radius:9px;
+    box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .dsel-bar[hidden]{display:none}
+  .dsel-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 4px 0 1px;user-select:none}
+  .dsel-bar button{height:26px;min-width:28px;display:inline-flex;align-items:center;justify-content:center;
+    gap:4px;background:none;border:1px solid transparent;border-radius:6px;color:var(--text1);
+    font-size:13px;padding:0 6px;cursor:pointer}
+  .dsel-bar button:hover{background:var(--bg3);color:var(--text0)}
+  .dsel-bar button.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dsel-sep{width:1px;height:18px;background:var(--border);margin:0 3px}
+  /* Colour button: pencil with the current colour underlining it, like the reference. */
+  .dsel-colbtn{position:relative;flex-direction:column;gap:0!important;padding-bottom:4px!important}
+  .dsel-swatch{position:absolute;left:6px;right:6px;bottom:3px;height:3px;border-radius:2px}
+  /* Width button: a live preview of the stroke plus its size. */
+  .dsel-wbtn{padding:0 7px!important}
+  .dsel-wlbl{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .wd-line{display:block;width:16px;background:currentColor;border-radius:2px}
+  .dsel-pop{min-width:170px}
+  /* Alert dialog -- a real modal, centred, with the reference's label/field rows. */
+  /* Alerts in the rail: a single stack sized for a ~320px column. */
+  .al-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .al-new{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);
+    font-family:var(--mono);font-size:11.5px;padding:6px 8px;cursor:pointer}
+  .al-new:hover{background:var(--bg3);color:var(--text0);border-color:var(--accent)}
+  .al-count{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px 10px 4px;font-size:12px;color:var(--text1)}
+  .al-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text2);padding:10px 10px 4px;border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
+  .al-pad{padding:0 10px 4px}
+  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px 10px 10px;margin:0}
+  .al-link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;
+    border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-item:hover{background:var(--bg2)}
+  .al-item.off{opacity:.55}
+  .al-item-main{flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+  .al-item-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0)}
+  .al-item-cond{font-size:11.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .al-item-meta{font-family:var(--mono);font-size:9.5px;color:var(--text2)}
+  .al-item-act{display:flex;gap:1px;flex:0 0 auto}
+  .al-item-act button{width:22px;height:22px;background:none;border:0;border-radius:4px;color:var(--text2);
+    font-size:10px;cursor:pointer;line-height:1}
+  .al-item-act button:hover{color:var(--text0);background:var(--bg3)}
+  .al-fire{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-fire-when{display:block;font-family:var(--mono);font-size:9.5px;color:var(--text2)}
+  .al-fire-msg{display:block;font-size:11.5px;color:var(--text1);line-height:1.4;white-space:normal}
+  .al-teaser{padding:12px 10px;font-size:12px;line-height:1.55;color:var(--text1)}
+  .al-teaser p{margin:6px 0;color:var(--text2)}
+  .al-teaser a{color:var(--accent)}
+  .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
+    background:rgba(4,6,10,.62);backdrop-filter:blur(3px)}
+  .al-modal-bg[hidden]{display:none}
+  .al-modal{width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .al-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .al-title{font-size:15px;color:var(--text0)}
+  .al-sym{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0);
+    background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 9px}
+  .al-head .dock-x{margin-left:auto}
+  .al-body{padding:6px 16px 12px}
+  .al-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .al-row > label{flex:0 0 96px;font-size:12.5px;color:var(--text2);padding-top:7px}
+  .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
+    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+    color:var(--text0);padding:7px 9px;font:inherit;font-size:13px}
+  .al-inline{display:flex;align-items:center;gap:7px}
+  .al-inline input{width:auto;flex:1}
+  .al-sub{font-size:11.5px;color:var(--text2);white-space:nowrap}
+  .al-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text1)}
+  .al-check input{width:auto}
+  .al-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--text2)}
+  .al-err{margin:10px 0 0;font-size:12.5px;color:var(--red)}
+  .al-err[hidden]{display:none}
+  .al-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+  .al-btn{padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);
+    color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
+  .al-btn:hover{background:var(--bg3);color:var(--text0)}
+  .al-btn.primary{background:var(--accent);border-color:var(--accent);color:#04202b;font-weight:600}
+  .al-btn.primary:hover{filter:brightness(1.08)}
+  .sw-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px 9px 8px}
+  .sw{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);cursor:pointer;padding:0}
+  .sw.on{outline:2px solid var(--accent);outline-offset:1px}
+  .wd-row{display:flex;align-items:center;gap:9px;padding:5px 9px;cursor:pointer;border-radius:5px}
+  .wd-row:hover{background:var(--bg2)}
+  .wd-row.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
+  .wd-row .wd-line{width:52px;color:var(--text1)}
+  .wd-lbl{font-family:var(--mono);font-size:11px;color:var(--text2)}
 
   /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
   .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
@@ -1173,7 +1271,6 @@
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders <span class="tp-badge" id="tpOrdCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');loadJournal()" title="The journal — realized results by day, the equity curve with drawdown, where exits happened, and every trade the autopilot declined with its reason">Journal</button>
-    <button class="tp-tab" role="tab" id="tptab-alerts" aria-selected="false" aria-controls="tp-alerts" data-tab="alerts" onclick="tpTab('alerts');loadAlerts()" title="Engine alerts on your watchlist — a signal fired, a price reached a zone, a washout setup confirmed. The scan runs every minute; alerts tell you what it saw.">Alerts</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -1181,7 +1278,6 @@
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-alerts" role="tabpanel" aria-labelledby="tptab-alerts" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -2635,6 +2731,328 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           };
           const shade = (fn) => { ctx.globalAlpha = base*0.16; fn(); ctx.globalAlpha = base; };
           switch (d.t) {
+            case 'regr': {                       // least-squares fit + 1 sigma channel
+              if (!P[1]) break;
+              const i0 = Math.max(0, Math.min(P[0].idx == null ? 0 : P[0].idx, n-1));
+              const x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
+              const lo = Math.max(0, Math.floor(x1/slotW)), hi = Math.min(n-1, Math.ceil(x2/slotW));
+              let sx=0, sy=0, sxy=0, sxx=0, m=0;
+              for (let q=lo; q<=hi; q++) { const px=q, py=bars[q].close; sx+=px; sy+=py; sxy+=px*py; sxx+=px*px; m++; }
+              if (m < 2) break;
+              const slope = (m*sxy - sx*sy) / Math.max(1e-9, (m*sxx - sx*sx));
+              const icept = (sy - slope*sx) / m;
+              let sd = 0;
+              for (let q=lo; q<=hi; q++) { const e = bars[q].close - (slope*q + icept); sd += e*e; }
+              sd = Math.sqrt(sd/Math.max(1,m));
+              const at = (q) => ({ x: q*slotW + slotW/2, y: y(slope*q + icept) });
+              const a0 = at(lo), b0 = at(hi);
+              const dev = Math.abs(y(0) - y(sd));
+              shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
+                ctx.beginPath(); ctx.moveTo(a0.x, a0.y-dev); ctx.lineTo(b0.x, b0.y-dev);
+                ctx.lineTo(b0.x, b0.y+dev); ctx.lineTo(a0.x, a0.y+dev); ctx.closePath(); ctx.fill(); });
+              seg(a0, b0);
+              ctx.save(); ctx.setLineDash([4,3]); ctx.globalAlpha = base*0.7;
+              seg({x:a0.x,y:a0.y-dev},{x:b0.x,y:b0.y-dev}); seg({x:a0.x,y:a0.y+dev},{x:b0.x,y:b0.y+dev});
+              ctx.restore();
+              break;
+            }
+            case 'djchan': {                     // two independently-drawn edges
+              if (!P[3]) break;
+              shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
+                ctx.beginPath(); ctx.moveTo(P[0].x,P[0].y); ctx.lineTo(P[1].x,P[1].y);
+                ctx.lineTo(P[3].x,P[3].y); ctx.lineTo(P[2].x,P[2].y); ctx.closePath(); ctx.fill(); });
+              seg(P[0], P[1]); seg(P[2], P[3]);
+              break;
+            }
+            case 'elliott': case '3drives': {
+              const labels = d.t === 'elliott' ? ['0','1','2','3','4','5'] : ['0','1','2','3','4','5','6'];
+              for (let q=1; q<P.length; q++) seg(P[q-1], P[q]);
+              ctx.fillStyle = drawOptOf(d,'labelColor') || col;
+              P.forEach((pt,q) => { if (labels[q]) tag(labels[q], pt.x+4, pt.y-3); });
+              ctx.fillStyle = col;
+              break;
+            }
+            case 'fibcirc': {                    // concentric arcs at the fib ratios
+              if (!P[1]) break;
+              const cx = P[0].x, cy = P[0].y;
+              const r0 = Math.hypot(P[1].x-cx, P[1].y-cy);
+              for (const lv of FIB_LEVELS) {
+                if (!lv) continue;
+                ctx.strokeStyle = fibColorOf(d, lv);
+                ctx.globalAlpha = base*0.85;
+                ctx.beginPath(); ctx.arc(cx, cy, r0*lv, 0, Math.PI*2); ctx.stroke();
+              }
+              ctx.globalAlpha = base; ctx.strokeStyle = col;
+              break;
+            }
+            case 'fibfan': {                     // rays through the fib divisions
+              if (!P[1]) break;
+              const a = P[0], b2 = P[1];
+              for (const lv of FIB_LEVELS) {
+                ctx.strokeStyle = fibColorOf(d, lv);
+                ctx.globalAlpha = base*0.85;
+                extend(a, { x: b2.x, y: a.y + (b2.y - a.y)*lv }, false);
+              }
+              ctx.globalAlpha = base; ctx.strokeStyle = col;
+              break;
+            }
+            case 'gannfan': {                    // 1x1 and its harmonics
+              if (!P[1]) break;
+              const a = P[0], b2 = P[1];
+              const dx = b2.x - a.x, dy = b2.y - a.y;
+              const RATIOS = [[1,8],[1,4],[1,3],[1,2],[1,1],[2,1],[3,1],[4,1],[8,1]];
+              for (const [rx, ry] of RATIOS) {
+                const one = (rx === 1 && ry === 1);
+                ctx.globalAlpha = base*(one ? 1 : 0.5);
+                ctx.lineWidth = one ? (drawOptOf(d,'w')||1.5)+0.5 : (drawOptOf(d,'w')||1.5);
+                extend(a, { x: a.x + dx*rx, y: a.y + dy*ry }, false);
+              }
+              ctx.globalAlpha = base; ctx.lineWidth = drawOptOf(d,'w')||1.5;
+              break;
+            }
+            case 'gannbox': {                    // box gridded at Gann's divisions
+              if (!P[1]) break;
+              const x1 = Math.min(P[0].x,P[1].x), x2 = Math.max(P[0].x,P[1].x);
+              const y1 = Math.min(P[0].y,P[1].y), y2 = Math.max(P[0].y,P[1].y);
+              ctx.strokeRect(x1, y1, x2-x1, y2-y1);
+              ctx.save(); ctx.globalAlpha = base*0.4;
+              for (const f of [0.25, 0.382, 0.5, 0.618, 0.75]) {
+                ctx.beginPath(); ctx.moveTo(x1+(x2-x1)*f, y1); ctx.lineTo(x1+(x2-x1)*f, y2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(x1, y1+(y2-y1)*f); ctx.lineTo(x2, y1+(y2-y1)*f); ctx.stroke();
+              }
+              ctx.restore();
+              break;
+            }
+            case 'proj': {                       // repeat a measured move from a new anchor
+              if (!P[2]) break;
+              const dp = P[1].y - P[0].y, dxp = P[1].x - P[0].x;
+              const tgt = { x: P[2].x + dxp, y: P[2].y + dp };
+              ctx.save(); ctx.globalAlpha = base*0.6; ctx.setLineDash([4,3]);
+              seg(P[0], P[1]); ctx.restore();
+              shade(() => { ctx.fillStyle = drawOptOf(d,'fillColor') || col;
+                ctx.fillRect(Math.min(P[2].x,tgt.x), Math.min(P[2].y,tgt.y),
+                             Math.abs(tgt.x-P[2].x), Math.abs(tgt.y-P[2].y)); });
+              seg(P[2], tgt);
+              tag(fmt(P[2].price + (P[1].price - P[0].price), 2), tgt.x+4, tgt.y-3);
+              break;
+            }
+            case 'arrowup': case 'arrowdn': {    // a marker pinned to one bar
+              const a = P[0], up = d.t === 'arrowup', s = drawOptOf(d,'headSize') || 11;
+              const oy = up ? s : -s;
+              ctx.beginPath();
+              ctx.moveTo(a.x, a.y); ctx.lineTo(a.x - s*0.55, a.y + oy); ctx.lineTo(a.x + s*0.55, a.y + oy);
+              ctx.closePath(); ctx.fill();
+              if (drawOptOf(d,'showLabels')) tag(fmt(a.price,2), a.x + s, a.y + oy);
+              break;
+            }
+            case 'balloon': {                    // rounded bubble anchored to a bar
+              const a = P[0], txt = d.text || 'Comment';
+              const fs = drawOptOf(d,'fontSize') || 12;
+              ctx.font = (drawOptOf(d,'bold') ? 'bold ' : '') + fs + 'px ui-monospace, Menlo, Consolas, monospace';
+              const w0 = ctx.measureText(txt).width + 14, h0 = fs + 10, r0 = 6;
+              const bx = a.x + 8, by = a.y - h0 - 8;
+              ctx.beginPath();
+              ctx.moveTo(bx+r0, by); ctx.arcTo(bx+w0, by, bx+w0, by+h0, r0);
+              ctx.arcTo(bx+w0, by+h0, bx, by+h0, r0); ctx.arcTo(bx, by+h0, bx, by, r0);
+              ctx.arcTo(bx, by, bx+w0, by, r0); ctx.closePath();
+              if (drawOptOf(d,'showBg') !== false) { ctx.fillStyle = drawOptOf(d,'bgColor') || '#151823'; ctx.fill(); }
+              ctx.stroke();
+              ctx.beginPath(); ctx.moveTo(bx+6, by+h0); ctx.lineTo(a.x, a.y); ctx.lineTo(bx+14, by+h0); ctx.stroke();
+              ctx.fillStyle = drawOptOf(d,'color') || col;
+              ctx.textAlign='left'; ctx.textBaseline='middle';
+              ctx.fillText(txt, bx+7, by+h0/2);
+              ctx.font = MONO; ctx.fillStyle = col;
+              break;
+            }
+
+            /* -- the sixteen shapes that were catalogued but never drawn ------------
+               Each one paints with the same helpers the original nineteen use (seg /
+               extend / tag / shade), so they inherit clipping, ghosting and the
+               per-drawing style without special cases. */
+            case 'info': {                       // trend line that reports its own move
+              if (!P[1]) break;
+              seg(P[0], P[1]);
+              const dp = P[1].price - P[0].price, pct = P[0].price ? dp/P[0].price*100 : 0;
+              const bars = Math.abs(Math.round((P[1].x - P[0].x) / Math.max(1, slotW)));
+              const bits = [];
+              if (drawOptOf(d, 'showChange') !== false) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
+              if (drawOptOf(d, 'showPercent') !== false) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
+              if (drawOptOf(d, 'showBars') !== false) bits.push(bars + ' bars');
+              if (bits.length) tag(bits.join('  '), (P[0].x + P[1].x)/2, Math.min(P[0].y, P[1].y) - 3, 'center');
+              break;
+            }
+            case 'angle': {                      // trend line plus the angle it makes
+              if (!P[1]) break;
+              seg(P[0], P[1]);
+              ctx.save(); ctx.setLineDash([3,3]); ctx.globalAlpha = base*0.5;
+              seg(P[0], { x: P[1].x, y: P[0].y });
+              ctx.restore();
+              if (drawOptOf(d, 'showAngle') !== false) {
+                const deg = Math.atan2(P[0].y - P[1].y, P[1].x - P[0].x) * 180/Math.PI;
+                tag(deg.toFixed(1) + '°', P[1].x + 4, P[1].y - 2);
+              }
+              break;
+            }
+            case 'crossline': {                  // one point, both axes
+              const a = P[0];
+              ctx.beginPath(); ctx.moveTo(0, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
+              ctx.beginPath(); ctx.moveTo(a.x, 0); ctx.lineTo(a.x, ph); ctx.stroke();
+              if (drawOptOf(d, 'showLabels') !== false) tag(fmt(a.price, 2), 3, a.y - 2);
+              break;
+            }
+            case 'flat': {                       // channel with one horizontal edge
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+              shade(() => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col;
+                ctx.fillRect(x1, Math.min(a.y, c2.y), x2 - x1, Math.abs(c2.y - a.y)); });
+              seg(a, b);
+              ctx.beginPath(); ctx.moveTo(x1, c2.y); ctx.lineTo(x2, c2.y); ctx.stroke();
+              if (drawOptOf(d, 'midline')) {
+                ctx.save(); ctx.setLineDash([4,3]);
+                ctx.beginPath(); ctx.moveTo(x1, (a.y + c2.y)/2); ctx.lineTo(x2, (a.y + c2.y)/2); ctx.stroke();
+                ctx.restore();
+              }
+              break;
+            }
+            case 'fork': {                       // Andrews pitchfork: median + two tines
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const mid = { x: (b.x + c2.x)/2, y: (b.y + c2.y)/2 };
+              ctx.strokeStyle = drawOptOf(d, 'color') || col;
+              extend(a, mid, false);
+              ctx.strokeStyle = drawOptOf(d, 'fillColor') || col;
+              const dx = mid.x - a.x, dy = mid.y - a.y;
+              for (const t0 of [b, c2]) extend(t0, { x: t0.x + dx, y: t0.y + dy }, false);
+              ctx.strokeStyle = col;
+              break;
+            }
+            case 'abcd': case 'xabcd': case 'hs': {
+              const letters = d.t === 'abcd' ? ['A','B','C','D']
+                : d.t === 'xabcd' ? ['X','A','B','C','D'] : ['LS','H1','HEAD','H2','RS'];
+              for (let q = 1; q < P.length; q++) seg(P[q-1], P[q]);
+              if (drawOptOf(d, 'showPoints') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'labelColor') || col;
+                P.forEach((pt, q) => { if (letters[q]) tag(letters[q], pt.x + 4, pt.y - 3); });
+                ctx.fillStyle = col;
+              }
+              if (drawOptOf(d, 'showRatios') !== false && P.length >= 3) {
+                for (let q = 2; q < P.length; q++) {
+                  const leg1 = Math.abs(P[q-1].price - P[q-2].price), leg2 = Math.abs(P[q].price - P[q-1].price);
+                  if (leg1 > 0) tag((leg2/leg1).toFixed(3), (P[q-1].x + P[q].x)/2, (P[q-1].y + P[q].y)/2 - 3, 'center');
+                }
+              }
+              break;
+            }
+            case 'fibchan': {                    // fib levels parallel to a trend
+              if (!P[2]) break;
+              const a = P[0], b = P[1], c2 = P[2];
+              const offY = c2.y - b.y;
+              for (const lv of FIB_LEVELS) {
+                ctx.strokeStyle = fibColorOf(d, lv);
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
+                const o = offY*lv;
+                ctx.beginPath(); ctx.moveTo(a.x, a.y + o); ctx.lineTo(b.x, b.y + o); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = fibColorOf(d, lv);
+                  tag((lv*100).toFixed(1) + '%', b.x + 4, b.y + o - 2);
+                }
+              }
+              ctx.globalAlpha = base; ctx.strokeStyle = col; ctx.fillStyle = col;
+              break;
+            }
+            case 'fibtime': {                    // vertical lines at fib intervals
+              if (!P[1]) break;
+              const x0 = P[0].x, unit = P[1].x - P[0].x;
+              if (!unit) break;
+              for (const n0 of [0, 1, 2, 3, 5, 8, 13, 21]) {
+                const xx = x0 + unit*n0;
+                if (xx < 0 || xx > pw) continue;
+                ctx.beginPath(); ctx.moveTo(xx, 0); ctx.lineTo(xx, ph); ctx.stroke();
+                if (drawOptOf(d, 'showLabels') !== false) tag(String(n0), xx + 3, ph - 3);
+              }
+              break;
+            }
+            case 'range': case 'drange': {       // measure one axis only
+              if (!P[1]) break;
+              const a = P[0], b = P[1];
+              const x1 = Math.min(a.x, b.x), x2 = Math.max(a.x, b.x);
+              const y1 = Math.min(a.y, b.y), y2 = Math.max(a.y, b.y);
+              shade(() => { ctx.fillStyle = drawOptOf(d, 'fillColor') || col;
+                ctx.fillRect(x1, y1, x2 - x1, y2 - y1); });
+              ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+              const dp = b.price - a.price, pct = a.price ? dp/a.price*100 : 0;
+              const bars = Math.abs(Math.round((b.x - a.x) / Math.max(1, slotW)));
+              const bits = [];
+              if (drawOptOf(d, 'showPrice')) bits.push((dp >= 0 ? '+' : '') + fmt(dp, 2));
+              if (drawOptOf(d, 'showPercent')) bits.push((pct >= 0 ? '+' : '') + pct.toFixed(2) + '%');
+              if (drawOptOf(d, 'showBars')) bits.push(bars + ' bars');
+              if (bits.length) tag(bits.join('  '), (x1 + x2)/2, y1 - 3, 'center');
+              break;
+            }
+            case 'fcast': {                      // a sketched path, dashed ahead of entry
+              if (!P[1]) break;
+              ctx.save(); ctx.setLineDash([5,4]);
+              for (let q = 1; q < P.length; q++) seg(P[q-1], P[q]);
+              ctx.restore();
+              for (const pt of P) { ctx.beginPath(); ctx.arc(pt.x, pt.y, 2.5, 0, Math.PI*2); ctx.fill(); }
+              const last = P[P.length-1];
+              if (drawOptOf(d, 'showLabels') !== false) tag(fmt(last.price, 2), last.x + 4, last.y - 3);
+              break;
+            }
+            case 'hl': {                         // highlighter: thick, translucent path
+              if (P.length < 2) break;
+              ctx.save();
+              ctx.globalAlpha = base*((drawOptOf(d, 'alpha') || 30)/100);
+              ctx.lineWidth = drawOptOf(d, 'w') || 10;
+              ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+              ctx.beginPath(); ctx.moveTo(P[0].x, P[0].y);
+              for (let q = 1; q < P.length; q++) ctx.lineTo(P[q].x, P[q].y);
+              ctx.stroke(); ctx.restore();
+              break;
+            }
+            case 'callout': {                    // text bubble with a leader line
+              if (!P[1]) break;
+              const anchor = P[0], box = P[1];
+              if (drawOptOf(d, 'showLeader') !== false) {
+                ctx.save(); ctx.globalAlpha = base*0.7;
+                ctx.strokeStyle = drawOptOf(d, 'lineColor') || col;
+                seg(anchor, box); ctx.restore();
+              }
+              const txt = d.text || 'Note';
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
+              const w0 = ctx.measureText(txt).width + 12, h0 = (drawOptOf(d, 'fontSize') || 12) + 8;
+              if (drawOptOf(d, 'showBg') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'bgColor') || '#151823';
+                ctx.fillRect(box.x, box.y - h0, w0, h0);
+                ctx.strokeRect(box.x, box.y - h0, w0, h0);
+              }
+              ctx.fillStyle = drawOptOf(d, 'color') || col;
+              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(txt, box.x + 6, box.y - h0/2);
+              ctx.font = MONO; ctx.fillStyle = col;
+              break;
+            }
+            case 'plabel': {                     // a price tag pinned to one level
+              const a = P[0];
+              const txt = (d.text ? d.text + '  ' : '') + fmt(a.price, 2);
+              ctx.font = (drawOptOf(d, 'bold') ? 'bold ' : '') + (drawOptOf(d, 'fontSize') || 12) + 'px ' + 'ui-monospace, Menlo, Consolas, monospace';
+              const w0 = ctx.measureText(txt).width + 10, h0 = (drawOptOf(d, 'fontSize') || 12) + 6;
+              ctx.save(); ctx.globalAlpha = base*0.5; ctx.setLineDash([4,3]);
+              ctx.beginPath(); ctx.moveTo(0, a.y); ctx.lineTo(pw, a.y); ctx.stroke();
+              ctx.restore();
+              if (drawOptOf(d, 'showBg') !== false) {
+                ctx.fillStyle = drawOptOf(d, 'bgColor') || '#151823';
+                ctx.fillRect(a.x, a.y - h0/2, w0, h0);
+                ctx.strokeRect(a.x, a.y - h0/2, w0, h0);
+              }
+              ctx.fillStyle = drawOptOf(d, 'color') || col;
+              ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+              ctx.fillText(txt, a.x + 5, a.y);
+              ctx.font = MONO; ctx.fillStyle = col;
+              break;
+            }
+
             case 'h': {
               const yy = P[0].y;
               ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(pw, yy); ctx.stroke();
@@ -2709,12 +3127,26 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (!P[1]) break;
               const a = P[0], b = P[1], span = b.price - a.price;
               const x1 = Math.min(a.x, b.x);
+              // Each level in its own colour -- one flat purple made them indistinguishable.
+              let _prevY = null;
               for (const lv of FIB_LEVELS) {
                 const pr = a.price + span*lv, yy = y(pr);
-                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.7);
+                const lc = (typeof fibColorOf === 'function') ? fibColorOf(d, lv) : col;
+                if (_prevY != null && drawOptOf(d, 'fill') !== false) {
+                  ctx.globalAlpha = base*0.07; ctx.fillStyle = lc;
+                  ctx.fillRect(x1, Math.min(_prevY, yy), pw - x1, Math.abs(yy - _prevY));
+                }
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
+                ctx.strokeStyle = lc;
                 ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
-                tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = lc;
+                  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                  ctx.fillText((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                }
+                _prevY = yy;
               }
+              ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
             }
             case 'fibx': {
@@ -2738,9 +3170,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const rr = risk > 0 ? reward/risk : 0;
               const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
               ctx.globalAlpha = base*0.16;
-              ctx.fillStyle = CHART_CANDLE_UP;
+              ctx.fillStyle = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP;
               ctx.fillRect(x1, Math.min(e0.y, tg.y), x2 - x1, Math.abs(tg.y - e0.y));
-              ctx.fillStyle = CHART_CANDLE_DOWN;
+              ctx.fillStyle = drawOptOf(d, 'stopColor') || CHART_CANDLE_DOWN;
               ctx.fillRect(x1, Math.min(e0.y, st.y), x2 - x1, Math.abs(st.y - e0.y));
               ctx.globalAlpha = base;
               ctx.strokeStyle = col;
@@ -2789,7 +3221,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           }
           ctx.restore();
         };
-        for (const d of list) drawOne(d, false);
+        for (const d of list) { if (d.hidden) continue; drawOne(d, false); }
         if (pend) {
           if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
           ctx.save(); ctx.fillStyle = DRAW_COLOR;
@@ -3890,6 +4322,8 @@ const DRAW_CATS = [
     ]},
     { name:'Pitchforks', tools:[
       ['fork',   { name:'Andrews pitchfork',        icon:'⑂',  pts:3,            why:'Andrews pitchfork: three points define a median line with two parallel tines that often act as support and resistance.' }],
+      ['regr',   { name:'Regression trend',   icon:'⌇',  pts:2,            why:'Fits a least-squares line through the bars you span, with a channel at one standard deviation either side — the statistical version of a hand-drawn trend line.' }],
+      ['djchan', { name:'Disjoint channel',   icon:'⧣',  pts:4,            why:'A channel whose two edges are drawn independently, for when price respects two lines that are not quite parallel.' }],
     ]},
   ]},
   { id:'patterns', name:'Chart patterns', groups:[
@@ -3902,6 +4336,8 @@ const DRAW_CATS = [
       ['abcd',   { name:'ABCD measured move',     icon:'Ⅲ',  pts:4,            why:'Four points labelled A-B-C-D, the base measured-move pattern.' }],
       ['xabcd',  { name:'XABCD harmonic',    icon:'Ⅴ',  pts:5,            why:'Five points for harmonic patterns — Gartley, Bat, Butterfly and friends.' }],
       ['hs',     { name:'Head and shoulders',icon:'⩙', pts:5,            why:'Five points: left shoulder, head, right shoulder and the two neckline anchors.' }],
+      ['elliott',{ name:'Elliott impulse wave',icon:'Ⅴ', pts:6,            why:'Labels a five-wave impulse 1-2-3-4-5 so you can check a count against the rules rather than eyeballing it.' }],
+      ['3drives',{ name:'Three drives',       icon:'⋙',  pts:7,            why:'The three-push exhaustion pattern, each drive labelled so the symmetry is checkable.' }],
     ]},
   ]},
   { id:'fib', name:'Fibonacci', groups:[
@@ -3910,6 +4346,12 @@ const DRAW_CATS = [
       ['fibx',   { name:'Fib extension',    icon:'⋰',  pts:3,            why:'Three points project where a move may END — the 1.272, 1.618 and 2.618 targets beyond the prior high.' }],
       ['fibchan',{ name:'Fib channel',      icon:'∥',  pts:3,            why:'Fibonacci levels drawn parallel to a trend rather than horizontally.' }],
       ['fibtime',{ name:'Fib time zones',    icon:'⦀',  pts:2,            why:'Vertical lines at Fibonacci intervals — projects WHEN a turn may be due rather than where.' }],
+      ['fibcirc',{ name:'Fib circles',        icon:'◎',  pts:2,            why:'Concentric arcs at the fib ratios, measuring price and time together instead of price alone.' }],
+      ['fibfan', { name:'Fib speed fan',      icon:'⋔',  pts:2,            why:'Rays through the fib divisions of a move — support and resistance that rises with time rather than staying flat.' }],
+    ]},
+    { name:'Gann', tools:[
+      ['gannfan',{ name:'Gann fan',           icon:'✳',  pts:2,            why:'Rays at Gann\'s price/time ratios (1x1, 1x2, 2x1 …). The 1x1 is the one Gann treated as the balance line.' }],
+      ['gannbox',{ name:'Gann box',           icon:'▦',  pts:2,            why:'A box gridded at Gann\'s divisions, for reading price and time proportions off the same rectangle.' }],
     ]},
   ]},
   { id:'forecast', name:'Forecasting', groups:[
@@ -3922,6 +4364,7 @@ const DRAW_CATS = [
       ['range',  { name:'Price range',      icon:'↕',  pts:2,            why:'Measures price only — how far a move travelled, ignoring how long it took.' }],
       ['drange', { name:'Date range',       icon:'↔',  pts:2,            why:'Measures time only — how many bars and how long a move lasted.' }],
       ['fcast',  { name:'Forecast',         icon:'⤳',  pts:3,            why:'Sketch a path you expect price to take, so you can compare it against what actually happens.' }],
+      ['proj',   { name:'Projection',         icon:'⤢',  pts:3,            why:'Takes a measured move and projects the same distance from a new anchor, shading the target zone.' }],
     ]},
   ]},
   { id:'brushes', name:'Brushes', groups:[
@@ -3931,6 +4374,8 @@ const DRAW_CATS = [
     ]},
     { name:'Arrows', tools:[
       ['arrow',  { name:'Arrow',            icon:'➚',  pts:2, k:'Alt+A', why:'A line with a head — points at the thing you want to point at.' }],
+      ['arrowup',{ name:'Arrow up',           icon:'⬆',  pts:1,            why:'A marker under a bar — the quickest way to flag an entry or a signal you want to find again.' }],
+      ['arrowdn',{ name:'Arrow down',         icon:'⬇',  pts:1,            why:'The same marker above a bar, for exits and rejections.' }],
     ]},
   ]},
   { id:'text', name:'Text and notes', groups:[
@@ -3939,6 +4384,7 @@ const DRAW_CATS = [
       ['note',   { name:'Note',             icon:'🗒', pts:1, text:true,            why:'A longer annotation — the reasoning behind a trade, kept where the trade happened.' }],
       ['callout',{ name:'Callout',          icon:'💬', pts:2, text:true,            why:'Text in a bubble with a leader line pointing at the bar it refers to.' }],
       ['plabel', { name:'Price label',      icon:'🏷', pts:1, text:true,            why:'A label pinned to one price, showing that price plus whatever you type.' }],
+      ['balloon',{ name:'Comment balloon',    icon:'🗨',  pts:1, text:true, why:'A rounded speech bubble anchored to a bar, for a short remark rather than a full note.' }],
     ]},
   ]},
 ];
@@ -4038,22 +4484,109 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   };
   let best = -1, bestD = (tol == null ? 14 : tol);
   list.forEach((d, i) => {
+    if (d.hidden) return;                 // invisible means unclickable
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
     let dist = Infinity;
-    if (d.t === 'h' || d.t === 'hray') dist = Math.abs(P[0].y - yPx);
-    else if (d.t === 'v') dist = Math.abs(P[0].x - xPx);
-    else if (d.t === 'text' || d.t === 'note') dist = Math.hypot(P[0].x - xPx, P[0].y - yPx);
-    else if (d.t === 'pen') {
-      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
-    } else if (d.t === 'rect' || d.t === 'ell' || d.t === 'meas') {
-      const x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
-      const y1 = Math.min(P[0].y, P[1].y), y2 = Math.max(P[0].y, P[1].y);
-      dist = Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
-    } else if (d.t === 'fib' || d.t === 'fibx' || d.t === 'pos' || d.t === 'poss') {
-      for (const a of P) dist = Math.min(dist, Math.abs(a.y - yPx));
-    } else {
-      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
+    // Hit-test what the tool actually DRAWS, not the polyline between its anchors.
+    // Rays, extended lines, fans and arcs paint far outside their anchor span, so
+    // measuring the segment alone left most of a line unclickable.
+    const A = P[0], B = P[1], C = P[2];
+    const lineDist = (a, b) => {            // distance to the INFINITE line through a,b
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy;
+      if (!L2) return Math.hypot(xPx - a.x, yPx - a.y);
+      return Math.abs(dy*(xPx - a.x) - dx*(yPx - a.y)) / Math.sqrt(L2);
+    };
+    const rayDist = (a, b) => {             // distance to the ray starting at a through b
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy || 1;
+      const t = ((xPx - a.x)*dx + (yPx - a.y)*dy) / L2;
+      if (t < 0) return Math.hypot(xPx - a.x, yPx - a.y);
+      return lineDist(a, b);
+    };
+    const boxDist = (p1, p2) => {
+      const x1 = Math.min(p1.x, p2.x), x2 = Math.max(p1.x, p2.x);
+      const y1 = Math.min(p1.y, p2.y), y2 = Math.max(p1.y, p2.y);
+      return Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
+    };
+    const pathDist = (pts) => {
+      let m = Infinity;
+      for (let q = 1; q < pts.length; q++) m = Math.min(m, segDist(xPx, yPx, pts[q-1].x, pts[q-1].y, pts[q].x, pts[q].y));
+      return pts.length === 1 ? Math.hypot(xPx - pts[0].x, yPx - pts[0].y) : m;
+    };
+    const levelsDist = (ys) => { let m = Infinity; for (const yy of ys) m = Math.min(m, Math.abs(yy - yPx)); return m; };
+
+    switch (d.t) {
+      // single levels drawn right across the plot
+      case 'h': case 'hray': case 'plabel': dist = Math.abs(A.y - yPx); break;
+      case 'v': dist = Math.abs(A.x - xPx); break;
+      case 'crossline': dist = Math.min(Math.abs(A.y - yPx), Math.abs(A.x - xPx)); break;
+      // lines that extend past their anchors
+      case 'ray': dist = B ? rayDist(A, B) : Infinity; break;
+      case 'xline': case 'angle': case 'regr': dist = B ? lineDist(A, B) : Infinity; break;
+      case 'l': case 'info': case 'arrow':
+        dist = B ? segDist(xPx, yPx, A.x, A.y, B.x, B.y) : Infinity; break;
+      // fans: a bundle of rays from one origin
+      case 'fibfan': case 'gannfan': {
+        if (!B) { dist = Infinity; break; }
+        const dx = B.x - A.x, dy = B.y - A.y;
+        const ratios = d.t === 'gannfan' ? [[1,8],[1,4],[1,3],[1,2],[1,1],[2,1],[3,1],[4,1],[8,1]]
+                                         : FIB_LEVELS.map(lv => [1, lv]);
+        let m = Infinity;
+        for (const [rx, ry] of ratios) m = Math.min(m, rayDist(A, { x: A.x + dx*rx, y: A.y + dy*ry }));
+        dist = m; break;
+      }
+      case 'fork': {
+        if (!C) { dist = Infinity; break; }
+        const mid = { x: (B.x + C.x)/2, y: (B.y + C.y)/2 };
+        const dx = mid.x - A.x, dy = mid.y - A.y;
+        dist = Math.min(rayDist(A, mid), rayDist(B, { x: B.x + dx, y: B.y + dy }),
+                        rayDist(C, { x: C.x + dx, y: C.y + dy })); break;
+      }
+      // horizontal level families
+      case 'fib': case 'fibx': case 'pos': case 'poss':
+        dist = levelsDist(P.map(a => a.y)); break;
+      case 'fibchan': {
+        if (!C) { dist = Infinity; break; }
+        const off = C.y - B.y;
+        let m = Infinity;
+        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(xPx, yPx, A.x, A.y + off*lv, B.x, B.y + off*lv));
+        dist = m; break;
+      }
+      case 'fibtime': {
+        if (!B) { dist = Infinity; break; }
+        const unit = B.x - A.x;
+        let m = Infinity;
+        if (unit) for (const n0 of [0,1,2,3,5,8,13,21]) m = Math.min(m, Math.abs((A.x + unit*n0) - xPx));
+        dist = m; break;
+      }
+      case 'fibcirc': {                       // distance to the nearest arc
+        if (!B) { dist = Infinity; break; }
+        const r0 = Math.hypot(B.x - A.x, B.y - A.y), rp = Math.hypot(xPx - A.x, yPx - A.y);
+        let m = Infinity;
+        for (const lv of FIB_LEVELS) if (lv) m = Math.min(m, Math.abs(rp - r0*lv));
+        dist = m; break;
+      }
+      // boxes and bands
+      case 'rect': case 'ell': case 'meas': case 'range': case 'drange': case 'gannbox':
+        dist = B ? boxDist(A, B) : Infinity; break;
+      case 'flat': dist = C ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), Math.abs(C.y - yPx)) : Infinity; break;
+      case 'djchan':
+        dist = P[3] ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y),
+                               segDist(xPx, yPx, C.x, C.y, P[3].x, P[3].y)) : Infinity; break;
+      case 'proj': {
+        if (!C) { dist = Infinity; break; }
+        const tgt = { x: C.x + (B.x - A.x), y: C.y + (B.y - A.y) };
+        dist = Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), boxDist(C, tgt)); break;
+      }
+      // markers and text sit at a point
+      case 'text': case 'note': case 'balloon': case 'arrowup': case 'arrowdn':
+        dist = Math.hypot(A.x - xPx, A.y - yPx); break;
+      case 'callout':
+        dist = B ? Math.min(Math.hypot(B.x - xPx, B.y - yPx), segDist(xPx, yPx, A.x, A.y, B.x, B.y)) : Infinity; break;
+      // freehand paths
+      case 'pen': case 'hl': dist = pathDist(P); break;
+      // multi-point polylines
+      default: dist = pathDist(P);
     }
     if (dist < bestD) { bestD = dist; best = i; }
   });
@@ -4113,6 +4646,18 @@ function _refreshTicker(tk) {
   try { renderZoneLadder(tk, zonesData[tk] || {}, (wlPrices.find(x => x.ticker === tk) || {}).price, null, null, true); }
   catch (e) {}
 }
+/* Repaint the CANVAS only. renderZoneLadder rewrites overlay.innerHTML, which destroys
+   the crosshair elements -- doing that on every pointermove is why the chart stopped
+   tracking the mouse while a shape was being dragged. During a drag we repaint just the
+   pixels and leave the DOM (and the crosshair) alone; the full rebuild happens once on
+   pointerup. */
+function _repaintChart(tk) {
+  const canvas = document.getElementById('chart-' + tk);
+  const d = canvas && _crossData[canvas.id];
+  if (!canvas || !d) { _refreshTicker(tk); return; }
+  try { renderChart(canvas, d.bars, d.rMin, d.rMax, chartType, chartTimeframe); }
+  catch (e) { _refreshTicker(tk); }
+}
 function selectDrawing(tk, i) { _selDraw = (i == null) ? null : { tk, i }; _refreshTicker(tk); }
 
 /* Delete/Backspace removes the selection, the way every canvas editor behaves. */
@@ -4125,33 +4670,237 @@ document.addEventListener('keydown', (e) => {
   deleteDrawing(_selDraw.tk, _selDraw.i);
 });
 
-/* Style popup for the selected drawing — colour, width, dash, delete. */
-let _styleEl = null;
-function openDrawingStyle(tk, i, atX, atY) {
+/* -- Per-drawing settings (#3354) ---------------------------------------------
+   TradingView's model: selecting a drawing raises a small floating toolbar, and its
+   gear opens a dialog with Inputs / Style / Visibility tabs whose contents differ per
+   tool. DRAW_SPEC describes those fields declaratively, so a tool gains real settings
+   by adding a spec entry -- no dialog code per tool.
+
+   Values live on the drawing: d.opts (inputs), d.style (style), d.vis (visibility),
+   which is what makes them save and restore with it. */
+const FIB_COLORS = {
+  0: '#787b86', 0.236: '#f23645', 0.382: '#ff9800', 0.5: '#4caf50',
+  0.618: '#089981', 0.786: '#00bcd4', 1: '#787b86',
+  1.272: '#2962ff', 1.618: '#9c27b0', 2.618: '#e91e63',
+};
+const _num = (k, label, def, extra) => Object.assign({ k, label, type: 'number', def }, extra || {});
+const _col = (k, label, def) => ({ k, label, type: 'color', def });
+const _chk = (k, label, def) => ({ k, label, type: 'check', def });
+
+const DRAW_SPEC = {
+  _default: {
+    inputs: [],
+    style: [_col('color', 'Colour', '#a78bfa'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }),
+            _chk('dash', 'Dashed', false)],
+    vis: [_chk('showLabels', 'Price labels', true)],
+  },
+  fib: {
+    inputs: [_chk('extendRight', 'Extend levels right', true), _chk('showPrices', 'Show prices', true),
+             _chk('showPercents', 'Show percentages', true)],
+    // Each level gets its own colour, the way every charting package draws fib -- one
+    // flat purple made the levels indistinguishable, which is the "doesn't look good".
+    style: [_col('c0', '0%', FIB_COLORS[0]), _col('c236', '23.6%', FIB_COLORS[0.236]),
+            _col('c382', '38.2%', FIB_COLORS[0.382]), _col('c50', '50%', FIB_COLORS[0.5]),
+            _col('c618', '61.8%', FIB_COLORS[0.618]), _col('c786', '78.6%', FIB_COLORS[0.786]),
+            _col('c100', '100%', FIB_COLORS[1]),
+            _num('w', 'Width', 1.2, { min: 1, max: 4, step: 0.5 }), _chk('fill', 'Shade between levels', true)],
+    vis: [_chk('showLabels', 'Level labels', true)],
+  },
+  pos: {
+    inputs: [_num('account', 'Account size', 10000, { min: 0 }), _num('riskPct', 'Risk %', 1, { min: 0, max: 100, step: 0.1 }),
+             _num('lot', 'Lot size', 1, { min: 0 })],
+    style: [_col('targetColor', 'Target colour', '#089981'), _col('stopColor', 'Stop colour', '#f23645'),
+            _col('color', 'Lines', '#a78bfa'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
+    vis: [_chk('showR', 'Risk/reward in R', true), _chk('showPrices', 'Entry / stop / target prices', true),
+          _chk('showQty', 'Position size', true)],
+  },
+};
+DRAW_SPEC.poss = DRAW_SPEC.pos;
+DRAW_SPEC.fibx = DRAW_SPEC.fib;
+
+/* The rest of the catalogue. Composed from shared style groups so a tool declares only
+   what is genuinely its own -- a channel has a fill and a midline, a text box has a font
+   and a background, a measure has units to show. Anything not listed still falls back to
+   _default, so no tool is ever left without controls. */
+const _lineStyle = (c) => [_col('color', 'Line colour', c || '#a78bfa'),
+                           _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
+const _shapeStyle = (c) => [_col('color', 'Border', c || '#a78bfa'), _col('fillColor', 'Fill', c || '#a78bfa'),
+                            _num('fillAlpha', 'Fill opacity %', 12, { min: 0, max: 100 }),
+                            _num('w', 'Border width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
+const _textStyle = () => [_col('color', 'Text colour', '#e6e8ef'), _num('fontSize', 'Font size', 12, { min: 8, max: 32 }),
+                          _col('bgColor', 'Background', '#151823'), _chk('showBg', 'Show background', true),
+                          _chk('bold', 'Bold', false)];
+const _extendInputs = () => [_chk('extendLeft', 'Extend left', false), _chk('extendRight', 'Extend right', false)];
+const _priceVis = () => [_chk('showLabels', 'Price label', true)];
+
+// --- Lines -----------------------------------------------------------------
+for (const t of ['l', 'ray', 'xline']) DRAW_SPEC[t] = { inputs: _extendInputs(), style: _lineStyle(), vis: _priceVis() };
+for (const t of ['h', 'hray']) DRAW_SPEC[t] = {
+  inputs: [_chk('extendRight', 'Extend right', true)], style: _lineStyle('#f5a623'),
+  vis: [_chk('showLabels', 'Price label', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
+DRAW_SPEC.v = { inputs: [], style: _lineStyle('#787b86'), vis: [_chk('showLabels', 'Time label', true)] };
+DRAW_SPEC.crossline = { inputs: [], style: _lineStyle('#787b86'),
+  vis: [_chk('showLabels', 'Price and time labels', true)] };
+DRAW_SPEC.angle = { inputs: _extendInputs(), style: _lineStyle(),
+  vis: [_chk('showAngle', 'Angle in degrees', true), _chk('showLabels', 'Price label', true)] };
+DRAW_SPEC.info = { inputs: [_chk('showChange', 'Price change', true), _chk('showPercent', 'Percent change', true),
+                            _chk('showBars', 'Bar count', true)],
+  style: _lineStyle(), vis: [_chk('showLabels', 'Stats label', true)] };
+for (const t of ['chan', 'flat']) DRAW_SPEC[t] = {
+  inputs: [_chk('extendRight', 'Extend right', true), _chk('midline', 'Show midline', false)],
+  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels', 'Price labels', true)] };
+DRAW_SPEC.fork = { inputs: [_chk('extendRight', 'Extend right', true)],
+  style: [_col('color', 'Median line', '#089981'), _col('fillColor', 'Tines', '#2962ff'),
+          _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
+  vis: [_chk('showLabels', 'Level labels', true)] };
+
+// --- Patterns ---------------------------------------------------------------
+for (const t of ['rect', 'ell', 'tri']) DRAW_SPEC[t] = {
+  inputs: [], style: _shapeStyle(),
+  vis: [_chk('showLabels', 'Price labels', true), _chk('showSize', 'Height and bar count', false)] };
+for (const t of ['abcd', 'xabcd', 'hs']) DRAW_SPEC[t] = {
+  inputs: [_chk('showRatios', 'Leg ratios', true)],
+  style: [_col('color', 'Lines', '#a78bfa'), _col('labelColor', 'Point labels', '#e6e8ef'),
+          _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)],
+  vis: [_chk('showPoints', 'Point letters', true), _chk('showLabels', 'Price labels', false)] };
+
+// --- Fibonacci --------------------------------------------------------------
+DRAW_SPEC.fibchan = { inputs: [_chk('extendRight', 'Extend right', true)],
+  style: DRAW_SPEC.fib.style, vis: [_chk('showLabels', 'Level labels', true)] };
+DRAW_SPEC.fibtime = { inputs: [], style: _lineStyle('#2962ff'),
+  vis: [_chk('showLabels', 'Sequence labels', true)] };
+
+// --- Forecasting ------------------------------------------------------------
+for (const t of ['meas', 'range', 'drange']) DRAW_SPEC[t] = {
+  inputs: [], style: _shapeStyle('#2962ff'),
+  vis: [_chk('showPrice', 'Price change', t !== 'drange'), _chk('showPercent', 'Percent change', t !== 'drange'),
+        _chk('showBars', 'Bar count', t !== 'range'), _chk('showTime', 'Elapsed time', t === 'drange')] };
+DRAW_SPEC.fcast = { inputs: [], style: _lineStyle('#2962ff'),
+  vis: [_chk('showLabels', 'Target labels', true)] };
+
+// --- Brushes ----------------------------------------------------------------
+DRAW_SPEC.pen = { inputs: [], style: [_col('color', 'Colour', '#a78bfa'),
+  _num('w', 'Width', 2, { min: 1, max: 10, step: 0.5 }), _num('alpha', 'Opacity %', 100, { min: 10, max: 100 })], vis: [] };
+DRAW_SPEC.hl = { inputs: [], style: [_col('color', 'Colour', '#f5a623'),
+  _num('w', 'Width', 10, { min: 4, max: 30 }), _num('alpha', 'Opacity %', 30, { min: 5, max: 80 })], vis: [] };
+DRAW_SPEC.arrow = { inputs: [], style: [_col('color', 'Colour', '#a78bfa'),
+  _num('w', 'Width', 2, { min: 1, max: 6, step: 0.5 }), _num('headSize', 'Head size', 9, { min: 4, max: 24 })],
+  vis: [_chk('showLabels', 'Price label', false)] };
+
+// --- Text and notes ---------------------------------------------------------
+DRAW_SPEC.text = { inputs: [], style: _textStyle(), vis: [_chk('showLabels', 'Price label', false)] };
+DRAW_SPEC.note = { inputs: [_chk('wrap', 'Wrap long text', true)], style: _textStyle(), vis: [] };
+DRAW_SPEC.callout = { inputs: [_chk('wrap', 'Wrap long text', true)],
+  style: _textStyle().concat([_col('lineColor', 'Leader line', '#a78bfa')]),
+  vis: [_chk('showLeader', 'Leader line', true)] };
+DRAW_SPEC.plabel = { inputs: [], style: _textStyle(),
+  vis: [_chk('showLabels', 'Price value', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
+
+// --- batch two -------------------------------------------------------------
+DRAW_SPEC.regr = { inputs: [_chk('extendRight','Extend right',false)],
+  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Channel labels',true)] };
+DRAW_SPEC.djchan = { inputs: [], style: _shapeStyle('#2962ff'), vis: [_chk('showLabels','Price labels',true)] };
+for (const t of ['elliott','3drives']) DRAW_SPEC[t] = {
+  inputs: [_chk('showRatios','Leg ratios',false)],
+  style: [_col('color','Lines','#a78bfa'), _col('labelColor','Wave labels','#e6e8ef'),
+          _num('w','Width',1.5,{min:1,max:6,step:0.5})],
+  vis: [_chk('showPoints','Wave numbers',true)] };
+for (const t of ['fibcirc','fibfan']) DRAW_SPEC[t] = {
+  inputs: [], style: DRAW_SPEC.fib.style, vis: [_chk('showLabels','Level labels',true)] };
+DRAW_SPEC.gannfan = { inputs: [], style: _lineStyle('#f5a623'),
+  vis: [_chk('showLabels','Ratio labels',true)] };
+DRAW_SPEC.gannbox = { inputs: [], style: _shapeStyle('#f5a623'),
+  vis: [_chk('showLabels','Division labels',false)] };
+DRAW_SPEC.proj = { inputs: [], style: _shapeStyle('#089981'),
+  vis: [_chk('showLabels','Target price',true)] };
+for (const t of ['arrowup','arrowdn']) DRAW_SPEC[t] = {
+  inputs: [], style: [_col('color','Colour', t === 'arrowup' ? '#089981' : '#f23645'),
+                      _num('headSize','Size',11,{min:6,max:28})],
+  vis: [_chk('showLabels','Price label',false)] };
+DRAW_SPEC.balloon = { inputs: [_chk('wrap','Wrap long text',true)], style: _textStyle(), vis: [] };
+
+
+
+const drawSpecOf = (t) => DRAW_SPEC[t] || DRAW_SPEC._default;
+function drawOptOf(d, key) {
+  const spec = drawSpecOf(d.t);
+  const all = [].concat(spec.inputs, spec.style, spec.vis);
+  const f = all.find(x => x.k === key);
+  const bag = Object.assign({}, d.opts, d.style, d.vis);
+  if (bag[key] !== undefined) return bag[key];
+  if (f) return f.def;
+  // Not in this tool's spec -- fib has per-level colours and no generic `color`, so the
+  // toolbar's swatch and width preview would render blank. Fall back to the shared
+  // default rather than undefined.
+  return DRAW_STYLE_DEFAULT[key];
+}
+/** Colour for one fib level, honouring an override on the drawing. */
+function fibColorOf(d, lv) {
+  const key = 'c' + String(lv).replace('0.', '').replace('.', '') || 'c0';
+  const map = { 0: 'c0', 0.236: 'c236', 0.382: 'c382', 0.5: 'c50', 0.618: 'c618', 0.786: 'c786', 1: 'c100' };
+  const k = map[lv];
+  return (k && d.style && d.style[k]) || FIB_COLORS[lv] || (d.style && d.style.color) || '#a78bfa';
+}
+
+let _styleEl = null, _setTab = 'Inputs', _setTabExplicit = false;
+function openDrawingStyle(tk, i, atX, atY) { openDrawingSettings(tk, i, atX, atY); }
+function openDrawingSettings(tk, i, atX, atY) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
-  const st = drawStyleOf(d);
   if (!_styleEl) {
     _styleEl = document.createElement('div');
-    _styleEl.className = 'dr-flyout'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
+    _styleEl.className = 'dr-flyout dr-settings'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
     document.body.appendChild(_styleEl);
     document.addEventListener('click', (ev) => {
       if (!_styleEl || _styleEl.hidden || _styleEl.contains(ev.target)) return;
+      if (ev.target.closest && ev.target.closest('.dsel-bar')) return;
       _styleEl.hidden = true;
     });
   }
+  const spec = drawSpecOf(d.t);
   const name = (DRAW_TOOLS[d.t] && DRAW_TOOLS[d.t].name) || d.t;
-  _styleEl.innerHTML = '<div class="dr-fly-group">' + name + '</div>'
-    + '<label class="dr-st-row"><span>Colour</span><input type="color" value="' + st.color + '"'
-    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{color:this.value})"></label>'
-    + '<label class="dr-st-row"><span>Width</span><input type="range" min="1" max="6" step="0.5" value="' + st.w + '"'
-    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{w:parseFloat(this.value)})"></label>'
-    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (st.dash ? 'checked' : '')
-    +   ' onchange="setDrawingStyle(\'' + tk + '\',' + i + ',{dash:this.checked?5:0})"></label>'
-    + '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button></div>';
+  const tabs = ['Inputs', 'Style', 'Visibility'];
+  const fields = { Inputs: spec.inputs, Style: spec.style, Visibility: spec.vis };
+  // Auto-pick a non-empty tab only when OPENING. Doing it on every render meant an
+  // explicit click on an empty tab silently landed on Style, so the dialog showed
+  // Style's fields under the Inputs heading.
+  if (_setTabExplicit !== true && (!fields[_setTab] || !fields[_setTab].length))
+    _setTab = tabs.find(t => (fields[t] || []).length) || 'Style';
+  _setTabExplicit = false;
+  const bagFor = (tab) => tab === 'Inputs' ? 'opts' : tab === 'Style' ? 'style' : 'vis';
+  let h = '<div class="dr-fly-group">' + name + '</div><div class="dset-tabs">'
+    + tabs.map(t => {
+        const empty = !(fields[t] || []).length;
+        return '<button type="button" class="dset-tab' + (t === _setTab ? ' on' : '') + (empty ? ' empty' : '')
+          + '"' + (empty ? ' disabled title="Nothing to configure for this tool"' : '')
+          + ' onclick="setDrawSettingsTab(\'' + t + '\',\'' + tk + '\',' + i + ')">' + t + '</button>';
+      }).join('') + '</div>';
+  for (const f of (fields[_setTab] || [])) {
+    const v = drawOptOf(d, f.k), bag = bagFor(_setTab);
+    h += '<label class="dr-st-row"><span>' + f.label + '</span>';
+    if (f.type === 'color') h += '<input type="color" value="' + v + '" oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.value)">';
+    else if (f.type === 'check') h += '<input type="checkbox" ' + (v ? 'checked' : '') + ' onchange="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.checked)">';
+    else h += '<input type="number" value="' + v + '"' + (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '')
+      + (f.step != null ? ' step="' + f.step + '"' : '') + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',parseFloat(this.value))">';
+    h += '</label>';
+  }
+  if (!(fields[_setTab] || []).length) h += '<p class="dr-fly-why">Nothing to configure here for this tool.</p>';
+  h += '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button>'
+    + '<button type="button" onclick="document.getElementById(\'drawStyle\').hidden=true">Done</button></div>';
+  _styleEl.innerHTML = h;
   _styleEl.hidden = false;
-  const w = _styleEl.offsetWidth || 200, h = _styleEl.offsetHeight || 140;
-  _styleEl.style.left = Math.max(8, Math.min(atX, window.innerWidth - w - 8)) + 'px';
-  _styleEl.style.top = Math.max(8, Math.min(atY, window.innerHeight - h - 8)) + 'px';
+  const w = _styleEl.offsetWidth || 240, hh = _styleEl.offsetHeight || 200;
+  _styleEl.style.left = Math.max(8, Math.min(atX == null ? 200 : atX, window.innerWidth - w - 8)) + 'px';
+  _styleEl.style.top = Math.max(8, Math.min(atY == null ? 120 : atY, window.innerHeight - hh - 8)) + 'px';
+}
+function setDrawSettingsTab(t, tk, i) {
+  _setTab = t; _setTabExplicit = true;   // honour the click even if the tab is empty
+  const r = _styleEl.getBoundingClientRect();
+  openDrawingSettings(tk, i, r.left, r.top);
+}
+function setDrawField(tk, i, bag, key, val) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d[bag] = Object.assign({}, d[bag]); d[bag][key] = val;
+  _saveDrawings(); _refreshTicker(tk);
 }
 function setDrawingStyle(tk, i, patch) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
@@ -4164,7 +4913,312 @@ function deleteDrawing(tk, i) {
   if (!list.length) delete _drawings[tk];
   _selDraw = null;
   if (_styleEl) _styleEl.hidden = true;
+  _hideSelBar();
   _saveDrawings(); _refreshTicker(tk);
+}
+
+/* Floating toolbar over the selected drawing -- the row TradingView raises so the
+   common edits never need the dialog: colour, line width, settings, alert, lock,
+   delete, and a More menu. Each control opens its own small popup rather than
+   cramming everything into one strip. */
+const SWATCHES = ['#a78bfa','#2962ff','#089981','#f23645','#f5a623','#00bcd4','#e91e63','#787b86','#e6e8ef','#111318'];
+const WIDTHS = [1, 1.5, 2, 3, 4, 6];
+let _selBar = null, _barPop = null;
+
+function _hideSelBar() { if (_selBar) _selBar.hidden = true; _hideBarPop(); }
+function _hideBarPop() { if (_barPop) _barPop.hidden = true; }
+function _barPopup(html, anchorEl) {
+  if (!_barPop) {
+    _barPop = document.createElement('div');
+    _barPop.className = 'dr-flyout dsel-pop'; _barPop.hidden = true;
+    document.body.appendChild(_barPop);
+    document.addEventListener('click', (e) => {
+      if (!_barPop || _barPop.hidden) return;
+      if (_barPop.contains(e.target) || (e.target.closest && e.target.closest('.dsel-bar'))) return;
+      _barPop.hidden = true;
+    });
+  }
+  _barPop.innerHTML = html; _barPop.hidden = false;
+  const r = anchorEl.getBoundingClientRect();
+  const w = _barPop.offsetWidth || 180, h = _barPop.offsetHeight || 80;
+  _barPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  _barPop.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - h - 8)) + 'px';
+}
+
+function openColourPop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const cur = drawOptOf(d, 'color');
+  _barPopup('<div class="dr-fly-group">Colour</div><div class="sw-grid">'
+    + SWATCHES.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" style="background:' + c + '"'
+        + ' title="' + c + '" onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',\'' + c + '\');showSelBar(\'' + tk + '\',' + i + ')"></button>').join('')
+    + '</div><label class="dr-st-row"><span>Custom</span><input type="color" value="' + cur + '"'
+    + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',this.value)"></label>', el);
+}
+function openWidthPop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const cur = drawOptOf(d, 'w');
+  _barPopup('<div class="dr-fly-group">Line width</div>'
+    + WIDTHS.map(w => '<div class="wd-row' + (w === cur ? ' on' : '') + '" role="button" tabindex="0"'
+        + ' onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'w\',' + w + ');showSelBar(\'' + tk + '\',' + i + ')">'
+        + '<span class="wd-line" style="height:' + w + 'px"></span><span class="wd-lbl">' + w + 'px</span></div>').join('')
+    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (drawOptOf(d, 'dash') ? 'checked' : '')
+    + ' onchange="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'dash\',this.checked?5:0)"></label>', el);
+}
+function openMorePop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const row = (label, fn, note) => '<div class="dr-fly-item" role="menuitem" tabindex="0" onclick="' + fn + '">'
+    + '<span class="dr-fly-name">' + label + '</span>' + (note ? '<span class="dr-fly-key">' + note + '</span>' : '') + '</div>';
+  _barPopup('<div class="dr-fly-group">' + ((DRAW_TOOLS[d.t] || {}).name || d.t) + '</div>'
+    + row('Duplicate', 'duplicateDrawing(\'' + tk + '\',' + i + ')')
+    + row('Bring to front', 'reorderDrawing(\'' + tk + '\',' + i + ',1)')
+    + row('Send to back', 'reorderDrawing(\'' + tk + '\',' + i + ',-1)')
+    + row(d.hidden ? 'Show' : 'Hide', 'toggleDrawingHidden(\'' + tk + '\',' + i + ')')
+    + row('Settings…', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
+    + row('Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')', 'Del'), el);
+}
+function duplicateDrawing(tk, i) {
+  const list = _drawings[tk] || [], d = list[i]; if (!d) return;
+  const copy = JSON.parse(JSON.stringify(d));
+  // Offset the copy so it is visibly a second object rather than hidden under the first.
+  const span = (copy.pts[copy.pts.length-1].ts - copy.pts[0].ts) || 60000;
+  copy.pts = copy.pts.map(pt => ({ ts: pt.ts + span*0.15, price: pt.price }));
+  list.push(copy); _selDraw = { tk, i: list.length - 1 };
+  _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, list.length - 1);
+}
+function reorderDrawing(tk, i, dir) {
+  const list = _drawings[tk] || []; if (!list[i]) return;
+  const [d] = list.splice(i, 1);
+  const at = dir > 0 ? list.length : 0;      // later in the array paints on top
+  list.splice(at, 0, d);
+  _selDraw = { tk, i: at };
+  _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, at);
+}
+function toggleDrawingHidden(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.hidden = !d.hidden; _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, i);
+}
+function toggleDrawingLock(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.locked = !d.locked; _saveDrawings(); _refreshTicker(tk); showSelBar(tk, i);
+}
+/* Alert from a drawing: our rule model has no plain price-cross type (signal / zone /
+   washout only), so rather than fake one this opens the Alerts panel for the symbol.
+   Honest about what the backend can actually watch. */
+/* -- Alert creation dialog (#3352) -------------------------------------------
+   The shape TradingView uses: symbol at the top, then Condition (what to watch and
+   the values it needs), Trigger, Message and Notifications, with Cancel / Create.
+   The condition row is driven by ALERT_CONDS, so the operator list and how many
+   value boxes appear both follow from what the backend can actually evaluate --
+   there is no option here the engine cannot honour. */
+const ALERT_PRICE_OPS = [
+  ['crossing', 'Crossing'], ['crossing_up', 'Crossing up'], ['crossing_down', 'Crossing down'],
+  ['greater', 'Greater than'], ['less', 'Less than'],
+  ['entering_channel', 'Entering channel'], ['exiting_channel', 'Exiting channel'],
+  ['inside_channel', 'Inside channel'], ['outside_channel', 'Outside channel'],
+  ['moving_up', 'Moving up'], ['moving_down', 'Moving down'],
+  ['moving_up_pct', 'Moving up %'], ['moving_down_pct', 'Moving down %'],
+];
+const TWO_VALUE_OPS = new Set(['entering_channel', 'exiting_channel', 'inside_channel', 'outside_channel']);
+let _alertDlg = null, _alertEditId = null;
+
+function openAlertDialog(opts) {
+  const o = opts || {};
+  const sym = (o.symbol || activeTicker || 'SPY').toUpperCase();
+  if (!_alertDlg) {
+    _alertDlg = document.createElement('div');
+    _alertDlg.className = 'al-modal-bg'; _alertDlg.id = 'alertDlg'; _alertDlg.hidden = true;
+    document.body.appendChild(_alertDlg);
+    _alertDlg.addEventListener('click', (e) => { if (e.target === _alertDlg) closeAlertDialog(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && _alertDlg && !_alertDlg.hidden) closeAlertDialog(); });
+  }
+  _alertEditId = o.id || null;
+  const price = o.value != null ? o.value : (() => {
+    const w = (wlPrices || []).find(x => x.ticker === sym);
+    return w && w.price != null ? Number(w.price).toFixed(2) : '';
+  })();
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const opt = (v, label, cur) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>';
+  const type = o.type || 'price';
+  _alertDlg.innerHTML =
+    '<div class="al-modal" role="dialog" aria-modal="true" aria-label="Create alert">'
+  + '  <header class="al-head"><span class="al-title">' + (_alertEditId ? 'Edit alert on' : 'Create alert on') + '</span>'
+  + '    <span class="al-sym">' + esc(sym) + '</span>'
+  + '    <button type="button" class="dock-x" onclick="closeAlertDialog()" aria-label="Close">✕</button></header>'
+  + '  <div class="al-body">'
+  + '    <div class="al-row"><label for="alCondType">Condition</label><div class="al-fields">'
+  + '      <select id="alCondType" onchange="_alertCondChanged()">'
+  +          opt('price', 'Price', type) + opt('signal', 'Signal fired', type)
+  +          opt('zone', 'Price at a zone', type) + opt('washout', 'Washout confirmed', type)
+  + '      </select>'
+  + '      <div id="alCondFields"></div>'
+  + '    </div></div>'
+  + '    <div class="al-row"><label for="alTrigger">Trigger</label><div class="al-fields">'
+  + '      <select id="alTrigger">' + opt('every', 'Every time', o.trigger || 'every') + opt('once', 'Once only', o.trigger) + '</select>'
+  + '      <div class="al-inline"><label for="alCool" class="al-sub">Stay quiet for</label>'
+  + '        <input id="alCool" type="number" min="5" max="1440" step="5" value="' + (o.cooldownMin || 60) + '"> <span class="al-sub">min</span></div>'
+  + '    </div></div>'
+  + '    <div class="al-row"><label for="alMsg">Message</label><div class="al-fields">'
+  + '      <input id="alMsg" type="text" maxlength="200" placeholder="Leave blank for an automatic message" value="' + esc(o.message) + '">'
+  + '    </div></div>'
+  + '    <div class="al-row"><label>Notifications</label><div class="al-fields">'
+  + '      <label class="al-check"><input type="checkbox" checked disabled> In-app <span class="al-sub">(always)</span></label>'
+  + '      <label class="al-check"><input type="checkbox" id="alEmail"' + (o.email === false ? '' : ' checked') + '> Email me</label>'
+  + '      <p class="al-note" id="alEmailNote"></p>'
+  + '    </div></div>'
+  + '    <p class="al-err" id="alErr" hidden></p>'
+  + '  </div>'
+  + '  <footer class="al-foot"><button type="button" class="al-btn" onclick="closeAlertDialog()">Cancel</button>'
+  + '    <button type="button" class="al-btn primary" onclick="submitAlertDialog(\'' + esc(sym) + '\')">'
+  +      (_alertEditId ? 'Save' : 'Create') + '</button></footer>'
+  + '</div>';
+  _alertDlg.hidden = false;
+  _alertCondChanged(o);
+  _alertEmailAvailability();
+  const f = _alertDlg.querySelector('select, input'); if (f) f.focus();
+}
+function closeAlertDialog() { if (_alertDlg) _alertDlg.hidden = true; _alertEditId = null; }
+
+/* The value boxes follow the operator: one for a level, two for a channel, and the
+   signal/zone conditions bring their own controls. */
+function _alertCondChanged(pre) {
+  const o = pre || {};
+  const host = document.getElementById('alCondFields'); if (!host) return;
+  const type = document.getElementById('alCondType').value;
+  const opt = (v, label, cur) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>';
+  const price = o.value != null ? o.value : (() => {
+    const w = (wlPrices || []).find(x => x.ticker === (o.symbol || activeTicker));
+    return w && w.price != null ? Number(w.price).toFixed(2) : '';
+  })();
+  if (type === 'price') {
+    host.innerHTML = '<select id="alOp" onchange="_alertOpChanged()">'
+      + ALERT_PRICE_OPS.map(([v, l]) => opt(v, l, o.op || 'crossing')).join('') + '</select>'
+      + '<div class="al-inline"><input id="alVal" type="number" step="0.01" value="' + price + '" aria-label="Value">'
+      + '<input id="alVal2" type="number" step="0.01" value="' + (o.value2 != null ? o.value2 : '') + '" aria-label="Second value" hidden></div>';
+    _alertOpChanged();
+  } else if (type === 'signal') {
+    host.innerHTML = '<select id="alDir">' + opt('ANY', 'Any direction', o.direction) + opt('BULLISH', 'Bullish', o.direction) + opt('BEARISH', 'Bearish', o.direction) + '</select>';
+  } else if (type === 'zone') {
+    host.innerHTML = '<select id="alZone">' + opt('support', 'Support', o.zone) + opt('resistance', 'Resistance', o.zone) + '</select>'
+      + '<div class="al-inline"><span class="al-sub">within</span><input id="alProx" type="number" min="0.1" max="5" step="0.1" value="' + (o.proximityPct || 0.5) + '"><span class="al-sub">%</span></div>';
+  } else {
+    host.innerHTML = '<p class="al-note">Fires when the engine\'s convergence verdict reaches ENTER on this symbol.</p>';
+  }
+}
+function _alertOpChanged() {
+  const op = (document.getElementById('alOp') || {}).value;
+  const v2 = document.getElementById('alVal2'); if (!v2) return;
+  const two = TWO_VALUE_OPS.has(op);
+  v2.hidden = !two;
+  const v1 = document.getElementById('alVal');
+  if (v1) v1.setAttribute('aria-label', two ? 'Lower bound' : 'Value');
+  if (two && !v2.value && v1 && v1.value) v2.value = (parseFloat(v1.value) * 1.01).toFixed(2);
+}
+/* Say up front whether email can actually reach this account, rather than letting
+   someone tick a box that will silently never send. */
+async function _alertEmailAvailability() {
+  const note = document.getElementById('alEmailNote'), box = document.getElementById('alEmail');
+  if (!note) return;
+  try {
+    const j = await (await fetch('/api/trading/alerts/rules', { cache: 'no-store' })).json();
+    const e = j.email || {};
+    if (e.possible) { note.textContent = ''; return; }
+    const why = e.why === 'mailer_unconfigured' ? 'no mailer is configured on this server'
+      : e.why === 'email_unverified' ? 'your email address is not confirmed yet'
+      : 'your account has no email address';
+    note.textContent = 'Email is unavailable — ' + why + '.';
+    if (box) { box.checked = false; box.disabled = true; }
+    if (!j.prefs || !j.prefs.email) note.textContent += ' Account alert emails are also off.';
+  } catch (_e) { /* leave the checkbox as it is */ }
+}
+
+async function submitAlertDialog(sym) {
+  const err = document.getElementById('alErr');
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  const type = val('alCondType');
+  const body = {
+    symbol: sym, type,
+    cooldownMin: parseInt(val('alCool'), 10) || 60,
+    trigger: val('alTrigger'),
+    message: (val('alMsg') || '').trim(),
+    email: !!(document.getElementById('alEmail') || {}).checked,
+  };
+  if (_alertEditId) body.id = _alertEditId;
+  if (type === 'price') {
+    body.op = val('alOp');
+    body.value = parseFloat(val('alVal'));
+    if (TWO_VALUE_OPS.has(body.op)) body.value2 = parseFloat(val('alVal2'));
+  } else if (type === 'signal') body.direction = val('alDir');
+  else if (type === 'zone') { body.zone = val('alZone'); body.proximityPct = parseFloat(val('alProx')); }
+
+  try {
+    const r = await fetch('/api/trading/alerts/rules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) {
+      // Surface the server's own reason rather than a generic failure.
+      const map = { invalid_value: 'Enter a price for the condition.', invalid_value2: 'A channel needs both bounds.',
+        empty_channel: 'The two channel bounds must differ.', invalid_percent: 'Percent must be between 0 and 100.',
+        invalid_move: 'The move must be greater than zero.', invalid_symbol: 'That symbol is not valid.',
+        rule_cap: 'You have reached the alert limit.', invalid_op: 'Pick a condition.' };
+      err.textContent = map[j.error] || ('Could not save: ' + String(j.error || r.status).replace(/_/g, ' '));
+      err.hidden = false;
+      return;
+    }
+    closeAlertDialog();
+    if (typeof loadAlerts === 'function') loadAlerts(true);
+    try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); } catch (_e) {}
+  } catch (e) {
+    err.textContent = 'Could not save: ' + e.message; err.hidden = false;
+  }
+}
+
+/* The drawing toolbar's alert button now creates a real price alert AT that drawing's
+   level, which is what it always should have done. */
+function alertFromDrawing(tk, i) {
+  const d = (_drawings[tk] || [])[i];
+  const lvl = d && d.pts && d.pts.length ? d.pts[d.pts.length - 1].price : null;
+  _hideBarPop();
+  openAlertDialog({ symbol: tk, type: 'price', op: 'crossing',
+                    value: lvl != null ? Number(lvl).toFixed(2) : undefined });
+}
+
+function showSelBar(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  if (!_selBar) {
+    _selBar = document.createElement('div');
+    _selBar.className = 'dsel-bar'; _selBar.id = 'selBar'; _selBar.hidden = true;
+    _selBar.setAttribute('role', 'toolbar'); _selBar.setAttribute('aria-label', 'Drawing actions');
+    document.body.appendChild(_selBar);
+  }
+  const col = drawOptOf(d, 'color'), w = drawOptOf(d, 'w');
+  const B = (icon, title, fn, extra) => '<button type="button" title="' + title + '" aria-label="' + title + '"'
+    + (extra || '') + ' onclick="' + fn + '">' + icon + '</button>';
+  _selBar.innerHTML =
+      '<span class="dsel-grip" title="Drawing actions">⠿</span>'
+    + B('⊞', 'Settings', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
+    + '<button type="button" class="dsel-colbtn" title="Colour" aria-label="Colour"'
+    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">✏<span class="dsel-swatch" style="background:' + col + '"></span></button>'
+    + '<button type="button" class="dsel-wbtn" title="Line width" aria-label="Line width"'
+    +   ' onclick="openWidthPop(\'' + tk + '\',' + i + ',this)"><span class="wd-line" style="height:' + Math.min(4, w) + 'px"></span>'
+    +   '<span class="dsel-wlbl">' + w + 'px</span></button>'
+    + '<span class="dsel-sep"></span>'
+    + B('⏱', 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
+    + B(d.locked ? '🔒' : '🔓', d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
+        d.locked ? ' class="on"' : '')
+    + B('🗑', 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
+    + B('⋯', 'More', 'openMorePop(\'' + tk + '\',' + i + ',this)');
+  const geom = _selGeom(tk);
+  const anchors = geom ? _drawingAnchors(tk, geom.data, i, geom.pw, geom.ph) : [];
+  const canvas = document.getElementById('chart-' + tk);
+  _selBar.hidden = false;
+  if (canvas && anchors.length) {
+    const r = canvas.getBoundingClientRect();
+    const minX = Math.min(...anchors.map(a => a.x)), minY = Math.min(...anchors.map(a => a.y));
+    const bw = _selBar.offsetWidth || 240;
+    _selBar.style.left = Math.max(8, Math.min(r.left + minX, window.innerWidth - bw - 8)) + 'px';
+    _selBar.style.top = Math.max(56, r.top + minY - 42) + 'px';
+  }
 }
 
 function _commitDrawing(tk, obj) {
@@ -4258,13 +5312,15 @@ document.addEventListener('pointerdown', (e) => {
   // 2. otherwise select whatever is under the pointer, and start a body drag
   const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
   if (hit) {
-    _selDraw = { tk, i: hit.i };
+    _selDraw = { tk, i: hit.i }; if (typeof showSelBar === 'function') showSelBar(tk, hit.i);
+    // A locked drawing selects (so it can be unlocked) but never drags.
+    if ((_drawings[tk][hit.i] || {}).locked) { e.stopPropagation(); e.preventDefault(); _refreshTicker(tk); return; }
     const d = _drawings[tk][hit.i];
     _dragDraw = { tk, i: hit.i, handle: -1, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
     e.stopPropagation(); e.preventDefault();
     _refreshTicker(tk);
   } else if (_selDraw) {
-    const had = _selDraw.tk; _selDraw = null; _refreshTicker(had);
+    const had = _selDraw.tk; _selDraw = null; _hideSelBar(); _refreshTicker(had);
   }
 });
 
@@ -4287,13 +5343,16 @@ document.addEventListener('pointermove', (e) => {
     const dpr = g.priceAt(y) - g.priceAt(_dragDraw.y0);
     d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
   }
-  _refreshTicker(_dragDraw.tk);
+  _repaintChart(_dragDraw.tk);     // pixels only -- keeps the crosshair alive
 });
 
 document.addEventListener('pointerup', () => {
   if (!_dragDraw) return;
-  _saveDrawings();                 // persist only once the drag ends, not per frame
+  const tk = _dragDraw.tk;
   _dragDraw = null;
+  _saveDrawings();                 // persist only once the drag ends, not per frame
+  _refreshTicker(tk);              // one full rebuild at the end
+  if (_selDraw) showSelBar(_selDraw.tk, _selDraw.i);
 });
 
 // Right-click a drawing to open its style popup.
@@ -6503,10 +7562,15 @@ function jrHash(){
   // the pitch (#3242 demo journal, #3250 alerts teaser) — the Pro-gate overlay
   // must not wall them off. Scoped to these arrivals only; every trade action
   // stays server-gated regardless (#3008 tracks the wider gating collision).
-  const target = location.hash==='#journal' ? 'journal' : location.hash==='#alerts' ? 'alerts' : null;
+  // #alerts now opens the rail's alerts panel; the bottom tab is gone.
+  if (location.hash === '#alerts') {
+    try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); } catch (_e) {}
+    if (typeof loadAlerts === 'function') loadAlerts(true);
+  }
+  const target = location.hash==='#journal' ? 'journal' : null;
   if(!target) return;
   tpTab(target);
-  if(target==='journal') loadJournal(); else loadAlerts();
+  loadJournal();
   // Durable suppression: on a DIRECT deep link, applyTierGate() runs after this
   // (session fetch) and would re-show the overlay — watch it for a few seconds
   // and keep it hidden, then disconnect.
@@ -6525,140 +7589,140 @@ function jrHash(){
 window.addEventListener('hashchange', jrHash);
 if(location.hash==='#journal'||location.hash==='#alerts') setTimeout(jrHash, 500);   // after guest/demo detection settles
 
-/* ── Alerts tab (#3248 + #3250) ─────────────────────────────────────────────
-   Rules + fired-alert feed over the per-user alerts API. Signed-in Pro+ only
-   (the endpoints sit behind the standard trading gate); guests get the teaser.
-   In-app feed today — email/push delivery lands with #3249. */
-let alBusy=false, alRules=[];
-async function loadAlerts(force){
-  const pane=document.getElementById('tp-alerts');
-  if(!pane || (pane.dataset.loaded==='1' && !force)) return;
-  if(alBusy) return; alBusy=true;
-  pane.innerHTML='<div class="jr-loading">Loading alerts…</div>';
-  try{
+/* -- Alerts, in the watchlist rail (#3352) -----------------------------------
+   Alerts are a watchlist-scoped idea -- "tell me when SPY does X" -- so they belong
+   beside the symbols, not in a tab at the bottom of the screen. This renders into the
+   rail's alerts panel, which is a ~320px column, so the layout is a single stack
+   rather than the two-column card grid the bottom tab used.
+
+   Creating and editing both go through the dialog; this surface lists, toggles,
+   mutes and deletes. */
+let alBusy = false, alRules = [], _alFeed = [], _alPrefs = { email: false }, _alEmailAvail = { possible: false };
+
+function _alHost() { return document.getElementById('rwAlertsBody'); }
+
+async function loadAlerts(force) {
+  const pane = _alHost();
+  if (!pane || (pane.dataset.loaded === '1' && !force)) return;
+  if (alBusy) return; alBusy = true;
+  if (!pane.innerHTML) pane.innerHTML = '<p class="al-empty">Loading alerts…</p>';
+  try {
     let rres;
-    try{ rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
-    catch(_e){ await _sleep(1500); rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
-    if(rres.status===401||rres.status===403){ pane.dataset.loaded='1'; alTeaser(pane); return; }
-    if(!rres.ok){ const err=new Error('HTTP '+rres.status); err.status=rres.status; throw err; }
-    const rj=await rres.json();
-    const fres=await fetch('/api/trading/alerts/feed?limit=50',{cache:'no-store'});
-    const fj=fres.ok? await fres.json():{alerts:[]};
-    alRules=rj.rules||[];
-    pane.dataset.loaded='1';
-    alRender(pane, alRules, rj.cap||20, fj.alerts||[], rj.prefs||{email:false}, rj.email||{possible:false,why:'unknown'});
-  }catch(e){
-    pane.innerHTML=jrErrorCard(e,'loadAlerts');
-  }finally{ alBusy=false; }
+    try { rres = await fetch('/api/trading/alerts/rules', { cache: 'no-store' }); }
+    catch (_e) { await _sleep(1200); rres = await fetch('/api/trading/alerts/rules', { cache: 'no-store' }); }
+    if (rres.status === 401 || rres.status === 403) { pane.dataset.loaded = '1'; alTeaser(pane); return; }
+    if (!rres.ok) { const err = new Error('HTTP ' + rres.status); err.status = rres.status; throw err; }
+    const rj = await rres.json();
+    const fres = await fetch('/api/trading/alerts/feed?limit=40', { cache: 'no-store' });
+    const fj = fres.ok ? await fres.json() : { alerts: [] };
+    alRules = rj.rules || [];
+    _alFeed = fj.alerts || [];
+    _alPrefs = rj.prefs || { email: false };
+    _alEmailAvail = rj.email || { possible: false };
+    pane.dataset.loaded = '1';
+    alRender(pane, alRules, rj.cap || 20, _alFeed);
+  } catch (e) {
+    pane.innerHTML = '<p class="al-empty">Alerts unavailable — ' + String(e.message).replace(/[<>&"]/g, '') + '</p>';
+  } finally { alBusy = false; }
 }
-function alTeaser(pane){
-  pane.innerHTML='<div class="jr-wrap"><div class="jr-banner"><span><b>Engine alerts come with Pro.</b> The scan already watches the list every minute — alerts tell you when a signal fires, a price reaches a support or resistance zone, or a washout setup is confirmed, without you watching the screen.</span>'
-    +'<a href="/pricing.html" style="margin-left:auto;white-space:nowrap">See plans →</a></div></div>';
+function alTeaser(pane) {
+  pane.innerHTML = '<div class="al-teaser"><b>Engine alerts come with Pro.</b>'
+    + '<p>The scan already watches your list every minute. Alerts tell you when a price level is '
+    + 'crossed, a signal fires, or a washout setup confirms — without you watching the screen.</p>'
+    + '<a href="/pricing.html">See plans →</a></div>';
 }
-function alTypeDesc(r){
-  if(r.type==='signal') return (r.direction==='ANY'?'any':String(r.direction||'').toLowerCase())+' signal';
-  if(r.type==='zone') return 'within '+r.proximityPct+'% of '+r.zone;
-  return 'washout confirmed (ENTER)';
-}
-function alDeliveryRow(prefs, email){
-  // In-app is always on; email is a real opt-in (#3249) that explains itself
-  // when it can't work; push is deliberately absent until it truly exists.
-  let emailBit;
-  if(email.possible || prefs.email){
-    emailBit='<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(prefs.email?'checked':'')+' onchange="alToggleEmail(this.checked)" aria-label="Email me fired alerts"> Email me</label>'
-      +(email.possible?'':' <span class="jr-flag">(currently undeliverable — '+(email.why==='mailer_unconfigured'?'no mailer configured on this server':email.why==='email_unverified'?'your email address isn’t confirmed yet':'no email on your account')+')</span>');
-  }else{
-    emailBit='<span title="'+(email.why==='mailer_unconfigured'?'This server has no mailer configured':'Your account has no email address')+'">Email — unavailable ('+(email.why==='mailer_unconfigured'?'no mailer on this server':email.why==='email_unverified'?'confirm your email address first':'no email on your account')+')</span>';
+/** One line describing what a rule watches, short enough for a 320px column. */
+function alTypeDesc(r) {
+  if (r.type === 'price') {
+    const L2 = { crossing: 'crosses', crossing_up: 'crosses up through', crossing_down: 'crosses down through',
+      greater: 'is above', less: 'is below', entering_channel: 'enters', exiting_channel: 'leaves',
+      inside_channel: 'is inside', outside_channel: 'is outside', moving_up: 'moves up by',
+      moving_down: 'moves down by', moving_up_pct: 'moves up', moving_down_pct: 'moves down' };
+    const pct = (r.op === 'moving_up_pct' || r.op === 'moving_down_pct') ? '%' : '';
+    const band = r.value2 != null ? (r.value + '–' + r.value2) : (r.value + pct);
+    return (L2[r.op] || r.op) + ' ' + band;
   }
-  return '<p class="jr-note" style="margin:6px 0 0">Delivery: <b style="color:var(--text1)">In-app feed</b> (always) · '+emailBit+' · Push — not built yet (#3249); capped at 6 emails/hour so a bug can\'t spam you.</p>';
+  if (r.type === 'signal') return (r.direction === 'ANY' ? 'any' : String(r.direction || '').toLowerCase()) + ' signal fires';
+  if (r.type === 'zone') return 'reaches ' + r.zone + ' (±' + r.proximityPct + '%)';
+  return 'washout confirms';
 }
-async function alToggleEmail(on){
-  try{ await fetch('/api/trading/alerts/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:!!on})}); }catch(_e){}
-  loadAlerts(true);
-}
-function alRender(pane, rules, cap, feed, prefs, email){
-  prefs=prefs||{email:false}; email=email||{possible:false,why:'unknown'};
-  let html='<div class="jr-wrap">';
-  html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">';
-  html+='<div class="jr-card"><h4>New alert rule</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
-    +'<input id="alSym" maxlength="8" placeholder="Symbol" aria-label="Symbol" style="width:82px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit;text-transform:uppercase">'
-    +'<select id="alType" aria-label="Alert type" onchange="alTypeChanged()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="signal">Signal fired</option><option value="zone">Price at zone</option><option value="washout">Washout confirmed</option></select>'
-    +'<select id="alDir" aria-label="Direction" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="ANY">Any direction</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>'
-    +'<select id="alZone" aria-label="Zone side" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="support">Support</option><option value="resistance">Resistance</option></select>'
-    +'<input id="alProx" type="number" min="0.1" max="5" step="0.1" value="0.5" aria-label="Proximity percent" title="How close price must get to the zone, in %" style="display:none;width:64px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
-    +'<input id="alCool" type="number" min="5" max="1440" step="5" value="60" aria-label="Cooldown minutes" title="Once fired, stay quiet for this many minutes" style="width:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
-    +'<span style="font-size:10.5px;color:var(--text2)">min quiet</span>'
-    +'<button type="button" class="jr-chip on" onclick="alSaveRule()">Add rule</button>'
-    +'</div><p class="jr-note" id="alFormMsg">'+rules.length+' of '+cap+' rules</p>'
-    +alDeliveryRow(prefs, email)+'</div>';
-  html+='<div class="jr-card"><h4>Your rules</h4>';
-  if(!rules.length){ html+='<p class="jr-note">No rules yet — add one above. The scan checks them every minute during market hours.</p>'; }
-  else{
-    html+='<table class="jr-table"><thead><tr><th>Symbol</th><th>When</th><th class="num">Quiet</th><th class="num">On</th><th class="num" title="Email me when this particular rule fires">✉</th><th class="num"></th></tr></thead><tbody>';
-    for(const r of rules){
-      html+='<tr><td>'+jrEsc(r.symbol)+'</td><td>'+jrEsc(alTypeDesc(r))+'</td><td class="num">'+r.cooldownMin+'m</td>'
-        +'<td class="num"><input type="checkbox" '+(r.enabled!==false?'checked':'')+' aria-label="Enable rule for '+jrEsc(r.symbol)+'" onchange="alToggleRule(\''+jrEsc(r.id)+'\')"></td>'
-        // Per-rule email mute. Only meaningful once the account has opted in, so it
-        // is disabled (and says why) rather than hidden — a control that silently
-        // does nothing is worse than one that explains itself.
-        +'<td class="num"><input type="checkbox" '+(r.email!==false?'checked':'')+(prefs.email?'':' disabled')
-        +' title="'+(prefs.email?'Email me when THIS rule fires':'Turn on “Email me” below first')+'"'
-        +' aria-label="Email me when the '+jrEsc(r.symbol)+' rule fires" onchange="alToggleRuleEmail(\''+jrEsc(r.id)+'\')"></td>'
-        +'<td class="num"><button type="button" class="jr-chip" aria-label="Delete rule for '+jrEsc(r.symbol)+'" onclick="alDeleteRule(\''+jrEsc(r.id)+'\')">✕</button></td></tr>';
+function alRender(pane, rules, cap, feed) {
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let h = '<div class="al-bar">'
+    + '<button type="button" class="al-new" onclick="openAlertDialog({})">+ New alert</button>'
+    + '<span class="al-count">' + rules.length + '/' + cap + '</span></div>';
+
+  // Delivery state, said once at the top rather than repeated per rule.
+  const emailOn = _alPrefs.email && _alEmailAvail.possible;
+  h += '<label class="al-deliv"><input type="checkbox" ' + (_alPrefs.email ? 'checked' : '')
+    + (_alEmailAvail.possible ? '' : ' disabled') + ' onchange="alToggleEmail(this.checked)">'
+    + ' Email me when alerts fire</label>';
+  if (!_alEmailAvail.possible) {
+    const why = _alEmailAvail.why === 'mailer_unconfigured' ? 'no mailer on this server'
+      : _alEmailAvail.why === 'email_unverified' ? 'confirm your email address first' : 'no email on your account';
+    h += '<p class="al-note al-pad">Email unavailable — ' + why + '.</p>';
+  } else if (emailOn) {
+    h += '<p class="al-note al-pad">Capped at 6 emails an hour.</p>';
+  }
+
+  h += '<div class="al-sec">Rules</div>';
+  if (!rules.length) {
+    h += '<p class="al-empty">No alerts yet. <button type="button" class="al-link" onclick="openAlertDialog({})">Create one</button> — the scan checks every minute during market hours.</p>';
+  } else {
+    for (const r of rules) {
+      const off = r.enabled === false;
+      h += '<div class="al-item' + (off ? ' off' : '') + '">'
+        + '  <div class="al-item-main" role="button" tabindex="0" title="Edit this alert"'
+        + '       onclick="alEditRule(\'' + esc(r.id) + '\')">'
+        + '    <span class="al-item-sym">' + esc(r.symbol) + '</span>'
+        + '    <span class="al-item-cond">' + esc(alTypeDesc(r)) + '</span>'
+        + '    <span class="al-item-meta">' + (r.trigger === 'once' ? 'once' : 'every ' + r.cooldownMin + 'm')
+        +        (r.email === false ? ' · muted' : '') + (off ? ' · paused' : '') + '</span>'
+        + '  </div>'
+        + '  <div class="al-item-act">'
+        + '    <button type="button" title="' + (off ? 'Resume' : 'Pause') + '" onclick="alToggleRule(\'' + esc(r.id) + '\')">' + (off ? '▶' : '❙❙') + '</button>'
+        + '    <button type="button" title="' + (r.email === false ? 'Unmute email' : 'Mute email') + '"'
+        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? '🔕' : '🔔') + '</button>'
+        + '    <button type="button" title="Delete" onclick="alDeleteRule(\'' + esc(r.id) + '\')">✕</button>'
+        + '  </div></div>';
     }
-    html+='</tbody></table>';
   }
-  html+='</div></div>';
-  html+='<div class="jr-card" style="min-width:0"><h4>Fired alerts</h4>';
-  if(!feed.length){ html+='<p class="jr-note">Nothing fired yet. When a rule matches a scan, it lands here'+(rules.length?' (and respects its quiet window)':'')+'.</p>'; }
-  else{
-    html+='<table class="jr-table"><thead><tr><th style="width:96px">When</th><th>Alert</th></tr></thead><tbody>';
-    for(const a of feed.slice(0,50)){
-      const t=a.ts? new Date(a.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-      html+='<tr><td title="'+jrEsc(a.ts||'')+'">'+jrEsc(t)+'</td><td style="white-space:normal">'+jrEsc(a.message||'')+'</td></tr>';
+
+  h += '<div class="al-sec">Recently fired</div>';
+  if (!feed.length) {
+    h += '<p class="al-empty">Nothing has fired yet.</p>';
+  } else {
+    for (const a of feed.slice(0, 40)) {
+      const t = a.ts ? new Date(a.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      h += '<div class="al-fire"><span class="al-fire-when">' + esc(t) + '</span>'
+        + '<span class="al-fire-msg">' + esc(a.message || '') + '</span></div>';
     }
-    html+='</tbody></table>';
   }
-  html+='</div></div>';
-  pane.innerHTML=html;
-  alTypeChanged();
+  pane.innerHTML = h;
 }
-function alTypeChanged(){
-  const t=(document.getElementById('alType')||{}).value;
-  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
-  show('alDir', t==='signal'); show('alZone', t==='zone'); show('alProx', t==='zone');
+/** Open the dialog on an existing rule, so editing and creating are one surface. */
+function alEditRule(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  openAlertDialog(Object.assign({}, r));
 }
-async function alSaveRule(){
-  const v=id=>{ const el=document.getElementById(id); return el?el.value:''; };
-  const body={ symbol:v('alSym').trim().toUpperCase(), type:v('alType'), direction:v('alDir'), zone:v('alZone'), proximityPct:parseFloat(v('alProx')), cooldownMin:parseInt(v('alCool'),10) };
-  const msg=document.getElementById('alFormMsg');
-  try{
-    const r=await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const j=await r.json();
-    if(!r.ok){ if(msg) msg.textContent='Could not add: '+(j.error||r.status).toString().replace(/_/g,' '); return; }
-    loadAlerts(true);
-  }catch(e){ if(msg) msg.textContent='Could not add: '+e.message; }
-}
-async function alToggleRule(id){
-  const r=alRules.find(x=>x.id===id); if(!r) return;
-  r.enabled=r.enabled===false;
-  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+async function alToggleEmail(on) {
+  try { await fetch('/api/trading/alerts/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: !!on }) }); } catch (_e) {}
   loadAlerts(true);
 }
-// Mute ONE rule's email without touching the account-level opt-in, which is what
-// the delivery email has always told people they could do (#3329 onto #3249).
-async function alToggleRuleEmail(id){
-  const r=alRules.find(x=>x.id===id); if(!r) return;
-  r.email = r.email===false;
-  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+async function alToggleRule(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  r.enabled = r.enabled === false;
+  try { await fetch('/api/trading/alerts/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) }); } catch (_e) {}
   loadAlerts(true);
 }
-async function alDeleteRule(id){
-  try{ await fetch('/api/trading/alerts/rules/'+encodeURIComponent(id),{method:'DELETE'}); }catch(_e){}
+async function alToggleRuleEmail(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  r.email = r.email === false;
+  try { await fetch('/api/trading/alerts/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) }); } catch (_e) {}
+  loadAlerts(true);
+}
+async function alDeleteRule(id) {
+  try { await fetch('/api/trading/alerts/rules/' + encodeURIComponent(id), { method: 'DELETE' }); } catch (_e) {}
   loadAlerts(true);
 }
 // Degraded-account-state handling (2026-08-11): keep the last good figures on
