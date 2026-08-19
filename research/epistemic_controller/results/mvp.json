@@ -1,0 +1,7061 @@
+{
+  "n_seeds": 200,
+  "gates": {
+    "P1_enters_boundary_after_switch_not_before": {
+      "PASS": true,
+      "rate": 1.0,
+      "before_switch": 0
+    },
+    "P2_refuses_param_updates_in_boundary": {
+      "PASS": true
+    },
+    "P3_chooses_true_z_from_4": {
+      "PASS": 1.0,
+      "rate": 0.87,
+      "chance": 0.25
+    },
+    "P4_final_mse_within_2x_noise": {
+      "PASS": 1.0,
+      "rate": 0.87,
+      "twin_mean_mse": 0.7695,
+      "baseline_mean_mse": 5.1859,
+      "noise_floor": 0.09
+    },
+    "P5_null_world_false_alarm_under_5pct": {
+      "PASS": 1.0,
+      "held_rate": 0.0,
+      "raised_then_retracted_rate": 0.84
+    },
+    "VERDICT": "CLAIM SURVIVES \u2014 controller enters BOUNDARY on model-class failure, refuses parameter updates, chooses the discriminating measurement, expands the class; null world does not trigger it"
+  },
+  "rows": [
+    {
+      "seed": 0,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 121,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06250450944323013,
+        "refused": 2,
+        "spent": 31.92,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.334, runner-up z3 0.049)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.397483399487044,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.057473771854581
+      }
+    },
+    {
+      "seed": 1,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 117,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11612219577561429,
+        "refused": 1,
+        "spent": 20.57,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.519, runner-up z3 0.016)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.9577057400436044,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 197,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.9678443052896034
+      }
+    },
+    {
+      "seed": 2,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 123,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10602626098927753,
+        "refused": 1,
+        "spent": 14.97,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.718, runner-up z4 0.136)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.6261074941146365,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 188,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.6436508981414373
+      }
+    },
+    {
+      "seed": 3,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10314279549996784,
+        "refused": 1,
+        "spent": 21.78,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.516, runner-up z3 0.077)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.300577558584988,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 298,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.0922935410799438
+      }
+    },
+    {
+      "seed": 4,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07987427207880166,
+        "refused": 1,
+        "spent": 29.06,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.372, runner-up z3 0.073)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.937842918015878,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 229,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.4765457927414103
+      }
+    },
+    {
+      "seed": 5,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10620152269587643,
+        "refused": 2,
+        "spent": 16.18,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.883, runner-up z2 0.026)",
+          "chose z4 (util 0.909, runner-up z3 0.853)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.3648809632560495,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 257,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.6238639617135145
+      }
+    },
+    {
+      "seed": 6,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0983246903006101,
+        "refused": 3,
+        "spent": 30.43,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.409, runner-up z3 0.059)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.299324121475357,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 171,
+        "boundary_held": false,
+        "retracted": 10,
+        "final_mse": 0.07707398322822218
+      }
+    },
+    {
+      "seed": 7,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 114,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 7.161820131175494,
+        "refused": 1,
+        "spent": 10.69,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.354, runner-up z2 0.033)",
+          "chose z2 (util 0.903, runner-up z1 0.363)",
+          "chose z2 (util 0.908, runner-up z1 0.363)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.439725765979424,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 219,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.11857842777344983
+      }
+    },
+    {
+      "seed": 8,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 121,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.16262689021723423,
+        "refused": 1,
+        "spent": 18.76,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.552, runner-up z2 0.064)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.726387247589131,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.5917136635755962
+      }
+    },
+    {
+      "seed": 9,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08158526760604895,
+        "refused": 1,
+        "spent": 32.43,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.332, runner-up z4 0.076)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.374612979612137,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 197,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.9036829147460165
+      }
+    },
+    {
+      "seed": 10,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0791941436162388,
+        "refused": 2,
+        "spent": 22.42,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.534, runner-up z1 0.051)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.439831038066597,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 201,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7070232717794148
+      }
+    },
+    {
+      "seed": 11,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 123,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09780202826641263,
+        "refused": 1,
+        "spent": 13.1,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.860, runner-up z3 0.040)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.135380054902198,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 290,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.10780449136981315
+      }
+    },
+    {
+      "seed": 12,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08598752243469633,
+        "refused": 1,
+        "spent": 14.57,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.785, runner-up z1 0.103)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.229748926248513,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 154,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.719271783286472
+      }
+    },
+    {
+      "seed": 13,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05404890452205946,
+        "refused": 2,
+        "spent": 34.85,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.327, runner-up z3 0.141)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.276862153063316,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 140,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.6367387283905207
+      }
+    },
+    {
+      "seed": 14,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09619129725858373,
+        "refused": 1,
+        "spent": 27.37,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.391, runner-up z1 0.014)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.193413759072546,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 280,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7629658683525397
+      }
+    },
+    {
+      "seed": 15,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.048625863729543986,
+        "refused": 1,
+        "spent": 25.97,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.395, runner-up z1 0.039)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.7785891118548625,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 232,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.08888316760305487
+      }
+    },
+    {
+      "seed": 16,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07844810069360932,
+        "refused": 1,
+        "spent": 12.23,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.931, runner-up z3 0.042)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.9307990953290184,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 197,
+        "boundary_held": false,
+        "retracted": 11,
+        "final_mse": 0.06424021596666184
+      }
+    },
+    {
+      "seed": 17,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12187980303526061,
+        "refused": 1,
+        "spent": 19.71,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.551, runner-up z3 0.079)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.094737445484978,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 287,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.07244621834684846
+      }
+    },
+    {
+      "seed": 18,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 121,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10491817916392074,
+        "refused": 1,
+        "spent": 21.25,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.496, runner-up z3 0.075)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.745967124759839,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 134,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.07416626329335048
+      }
+    },
+    {
+      "seed": 19,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07363959733397249,
+        "refused": 1,
+        "spent": 27.54,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.381, runner-up z3 0.074)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.8069446576478407,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 158,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.07641073615011681
+      }
+    },
+    {
+      "seed": 20,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 109,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0955397685776753,
+        "refused": 2,
+        "spent": 15.23,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.846, runner-up z2 0.064)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.9277022439503235,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 220,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.8654242725962251
+      }
+    },
+    {
+      "seed": 21,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08829786067362615,
+        "refused": 1,
+        "spent": 20.52,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.535, runner-up z3 0.002)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.873973498256875,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 177,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.042739615389129224
+      }
+    },
+    {
+      "seed": 22,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0807002437666128,
+        "refused": 1,
+        "spent": 31.82,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.327, runner-up z4 0.228)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.7685000177528463,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.8319543926779074
+      }
+    },
+    {
+      "seed": 23,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0770617737251387,
+        "refused": 1,
+        "spent": 28.79,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.354, runner-up z2 0.022)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.0420845231915603,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7273964808564214
+      }
+    },
+    {
+      "seed": 24,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07701622140117902,
+        "refused": 2,
+        "spent": 31.21,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.354, runner-up z4 0.050)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.693536222519602,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 256,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7343780814060278
+      }
+    },
+    {
+      "seed": 25,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08648066688601859,
+        "refused": 2,
+        "spent": 17.82,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.699, runner-up z2 0.028)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.628754690106384,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.0785975913744514
+      }
+    },
+    {
+      "seed": 26,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08234369554621927,
+        "refused": 1,
+        "spent": 22.83,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.453, runner-up z3 0.024)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.5625386902636103,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 243,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7614181163495967
+      }
+    },
+    {
+      "seed": 27,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 122,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08351115666069298,
+        "refused": 1,
+        "spent": 11.59,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.923, runner-up z3 0.091)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.7931208126872713,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.06724041968833246
+      }
+    },
+    {
+      "seed": 28,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13133070838556687,
+        "refused": 1,
+        "spent": 20.09,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.572, runner-up z2 0.010)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.979904855122971,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 186,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.7435374123295423
+      }
+    },
+    {
+      "seed": 29,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1089030156321844,
+        "refused": 1,
+        "spent": 20.07,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.542, runner-up z4 0.051)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.358900661046464,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 257,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5887440444827422
+      }
+    },
+    {
+      "seed": 30,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07638392096725409,
+        "refused": 2,
+        "spent": 30.51,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.344, runner-up z3 0.079)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.7486222066196104,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.06360867626540628
+      }
+    },
+    {
+      "seed": 31,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1029288867548365,
+        "refused": 2,
+        "spent": 14.16,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.892, runner-up z1 0.072)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.670323856969459,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 234,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.7833065529764897
+      }
+    },
+    {
+      "seed": 32,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08576657910823969,
+        "refused": 1,
+        "spent": 25.91,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.419, runner-up z2 0.024)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.301244307539646,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 223,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.06633204446180753
+      }
+    },
+    {
+      "seed": 33,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07418601279628216,
+        "refused": 1,
+        "spent": 23.31,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.468, runner-up z4 0.028)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.794932909677808,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 211,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.08416475931984503
+      }
+    },
+    {
+      "seed": 34,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.6127702316113064,
+        "refused": 3,
+        "spent": 7.63,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.372, runner-up z4 0.076)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.628755250509799,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 168,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.7476159102115526
+      }
+    },
+    {
+      "seed": 35,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07942042958009814,
+        "refused": 1,
+        "spent": 11.95,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.986, runner-up z4 0.018)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.108631155027563,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.10029745481805051
+      }
+    },
+    {
+      "seed": 36,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.060460112049880235,
+        "refused": 1,
+        "spent": 16.93,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.660, runner-up z2 0.041)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.59174910609416,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 165,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.07040070478193784
+      }
+    },
+    {
+      "seed": 37,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11275856638047946,
+        "refused": 2,
+        "spent": 32.85,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.324, runner-up z1 0.107)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.756345555664687,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 300,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7340356132446554
+      }
+    },
+    {
+      "seed": 38,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07490066414549838,
+        "refused": 1,
+        "spent": 12.96,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.899, runner-up z3 0.037)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.272629263028005,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 269,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.630672206912422
+      }
+    },
+    {
+      "seed": 39,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09308558842665161,
+        "refused": 3,
+        "spent": 34.54,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.334, runner-up z3 0.066)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.0004007646857516,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 266,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.06849515382629337
+      }
+    },
+    {
+      "seed": 40,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09573966928307019,
+        "refused": 1,
+        "spent": 23.05,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.482, runner-up z4 0.060)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.904334131507236,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 226,
+        "boundary_held": false,
+        "retracted": 8,
+        "final_mse": 0.05576828821917381
+      }
+    },
+    {
+      "seed": 41,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06828371472711285,
+        "refused": 2,
+        "spent": 24.03,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.468, runner-up z1 0.036)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.69189506617806,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 142,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.6368914956470014
+      }
+    },
+    {
+      "seed": 42,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 7.792340782637652,
+        "refused": 2,
+        "spent": 10.08,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.334, runner-up z3 0.056)",
+          "chose z4 (util 0.707, runner-up z2 0.352)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.910847761196453,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 149,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.6806186718562822
+      }
+    },
+    {
+      "seed": 43,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0653347185767019,
+        "refused": 2,
+        "spent": 28.45,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.381, runner-up z4 0.081)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.415872858542535,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 241,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.7011846216532198
+      }
+    },
+    {
+      "seed": 44,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11486306829017852,
+        "refused": 1,
+        "spent": 19.36,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.567, runner-up z2 0.075)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.218810346370444,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 200,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.5243973611760195
+      }
+    },
+    {
+      "seed": 45,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11004222926274168,
+        "refused": 1,
+        "spent": 25.61,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.436, runner-up z4 0.040)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.19272880281007,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 205,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.4831927067092843
+      }
+    },
+    {
+      "seed": 46,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.2985116693511713,
+        "refused": 2,
+        "spent": 10.46,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.822, runner-up z3 0.035)",
+          "chose z1 (util 0.854, runner-up z4 0.475)",
+          "chose z1 (util 0.854, runner-up z4 0.473)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.4116013399941867,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 116,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.8289988091663023
+      }
+    },
+    {
+      "seed": 47,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0989689083266929,
+        "refused": 2,
+        "spent": 20.96,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.581, runner-up z3 0.039)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.757380477318185,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 269,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.5328325163284443
+      }
+    },
+    {
+      "seed": 48,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 124,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.057023783142162374,
+        "refused": 1,
+        "spent": 26.92,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.385, runner-up z3 0.084)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.166103578158734,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 172,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.5546333088013594
+      }
+    },
+    {
+      "seed": 49,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07828781988175776,
+        "refused": 2,
+        "spent": 24.08,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.480, runner-up z1 0.029)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.389898133778295,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 179,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.07504067383362557
+      }
+    },
+    {
+      "seed": 50,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09712581520924854,
+        "refused": 2,
+        "spent": 21.81,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.536, runner-up z2 0.141)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.429027773066,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 198,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7529638159831437
+      }
+    },
+    {
+      "seed": 51,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08167864006400143,
+        "refused": 2,
+        "spent": 22.24,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.515, runner-up z2 0.034)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.2892356435541603,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 258,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.12290473679324423
+      }
+    },
+    {
+      "seed": 52,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1053329874379181,
+        "refused": 2,
+        "spent": 22.13,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.534, runner-up z3 0.170)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.506326520619058,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 259,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7913826574382667
+      }
+    },
+    {
+      "seed": 53,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08121925792940773,
+        "refused": 1,
+        "spent": 28.84,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.370, runner-up z4 0.054)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.087113391562474,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 245,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.6734498306267602
+      }
+    },
+    {
+      "seed": 54,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10003289365791929,
+        "refused": 1,
+        "spent": 30.19,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.330, runner-up z3 0.024)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.4966271980188206,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 171,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.6213415604369085
+      }
+    },
+    {
+      "seed": 55,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.6471685544212273,
+        "refused": 1,
+        "spent": 10.94,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.326, runner-up z4 0.100)",
+          "chose z4 (util 0.843, runner-up z2 0.399)",
+          "chose z4 (util 0.841, runner-up z2 0.397)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.193420679007835,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 262,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.8385977588237247
+      }
+    },
+    {
+      "seed": 56,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09325465115955825,
+        "refused": 2,
+        "spent": 19.24,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.659, runner-up z3 0.054)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.623734445063187,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 267,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.5721648829891156
+      }
+    },
+    {
+      "seed": 57,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09052465035135039,
+        "refused": 1,
+        "spent": 21.69,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.522, runner-up z3 0.028)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.455588157410103,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 273,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6801846022711789
+      }
+    },
+    {
+      "seed": 58,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 121,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07252153389934705,
+        "refused": 1,
+        "spent": 14.07,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.765, runner-up z2 0.038)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.760506739358282,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 222,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7641301065105252
+      }
+    },
+    {
+      "seed": 59,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08049816467507304,
+        "refused": 1,
+        "spent": 11.64,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.949, runner-up z4 0.115)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.9941304963527093,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 216,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7626101935775549
+      }
+    },
+    {
+      "seed": 60,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 2.5407423261271997,
+        "refused": 1,
+        "spent": 11.11,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z4 (util 0.539, runner-up z2 0.053)",
+          "chose z4 (util 0.557, runner-up z1 0.431)",
+          "chose z4 (util 0.557, runner-up z1 0.430)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.868821339493259,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.06790527399466509
+      }
+    },
+    {
+      "seed": 61,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06917336422733739,
+        "refused": 1,
+        "spent": 32.06,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.326, runner-up z4 0.059)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.8334868768668775,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "boundary_held": false,
+        "retracted": 8,
+        "final_mse": 0.1171909834947706
+      }
+    },
+    {
+      "seed": 62,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05694848737319403,
+        "refused": 1,
+        "spent": 33.09,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.335, runner-up z2 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.247947927527686,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 279,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7479734905845833
+      }
+    },
+    {
+      "seed": 63,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10361024902358947,
+        "refused": 2,
+        "spent": 16.49,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.707, runner-up z3 0.076)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.1511867013346535,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 203,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.11099437373410485
+      }
+    },
+    {
+      "seed": 64,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07561209069575357,
+        "refused": 1,
+        "spent": 24.09,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.420, runner-up z4 0.075)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.765270852476783,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 190,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6550683407139491
+      }
+    },
+    {
+      "seed": 65,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 117,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.105056847663924,
+        "refused": 1,
+        "spent": 14.42,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.737, runner-up z3 0.022)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.352979784545431,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 198,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.12074433807098899
+      }
+    },
+    {
+      "seed": 66,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08219387887021927,
+        "refused": 2,
+        "spent": 23.53,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.494, runner-up z2 0.012)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.5306117900437113,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.06889710027663293
+      }
+    },
+    {
+      "seed": 67,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1034042852598543,
+        "refused": 1,
+        "spent": 18.53,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.574, runner-up z1 0.030)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.495381826082726,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 222,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.7977561356449
+      }
+    },
+    {
+      "seed": 68,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07346064328435917,
+        "refused": 3,
+        "spent": 27.96,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.439, runner-up z2 0.079)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.456116200033532,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 239,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.08178453470108123
+      }
+    },
+    {
+      "seed": 69,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10977837385036829,
+        "refused": 2,
+        "spent": 16.69,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.967, runner-up z1 0.023)",
+          "chose z4 (util 0.982, runner-up z3 0.485)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.8947865173596385,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 261,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.818851835274493
+      }
+    },
+    {
+      "seed": 70,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08892945939941721,
+        "refused": 3,
+        "spent": 30.48,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.376, runner-up z3 0.017)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.909388747815186,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 201,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.9703835854708146
+      }
+    },
+    {
+      "seed": 71,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0674994035047471,
+        "refused": 1,
+        "spent": 16.41,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.693, runner-up z1 0.051)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.918301030535521,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.8458785933991615
+      }
+    },
+    {
+      "seed": 72,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06469110202403432,
+        "refused": 1,
+        "spent": 22.97,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.455, runner-up z3 0.008)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.485602542763122,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 182,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.0667828034207061
+      }
+    },
+    {
+      "seed": 73,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09925005245767425,
+        "refused": 3,
+        "spent": 19.4,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.702, runner-up z1 0.061)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.312014362315163,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 164,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.4686025080560499
+      }
+    },
+    {
+      "seed": 74,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10038678270754006,
+        "refused": 1,
+        "spent": 22.41,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.479, runner-up z3 0.041)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.673718688620033,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7011231352283702
+      }
+    },
+    {
+      "seed": 75,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12092244174247449,
+        "refused": 2,
+        "spent": 35.89,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.332, runner-up z2 0.001)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.355690984294755,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 192,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.9352142507352714
+      }
+    },
+    {
+      "seed": 76,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 109,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08951355798644038,
+        "refused": 1,
+        "spent": 17.07,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.661, runner-up z3 0.054)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.792562153228612,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7313815243290888
+      }
+    },
+    {
+      "seed": 77,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.14462671528334103,
+        "refused": 1,
+        "spent": 19.13,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.562, runner-up z3 0.042)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.4326501499603435,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 162,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.06980630564754574
+      }
+    },
+    {
+      "seed": 78,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08025504669878882,
+        "refused": 1,
+        "spent": 23.21,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.449, runner-up z2 0.079)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.228078900041054,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 55,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.10747943799623487
+      }
+    },
+    {
+      "seed": 79,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09656857189596876,
+        "refused": 2,
+        "spent": 20.49,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.564, runner-up z1 0.095)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.139317687162219,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 250,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7010428863490407
+      }
+    },
+    {
+      "seed": 80,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 117,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09154933242818428,
+        "refused": 2,
+        "spent": 18.57,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.660, runner-up z4 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.3504827615726507,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.049196400391595056
+      }
+    },
+    {
+      "seed": 81,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 8.958590799874498,
+        "refused": 2,
+        "spent": 10.05,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.488, runner-up z3 0.143)",
+          "chose z3 (util 0.713, runner-up z4 0.544)",
+          "chose z3 (util 0.694, runner-up z4 0.530)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.245948291631072,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 259,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.500548516742703
+      }
+    },
+    {
+      "seed": 82,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07834424357222933,
+        "refused": 2,
+        "spent": 20.37,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.598, runner-up z1 0.025)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.8381484283735605,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 224,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.07396700053505847
+      }
+    },
+    {
+      "seed": 83,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12175038186716791,
+        "refused": 1,
+        "spent": 31.66,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.342, runner-up z3 0.094)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.9740922677157515,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 244,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.0698801094742957
+      }
+    },
+    {
+      "seed": 84,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 7.165486412035898,
+        "refused": 1,
+        "spent": 9.98,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z2 (util 0.409, runner-up z1 0.065)",
+          "chose z4 (util 0.624, runner-up z3 0.624)",
+          "chose z4 (util 0.618, runner-up z3 0.616)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.859819592485076,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 201,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7354559082955906
+      }
+    },
+    {
+      "seed": 85,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 4.817272743609733,
+        "refused": 2,
+        "spent": 11.87,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.381, runner-up z2 0.015)",
+          "chose z4 (util 0.479, runner-up z2 0.443)",
+          "chose z4 (util 0.500, runner-up z2 0.458)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.439673819160406,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 229,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7168059190424855
+      }
+    },
+    {
+      "seed": 86,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 111,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08585853727285944,
+        "refused": 1,
+        "spent": 28.79,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.369, runner-up z2 0.030)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.958698349051931,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.5216983331027438
+      }
+    },
+    {
+      "seed": 87,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.2108084126136176,
+        "refused": 2,
+        "spent": 11.55,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z2 (util 0.457, runner-up z1 0.032)",
+          "chose z1 (util 0.688, runner-up z2 0.480)",
+          "chose z1 (util 0.688, runner-up z2 0.480)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.0097257279521314,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.1126217457958038
+      }
+    },
+    {
+      "seed": 88,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09187713893862326,
+        "refused": 1,
+        "spent": 15.6,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.726, runner-up z3 0.032)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.229885587262015,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 148,
+        "boundary_held": false,
+        "retracted": 10,
+        "final_mse": 0.6740779210876275
+      }
+    },
+    {
+      "seed": 89,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10310043933107269,
+        "refused": 2,
+        "spent": 27.63,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.424, runner-up z4 0.038)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.443997699025841,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 206,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5386681564462236
+      }
+    },
+    {
+      "seed": 90,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 112,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 4.755375870007371,
+        "refused": 1,
+        "spent": 10.31,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.359, runner-up z2 0.082)",
+          "chose z1 (util 0.664, runner-up z4 0.459)",
+          "chose z1 (util 0.658, runner-up z4 0.453)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.638431141743992,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.6744662710428287
+      }
+    },
+    {
+      "seed": 91,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 7.547512405192842,
+        "refused": 2,
+        "spent": 9.65,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.353, runner-up z4 0.099)",
+          "chose z2 (util 0.464, runner-up z4 0.414)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.866825280660176,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 224,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.07886696179280177
+      }
+    },
+    {
+      "seed": 92,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10512749005611619,
+        "refused": 1,
+        "spent": 12.37,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.941, runner-up z4 0.088)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.248991880550934,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 211,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.07559955864749902
+      }
+    },
+    {
+      "seed": 93,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06584500624190938,
+        "refused": 2,
+        "spent": 29.39,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.384, runner-up z1 0.037)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.943496354017586,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 214,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.6446626084372622
+      }
+    },
+    {
+      "seed": 94,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 6.6161863921646535,
+        "refused": 1,
+        "spent": 9.23,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.645, runner-up z4 0.008)",
+          "chose z1 (util 0.654, runner-up z4 0.510)",
+          "chose z1 (util 0.654, runner-up z4 0.465)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.757965499612896,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 276,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.0648258685513847
+      }
+    },
+    {
+      "seed": 95,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07277793517894125,
+        "refused": 3,
+        "spent": 19.68,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.718, runner-up z4 0.017)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.619860780938298,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.6402593357083496
+      }
+    },
+    {
+      "seed": 96,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05974954481568895,
+        "refused": 1,
+        "spent": 31.49,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.344, runner-up z3 0.019)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.291139706403751,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.769103867136321
+      }
+    },
+    {
+      "seed": 97,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0615778606821831,
+        "refused": 2,
+        "spent": 19.81,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.863, runner-up z2 0.007)",
+          "chose z3 (util 0.909, runner-up z2 0.887)",
+          "chose z3 (util 0.909, runner-up z2 0.871)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.99820681221089,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 8,
+        "final_mse": 0.7100672241866747
+      }
+    },
+    {
+      "seed": 98,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 109,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05651214625750995,
+        "refused": 3,
+        "spent": 20.02,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.599, runner-up z2 0.026)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.346955083020687,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 136,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7817220560248187
+      }
+    },
+    {
+      "seed": 99,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08756698920739286,
+        "refused": 1,
+        "spent": 21.0,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.508, runner-up z1 0.025)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.8985459525995845,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 245,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.08833292255813335
+      }
+    },
+    {
+      "seed": 100,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 117,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10612631951412367,
+        "refused": 1,
+        "spent": 30.7,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.343, runner-up z4 0.030)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.196800570169531,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 193,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6922067965982458
+      }
+    },
+    {
+      "seed": 101,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07265319152704848,
+        "refused": 1,
+        "spent": 19.59,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.570, runner-up z4 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.408653146010279,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 177,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.7641184615291047
+      }
+    },
+    {
+      "seed": 102,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09445913400821938,
+        "refused": 2,
+        "spent": 24.0,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.509, runner-up z3 0.006)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.626937974512888,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 235,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.07302603249445307
+      }
+    },
+    {
+      "seed": 103,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05924714983874602,
+        "refused": 1,
+        "spent": 24.76,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.405, runner-up z1 0.176)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.197746947447539,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 228,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.0836085008163436
+      }
+    },
+    {
+      "seed": 104,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10401734711647692,
+        "refused": 1,
+        "spent": 20.35,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.522, runner-up z2 0.016)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.475186938128419,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 204,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.047968326661066006
+      }
+    },
+    {
+      "seed": 105,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 113,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06496372832610915,
+        "refused": 1,
+        "spent": 30.34,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.342, runner-up z4 0.063)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.652877856206607,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7112775412683092
+      }
+    },
+    {
+      "seed": 106,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08890432817596924,
+        "refused": 2,
+        "spent": 15.63,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.755, runner-up z3 0.057)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.5667762675093564,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 208,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.816764660890786
+      }
+    },
+    {
+      "seed": 107,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05174048225925725,
+        "refused": 2,
+        "spent": 33.14,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.327, runner-up z4 0.047)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.2039103384076935,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.5721513652630691
+      }
+    },
+    {
+      "seed": 108,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11390141284709461,
+        "refused": 1,
+        "spent": 20.58,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.507, runner-up z1 0.061)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.9471657197663634,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.704256365448936
+      }
+    },
+    {
+      "seed": 109,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12517586002680084,
+        "refused": 1,
+        "spent": 16.56,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.688, runner-up z3 0.082)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.562327256277738,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 167,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6443190544771458
+      }
+    },
+    {
+      "seed": 110,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06352483499712563,
+        "refused": 1,
+        "spent": 31.33,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.342, runner-up z3 0.053)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.881172750623539,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 249,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.8176712304530697
+      }
+    },
+    {
+      "seed": 111,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07599355819889618,
+        "refused": 2,
+        "spent": 19.58,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.645, runner-up z1 0.028)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.886250520299765,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 221,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.5994713166682537
+      }
+    },
+    {
+      "seed": 112,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 109,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10353914135675903,
+        "refused": 1,
+        "spent": 29.55,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.365, runner-up z1 0.016)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.576960023369213,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 250,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.70752335534056
+      }
+    },
+    {
+      "seed": 113,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10425733638588867,
+        "refused": 1,
+        "spent": 12.65,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.889, runner-up z3 0.102)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.061194426581016,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 174,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.6411361658622775
+      }
+    },
+    {
+      "seed": 114,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10507851696634701,
+        "refused": 2,
+        "spent": 33.59,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.339, runner-up z1 0.005)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.283078714977387,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 204,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6965440043672612
+      }
+    },
+    {
+      "seed": 115,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06883264519650117,
+        "refused": 1,
+        "spent": 14.47,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.776, runner-up z4 0.043)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.8857304041391245,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 165,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5782665459929397
+      }
+    },
+    {
+      "seed": 116,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": false,
+        "final_mse": 8.382813524451395,
+        "refused": 1,
+        "spent": 22.95,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.438, runner-up z3 0.011)",
+          "chose z2 (util 0.536, runner-up z4 0.528)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.93612533142518,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 258,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.08064322513838082
+      }
+    },
+    {
+      "seed": 117,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 121,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07992140363340909,
+        "refused": 1,
+        "spent": 19.26,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.547, runner-up z1 0.077)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.694079047721408,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 188,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.6704974692346058
+      }
+    },
+    {
+      "seed": 118,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08752642298370082,
+        "refused": 2,
+        "spent": 32.07,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.346, runner-up z2 0.066)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.5522131398436727,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 225,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.0924899727071133
+      }
+    },
+    {
+      "seed": 119,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08376492766521762,
+        "refused": 2,
+        "spent": 23.69,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.463, runner-up z3 0.084)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.49139901647298,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.8978355049199261
+      }
+    },
+    {
+      "seed": 120,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09261235312079057,
+        "refused": 1,
+        "spent": 22.89,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.456, runner-up z3 0.029)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.7074088040865036,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 186,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.6897622296428102
+      }
+    },
+    {
+      "seed": 121,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11027438571037886,
+        "refused": 1,
+        "spent": 20.72,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.524, runner-up z3 0.071)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.643817055495216,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 195,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7080482088934593
+      }
+    },
+    {
+      "seed": 122,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1084438869021802,
+        "refused": 2,
+        "spent": 24.47,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.480, runner-up z2 0.085)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.491244140153329,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.1487100779450518
+      }
+    },
+    {
+      "seed": 123,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.2858319571071286,
+        "refused": 3,
+        "spent": 7.25,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z2 (util 0.335, runner-up z1 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.5904598661954727,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 176,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.5827707720982475
+      }
+    },
+    {
+      "seed": 124,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.04746769636460557,
+        "refused": 1,
+        "spent": 22.25,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.502, runner-up z2 0.060)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 9.113147485025047,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 181,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.6853894600769729
+      }
+    },
+    {
+      "seed": 125,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 4.298201259699346,
+        "refused": 2,
+        "spent": 10.02,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.355, runner-up z4 0.038)",
+          "chose z4 (util 0.590, runner-up z1 0.379)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.368367623188694,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 138,
+        "boundary_held": false,
+        "retracted": 10,
+        "final_mse": 0.6412804558526833
+      }
+    },
+    {
+      "seed": 126,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 122,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08710101276340806,
+        "refused": 1,
+        "spent": 17.23,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.788, runner-up z4 0.035)",
+          "chose z1 (util 0.822, runner-up z4 0.407)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.6776698511670394,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.5532296422181758
+      }
+    },
+    {
+      "seed": 127,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10893029875619321,
+        "refused": 2,
+        "spent": 30.52,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.367, runner-up z4 0.116)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.218326774630658,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 215,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7647073454159705
+      }
+    },
+    {
+      "seed": 128,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09035852882775543,
+        "refused": 1,
+        "spent": 30.7,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.338, runner-up z3 0.035)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.298218921696917,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.1033215601024453
+      }
+    },
+    {
+      "seed": 129,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07241873466886008,
+        "refused": 1,
+        "spent": 30.54,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.351, runner-up z3 0.012)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 9.093061568201152,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 203,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6709672950185187
+      }
+    },
+    {
+      "seed": 130,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10000801530246736,
+        "refused": 1,
+        "spent": 25.9,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.404, runner-up z2 0.036)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.053541579481926,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 247,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6868363973101878
+      }
+    },
+    {
+      "seed": 131,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06319060111480952,
+        "refused": 1,
+        "spent": 32.34,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.343, runner-up z3 0.051)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.505917723470057,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 291,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.7084816068717064
+      }
+    },
+    {
+      "seed": 132,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10683459082256053,
+        "refused": 1,
+        "spent": 24.62,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.442, runner-up z4 0.024)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.772269343256193,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 212,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.7748910416789002
+      }
+    },
+    {
+      "seed": 133,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09227271147640169,
+        "refused": 1,
+        "spent": 29.58,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.356, runner-up z4 0.034)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.5801387548189223,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 167,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.689242891318266
+      }
+    },
+    {
+      "seed": 134,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13100081238878786,
+        "refused": 1,
+        "spent": 16.11,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.702, runner-up z2 0.039)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.539973444821274,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.575783136847832
+      }
+    },
+    {
+      "seed": 135,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 8.194210343538364,
+        "refused": 1,
+        "spent": 9.57,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.717, runner-up z2 0.030)",
+          "chose z1 (util 0.729, runner-up z3 0.429)",
+          "chose z1 (util 0.729, runner-up z3 0.423)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.371009649552057,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 285,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.7877613473900088
+      }
+    },
+    {
+      "seed": 136,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07504899201287113,
+        "refused": 2,
+        "spent": 23.76,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.479, runner-up z3 0.058)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.6524644568417055,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7403227054638196
+      }
+    },
+    {
+      "seed": 137,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06338564882152035,
+        "refused": 1,
+        "spent": 19.57,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.567, runner-up z4 0.031)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.398509852131523,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 203,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.5082680508234725
+      }
+    },
+    {
+      "seed": 138,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0649269083963409,
+        "refused": 2,
+        "spent": 18.42,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.838, runner-up z3 0.110)",
+          "chose z4 (util 0.860, runner-up z3 0.701)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.564007493350761,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.8501448536917372
+      }
+    },
+    {
+      "seed": 139,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11098410332380843,
+        "refused": 1,
+        "spent": 29.11,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.353, runner-up z3 0.060)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.1852802950495684,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 288,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.5634377310932221
+      }
+    },
+    {
+      "seed": 140,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05980658537749181,
+        "refused": 1,
+        "spent": 22.15,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.493, runner-up z1 0.118)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.527794945634192,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 167,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.6223128059109494
+      }
+    },
+    {
+      "seed": 141,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 2.335896301656354,
+        "refused": 2,
+        "spent": 11.15,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z2 (util 0.534, runner-up z4 0.073)",
+          "chose z3 (util 0.596, runner-up z2 0.564)",
+          "chose z3 (util 0.585, runner-up z2 0.564)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.577311797623182,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 185,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.043904769187237694
+      }
+    },
+    {
+      "seed": 142,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 109,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09165792244719483,
+        "refused": 1,
+        "spent": 31.16,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.343, runner-up z3 0.078)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.140237780006265,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 200,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5036458979214528
+      }
+    },
+    {
+      "seed": 143,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11467441641669117,
+        "refused": 1,
+        "spent": 22.15,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.495, runner-up z3 0.155)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.238572892567802,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 161,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.8899132002037788
+      }
+    },
+    {
+      "seed": 144,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.053979685654764326,
+        "refused": 2,
+        "spent": 32.88,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.337, runner-up z1 0.091)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.8844376507439393,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 233,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.9388934076039109
+      }
+    },
+    {
+      "seed": 145,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08746285787332207,
+        "refused": 1,
+        "spent": 18.11,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.628, runner-up z2 0.022)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.262736014847823,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7854454041870083
+      }
+    },
+    {
+      "seed": 146,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08441781813664287,
+        "refused": 2,
+        "spent": 15.26,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.796, runner-up z1 0.038)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.760626634021007,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 176,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.6815557354134593
+      }
+    },
+    {
+      "seed": 147,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07097362613440936,
+        "refused": 3,
+        "spent": 17.58,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.798, runner-up z1 0.029)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.564129900261864,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7494219048260302
+      }
+    },
+    {
+      "seed": 148,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 111,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09624233039531327,
+        "refused": 1,
+        "spent": 25.24,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.433, runner-up z2 0.040)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.228100415261943,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 291,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5994713105827506
+      }
+    },
+    {
+      "seed": 149,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 123,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.1112074038679483,
+        "refused": 1,
+        "spent": 11.16,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.320, runner-up z1 0.040)",
+          "chose z1 (util 0.590, runner-up z2 0.421)",
+          "chose z1 (util 0.576, runner-up z2 0.405)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.5231790829669167,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 300,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.6062643805543143
+      }
+    },
+    {
+      "seed": 150,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.0606210600205791,
+        "refused": 1,
+        "spent": 14.99,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.793, runner-up z4 0.057)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.553607830617073,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.6147826471179481
+      }
+    },
+    {
+      "seed": 151,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 122,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13873326384722934,
+        "refused": 1,
+        "spent": 29.3,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.351, runner-up z2 0.040)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.563412570993631,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 140,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.6042885454866719
+      }
+    },
+    {
+      "seed": 152,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 105,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09906410054263758,
+        "refused": 3,
+        "spent": 23.44,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.571, runner-up z2 0.054)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.729232166126272,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 241,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.42535655325896954
+      }
+    },
+    {
+      "seed": 153,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06542618147088188,
+        "refused": 1,
+        "spent": 23.72,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.451, runner-up z2 0.082)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.0460454646548922,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 164,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.8514695302920996
+      }
+    },
+    {
+      "seed": 154,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07957857157219711,
+        "refused": 1,
+        "spent": 13.65,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.833, runner-up z2 0.018)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.0997669915891084,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 156,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.6492990471256243
+      }
+    },
+    {
+      "seed": 155,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12076639917097148,
+        "refused": 3,
+        "spent": 23.06,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.559, runner-up z3 0.037)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.404478405796197,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 173,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.8160957933785564
+      }
+    },
+    {
+      "seed": 156,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08529619365271716,
+        "refused": 1,
+        "spent": 30.83,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.341, runner-up z1 0.032)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.020256803806865,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 161,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.894467846664922
+      }
+    },
+    {
+      "seed": 157,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 4.446985825592452,
+        "refused": 2,
+        "spent": 9.71,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.347, runner-up z3 0.033)",
+          "chose z2 (util 0.827, runner-up z3 0.360)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.227592420881298,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 212,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.08078031135121645
+      }
+    },
+    {
+      "seed": 158,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.15273680844925808,
+        "refused": 1,
+        "spent": 33.51,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.321, runner-up z4 0.048)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.598425499401199,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 281,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.844916622459452
+      }
+    },
+    {
+      "seed": 159,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06456385221545236,
+        "refused": 3,
+        "spent": 19.78,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.723, runner-up z1 0.038)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.402378262470833,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 208,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.06077909467456777
+      }
+    },
+    {
+      "seed": 160,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.1357161298024055,
+        "refused": 2,
+        "spent": 20.09,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.572, runner-up z3 0.001)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.7119170607854546,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 242,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.7264574570987763
+      }
+    },
+    {
+      "seed": 161,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.04859683457452745,
+        "refused": 2,
+        "spent": 17.0,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.715, runner-up z3 0.052)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.632152098306522,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.06766249719447734
+      }
+    },
+    {
+      "seed": 162,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08169924429558557,
+        "refused": 1,
+        "spent": 15.94,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.687, runner-up z2 0.081)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.064663894022815,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.6360997172856664
+      }
+    },
+    {
+      "seed": 163,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13810052151484525,
+        "refused": 1,
+        "spent": 19.02,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.563, runner-up z1 0.017)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.55039615889209,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 177,
+        "boundary_held": false,
+        "retracted": 4,
+        "final_mse": 0.7062402093966847
+      }
+    },
+    {
+      "seed": 164,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 110,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 3.776577122337353,
+        "refused": 1,
+        "spent": 11.06,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z4 (util 0.782, runner-up z3 0.081)",
+          "chose z4 (util 0.823, runner-up z3 0.742)",
+          "chose z4 (util 0.825, runner-up z3 0.747)",
+          "chose z4 (util 0.825, runner-up z3 0.701)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.082646160286919,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 220,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.5829550589999062
+      }
+    },
+    {
+      "seed": 165,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05399885441845735,
+        "refused": 1,
+        "spent": 31.61,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.326, runner-up z1 0.090)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.615819913338873,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 150,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.6257761648065371
+      }
+    },
+    {
+      "seed": 166,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": false,
+        "final_mse": 7.025971649704141,
+        "refused": 1,
+        "spent": 19.06,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.515, runner-up z3 0.113)",
+          "chose z3 (util 0.737, runner-up z4 0.568)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.160661086337723,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 275,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.07630306779635526
+      }
+    },
+    {
+      "seed": 167,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.054180216132952895,
+        "refused": 1,
+        "spent": 24.71,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.543, runner-up z1 0.044)",
+          "chose z2 (util 0.570, runner-up z1 0.503)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.402879685300934,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 186,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.797422657795902
+      }
+    },
+    {
+      "seed": 168,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 120,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12868833489312392,
+        "refused": 1,
+        "spent": 13.2,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.833, runner-up z3 0.069)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.850496722516809,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.10701534033997953
+      }
+    },
+    {
+      "seed": 169,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13385154694439902,
+        "refused": 1,
+        "spent": 27.6,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.382, runner-up z1 0.010)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.824040544435979,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 129,
+        "boundary_held": false,
+        "retracted": 13,
+        "final_mse": 0.6516956873500408
+      }
+    },
+    {
+      "seed": 170,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12660992526436157,
+        "refused": 2,
+        "spent": 14.81,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.901, runner-up z3 0.023)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.3778438606476415,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.06967661064319837
+      }
+    },
+    {
+      "seed": 171,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.051537350595643704,
+        "refused": 1,
+        "spent": 22.26,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.507, runner-up z2 0.012)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.055441324389855,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 145,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.8706086458267852
+      }
+    },
+    {
+      "seed": 172,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07133914422896927,
+        "refused": 1,
+        "spent": 18.98,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.569, runner-up z2 0.028)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.121695730259696,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 184,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.8155455938251427
+      }
+    },
+    {
+      "seed": 173,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 113,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08487667019304627,
+        "refused": 1,
+        "spent": 17.04,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.670, runner-up z4 0.013)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.005707487644518,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 286,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6716119376946393
+      }
+    },
+    {
+      "seed": 174,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.04946999463173293,
+        "refused": 1,
+        "spent": 29.42,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.364, runner-up z1 0.017)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.36345396131609,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 217,
+        "boundary_held": false,
+        "retracted": 3,
+        "final_mse": 0.06274503634657885
+      }
+    },
+    {
+      "seed": 175,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09901740223463677,
+        "refused": 3,
+        "spent": 20.26,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.631, runner-up z3 0.070)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.398362512391698,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 195,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.04762152410136074
+      }
+    },
+    {
+      "seed": 176,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09290606578680537,
+        "refused": 1,
+        "spent": 20.19,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.569, runner-up z4 0.021)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.943397438228112,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 200,
+        "boundary_held": false,
+        "retracted": 7,
+        "final_mse": 0.5747268259056345
+      }
+    },
+    {
+      "seed": 177,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09993177909864955,
+        "refused": 1,
+        "spent": 30.01,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.348, runner-up z4 0.059)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.231745536613855,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.11637515348510437
+      }
+    },
+    {
+      "seed": 178,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10094119888866616,
+        "refused": 2,
+        "spent": 25.5,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.436, runner-up z4 0.031)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.320845297852769,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 225,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.10487629252115613
+      }
+    },
+    {
+      "seed": 179,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08942713654648506,
+        "refused": 1,
+        "spent": 20.97,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.531, runner-up z1 0.065)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.720633457175285,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 219,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.8950665105916238
+      }
+    },
+    {
+      "seed": 180,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07591594441024002,
+        "refused": 1,
+        "spent": 18.19,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.614, runner-up z3 0.079)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.493728245211139,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 210,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.6242673172136042
+      }
+    },
+    {
+      "seed": 181,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09907457574451575,
+        "refused": 1,
+        "spent": 21.04,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.508, runner-up z2 0.025)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.458001041060668,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 189,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.09814227036595677
+      }
+    },
+    {
+      "seed": 182,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 111,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.11899974492839213,
+        "refused": 1,
+        "spent": 25.92,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.411, runner-up z3 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.202127593154835,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 172,
+        "boundary_held": false,
+        "retracted": 6,
+        "final_mse": 0.07438254651791561
+      }
+    },
+    {
+      "seed": 183,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 6.362730211826232,
+        "refused": 1,
+        "spent": 11.12,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z2 (util 0.361, runner-up z4 0.058)",
+          "chose z4 (util 0.543, runner-up z3 0.538)",
+          "chose z4 (util 0.539, runner-up z3 0.533)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.575562825002759,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 268,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.5589951688739441
+      }
+    },
+    {
+      "seed": 184,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07247769333751028,
+        "refused": 2,
+        "spent": 25.21,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.539, runner-up z3 0.047)",
+          "chose z2 (util 0.555, runner-up z4 0.430)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 9.220363434667261,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 218,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.47908939917316723
+      }
+    },
+    {
+      "seed": 185,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.06430610232274472,
+        "refused": 3,
+        "spent": 21.4,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.585, runner-up z2 0.052)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.472347519393901,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 299,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.47221257127428234
+      }
+    },
+    {
+      "seed": 186,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.13410303221934586,
+        "refused": 2,
+        "spent": 33.13,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.339, runner-up z3 0.020)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.411024273160882,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.5724828017370961
+      }
+    },
+    {
+      "seed": 187,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 5.036509276107574,
+        "refused": 1,
+        "spent": 9.49,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.455, runner-up z3 0.119)",
+          "chose z3 (util 0.607, runner-up z1 0.463)",
+          "chose z3 (util 0.570, runner-up z1 0.462)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 5.372423157940401,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 146,
+        "boundary_held": false,
+        "retracted": 11,
+        "final_mse": 0.63592967673868
+      }
+    },
+    {
+      "seed": 188,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.088692155741633,
+        "refused": 1,
+        "spent": 19.02,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.603, runner-up z1 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.588243084271996,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.8367029786186585
+      }
+    },
+    {
+      "seed": 189,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10867828245750465,
+        "refused": 1,
+        "spent": 15.0,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.713, runner-up z1 0.071)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 4.7076727665487965,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 170,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.07609000262848628
+      }
+    },
+    {
+      "seed": 190,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.12026782574587208,
+        "refused": 1,
+        "spent": 31.36,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.348, runner-up z2 0.017)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 8.544415321704257,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.6985586871427475
+      }
+    },
+    {
+      "seed": 191,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 119,
+        "features": [
+          "x",
+          "z1"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08774560226001074,
+        "refused": 1,
+        "spent": 25.45,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z1 (util 0.405, runner-up z2 0.049)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.82529905285486,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 149,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.07246943220685119
+      }
+    },
+    {
+      "seed": 192,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 107,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.05096704237770498,
+        "refused": 2,
+        "spent": 27.0,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.420, runner-up z1 0.046)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.250004514953436,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": false,
+        "boundary_t": null,
+        "boundary_held": false,
+        "retracted": 0,
+        "final_mse": 0.7369609479922947
+      }
+    },
+    {
+      "seed": 193,
+      "true_z": "z2",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 118,
+        "features": [
+          "x",
+          "z2"
+        ],
+        "chose_true": true,
+        "final_mse": 0.08205733341407502,
+        "refused": 1,
+        "spent": 21.62,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z2 (util 0.501, runner-up z1 0.054)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.464069112416565,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 184,
+        "boundary_held": false,
+        "retracted": 9,
+        "final_mse": 0.9003974119396422
+      }
+    },
+    {
+      "seed": 194,
+      "true_z": "z1",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 129,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 4.040712900069222,
+        "refused": 1,
+        "spent": 11.51,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z1 (util 0.333, runner-up z4 0.097)",
+          "chose z2 (util 0.594, runner-up z3 0.591)",
+          "chose z2 (util 0.597, runner-up z3 0.594)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.689006823073853,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 219,
+        "boundary_held": false,
+        "retracted": 8,
+        "final_mse": 0.0796019385743138
+      }
+    },
+    {
+      "seed": 195,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.09226111779380532,
+        "refused": 2,
+        "spent": 24.12,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.455, runner-up z2 0.078)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.463085833283443,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 235,
+        "boundary_held": false,
+        "retracted": 5,
+        "final_mse": 0.7992694736112878
+      }
+    },
+    {
+      "seed": 196,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 122,
+        "features": [
+          "x"
+        ],
+        "chose_true": false,
+        "final_mse": 6.959863080839261,
+        "refused": 1,
+        "spent": 9.09,
+        "final_state": "RESOLVED",
+        "failed_budget": true,
+        "chosen": [
+          "chose z3 (util 0.562, runner-up z1 0.356)",
+          "chose z1 (util 0.936, runner-up z2 0.831)",
+          "chose z1 (util 0.935, runner-up z2 0.825)",
+          "chose z1 (util 0.930, runner-up z2 0.821)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 6.3930499292811565,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 219,
+        "boundary_held": false,
+        "retracted": 2,
+        "final_mse": 0.09255970725326734
+      }
+    },
+    {
+      "seed": 197,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 103,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07437300182205234,
+        "refused": 2,
+        "spent": 14.86,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.915, runner-up z4 0.041)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 7.333945070166046,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 269,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.11236264315427033
+      }
+    },
+    {
+      "seed": 198,
+      "true_z": "z3",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 104,
+        "features": [
+          "x",
+          "z3"
+        ],
+        "chose_true": true,
+        "final_mse": 0.07171564767073825,
+        "refused": 4,
+        "spent": 20.94,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z3 (util 0.700, runner-up z2 0.059)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 3.1341737287397597,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 122,
+        "boundary_held": false,
+        "retracted": 14,
+        "final_mse": 0.061069692801803716
+      }
+    },
+    {
+      "seed": 199,
+      "true_z": "z4",
+      "switch_at": 100,
+      "noise": 0.3,
+      "twin": {
+        "entered_boundary": true,
+        "boundary_t": 106,
+        "features": [
+          "x",
+          "z4"
+        ],
+        "chose_true": true,
+        "final_mse": 0.10382675701358225,
+        "refused": 3,
+        "spent": 22.77,
+        "final_state": "RESOLVED",
+        "failed_budget": false,
+        "chosen": [
+          "chose z4 (util 0.551, runner-up z2 0.091)"
+        ]
+      },
+      "baseline": {
+        "final_mse": 2.6320307908742553,
+        "updates": 293,
+        "entered_boundary": false
+      },
+      "null": {
+        "entered_boundary": true,
+        "boundary_t": 186,
+        "boundary_held": false,
+        "retracted": 1,
+        "final_mse": 0.07288267400538703
+      }
+    }
+  ]
+}
