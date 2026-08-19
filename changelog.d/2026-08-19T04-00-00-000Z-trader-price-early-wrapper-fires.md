@@ -1,0 +1,3 @@
+### Changed
+
+- trader: `TRADER_SHORT_EDGE=selective` now PRICES early wrapper fires instead of banning them. The 11:00 floor was a ban wearing a filter's clothes — measured over 25 sessions and 8 wrappers, 72.2% of first fires per symbol/session land in 09:30–10:00 and only 14.6% at or after 11:00, so the floor refused ~85% of actionable setups and two live sessions produced 23 fires and zero decisions. The measured effect is on win rate (47% early vs 54–67% late), so it is charged there: −7pp of p_win before 10:00, −4pp until 11:00, nothing after, with EV and the decision re-derived. A strong early setup can now clear on its other merits. The two setup checks (collapsed wrapper, ripping underlying) stay hard
