@@ -176,3 +176,30 @@ test('every call is journalled, including the ones that failed', async () => {
   assert.strictEqual(last.model, sr.MODEL);
   assert.match(last.reason, /429/);
 });
+
+// ── the wiring (#3359). A flag on an uncalled module does nothing; these pin
+// that the reviewer is actually invoked at the close, and that it cannot
+// interfere with it.
+test('WIRED: auto-trader invokes the reviewer at the session-record site', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'auto-trader.js'), 'utf8');
+  assert.match(src, /require\('\.\/session-review'\)/, 'the reviewer must actually be called');
+  const recIdx = src.indexOf('buildSessionRecord');
+  const revIdx = src.indexOf("require('./session-review')");
+  assert.ok(recIdx > 0 && revIdx > recIdx, 'must run AFTER the session row is written, so it reads it');
+});
+
+test('WIRED: the call is fire-and-forget — the close is never awaited on it', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib', 'auto-trader.js'), 'utf8');
+  const seg = src.slice(src.indexOf("require('./session-review')"), src.indexOf("require('./session-review')") + 1600);
+  assert.ok(!/await\s+_rev\.review/.test(seg), 'awaiting would let a slow API delay the close');
+  assert.match(seg, /\.catch\(/, 'a rejected review must be swallowed');
+  assert.match(seg, /_rev\.enabled\(\)/, 'gated on the flag, not run unconditionally');
+});
+
+test('WIRED: the reviewer is gated so a disabled flag costs nothing', async () => {
+  let called = false;
+  await withEnv({ TRADER_SESSION_REVIEW: null }, async () => {
+    if (sr.enabled()) { called = true; }
+  });
+  assert.strictEqual(called, false, 'enabled() is the gate auto-trader checks');
+});
