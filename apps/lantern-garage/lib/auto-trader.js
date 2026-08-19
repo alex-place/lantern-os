@@ -2064,7 +2064,17 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
       }));
       // POST-CLOSE REVIEW (#3359). Fire-and-forget, AFTER the session row is
-      // written so the reviewer reads the same record a human would. It holds no
+      // written — and read back FRESH, because `_ledger` is a string snapshot
+      // taken BEFORE that row was appended. The reviewer's own first live run
+      // (2026-08-19) caught the distinction: its top finding was "session_record
+      // is null — the day's equity, day_pnl, stops_fired were never recorded",
+      // and it was right about the text it was given. The snapshot structurally
+      // cannot contain the record this role exists to audit, so every close
+      // would have opened on the same false finding, burning one of its 12
+      // finding slots and training whoever reads it to ignore the rest.
+      // logTrade appends synchronously, so one re-read is guaranteed to include
+      // today's row; if the read fails, fall back to the snapshot rather than
+      // skip the review. It holds no
       // bridge and cannot place, cancel or size anything — the only thing it can
       // produce is a journal row of findings. Deliberately NOT awaited: a slow or
       // dead API must never delay the close, and its own failure paths already
@@ -2074,7 +2084,9 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
         const _rev = require('./session-review');
         if (_rev.enabled()) {
           const _day = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
-          _rev.review({ ledgerText: _ledger, day: _day })
+          let _ledgerFresh = _ledger;
+          try { _ledgerFresh = fs.readFileSync(TRADES_LOG, 'utf8'); } catch (_e) { /* snapshot fallback */ }
+          _rev.review({ ledgerText: _ledgerFresh, day: _day })
             .then((r) => {
               // Summarise into the TRADE LEDGER, not stdout: every other
               // observable in this engine is queryable there, and a finding that
