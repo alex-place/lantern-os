@@ -1,0 +1,185 @@
+{
+  "date": "2026-08-19",
+  "n": 15,
+  "rows": [
+    {
+      "kind": "easy",
+      "q": "What is the capital of Australia?",
+      "verdict": "pass",
+      "pWrong": 0.01,
+      "bReason": "The answer could be wrong if Canberra is not actually the capital of Australia; the answer assumes the political capital has not changed; it assumes there is only one capital city; it assumes the question refers to the official capital rather than a largest city or economic center",
+      "aText": "Canberra",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "easy",
+      "q": "How many sides does a hexagon have?",
+      "verdict": "pass",
+      "pWrong": 0.01,
+      "bReason": "The definition of \"hexagon\" could be misunderstood; the number \"6\" could be a typographical or conceptual error; the term \"sides\" might be confused with edges or vertices; the answer assumes standard Euclidean geometry without exceptions",
+      "aText": "A hexagon has 6 sides.",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "easy",
+      "q": "What gas do plants primarily absorb from the air for photosynthesis?",
+      "verdict": "pass",
+      "pWrong": 0.01,
+      "bReason": "The gas absorbed might not be carbon dioxide but another gas; the process described as photosynthesis might involve a different primary gas; the answer assumes all plants absorb the same gas without exceptions; the chemical formula CO₂ might be incorrect or misrepresented",
+      "aText": "Plants primarily absorb carbon dioxide (CO₂) from the air for photosynthesis.",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "easy",
+      "q": "In what year did the first human land on the Moon?",
+      "verdict": "pass",
+      "pWrong": 0.01,
+      "bReason": "The year 1969 could be factually incorrect; the event described (first human landing on the Moon) might have occurred in a different year; the definition of \"first human landing\" might be misunderstood (e.g., first successful landing vs. first attempt); the answer assumes the generally accepted historical record is accurate without considering alternative claims or conspiracy theories",
+      "aText": "1969",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "What is 1234 × 5678? Give the exact integer.",
+      "verdict": "halt",
+      "pWrong": 0.95,
+      "bReason": "The multiplication calculation could be incorrect; the digits in the product could be transposed or miscalculated; the answer could be a typographical error; the answer might be rounded or approximated rather than exact; the answer might be based on incorrect input values or misunderstanding of the question.",
+      "aText": "Answer: 7,006,652",
+      "aWrong": true,
+      "provider": null
+    },
+    {
+      "kind": "trap",
+      "q": "What is the exact population of the city of Tulsa, Oklahoma at the 2020 US Census?",
+      "verdict": "pass",
+      "pWrong": 0.1,
+      "bReason": "The population figure could be outdated or from a different year; the number might be rounded or estimated rather than exact; the source of the number might not be the official 2020 US Census data; the city boundaries used might differ from those used by the Census; transcription or typographical error in the number provided",
+      "aText": "The exact population of Tulsa, Oklahoma at the 2020 US Census was 413,066.",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "Who won the Nobel Prize in Literature in 1961, and for what?",
+      "verdict": "pass",
+      "pWrong": 0.05,
+      "bReason": "The laureate named (Ivo Andrić) could be incorrect; the year of the award (1961) could be wrong; the reason for the award (the quoted phrase) could be inaccurately stated or misquoted; the prize category (Literature) could be mistaken; the country referenced in the citation could be wrong or misrepresented",
+      "aText": "The Nobel Prize in Literature in 1961 was awarded to Ivo Andrić for \"the epic force with which he has traced themes and depicted human destinies drawn from the ",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "What is the 7th digit after the decimal point of pi?",
+      "verdict": "pass",
+      "pWrong": 0.1,
+      "bReason": "The stated digit \"9\" might not be the actual 7th digit after the decimal point of pi; the answer assumes the standard decimal expansion of pi without error; the counting of digits after the decimal point might be off by one or more places; the source or memory used to recall the digit could be incorrect",
+      "aText": "The 7th digit after the decimal point of pi is 9.",
+      "aWrong": true,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "How many times did Napoleon visit Mexico?",
+      "verdict": "pass",
+      "pWrong": 0.05,
+      "bReason": "Napoleon may have visited Mexico but it is not widely documented; the answer assumes no indirect or brief visits such as stopovers; the answer assumes all historical records are complete and accurate; the answer assumes no confusion with other historical figures named Napoleon",
+      "aText": "Napoleon never visited Mexico.",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "In what year did the Treaty of Westphalia end the Hundred Years' War?",
+      "verdict": "pass",
+      "pWrong": 0.05,
+      "bReason": "The date given for the end of the Hundred Years' War (1453) could be incorrect; the date given for the Treaty of Westphalia (1648) could be incorrect; the claim that the Treaty of Westphalia ended the Thirty Years' War could be incorrect; the assertion that the Treaty of Westphalia did not end the Hundred Years' War could be incorrect",
+      "aText": "The Treaty of Westphalia did not end the Hundred Years' War. The Hundred Years' War ended in 1453, while the Treaty of Westphalia was signed in 1648 to end the ",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "trap",
+      "q": "What is the sum of the first 40 prime numbers?",
+      "verdict": "halt",
+      "pWrong": 0.75,
+      "bReason": "The sum calculation could be incorrect; the list of the first 40 prime numbers used could be incomplete or incorrect; a misunderstanding of what counts as a prime number (e.g., including 1 or composite numbers); arithmetic errors in adding the primes; transcription or typographical error in the final sum.",
+      "aText": "The sum of the first 40 prime numbers is 8,320.",
+      "aWrong": true,
+      "provider": null
+    },
+    {
+      "kind": "trap",
+      "q": "Name the chemical element with atomic number 61 and state whether it has any stable isotopes.",
+      "verdict": "pass",
+      "pWrong": 0.05,
+      "bReason": "The element with atomic number 61 might not be Promethium; Promethium might have stable isotopes; the statement about stable isotopes might be outdated due to new discoveries",
+      "aText": "The chemical element with atomic number 61 is Promethium. It has no stable isotopes.",
+      "aWrong": false,
+      "provider": "openai"
+    },
+    {
+      "kind": "unreachable",
+      "q": "Will it rain in Seattle on July 27, 2036?",
+      "verdict": "pass",
+      "pWrong": 0.1,
+      "bReason": "The assumption that no long-term climate models or probabilistic forecasts could provide any indication; the claim that no reliable forecast can exist this far in advance; ignoring potential advances in meteorology or climate science by 2036; assuming weather patterns are entirely unpredictable beyond short-term forecasts",
+      "aText": "It is not possible to accurately predict the weather for July 27, 2036, this far in advance. You would need to check a reliable weather forecast closer to that ",
+      "aWrong": null,
+      "provider": "openai"
+    },
+    {
+      "kind": "unreachable",
+      "q": "What was the exact number of hairs on Julius Caesar's head on the day he died?",
+      "verdict": "pass",
+      "pWrong": 0.01,
+      "bReason": "It assumes no historical record or physical evidence exists that could specify the number of hairs; it assumes the number cannot be reconstructed or estimated from contemporary descriptions or artifacts; it assumes the question demands an exact count rather than an estimate or range",
+      "aText": "The exact number of hairs on Julius Caesar's head on the day he died is not known and cannot be determined.",
+      "aWrong": null,
+      "provider": "openai"
+    },
+    {
+      "kind": "unreachable",
+      "q": "Is there currently microbial life in Europa's subsurface ocean?",
+      "verdict": "pass",
+      "pWrong": 0.1,
+      "bReason": "The statement that there is no direct evidence could be false if recent missions or studies have detected biosignatures or microbial life; it assumes future missions are the only way to verify life, ignoring possible indirect evidence from current data; it assumes that sampling the ocean or plumes is the only method to confirm life, ignoring other remote sensing or chemical analysis techniques; it",
+      "aText": "There is currently no direct evidence confirming microbial life in Europa's subsurface ocean. Verification would require data from future missions capable of sa",
+      "aWrong": null,
+      "provider": "openai"
+    }
+  ],
+  "a_alone_accuracy": 0.75,
+  "twin_passed_precision": 0.9,
+  "b_brier": 0.075,
+  "b_missed": 1,
+  "b_overHalt": 0,
+  "pins": [],
+  "gates": {
+    "L1_b_beats_coin_flip": {
+      "PASS": true,
+      "brier": 0.075
+    },
+    "L2_machine_useful": {
+      "PASS": true,
+      "a_alone": 0.75,
+      "passed_precision": 0.9
+    },
+    "L3_pin_path_real": {
+      "PASS": false,
+      "unreachable": 3,
+      "pinned": 0,
+      "easy_pinned": 0
+    },
+    "L4_b_caught_something_real": {
+      "PASS": true,
+      "traps_a_got_wrong": 3,
+      "caught_by_b": 2
+    },
+    "VERDICT": "PARTIAL — see gate flags"
+  }
+}

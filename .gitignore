@@ -581,3 +581,6 @@ apps/lantern-garage/data/lantern-garage/trading/*-state.json
 # Yahoo still serves and defeating the module's entire purpose.
 data/lantern-garage/trading/bars/
 apps/lantern-garage/data/lantern-garage/trading/bars/
+
+# Twin machine live journal (experiments/twin_machine_live.js). A text + B reasoning per run — runtime record, not source.
+data/twin-machine/
