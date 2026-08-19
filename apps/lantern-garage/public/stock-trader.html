@@ -262,6 +262,38 @@
   .dsel-wlbl{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
   .wd-line{display:block;width:16px;background:currentColor;border-radius:2px}
   .dsel-pop{min-width:170px}
+  /* Alert dialog -- a real modal, centred, with the reference's label/field rows. */
+  .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
+    background:rgba(4,6,10,.62);backdrop-filter:blur(3px)}
+  .al-modal-bg[hidden]{display:none}
+  .al-modal{width:min(440px,94vw);max-height:88vh;overflow:auto;background:var(--bg1);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6)}
+  .al-head{display:flex;align-items:center;gap:9px;padding:14px 16px;border-bottom:1px solid var(--border)}
+  .al-title{font-size:15px;color:var(--text0)}
+  .al-sym{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--text0);
+    background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 9px}
+  .al-head .dock-x{margin-left:auto}
+  .al-body{padding:6px 16px 12px}
+  .al-row{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+  .al-row > label{flex:0 0 96px;font-size:12.5px;color:var(--text2);padding-top:7px}
+  .al-fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+  .al-fields select,.al-fields input[type=text],.al-fields input[type=number]{
+    width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:7px;
+    color:var(--text0);padding:7px 9px;font:inherit;font-size:13px}
+  .al-inline{display:flex;align-items:center;gap:7px}
+  .al-inline input{width:auto;flex:1}
+  .al-sub{font-size:11.5px;color:var(--text2);white-space:nowrap}
+  .al-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text1)}
+  .al-check input{width:auto}
+  .al-note{margin:0;font-size:11.5px;line-height:1.5;color:var(--text2)}
+  .al-err{margin:10px 0 0;font-size:12.5px;color:var(--red)}
+  .al-err[hidden]{display:none}
+  .al-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
+  .al-btn{padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:var(--bg2);
+    color:var(--text1);font:inherit;font-size:13px;cursor:pointer}
+  .al-btn:hover{background:var(--bg3);color:var(--text0)}
+  .al-btn.primary{background:var(--accent);border-color:var(--accent);color:#04202b;font-weight:600}
+  .al-btn.primary:hover{filter:brightness(1.08)}
   .sw-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px 9px 8px}
   .sw{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);cursor:pointer;padding:0}
   .sw.on{outline:2px solid var(--accent);outline-offset:1px}
@@ -4857,10 +4889,183 @@ function toggleDrawingLock(tk, i) {
 /* Alert from a drawing: our rule model has no plain price-cross type (signal / zone /
    washout only), so rather than fake one this opens the Alerts panel for the symbol.
    Honest about what the backend can actually watch. */
-function alertFromDrawing(tk) {
-  try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); }
-  catch (e) {}
+/* -- Alert creation dialog (#3352) -------------------------------------------
+   The shape TradingView uses: symbol at the top, then Condition (what to watch and
+   the values it needs), Trigger, Message and Notifications, with Cancel / Create.
+   The condition row is driven by ALERT_CONDS, so the operator list and how many
+   value boxes appear both follow from what the backend can actually evaluate --
+   there is no option here the engine cannot honour. */
+const ALERT_PRICE_OPS = [
+  ['crossing', 'Crossing'], ['crossing_up', 'Crossing up'], ['crossing_down', 'Crossing down'],
+  ['greater', 'Greater than'], ['less', 'Less than'],
+  ['entering_channel', 'Entering channel'], ['exiting_channel', 'Exiting channel'],
+  ['inside_channel', 'Inside channel'], ['outside_channel', 'Outside channel'],
+  ['moving_up', 'Moving up'], ['moving_down', 'Moving down'],
+  ['moving_up_pct', 'Moving up %'], ['moving_down_pct', 'Moving down %'],
+];
+const TWO_VALUE_OPS = new Set(['entering_channel', 'exiting_channel', 'inside_channel', 'outside_channel']);
+let _alertDlg = null, _alertEditId = null;
+
+function openAlertDialog(opts) {
+  const o = opts || {};
+  const sym = (o.symbol || activeTicker || 'SPY').toUpperCase();
+  if (!_alertDlg) {
+    _alertDlg = document.createElement('div');
+    _alertDlg.className = 'al-modal-bg'; _alertDlg.id = 'alertDlg'; _alertDlg.hidden = true;
+    document.body.appendChild(_alertDlg);
+    _alertDlg.addEventListener('click', (e) => { if (e.target === _alertDlg) closeAlertDialog(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && _alertDlg && !_alertDlg.hidden) closeAlertDialog(); });
+  }
+  _alertEditId = o.id || null;
+  const price = o.value != null ? o.value : (() => {
+    const w = (wlPrices || []).find(x => x.ticker === sym);
+    return w && w.price != null ? Number(w.price).toFixed(2) : '';
+  })();
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const opt = (v, label, cur) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>';
+  const type = o.type || 'price';
+  _alertDlg.innerHTML =
+    '<div class="al-modal" role="dialog" aria-modal="true" aria-label="Create alert">'
+  + '  <header class="al-head"><span class="al-title">' + (_alertEditId ? 'Edit alert on' : 'Create alert on') + '</span>'
+  + '    <span class="al-sym">' + esc(sym) + '</span>'
+  + '    <button type="button" class="dock-x" onclick="closeAlertDialog()" aria-label="Close">✕</button></header>'
+  + '  <div class="al-body">'
+  + '    <div class="al-row"><label for="alCondType">Condition</label><div class="al-fields">'
+  + '      <select id="alCondType" onchange="_alertCondChanged()">'
+  +          opt('price', 'Price', type) + opt('signal', 'Signal fired', type)
+  +          opt('zone', 'Price at a zone', type) + opt('washout', 'Washout confirmed', type)
+  + '      </select>'
+  + '      <div id="alCondFields"></div>'
+  + '    </div></div>'
+  + '    <div class="al-row"><label for="alTrigger">Trigger</label><div class="al-fields">'
+  + '      <select id="alTrigger">' + opt('every', 'Every time', o.trigger || 'every') + opt('once', 'Once only', o.trigger) + '</select>'
+  + '      <div class="al-inline"><label for="alCool" class="al-sub">Stay quiet for</label>'
+  + '        <input id="alCool" type="number" min="5" max="1440" step="5" value="' + (o.cooldownMin || 60) + '"> <span class="al-sub">min</span></div>'
+  + '    </div></div>'
+  + '    <div class="al-row"><label for="alMsg">Message</label><div class="al-fields">'
+  + '      <input id="alMsg" type="text" maxlength="200" placeholder="Leave blank for an automatic message" value="' + esc(o.message) + '">'
+  + '    </div></div>'
+  + '    <div class="al-row"><label>Notifications</label><div class="al-fields">'
+  + '      <label class="al-check"><input type="checkbox" checked disabled> In-app <span class="al-sub">(always)</span></label>'
+  + '      <label class="al-check"><input type="checkbox" id="alEmail"' + (o.email === false ? '' : ' checked') + '> Email me</label>'
+  + '      <p class="al-note" id="alEmailNote"></p>'
+  + '    </div></div>'
+  + '    <p class="al-err" id="alErr" hidden></p>'
+  + '  </div>'
+  + '  <footer class="al-foot"><button type="button" class="al-btn" onclick="closeAlertDialog()">Cancel</button>'
+  + '    <button type="button" class="al-btn primary" onclick="submitAlertDialog(\'' + esc(sym) + '\')">'
+  +      (_alertEditId ? 'Save' : 'Create') + '</button></footer>'
+  + '</div>';
+  _alertDlg.hidden = false;
+  _alertCondChanged(o);
+  _alertEmailAvailability();
+  const f = _alertDlg.querySelector('select, input'); if (f) f.focus();
+}
+function closeAlertDialog() { if (_alertDlg) _alertDlg.hidden = true; _alertEditId = null; }
+
+/* The value boxes follow the operator: one for a level, two for a channel, and the
+   signal/zone conditions bring their own controls. */
+function _alertCondChanged(pre) {
+  const o = pre || {};
+  const host = document.getElementById('alCondFields'); if (!host) return;
+  const type = document.getElementById('alCondType').value;
+  const opt = (v, label, cur) => '<option value="' + v + '"' + (v === cur ? ' selected' : '') + '>' + label + '</option>';
+  const price = o.value != null ? o.value : (() => {
+    const w = (wlPrices || []).find(x => x.ticker === (o.symbol || activeTicker));
+    return w && w.price != null ? Number(w.price).toFixed(2) : '';
+  })();
+  if (type === 'price') {
+    host.innerHTML = '<select id="alOp" onchange="_alertOpChanged()">'
+      + ALERT_PRICE_OPS.map(([v, l]) => opt(v, l, o.op || 'crossing')).join('') + '</select>'
+      + '<div class="al-inline"><input id="alVal" type="number" step="0.01" value="' + price + '" aria-label="Value">'
+      + '<input id="alVal2" type="number" step="0.01" value="' + (o.value2 != null ? o.value2 : '') + '" aria-label="Second value" hidden></div>';
+    _alertOpChanged();
+  } else if (type === 'signal') {
+    host.innerHTML = '<select id="alDir">' + opt('ANY', 'Any direction', o.direction) + opt('BULLISH', 'Bullish', o.direction) + opt('BEARISH', 'Bearish', o.direction) + '</select>';
+  } else if (type === 'zone') {
+    host.innerHTML = '<select id="alZone">' + opt('support', 'Support', o.zone) + opt('resistance', 'Resistance', o.zone) + '</select>'
+      + '<div class="al-inline"><span class="al-sub">within</span><input id="alProx" type="number" min="0.1" max="5" step="0.1" value="' + (o.proximityPct || 0.5) + '"><span class="al-sub">%</span></div>';
+  } else {
+    host.innerHTML = '<p class="al-note">Fires when the engine\'s convergence verdict reaches ENTER on this symbol.</p>';
+  }
+}
+function _alertOpChanged() {
+  const op = (document.getElementById('alOp') || {}).value;
+  const v2 = document.getElementById('alVal2'); if (!v2) return;
+  const two = TWO_VALUE_OPS.has(op);
+  v2.hidden = !two;
+  const v1 = document.getElementById('alVal');
+  if (v1) v1.setAttribute('aria-label', two ? 'Lower bound' : 'Value');
+  if (two && !v2.value && v1 && v1.value) v2.value = (parseFloat(v1.value) * 1.01).toFixed(2);
+}
+/* Say up front whether email can actually reach this account, rather than letting
+   someone tick a box that will silently never send. */
+async function _alertEmailAvailability() {
+  const note = document.getElementById('alEmailNote'), box = document.getElementById('alEmail');
+  if (!note) return;
+  try {
+    const j = await (await fetch('/api/trading/alerts/rules', { cache: 'no-store' })).json();
+    const e = j.email || {};
+    if (e.possible) { note.textContent = ''; return; }
+    const why = e.why === 'mailer_unconfigured' ? 'no mailer is configured on this server'
+      : e.why === 'email_unverified' ? 'your email address is not confirmed yet'
+      : 'your account has no email address';
+    note.textContent = 'Email is unavailable — ' + why + '.';
+    if (box) { box.checked = false; box.disabled = true; }
+    if (!j.prefs || !j.prefs.email) note.textContent += ' Account alert emails are also off.';
+  } catch (_e) { /* leave the checkbox as it is */ }
+}
+
+async function submitAlertDialog(sym) {
+  const err = document.getElementById('alErr');
+  const val = (id) => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  const type = val('alCondType');
+  const body = {
+    symbol: sym, type,
+    cooldownMin: parseInt(val('alCool'), 10) || 60,
+    trigger: val('alTrigger'),
+    message: (val('alMsg') || '').trim(),
+    email: !!(document.getElementById('alEmail') || {}).checked,
+  };
+  if (_alertEditId) body.id = _alertEditId;
+  if (type === 'price') {
+    body.op = val('alOp');
+    body.value = parseFloat(val('alVal'));
+    if (TWO_VALUE_OPS.has(body.op)) body.value2 = parseFloat(val('alVal2'));
+  } else if (type === 'signal') body.direction = val('alDir');
+  else if (type === 'zone') { body.zone = val('alZone'); body.proximityPct = parseFloat(val('alProx')); }
+
+  try {
+    const r = await fetch('/api/trading/alerts/rules', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    const j = await r.json();
+    if (!r.ok || j.ok === false) {
+      // Surface the server's own reason rather than a generic failure.
+      const map = { invalid_value: 'Enter a price for the condition.', invalid_value2: 'A channel needs both bounds.',
+        empty_channel: 'The two channel bounds must differ.', invalid_percent: 'Percent must be between 0 and 100.',
+        invalid_move: 'The move must be greater than zero.', invalid_symbol: 'That symbol is not valid.',
+        rule_cap: 'You have reached the alert limit.', invalid_op: 'Pick a condition.' };
+      err.textContent = map[j.error] || ('Could not save: ' + String(j.error || r.status).replace(/_/g, ' '));
+      err.hidden = false;
+      return;
+    }
+    closeAlertDialog();
+    if (typeof loadAlerts === 'function') loadAlerts(true);
+    try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); } catch (_e) {}
+  } catch (e) {
+    err.textContent = 'Could not save: ' + e.message; err.hidden = false;
+  }
+}
+
+/* The drawing toolbar's alert button now creates a real price alert AT that drawing's
+   level, which is what it always should have done. */
+function alertFromDrawing(tk, i) {
+  const d = (_drawings[tk] || [])[i];
+  const lvl = d && d.pts && d.pts.length ? d.pts[d.pts.length - 1].price : null;
   _hideBarPop();
+  openAlertDialog({ symbol: tk, type: 'price', op: 'crossing',
+                    value: lvl != null ? Number(lvl).toFixed(2) : undefined });
 }
 
 function showSelBar(tk, i) {

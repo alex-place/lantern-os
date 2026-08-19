@@ -92,6 +92,10 @@ function normalizeRule(input) {
     // delivery email already promised this ("mute this one from the Alerts
     // tab") before anything implemented it.
     email: r.email !== false,
+    // Trigger: 'once' disables the rule after it fires, 'every' re-arms after the quiet
+    // window. Default 'every' -- a rule that silently stops watching is the surprising one.
+    trigger: r.trigger === 'once' ? 'once' : 'every',
+    message: typeof r.message === 'string' ? r.message.slice(0, 200) : '',
     cooldownMin: Math.min(1440, Math.max(5, Number(r.cooldownMin) || 60)),
     createdAt: r.createdAt || new Date().toISOString(),
     lastFiredAt: r.lastFiredAt || null,

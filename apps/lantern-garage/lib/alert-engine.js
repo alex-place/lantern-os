@@ -135,9 +135,15 @@ function evaluateScan(scan, nowMs = Date.now()) {
           const row = {
             ts: new Date(nowMs).toISOString(),
             ruleId: rule.id, symbol: rule.symbol, type: rule.type,
-            message: hit.message, evidence: hit.evidence,
+            // A custom message replaces the generated one, never the evidence.
+            message: rule.message || hit.message, evidence: hit.evidence,
           };
           store.recordFire(uid, rule.id, row);
+          // 'once' means once: DISABLE rather than delete, so the rule stays in the list
+          // with its fire history instead of vanishing.
+          if (rule.trigger === 'once') {
+            try { store.saveRule(uid, Object.assign({}, rule, { enabled: false })); } catch (_e) {}
+          }
           // Delivery beyond the feed (#3249): fire-and-forget, fail-soft —
           // the in-app row above is already durable whatever email does.
           try { require('./alert-delivery').deliver(uid, row).catch(() => {}); } catch (_e) { /* absent → in-app only */ }
