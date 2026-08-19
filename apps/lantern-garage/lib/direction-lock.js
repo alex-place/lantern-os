@@ -46,6 +46,53 @@ const FAMILY = {
   TLT: ['TLT', 1], TBT: ['TLT', -1], TBF: ['TLT', -1],
 };
 
+// ── LEVERAGE (#3354) ────────────────────────────────────────────────────────
+// A 3x wrapper at 6% of equity carries 18% of market risk. Nothing in sizing,
+// the gross cap (maxGrossPct, measured on NOTIONAL) or the family lock knew
+// that, so concentration was invisible: on 2026-08-18 SMH (12.1%) + SOXL (6.0%
+// notional, 18.1% beta-adjusted) put 30.2% of the book in semis at 09:30 and
+// semis fell 4.33% — 67% of that day's loss, from an exposure no log reported.
+//
+// This map exists to MEASURE, not to constrain. The measured record is explicit
+// that leverage is where the edge lives (2026-08 round trips: 3x wrappers n=17,
+// +$7,647, +0.714% per trade on notional; 1x n=59, +$2,991, +0.057%) and that
+// the two HIGHEST-concentration sessions were the two best days (SOXS alone at
+// 53.7% beta on 8/13 and 8/14: +$2,145 and +$6,803). Every cap level tested in
+// the observed range removed more profit than loss, so no cap ships — only the
+// number, so a human can see 30% semis and decide.
+const LEVERAGE = {
+  SPXL: 3, UPRO: 3, SPXS: 3, SPXU: 3,      // S&P 3x
+  TQQQ: 3, SQQQ: 3,                         // Nasdaq 3x
+  TNA: 3, TZA: 3,                           // Russell 3x
+  SOXL: 3, SOXS: 3,                         // Semis 3x
+  UDOW: 3, SDOW: 3,                         // Dow 3x
+  SSO: 2, SDS: 2, QLD: 2, QID: 2,           // 2x
+  UWM: 2, TWM: 2, GLL: 2, TBT: 2,
+};
+/** Leverage MAGNITUDE (always positive; direction is `sign`). Unknown = 1x. */
+function leverageOf(sym) {
+  return LEVERAGE[String(sym || '').toUpperCase()] || 1;
+}
+
+/**
+ * Beta-adjusted exposure per family, in absolute currency: |market value| x
+ * leverage. This is the number the notional-based gross cap cannot see.
+ * Dust (<1 share) is excluded, matching familyExposure().
+ */
+function familyBetaNotional(positions) {
+  const out = {};
+  for (const p of (positions || [])) {
+    const qty = Number(p.qty) || 0;
+    if (Math.abs(qty) < 1) continue;
+    const mv = Math.abs(Number(p.market_value) || (qty * (Number(p.current_price) || 0)));
+    if (!(mv > 0)) continue;
+    const { family } = instrumentSign(p.symbol);
+    out[family] = (out[family] || 0) + mv * leverageOf(p.symbol);
+  }
+  for (const k of Object.keys(out)) out[k] = Math.round(out[k] * 100) / 100;
+  return out;
+}
+
 // ── RISK BUCKETS (2026-08-13) ────────────────────────────────────────────────
 // The concurrency cap counts SYMBOLS, but risk is carried by DIRECTION. On
 // 2026-08-13 the book held SOXS, SQQQ and SPXS simultaneously — three different
@@ -152,4 +199,4 @@ function conflicts(sym, positions) {
   return { conflict: true, family, entrySign: sign, existingSign: existing, against };
 }
 
-module.exports = { FAMILY, instrumentSign, underlyingProxy, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
+module.exports = { FAMILY, LEVERAGE, leverageOf, familyBetaNotional, instrumentSign, underlyingProxy, familyExposure, conflicts, riskBucket, bucketCounts, EQUITY_FAMILIES, METALS };
