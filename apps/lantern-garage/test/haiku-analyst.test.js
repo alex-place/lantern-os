@@ -166,12 +166,18 @@ test('the prompt states the inverse case in ECONOMIC terms, not wrapper terms', 
   assert.match(p, /3x leveraged/);
 });
 
-test('the prompt names the strategy AND its known failure mode', () => {
+test('the prompt asks SYMMETRICALLY — naming the failure mode biased it (#3358)', () => {
+  // Was: asserted the prompt names "its known failure mode ... falling knife".
+  // Measured 2026-08-19 — that framing made the model hunt one failure and never
+  // use the upper half of the scale (25/25 convictions below 45). The prompt now
+  // asks whether the setup is better OR worse than the deterministic score.
   const p = analyst.buildPrompt(SIG);
   assert.match(p, /mean-reversion/);
-  assert.match(p, /falling knife|keeps falling/);
   assert.match(p, /longs only/i);
-  assert.doesNotMatch(p, /position sizing.{0,40}consider/i);
+  assert.match(p, /better or worse/i, 'must invite both directions');
+  assert.match(p, /full range/i);
+  assert.match(p, /answer exactly 50/i, 'no-view must be reachable');
+  assert.doesNotMatch(p, /known failure mode/i, 'the biasing line must stay out');
 });
 
 test('the model is Haiku, and overridable', () => {

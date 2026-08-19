@@ -28,6 +28,28 @@
  * fires before it touches a live decision. Every call is journalled with its
  * conviction, latency and the situation it judged, so "does the 9% earn its
  * place?" is answerable from data rather than opinion.
+ *
+ * MEASURED 2026-08-19 — IT DOES NOT. STAY OFF (#3358).
+ * 25 recorded round trips, context reconstructed from the 5m bar cache at each
+ * fire instant. (Ledger rows alone leave IBS/MACD/regime null, and the first
+ * replay on those was uninterpretable: every conviction landed 35-42 because the
+ * model was correctly answering "I cannot see enough to have a view". Filling the
+ * context 5.3/6 is what made the test decidable.)
+ *     conviction > 55   n=4    50% WR   -$2,184
+ *     45-55             n=3    33% WR   -$1,987
+ *     conviction < 45   n=18   61% WR   +$7,998
+ *     Spearman rho(conviction, pnl) = 0.007
+ * Re-run with an independently worded, debiased prompt: rho = 0.089. Two prompts,
+ * both indistinguishable from chance. On the two most consequential trades in the
+ * sample it was inverted: 58 on the SOXL that lost $2,433, and 42 — below neutral
+ * — on the SOXS that made $6,710.
+ *
+ * n=25 is far too small to call it ANTI-predictive; the honest claim is NO
+ * MEASURABLE SIGNAL. The decision rule set before the test was "if rho is near
+ * zero the slot earns nothing and stays neutral", and that is the outcome. The
+ * code stays because the harness is reusable and the question is worth re-asking
+ * with more data or a different model — not because it is expected to be enabled.
+ * Total cost of finding out: about five cents.
  */
 const fs = require('fs');
 const path = require('path');
@@ -70,12 +92,21 @@ function buildPrompt(sig) {
     '',
     'The strategy is intraday mean-reversion on US equity ETFs, longs only.',
     'It buys instruments that have washed out within the session and sells the bounce.',
-    'Its known failure mode is buying continuation instead of reversion: an',
-    'instrument at its session low in a market that simply keeps falling.',
+    // NAMING THE FAILURE MODE BIASED IT (#3358). This block used to read "its
+    // known failure mode is buying continuation instead of reversion" and asked
+    // the model to judge "reversion candidate or falling knife". It then hunted
+    // that one failure across every setup and never used the upper half of the
+    // scale: 25 of 25 convictions came back below 45, with near-identical
+    // reasoning ("IBS extreme but MACD negative"). A washout co-occurs with
+    // negative momentum by construction, so that framing condemns the strategy's
+    // own core signal. Asking symmetrically restored the range to 38-62 — though
+    // the correlation with outcome stayed ~0 either way; see the header.
     '',
-    'Judge ONLY whether this specific setup is a reversion candidate or a falling',
-    'knife. Do not consider position sizing, portfolio risk, or whether to trade',
-    'at all — other layers own those.',
+    'The deterministic score already accounts for this evidence. Your job is only',
+    'to say whether THIS setup is better or worse than that score suggests. Some',
+    'setups are better than the numbers imply; some are worse; most are neither.',
+    'Use the full range. If nothing distinguishes this setup, answer exactly 50.',
+    'Do not consider position sizing or portfolio risk — other layers own those.',
     '',
     'Reply with strict JSON, no prose: {"conviction": <integer 0-100>, "reason": "<max 14 words>"}',
     'conviction 50 = no view. >50 = better than the deterministic read. <50 = worse.',
