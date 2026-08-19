@@ -56,6 +56,18 @@ threshold-moving refused elsewhere in this repo. Each is defended as a measureme
 gap; an arbitrary constant that starved correct diagnoses), and the real defence is the 300-seed
 holdout they were not tuned on and pass.
 
+## Is any of it new? — the prior-art search
+
+Bounded search (web + corpus, 2026-07-27), recorded in
+[docs/research/2026-07-27-retraction-by-remedy-failure-prior-art.md](../../docs/research/2026-07-27-retraction-by-remedy-failure-prior-art.md).
+The system is assembled from known parts and the broad claim has a direct ancestor — Adam the
+robot scientist (King et al., *Science* 2009) already runs hypothesis → experiment → falsify →
+revise. Structural-vs-parametric mismatch is a named problem in MPC diagnosis (Srinivasan &
+Bonvin 2018). What survives is narrow: **retraction by remedy-failure** — a deliberately
+sensitive detector whose false alarms are caught *downstream* by the emptiness of the design
+space, not upstream by threshold calibration. Every false-alarm mechanism found in the literature
+runs the other way. Graded **AUDITED-CANDIDATE ✓**, not breakthrough; world H is the kill test.
+
 ## Honest limits
 
 One world class (missing binary variable), linear A, one slow variable. The ten hostile worlds
