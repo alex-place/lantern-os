@@ -22,8 +22,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const readline = require("readline");
 const { createScheduler, midCents } = require("../apps/lantern-garage/lib/kalshi-adaptive-poll");
+const { iterateSnapshots } = require("../apps/lantern-garage/lib/kalshi-snapshot-codec");
 
 const KALSHI_DIR = path.resolve(__dirname, "..", "data", "kalshi");
 const OUT_PATH = path.resolve(__dirname, "results", "kalshi_send_on_delta_replay.json");
@@ -34,7 +34,7 @@ const FIXED_KS = [2, 3, 5, 10];
 function pickDefaultFile() {
   const today = new Date().toISOString().split("T")[0];
   const files = fs.readdirSync(KALSHI_DIR)
-    .filter((f) => /^tight-band-\d{4}-\d{2}-\d{2}\.jsonl$/.test(f) && !f.includes(today))
+    .filter((f) => /^tight-band-\d{4}-\d{2}-\d{2}\.jsonl(\.gz)?$/.test(f) && !f.includes(today))
     .sort();
   if (!files.length) throw new Error(`no complete tight-band-*.jsonl in ${KALSHI_DIR}`);
   return path.join(KALSHI_DIR, files[files.length - 1]);
@@ -83,7 +83,7 @@ async function main() {
   const args = process.argv.slice(2);
   const maxIdx = args.indexOf("--max-lines");
   const maxLines = maxIdx >= 0 ? parseInt(args[maxIdx + 1], 10) : Infinity;
-  const file = args.find((a) => a.endsWith(".jsonl")) || pickDefaultFile();
+  const file = args.find((a) => a.endsWith(".jsonl") || a.endsWith(".jsonl.gz")) || pickDefaultFile();
   const fileBytes = fs.statSync(file).size;
   console.log(`replaying ${file} (${(fileBytes / 1e6).toFixed(0)} MB)`);
 
@@ -102,17 +102,9 @@ async function main() {
   let tickIdx = 0, lineCount = 0, byteCount = 0;
   let firstTs = null, lastTs = null, prevTs = null, segments = 0;
 
-  const rl = readline.createInterface({
-    input: fs.createReadStream(file, { encoding: "utf8" }),
-    crlfDelay: Infinity,
-  });
-
-  for await (const line of rl) {
+  // Decodes v1, v2 (keyframe+delta) and .gz transparently.
+  for await (const rec of iterateSnapshots(file)) {
     if (++lineCount > maxLines) break;
-    byteCount += line.length + 1;
-    if (!line.trim()) continue;
-    let rec;
-    try { rec = JSON.parse(line); } catch { continue; }
     const tsMs = Date.parse(rec.ts);
     const markets = rec.snapshot && Array.isArray(rec.snapshot.markets) ? rec.snapshot.markets : null;
     if (!Number.isFinite(tsMs) || !markets || !markets.length) continue;
@@ -159,10 +151,11 @@ async function main() {
 
     prevTs = tsMs; lastTs = tsMs; tickIdx++;
   }
-  rl.close();
 
   const durationMs = lastTs - firstTs;
-  const avgLineBytes = byteCount / Math.max(1, tickIdx);
+  // On-disk bytes per usable tick, whatever the encoding - with v2 this is the
+  // real (much smaller) cost, so estDiskMB stays meaningful across formats.
+  const avgLineBytes = (byteCount || fileBytes) / Math.max(1, tickIdx);
   const rows = [
     baseline.summary(tickIdx, avgLineBytes, durationMs),
     ...fixed.map((f) => f.p.summary(tickIdx, avgLineBytes, durationMs)),
