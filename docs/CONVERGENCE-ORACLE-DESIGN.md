@@ -351,3 +351,65 @@ addition.
 - Move 3: [`src/convergence/grounding.py`](../src/convergence/grounding.py) · confidence-basis (#2803)
 - Move 4: [`apps/lantern-garage/lib/grounding-calibration.js`](../apps/lantern-garage/lib/grounding-calibration.js) (#1011)
 - Frame: [`docs/SIGMA0-COLLAPSE-CERTIFICATE.md`](SIGMA0-COLLAPSE-CERTIFICATE.md) (the σ=0 / 42-state collapse) · [`docs/research/question-machine.md`](research/question-machine.md)
+
+---
+
+## 10. One week later (2026-07-27) — what the branch did to this document
+
+This design is dated 2026-07-21. Six days of work on `claude/overnight-sh-fade-edgeminn` touched
+most of it. Graded on this document's own ladder, no claim promoted past its evidence:
+
+| §5 GAP, as written 2026-07-21 | status 2026-07-27 | evidence |
+|---|---|---|
+| 1. The contract module `oracle(question, domain)` | **still GAP** | not built; the four-way verdict is live in `council-review.js:122` but nothing composes place→price→answer→learn into one call |
+| 5. The fifth move — frontier experiment loop | **SEED → built deterministically, measured, and partly KILLED** | `research/epistemic_controller/` — see below |
+| §6 "knows everything it *could* know" | **sharpened by a kill** | the discoveries-per-experiment benchmark |
+| §7 ACT-TO-KNOW honesty guard | **held, and found a case it missed** | world H |
+
+**What the week built that this document asked for.** The ACT-TO-KNOW loop — place the unknown,
+price the measurement, buy it, learn — now exists as a deterministic controller with no LLM in it
+(`research/epistemic_controller/`). On a world with a hidden rule the model class cannot represent,
+it enters the boundary state after the rule appears and never before (100%), refuses parameter
+updates there (always), buys the true discriminating observable from four candidates (88%, chance
+25%), and raises zero held false alarms on a drift-only null world — on 300 held-out seeds with
+thresholds frozen. That is §7's "buy grounding to move `seam_open → grounded`" made concrete, and
+it is the first evidence for the seam §8 called candidate-novel. Measured, not asserted.
+
+**Two things the week found that this document did not anticipate.**
+
+*(a) The remedy is itself a hypothesis.* §7 says the ceiling breaks "exactly where action resolves
+it." World H — two candidate observables both explain the residual, one the true cause and one a
+cheaper proxy — showed that buying the wrong one *also* "resolves" the residual on the window you
+bought it on. The shipped loop committed to the proxy 34% of the time. Holding the expansion as a
+revocable hypothesis and re-scoring it on fresh data cut that to 14%. So the honesty guard needs
+one more clause: **a resolution is provisional until fresh evidence fails to unseat it.** Not "the
+action resolved it," but "the action resolved it and the next action did not un-resolve it."
+
+*(b) Scientific memory, carried naively, is hubris.* The §6 objective is "drive the boundary
+outward." The obvious implementation — carry the expanded model class across episodes so a
+regularity learned once is not re-bought — was **killed** by the benchmark it was designed for:
+discoveries per experiment fell 47% and false discoveries rose 20× (`run_discovery_benchmark.py`).
+The mechanism is exactly the §1 failure mode, one level up: a carried column whose meaning changed
+under it is a 42 — a confident structure that has lost contact with the question. **Memory of a
+name is not memory of a regularity.** What survives is memory of the *validated relation* as a
+falsifiable hypothesis to be re-tested cheaply — never as a column assumed still live. That is
+the next build, and it is §4's invariant 4 ("only fresh truth de-ratchets") applied to the
+Oracle's own memory.
+
+**The novelty grade, re-graded.** §8 said `seam_open`: candidate-novel, unproven because unbuilt.
+One week later, with a bounded prior-art search on the record
+(`docs/research/2026-07-27-retraction-by-remedy-failure-prior-art.md`): the *parts* are as
+occupied as §8 said — and more so (Adam, King et al. 2009, already runs hypothesise→experiment→
+falsify→revise). What the search did not find is the narrow thing the week measured: a
+deliberately sensitive boundary detector whose false alarms are caught **downstream by the
+emptiness of the design space**, and a remedy that is itself revocable. Every false-alarm
+mechanism in the literature runs upstream. Grade on this document's scale: still `seam_open`,
+now with one built surface and one named kill test (world H, passed by the hold variant). Not
+`grounded`. The prior-art search was bounded, and a bounded search cannot ground a novelty claim.
+
+**What moved from GAP to a measured number.** §7's "updated objective" adds the term
+*reachable-by-action-left-unattempted*. The benchmark now reports the complementary number the
+Oracle should be judged on — **validated regularities per experiment** (0.107 for the loop as
+shipped, on a world with one hidden rule per episode) — and a control that must read zero
+(drift-only null world: 0/180, every arm). A number with a control is the first thing this
+document can be *held to*.
