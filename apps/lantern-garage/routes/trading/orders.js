@@ -28,6 +28,38 @@ function _sessionState(now = Date.now()) {
   return 'closed';
 }
 
+// THE ANSWER WE ALREADY HAD (#3327 follow-up). On 2026-08-15 this probe asked
+// IBKR to sell 0.8 SOXS and IBKR replied verbatim: "IBKR cancelled: fractional
+// not supported on this account". That is a complete answer, and it sat unread
+// for four days while the same question was asked three more ways — a weekend
+// probe, an RTH probe, and a manual 1-share round trip that spent a real order —
+// because the verdict went into agent-log.jsonl and nothing ever read it back.
+//
+// The probe now keeps its OWN journal. That matters more than it sounds: the
+// shared agent log is ~90MB and grows by megabytes a day, so a broker verdict
+// written there is unfindable within days without scanning the file. A dedicated
+// file holds a handful of rows forever, so the lookup is exact and costs nothing.
+function _dustProbeLog(agentLogPath) {
+  return require('path').join(require('path').dirname(agentLogPath), 'dust-probes.jsonl');
+}
+
+/** The most recent recorded broker REJECTION for `sym`, or null. Advisory only. */
+function _lastFractionalRejection(agentLogPath, sym) {
+  try {
+    const rows = require('fs').readFileSync(_dustProbeLog(agentLogPath), 'utf8').split('\n');
+    for (let i = rows.length - 1; i >= 0; i--) {
+      if (!rows[i]) continue;
+      let row;
+      try { row = JSON.parse(rows[i]); } catch (_e) { continue; }
+      if (row.symbol !== sym || row.result !== 'error' || !row.reason) continue;
+      return { ts: row.ts, account: row.account, broker_said: String(row.reason).slice(0, 200) };
+    }
+    return null;
+  } catch (_e) {
+    return null;                    // no file yet, or unreadable — never break the probe
+  }
+}
+
 module.exports = async function ordersRoutes(req, res, url, ctx) {
   const { sendJson, collectRequestBody, bridge, traderAgent, tradingMemory, tradingStore, getEffectiveUserId } = ctx;
 
@@ -205,23 +237,42 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
           _dNote = 'market closed and no quote available to price a resting order — try again during market hours';
         }
       }
+      const _priorRejection = _lastFractionalRejection(
+        require('../../lib/trading-store').agentLogPath(), sym);
+
       const r = await bridge.placeIBKROrder(acct, _dOrder)
         .catch((e) => ({ status: 'error', reason: e.message }));
 
-      const placed = !!(r && r.status === 'placed');
+      // ACCEPTED IS NOT FILLED, and this path is where that keeps being forgotten.
+      // `placed` means only that the broker took the order. On an account without
+      // fractional permission IBKR accepts it and then cancels it, which is what
+      // the 2026-08-15 rows show. Three conclusions have been drawn from a
+      // `placed` here — "fractional sells DO work", "the order queues to Monday",
+      // "the position will clear at the open" — and all three were wrong. So this
+      // response reports acceptance and nothing more; only re-reading the book
+      // can say whether the position actually went away.
+      const accepted = !!(r && r.status === 'placed');
       // Recorded either way — the point is the evidence, not the fill.
+      const _probeRow = {
+        ts: new Date().toISOString(), kind: 'dust_clear_probe', symbol: sym, qty: held,
+        account: acct === OPERATOR_UID ? 'operator' : 'self',
+        result: r && r.status, reason: (r && (r.reason || r.error)) || null,
+      };
       try {
-        require('../../lib/trading-store').appendLogEntry({
-          ts: new Date().toISOString(), kind: 'dust_clear_probe', symbol: sym, qty: held,
-          account: acct === OPERATOR_UID ? 'operator' : 'self',
-          result: r && r.status, reason: (r && (r.reason || r.error)) || null,
-        });
+        require('../../lib/trading-store').appendLogEntry(_probeRow);
+      } catch (_e) { /* logging must never break the probe */ }
+      // ...and to the probe's own journal, which is what _lastFractionalRejection
+      // reads. Same row, small file, so the next attempt can actually find it.
+      try {
+        require('fs').appendFileSync(
+          _dustProbeLog(require('../../lib/trading-store').agentLogPath()),
+          JSON.stringify(_probeRow) + '\n');
       } catch (_e) { /* logging must never break the probe */ }
 
       // Record it like any other order, so it appears in the Orders tab instead
       // of vanishing — the first probe was accepted by the broker and then had
       // no row anywhere, which is indistinguishable from "nothing happened".
-      if (placed && r.order_id) {
+      if (accepted && r.order_id) {
         try {
           await tradingMemory.recordNewOrders([{
             id: r.order_id, symbol: sym, side: 'sell', qty: held,
@@ -230,12 +281,15 @@ module.exports = async function ordersRoutes(req, res, url, ctx) {
         } catch (_e) { /* the order is placed; bookkeeping must not fail it */ }
       }
       sendJson(res, {
-        ok: placed, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
+        ok: accepted, ticker: sym, qty: held, order_id: (r && r.order_id) || null,
+        accepted,                    // the broker TOOK the order
+        confirmed_cleared: null,     // never knowable here — re-read the position
         broker_status: (r && r.status) || null,
         broker_says: (r && (r.reason || r.error)) || null,   // verbatim — this IS the finding
+        prior_rejection: _priorRejection,                    // what this account already answered
         operator_account: acct === OPERATOR_UID && uid !== OPERATOR_UID,
         session: _dSess, session_note: _dNote,
-      }, placed ? 200 : 502);
+      }, accepted ? 200 : 502);
     } catch (error) {
       sendJson(res, { ok: false, error: error.message }, 500);
     }

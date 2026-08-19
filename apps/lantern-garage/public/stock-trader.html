@@ -7858,10 +7858,21 @@ async function dustClear(symbol, btn){
       body: JSON.stringify({ ticker: symbol })
     });
     const j = await r.json().catch(()=>({}));
+    // ACCEPTED != FILLED. This toast used to read "fractional sells DO work" the
+    // moment the broker returned `placed`, and that claim was wrong every time it
+    // was made: IBKR accepts the order on a non-fractional account and cancels it
+    // seconds later. Say what is actually known — the order went in — and tell the
+    // operator the one thing that settles it, which is the position row itself.
     if(j && j.ok){
-      _alertToast(`${j.session_note?'⏳':'✓'} Dust order accepted for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — fractional sells DO work${j.session_note?' — '+j.session_note:''}`);
+      _alertToast(`${j.session_note?'⏳':'✓'} Dust order ACCEPTED for ${symbol} (${j.qty} sh${j.operator_account?', operator account':''}) — accepted is not filled; re-check the position to confirm it cleared${j.session_note?' — '+j.session_note:''}`);
     }else{
       _alertToast(`⚠ ${symbol} dust not cleared — IBKR: ${(j && (j.broker_says||j.error)) || r.statusText}. Clear it in Client Portal (enable Fractional Trading).`);
+    }
+    // What this account has already answered, surfaced at the point of decision —
+    // IBKR's "fractional not supported on this account" verdict sat in the probe
+    // log for four days while the same question was asked three more ways.
+    if(j && j.prior_rejection){
+      _alertToast(`ℹ ${symbol}: this account previously rejected a fractional order — IBKR said "${j.prior_rejection.broker_said}" (${String(j.prior_rejection.ts).slice(0,10)}). Enable Fractional Trading in Client Portal, or have IBKR sweep the residue.`);
     }
   }catch(e){ _alertToast('⚠ Dust probe failed: '+e.message); }
   await Promise.all([loadOrders(), loadPortfolio()]);
