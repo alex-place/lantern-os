@@ -150,3 +150,10 @@ Artifact: [`experiments/sigma0_composition_epsilon_threshold.py`](../experiments
 
 Read §1 (the proven result) and §8.4 (the open problem). Everything else is either imported,
 conjectured, or commentary on those two.
+
+## Where this goes next
+
+The certificate is the stop signal. What it protects — and the part that actually finds questions
+rather than only answers — is the twin machine: one system, two faces built to fail differently,
+where one holds the only veto and the veto answers to reality alone.
+[TWIN-MACHINE-DESIGN.md](TWIN-MACHINE-DESIGN.md).
