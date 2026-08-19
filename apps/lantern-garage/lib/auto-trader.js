@@ -2025,6 +2025,37 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
       logTrade(_sr.buildSessionRecord({
         ledgerText: _ledger, now, account, positions: _mine, dayPnl: _dp,
       }));
+      // POST-CLOSE REVIEW (#3359). Fire-and-forget, AFTER the session row is
+      // written so the reviewer reads the same record a human would. It holds no
+      // bridge and cannot place, cancel or size anything — the only thing it can
+      // produce is a journal row of findings. Deliberately NOT awaited: a slow or
+      // dead API must never delay the close, and its own failure paths already
+      // return an empty review rather than throwing. Default OFF; enable with
+      // TRADER_SESSION_REVIEW=1.
+      try {
+        const _rev = require('./session-review');
+        if (_rev.enabled()) {
+          const _day = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+          _rev.review({ ledgerText: _ledger, day: _day })
+            .then((r) => {
+              // Summarise into the TRADE LEDGER, not stdout: every other
+              // observable in this engine is queryable there, and a finding that
+              // only exists in a console line is invisible to any post-mortem.
+              // The findings themselves stay in session-reviews.jsonl; this row
+              // is the pointer that shows up when you read the day back.
+              if (r && !r.degraded && r.findings.length) {
+                logTrade({
+                  ts: new Date(now).toISOString(), user: userId, event: 'session_review',
+                  date: _day, findings: r.findings.length,
+                  high: r.findings.filter((f) => f.severity === 'high').length,
+                  categories: [...new Set(r.findings.map((f) => f.category))].slice(0, 8),
+                  summary: String(r.summary || '').slice(0, 200),
+                });
+              }
+            })
+            .catch(() => { /* the reviewer never escalates */ });
+        }
+      } catch (_e) { /* a missing reviewer must not affect the close */ }
     }
   } catch (_e) { /* observability only — never breaks the scan */ }
   // Persist the updated peaks/timers so the trailing stop survives a restart.
