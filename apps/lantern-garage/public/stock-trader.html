@@ -242,13 +242,34 @@
   .dset-tab.empty{opacity:.45}
   .dset-tab:hover{color:var(--text0)}
   /* Quick-action row raised over a selected drawing. */
-  .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:2px;padding:3px 4px;
-    background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+  /* Selection toolbar -- a compact strip of real controls, not a row of glyphs. */
+  .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:1px;padding:3px 5px;
+    background:var(--bg1);border:1px solid var(--border);border-radius:9px;
+    box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .dsel-bar[hidden]{display:none}
-  .dsel-bar button{width:26px;height:24px;background:none;border:1px solid transparent;border-radius:5px;
-    color:var(--text2);font-size:12px;cursor:pointer}
-  .dsel-bar button:hover{color:var(--text0);background:var(--bg3)}
-  .dsel-col input[type=color]{width:24px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0;cursor:pointer}
+  .dsel-grip{cursor:grab;color:var(--text2);font-size:11px;padding:0 4px 0 1px;user-select:none}
+  .dsel-bar button{height:26px;min-width:28px;display:inline-flex;align-items:center;justify-content:center;
+    gap:4px;background:none;border:1px solid transparent;border-radius:6px;color:var(--text1);
+    font-size:13px;padding:0 6px;cursor:pointer}
+  .dsel-bar button:hover{background:var(--bg3);color:var(--text0)}
+  .dsel-bar button.on{color:var(--accent);border-color:var(--accent);background:var(--bg2)}
+  .dsel-sep{width:1px;height:18px;background:var(--border);margin:0 3px}
+  /* Colour button: pencil with the current colour underlining it, like the reference. */
+  .dsel-colbtn{position:relative;flex-direction:column;gap:0!important;padding-bottom:4px!important}
+  .dsel-swatch{position:absolute;left:6px;right:6px;bottom:3px;height:3px;border-radius:2px}
+  /* Width button: a live preview of the stroke plus its size. */
+  .dsel-wbtn{padding:0 7px!important}
+  .dsel-wlbl{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .wd-line{display:block;width:16px;background:currentColor;border-radius:2px}
+  .dsel-pop{min-width:170px}
+  .sw-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px 9px 8px}
+  .sw{width:22px;height:22px;border-radius:5px;border:1px solid var(--border);cursor:pointer;padding:0}
+  .sw.on{outline:2px solid var(--accent);outline-offset:1px}
+  .wd-row{display:flex;align-items:center;gap:9px;padding:5px 9px;cursor:pointer;border-radius:5px}
+  .wd-row:hover{background:var(--bg2)}
+  .wd-row.on{background:var(--bg3);box-shadow:inset 2px 0 0 var(--accent)}
+  .wd-row .wd-line{width:52px;color:var(--text1)}
+  .wd-lbl{font-family:var(--mono);font-size:11px;color:var(--text2)}
 
   /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
   .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
@@ -3140,7 +3161,7 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
           }
           ctx.restore();
         };
-        for (const d of list) drawOne(d, false);
+        for (const d of list) { if (d.hidden) continue; drawOne(d, false); }
         if (pend) {
           if (pend.pts.length) drawOne({ t: pend.t, pts: pend.pts, text: pend.text }, true);
           ctx.save(); ctx.fillStyle = DRAW_COLOR;
@@ -4659,7 +4680,12 @@ function drawOptOf(d, key) {
   const all = [].concat(spec.inputs, spec.style, spec.vis);
   const f = all.find(x => x.k === key);
   const bag = Object.assign({}, d.opts, d.style, d.vis);
-  return bag[key] !== undefined ? bag[key] : (f ? f.def : undefined);
+  if (bag[key] !== undefined) return bag[key];
+  if (f) return f.def;
+  // Not in this tool's spec -- fib has per-level colours and no generic `color`, so the
+  // toolbar's swatch and width preview would render blank. Fall back to the shared
+  // default rather than undefined.
+  return DRAW_STYLE_DEFAULT[key];
 }
 /** Colour for one fib level, honouring an override on the drawing. */
 function fibColorOf(d, lv) {
@@ -4744,35 +4770,135 @@ function deleteDrawing(tk, i) {
   _saveDrawings(); _refreshTicker(tk);
 }
 
-/* Floating toolbar over the selected drawing: settings, colour, delete -- the quick
-   row TradingView raises so the common actions do not need the dialog. */
-let _selBar = null;
-function _hideSelBar() { if (_selBar) _selBar.hidden = true; }
+/* Floating toolbar over the selected drawing -- the row TradingView raises so the
+   common edits never need the dialog: colour, line width, settings, alert, lock,
+   delete, and a More menu. Each control opens its own small popup rather than
+   cramming everything into one strip. */
+const SWATCHES = ['#a78bfa','#2962ff','#089981','#f23645','#f5a623','#00bcd4','#e91e63','#787b86','#e6e8ef','#111318'];
+const WIDTHS = [1, 1.5, 2, 3, 4, 6];
+let _selBar = null, _barPop = null;
+
+function _hideSelBar() { if (_selBar) _selBar.hidden = true; _hideBarPop(); }
+function _hideBarPop() { if (_barPop) _barPop.hidden = true; }
+function _barPopup(html, anchorEl) {
+  if (!_barPop) {
+    _barPop = document.createElement('div');
+    _barPop.className = 'dr-flyout dsel-pop'; _barPop.hidden = true;
+    document.body.appendChild(_barPop);
+    document.addEventListener('click', (e) => {
+      if (!_barPop || _barPop.hidden) return;
+      if (_barPop.contains(e.target) || (e.target.closest && e.target.closest('.dsel-bar'))) return;
+      _barPop.hidden = true;
+    });
+  }
+  _barPop.innerHTML = html; _barPop.hidden = false;
+  const r = anchorEl.getBoundingClientRect();
+  const w = _barPop.offsetWidth || 180, h = _barPop.offsetHeight || 80;
+  _barPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px';
+  _barPop.style.top = Math.max(8, Math.min(r.bottom + 6, window.innerHeight - h - 8)) + 'px';
+}
+
+function openColourPop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const cur = drawOptOf(d, 'color');
+  _barPopup('<div class="dr-fly-group">Colour</div><div class="sw-grid">'
+    + SWATCHES.map(c => '<button type="button" class="sw' + (c === cur ? ' on' : '') + '" style="background:' + c + '"'
+        + ' title="' + c + '" onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',\'' + c + '\');showSelBar(\'' + tk + '\',' + i + ')"></button>').join('')
+    + '</div><label class="dr-st-row"><span>Custom</span><input type="color" value="' + cur + '"'
+    + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',this.value)"></label>', el);
+}
+function openWidthPop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const cur = drawOptOf(d, 'w');
+  _barPopup('<div class="dr-fly-group">Line width</div>'
+    + WIDTHS.map(w => '<div class="wd-row' + (w === cur ? ' on' : '') + '" role="button" tabindex="0"'
+        + ' onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'w\',' + w + ');showSelBar(\'' + tk + '\',' + i + ')">'
+        + '<span class="wd-line" style="height:' + w + 'px"></span><span class="wd-lbl">' + w + 'px</span></div>').join('')
+    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (drawOptOf(d, 'dash') ? 'checked' : '')
+    + ' onchange="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'dash\',this.checked?5:0)"></label>', el);
+}
+function openMorePop(tk, i, el) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  const row = (label, fn, note) => '<div class="dr-fly-item" role="menuitem" tabindex="0" onclick="' + fn + '">'
+    + '<span class="dr-fly-name">' + label + '</span>' + (note ? '<span class="dr-fly-key">' + note + '</span>' : '') + '</div>';
+  _barPopup('<div class="dr-fly-group">' + ((DRAW_TOOLS[d.t] || {}).name || d.t) + '</div>'
+    + row('Duplicate', 'duplicateDrawing(\'' + tk + '\',' + i + ')')
+    + row('Bring to front', 'reorderDrawing(\'' + tk + '\',' + i + ',1)')
+    + row('Send to back', 'reorderDrawing(\'' + tk + '\',' + i + ',-1)')
+    + row(d.hidden ? 'Show' : 'Hide', 'toggleDrawingHidden(\'' + tk + '\',' + i + ')')
+    + row('Settings…', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
+    + row('Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')', 'Del'), el);
+}
+function duplicateDrawing(tk, i) {
+  const list = _drawings[tk] || [], d = list[i]; if (!d) return;
+  const copy = JSON.parse(JSON.stringify(d));
+  // Offset the copy so it is visibly a second object rather than hidden under the first.
+  const span = (copy.pts[copy.pts.length-1].ts - copy.pts[0].ts) || 60000;
+  copy.pts = copy.pts.map(pt => ({ ts: pt.ts + span*0.15, price: pt.price }));
+  list.push(copy); _selDraw = { tk, i: list.length - 1 };
+  _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, list.length - 1);
+}
+function reorderDrawing(tk, i, dir) {
+  const list = _drawings[tk] || []; if (!list[i]) return;
+  const [d] = list.splice(i, 1);
+  const at = dir > 0 ? list.length : 0;      // later in the array paints on top
+  list.splice(at, 0, d);
+  _selDraw = { tk, i: at };
+  _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, at);
+}
+function toggleDrawingHidden(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.hidden = !d.hidden; _hideBarPop(); _saveDrawings(); _refreshTicker(tk); showSelBar(tk, i);
+}
+function toggleDrawingLock(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d.locked = !d.locked; _saveDrawings(); _refreshTicker(tk); showSelBar(tk, i);
+}
+/* Alert from a drawing: our rule model has no plain price-cross type (signal / zone /
+   washout only), so rather than fake one this opens the Alerts panel for the symbol.
+   Honest about what the backend can actually watch. */
+function alertFromDrawing(tk) {
+  try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); }
+  catch (e) {}
+  _hideBarPop();
+}
+
 function showSelBar(tk, i) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
   if (!_selBar) {
     _selBar = document.createElement('div');
     _selBar.className = 'dsel-bar'; _selBar.id = 'selBar'; _selBar.hidden = true;
+    _selBar.setAttribute('role', 'toolbar'); _selBar.setAttribute('aria-label', 'Drawing actions');
     document.body.appendChild(_selBar);
   }
-  const st = drawStyleOf(d);
+  const col = drawOptOf(d, 'color'), w = drawOptOf(d, 'w');
+  const B = (icon, title, fn, extra) => '<button type="button" title="' + title + '" aria-label="' + title + '"'
+    + (extra || '') + ' onclick="' + fn + '">' + icon + '</button>';
   _selBar.innerHTML =
-      '<button type="button" title="Settings" onclick="openDrawingSettings(\'' + tk + '\',' + i + ',null,null)">⚙</button>'
-    + '<label class="dsel-col" title="Colour"><input type="color" value="' + (st.color || '#a78bfa') + '"'
-    +   ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',this.value)"></label>'
-    + '<button type="button" title="Thicker" onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'w\',Math.min(6,(drawOptOf(_drawings[\'' + tk + '\'][' + i + '],\'w\')||1.5)+0.5))">▔</button>'
-    + '<button type="button" title="Delete" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">🗑</button>';
+      '<span class="dsel-grip" title="Drawing actions">⠿</span>'
+    + B('⊞', 'Settings', 'openDrawingSettings(\'' + tk + '\',' + i + ',null,null)')
+    + '<button type="button" class="dsel-colbtn" title="Colour" aria-label="Colour"'
+    +   ' onclick="openColourPop(\'' + tk + '\',' + i + ',this)">✏<span class="dsel-swatch" style="background:' + col + '"></span></button>'
+    + '<button type="button" class="dsel-wbtn" title="Line width" aria-label="Line width"'
+    +   ' onclick="openWidthPop(\'' + tk + '\',' + i + ',this)"><span class="wd-line" style="height:' + Math.min(4, w) + 'px"></span>'
+    +   '<span class="dsel-wlbl">' + w + 'px</span></button>'
+    + '<span class="dsel-sep"></span>'
+    + B('⏱', 'Alerts for this symbol', 'alertFromDrawing(\'' + tk + '\')')
+    + B(d.locked ? '🔒' : '🔓', d.locked ? 'Unlock' : 'Lock', 'toggleDrawingLock(\'' + tk + '\',' + i + ')',
+        d.locked ? ' class="on"' : '')
+    + B('🗑', 'Delete', 'deleteDrawing(\'' + tk + '\',' + i + ')')
+    + B('⋯', 'More', 'openMorePop(\'' + tk + '\',' + i + ',this)');
   const geom = _selGeom(tk);
   const anchors = geom ? _drawingAnchors(tk, geom.data, i, geom.pw, geom.ph) : [];
   const canvas = document.getElementById('chart-' + tk);
+  _selBar.hidden = false;
   if (canvas && anchors.length) {
     const r = canvas.getBoundingClientRect();
     const minX = Math.min(...anchors.map(a => a.x)), minY = Math.min(...anchors.map(a => a.y));
-    _selBar.hidden = false;
-    const bw = _selBar.offsetWidth || 150;
+    const bw = _selBar.offsetWidth || 240;
     _selBar.style.left = Math.max(8, Math.min(r.left + minX, window.innerWidth - bw - 8)) + 'px';
-    _selBar.style.top = Math.max(56, r.top + minY - 40) + 'px';
-  } else { _selBar.hidden = false; }
+    _selBar.style.top = Math.max(56, r.top + minY - 42) + 'px';
+  }
 }
 
 function _commitDrawing(tk, obj) {
@@ -4867,6 +4993,8 @@ document.addEventListener('pointerdown', (e) => {
   const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
   if (hit) {
     _selDraw = { tk, i: hit.i }; if (typeof showSelBar === 'function') showSelBar(tk, hit.i);
+    // A locked drawing selects (so it can be unlocked) but never drags.
+    if ((_drawings[tk][hit.i] || {}).locked) { e.stopPropagation(); e.preventDefault(); _refreshTicker(tk); return; }
     const d = _drawings[tk][hit.i];
     _dragDraw = { tk, i: hit.i, handle: -1, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
     e.stopPropagation(); e.preventDefault();
