@@ -4113,6 +4113,18 @@ function _refreshTicker(tk) {
   try { renderZoneLadder(tk, zonesData[tk] || {}, (wlPrices.find(x => x.ticker === tk) || {}).price, null, null, true); }
   catch (e) {}
 }
+/* Repaint the CANVAS only. renderZoneLadder rewrites overlay.innerHTML, which destroys
+   the crosshair elements -- doing that on every pointermove is why the chart stopped
+   tracking the mouse while a shape was being dragged. During a drag we repaint just the
+   pixels and leave the DOM (and the crosshair) alone; the full rebuild happens once on
+   pointerup. */
+function _repaintChart(tk) {
+  const canvas = document.getElementById('chart-' + tk);
+  const d = canvas && _crossData[canvas.id];
+  if (!canvas || !d) { _refreshTicker(tk); return; }
+  try { renderChart(canvas, d.bars, d.rMin, d.rMax, chartType, chartTimeframe); }
+  catch (e) { _refreshTicker(tk); }
+}
 function selectDrawing(tk, i) { _selDraw = (i == null) ? null : { tk, i }; _refreshTicker(tk); }
 
 /* Delete/Backspace removes the selection, the way every canvas editor behaves. */
@@ -4287,13 +4299,15 @@ document.addEventListener('pointermove', (e) => {
     const dpr = g.priceAt(y) - g.priceAt(_dragDraw.y0);
     d.pts = _dragDraw.startPts.map(pt => ({ ts: pt.ts + dts, price: pt.price + dpr }));
   }
-  _refreshTicker(_dragDraw.tk);
+  _repaintChart(_dragDraw.tk);     // pixels only -- keeps the crosshair alive
 });
 
 document.addEventListener('pointerup', () => {
   if (!_dragDraw) return;
-  _saveDrawings();                 // persist only once the drag ends, not per frame
+  const tk = _dragDraw.tk;
   _dragDraw = null;
+  _saveDrawings();                 // persist only once the drag ends, not per frame
+  _refreshTicker(tk);              // one full rebuild at the end
 });
 
 // Right-click a drawing to open its style popup.
