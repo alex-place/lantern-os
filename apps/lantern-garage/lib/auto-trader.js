@@ -691,12 +691,34 @@ function _isPinned(sym) {
   return _pinCache.set.has(String(sym || '').toUpperCase());
 }
 
-function isFallingKnife(closes) {
-  if (!Array.isArray(closes) || closes.length < 36) return false;   // need 2 MACD reads
+/** Round for the ledger — MACD histograms live in the third decimal. */
+const r4 = (n) => (Number.isFinite(Number(n)) ? Math.round(Number(n) * 1e4) / 1e4 : null);
+
+/**
+ * The knife READING, not just its verdict — { hist, prev, fires } or null.
+ *
+ * Split out so the skip row can record the two numbers the gate actually
+ * decided on. Reconstructing them afterwards does not work: an offline replay
+ * against the stored 5m corpus reproduces `hist < 0` on 91% of recorded fires
+ * but `hist < prev` on only 72%, because the engine decides on bars fetched
+ * live at scan time and a one-bar offset flips a difference between two
+ * adjacent MACD reads. 70% fidelity is not enough to ask anything — a model
+ * shown the reconstruction correctly objected that the rule's own premise was
+ * unmet on 11 of 47 fires, which is a harness defect wearing the costume of a
+ * finding. Recording beats rebuilding.
+ */
+function knifeReading(closes) {
+  if (!Array.isArray(closes) || closes.length < 36) return null;     // need 2 MACD reads
   const now = macd(closes);
   const prev = macd(closes.slice(0, -1));
-  if (!now || !prev) return false;
-  return now.histogram < 0 && now.histogram < prev.histogram;        // negative AND deepening
+  if (!now || !prev) return null;
+  return { hist: now.histogram, prev: prev.histogram,
+    fires: now.histogram < 0 && now.histogram < prev.histogram };    // negative AND deepening
+}
+
+function isFallingKnife(closes) {
+  const r = knifeReading(closes);
+  return !!(r && r.fires);
 }
 
 /**
@@ -1456,7 +1478,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     const price = Number(s.entry_price) || 0;
     const held = heldQty[sym] || 0;
     const bullish = s.direction === 'BULLISH';
-    const record = { symbol: sym, direction: s.direction, p_win: s.convergence.p_win, news: s.news || null };
+    // The skip row carries the EVIDENCE, not just the verdict (#3374 follow-up).
+    // Every gate below is judged on these numbers; recording them here is what
+    // makes "was that veto right?" answerable later without rebuilding the
+    // inputs from a bar corpus that disagrees with the engine 30% of the time.
+    // scan.js computes the bundle as part of producing the signal, so this is a
+    // spread, not a second calculation. Entry candidates only — exit-side skips
+    // never reach this loop, so the ledger does not grow for them.
+    const record = { symbol: sym, direction: s.direction, p_win: s.convergence.p_win, news: s.news || null,
+      ...(s.decision_context || {}) };
 
     if (price < c.minPrice) { out.skipped.push({ ...record, why: 'price too low' }); continue; }
     // Crypto pairs can't trade through this IBKR path (Paxos needs a US crypto acct
@@ -1605,7 +1635,15 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     // buying into the acceleration.
     if (c.entryKnifeFilter) {
       const closes = ((entryBars[sym] && entryBars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
-      if (isFallingKnife(closes)) { out.skipped.push({ ...record, why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' }); continue; }
+      const _knife = knifeReading(closes);
+      if (_knife && _knife.fires) {
+        out.skipped.push({ ...record,
+          // the exact pair this verdict turned on, so the decision is auditable
+          // without re-deriving it from a corpus that disagrees 30% of the time
+          knife_hist: r4(_knife.hist), knife_prev: r4(_knife.prev),
+          why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' });
+        continue;
+      }
     }
     // Defensive: on a stray short, clear any stale resting orders before re-entering.
     if (held < 0) await cancelRestingStops(bridge, userId, sym);
@@ -2100,4 +2138,4 @@ function _logSkips(skipped) {
 /** Test/ops helper: clear the per-symbol state (memory + on-disk snapshot). */
 function _resetCooldowns() { _lastSlotSig = null; _stopCooldownThrough.clear(); _stopFillsDay = null; _stopFillsCount = 0; _lastSkipWhy.clear(); _lastOrderAt.clear(); _entryAt.clear(); _dirStreak.clear(); _peak.clear(); _trough.clear(); _excursion.clear(); _exitAt.clear(); _exitStatus.clear(); _lastPos.clear(); _exitFailures.clear(); _unclosable.clear(); _unclosableAt.clear(); _exitNoOrder.clear(); _zoneLadder.clear(); _stopDistPct.clear(); _lastConfirmedHold.clear(); _saveState(); }
 
-module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };
+module.exports = { _isFailedStop: isFailedStop, _STOP_WORKING: STOP_WORKING, _STOP_TERMINAL: STOP_TERMINAL, runAutoTrade, fastExitTick, sizePosition, cfg, trailTriggerPct, isFallingKnife, knifeReading, _resetCooldowns, _logSkips, _saveState, _loadState, STATE_FILE };

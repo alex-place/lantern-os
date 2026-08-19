@@ -545,7 +545,9 @@ async function scanAll(watchlist) {
     const rsiVal = rsi(_closes15) ?? 50;
     // closes feed the ZONE_TREND_DIR override — without them the trend can't be
     // judged and deriveDirection silently falls back to pure mean-reversion.
-    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: sessionIbs(b15) });
+    // Hoisted: the entry trigger itself, and the ledger records it below.
+    const _sessionIbs = sessionIbs(b15);
+    let direction = deriveDirection(sr, rsiVal, thresholds, { closes: _closes15, ibs: _sessionIbs });
     // Polarity: a BULLISH verdict on a negative-sign wrapper is an economic
     // short and must be judged on the UNDERLYING's bars (see applyPolarity).
       // Declared OUTSIDE the polarity block: the scoring site below consumes it.
@@ -704,11 +706,35 @@ async function scanAll(watchlist) {
       const dailyMove = (a || price * 0.005) * 5.1; // 15m ATR → ~daily (√26)
       const holdDays = Math.max(1, Math.min(15, Math.round((tr * riskAbs) / dailyMove)));
 
+      // WHAT THE DECISION WAS MADE ON (#3374 follow-up). Every gate downstream is
+      // judged against these numbers, and until now none of them survived the
+      // decision — the ledger recorded the VERDICT and not the evidence, so
+      // asking "was that veto right?" months later meant rebuilding the inputs
+      // from a stored bar corpus. Measured, that reconstruction reproduces the
+      // falling-knife predicate on only 70% of its own recorded fires, which is
+      // far too loose to audit a gate with: a model shown the rebuilt values
+      // correctly objected that the rule's premise was unmet on 11 of 47 fires.
+      //
+      // All of it is already computed above for the signal itself, so this costs
+      // one object per candidate and no extra math.
+      const _spyCtxSig = spyTapeContext(bars15.SPY && bars15.SPY.bars) || {};
+      const _decisionContext = {
+        ibs: _sessionIbs == null ? null : Math.round(_sessionIbs * 1e3) / 1e3,
+        spy_tape: _spyCtxSig.tape == null ? null : r2(_spyCtxSig.tape),
+        spy_mom30: _spyCtxSig.mom30 == null ? null : r2(_spyCtxSig.mom30),
+        regime: (marketStatus && marketStatus.market) || null,
+        et_min: barEtMinute(b15),
+        macd_hist: convergence && convergence._ev ? convergence._ev.macd_hist : null,
+        in_zone: convergence && convergence._ev ? !!convergence._ev.in_zone : null,
+        sign: convergence ? convergence._sign : null,
+      };
+
       signals.push({
         symbol: t,
         direction,
         confidence: gate.confidence,
         entry_price: price,
+        decision_context: _decisionContext,
         support: sr.support,
         resistance: sr.resistance,
         zone_mid: sr.mid,
