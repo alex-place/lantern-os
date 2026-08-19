@@ -234,6 +234,21 @@
   .dr-st-row span{flex:1}
   .dr-st-row input[type=color]{width:44px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0}
   .dr-st-row input[type=range]{width:96px}
+  .dr-settings{min-width:250px}
+  .dset-tabs{display:flex;gap:2px;padding:2px 6px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+  .dset-tab{flex:1;background:none;border:0;border-bottom:2px solid transparent;color:var(--text2);
+    font-size:11.5px;padding:4px 2px;cursor:pointer}
+  .dset-tab.on{color:var(--accent);border-bottom-color:var(--accent)}
+  .dset-tab.empty{opacity:.45}
+  .dset-tab:hover{color:var(--text0)}
+  /* Quick-action row raised over a selected drawing. */
+  .dsel-bar{position:fixed;z-index:1350;display:flex;align-items:center;gap:2px;padding:3px 4px;
+    background:var(--bg1);border:1px solid var(--border);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+  .dsel-bar[hidden]{display:none}
+  .dsel-bar button{width:26px;height:24px;background:none;border:1px solid transparent;border-radius:5px;
+    color:var(--text2);font-size:12px;cursor:pointer}
+  .dsel-bar button:hover{color:var(--text0);background:var(--bg3)}
+  .dsel-col input[type=color]{width:24px;height:22px;background:none;border:1px solid var(--border);border-radius:4px;padding:0;cursor:pointer}
 
   /* Favourites bar: starred tools, floating over the chart, draggable by its grip. */
   .fav-bar{position:fixed;left:auto;right:26vw;top:120px;z-index:1300;display:flex;align-items:center;gap:2px;
@@ -2709,12 +2724,26 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               if (!P[1]) break;
               const a = P[0], b = P[1], span = b.price - a.price;
               const x1 = Math.min(a.x, b.x);
+              // Each level in its own colour -- one flat purple made them indistinguishable.
+              let _prevY = null;
               for (const lv of FIB_LEVELS) {
                 const pr = a.price + span*lv, yy = y(pr);
-                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.7);
+                const lc = (typeof fibColorOf === 'function') ? fibColorOf(d, lv) : col;
+                if (_prevY != null && drawOptOf(d, 'fill') !== false) {
+                  ctx.globalAlpha = base*0.07; ctx.fillStyle = lc;
+                  ctx.fillRect(x1, Math.min(_prevY, yy), pw - x1, Math.abs(yy - _prevY));
+                }
+                ctx.globalAlpha = base*((lv === 0 || lv === 1) ? 1 : 0.85);
+                ctx.strokeStyle = lc;
                 ctx.beginPath(); ctx.moveTo(x1, yy); ctx.lineTo(pw, yy); ctx.stroke();
-                tag((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                if (drawOptOf(d, 'showLabels') !== false) {
+                  ctx.fillStyle = lc;
+                  ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+                  ctx.fillText((lv*100).toFixed(1) + '%  ' + fmt(pr, 2), x1 + 3, yy - 2);
+                }
+                _prevY = yy;
               }
+              ctx.strokeStyle = col; ctx.fillStyle = col;
               break;
             }
             case 'fibx': {
@@ -2738,9 +2767,9 @@ function renderChart(canvas, bars, rMin, rMax, type, timeframe){
               const rr = risk > 0 ? reward/risk : 0;
               const x1 = Math.min(e0.x, tg.x, st.x), x2 = Math.max(e0.x, tg.x, st.x, x1 + 40);
               ctx.globalAlpha = base*0.16;
-              ctx.fillStyle = CHART_CANDLE_UP;
+              ctx.fillStyle = drawOptOf(d, 'targetColor') || CHART_CANDLE_UP;
               ctx.fillRect(x1, Math.min(e0.y, tg.y), x2 - x1, Math.abs(tg.y - e0.y));
-              ctx.fillStyle = CHART_CANDLE_DOWN;
+              ctx.fillStyle = drawOptOf(d, 'stopColor') || CHART_CANDLE_DOWN;
               ctx.fillRect(x1, Math.min(e0.y, st.y), x2 - x1, Math.abs(st.y - e0.y));
               ctx.globalAlpha = base;
               ctx.strokeStyle = col;
@@ -4137,33 +4166,120 @@ document.addEventListener('keydown', (e) => {
   deleteDrawing(_selDraw.tk, _selDraw.i);
 });
 
-/* Style popup for the selected drawing — colour, width, dash, delete. */
-let _styleEl = null;
-function openDrawingStyle(tk, i, atX, atY) {
+/* -- Per-drawing settings (#3354) ---------------------------------------------
+   TradingView's model: selecting a drawing raises a small floating toolbar, and its
+   gear opens a dialog with Inputs / Style / Visibility tabs whose contents differ per
+   tool. DRAW_SPEC describes those fields declaratively, so a tool gains real settings
+   by adding a spec entry -- no dialog code per tool.
+
+   Values live on the drawing: d.opts (inputs), d.style (style), d.vis (visibility),
+   which is what makes them save and restore with it. */
+const FIB_COLORS = {
+  0: '#787b86', 0.236: '#f23645', 0.382: '#ff9800', 0.5: '#4caf50',
+  0.618: '#089981', 0.786: '#00bcd4', 1: '#787b86',
+  1.272: '#2962ff', 1.618: '#9c27b0', 2.618: '#e91e63',
+};
+const _num = (k, label, def, extra) => Object.assign({ k, label, type: 'number', def }, extra || {});
+const _col = (k, label, def) => ({ k, label, type: 'color', def });
+const _chk = (k, label, def) => ({ k, label, type: 'check', def });
+
+const DRAW_SPEC = {
+  _default: {
+    inputs: [],
+    style: [_col('color', 'Colour', '#a78bfa'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }),
+            _chk('dash', 'Dashed', false)],
+    vis: [_chk('showLabels', 'Price labels', true)],
+  },
+  fib: {
+    inputs: [_chk('extendRight', 'Extend levels right', true), _chk('showPrices', 'Show prices', true),
+             _chk('showPercents', 'Show percentages', true)],
+    // Each level gets its own colour, the way every charting package draws fib -- one
+    // flat purple made the levels indistinguishable, which is the "doesn't look good".
+    style: [_col('c0', '0%', FIB_COLORS[0]), _col('c236', '23.6%', FIB_COLORS[0.236]),
+            _col('c382', '38.2%', FIB_COLORS[0.382]), _col('c50', '50%', FIB_COLORS[0.5]),
+            _col('c618', '61.8%', FIB_COLORS[0.618]), _col('c786', '78.6%', FIB_COLORS[0.786]),
+            _col('c100', '100%', FIB_COLORS[1]),
+            _num('w', 'Width', 1.2, { min: 1, max: 4, step: 0.5 }), _chk('fill', 'Shade between levels', true)],
+    vis: [_chk('showLabels', 'Level labels', true)],
+  },
+  pos: {
+    inputs: [_num('account', 'Account size', 10000, { min: 0 }), _num('riskPct', 'Risk %', 1, { min: 0, max: 100, step: 0.1 }),
+             _num('lot', 'Lot size', 1, { min: 0 })],
+    style: [_col('targetColor', 'Target colour', '#089981'), _col('stopColor', 'Stop colour', '#f23645'),
+            _col('color', 'Lines', '#a78bfa'), _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
+    vis: [_chk('showR', 'Risk/reward in R', true), _chk('showPrices', 'Entry / stop / target prices', true),
+          _chk('showQty', 'Position size', true)],
+  },
+};
+DRAW_SPEC.poss = DRAW_SPEC.pos;
+DRAW_SPEC.fibx = DRAW_SPEC.fib;
+const drawSpecOf = (t) => DRAW_SPEC[t] || DRAW_SPEC._default;
+function drawOptOf(d, key) {
+  const spec = drawSpecOf(d.t);
+  const all = [].concat(spec.inputs, spec.style, spec.vis);
+  const f = all.find(x => x.k === key);
+  const bag = Object.assign({}, d.opts, d.style, d.vis);
+  return bag[key] !== undefined ? bag[key] : (f ? f.def : undefined);
+}
+/** Colour for one fib level, honouring an override on the drawing. */
+function fibColorOf(d, lv) {
+  const key = 'c' + String(lv).replace('0.', '').replace('.', '') || 'c0';
+  const map = { 0: 'c0', 0.236: 'c236', 0.382: 'c382', 0.5: 'c50', 0.618: 'c618', 0.786: 'c786', 1: 'c100' };
+  const k = map[lv];
+  return (k && d.style && d.style[k]) || FIB_COLORS[lv] || (d.style && d.style.color) || '#a78bfa';
+}
+
+let _styleEl = null, _setTab = 'Inputs';
+function openDrawingStyle(tk, i, atX, atY) { openDrawingSettings(tk, i, atX, atY); }
+function openDrawingSettings(tk, i, atX, atY) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
-  const st = drawStyleOf(d);
   if (!_styleEl) {
     _styleEl = document.createElement('div');
-    _styleEl.className = 'dr-flyout'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
+    _styleEl.className = 'dr-flyout dr-settings'; _styleEl.id = 'drawStyle'; _styleEl.hidden = true;
     document.body.appendChild(_styleEl);
     document.addEventListener('click', (ev) => {
       if (!_styleEl || _styleEl.hidden || _styleEl.contains(ev.target)) return;
+      if (ev.target.closest && ev.target.closest('.dsel-bar')) return;
       _styleEl.hidden = true;
     });
   }
+  const spec = drawSpecOf(d.t);
   const name = (DRAW_TOOLS[d.t] && DRAW_TOOLS[d.t].name) || d.t;
-  _styleEl.innerHTML = '<div class="dr-fly-group">' + name + '</div>'
-    + '<label class="dr-st-row"><span>Colour</span><input type="color" value="' + st.color + '"'
-    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{color:this.value})"></label>'
-    + '<label class="dr-st-row"><span>Width</span><input type="range" min="1" max="6" step="0.5" value="' + st.w + '"'
-    +   ' oninput="setDrawingStyle(\'' + tk + '\',' + i + ',{w:parseFloat(this.value)})"></label>'
-    + '<label class="dr-st-row"><span>Dashed</span><input type="checkbox" ' + (st.dash ? 'checked' : '')
-    +   ' onchange="setDrawingStyle(\'' + tk + '\',' + i + ',{dash:this.checked?5:0})"></label>'
-    + '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button></div>';
+  const tabs = ['Inputs', 'Style', 'Visibility'];
+  const fields = { Inputs: spec.inputs, Style: spec.style, Visibility: spec.vis };
+  if (!fields[_setTab] || !fields[_setTab].length) _setTab = tabs.find(t => (fields[t] || []).length) || 'Style';
+  const bagFor = (tab) => tab === 'Inputs' ? 'opts' : tab === 'Style' ? 'style' : 'vis';
+  let h = '<div class="dr-fly-group">' + name + '</div><div class="dset-tabs">'
+    + tabs.map(t => '<button type="button" class="dset-tab' + (t === _setTab ? ' on' : '')
+        + (!(fields[t] || []).length ? ' empty' : '') + '" onclick="setDrawSettingsTab(\'' + t + '\',\'' + tk + '\',' + i + ')">'
+        + t + '</button>').join('') + '</div>';
+  for (const f of (fields[_setTab] || [])) {
+    const v = drawOptOf(d, f.k), bag = bagFor(_setTab);
+    h += '<label class="dr-st-row"><span>' + f.label + '</span>';
+    if (f.type === 'color') h += '<input type="color" value="' + v + '" oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.value)">';
+    else if (f.type === 'check') h += '<input type="checkbox" ' + (v ? 'checked' : '') + ' onchange="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',this.checked)">';
+    else h += '<input type="number" value="' + v + '"' + (f.min != null ? ' min="' + f.min + '"' : '') + (f.max != null ? ' max="' + f.max + '"' : '')
+      + (f.step != null ? ' step="' + f.step + '"' : '') + ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'' + bag + '\',\'' + f.k + '\',parseFloat(this.value))">';
+    h += '</label>';
+  }
+  if (!(fields[_setTab] || []).length) h += '<p class="dr-fly-why">Nothing to configure here for this tool.</p>';
+  h += '<div class="dr-fly-foot"><button type="button" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">Delete</button>'
+    + '<button type="button" onclick="document.getElementById(\'drawStyle\').hidden=true">Done</button></div>';
+  _styleEl.innerHTML = h;
   _styleEl.hidden = false;
-  const w = _styleEl.offsetWidth || 200, h = _styleEl.offsetHeight || 140;
-  _styleEl.style.left = Math.max(8, Math.min(atX, window.innerWidth - w - 8)) + 'px';
-  _styleEl.style.top = Math.max(8, Math.min(atY, window.innerHeight - h - 8)) + 'px';
+  const w = _styleEl.offsetWidth || 240, hh = _styleEl.offsetHeight || 200;
+  _styleEl.style.left = Math.max(8, Math.min(atX == null ? 200 : atX, window.innerWidth - w - 8)) + 'px';
+  _styleEl.style.top = Math.max(8, Math.min(atY == null ? 120 : atY, window.innerHeight - hh - 8)) + 'px';
+}
+function setDrawSettingsTab(t, tk, i) {
+  _setTab = t;
+  const r = _styleEl.getBoundingClientRect();
+  openDrawingSettings(tk, i, r.left, r.top);
+}
+function setDrawField(tk, i, bag, key, val) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  d[bag] = Object.assign({}, d[bag]); d[bag][key] = val;
+  _saveDrawings(); _refreshTicker(tk);
 }
 function setDrawingStyle(tk, i, patch) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
@@ -4176,7 +4292,39 @@ function deleteDrawing(tk, i) {
   if (!list.length) delete _drawings[tk];
   _selDraw = null;
   if (_styleEl) _styleEl.hidden = true;
+  _hideSelBar();
   _saveDrawings(); _refreshTicker(tk);
+}
+
+/* Floating toolbar over the selected drawing: settings, colour, delete -- the quick
+   row TradingView raises so the common actions do not need the dialog. */
+let _selBar = null;
+function _hideSelBar() { if (_selBar) _selBar.hidden = true; }
+function showSelBar(tk, i) {
+  const d = (_drawings[tk] || [])[i]; if (!d) return;
+  if (!_selBar) {
+    _selBar = document.createElement('div');
+    _selBar.className = 'dsel-bar'; _selBar.id = 'selBar'; _selBar.hidden = true;
+    document.body.appendChild(_selBar);
+  }
+  const st = drawStyleOf(d);
+  _selBar.innerHTML =
+      '<button type="button" title="Settings" onclick="openDrawingSettings(\'' + tk + '\',' + i + ',null,null)">⚙</button>'
+    + '<label class="dsel-col" title="Colour"><input type="color" value="' + (st.color || '#a78bfa') + '"'
+    +   ' oninput="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'color\',this.value)"></label>'
+    + '<button type="button" title="Thicker" onclick="setDrawField(\'' + tk + '\',' + i + ',\'style\',\'w\',Math.min(6,(drawOptOf(_drawings[\'' + tk + '\'][' + i + '],\'w\')||1.5)+0.5))">▔</button>'
+    + '<button type="button" title="Delete" onclick="deleteDrawing(\'' + tk + '\',' + i + ')">🗑</button>';
+  const geom = _selGeom(tk);
+  const anchors = geom ? _drawingAnchors(tk, geom.data, i, geom.pw, geom.ph) : [];
+  const canvas = document.getElementById('chart-' + tk);
+  if (canvas && anchors.length) {
+    const r = canvas.getBoundingClientRect();
+    const minX = Math.min(...anchors.map(a => a.x)), minY = Math.min(...anchors.map(a => a.y));
+    _selBar.hidden = false;
+    const bw = _selBar.offsetWidth || 150;
+    _selBar.style.left = Math.max(8, Math.min(r.left + minX, window.innerWidth - bw - 8)) + 'px';
+    _selBar.style.top = Math.max(56, r.top + minY - 40) + 'px';
+  } else { _selBar.hidden = false; }
 }
 
 function _commitDrawing(tk, obj) {
@@ -4270,13 +4418,13 @@ document.addEventListener('pointerdown', (e) => {
   // 2. otherwise select whatever is under the pointer, and start a body drag
   const hit = _hitDrawing(tk, a.data, a.xPx, a.yPx, a.pw, a.ph, 14);
   if (hit) {
-    _selDraw = { tk, i: hit.i };
+    _selDraw = { tk, i: hit.i }; if (typeof showSelBar === 'function') showSelBar(tk, hit.i);
     const d = _drawings[tk][hit.i];
     _dragDraw = { tk, i: hit.i, handle: -1, startPts: JSON.parse(JSON.stringify(d.pts)), x0: a.xPx, y0: a.yPx };
     e.stopPropagation(); e.preventDefault();
     _refreshTicker(tk);
   } else if (_selDraw) {
-    const had = _selDraw.tk; _selDraw = null; _refreshTicker(had);
+    const had = _selDraw.tk; _selDraw = null; _hideSelBar(); _refreshTicker(had);
   }
 });
 
@@ -4308,6 +4456,7 @@ document.addEventListener('pointerup', () => {
   _dragDraw = null;
   _saveDrawings();                 // persist only once the drag ends, not per frame
   _refreshTicker(tk);              // one full rebuild at the end
+  if (_selDraw) showSelBar(_selDraw.tk, _selDraw.i);
 });
 
 // Right-click a drawing to open its style popup.
