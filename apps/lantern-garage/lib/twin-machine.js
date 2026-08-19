@@ -178,7 +178,18 @@ function create({ a, b, ...opts } = {}) {
     return g;
   }
 
-  /** B's report card: calibration, the two failure modes, and the boundary. */
+  /**
+   * B's report card: calibration, the two failure modes, the boundary — and the two numbers the
+   * literature says decide whether B is NET-NEGATIVE.
+   *
+   * Oracle Gap (arXiv:2607.17531) measured an LLM selector FLIPPING already-correct answers to
+   * wrong 4.69% of the time, and found verifier gains "bounded first by the oracle gap and then
+   * by signal fidelity" — candidate-level agreement between verdicts and labels, reported as MCC.
+   * So a good Brier is not enough:
+   *   harmRate  = overHalt / (answers reality says were RIGHT)   — how often B breaks a good answer
+   *   mcc       = Matthews correlation of B's verdict vs reality — fidelity, chance = 0
+   * Below the pre-registered bar (harm < 2%, n >= 200) the machine is switched off, not tuned.
+   */
   function report() {
     const g = state.graded;
     const n = g.length;
@@ -186,12 +197,26 @@ function create({ a, b, ...opts } = {}) {
     const overHalt = g.filter((x) => x.failure === "overHalt").length;
     // Brier score of B's pWrong against reality — lower is better; 0.25 is "always say 0.5".
     const brier = n ? g.reduce((s, x) => s + (x.pWrong - (x.reality === "wrong" ? 1 : 0)) ** 2, 0) / n : null;
+    // Confusion of B's binary verdict (predicted wrong = halted/pinned) against reality.
+    const tp = g.filter((x) => x.pWrong >= cfg.stop && x.reality === "wrong").length;   // halted a wrong answer
+    const tn = g.filter((x) => x.pWrong < cfg.stop && x.reality === "right").length;    // passed a right answer
+    const fp = overHalt;                                                                // halted a right answer (HARM)
+    const fn = missed;                                                                  // passed a wrong answer
+    const rightAnswers = tn + fp;
+    const harmRate = rightAnswers ? fp / rightAnswers : null;
+    const mccDen = Math.sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn));
+    const mcc = mccDen > 0 ? (tp * tn - fp * fn) / mccDen : null;
     return {
       runs: state.runs,
       graded: n,
       bAccuracy: n ? g.filter((x) => x.bWasRight).length / n : null,
       brier: brier === null ? null : Math.round(brier * 1000) / 1000,
       missed, overHalt,
+      harmRate: harmRate === null ? null : Math.round(harmRate * 10000) / 10000,
+      mcc: mcc === null ? null : Math.round(mcc * 1000) / 1000,
+      confusion: { tp, tn, fp, fn },
+      // The switch-off rule, stated in the output so a dashboard cannot quietly omit it.
+      netNegative: harmRate !== null && n >= 200 ? harmRate >= 0.02 : null,
       pins: state.pins.length,
       pinList: state.pins.map((p) => ({ question: p.question, pWrong: p.pWrong, reason: p.reason })),
       verdicts: {

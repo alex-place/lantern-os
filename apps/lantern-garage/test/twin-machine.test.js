@@ -237,6 +237,32 @@ function truthOf(world, question, envelope, aAnswer) {
     assert.strictEqual(res.rows[0].b2Moves, true);
   });
 
+
+  // ════════════════════════ HARM — the red-team gate ════════════════════════
+  // Oracle Gap (arXiv:2607.17531): an LLM selector flipped already-correct answers 4.69% of
+  // the time. A verifier can be NET-NEGATIVE. So the report must carry the harm rate and MCC,
+  // and a B that halts good answers must read as net-negative at the pre-registered bar.
+  await check("HARM: report carries harmRate + MCC, and a B that breaks good answers reads net-negative", async () => {
+    // B that halts EVERYTHING: harm rate on right answers is 100%, MCC is 0 (no discrimination).
+    const m = twin.create({ a: async () => ({ text: "x" }), b: async () => ({ pWrong: 0.9, canResolve: true }), freshnessEvery: 0 });
+    for (let i = 0; i < 220; i++) { const r = await m.run({ id: i, text: "q" + i }); m.grade(r.id, i % 4 === 0); }  // 25% actually wrong
+    const rep = m.report();
+    assert.strictEqual(rep.harmRate, 1, "halting every right answer is 100% harm");
+    assert.strictEqual(rep.netNegative, true, "at n>=200 and harm>=2% the machine must read NET-NEGATIVE");
+    assert.ok(rep.mcc === null || rep.mcc === 0, "an always-halt B has no discrimination");
+    assert.deepStrictEqual(Object.keys(rep.confusion).sort(), ["fn", "fp", "tn", "tp"]);
+  });
+
+  await check("HARM: a discriminating B has low harm and positive MCC on the known world", async () => {
+    const world = makeWorld(21);
+    const m = twin.create({ a: makeA(world), b: makeB(world), freshnessEvery: 0 });
+    for (const q of world.qs) { const r = await m.run(q); m.grade(r.id, world.saidWrong.get(q.id)); }
+    const rep = m.report();
+    console.log(`         harmRate ${rep.harmRate}  mcc ${rep.mcc}  netNegative ${rep.netNegative}`);
+    assert.ok(rep.mcc > 0.3, `a real B must discriminate: mcc ${rep.mcc}`);
+    assert.ok(rep.harmRate < 0.35, `harm should be bounded for a noisy-but-real B: ${rep.harmRate}`);
+  });
+
   console.log(failures ? `\n${failures} FAILED` : "\nall twin-machine tests passed");
   process.exit(failures ? 1 : 0);
 })();
