@@ -443,6 +443,11 @@ function convergenceVerdict({ t, direction, sr, struct, candle, marketStatus, ne
       ev_r: c.ev_r,
       target_r: c.target_r,
       size_mult: ev.edgeRiskMultiplier(c.p_win, c.target_r),
+        // Retained so the analyst pass (#3355) can RE-SCORE this exact input with
+        // claude_conf set, rather than re-deriving it. Stripped before the signal
+        // leaves scanAll, so the API payload is unchanged.
+        _ev: evInput,
+        _sign,
     };
   } catch (_e) {
     return null;
@@ -688,6 +693,85 @@ async function scanAll(watchlist) {
   }
 
   signals.sort((a, b) => b.confidence - a.confidence);
+    // ── ANALYST PASS (#3355) ────────────────────────────────────────────────
+    // The 9% `claude_conf` weight has been fed a neutral 50 since PR #1959
+    // deleted the agent layer on 2026-07-03. This is the only place that sets
+    // it. Bounded by construction: ENTER candidates only (never the whole
+    // watchlist), one call each, hard timeout, and any failure returns 50 —
+    // which reproduces exactly the behaviour of the last six weeks. It moves
+    // p_win by at most +/-4.5pp and cannot veto: every auto-trader gate still
+    // runs afterwards.
+    const _haiku = require("./haiku-analyst");
+    if (_haiku.enabled()) {
+      const _cands = signals.filter((s2) => s2.convergence && s2.convergence.decision === "ENTER" && s2.convergence._ev);
+      const _spy = spyTapeContext(bars15.SPY && bars15.SPY.bars);
+      const _dl = require("../direction-lock");
+      await Promise.all(_cands.map(async (s2) => {
+        try {
+          const _b15 = (bars15[s2.symbol] && bars15[s2.symbol].bars) || [];
+          const _proxy = _dl.underlyingProxy(s2.symbol);
+          const _uBars = _proxy && _proxy !== s2.symbol && bars15[_proxy] ? (bars15[_proxy].bars || []) : null;
+          const _m = barEtMinute(_b15);
+          const r = await _haiku.analyze({
+            symbol: s2.symbol,
+            direction: s2.direction,
+            price: s2.entry_price,
+            stop: s2.plan && s2.plan.stop,
+            target: s2.plan && s2.plan.target1,
+            p_win: s2.convergence.p_win,
+            ev_r: s2.convergence.ev_r,
+            ibs: sessionIbs(_b15),
+            underlying: _proxy,
+            underlying_tape: _uBars ? sessionDrawdownPct(_uBars) : null,
+            spy_tape: _spy.tape,
+            spy_mom30: _spy.mom30,
+            regime: marketStatus && marketStatus.market,
+            volume_ratio: s2.volume_ratio,
+            macd_hist: s2.convergence._ev.macd_hist,
+            news_sentiment: s2.convergence._ev.news_sentiment,
+            sector_trend: s2.convergence._ev.sector_trend,
+            in_zone: s2.convergence._ev.in_zone,
+            et_time: _m == null ? null : Math.floor(_m / 60) + ":" + String(_m % 60).padStart(2, "0"),
+            sign: s2.convergence._sign,
+            leverage: _dl.leverageOf(s2.symbol),
+            family: _dl.instrumentSign(s2.symbol).family,
+          });
+          s2.analyst = { conviction: r.conviction, reason: r.reason, degraded: !!r.degraded, latency_ms: r.latency_ms };
+          if (r.degraded || r.conviction === _haiku.NEUTRAL) return;   // no view -> leave the verdict untouched
+          // BOUND THE INFLUENCE HERE, not by trusting convergence-ev's internal
+          // weight. Measured: claude_conf 50->0 moves p_win a full 9.00pp, which
+          // near P_MIN (0.45) is enough to flip a verdict on its own — a weight
+          // that large is a gate wearing a weight's clothes, and the whole reason
+          // this slot was demoted from gate to weight is that a model must not
+          // decide alone. The swing is capped at TRADER_HAIKU_MAX_SWING_PP (4.5
+          // by default = half the available pull). The relationship is linear in
+          // conviction, so one interpolation toward neutral lands exactly on the
+          // cap, and the cap holds even if the underlying weight is retuned.
+          const _capPp = Number(process.env.TRADER_HAIKU_MAX_SWING_PP);
+          const _cap = (Number.isFinite(_capPp) ? _capPp : 4.5) / 100;
+          let c2 = ev.scoreConvergence({ ...s2.convergence._ev, claude_conf: r.conviction });
+          const _swing = c2.p_win - s2.convergence.p_win;
+          if (_cap > 0 && Math.abs(_swing) > _cap) {
+            const _scaled = 50 + (r.conviction - 50) * (_cap / Math.abs(_swing));
+            c2 = ev.scoreConvergence({ ...s2.convergence._ev, claude_conf: _scaled });
+            s2.analyst.conviction_applied = Math.round(_scaled * 10) / 10;
+            s2.analyst.capped = true;
+          }
+          s2.convergence.p_win_before = s2.convergence.p_win;
+          s2.convergence.p_win = c2.p_win;
+          s2.convergence.ev_r = c2.ev_r;
+          s2.convergence.decision = c2.decision;
+          s2.convergence.size_mult = ev.edgeRiskMultiplier(c2.p_win, c2.target_r);
+          logs.push({ time: nowIso, agent: "haiku", symbol: s2.symbol,
+            body: `analyst ${r.conviction}/100 — ${r.reason} (p_win ${s2.convergence.p_win_before} -> ${c2.p_win}, ${c2.decision})` });
+        } catch (_e) { /* the analyst must never break a scan */ }
+      }));
+    }
+    // strip the retained scoring input — not part of the signal contract
+    for (const s2 of signals) {
+      if (s2.convergence) { delete s2.convergence._ev; delete s2.convergence._sign; }
+    }
+
   return {
     signals,
     zones,
