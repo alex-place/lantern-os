@@ -4213,6 +4213,86 @@ const DRAW_SPEC = {
 };
 DRAW_SPEC.poss = DRAW_SPEC.pos;
 DRAW_SPEC.fibx = DRAW_SPEC.fib;
+
+/* The rest of the catalogue. Composed from shared style groups so a tool declares only
+   what is genuinely its own -- a channel has a fill and a midline, a text box has a font
+   and a background, a measure has units to show. Anything not listed still falls back to
+   _default, so no tool is ever left without controls. */
+const _lineStyle = (c) => [_col('color', 'Line colour', c || '#a78bfa'),
+                           _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
+const _shapeStyle = (c) => [_col('color', 'Border', c || '#a78bfa'), _col('fillColor', 'Fill', c || '#a78bfa'),
+                            _num('fillAlpha', 'Fill opacity %', 12, { min: 0, max: 100 }),
+                            _num('w', 'Border width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)];
+const _textStyle = () => [_col('color', 'Text colour', '#e6e8ef'), _num('fontSize', 'Font size', 12, { min: 8, max: 32 }),
+                          _col('bgColor', 'Background', '#151823'), _chk('showBg', 'Show background', true),
+                          _chk('bold', 'Bold', false)];
+const _extendInputs = () => [_chk('extendLeft', 'Extend left', false), _chk('extendRight', 'Extend right', false)];
+const _priceVis = () => [_chk('showLabels', 'Price label', true)];
+
+// --- Lines -----------------------------------------------------------------
+for (const t of ['l', 'ray', 'xline']) DRAW_SPEC[t] = { inputs: _extendInputs(), style: _lineStyle(), vis: _priceVis() };
+for (const t of ['h', 'hray']) DRAW_SPEC[t] = {
+  inputs: [_chk('extendRight', 'Extend right', true)], style: _lineStyle('#f5a623'),
+  vis: [_chk('showLabels', 'Price label', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
+DRAW_SPEC.v = { inputs: [], style: _lineStyle('#787b86'), vis: [_chk('showLabels', 'Time label', true)] };
+DRAW_SPEC.crossline = { inputs: [], style: _lineStyle('#787b86'),
+  vis: [_chk('showLabels', 'Price and time labels', true)] };
+DRAW_SPEC.angle = { inputs: _extendInputs(), style: _lineStyle(),
+  vis: [_chk('showAngle', 'Angle in degrees', true), _chk('showLabels', 'Price label', true)] };
+DRAW_SPEC.info = { inputs: [_chk('showChange', 'Price change', true), _chk('showPercent', 'Percent change', true),
+                            _chk('showBars', 'Bar count', true)],
+  style: _lineStyle(), vis: [_chk('showLabels', 'Stats label', true)] };
+for (const t of ['chan', 'flat']) DRAW_SPEC[t] = {
+  inputs: [_chk('extendRight', 'Extend right', true), _chk('midline', 'Show midline', false)],
+  style: _shapeStyle('#2962ff'), vis: [_chk('showLabels', 'Price labels', true)] };
+DRAW_SPEC.fork = { inputs: [_chk('extendRight', 'Extend right', true)],
+  style: [_col('color', 'Median line', '#089981'), _col('fillColor', 'Tines', '#2962ff'),
+          _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 })],
+  vis: [_chk('showLabels', 'Level labels', true)] };
+
+// --- Patterns ---------------------------------------------------------------
+for (const t of ['rect', 'ell', 'tri']) DRAW_SPEC[t] = {
+  inputs: [], style: _shapeStyle(),
+  vis: [_chk('showLabels', 'Price labels', true), _chk('showSize', 'Height and bar count', false)] };
+for (const t of ['abcd', 'xabcd', 'hs']) DRAW_SPEC[t] = {
+  inputs: [_chk('showRatios', 'Leg ratios', true)],
+  style: [_col('color', 'Lines', '#a78bfa'), _col('labelColor', 'Point labels', '#e6e8ef'),
+          _num('w', 'Width', 1.5, { min: 1, max: 6, step: 0.5 }), _chk('dash', 'Dashed', false)],
+  vis: [_chk('showPoints', 'Point letters', true), _chk('showLabels', 'Price labels', false)] };
+
+// --- Fibonacci --------------------------------------------------------------
+DRAW_SPEC.fibchan = { inputs: [_chk('extendRight', 'Extend right', true)],
+  style: DRAW_SPEC.fib.style, vis: [_chk('showLabels', 'Level labels', true)] };
+DRAW_SPEC.fibtime = { inputs: [], style: _lineStyle('#2962ff'),
+  vis: [_chk('showLabels', 'Sequence labels', true)] };
+
+// --- Forecasting ------------------------------------------------------------
+for (const t of ['meas', 'range', 'drange']) DRAW_SPEC[t] = {
+  inputs: [], style: _shapeStyle('#2962ff'),
+  vis: [_chk('showPrice', 'Price change', t !== 'drange'), _chk('showPercent', 'Percent change', t !== 'drange'),
+        _chk('showBars', 'Bar count', t !== 'range'), _chk('showTime', 'Elapsed time', t === 'drange')] };
+DRAW_SPEC.fcast = { inputs: [], style: _lineStyle('#2962ff'),
+  vis: [_chk('showLabels', 'Target labels', true)] };
+
+// --- Brushes ----------------------------------------------------------------
+DRAW_SPEC.pen = { inputs: [], style: [_col('color', 'Colour', '#a78bfa'),
+  _num('w', 'Width', 2, { min: 1, max: 10, step: 0.5 }), _num('alpha', 'Opacity %', 100, { min: 10, max: 100 })], vis: [] };
+DRAW_SPEC.hl = { inputs: [], style: [_col('color', 'Colour', '#f5a623'),
+  _num('w', 'Width', 10, { min: 4, max: 30 }), _num('alpha', 'Opacity %', 30, { min: 5, max: 80 })], vis: [] };
+DRAW_SPEC.arrow = { inputs: [], style: [_col('color', 'Colour', '#a78bfa'),
+  _num('w', 'Width', 2, { min: 1, max: 6, step: 0.5 }), _num('headSize', 'Head size', 9, { min: 4, max: 24 })],
+  vis: [_chk('showLabels', 'Price label', false)] };
+
+// --- Text and notes ---------------------------------------------------------
+DRAW_SPEC.text = { inputs: [], style: _textStyle(), vis: [_chk('showLabels', 'Price label', false)] };
+DRAW_SPEC.note = { inputs: [_chk('wrap', 'Wrap long text', true)], style: _textStyle(), vis: [] };
+DRAW_SPEC.callout = { inputs: [_chk('wrap', 'Wrap long text', true)],
+  style: _textStyle().concat([_col('lineColor', 'Leader line', '#a78bfa')]),
+  vis: [_chk('showLeader', 'Leader line', true)] };
+DRAW_SPEC.plabel = { inputs: [], style: _textStyle(),
+  vis: [_chk('showLabels', 'Price value', true), _chk('showOnAxis', 'Tag on the price axis', true)] };
+
+
 const drawSpecOf = (t) => DRAW_SPEC[t] || DRAW_SPEC._default;
 function drawOptOf(d, key) {
   const spec = drawSpecOf(d.t);
@@ -4229,7 +4309,7 @@ function fibColorOf(d, lv) {
   return (k && d.style && d.style[k]) || FIB_COLORS[lv] || (d.style && d.style.color) || '#a78bfa';
 }
 
-let _styleEl = null, _setTab = 'Inputs';
+let _styleEl = null, _setTab = 'Inputs', _setTabExplicit = false;
 function openDrawingStyle(tk, i, atX, atY) { openDrawingSettings(tk, i, atX, atY); }
 function openDrawingSettings(tk, i, atX, atY) {
   const d = (_drawings[tk] || [])[i]; if (!d) return;
@@ -4247,12 +4327,20 @@ function openDrawingSettings(tk, i, atX, atY) {
   const name = (DRAW_TOOLS[d.t] && DRAW_TOOLS[d.t].name) || d.t;
   const tabs = ['Inputs', 'Style', 'Visibility'];
   const fields = { Inputs: spec.inputs, Style: spec.style, Visibility: spec.vis };
-  if (!fields[_setTab] || !fields[_setTab].length) _setTab = tabs.find(t => (fields[t] || []).length) || 'Style';
+  // Auto-pick a non-empty tab only when OPENING. Doing it on every render meant an
+  // explicit click on an empty tab silently landed on Style, so the dialog showed
+  // Style's fields under the Inputs heading.
+  if (_setTabExplicit !== true && (!fields[_setTab] || !fields[_setTab].length))
+    _setTab = tabs.find(t => (fields[t] || []).length) || 'Style';
+  _setTabExplicit = false;
   const bagFor = (tab) => tab === 'Inputs' ? 'opts' : tab === 'Style' ? 'style' : 'vis';
   let h = '<div class="dr-fly-group">' + name + '</div><div class="dset-tabs">'
-    + tabs.map(t => '<button type="button" class="dset-tab' + (t === _setTab ? ' on' : '')
-        + (!(fields[t] || []).length ? ' empty' : '') + '" onclick="setDrawSettingsTab(\'' + t + '\',\'' + tk + '\',' + i + ')">'
-        + t + '</button>').join('') + '</div>';
+    + tabs.map(t => {
+        const empty = !(fields[t] || []).length;
+        return '<button type="button" class="dset-tab' + (t === _setTab ? ' on' : '') + (empty ? ' empty' : '')
+          + '"' + (empty ? ' disabled title="Nothing to configure for this tool"' : '')
+          + ' onclick="setDrawSettingsTab(\'' + t + '\',\'' + tk + '\',' + i + ')">' + t + '</button>';
+      }).join('') + '</div>';
   for (const f of (fields[_setTab] || [])) {
     const v = drawOptOf(d, f.k), bag = bagFor(_setTab);
     h += '<label class="dr-st-row"><span>' + f.label + '</span>';
@@ -4272,7 +4360,7 @@ function openDrawingSettings(tk, i, atX, atY) {
   _styleEl.style.top = Math.max(8, Math.min(atY == null ? 120 : atY, window.innerHeight - hh - 8)) + 'px';
 }
 function setDrawSettingsTab(t, tk, i) {
-  _setTab = t;
+  _setTab = t; _setTabExplicit = true;   // honour the click even if the tab is empty
   const r = _styleEl.getBoundingClientRect();
   openDrawingSettings(tk, i, r.left, r.top);
 }
