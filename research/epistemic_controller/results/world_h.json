@@ -5,32 +5,32 @@
       "arm": "commit (shipped)",
       "n": 200,
       "entered_boundary": 1.0,
-      "expanded": 178,
-      "chose_true": 170,
-      "chose_proxy": 7,
-      "other": 1,
-      "truth_rate_among_two": 0.96,
-      "final_mse_when_true": 0.089,
-      "final_mse_when_proxy": 3.783
+      "expanded": 159,
+      "chose_true": 105,
+      "chose_proxy": 54,
+      "other": 0,
+      "truth_rate_among_two": 0.66,
+      "final_mse_when_true": 0.09,
+      "final_mse_when_proxy": 2.688
     },
     "hold": {
       "arm": "hold (expansion is a hypothesis)",
       "n": 200,
       "entered_boundary": 1.0,
-      "expanded": 171,
-      "chose_true": 171,
-      "chose_proxy": 0,
+      "expanded": 133,
+      "chose_true": 114,
+      "chose_proxy": 19,
       "other": 0,
-      "truth_rate_among_two": 1.0,
-      "final_mse_when_true": 0.089,
-      "final_mse_when_proxy": null
+      "truth_rate_among_two": 0.857,
+      "final_mse_when_true": 0.09,
+      "final_mse_when_proxy": 2.534
     }
   },
   "gates": {
     "commit": {
       "H1_enters_and_expands": true,
-      "H2_truth_over_proxy": "PASS",
-      "truth_rate": 0.96,
+      "H2_truth_over_proxy": "INCONCLUSIVE",
+      "truth_rate": 0.66,
       "H3_proxy_is_really_worse": true,
       "H4_control_P3": 0.87,
       "H4_pass": true
@@ -38,11 +38,11 @@
     "hold": {
       "H1_enters_and_expands": true,
       "H2_truth_over_proxy": "PASS",
-      "truth_rate": 1.0,
+      "truth_rate": 0.857,
       "H3_proxy_is_really_worse": true,
       "H4_control_P3": 0.86,
       "H4_pass": true
     }
   },
-  "verdict": "BOTH PASS \u2014 even one-shot commit separates them (the world is not adversarial enough)"
+  "verdict": "PRINCIPLE SURVIVES, SHIPPED CONTROLLER INCOMPLETE \u2014 committing on the first window cannot separate two explainers; holding the expansion as a hypothesis can"
 }

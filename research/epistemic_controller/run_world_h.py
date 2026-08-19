@@ -67,6 +67,11 @@ class HoldController(Controller):
         scored = super()._design(resid)
         return [s for s in scored if s["name"] not in self._excluded] or scored
 
+    def run(self):
+        out = super().run()
+        out["expansions_dropped"] = self.expansions_dropped   # parent run() does not know this field
+        return out
+
     def step(self):
         # Run the parent machine; then, if we are RESOLVED and still in the hold window, re-check.
         alive = super().step()

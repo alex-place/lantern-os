@@ -52,11 +52,18 @@ class TwoExplanationsWorld:
         x = float(self.rng.uniform(-5, 5))
         on = self.t >= self.switch_at
         z = float(self.rng.choice([-1.0, 1.0])) if on else 0.0
-        # proxy agrees with z with prob fidelity, else flips; before the switch it is just noise
+        # proxy agrees with z with prob fidelity, else flips. BEFORE the switch z is 0 and
+        # contributes nothing, so the proxy must carry NO information then either -- it is 0
+        # too. The first version made the pre-switch proxy random +-1 noise, which meant that
+        # over any window straddling the switch the proxy was uncorrelated with the residual for
+        # the early part and the "perfect copy" at fidelity 1.0 only explained ~0.69 of the
+        # residual vs the truth's 0.98. That leaked which slot was the truth through the
+        # pre-switch history, and made world H pass for the wrong reason. Caught by asking why a
+        # perfect copy lost 95% of the time -- it cannot, so the harness was wrong.
         if on:
             proxy = z if self.rng.random() < self.proxy_fidelity else -z
         else:
-            proxy = float(self.rng.choice([-1.0, 1.0]))
+            proxy = 0.0
         y = self.a * x + self.b + (self.c * z if on else 0.0) + float(self.rng.normal(0, self.noise))
         self._history.append((x, z, proxy, y))
         self.t += 1
