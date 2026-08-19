@@ -1584,7 +1584,25 @@ async function _runAutoTradeInner(scan, { bridge, userId, now = Date.now(), caps
     if (!persistent) { out.skipped.push({ ...record, why: `awaiting ${_needScans} consecutive bullish scans (persistence)` }); continue; }
     if (opened >= c.maxNewPerScan) { out.skipped.push({ ...record, why: 'max new/scan reached' }); continue; }
     // Falling-knife veto: don't buy the dip while down-momentum is still accelerating.
-    // Wait for the momentum to turn (histogram rising, even if negative). (#c)
+    // Wait for the momentum to turn (histogram rising, even if negative).
+    //
+    // MEASURED 2026-08-19 (#3357). This was the highest-firing gate in the engine
+    // — 182 skips in a single session — and its only justification was the
+    // sentence above plus a "(#c)" placeholder that referenced nothing. It was
+    // also the gate most open to the objection that it fights the strategy: IBS
+    // mean-reversion BUYS washouts, and a washout is exactly where MACD is
+    // negative and deepening, so the veto looked like it might be filtering out
+    // the very edge it was meant to protect.
+    //
+    // Replaying 565 first-IBS fires over 29 sessions and 35 symbols (same-day
+    // close exit, 3% stop), evaluating this predicate on the closes available AT
+    // each fire:
+    //     vetoed  n=312   47% WR   -0.038%/trade   -11.9% total
+    //     allowed n=253   45% WR   +0.041%/trade   +10.4% total
+    // It earns its place: blocking those 312 avoided -11.9% of cumulative return.
+    // Note it does NOT pick winners — the hit rates are within 2pp — it avoids
+    // MAGNITUDE. The objection was wrong; waiting for the histogram to turn beats
+    // buying into the acceleration.
     if (c.entryKnifeFilter) {
       const closes = ((entryBars[sym] && entryBars[sym].bars) || []).map((b) => b.close).filter((x) => x > 0);
       if (isFallingKnife(closes)) { out.skipped.push({ ...record, why: 'falling_knife — momentum still cratering (MACD hist<0 & deepening); waiting for the turn' }); continue; }
