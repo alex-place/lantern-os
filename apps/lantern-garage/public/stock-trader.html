@@ -4484,22 +4484,109 @@ function _hitDrawing(tk, data, xPx, yPx, pw, ph, tol) {
   };
   let best = -1, bestD = (tol == null ? 14 : tol);
   list.forEach((d, i) => {
+    if (d.hidden) return;                 // invisible means unclickable
     const P = (d.pts || []).map(a => ({ x: xOf(a.ts), y: yOf(a.price) }));
     if (!P.length) return;
     let dist = Infinity;
-    if (d.t === 'h' || d.t === 'hray') dist = Math.abs(P[0].y - yPx);
-    else if (d.t === 'v') dist = Math.abs(P[0].x - xPx);
-    else if (d.t === 'text' || d.t === 'note') dist = Math.hypot(P[0].x - xPx, P[0].y - yPx);
-    else if (d.t === 'pen') {
-      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
-    } else if (d.t === 'rect' || d.t === 'ell' || d.t === 'meas') {
-      const x1 = Math.min(P[0].x, P[1].x), x2 = Math.max(P[0].x, P[1].x);
-      const y1 = Math.min(P[0].y, P[1].y), y2 = Math.max(P[0].y, P[1].y);
-      dist = Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
-    } else if (d.t === 'fib' || d.t === 'fibx' || d.t === 'pos' || d.t === 'poss') {
-      for (const a of P) dist = Math.min(dist, Math.abs(a.y - yPx));
-    } else {
-      for (let q = 1; q < P.length; q++) dist = Math.min(dist, segDist(xPx, yPx, P[q-1].x, P[q-1].y, P[q].x, P[q].y));
+    // Hit-test what the tool actually DRAWS, not the polyline between its anchors.
+    // Rays, extended lines, fans and arcs paint far outside their anchor span, so
+    // measuring the segment alone left most of a line unclickable.
+    const A = P[0], B = P[1], C = P[2];
+    const lineDist = (a, b) => {            // distance to the INFINITE line through a,b
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy;
+      if (!L2) return Math.hypot(xPx - a.x, yPx - a.y);
+      return Math.abs(dy*(xPx - a.x) - dx*(yPx - a.y)) / Math.sqrt(L2);
+    };
+    const rayDist = (a, b) => {             // distance to the ray starting at a through b
+      const dx = b.x - a.x, dy = b.y - a.y, L2 = dx*dx + dy*dy || 1;
+      const t = ((xPx - a.x)*dx + (yPx - a.y)*dy) / L2;
+      if (t < 0) return Math.hypot(xPx - a.x, yPx - a.y);
+      return lineDist(a, b);
+    };
+    const boxDist = (p1, p2) => {
+      const x1 = Math.min(p1.x, p2.x), x2 = Math.max(p1.x, p2.x);
+      const y1 = Math.min(p1.y, p2.y), y2 = Math.max(p1.y, p2.y);
+      return Math.max(0, Math.max(x1 - xPx, xPx - x2, y1 - yPx, yPx - y2));
+    };
+    const pathDist = (pts) => {
+      let m = Infinity;
+      for (let q = 1; q < pts.length; q++) m = Math.min(m, segDist(xPx, yPx, pts[q-1].x, pts[q-1].y, pts[q].x, pts[q].y));
+      return pts.length === 1 ? Math.hypot(xPx - pts[0].x, yPx - pts[0].y) : m;
+    };
+    const levelsDist = (ys) => { let m = Infinity; for (const yy of ys) m = Math.min(m, Math.abs(yy - yPx)); return m; };
+
+    switch (d.t) {
+      // single levels drawn right across the plot
+      case 'h': case 'hray': case 'plabel': dist = Math.abs(A.y - yPx); break;
+      case 'v': dist = Math.abs(A.x - xPx); break;
+      case 'crossline': dist = Math.min(Math.abs(A.y - yPx), Math.abs(A.x - xPx)); break;
+      // lines that extend past their anchors
+      case 'ray': dist = B ? rayDist(A, B) : Infinity; break;
+      case 'xline': case 'angle': case 'regr': dist = B ? lineDist(A, B) : Infinity; break;
+      case 'l': case 'info': case 'arrow':
+        dist = B ? segDist(xPx, yPx, A.x, A.y, B.x, B.y) : Infinity; break;
+      // fans: a bundle of rays from one origin
+      case 'fibfan': case 'gannfan': {
+        if (!B) { dist = Infinity; break; }
+        const dx = B.x - A.x, dy = B.y - A.y;
+        const ratios = d.t === 'gannfan' ? [[1,8],[1,4],[1,3],[1,2],[1,1],[2,1],[3,1],[4,1],[8,1]]
+                                         : FIB_LEVELS.map(lv => [1, lv]);
+        let m = Infinity;
+        for (const [rx, ry] of ratios) m = Math.min(m, rayDist(A, { x: A.x + dx*rx, y: A.y + dy*ry }));
+        dist = m; break;
+      }
+      case 'fork': {
+        if (!C) { dist = Infinity; break; }
+        const mid = { x: (B.x + C.x)/2, y: (B.y + C.y)/2 };
+        const dx = mid.x - A.x, dy = mid.y - A.y;
+        dist = Math.min(rayDist(A, mid), rayDist(B, { x: B.x + dx, y: B.y + dy }),
+                        rayDist(C, { x: C.x + dx, y: C.y + dy })); break;
+      }
+      // horizontal level families
+      case 'fib': case 'fibx': case 'pos': case 'poss':
+        dist = levelsDist(P.map(a => a.y)); break;
+      case 'fibchan': {
+        if (!C) { dist = Infinity; break; }
+        const off = C.y - B.y;
+        let m = Infinity;
+        for (const lv of FIB_LEVELS) m = Math.min(m, segDist(xPx, yPx, A.x, A.y + off*lv, B.x, B.y + off*lv));
+        dist = m; break;
+      }
+      case 'fibtime': {
+        if (!B) { dist = Infinity; break; }
+        const unit = B.x - A.x;
+        let m = Infinity;
+        if (unit) for (const n0 of [0,1,2,3,5,8,13,21]) m = Math.min(m, Math.abs((A.x + unit*n0) - xPx));
+        dist = m; break;
+      }
+      case 'fibcirc': {                       // distance to the nearest arc
+        if (!B) { dist = Infinity; break; }
+        const r0 = Math.hypot(B.x - A.x, B.y - A.y), rp = Math.hypot(xPx - A.x, yPx - A.y);
+        let m = Infinity;
+        for (const lv of FIB_LEVELS) if (lv) m = Math.min(m, Math.abs(rp - r0*lv));
+        dist = m; break;
+      }
+      // boxes and bands
+      case 'rect': case 'ell': case 'meas': case 'range': case 'drange': case 'gannbox':
+        dist = B ? boxDist(A, B) : Infinity; break;
+      case 'flat': dist = C ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), Math.abs(C.y - yPx)) : Infinity; break;
+      case 'djchan':
+        dist = P[3] ? Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y),
+                               segDist(xPx, yPx, C.x, C.y, P[3].x, P[3].y)) : Infinity; break;
+      case 'proj': {
+        if (!C) { dist = Infinity; break; }
+        const tgt = { x: C.x + (B.x - A.x), y: C.y + (B.y - A.y) };
+        dist = Math.min(segDist(xPx, yPx, A.x, A.y, B.x, B.y), boxDist(C, tgt)); break;
+      }
+      // markers and text sit at a point
+      case 'text': case 'note': case 'balloon': case 'arrowup': case 'arrowdn':
+        dist = Math.hypot(A.x - xPx, A.y - yPx); break;
+      case 'callout':
+        dist = B ? Math.min(Math.hypot(B.x - xPx, B.y - yPx), segDist(xPx, yPx, A.x, A.y, B.x, B.y)) : Infinity; break;
+      // freehand paths
+      case 'pen': case 'hl': dist = pathDist(P); break;
+      // multi-point polylines
+      default: dist = pathDist(P);
     }
     if (dist < bestD) { bestD = dist; best = i; }
   });
