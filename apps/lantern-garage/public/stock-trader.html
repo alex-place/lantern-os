@@ -263,6 +263,36 @@
   .wd-line{display:block;width:16px;background:currentColor;border-radius:2px}
   .dsel-pop{min-width:170px}
   /* Alert dialog -- a real modal, centred, with the reference's label/field rows. */
+  /* Alerts in the rail: a single stack sized for a ~320px column. */
+  .al-bar{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .al-new{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:var(--text1);
+    font-family:var(--mono);font-size:11.5px;padding:6px 8px;cursor:pointer}
+  .al-new:hover{background:var(--bg3);color:var(--text0);border-color:var(--accent)}
+  .al-count{font-family:var(--mono);font-size:10.5px;color:var(--text2)}
+  .al-deliv{display:flex;align-items:center;gap:7px;padding:8px 10px 4px;font-size:12px;color:var(--text1)}
+  .al-sec{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--text2);padding:10px 10px 4px;border-top:1px solid rgba(255,255,255,.04);margin-top:4px}
+  .al-pad{padding:0 10px 4px}
+  .al-empty{font-size:12px;line-height:1.5;color:var(--text2);padding:6px 10px 10px;margin:0}
+  .al-link{background:none;border:0;color:var(--accent);cursor:pointer;font:inherit;padding:0;text-decoration:underline}
+  .al-item{display:flex;align-items:flex-start;gap:6px;padding:7px 8px 7px 10px;
+    border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-item:hover{background:var(--bg2)}
+  .al-item.off{opacity:.55}
+  .al-item-main{flex:1;min-width:0;cursor:pointer;display:flex;flex-direction:column;gap:1px}
+  .al-item-sym{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--text0)}
+  .al-item-cond{font-size:11.5px;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .al-item-meta{font-family:var(--mono);font-size:9.5px;color:var(--text2)}
+  .al-item-act{display:flex;gap:1px;flex:0 0 auto}
+  .al-item-act button{width:22px;height:22px;background:none;border:0;border-radius:4px;color:var(--text2);
+    font-size:10px;cursor:pointer;line-height:1}
+  .al-item-act button:hover{color:var(--text0);background:var(--bg3)}
+  .al-fire{padding:5px 10px;border-bottom:1px solid rgba(255,255,255,.03)}
+  .al-fire-when{display:block;font-family:var(--mono);font-size:9.5px;color:var(--text2)}
+  .al-fire-msg{display:block;font-size:11.5px;color:var(--text1);line-height:1.4;white-space:normal}
+  .al-teaser{padding:12px 10px;font-size:12px;line-height:1.55;color:var(--text1)}
+  .al-teaser p{margin:6px 0;color:var(--text2)}
+  .al-teaser a{color:var(--accent)}
   .al-modal-bg{position:fixed;inset:0;z-index:1600;display:flex;align-items:center;justify-content:center;
     background:rgba(4,6,10,.62);backdrop-filter:blur(3px)}
   .al-modal-bg[hidden]{display:none}
@@ -1241,7 +1271,6 @@
     <button class="tp-tab" role="tab" id="tptab-orders" aria-selected="false" aria-controls="tp-orders" data-tab="orders" onclick="tpTab('orders')" title="Working orders that haven't filled yet">Orders <span class="tp-badge" id="tpOrdCount">0</span></button>
     <button class="tp-tab" role="tab" id="tptab-history" aria-selected="false" aria-controls="tp-history" data-tab="history" onclick="tpTab('history')" title="Past orders — filled, cancelled, and rejected">Order history</button>
     <button class="tp-tab" role="tab" id="tptab-journal" aria-selected="false" aria-controls="tp-journal" data-tab="journal" onclick="tpTab('journal');loadJournal()" title="The journal — realized results by day, the equity curve with drawdown, where exits happened, and every trade the autopilot declined with its reason">Journal</button>
-    <button class="tp-tab" role="tab" id="tptab-alerts" aria-selected="false" aria-controls="tp-alerts" data-tab="alerts" onclick="tpTab('alerts');loadAlerts()" title="Engine alerts on your watchlist — a signal fired, a price reached a zone, a washout setup confirmed. The scan runs every minute; alerts tell you what it saw.">Alerts</button>
   </div>
   <!-- Tab bodies -->
   <div class="tp-body">
@@ -1249,7 +1278,6 @@
     <div class="tp-pane" id="tp-orders" role="tabpanel" aria-labelledby="tptab-orders" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-history" role="tabpanel" aria-labelledby="tptab-history" tabindex="0" hidden></div>
     <div class="tp-pane" id="tp-journal" role="tabpanel" aria-labelledby="tptab-journal" tabindex="0" hidden></div>
-    <div class="tp-pane" id="tp-alerts" role="tabpanel" aria-labelledby="tptab-alerts" tabindex="0" hidden></div>
   </div>
 </div>
 
@@ -7447,10 +7475,15 @@ function jrHash(){
   // the pitch (#3242 demo journal, #3250 alerts teaser) — the Pro-gate overlay
   // must not wall them off. Scoped to these arrivals only; every trade action
   // stays server-gated regardless (#3008 tracks the wider gating collision).
-  const target = location.hash==='#journal' ? 'journal' : location.hash==='#alerts' ? 'alerts' : null;
+  // #alerts now opens the rail's alerts panel; the bottom tab is gone.
+  if (location.hash === '#alerts') {
+    try { _rwPanel = 'alerts'; _rightOpen = true; _saveDocks(); _applyDocks(); } catch (_e) {}
+    if (typeof loadAlerts === 'function') loadAlerts(true);
+  }
+  const target = location.hash==='#journal' ? 'journal' : null;
   if(!target) return;
   tpTab(target);
-  if(target==='journal') loadJournal(); else loadAlerts();
+  loadJournal();
   // Durable suppression: on a DIRECT deep link, applyTierGate() runs after this
   // (session fetch) and would re-show the overlay — watch it for a few seconds
   // and keep it hidden, then disconnect.
@@ -7469,140 +7502,140 @@ function jrHash(){
 window.addEventListener('hashchange', jrHash);
 if(location.hash==='#journal'||location.hash==='#alerts') setTimeout(jrHash, 500);   // after guest/demo detection settles
 
-/* ── Alerts tab (#3248 + #3250) ─────────────────────────────────────────────
-   Rules + fired-alert feed over the per-user alerts API. Signed-in Pro+ only
-   (the endpoints sit behind the standard trading gate); guests get the teaser.
-   In-app feed today — email/push delivery lands with #3249. */
-let alBusy=false, alRules=[];
-async function loadAlerts(force){
-  const pane=document.getElementById('tp-alerts');
-  if(!pane || (pane.dataset.loaded==='1' && !force)) return;
-  if(alBusy) return; alBusy=true;
-  pane.innerHTML='<div class="jr-loading">Loading alerts…</div>';
-  try{
+/* -- Alerts, in the watchlist rail (#3352) -----------------------------------
+   Alerts are a watchlist-scoped idea -- "tell me when SPY does X" -- so they belong
+   beside the symbols, not in a tab at the bottom of the screen. This renders into the
+   rail's alerts panel, which is a ~320px column, so the layout is a single stack
+   rather than the two-column card grid the bottom tab used.
+
+   Creating and editing both go through the dialog; this surface lists, toggles,
+   mutes and deletes. */
+let alBusy = false, alRules = [], _alFeed = [], _alPrefs = { email: false }, _alEmailAvail = { possible: false };
+
+function _alHost() { return document.getElementById('rwAlertsBody'); }
+
+async function loadAlerts(force) {
+  const pane = _alHost();
+  if (!pane || (pane.dataset.loaded === '1' && !force)) return;
+  if (alBusy) return; alBusy = true;
+  if (!pane.innerHTML) pane.innerHTML = '<p class="al-empty">Loading alerts…</p>';
+  try {
     let rres;
-    try{ rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
-    catch(_e){ await _sleep(1500); rres=await fetch('/api/trading/alerts/rules',{cache:'no-store'}); }
-    if(rres.status===401||rres.status===403){ pane.dataset.loaded='1'; alTeaser(pane); return; }
-    if(!rres.ok){ const err=new Error('HTTP '+rres.status); err.status=rres.status; throw err; }
-    const rj=await rres.json();
-    const fres=await fetch('/api/trading/alerts/feed?limit=50',{cache:'no-store'});
-    const fj=fres.ok? await fres.json():{alerts:[]};
-    alRules=rj.rules||[];
-    pane.dataset.loaded='1';
-    alRender(pane, alRules, rj.cap||20, fj.alerts||[], rj.prefs||{email:false}, rj.email||{possible:false,why:'unknown'});
-  }catch(e){
-    pane.innerHTML=jrErrorCard(e,'loadAlerts');
-  }finally{ alBusy=false; }
+    try { rres = await fetch('/api/trading/alerts/rules', { cache: 'no-store' }); }
+    catch (_e) { await _sleep(1200); rres = await fetch('/api/trading/alerts/rules', { cache: 'no-store' }); }
+    if (rres.status === 401 || rres.status === 403) { pane.dataset.loaded = '1'; alTeaser(pane); return; }
+    if (!rres.ok) { const err = new Error('HTTP ' + rres.status); err.status = rres.status; throw err; }
+    const rj = await rres.json();
+    const fres = await fetch('/api/trading/alerts/feed?limit=40', { cache: 'no-store' });
+    const fj = fres.ok ? await fres.json() : { alerts: [] };
+    alRules = rj.rules || [];
+    _alFeed = fj.alerts || [];
+    _alPrefs = rj.prefs || { email: false };
+    _alEmailAvail = rj.email || { possible: false };
+    pane.dataset.loaded = '1';
+    alRender(pane, alRules, rj.cap || 20, _alFeed);
+  } catch (e) {
+    pane.innerHTML = '<p class="al-empty">Alerts unavailable — ' + String(e.message).replace(/[<>&"]/g, '') + '</p>';
+  } finally { alBusy = false; }
 }
-function alTeaser(pane){
-  pane.innerHTML='<div class="jr-wrap"><div class="jr-banner"><span><b>Engine alerts come with Pro.</b> The scan already watches the list every minute — alerts tell you when a signal fires, a price reaches a support or resistance zone, or a washout setup is confirmed, without you watching the screen.</span>'
-    +'<a href="/pricing.html" style="margin-left:auto;white-space:nowrap">See plans →</a></div></div>';
+function alTeaser(pane) {
+  pane.innerHTML = '<div class="al-teaser"><b>Engine alerts come with Pro.</b>'
+    + '<p>The scan already watches your list every minute. Alerts tell you when a price level is '
+    + 'crossed, a signal fires, or a washout setup confirms — without you watching the screen.</p>'
+    + '<a href="/pricing.html">See plans →</a></div>';
 }
-function alTypeDesc(r){
-  if(r.type==='signal') return (r.direction==='ANY'?'any':String(r.direction||'').toLowerCase())+' signal';
-  if(r.type==='zone') return 'within '+r.proximityPct+'% of '+r.zone;
-  return 'washout confirmed (ENTER)';
-}
-function alDeliveryRow(prefs, email){
-  // In-app is always on; email is a real opt-in (#3249) that explains itself
-  // when it can't work; push is deliberately absent until it truly exists.
-  let emailBit;
-  if(email.possible || prefs.email){
-    emailBit='<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" '+(prefs.email?'checked':'')+' onchange="alToggleEmail(this.checked)" aria-label="Email me fired alerts"> Email me</label>'
-      +(email.possible?'':' <span class="jr-flag">(currently undeliverable — '+(email.why==='mailer_unconfigured'?'no mailer configured on this server':email.why==='email_unverified'?'your email address isn’t confirmed yet':'no email on your account')+')</span>');
-  }else{
-    emailBit='<span title="'+(email.why==='mailer_unconfigured'?'This server has no mailer configured':'Your account has no email address')+'">Email — unavailable ('+(email.why==='mailer_unconfigured'?'no mailer on this server':email.why==='email_unverified'?'confirm your email address first':'no email on your account')+')</span>';
+/** One line describing what a rule watches, short enough for a 320px column. */
+function alTypeDesc(r) {
+  if (r.type === 'price') {
+    const L2 = { crossing: 'crosses', crossing_up: 'crosses up through', crossing_down: 'crosses down through',
+      greater: 'is above', less: 'is below', entering_channel: 'enters', exiting_channel: 'leaves',
+      inside_channel: 'is inside', outside_channel: 'is outside', moving_up: 'moves up by',
+      moving_down: 'moves down by', moving_up_pct: 'moves up', moving_down_pct: 'moves down' };
+    const pct = (r.op === 'moving_up_pct' || r.op === 'moving_down_pct') ? '%' : '';
+    const band = r.value2 != null ? (r.value + '–' + r.value2) : (r.value + pct);
+    return (L2[r.op] || r.op) + ' ' + band;
   }
-  return '<p class="jr-note" style="margin:6px 0 0">Delivery: <b style="color:var(--text1)">In-app feed</b> (always) · '+emailBit+' · Push — not built yet (#3249); capped at 6 emails/hour so a bug can\'t spam you.</p>';
+  if (r.type === 'signal') return (r.direction === 'ANY' ? 'any' : String(r.direction || '').toLowerCase()) + ' signal fires';
+  if (r.type === 'zone') return 'reaches ' + r.zone + ' (±' + r.proximityPct + '%)';
+  return 'washout confirms';
 }
-async function alToggleEmail(on){
-  try{ await fetch('/api/trading/alerts/prefs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:!!on})}); }catch(_e){}
-  loadAlerts(true);
-}
-function alRender(pane, rules, cap, feed, prefs, email){
-  prefs=prefs||{email:false}; email=email||{possible:false,why:'unknown'};
-  let html='<div class="jr-wrap">';
-  html+='<div class="jr-cols"><div style="display:flex;flex-direction:column;gap:10px;min-width:0">';
-  html+='<div class="jr-card"><h4>New alert rule</h4>'
-    +'<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">'
-    +'<input id="alSym" maxlength="8" placeholder="Symbol" aria-label="Symbol" style="width:82px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit;text-transform:uppercase">'
-    +'<select id="alType" aria-label="Alert type" onchange="alTypeChanged()" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="signal">Signal fired</option><option value="zone">Price at zone</option><option value="washout">Washout confirmed</option></select>'
-    +'<select id="alDir" aria-label="Direction" style="background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="ANY">Any direction</option><option value="BULLISH">Bullish</option><option value="BEARISH">Bearish</option></select>'
-    +'<select id="alZone" aria-label="Zone side" style="display:none;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 6px;font:inherit">'
-    +'<option value="support">Support</option><option value="resistance">Resistance</option></select>'
-    +'<input id="alProx" type="number" min="0.1" max="5" step="0.1" value="0.5" aria-label="Proximity percent" title="How close price must get to the zone, in %" style="display:none;width:64px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
-    +'<input id="alCool" type="number" min="5" max="1440" step="5" value="60" aria-label="Cooldown minutes" title="Once fired, stay quiet for this many minutes" style="width:70px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text0);padding:5px 8px;font:inherit">'
-    +'<span style="font-size:10.5px;color:var(--text2)">min quiet</span>'
-    +'<button type="button" class="jr-chip on" onclick="alSaveRule()">Add rule</button>'
-    +'</div><p class="jr-note" id="alFormMsg">'+rules.length+' of '+cap+' rules</p>'
-    +alDeliveryRow(prefs, email)+'</div>';
-  html+='<div class="jr-card"><h4>Your rules</h4>';
-  if(!rules.length){ html+='<p class="jr-note">No rules yet — add one above. The scan checks them every minute during market hours.</p>'; }
-  else{
-    html+='<table class="jr-table"><thead><tr><th>Symbol</th><th>When</th><th class="num">Quiet</th><th class="num">On</th><th class="num" title="Email me when this particular rule fires">✉</th><th class="num"></th></tr></thead><tbody>';
-    for(const r of rules){
-      html+='<tr><td>'+jrEsc(r.symbol)+'</td><td>'+jrEsc(alTypeDesc(r))+'</td><td class="num">'+r.cooldownMin+'m</td>'
-        +'<td class="num"><input type="checkbox" '+(r.enabled!==false?'checked':'')+' aria-label="Enable rule for '+jrEsc(r.symbol)+'" onchange="alToggleRule(\''+jrEsc(r.id)+'\')"></td>'
-        // Per-rule email mute. Only meaningful once the account has opted in, so it
-        // is disabled (and says why) rather than hidden — a control that silently
-        // does nothing is worse than one that explains itself.
-        +'<td class="num"><input type="checkbox" '+(r.email!==false?'checked':'')+(prefs.email?'':' disabled')
-        +' title="'+(prefs.email?'Email me when THIS rule fires':'Turn on “Email me” below first')+'"'
-        +' aria-label="Email me when the '+jrEsc(r.symbol)+' rule fires" onchange="alToggleRuleEmail(\''+jrEsc(r.id)+'\')"></td>'
-        +'<td class="num"><button type="button" class="jr-chip" aria-label="Delete rule for '+jrEsc(r.symbol)+'" onclick="alDeleteRule(\''+jrEsc(r.id)+'\')">✕</button></td></tr>';
+function alRender(pane, rules, cap, feed) {
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  let h = '<div class="al-bar">'
+    + '<button type="button" class="al-new" onclick="openAlertDialog({})">+ New alert</button>'
+    + '<span class="al-count">' + rules.length + '/' + cap + '</span></div>';
+
+  // Delivery state, said once at the top rather than repeated per rule.
+  const emailOn = _alPrefs.email && _alEmailAvail.possible;
+  h += '<label class="al-deliv"><input type="checkbox" ' + (_alPrefs.email ? 'checked' : '')
+    + (_alEmailAvail.possible ? '' : ' disabled') + ' onchange="alToggleEmail(this.checked)">'
+    + ' Email me when alerts fire</label>';
+  if (!_alEmailAvail.possible) {
+    const why = _alEmailAvail.why === 'mailer_unconfigured' ? 'no mailer on this server'
+      : _alEmailAvail.why === 'email_unverified' ? 'confirm your email address first' : 'no email on your account';
+    h += '<p class="al-note al-pad">Email unavailable — ' + why + '.</p>';
+  } else if (emailOn) {
+    h += '<p class="al-note al-pad">Capped at 6 emails an hour.</p>';
+  }
+
+  h += '<div class="al-sec">Rules</div>';
+  if (!rules.length) {
+    h += '<p class="al-empty">No alerts yet. <button type="button" class="al-link" onclick="openAlertDialog({})">Create one</button> — the scan checks every minute during market hours.</p>';
+  } else {
+    for (const r of rules) {
+      const off = r.enabled === false;
+      h += '<div class="al-item' + (off ? ' off' : '') + '">'
+        + '  <div class="al-item-main" role="button" tabindex="0" title="Edit this alert"'
+        + '       onclick="alEditRule(\'' + esc(r.id) + '\')">'
+        + '    <span class="al-item-sym">' + esc(r.symbol) + '</span>'
+        + '    <span class="al-item-cond">' + esc(alTypeDesc(r)) + '</span>'
+        + '    <span class="al-item-meta">' + (r.trigger === 'once' ? 'once' : 'every ' + r.cooldownMin + 'm')
+        +        (r.email === false ? ' · muted' : '') + (off ? ' · paused' : '') + '</span>'
+        + '  </div>'
+        + '  <div class="al-item-act">'
+        + '    <button type="button" title="' + (off ? 'Resume' : 'Pause') + '" onclick="alToggleRule(\'' + esc(r.id) + '\')">' + (off ? '▶' : '❙❙') + '</button>'
+        + '    <button type="button" title="' + (r.email === false ? 'Unmute email' : 'Mute email') + '"'
+        + '      onclick="alToggleRuleEmail(\'' + esc(r.id) + '\')">' + (r.email === false ? '🔕' : '🔔') + '</button>'
+        + '    <button type="button" title="Delete" onclick="alDeleteRule(\'' + esc(r.id) + '\')">✕</button>'
+        + '  </div></div>';
     }
-    html+='</tbody></table>';
   }
-  html+='</div></div>';
-  html+='<div class="jr-card" style="min-width:0"><h4>Fired alerts</h4>';
-  if(!feed.length){ html+='<p class="jr-note">Nothing fired yet. When a rule matches a scan, it lands here'+(rules.length?' (and respects its quiet window)':'')+'.</p>'; }
-  else{
-    html+='<table class="jr-table"><thead><tr><th style="width:96px">When</th><th>Alert</th></tr></thead><tbody>';
-    for(const a of feed.slice(0,50)){
-      const t=a.ts? new Date(a.ts).toLocaleString([], {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
-      html+='<tr><td title="'+jrEsc(a.ts||'')+'">'+jrEsc(t)+'</td><td style="white-space:normal">'+jrEsc(a.message||'')+'</td></tr>';
+
+  h += '<div class="al-sec">Recently fired</div>';
+  if (!feed.length) {
+    h += '<p class="al-empty">Nothing has fired yet.</p>';
+  } else {
+    for (const a of feed.slice(0, 40)) {
+      const t = a.ts ? new Date(a.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+      h += '<div class="al-fire"><span class="al-fire-when">' + esc(t) + '</span>'
+        + '<span class="al-fire-msg">' + esc(a.message || '') + '</span></div>';
     }
-    html+='</tbody></table>';
   }
-  html+='</div></div>';
-  pane.innerHTML=html;
-  alTypeChanged();
+  pane.innerHTML = h;
 }
-function alTypeChanged(){
-  const t=(document.getElementById('alType')||{}).value;
-  const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
-  show('alDir', t==='signal'); show('alZone', t==='zone'); show('alProx', t==='zone');
+/** Open the dialog on an existing rule, so editing and creating are one surface. */
+function alEditRule(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  openAlertDialog(Object.assign({}, r));
 }
-async function alSaveRule(){
-  const v=id=>{ const el=document.getElementById(id); return el?el.value:''; };
-  const body={ symbol:v('alSym').trim().toUpperCase(), type:v('alType'), direction:v('alDir'), zone:v('alZone'), proximityPct:parseFloat(v('alProx')), cooldownMin:parseInt(v('alCool'),10) };
-  const msg=document.getElementById('alFormMsg');
-  try{
-    const r=await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    const j=await r.json();
-    if(!r.ok){ if(msg) msg.textContent='Could not add: '+(j.error||r.status).toString().replace(/_/g,' '); return; }
-    loadAlerts(true);
-  }catch(e){ if(msg) msg.textContent='Could not add: '+e.message; }
-}
-async function alToggleRule(id){
-  const r=alRules.find(x=>x.id===id); if(!r) return;
-  r.enabled=r.enabled===false;
-  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+async function alToggleEmail(on) {
+  try { await fetch('/api/trading/alerts/prefs', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: !!on }) }); } catch (_e) {}
   loadAlerts(true);
 }
-// Mute ONE rule's email without touching the account-level opt-in, which is what
-// the delivery email has always told people they could do (#3329 onto #3249).
-async function alToggleRuleEmail(id){
-  const r=alRules.find(x=>x.id===id); if(!r) return;
-  r.email = r.email===false;
-  try{ await fetch('/api/trading/alerts/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(r)}); }catch(_e){}
+async function alToggleRule(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  r.enabled = r.enabled === false;
+  try { await fetch('/api/trading/alerts/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) }); } catch (_e) {}
   loadAlerts(true);
 }
-async function alDeleteRule(id){
-  try{ await fetch('/api/trading/alerts/rules/'+encodeURIComponent(id),{method:'DELETE'}); }catch(_e){}
+async function alToggleRuleEmail(id) {
+  const r = alRules.find(x => x.id === id); if (!r) return;
+  r.email = r.email === false;
+  try { await fetch('/api/trading/alerts/rules', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(r) }); } catch (_e) {}
+  loadAlerts(true);
+}
+async function alDeleteRule(id) {
+  try { await fetch('/api/trading/alerts/rules/' + encodeURIComponent(id), { method: 'DELETE' }); } catch (_e) {}
   loadAlerts(true);
 }
 // Degraded-account-state handling (2026-08-11): keep the last good figures on
