@@ -47,6 +47,47 @@ function matchRule(rule, sig) {
     };
   }
 
+  if (rule.type === 'price') {
+    // Every operator is judged on the CURRENT price and, where the condition is about a
+    // change, the price this rule last saw. A rule with no previous observation cannot
+    // have crossed anything yet, so those operators wait one scan rather than firing on
+    // the first tick they see.
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const prev = Number.isFinite(rule.lastPrice) ? rule.lastPrice : null;
+    const v = rule.value, v2 = rule.value2;
+    const lo = Math.min(v, v2 == null ? v : v2), hi = Math.max(v, v2 == null ? v : v2);
+    const inBand = (x) => x >= lo && x <= hi;
+    const pct = prev ? ((price - prev) / prev) * 100 : 0;
+    let hit = false, how = '';
+    switch (rule.op) {
+      case 'crossing':
+        hit = prev != null && ((prev < v && price >= v) || (prev > v && price <= v));
+        how = 'crossed ' + v; break;
+      case 'crossing_up':
+        hit = prev != null && prev < v && price >= v; how = 'crossed up through ' + v; break;
+      case 'crossing_down':
+        hit = prev != null && prev > v && price <= v; how = 'crossed down through ' + v; break;
+      case 'greater': hit = price > v; how = 'is above ' + v; break;
+      case 'less':    hit = price < v; how = 'is below ' + v; break;
+      case 'entering_channel':
+        hit = prev != null && !inBand(prev) && inBand(price); how = 'entered ' + lo + '-' + hi; break;
+      case 'exiting_channel':
+        hit = prev != null && inBand(prev) && !inBand(price); how = 'left ' + lo + '-' + hi; break;
+      case 'inside_channel':  hit = inBand(price);  how = 'is inside ' + lo + '-' + hi; break;
+      case 'outside_channel': hit = !inBand(price); how = 'is outside ' + lo + '-' + hi; break;
+      case 'moving_up':   hit = prev != null && (price - prev) >= v; how = 'moved up ' + v; break;
+      case 'moving_down': hit = prev != null && (prev - price) >= v; how = 'moved down ' + v; break;
+      case 'moving_up_pct':   hit = prev != null && pct >= v;  how = 'moved up ' + v + '%'; break;
+      case 'moving_down_pct': hit = prev != null && -pct >= v; how = 'moved down ' + v + '%'; break;
+      default: return null;
+    }
+    if (!hit) return null;
+    return {
+      message: `${rule.symbol}: $${price.toFixed(2)} ${how}`,
+      evidence: { op: rule.op, price, prev, value: v, value2: v2 ?? null },
+    };
+  }
+
   if (rule.type === 'washout') {
     const verdict = sig.convergence && String(sig.convergence.decision || '').toUpperCase();
     if (verdict !== 'ENTER') return null;
@@ -77,8 +118,17 @@ function evaluateScan(scan, nowMs = Date.now()) {
     const bySym = new Map();
     for (const s of signals) bySym.set(String(s.symbol || '').toUpperCase(), s);
     for (const uid of store.listUsersWithRules()) {
+      const seenPrices = {};                       // batched: one write per user, not per rule
       for (const rule of store.listRules(uid)) {
         try {
+          // Record what a price rule saw even when it is cooling down or disabled --
+          // otherwise the "previous price" would jump across the quiet window and the
+          // next comparison would be against a stale observation.
+          if (rule.type === 'price') {
+            const sig0 = bySym.get(rule.symbol);
+            const px = sig0 && Number(sig0.entry_price);
+            if (Number.isFinite(px) && px > 0) seenPrices[rule.id] = px;
+          }
           if (rule.enabled === false || _coolingDown(rule, nowMs)) continue;
           const hit = matchRule(rule, bySym.get(rule.symbol));
           if (!hit) continue;
@@ -94,6 +144,7 @@ function evaluateScan(scan, nowMs = Date.now()) {
           fired += 1;
         } catch (_e) { /* one bad rule must not stop the rest */ }
       }
+      try { store.recordPrices(uid, seenPrices); } catch (_e) { /* never break the scan */ }
     }
   } catch (_e) { /* alerting must never break the scan loop */ }
   return fired;

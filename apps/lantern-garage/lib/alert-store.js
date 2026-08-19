@@ -24,7 +24,26 @@ const ROOT = process.env.ALERTS_DIR
 const MAX_RULES_PER_USER = 20;   // bounds per-scan evaluation cost
 const MAX_FEED_READ = 200;
 
-const RULE_TYPES = new Set(['signal', 'zone', 'washout']);
+const RULE_TYPES = new Set(['signal', 'zone', 'washout', 'price']);
+
+// Price-rule operators (#3352). Two families: LEVEL ops compare against one value,
+// CHANNEL ops against a band, and MOVE ops against a change since the last scan.
+// `needs` says how many values the operator reads, so validation is data-driven.
+const PRICE_OPS = {
+  crossing:       { needs: 1, label: 'crossing' },
+  crossing_up:    { needs: 1, label: 'crossing up' },
+  crossing_down:  { needs: 1, label: 'crossing down' },
+  greater:        { needs: 1, label: 'greater than' },
+  less:           { needs: 1, label: 'less than' },
+  entering_channel: { needs: 2, label: 'entering the channel' },
+  exiting_channel:  { needs: 2, label: 'exiting the channel' },
+  inside_channel:   { needs: 2, label: 'inside the channel' },
+  outside_channel:  { needs: 2, label: 'outside the channel' },
+  moving_up:      { needs: 1, label: 'moving up by' },
+  moving_down:    { needs: 1, label: 'moving down by' },
+  moving_up_pct:  { needs: 1, label: 'moving up %' },
+  moving_down_pct:{ needs: 1, label: 'moving down %' },
+};
 
 /** Filesystem-safe user id — reject anything that could escape the directory. */
 function safeUid(userId) {
@@ -76,6 +95,10 @@ function normalizeRule(input) {
     cooldownMin: Math.min(1440, Math.max(5, Number(r.cooldownMin) || 60)),
     createdAt: r.createdAt || new Date().toISOString(),
     lastFiredAt: r.lastFiredAt || null,
+    // Server-owned, like lastFiredAt: the previous price this rule saw. Crossing and
+    // moving operators are defined by a CHANGE, so they need the last observation and a
+    // client must not be able to fake it.
+    lastPrice: Number.isFinite(Number(r.lastPrice)) ? Number(r.lastPrice) : null,
   };
   if (type === 'signal') {
     const dir = String(r.direction || 'any').toUpperCase();
@@ -88,6 +111,25 @@ function normalizeRule(input) {
     out.zone = side;
     const p = Number(r.proximityPct);
     out.proximityPct = Number.isFinite(p) ? Math.min(5, Math.max(0.1, p)) : 0.5;
+  }
+  if (type === 'price') {
+    const op = String(r.op || '').trim();
+    if (!PRICE_OPS[op]) return { ok: false, error: 'invalid_op', supported: Object.keys(PRICE_OPS) };
+    out.op = op;
+    const v = Number(r.value);
+    if (!Number.isFinite(v)) return { ok: false, error: 'invalid_value' };
+    out.value = v;
+    if (PRICE_OPS[op].needs === 2) {
+      const v2 = Number(r.value2);
+      if (!Number.isFinite(v2)) return { ok: false, error: 'invalid_value2' };
+      // Store the band already ordered so evaluation never has to care which way round
+      // the user typed it.
+      out.value = Math.min(v, v2); out.value2 = Math.max(v, v2);
+      if (out.value === out.value2) return { ok: false, error: 'empty_channel' };
+    }
+    if ((op === 'moving_up_pct' || op === 'moving_down_pct') && (v <= 0 || v > 100))
+      return { ok: false, error: 'invalid_percent' };
+    if ((op === 'moving_up' || op === 'moving_down') && v <= 0) return { ok: false, error: 'invalid_move' };
   }
   return { ok: true, rule: out };
 }
@@ -103,6 +145,7 @@ function saveRule(userId, input) {
   if (i >= 0) {
     norm.rule.createdAt = rules[i].createdAt;
     norm.rule.lastFiredAt = rules[i].lastFiredAt || null;   // server-owned; a client edit can't reset the cooldown
+    norm.rule.lastPrice = rules[i].lastPrice ?? null;      // likewise: re-saving must not fake a crossing
     rules[i] = norm.rule;
   } else {
     if (rules.length >= MAX_RULES_PER_USER) return { ok: false, error: 'rule_cap', cap: MAX_RULES_PER_USER };
@@ -184,6 +227,20 @@ function tryConsumeEmailBudget(userId, cap, nowMs = Date.now()) {
   return true;
 }
 
+/** Remember the price a price-rule just saw. Batched by the caller: one write per user
+ *  per scan, not one per rule, so this cannot become the scan loop's bottleneck. */
+function recordPrices(userId, priceByRuleId) {
+  const uid = safeUid(userId);
+  if (!uid || !priceByRuleId || !Object.keys(priceByRuleId).length) return;
+  const rules = listRules(uid);
+  let touched = false;
+  for (const r of rules) {
+    const px = priceByRuleId[r.id];
+    if (Number.isFinite(px) && r.lastPrice !== px) { r.lastPrice = px; touched = true; }
+  }
+  if (touched) _writeRules(uid, rules);
+}
+
 /** Every user who has at least one rule on disk (drives per-scan evaluation). */
 function listUsersWithRules() {
   try {
@@ -195,6 +252,6 @@ function listUsersWithRules() {
 
 module.exports = {
   listRules, saveRule, deleteRule, recordFire, readFeed, listUsersWithRules,
-  normalizeRule, safeUid, MAX_RULES_PER_USER, RULE_TYPES,
+  normalizeRule, safeUid, MAX_RULES_PER_USER, RULE_TYPES, PRICE_OPS, recordPrices,
   getPrefs, setPrefs, tryConsumeEmailBudget,
 };
